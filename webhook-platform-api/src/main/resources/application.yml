@@ -43,6 +43,10 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoint:
     health:
       show-details: always

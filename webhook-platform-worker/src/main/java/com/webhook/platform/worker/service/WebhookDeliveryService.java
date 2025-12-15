@@ -118,6 +118,22 @@ public class WebhookDeliveryService {
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
         long startTime = System.currentTimeMillis();
         
+        if (!rateLimiterService.tryAcquire(endpoint.getId(), endpoint.getRateLimitPerSecond())) {
+            log.warn("Rate limited for endpoint {}, rescheduling delivery {}", endpoint.getId(), delivery.getId());
+            delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+            delivery.setNextRetryAt(Instant.now().plusSeconds(1));
+            deliveryRepository.save(delivery);
+            return;
+        }
+        
+        if (!concurrencyControlService.tryAcquire(endpoint.getId())) {
+            log.warn("Max concurrency reached for endpoint {}, rescheduling delivery {}", endpoint.getId(), delivery.getId());
+            delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+            delivery.setNextRetryAt(Instant.now().plusSeconds(1));
+            deliveryRepository.save(delivery);
+            return;
+        }
+        
         try {
             UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
         } catch (UrlValidator.InvalidUrlException e) {
@@ -125,6 +141,7 @@ public class WebhookDeliveryService {
             saveAttempt(delivery, null, null, "SSRF_PROTECTION: " + e.getMessage(), 
                     (int) (System.currentTimeMillis() - startTime));
             markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
+            concurrencyControlService.release(endpoint.getId());
             return;
         }
         
@@ -164,11 +181,13 @@ public class WebhookDeliveryService {
         } catch (Exception e) {
             log.error("Unexpected error during delivery {}: {}", delivery.getId(), e.getMessage(), e);
             handleError(delivery, e, (int) (System.currentTimeMillis() - startTime));
+        } finally {
+            concurrencyControlService.release(endpoint.getId());
         }
     }
 
     private void handleResponse(Delivery delivery, int statusCode, String responseBody, int durationMs) {
-        saveAttempt(delivery, statusCode, responseBody, null, durationMs);
+        saveAttempt(delivery, statusCode, responseBody, null, durationMs, null);
 
         if (statusCode >= 200 && statusCode < 300) {
             markAsSuccess(delivery);

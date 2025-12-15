@@ -46,10 +46,10 @@ public class Endpoint {
     private Instant secretRotatedAt;
 
     @Column(name = "secret_rotation_grace_period_hours")
-    private Integer secretRotationGracePeriodHours = 24;
+    private Integer secretRotationGracePeriodHours;
 
-    @Column(nullable = false)
-    private Boolean enabled = true;
+    @Column(name = "enabled", nullable = false)
+    private Boolean enabled;
 
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
