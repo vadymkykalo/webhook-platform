@@ -58,6 +58,9 @@ outbox:
   publisher:
     poll-interval-ms: 1000
 
+webhook:
+  encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
+
 logging:
   level:
     root: INFO

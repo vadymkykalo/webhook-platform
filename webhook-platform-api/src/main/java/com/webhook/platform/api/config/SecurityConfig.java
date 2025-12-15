@@ -27,6 +27,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/v1/events").authenticated()
+                        .requestMatchers("/api/v1/projects/**").permitAll()
+                        .requestMatchers("/api/v1/deliveries/**").permitAll()
                         .anyRequest().permitAll()
                 )
                 .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
