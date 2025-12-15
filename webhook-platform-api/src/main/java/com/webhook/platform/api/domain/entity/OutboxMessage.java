@@ -1,0 +1,61 @@
+package com.webhook.platform.api.domain.entity;
+
+import com.webhook.platform.api.domain.enums.OutboxStatus;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "outbox_messages")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OutboxMessage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "aggregate_type", nullable = false)
+    private String aggregateType;
+
+    @Column(name = "aggregate_id", nullable = false)
+    private UUID aggregateId;
+
+    @Column(name = "event_type", nullable = false)
+    private String eventType;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private String payload;
+
+    @Column(name = "kafka_topic", nullable = false)
+    private String kafkaTopic;
+
+    @Column(name = "kafka_key", nullable = false)
+    private String kafkaKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "outbox_status")
+    private OutboxStatus status = OutboxStatus.PENDING;
+
+    @Column(name = "retry_count", nullable = false)
+    private Integer retryCount = 0;
+
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+}
