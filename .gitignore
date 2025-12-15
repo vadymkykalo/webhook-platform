@@ -1,22 +1,60 @@
-### AL ###
-#Template for AL projects for Dynamics 365 Business Central
-#launch.json folder
+# === Java / Maven ===
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.log
+
+# Maven wrapper (keep scripts, ignore binary jar if you want)
+!.mvn/wrapper/maven-wrapper.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# === IntelliJ IDEA ===
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# === VS Code / Windsurf ===
 .vscode/
-#Cache folder
-.alcache/
-#Symbols folder
-.alpackages/
-#Snapshots folder
-.snapshots/
-#Testing Output folder
-.output/
-#Extension App-file
-*.app
-#Rapid Application Development File
-rad.json
-#Translation Base-file
-*.g.xlf
-#License-file
-*.flf
-#Test results file
-TestResults.xml
+.windsurf/
+*.code-workspace
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === Env / secrets ===
+.env
+.env.*
+!.env.example
+
+# === Docker ===
+**/docker-data/
+**/data/
+**/logs/
+**/*.pid
+
+# === Testcontainers ===
+.testcontainers.properties
+
+# === Gradle (just in case) ===
+.gradle/
+build/
+
+# === Node (if UI appears later) ===
+node_modules/
+dist/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Local override configs ===
+application-local.yml
+application-dev.yml
+application-prod.yml
