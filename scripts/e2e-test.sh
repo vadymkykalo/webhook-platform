@@ -115,7 +115,7 @@ VALUES (
   gen_random_uuid(),
   '${PROJECT_ID}',
   'E2E Test Key',
-  'qnR5htNz1D8pTNh8i8V3dJQzXhBL4l0RciOiCNFNLWo=',
+  'Ra+JtRCjJ5qBf4Ud5dP5W3NIXVjsJnKjnlLYrusBQFk=',
   'test_key',
   CURRENT_TIMESTAMP
 )
@@ -187,11 +187,11 @@ echo "=========================================="
 echo "3. Testing Outbox Publisher"
 echo "=========================================="
 
-info "Waiting for outbox publisher to process messages (2s)..."
-sleep 2
+info "Waiting for outbox publisher to process messages (5s)..."
+sleep 5
 
 OUTBOX_COUNT=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -t -c \
-  "SELECT COUNT(*) FROM outbox_messages WHERE status = 'published';" | tr -d ' ')
+  "SELECT COUNT(*) FROM outbox_messages WHERE status = 'PUBLISHED';" | tr -d ' ')
 
 if [ "$OUTBOX_COUNT" -gt "0" ]; then
   success "Outbox messages published: $OUTBOX_COUNT"

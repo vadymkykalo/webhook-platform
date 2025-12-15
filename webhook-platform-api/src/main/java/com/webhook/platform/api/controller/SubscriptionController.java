@@ -22,34 +22,34 @@ public class SubscriptionController {
 
     @PostMapping
     public ResponseEntity<SubscriptionResponse> createSubscription(
-            @PathVariable UUID projectId,
+            @PathVariable("projectId") UUID projectId,
             @RequestBody SubscriptionRequest request) {
         SubscriptionResponse response = subscriptionService.createSubscription(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SubscriptionResponse> getSubscription(@PathVariable UUID id) {
+    public ResponseEntity<SubscriptionResponse> getSubscription(@PathVariable("id") UUID id) {
         SubscriptionResponse response = subscriptionService.getSubscription(id);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<SubscriptionResponse>> listSubscriptions(@PathVariable UUID projectId) {
+    public ResponseEntity<List<SubscriptionResponse>> listSubscriptions(@PathVariable("projectId") UUID projectId) {
         List<SubscriptionResponse> response = subscriptionService.listSubscriptions(projectId);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> updateSubscription(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @RequestBody SubscriptionRequest request) {
         SubscriptionResponse response = subscriptionService.updateSubscription(id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteSubscription(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteSubscription(@PathVariable("id") UUID id) {
         subscriptionService.deleteSubscription(id);
         return ResponseEntity.noContent().build();
     }

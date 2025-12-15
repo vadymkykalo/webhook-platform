@@ -27,7 +27,7 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProjectResponse> getProject(@PathVariable UUID id) {
+    public ResponseEntity<ProjectResponse> getProject(@PathVariable("id") UUID id) {
         ProjectResponse response = projectService.getProject(id);
         return ResponseEntity.ok(response);
     }
@@ -40,14 +40,14 @@ public class ProjectController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ProjectResponse> updateProject(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @RequestBody ProjectRequest request) {
         ProjectResponse response = projectService.updateProject(id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteProject(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteProject(@PathVariable("id") UUID id) {
         projectService.deleteProject(id);
         return ResponseEntity.noContent().build();
     }

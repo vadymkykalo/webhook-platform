@@ -14,14 +14,12 @@ CREATE INDEX idx_subscriptions_event_type ON subscriptions(event_type);
 CREATE INDEX idx_subscriptions_enabled ON subscriptions(enabled) WHERE enabled = true;
 CREATE UNIQUE INDEX idx_subscriptions_unique ON subscriptions(endpoint_id, event_type);
 
-CREATE TYPE delivery_status AS ENUM ('pending', 'processing', 'success', 'failed', 'dlq');
-
 CREATE TABLE deliveries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     endpoint_id UUID NOT NULL REFERENCES endpoints(id) ON DELETE CASCADE,
     subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
-    status delivery_status NOT NULL DEFAULT 'pending',
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     attempt_count INTEGER NOT NULL DEFAULT 0,
     max_attempts INTEGER NOT NULL DEFAULT 7,
     next_retry_at TIMESTAMP,

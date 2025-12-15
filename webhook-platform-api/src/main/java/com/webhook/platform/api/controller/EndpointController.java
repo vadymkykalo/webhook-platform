@@ -22,34 +22,34 @@ public class EndpointController {
 
     @PostMapping
     public ResponseEntity<EndpointResponse> createEndpoint(
-            @PathVariable UUID projectId,
+            @PathVariable("projectId") UUID projectId,
             @RequestBody EndpointRequest request) {
         EndpointResponse response = endpointService.createEndpoint(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EndpointResponse> getEndpoint(@PathVariable UUID id) {
+    public ResponseEntity<EndpointResponse> getEndpoint(@PathVariable("id") UUID id) {
         EndpointResponse response = endpointService.getEndpoint(id);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<EndpointResponse>> listEndpoints(@PathVariable UUID projectId) {
+    public ResponseEntity<List<EndpointResponse>> listEndpoints(@PathVariable("projectId") UUID projectId) {
         List<EndpointResponse> response = endpointService.listEndpoints(projectId);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @RequestBody EndpointRequest request) {
         EndpointResponse response = endpointService.updateEndpoint(id, request);
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEndpoint(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteEndpoint(@PathVariable("id") UUID id) {
         endpointService.deleteEndpoint(id);
         return ResponseEntity.noContent().build();
     }

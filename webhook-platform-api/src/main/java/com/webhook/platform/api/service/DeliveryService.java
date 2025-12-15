@@ -45,18 +45,13 @@ public class DeliveryService {
     }
 
     public Page<DeliveryResponse> listDeliveries(UUID eventId, Pageable pageable) {
-        List<Delivery> deliveries = deliveryRepository.findAll().stream()
-                .filter(d -> eventId == null || d.getEventId().equals(eventId))
-                .collect(Collectors.toList());
-        
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), deliveries.size());
-        
-        List<DeliveryResponse> responseList = deliveries.subList(start, end).stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-        
-        return new PageImpl<>(responseList, pageable, deliveries.size());
+        Page<Delivery> deliveries;
+        if (eventId != null) {
+            deliveries = deliveryRepository.findByEventId(eventId, pageable);
+        } else {
+            deliveries = deliveryRepository.findAll(pageable);
+        }
+        return deliveries.map(this::mapToResponse);
     }
 
     @Transactional
