@@ -32,7 +32,7 @@ public class Delivery {
     private UUID subscriptionId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "delivery_status")
+    @Column(nullable = false)
     private DeliveryStatus status = DeliveryStatus.PENDING;
 
     @Column(name = "attempt_count", nullable = false)

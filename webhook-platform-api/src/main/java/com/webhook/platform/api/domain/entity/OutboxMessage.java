@@ -43,7 +43,7 @@ public class OutboxMessage {
     private String kafkaKey;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "outbox_status")
+    @Column(nullable = false)
     private OutboxStatus status = OutboxStatus.PENDING;
 
     @Column(name = "retry_count", nullable = false)

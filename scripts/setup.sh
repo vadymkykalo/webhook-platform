@@ -15,8 +15,8 @@ echo ""
 
 # Start services
 echo "Starting services..."
-docker compose down -v
-docker compose up -d
+docker-compose down -v
+docker-compose up -d
 echo "✓ Services started"
 echo ""
 

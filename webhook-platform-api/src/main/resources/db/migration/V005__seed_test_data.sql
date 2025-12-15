@@ -34,7 +34,7 @@ VALUES (
 -- Test subscription (subscribe to 'user.created' events)
 INSERT INTO subscriptions (id, project_id, endpoint_id, event_type, enabled, created_at, updated_at)
 VALUES (
-    's1t2u3v4-5678-90wx-yz12-3456789abcde',
+    'a1b2c3d4-5678-90ab-cdef-123456789abc',
     'd7f8e9a0-1234-5678-9abc-def012345678',
     'e1f2a3b4-5678-90cd-ef12-3456789abcde',
     'user.created',
@@ -46,7 +46,7 @@ VALUES (
 -- Another subscription for 'order.completed' events
 INSERT INTO subscriptions (id, project_id, endpoint_id, event_type, enabled, created_at, updated_at)
 VALUES (
-    's2t3u4v5-6789-01wx-yz23-4567890abcde',
+    'b2c3d4e5-6789-01ab-cdef-234567890abc',
     'd7f8e9a0-1234-5678-9abc-def012345678',
     'e1f2a3b4-5678-90cd-ef12-3456789abcde',
     'order.completed',
