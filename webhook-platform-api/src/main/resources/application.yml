@@ -66,12 +66,15 @@ outbox:
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
   url-validation:
-    allow-private-ips: false
+    allow-private-ips: true
     allowed-hosts: [test-receiver]
 
 logging:
   level:
     root: INFO
     com.webhook.platform: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: TRACE
+    org.springframework.orm.jpa: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

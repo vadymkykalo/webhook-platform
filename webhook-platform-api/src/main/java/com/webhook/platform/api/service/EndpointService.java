@@ -46,13 +46,12 @@ public class EndpointService {
                 .description(request.getDescription())
                 .secretEncrypted(encrypted.getCiphertext())
                 .secretIv(encrypted.getIv())
-                .secretPreviousEncrypted(null)
-                .secretPreviousIv(null)
-                .secretRotatedAt(null)
-                .secretRotationGracePeriodHours(24)
-                .enabled(request.getEnabled() != null ? request.getEnabled() : true)
                 .rateLimitPerSecond(request.getRateLimitPerSecond())
                 .build();
+        
+        if (request.getEnabled() != null) {
+            endpoint.setEnabled(request.getEnabled());
+        }
         
         endpoint = endpointRepository.save(endpoint);
         return mapToResponse(endpoint);
