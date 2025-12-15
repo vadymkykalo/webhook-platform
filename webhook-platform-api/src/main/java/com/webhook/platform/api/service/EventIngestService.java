@@ -9,6 +9,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,18 +27,21 @@ public class EventIngestService {
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
     public EventIngestService(
             EventRepository eventRepository,
             SubscriptionRepository subscriptionRepository,
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional

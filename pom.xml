@@ -16,6 +16,7 @@
         <module>webhook-platform-common</module>
         <module>webhook-platform-api</module>
         <module>webhook-platform-worker</module>
+        <module>webhook-platform-test-receiver</module>
     </modules>
 
     <properties>

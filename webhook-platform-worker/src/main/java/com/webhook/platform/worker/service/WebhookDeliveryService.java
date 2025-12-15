@@ -6,6 +6,9 @@ import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.*;
 import com.webhook.platform.worker.domain.repository.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -33,6 +36,10 @@ public class WebhookDeliveryService {
     private final String encryptionKey;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
+    private final RateLimiterService rateLimiterService;
+    private final ConcurrencyControlService concurrencyControlService;
+    private final MeterRegistry meterRegistry;
+    private final ObjectMapper objectMapper;
 
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
@@ -42,7 +49,11 @@ public class WebhookDeliveryService {
             WebClient.Builder webClientBuilder,
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
+            RateLimiterService rateLimiterService,
+            ConcurrencyControlService concurrencyControlService,
+            MeterRegistry meterRegistry,
+            ObjectMapper objectMapper) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -53,6 +64,10 @@ public class WebhookDeliveryService {
         this.encryptionKey = encryptionKey;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+        this.rateLimiterService = rateLimiterService;
+        this.concurrencyControlService = concurrencyControlService;
+        this.meterRegistry = meterRegistry;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -212,6 +227,11 @@ public class WebhookDeliveryService {
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 
                             String errorMessage, int durationMs) {
+        saveAttempt(delivery, statusCode, responseBody, errorMessage, durationMs, null);
+    }
+    
+    private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 
+                            String errorMessage, int durationMs, String responseHeaders) {
         DeliveryAttempt attempt = DeliveryAttempt.builder()
                 .deliveryId(delivery.getId())
                 .attemptNumber(delivery.getAttemptCount())
@@ -221,6 +241,7 @@ public class WebhookDeliveryService {
                         : responseBody)
                 .errorMessage(errorMessage)
                 .durationMs(durationMs)
+                .responseHeaders(responseHeaders)
                 .build();
         deliveryAttemptRepository.save(attempt);
     }

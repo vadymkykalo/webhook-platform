@@ -36,6 +36,18 @@ public class Endpoint {
     @Column(name = "secret_iv", nullable = false, columnDefinition = "TEXT")
     private String secretIv;
 
+    @Column(name = "secret_previous_encrypted", columnDefinition = "TEXT")
+    private String secretPreviousEncrypted;
+
+    @Column(name = "secret_previous_iv", columnDefinition = "TEXT")
+    private String secretPreviousIv;
+
+    @Column(name = "secret_rotated_at")
+    private Instant secretRotatedAt;
+
+    @Column(name = "secret_rotation_grace_period_hours")
+    private Integer secretRotationGracePeriodHours = 24;
+
     @Column(nullable = false)
     private Boolean enabled = true;
 

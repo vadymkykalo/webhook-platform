@@ -38,6 +38,9 @@ public class DeliveryAttempt {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
+    @Column(name = "response_headers", columnDefinition = "jsonb")
+    private String responseHeaders;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

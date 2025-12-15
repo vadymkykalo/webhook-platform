@@ -56,7 +56,7 @@ webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
   url-validation:
     allow-private-ips: false
-    allowed-hosts: []
+    allowed-hosts: [test-receiver]
 
 retry:
   scheduler:

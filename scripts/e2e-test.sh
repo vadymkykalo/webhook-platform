@@ -79,7 +79,7 @@ info "Creating endpoint..."
 ENDPOINT_RESPONSE=$(curl -s -X POST "${API_URL}/api/v1/projects/${PROJECT_ID}/endpoints" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://webhook.site/e2e-test",
+    "url": "http://test-receiver:8082/webhook",
     "description": "E2E test endpoint",
     "secret": "e2e_test_secret_123",
     "enabled": true
@@ -225,6 +225,31 @@ if [ "$ATTEMPTS_COUNT" -gt "0" ]; then
   success "Delivery attempts recorded: $ATTEMPTS_COUNT"
 else
   info "No delivery attempts yet (webhook might be processing)"
+fi
+
+# Verify test-receiver got the webhook
+info "Verifying test-receiver received webhook..."
+sleep 2
+RECEIVER_REQUESTS=$(curl -s http://localhost:8082/requests)
+REQUEST_COUNT=$(echo $RECEIVER_REQUESTS | jq '. | length')
+
+if [ "$REQUEST_COUNT" -gt "0" ]; then
+  success "Test receiver got $REQUEST_COUNT request(s)"
+  FIRST_REQUEST=$(echo $RECEIVER_REQUESTS | jq '.[0]')
+  HAS_SIGNATURE=$(echo $FIRST_REQUEST | jq -r '.headers["x-signature"] // empty')
+  HAS_EVENT_ID=$(echo $FIRST_REQUEST | jq -r '.headers["x-event-id"] // empty')
+  
+  if [ -n "$HAS_SIGNATURE" ]; then
+    success "Webhook signature present"
+  else
+    info "No signature header found"
+  fi
+  
+  if [ -n "$HAS_EVENT_ID" ]; then
+    success "Event ID header present: $HAS_EVENT_ID"
+  fi
+else
+  info "No requests received by test-receiver yet"
 fi
 
 echo ""

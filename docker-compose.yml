@@ -129,6 +129,16 @@ services:
     networks:
       - webhook-network
 
+  test-receiver:
+    build:
+      context: ./webhook-platform-test-receiver
+      dockerfile: Dockerfile
+    container_name: webhook-test-receiver
+    ports:
+      - "8082:8082"
+    networks:
+      - webhook-network
+
 volumes:
   postgres_data:
   kafka_data:
