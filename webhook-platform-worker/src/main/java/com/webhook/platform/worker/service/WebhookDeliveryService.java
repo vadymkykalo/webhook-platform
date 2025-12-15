@@ -7,6 +7,7 @@ import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.*;
 import com.webhook.platform.worker.domain.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
@@ -152,6 +153,7 @@ public class WebhookDeliveryService {
         String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
 
         try {
+            Timer.Sample sample = Timer.start(meterRegistry);
             Integer statusCode = webClient.post()
                     .uri(endpoint.getUrl())
                     .contentType(MediaType.APPLICATION_JSON)
@@ -165,6 +167,9 @@ public class WebhookDeliveryService {
                         return response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
                                 .map(responseBody -> {
+                                    sample.stop(Timer.builder("webhook_delivery_latency_ms")
+                                        .tag("status_code", String.valueOf(status))
+                                        .register(meterRegistry));
                                     handleResponse(delivery, status, responseBody, 
                                             (int) (System.currentTimeMillis() - startTime));
                                     return status;
@@ -187,6 +192,12 @@ public class WebhookDeliveryService {
     }
 
     private void handleResponse(Delivery delivery, int statusCode, String responseBody, int durationMs) {
+        String result = (statusCode >= 200 && statusCode < 300) ? "success" : "failure";
+        Counter.builder("webhook_delivery_attempts_total")
+            .tag("result", result)
+            .tag("status_code", String.valueOf(statusCode))
+            .register(meterRegistry).increment();
+        
         saveAttempt(delivery, statusCode, responseBody, null, durationMs, null);
 
         if (statusCode >= 200 && statusCode < 300) {
@@ -199,6 +210,11 @@ public class WebhookDeliveryService {
     }
 
     private void handleError(Delivery delivery, Throwable error, int durationMs) {
+        Counter.builder("webhook_delivery_attempts_total")
+            .tag("result", "error")
+            .tag("status_code", "0")
+            .register(meterRegistry).increment();
+        
         saveAttempt(delivery, null, null, error.getMessage(), durationMs);
         scheduleRetry(delivery);
     }

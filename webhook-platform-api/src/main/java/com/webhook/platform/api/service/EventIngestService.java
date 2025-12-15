@@ -9,6 +9,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,12 +52,14 @@ public class EventIngestService {
             if (existingEvent.isPresent()) {
                 Event event = existingEvent.get();
                 log.info("Duplicate event detected, returning existing event: {}", event.getId());
+                Counter.builder("events_duplicate_total").tag("event_type", request.getType()).register(meterRegistry).increment();
                 return buildResponse(event, 0);
             }
         }
 
         Event event = createEvent(projectId, request, idempotencyKey);
         eventRepository.save(event);
+        Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
         List<Subscription> subscriptions = subscriptionRepository
@@ -73,6 +76,7 @@ public class EventIngestService {
 
             deliveriesCreated++;
         }
+        Counter.builder("deliveries_created_total").tag("project_id", projectId.toString()).register(meterRegistry).increment(deliveriesCreated);
 
         log.info("Created {} deliveries for event: {}", deliveriesCreated, event.getId());
         return buildResponse(event, deliveriesCreated);
