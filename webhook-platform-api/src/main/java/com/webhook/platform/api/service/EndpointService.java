@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
+import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -19,16 +20,24 @@ public class EndpointService {
 
     private final EndpointRepository endpointRepository;
     private final String encryptionKey;
+    private final boolean allowPrivateIps;
+    private final List<String> allowedHosts;
 
     public EndpointService(
             EndpointRepository endpointRepository,
-            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey) {
+            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.endpointRepository = endpointRepository;
         this.encryptionKey = encryptionKey;
+        this.allowPrivateIps = allowPrivateIps;
+        this.allowedHosts = allowedHosts;
     }
 
     @Transactional
     public EndpointResponse createEndpoint(UUID projectId, EndpointRequest request) {
+        UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
+        
         CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(request.getSecret(), encryptionKey);
         
         Endpoint endpoint = Endpoint.builder()
@@ -63,6 +72,8 @@ public class EndpointService {
     public EndpointResponse updateEndpoint(UUID id, EndpointRequest request) {
         Endpoint endpoint = endpointRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        
+        UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         
         endpoint.setUrl(request.getUrl());
         endpoint.setDescription(request.getDescription());

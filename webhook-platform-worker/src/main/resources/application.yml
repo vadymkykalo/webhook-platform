@@ -54,6 +54,9 @@ management:
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
+  url-validation:
+    allow-private-ips: false
+    allowed-hosts: []
 
 retry:
   scheduler:

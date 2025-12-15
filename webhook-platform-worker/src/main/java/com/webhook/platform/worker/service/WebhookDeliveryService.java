@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.*;
@@ -16,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +31,8 @@ public class WebhookDeliveryService {
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final WebClient webClient;
     private final String encryptionKey;
+    private final boolean allowPrivateIps;
+    private final List<String> allowedHosts;
 
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
@@ -36,7 +40,9 @@ public class WebhookDeliveryService {
             EventRepository eventRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
             WebClient.Builder webClientBuilder,
-            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey) {
+            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -45,6 +51,8 @@ public class WebhookDeliveryService {
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
         this.encryptionKey = encryptionKey;
+        this.allowPrivateIps = allowPrivateIps;
+        this.allowedHosts = allowedHosts;
     }
 
     @Transactional
@@ -94,6 +102,17 @@ public class WebhookDeliveryService {
 
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
         long startTime = System.currentTimeMillis();
+        
+        try {
+            UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
+        } catch (UrlValidator.InvalidUrlException e) {
+            log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
+            saveAttempt(delivery, null, null, "SSRF_PROTECTION: " + e.getMessage(), 
+                    (int) (System.currentTimeMillis() - startTime));
+            markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
+            return;
+        }
+        
         String secret = decryptSecret(endpoint);
         String body = event.getPayload();
         long timestamp = System.currentTimeMillis();

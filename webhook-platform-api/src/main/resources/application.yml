@@ -57,9 +57,13 @@ management:
 outbox:
   publisher:
     poll-interval-ms: 1000
+    batch-size: 100
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
+  url-validation:
+    allow-private-ips: false
+    allowed-hosts: []
 
 logging:
   level:
