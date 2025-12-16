@@ -4,12 +4,14 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 public class WebhookSignatureUtils {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final long DEFAULT_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
     public static String generateSignature(String secret, long timestamp, String body) {
         try {
@@ -33,6 +35,10 @@ public class WebhookSignatureUtils {
     }
 
     public static boolean verifySignature(String secret, String signatureHeader, String body) {
+        return verifySignature(secret, signatureHeader, body, DEFAULT_TIMESTAMP_TOLERANCE_SECONDS);
+    }
+
+    public static boolean verifySignature(String secret, String signatureHeader, String body, long toleranceSeconds) {
         try {
             String[] parts = signatureHeader.split(",");
             long timestamp = 0;
@@ -53,10 +59,25 @@ public class WebhookSignatureUtils {
                 return false;
             }
 
+            long currentTime = System.currentTimeMillis();
+            long timeDiff = Math.abs(currentTime - timestamp);
+            if (timeDiff > toleranceSeconds * 1000) {
+                return false;
+            }
+
             String expectedSignature = generateSignature(secret, timestamp, body);
-            return expectedSignature.equals(providedSignature);
+            return constantTimeEquals(expectedSignature, providedSignature);
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        byte[] aBytes = a.getBytes(StandardCharsets.UTF_8);
+        byte[] bBytes = b.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(aBytes, bBytes);
     }
 }
