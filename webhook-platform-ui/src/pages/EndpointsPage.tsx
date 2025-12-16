@@ -38,6 +38,7 @@ export default function EndpointsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
+  const [rateLimitPerSecond, setRateLimitPerSecond] = useState<number | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -78,10 +79,17 @@ export default function EndpointsPage() {
     setCreating(true);
     try {
       const secret = generateSecret();
-      const response = await endpointsApi.create(projectId, { url, description, enabled: true, secret });
+      const response = await endpointsApi.create(projectId, { 
+        url, 
+        description, 
+        enabled: true, 
+        secret,
+        rateLimitPerSecond: rateLimitPerSecond || undefined,
+      });
       setShowCreateDialog(false);
       setUrl('');
       setDescription('');
+      setRateLimitPerSecond(undefined);
       setNewSecret(secret);
       toast.success('Endpoint created successfully');
       loadData();
@@ -305,9 +313,19 @@ export default function EndpointsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Created on {formatDate(endpoint.createdAt)}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center text-muted-foreground">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Created on {formatDate(endpoint.createdAt)}
+                  </div>
+                  {endpoint.rateLimitPerSecond && (
+                    <div className="flex items-center text-muted-foreground">
+                      <span className="font-medium text-foreground mr-2">
+                        Rate Limit:
+                      </span>
+                      {endpoint.rateLimitPerSecond} req/s
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -351,6 +369,22 @@ export default function EndpointsPage() {
                   disabled={creating}
                   rows={2}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rateLimit">Rate Limit (optional)</Label>
+                <Input
+                  id="rateLimit"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  placeholder="Requests per second"
+                  value={rateLimitPerSecond || ''}
+                  onChange={(e) => setRateLimitPerSecond(e.target.value ? parseInt(e.target.value) : undefined)}
+                  disabled={creating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum requests per second (leave empty for no limit)
+                </p>
               </div>
             </div>
             <DialogFooter>
