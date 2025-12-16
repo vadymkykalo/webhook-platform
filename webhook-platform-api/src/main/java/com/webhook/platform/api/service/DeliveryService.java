@@ -6,11 +6,14 @@ import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
+import java.time.Instant;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.specification.DeliverySpecification;
 import com.webhook.platform.api.dto.DeliveryResponse;
+import org.springframework.data.jpa.domain.Specification;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -82,19 +84,43 @@ public class DeliveryService {
         return deliveries.map(this::mapToResponse);
     }
 
-    public Page<DeliveryResponse> listDeliveriesByProject(UUID projectId, UUID organizationId, Pageable pageable) {
+    public Page<DeliveryResponse> listDeliveriesByProject(
+            UUID projectId,
+            UUID organizationId,
+            DeliveryStatus status,
+            UUID endpointId,
+            Instant fromDate,
+            Instant toDate,
+            Pageable pageable
+    ) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+
         if (!project.getOrganizationId().equals(organizationId)) {
             throw new RuntimeException("Access denied");
         }
-        
-        List<Event> events = eventRepository.findByProjectId(projectId);
-        List<UUID> eventIds = events.stream().map(Event::getId).collect(Collectors.toList());
-        
-        Page<Delivery> deliveries = deliveryRepository.findByEventIdIn(eventIds, pageable);
+
+        List<UUID> eventIds = eventRepository.findByProjectId(projectId)
+                .stream()
+                .map(Event::getId)
+                .toList();
+
+        if (eventIds.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        Specification<Delivery> spec = Specification
+                .where(DeliverySpecification.hasEventIds(eventIds))
+                .and(DeliverySpecification.hasStatus(status))
+                .and(DeliverySpecification.hasEndpointId(endpointId))
+                .and(DeliverySpecification.createdAfter(fromDate))
+                .and(DeliverySpecification.createdBefore(toDate));
+
+        Page<Delivery> deliveries = deliveryRepository.findAll(spec, pageable);
+
         return deliveries.map(this::mapToResponse);
     }
+
 
     @Transactional
     public void replayDelivery(UUID deliveryId, UUID organizationId) {

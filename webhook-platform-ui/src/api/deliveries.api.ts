@@ -4,6 +4,10 @@ import type { DeliveryResponse, PageResponse } from '../types/api.types';
 export interface DeliveryFilters {
   page?: number;
   size?: number;
+  status?: string;
+  endpointId?: string;
+  fromDate?: string;
+  toDate?: string;
 }
 
 export const deliveriesApi = {
@@ -12,6 +16,10 @@ export const deliveriesApi = {
     
     if (filters?.page !== undefined) params.append('page', filters.page.toString());
     if (filters?.size !== undefined) params.append('size', filters.size.toString());
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.endpointId) params.append('endpointId', filters.endpointId);
+    if (filters?.fromDate) params.append('fromDate', filters.fromDate);
+    if (filters?.toDate) params.append('toDate', filters.toDate);
     
     const queryString = params.toString();
     return http.get<PageResponse<DeliveryResponse>>(

@@ -66,7 +66,7 @@ export default function DeliveriesPage() {
     if (projectId) {
       loadDeliveries();
     }
-  }, [projectId, statusFilter, endpointFilter, page]);
+  }, [projectId, statusFilter, endpointFilter, dateRange, page]);
 
   const loadInitialData = async () => {
     if (!projectId) return;
@@ -88,21 +88,38 @@ export default function DeliveriesPage() {
     
     try {
       setLoading(true);
+      
+      // Calculate date range for fromDate/toDate
+      let fromDate: string | undefined;
+      let toDate: string | undefined;
+      
+      if (dateRange) {
+        const now = new Date();
+        toDate = now.toISOString();
+        
+        switch (dateRange) {
+          case '24h':
+            fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case '7d':
+            fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case '30d':
+            fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+        }
+      }
+      
       const response = await deliveriesApi.listByProject(projectId, {
         page,
         size: pageSize,
+        status: statusFilter || undefined,
+        endpointId: endpointFilter || undefined,
+        fromDate,
+        toDate,
       });
       
-      let filtered = response.content;
-      
-      if (statusFilter) {
-        filtered = filtered.filter(d => d.status === statusFilter);
-      }
-      if (endpointFilter) {
-        filtered = filtered.filter(d => d.endpointId === endpointFilter);
-      }
-      
-      setDeliveries(filtered);
+      setDeliveries(response.content);
       setTotalElements(response.totalElements);
       setTotalPages(response.totalPages);
     } catch (err: any) {
