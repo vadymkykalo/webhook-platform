@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Menu, X, LogOut, FolderKanban, Webhook, Radio, Send } from 'lucide-react';
+import { Menu, X, LogOut, FolderKanban, Webhook, Radio, Send, Users } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 const navItems = [
   { name: 'Projects', path: '/projects', icon: FolderKanban, disabled: false },
+  { name: 'Members', path: '/members', icon: Users, disabled: false },
   { name: 'Endpoints', path: '/endpoints', icon: Webhook, disabled: true },
   { name: 'Events', path: '/events', icon: Radio, disabled: true },
   { name: 'Deliveries', path: '/deliveries', icon: Send, disabled: true },

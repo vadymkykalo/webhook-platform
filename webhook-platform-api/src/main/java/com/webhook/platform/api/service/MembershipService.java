@@ -3,14 +3,17 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,11 +34,7 @@ public class MembershipService {
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    public List<MemberResponse> getOrganizationMembers(UUID organizationId, UUID requestingUserId, MembershipRole requestingRole) {
-        if (requestingRole != MembershipRole.OWNER) {
-            throw new RuntimeException("Only owners can view members");
-        }
-
+    public List<MemberResponse> getOrganizationMembers(UUID organizationId) {
         List<Membership> memberships = membershipRepository.findByOrganizationId(organizationId);
         
         return memberships.stream()
@@ -46,6 +45,8 @@ public class MembershipService {
                             .userId(user.getId())
                             .email(user.getEmail())
                             .role(membership.getRole())
+                            .status(MembershipStatus.ACTIVE)
+                            .createdAt(membership.getCreatedAt())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -82,24 +83,63 @@ public class MembershipService {
                 .userId(user.getId())
                 .email(user.getEmail())
                 .role(membership.getRole())
+                .status(MembershipStatus.ACTIVE)
+                .createdAt(membership.getCreatedAt())
                 .build();
     }
 
     @Transactional
-    public void removeMember(UUID organizationId, UUID userId, MembershipRole requestingRole) {
+    public MemberResponse changeMemberRole(UUID organizationId, UUID userId, MembershipRole newRole, MembershipRole requestingRole) {
         if (requestingRole != MembershipRole.OWNER) {
-            throw new RuntimeException("Only owners can remove members");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can change member roles");
+        }
+
+        if (newRole == MembershipRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot assign OWNER role through this endpoint");
         }
 
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
-                .orElseThrow(() -> new RuntimeException("Membership not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
         if (membership.getRole() == MembershipRole.OWNER) {
             long ownerCount = membershipRepository.findByOrganizationId(organizationId).stream()
                     .filter(m -> m.getRole() == MembershipRole.OWNER)
                     .count();
             if (ownerCount <= 1) {
-                throw new RuntimeException("Cannot remove the last owner");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot demote the last owner");
+            }
+        }
+
+        membership.setRole(newRole);
+        membershipRepository.save(membership);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return MemberResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .role(membership.getRole())
+                .status(MembershipStatus.ACTIVE)
+                .createdAt(membership.getCreatedAt())
+                .build();
+    }
+
+    @Transactional
+    public void removeMember(UUID organizationId, UUID userId, MembershipRole requestingRole) {
+        if (requestingRole != MembershipRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can remove members");
+        }
+
+        Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+
+        if (membership.getRole() == MembershipRole.OWNER) {
+            long ownerCount = membershipRepository.findByOrganizationId(organizationId).stream()
+                    .filter(m -> m.getRole() == MembershipRole.OWNER)
+                    .count();
+            if (ownerCount <= 1) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot remove the last owner");
             }
         }
 

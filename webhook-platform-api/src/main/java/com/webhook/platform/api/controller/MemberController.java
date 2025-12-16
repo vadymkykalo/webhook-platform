@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.AddMemberRequest;
+import com.webhook.platform.api.dto.ChangeMemberRoleRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.MembershipService;
@@ -32,12 +33,7 @@ public class MemberController {
             throw new RuntimeException("Authentication required");
         }
 
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        List<MemberResponse> response = membershipService.getOrganizationMembers(
-                orgId,
-                jwtAuth.getUserId(),
-                jwtAuth.getRole()
-        );
+        List<MemberResponse> response = membershipService.getOrganizationMembers(orgId);
         return ResponseEntity.ok(response);
     }
 
@@ -57,6 +53,26 @@ public class MemberController {
                 jwtAuth.getRole()
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PatchMapping("/{userId}")
+    public ResponseEntity<MemberResponse> changeMemberRole(
+            @PathVariable("orgId") UUID orgId,
+            @PathVariable("userId") UUID userId,
+            @RequestBody ChangeMemberRoleRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        MemberResponse response = membershipService.changeMemberRole(
+                orgId,
+                userId,
+                request.getRole(),
+                jwtAuth.getRole()
+        );
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{userId}")
