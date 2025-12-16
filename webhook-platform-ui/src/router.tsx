@@ -13,11 +13,21 @@ import MembersPage from './pages/MembersPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import SettingsPage from './pages/SettingsPage';
 import DocumentationPage from './pages/DocumentationPage';
+import LandingPage from './pages/LandingPage';
+import QuickstartPage from './pages/QuickstartPage';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <LandingPage />,
+  },
+  {
+    path: '/quickstart',
+    element: <QuickstartPage />,
+  },
+  {
+    path: '/docs',
+    element: <DocumentationPage />,
   },
   {
     path: '/login',
@@ -70,10 +80,6 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SettingsPage />,
-      },
-      {
-        path: 'docs',
-        element: <DocumentationPage />,
       },
     ],
   },
