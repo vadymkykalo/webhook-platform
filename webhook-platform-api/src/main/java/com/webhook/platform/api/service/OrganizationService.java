@@ -34,6 +34,7 @@ public class OrganizationService {
                     return OrganizationResponse.builder()
                             .id(org.getId())
                             .name(org.getName())
+                            .createdAt(org.getCreatedAt())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -50,6 +51,7 @@ public class OrganizationService {
         return OrganizationResponse.builder()
                 .id(organization.getId())
                 .name(organization.getName())
+                .createdAt(organization.getCreatedAt())
                 .build();
     }
 }
