@@ -33,9 +33,17 @@ export default function MembersPage() {
   const currentUserRole = (user?.role || 'VIEWER') as MembershipRole;
   const isOwner = currentUserRole === 'OWNER';
 
+  console.log('[MembersPage] user:', user);
+  console.log('[MembersPage] orgId:', orgId);
+  console.log('[MembersPage] currentUserRole:', currentUserRole);
+
   useEffect(() => {
+    console.log('[MembersPage] useEffect - orgId:', orgId);
     if (orgId) {
+      console.log('[MembersPage] Calling loadMembers...');
       loadMembers();
+    } else {
+      console.log('[MembersPage] No orgId, skipping loadMembers');
     }
   }, [orgId]);
 
