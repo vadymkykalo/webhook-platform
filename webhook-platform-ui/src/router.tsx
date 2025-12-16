@@ -9,6 +9,7 @@ import DeliveriesPage from './pages/DeliveriesPage';
 import EventsPage from './pages/EventsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import MembersPage from './pages/MembersPage';
+import ApiKeysPage from './pages/ApiKeysPage';
 
 export const router = createBrowserRouter([
   {
@@ -50,6 +51,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/subscriptions',
         element: <SubscriptionsPage />,
+      },
+      {
+        path: 'projects/:projectId/api-keys',
+        element: <ApiKeysPage />,
       },
       {
         path: 'members',
