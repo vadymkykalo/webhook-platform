@@ -114,6 +114,7 @@ public class AuthService {
         OrganizationResponse orgResponse = OrganizationResponse.builder()
                 .id(organization.getId())
                 .name(organization.getName())
+                .createdAt(organization.getCreatedAt())
                 .build();
 
         return CurrentUserResponse.builder()
