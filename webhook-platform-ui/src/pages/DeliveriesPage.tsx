@@ -55,6 +55,7 @@ export default function DeliveriesPage() {
   const [pageSize] = useState(20);
   
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+  const [bulkReplaying, setBulkReplaying] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -175,6 +176,34 @@ export default function DeliveriesPage() {
     return endpoint?.url || endpointId.substring(0, 8);
   };
 
+  const handleBulkReplay = async () => {
+    if (!projectId) return;
+    
+    const hasFilters = statusFilter || endpointFilter;
+    const failedOrDlqSelected = statusFilter === 'FAILED' || statusFilter === 'DLQ';
+    
+    if (!hasFilters && !failedOrDlqSelected) {
+      toast.error('Please select a status filter (FAILED or DLQ) before bulk replay');
+      return;
+    }
+    
+    setBulkReplaying(true);
+    try {
+      const response = await deliveriesApi.bulkReplay({
+        projectId,
+        status: statusFilter || undefined,
+        endpointId: endpointFilter || undefined,
+      });
+      
+      toast.success(response.message);
+      loadDeliveries();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to bulk replay deliveries');
+    } finally {
+      setBulkReplaying(false);
+    }
+  };
+
   const filteredDeliveries = searchQuery
     ? deliveries.filter(d => d.id.toLowerCase().includes(searchQuery.toLowerCase()))
     : deliveries;
@@ -213,7 +242,7 @@ export default function DeliveriesPage() {
 
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
@@ -272,6 +301,19 @@ export default function DeliveriesPage() {
               />
             </div>
           </div>
+          {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleBulkReplay} 
+                disabled={bulkReplaying}
+                variant="outline"
+                className="gap-2"
+              >
+                {bulkReplaying && <RefreshCw className="h-4 w-4 animate-spin" />}
+                {bulkReplaying ? 'Replaying...' : `Replay All ${statusFilter} Deliveries`}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

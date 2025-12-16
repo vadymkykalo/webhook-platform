@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight } from 'lucide-react';
+import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { endpointsApi } from '../api/endpoints.api';
 import { projectsApi } from '../api/projects.api';
@@ -47,6 +47,9 @@ export default function EndpointsPage() {
   const [rotateId, setRotateId] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
+  const [testId, setTestId] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -169,6 +172,34 @@ export default function EndpointsPage() {
     setNewSecret(null);
   };
 
+  const handleTest = async (endpointId: string) => {
+    if (!projectId) return;
+    
+    setTestId(endpointId);
+    setTesting(true);
+    setTestResult(null);
+    
+    try {
+      const result = await endpointsApi.test(projectId, endpointId);
+      setTestResult(result);
+      if (result.success) {
+        toast.success(`Test successful: ${result.httpStatusCode} (${result.latencyMs}ms)`);
+      } else {
+        toast.error(`Test failed: ${result.message}`);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to test endpoint');
+      setTestId(null);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const closeTestDialog = () => {
+    setTestId(null);
+    setTestResult(null);
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -281,6 +312,19 @@ export default function EndpointsPage() {
                     )}
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleTest(endpoint.id)}
+                      title="Test Endpoint"
+                      disabled={testing && testId === endpoint.id}
+                    >
+                      {testing && testId === endpoint.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 text-purple-600" />
+                      )}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -498,6 +542,85 @@ export default function EndpointsPage() {
           </div>
           <DialogFooter>
             <Button onClick={closeSecretDialog}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!testResult} onOpenChange={closeTestDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Endpoint Test Result</DialogTitle>
+            <DialogDescription>
+              Test webhook was sent to the endpoint
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted">
+              <div className="flex items-center gap-3">
+                {testResult?.success ? (
+                  <>
+                    <div className="rounded-full bg-green-100 p-2">
+                      <Power className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-green-700">Test Successful</div>
+                      <div className="text-sm text-muted-foreground">
+                        HTTP {testResult.httpStatusCode} • {testResult.latencyMs}ms
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="rounded-full bg-red-100 p-2">
+                      <PowerOff className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-red-700">Test Failed</div>
+                      <div className="text-sm text-muted-foreground">
+                        {testResult?.latencyMs ? `${testResult.latencyMs}ms` : 'No response'}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {testResult?.httpStatusCode && (
+              <div>
+                <Label>HTTP Status Code</Label>
+                <div className="mt-1 p-3 bg-muted rounded-md font-mono text-sm">
+                  {testResult.httpStatusCode}
+                </div>
+              </div>
+            )}
+
+            {testResult?.responseBody && (
+              <div>
+                <Label>Response Body</Label>
+                <div className="mt-1 p-3 bg-muted rounded-md font-mono text-xs max-h-48 overflow-auto">
+                  {testResult.responseBody}
+                </div>
+              </div>
+            )}
+
+            {testResult?.errorMessage && (
+              <div>
+                <Label>Error Message</Label>
+                <div className="mt-1 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+                  {testResult.errorMessage}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label>Message</Label>
+              <div className="mt-1 p-3 bg-muted rounded-md text-sm">
+                {testResult?.message}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={closeTestDialog}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

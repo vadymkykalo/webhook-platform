@@ -6,22 +6,31 @@ import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
+import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.util.WebhookSignatureUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class EndpointService {
 
     private final EndpointRepository endpointRepository;
     private final ProjectRepository projectRepository;
+    private final WebClient webClient;
     private final String encryptionKey;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
@@ -29,11 +38,15 @@ public class EndpointService {
     public EndpointService(
             EndpointRepository endpointRepository,
             ProjectRepository projectRepository,
+            WebClient.Builder webClientBuilder,
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.endpointRepository = endpointRepository;
         this.projectRepository = projectRepository;
+        this.webClient = webClientBuilder
+                .defaultHeader("User-Agent", "WebhookPlatform/1.0-Test")
+                .build();
         this.encryptionKey = encryptionKey;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
@@ -138,6 +151,92 @@ public class EndpointService {
         endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponseWithSecret(endpoint, newSecret);
+    }
+
+    public EndpointTestResponse testEndpoint(UUID id, UUID organizationId) {
+        Endpoint endpoint = endpointRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
+        
+        if (!endpoint.getEnabled()) {
+            return EndpointTestResponse.builder()
+                    .success(false)
+                    .message("Endpoint is disabled")
+                    .build();
+        }
+        
+        try {
+            UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
+        } catch (UrlValidator.InvalidUrlException e) {
+            return EndpointTestResponse.builder()
+                    .success(false)
+                    .errorMessage("SSRF protection: " + e.getMessage())
+                    .message("Endpoint URL validation failed")
+                    .build();
+        }
+        
+        String secret = CryptoUtils.decryptSecret(
+                endpoint.getSecretEncrypted(),
+                endpoint.getSecretIv(),
+                encryptionKey
+        );
+        
+        String testPayload = "{\"test\":true,\"message\":\"This is a test webhook\",\"timestamp\":\"" 
+                + Instant.now().toString() + "\"}";
+        long timestamp = System.currentTimeMillis();
+        String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, testPayload);
+        
+        long startTime = System.currentTimeMillis();
+        
+        try {
+            EndpointTestResponse response = webClient.post()
+                    .uri(endpoint.getUrl())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Signature", signature)
+                    .header("X-Event-Id", UUID.randomUUID().toString())
+                    .header("X-Delivery-Id", UUID.randomUUID().toString())
+                    .header("X-Timestamp", String.valueOf(timestamp))
+                    .header("X-Test", "true")
+                    .bodyValue(testPayload)
+                    .exchangeToMono(resp -> {
+                        int status = resp.statusCode().value();
+                        return resp.bodyToMono(String.class)
+                                .defaultIfEmpty("")
+                                .map(responseBody -> new com.webhook.platform.api.dto.TestResult(status, responseBody));
+                    })
+                    .timeout(Duration.ofSeconds(10))
+                    .blockOptional()
+                    .map(result -> {
+                        long latency = System.currentTimeMillis() - startTime;
+                        boolean success = result.getStatus() >= 200 && result.getStatus() < 300;
+                        String responseBody = result.getResponseBody();
+                        
+                        return EndpointTestResponse.builder()
+                                .success(success)
+                                .httpStatusCode(result.getStatus())
+                                .responseBody(responseBody.length() > 500 ? responseBody.substring(0, 500) : responseBody)
+                                .latencyMs(latency)
+                                .message(success ? "Endpoint test successful" : "Endpoint returned non-2xx status")
+                                .build();
+                    })
+                    .orElse(EndpointTestResponse.builder()
+                            .success(false)
+                            .errorMessage("No response received")
+                            .latencyMs(System.currentTimeMillis() - startTime)
+                            .message("Endpoint test failed")
+                            .build());
+            
+            return response;
+        } catch (Exception e) {
+            long latency = System.currentTimeMillis() - startTime;
+            log.error("Endpoint test failed for {}: {}", endpoint.getUrl(), e.getMessage());
+            return EndpointTestResponse.builder()
+                    .success(false)
+                    .errorMessage(e.getMessage())
+                    .latencyMs(latency)
+                    .message("Endpoint test failed: " + e.getClass().getSimpleName())
+                    .build();
+        }
     }
 
     private EndpointResponse mapToResponse(Endpoint endpoint) {

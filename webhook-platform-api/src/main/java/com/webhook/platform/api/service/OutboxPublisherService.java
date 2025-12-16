@@ -60,6 +60,55 @@ public class OutboxPublisherService {
         }
     }
 
+    @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void retryFailedMessages() {
+        List<OutboxMessage> failedMessages = outboxMessageRepository
+                .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), 5, batchSize);
+
+        if (failedMessages.isEmpty()) {
+            return;
+        }
+
+        log.info("Retrying {} failed outbox messages", failedMessages.size());
+
+        for (OutboxMessage message : failedMessages) {
+            long backoffSeconds = calculateBackoff(message.getRetryCount());
+            Instant nextRetryTime = message.getCreatedAt().plusSeconds(backoffSeconds);
+            
+            if (Instant.now().isBefore(nextRetryTime)) {
+                log.debug("Skipping message {} - backoff not expired (retry at {})", 
+                        message.getId(), nextRetryTime);
+                continue;
+            }
+            
+            try {
+                publishMessageSynchronously(message);
+                markAsPublished(message);
+                log.info("Successfully retried outbox message: {}", message.getId());
+            } catch (Exception e) {
+                log.error("Failed to retry outbox message {} (attempt {}): {}", 
+                        message.getId(), message.getRetryCount() + 1, e.getMessage());
+                incrementRetryCount(message, e.getMessage());
+            }
+        }
+    }
+
+    private long calculateBackoff(int retryCount) {
+        return (long) Math.min(Math.pow(2, retryCount) * 10, 600);
+    }
+
+    private void incrementRetryCount(OutboxMessage message, String errorMessage) {
+        message.setRetryCount(message.getRetryCount() + 1);
+        message.setErrorMessage(errorMessage);
+        
+        if (message.getRetryCount() >= 5) {
+            log.error("Outbox message {} exceeded max retries, giving up", message.getId());
+        }
+        
+        outboxMessageRepository.save(message);
+    }
+
     private void publishMessageSynchronously(OutboxMessage message) throws Exception {
         DeliveryMessage deliveryMessage = objectMapper.readValue(
                 message.getPayload(),

@@ -1,6 +1,15 @@
 import { http } from './http';
 import type { EndpointRequest, EndpointResponse } from '../types/api.types';
 
+export interface EndpointTestResponse {
+  success: boolean;
+  httpStatusCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  latencyMs: number;
+  message: string;
+}
+
 export const endpointsApi = {
   list: (projectId: string): Promise<EndpointResponse[]> => {
     return http.get<EndpointResponse[]>(`/api/v1/projects/${projectId}/endpoints`);
@@ -24,5 +33,9 @@ export const endpointsApi = {
 
   rotateSecret: (projectId: string, id: string): Promise<EndpointResponse> => {
     return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/rotate-secret`);
+  },
+
+  test: (projectId: string, id: string): Promise<EndpointTestResponse> => {
+    return http.post<EndpointTestResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/test`);
   },
 };

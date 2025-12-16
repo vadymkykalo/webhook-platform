@@ -101,4 +101,35 @@ public class DeliveryController {
         List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, jwtAuth.getOrganizationId());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/bulk-replay")
+    public ResponseEntity<com.webhook.platform.api.dto.BulkReplayResponse> bulkReplayDeliveries(
+            @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        
+        int replayedCount = deliveryService.bulkReplayDeliveries(
+                request.getDeliveryIds(),
+                request.getStatus(),
+                request.getEndpointId(),
+                request.getProjectId(),
+                jwtAuth.getOrganizationId()
+        );
+        
+        int totalRequested = request.getDeliveryIds() != null ? request.getDeliveryIds().size() : 0;
+        int skipped = totalRequested > 0 ? totalRequested - replayedCount : 0;
+        
+        return ResponseEntity.accepted().body(
+                com.webhook.platform.api.dto.BulkReplayResponse.builder()
+                        .totalRequested(totalRequested)
+                        .replayed(replayedCount)
+                        .skipped(skipped)
+                        .message("Bulk replay initiated for " + replayedCount + " deliveries")
+                        .build()
+        );
+    }
 }

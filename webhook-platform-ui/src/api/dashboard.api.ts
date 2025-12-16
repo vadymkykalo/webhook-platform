@@ -11,6 +11,7 @@ export interface DeliveryStats {
   successfulDeliveries: number;
   failedDeliveries: number;
   pendingDeliveries: number;
+  dlqDeliveries: number;
   successRate: number;
 }
 

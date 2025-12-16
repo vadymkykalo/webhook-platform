@@ -69,7 +69,7 @@ public class DashboardService {
     
     private DashboardStatsResponse createEmptyStats() {
         return new DashboardStatsResponse(
-                new DashboardStatsResponse.DeliveryStats(0, 0, 0, 0, 0.0),
+                new DashboardStatsResponse.DeliveryStats(0, 0, 0, 0, 0, 0.0),
                 new ArrayList<>(),
                 new ArrayList<>()
         );
@@ -81,7 +81,10 @@ public class DashboardService {
                 .filter(d -> d.getStatus() == DeliveryStatus.SUCCESS)
                 .count();
         long failed = deliveries.stream()
-                .filter(d -> d.getStatus() == DeliveryStatus.FAILED || d.getStatus() == DeliveryStatus.DLQ)
+                .filter(d -> d.getStatus() == DeliveryStatus.FAILED)
+                .count();
+        long dlq = deliveries.stream()
+                .filter(d -> d.getStatus() == DeliveryStatus.DLQ)
                 .count();
         long pending = deliveries.stream()
                 .filter(d -> d.getStatus() == DeliveryStatus.PENDING || d.getStatus() == DeliveryStatus.PROCESSING)
@@ -94,6 +97,7 @@ public class DashboardService {
                 successful,
                 failed,
                 pending,
+                dlq,
                 Math.round(successRate * 100.0) / 100.0
         );
     }

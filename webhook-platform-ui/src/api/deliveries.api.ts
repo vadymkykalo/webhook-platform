@@ -10,6 +10,20 @@ export interface DeliveryFilters {
   toDate?: string;
 }
 
+export interface BulkReplayRequest {
+  deliveryIds?: string[];
+  status?: string;
+  endpointId?: string;
+  projectId?: string;
+}
+
+export interface BulkReplayResponse {
+  totalRequested: number;
+  replayed: number;
+  skipped: number;
+  message: string;
+}
+
 export const deliveriesApi = {
   listByProject: (projectId: string, filters?: DeliveryFilters): Promise<PageResponse<DeliveryResponse>> => {
     const params = new URLSearchParams();
@@ -33,6 +47,10 @@ export const deliveriesApi = {
 
   replay: (id: string): Promise<void> => {
     return http.post<void>(`/api/v1/deliveries/${id}/replay`);
+  },
+
+  bulkReplay: (request: BulkReplayRequest): Promise<BulkReplayResponse> => {
+    return http.post<BulkReplayResponse>('/api/v1/deliveries/bulk-replay', request);
   },
 
   getAttempts: (deliveryId: string): Promise<DeliveryAttemptResponse[]> => {

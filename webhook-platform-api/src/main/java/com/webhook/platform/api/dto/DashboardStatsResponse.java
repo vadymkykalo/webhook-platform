@@ -22,6 +22,7 @@ public class DashboardStatsResponse {
         private long successfulDeliveries;
         private long failedDeliveries;
         private long pendingDeliveries;
+        private long dlqDeliveries;
         private double successRate;
     }
     
