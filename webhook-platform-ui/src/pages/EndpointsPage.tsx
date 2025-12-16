@@ -79,7 +79,7 @@ export default function EndpointsPage() {
     setCreating(true);
     try {
       const secret = generateSecret();
-      const response = await endpointsApi.create(projectId, { 
+      await endpointsApi.create(projectId, { 
         url, 
         description, 
         enabled: true, 

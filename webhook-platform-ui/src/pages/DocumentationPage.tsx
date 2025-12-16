@@ -1,4 +1,4 @@
-import { BookOpen, Code, Key, Webhook, Send, Shield, Zap } from 'lucide-react';
+import { Code, Key, Webhook, Send, Shield, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 
 export default function DocumentationPage() {

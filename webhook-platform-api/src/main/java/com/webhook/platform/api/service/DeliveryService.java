@@ -121,7 +121,6 @@ public class DeliveryService {
         return deliveries.map(this::mapToResponse);
     }
 
-
     @Transactional
     public void replayDelivery(UUID deliveryId, UUID organizationId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
