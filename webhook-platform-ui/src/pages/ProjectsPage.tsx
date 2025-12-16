@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse } from '../types/api.types';
@@ -28,6 +29,7 @@ import {
 } from '../components/ui/alert-dialog';
 
 export default function ProjectsPage() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -165,6 +167,14 @@ export default function ProjectsPage() {
                     )}
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${project.id}/endpoints`)}
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Manage Endpoints
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

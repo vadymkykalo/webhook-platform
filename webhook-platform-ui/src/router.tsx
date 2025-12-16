@@ -4,6 +4,7 @@ import LoginPage from './auth/LoginPage';
 import RegisterPage from './auth/RegisterPage';
 import ProtectedRoute from './auth/ProtectedRoute';
 import ProjectsPage from './pages/ProjectsPage';
+import EndpointsPage from './pages/EndpointsPage';
 
 export const router = createBrowserRouter([
   {
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects',
         element: <ProjectsPage />,
+      },
+      {
+        path: 'projects/:projectId/endpoints',
+        element: <EndpointsPage />,
       },
     ],
   },

@@ -43,3 +43,22 @@ export interface ProjectResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface EndpointRequest {
+  url: string;
+  description?: string;
+  secret?: string;
+  enabled?: boolean;
+  rateLimitPerSecond?: number;
+}
+
+export interface EndpointResponse {
+  id: string;
+  projectId: string;
+  url: string;
+  description?: string;
+  enabled: boolean;
+  rateLimitPerSecond?: number;
+  createdAt: string;
+  updatedAt: string;
+}
