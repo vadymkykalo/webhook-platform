@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { deliveriesApi } from '../api/deliveries.api';
-import type { DeliveryResponse } from '../types/api.types';
+import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import {
@@ -38,13 +38,16 @@ export default function DeliveryDetailsSheet({
   onRefresh,
 }: DeliveryDetailsSheetProps) {
   const [delivery, setDelivery] = useState<DeliveryResponse | null>(null);
+  const [attempts, setAttempts] = useState<DeliveryAttemptResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [attemptsLoading, setAttemptsLoading] = useState(false);
   const [showReplayDialog, setShowReplayDialog] = useState(false);
   const [replaying, setReplaying] = useState(false);
 
   useEffect(() => {
     if (deliveryId && open) {
       loadDelivery();
+      loadAttempts();
     }
   }, [deliveryId, open]);
 
@@ -62,6 +65,21 @@ export default function DeliveryDetailsSheet({
     }
   };
 
+  const loadAttempts = async () => {
+    if (!deliveryId) return;
+
+    try {
+      setAttemptsLoading(true);
+      const data = await deliveriesApi.getAttempts(deliveryId);
+      setAttempts(data);
+    } catch (err: any) {
+      console.error('Failed to load delivery attempts:', err);
+      setAttempts([]);
+    } finally {
+      setAttemptsLoading(false);
+    }
+  };
+
   const handleReplay = async () => {
     if (!deliveryId) return;
 
@@ -72,6 +90,7 @@ export default function DeliveryDetailsSheet({
       setShowReplayDialog(false);
       onRefresh();
       loadDelivery();
+      loadAttempts();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to replay delivery');
     } finally {
@@ -217,14 +236,71 @@ export default function DeliveryDetailsSheet({
                   <CardTitle className="text-lg">Delivery Attempts</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Detailed attempt history is not available in the current API response.
-                    Showing summary: {delivery.attemptCount} attempts made.
-                  </p>
-                  {delivery.lastAttemptAt && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Last attempt: {formatDateTime(delivery.lastAttemptAt)}
+                  {attemptsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : attempts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No attempts recorded yet for this delivery.
                     </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {attempts.map((attempt, index) => (
+                        <div
+                          key={attempt.id}
+                          className="border rounded-lg p-4 space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-sm">
+                              Attempt #{attempt.attemptNumber}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDateTime(attempt.createdAt)}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            {attempt.httpStatusCode && (
+                              <div>
+                                <span className="text-muted-foreground">Status:</span>
+                                <span className={`ml-2 font-medium ${
+                                  attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300
+                                    ? 'text-green-600'
+                                    : 'text-red-600'
+                                }`}>
+                                  {attempt.httpStatusCode}
+                                </span>
+                              </div>
+                            )}
+                            {attempt.durationMs !== null && attempt.durationMs !== undefined && (
+                              <div>
+                                <span className="text-muted-foreground">Duration:</span>
+                                <span className="ml-2 font-medium">{attempt.durationMs}ms</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {attempt.errorMessage && (
+                            <div className="mt-2">
+                              <span className="text-sm text-muted-foreground">Error:</span>
+                              <p className="text-sm text-red-600 mt-1 font-mono bg-red-50 p-2 rounded">
+                                {attempt.errorMessage}
+                              </p>
+                            </div>
+                          )}
+
+                          {attempt.responseBody && (
+                            <div className="mt-2">
+                              <span className="text-sm text-muted-foreground">Response:</span>
+                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
+                                {attempt.responseBody}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

@@ -1,17 +1,20 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Delivery;
+import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import java.time.Instant;
+import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.specification.DeliverySpecification;
+import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import org.springframework.data.jpa.domain.Specification;
 import com.webhook.platform.common.constants.KafkaTopics;
@@ -32,6 +35,7 @@ import java.util.UUID;
 public class DeliveryService {
 
     private final DeliveryRepository deliveryRepository;
+    private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
@@ -39,11 +43,13 @@ public class DeliveryService {
 
     public DeliveryService(
             DeliveryRepository deliveryRepository,
+            DeliveryAttemptRepository deliveryAttemptRepository,
             OutboxMessageRepository outboxMessageRepository,
             EventRepository eventRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper) {
         this.deliveryRepository = deliveryRepository;
+        this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.eventRepository = eventRepository;
         this.projectRepository = projectRepository;
@@ -165,6 +171,32 @@ public class DeliveryService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to create replay outbox message", e);
         }
+    }
+
+    public List<DeliveryAttemptResponse> getDeliveryAttempts(UUID deliveryId, UUID organizationId) {
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+        validateDeliveryAccess(delivery, organizationId);
+        
+        List<DeliveryAttempt> attempts = deliveryAttemptRepository
+                .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
+        
+        return attempts.stream()
+                .map(this::mapAttemptToResponse)
+                .toList();
+    }
+
+    private DeliveryAttemptResponse mapAttemptToResponse(DeliveryAttempt attempt) {
+        return DeliveryAttemptResponse.builder()
+                .id(attempt.getId())
+                .deliveryId(attempt.getDeliveryId())
+                .attemptNumber(attempt.getAttemptNumber())
+                .httpStatusCode(attempt.getHttpStatusCode())
+                .responseBody(attempt.getResponseBody())
+                .errorMessage(attempt.getErrorMessage())
+                .durationMs(attempt.getDurationMs())
+                .createdAt(attempt.getCreatedAt())
+                .build();
     }
 
     private DeliveryResponse mapToResponse(Delivery delivery) {

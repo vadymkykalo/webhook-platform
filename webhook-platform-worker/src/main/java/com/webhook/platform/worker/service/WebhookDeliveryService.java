@@ -198,7 +198,7 @@ public class WebhookDeliveryService {
             .tag("status_code", String.valueOf(statusCode))
             .register(meterRegistry).increment();
         
-        saveAttempt(delivery, statusCode, responseBody, null, durationMs, null);
+        saveAttempt(delivery, statusCode, responseBody, null, durationMs);
 
         if (statusCode >= 200 && statusCode < 300) {
             markAsSuccess(delivery);
@@ -262,11 +262,6 @@ public class WebhookDeliveryService {
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 
                             String errorMessage, int durationMs) {
-        saveAttempt(delivery, statusCode, responseBody, errorMessage, durationMs, null);
-    }
-    
-    private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 
-                            String errorMessage, int durationMs, String responseHeaders) {
         DeliveryAttempt attempt = DeliveryAttempt.builder()
                 .deliveryId(delivery.getId())
                 .attemptNumber(delivery.getAttemptCount())
@@ -276,7 +271,6 @@ public class WebhookDeliveryService {
                         : responseBody)
                 .errorMessage(errorMessage)
                 .durationMs(durationMs)
-                .responseHeaders(responseHeaders)
                 .build();
         deliveryAttemptRepository.save(attempt);
     }

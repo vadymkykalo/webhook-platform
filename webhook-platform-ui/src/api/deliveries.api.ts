@@ -34,4 +34,8 @@ export const deliveriesApi = {
   replay: (id: string): Promise<void> => {
     return http.post<void>(`/api/v1/deliveries/${id}/replay`);
   },
+
+  getAttempts: (deliveryId: string): Promise<DeliveryAttemptResponse[]> => {
+    return http.get<DeliveryAttemptResponse[]>(`/api/v1/deliveries/${deliveryId}/attempts`);
+  },
 };

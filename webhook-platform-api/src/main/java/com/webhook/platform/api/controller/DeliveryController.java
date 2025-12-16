@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
@@ -13,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
@@ -86,5 +88,17 @@ public class DeliveryController {
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
         deliveryService.replayDelivery(id, jwtAuth.getOrganizationId());
         return ResponseEntity.accepted().build();
+    }
+
+    @GetMapping("/{id}/attempts")
+    public ResponseEntity<List<DeliveryAttemptResponse>> getDeliveryAttempts(
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, jwtAuth.getOrganizationId());
+        return ResponseEntity.ok(response);
     }
 }
