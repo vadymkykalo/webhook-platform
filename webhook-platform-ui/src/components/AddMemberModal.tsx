@@ -62,11 +62,20 @@ export default function AddMemberModal({
 
     setAdding(true);
     try {
-      await membersApi.add(orgId, {
+      const response = await membersApi.add(orgId, {
         email: email.trim(),
         role,
       });
-      toast.success('Member added successfully');
+      
+      if (response.temporaryPassword) {
+        toast.success(
+          `Member added! Temporary password: ${response.temporaryPassword}`,
+          { duration: 10000 }
+        );
+      } else {
+        toast.success('Member added successfully');
+      }
+      
       handleClose();
       onSuccess();
     } catch (err: any) {

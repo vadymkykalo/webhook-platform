@@ -58,11 +58,15 @@ public class MembershipService {
             throw new RuntimeException("Only owners can add members");
         }
 
+        String temporaryPassword = null;
+        boolean isNewUser = !userRepository.existsByEmail(request.getEmail());
+        
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseGet(() -> {
+                    String tempPass = generateTemporaryPassword();
                     User newUser = User.builder()
                             .email(request.getEmail())
-                            .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                            .passwordHash(passwordEncoder.encode(tempPass))
                             .status(UserStatus.ACTIVE)
                             .build();
                     return userRepository.save(newUser);
@@ -70,6 +74,12 @@ public class MembershipService {
 
         if (membershipRepository.existsByUserIdAndOrganizationId(user.getId(), organizationId)) {
             throw new RuntimeException("User is already a member");
+        }
+
+        if (isNewUser) {
+            temporaryPassword = generateTemporaryPassword();
+            user.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+            userRepository.save(user);
         }
 
         Membership membership = Membership.builder()
@@ -85,7 +95,12 @@ public class MembershipService {
                 .role(membership.getRole())
                 .status(MembershipStatus.ACTIVE)
                 .createdAt(membership.getCreatedAt())
+                .temporaryPassword(temporaryPassword)
                 .build();
+    }
+
+    private String generateTemporaryPassword() {
+        return "Temp" + UUID.randomUUID().toString().substring(0, 8) + "!";
     }
 
     @Transactional

@@ -9,6 +9,7 @@ export interface MemberResponse {
   role: MembershipRole;
   status: MembershipStatus;
   createdAt: string;
+  temporaryPassword?: string;
 }
 
 export interface AddMemberRequest {
