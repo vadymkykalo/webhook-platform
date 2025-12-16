@@ -22,20 +22,7 @@ export const endpointsApi = {
     return http.delete<void>(`/api/v1/projects/${projectId}/endpoints/${id}`);
   },
 
-  rotateSecret: (projectId: string, id: string, currentEndpoint: EndpointResponse): Promise<EndpointResponse> => {
-    const newSecret = generateSecret();
-    return http.put<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}`, {
-      url: currentEndpoint.url,
-      description: currentEndpoint.description,
-      enabled: currentEndpoint.enabled,
-      rateLimitPerSecond: currentEndpoint.rateLimitPerSecond,
-      secret: newSecret,
-    });
+  rotateSecret: (projectId: string, id: string): Promise<EndpointResponse> => {
+    return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/rotate-secret`);
   },
 };
-
-function generateSecret(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-}

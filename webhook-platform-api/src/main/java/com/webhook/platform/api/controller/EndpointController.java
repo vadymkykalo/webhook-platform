@@ -94,4 +94,18 @@ public class EndpointController {
         endpointService.deleteEndpoint(id, jwtAuth.getOrganizationId());
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/rotate-secret")
+    public ResponseEntity<EndpointResponse> rotateSecret(
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        EndpointResponse response = endpointService.rotateSecret(id, jwtAuth.getOrganizationId());
+        log.info("Rotated secret for endpoint {}", id);
+        return ResponseEntity.ok(response);
+    }
 }

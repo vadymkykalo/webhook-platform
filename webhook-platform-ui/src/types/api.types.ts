@@ -65,6 +65,7 @@ export interface EndpointResponse {
   rateLimitPerSecond?: number;
   createdAt: string;
   updatedAt: string;
+  secret?: string;
 }
 
 export interface DeliveryResponse {

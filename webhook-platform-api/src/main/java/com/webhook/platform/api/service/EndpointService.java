@@ -124,7 +124,27 @@ public class EndpointService {
         endpointRepository.save(endpoint);
     }
 
+    @Transactional
+    public EndpointResponse rotateSecret(UUID id, UUID organizationId) {
+        Endpoint endpoint = endpointRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
+        
+        String newSecret = CryptoUtils.generateSecureToken(32);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(newSecret, encryptionKey);
+        
+        endpoint.setSecretEncrypted(encrypted.getCiphertext());
+        endpoint.setSecretIv(encrypted.getIv());
+        endpoint = endpointRepository.save(endpoint);
+        
+        return mapToResponseWithSecret(endpoint, newSecret);
+    }
+
     private EndpointResponse mapToResponse(Endpoint endpoint) {
+        return mapToResponseWithSecret(endpoint, null);
+    }
+
+    private EndpointResponse mapToResponseWithSecret(Endpoint endpoint, String secret) {
         return EndpointResponse.builder()
                 .id(endpoint.getId())
                 .projectId(endpoint.getProjectId())
@@ -134,6 +154,7 @@ public class EndpointService {
                 .rateLimitPerSecond(endpoint.getRateLimitPerSecond())
                 .createdAt(endpoint.getCreatedAt())
                 .updatedAt(endpoint.getUpdatedAt())
+                .secret(secret)
                 .build();
     }
 }

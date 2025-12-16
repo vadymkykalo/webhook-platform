@@ -78,10 +78,11 @@ export default function EndpointsPage() {
     setCreating(true);
     try {
       const secret = generateSecret();
-      await endpointsApi.create(projectId, { url, description, enabled: true, secret });
+      const response = await endpointsApi.create(projectId, { url, description, enabled: true, secret });
       setShowCreateDialog(false);
       setUrl('');
       setDescription('');
+      setNewSecret(secret);
       toast.success('Endpoint created successfully');
       loadData();
     } catch (err: any) {
@@ -133,15 +134,11 @@ export default function EndpointsPage() {
 
   const handleRotateSecret = async () => {
     if (!rotateId || !projectId) return;
-    
-    const endpoint = endpoints.find((e) => e.id === rotateId);
-    if (!endpoint) return;
 
     setRotating(true);
     try {
-      await endpointsApi.rotateSecret(projectId, rotateId, endpoint);
-      const generatedSecret = generateSecret();
-      setNewSecret(generatedSecret);
+      const response = await endpointsApi.rotateSecret(projectId, rotateId);
+      setNewSecret(response.secret || null);
       toast.success('Secret rotated successfully');
       loadData();
     } catch (err: any) {
