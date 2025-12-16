@@ -7,6 +7,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import EndpointsPage from './pages/EndpointsPage';
 import DeliveriesPage from './pages/DeliveriesPage';
 import EventsPage from './pages/EventsPage';
+import SubscriptionsPage from './pages/SubscriptionsPage';
 
 export const router = createBrowserRouter([
   {
@@ -44,6 +45,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/events',
         element: <EventsPage />,
+      },
+      {
+        path: 'projects/:projectId/subscriptions',
+        element: <SubscriptionsPage />,
       },
     ],
   },

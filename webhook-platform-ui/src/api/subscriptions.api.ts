@@ -1,0 +1,39 @@
+import { http } from './http';
+
+export interface SubscriptionRequest {
+  endpointId: string;
+  eventType: string;
+  enabled: boolean;
+}
+
+export interface SubscriptionResponse {
+  id: string;
+  projectId: string;
+  endpointId: string;
+  eventType: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const subscriptionsApi = {
+  list: (projectId: string): Promise<SubscriptionResponse[]> => {
+    return http.get<SubscriptionResponse[]>(`/api/v1/projects/${projectId}/subscriptions`);
+  },
+
+  get: (projectId: string, subscriptionId: string): Promise<SubscriptionResponse> => {
+    return http.get<SubscriptionResponse>(`/api/v1/projects/${projectId}/subscriptions/${subscriptionId}`);
+  },
+
+  create: (projectId: string, request: SubscriptionRequest): Promise<SubscriptionResponse> => {
+    return http.post<SubscriptionResponse>(`/api/v1/projects/${projectId}/subscriptions`, request);
+  },
+
+  update: (projectId: string, subscriptionId: string, request: SubscriptionRequest): Promise<SubscriptionResponse> => {
+    return http.put<SubscriptionResponse>(`/api/v1/projects/${projectId}/subscriptions/${subscriptionId}`, request);
+  },
+
+  delete: (projectId: string, subscriptionId: string): Promise<void> => {
+    return http.delete<void>(`/api/v1/projects/${projectId}/subscriptions/${subscriptionId}`);
+  },
+};

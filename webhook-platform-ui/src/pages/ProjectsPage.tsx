@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio } from 'lucide-react';
+import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse } from '../types/api.types';
@@ -173,7 +173,15 @@ export default function ProjectsPage() {
                       onClick={() => navigate(`/projects/${project.id}/endpoints`)}
                     >
                       <Settings className="mr-2 h-4 w-4" />
-                      Manage Endpoints
+                      Endpoints
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${project.id}/subscriptions`)}
+                    >
+                      <LinkIcon className="mr-2 h-4 w-4" />
+                      Subscriptions
                     </Button>
                     <Button
                       variant="outline"
@@ -181,7 +189,7 @@ export default function ProjectsPage() {
                       onClick={() => navigate(`/projects/${project.id}/events`)}
                     >
                       <Radio className="mr-2 h-4 w-4" />
-                      View Events
+                      Events
                     </Button>
                     <Button
                       variant="outline"
@@ -189,7 +197,7 @@ export default function ProjectsPage() {
                       onClick={() => navigate(`/projects/${project.id}/deliveries`)}
                     >
                       <Send className="mr-2 h-4 w-4" />
-                      View Deliveries
+                      Deliveries
                     </Button>
                     <Button
                       variant="ghost"

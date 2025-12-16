@@ -105,3 +105,13 @@ export interface EventResponse {
   createdAt: string;
   deliveriesCreated?: number;
 }
+
+export interface SubscriptionResponse {
+  id: string;
+  projectId: string;
+  endpointId: string;
+  eventType: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
