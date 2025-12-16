@@ -35,14 +35,9 @@ public class DeliveryConsumer {
         log.info("Received delivery from {}: deliveryId={}, endpointId={}", 
                 topic, message.getDeliveryId(), message.getEndpointId());
         
-        try {
-            webhookDeliveryService.processDelivery(message);
-            acknowledgment.acknowledge();
-            log.debug("Acknowledged message for delivery: {}", message.getDeliveryId());
-        } catch (Exception e) {
-            log.error("Failed to process delivery {}: {}", message.getDeliveryId(), e.getMessage(), e);
-            acknowledgment.acknowledge();
-        }
+        webhookDeliveryService.processDelivery(message);
+        acknowledgment.acknowledge();
+        log.debug("Acknowledged message for delivery: {}", message.getDeliveryId());
     }
 
     @KafkaListener(
@@ -66,29 +61,9 @@ public class DeliveryConsumer {
         log.info("Received retry from {}: deliveryId={}, attempt={}", 
                 topic, message.getDeliveryId(), message.getAttemptCount());
         
-        try {
-            webhookDeliveryService.processDelivery(message);
-            acknowledgment.acknowledge();
-        } catch (Exception e) {
-            log.error("Failed to process retry for delivery {}: {}", 
-                    message.getDeliveryId(), e.getMessage(), e);
-            acknowledgment.acknowledge();
-        }
+        webhookDeliveryService.processDelivery(message);
+        acknowledgment.acknowledge();
+        log.debug("Acknowledged retry message for delivery: {}", message.getDeliveryId());
     }
 
-    @KafkaListener(
-            topics = KafkaTopics.DELIVERIES_DLQ,
-            groupId = "${spring.kafka.consumer.group-id}",
-            containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void consumeDlq(
-            @Payload DeliveryMessage message,
-            @Header(KafkaHeaders.RECEIVED_KEY) String key,
-            Acknowledgment acknowledgment) {
-        
-        log.warn("Received DLQ message: deliveryId={}, endpointId={}", 
-                message.getDeliveryId(), message.getEndpointId());
-        
-        acknowledgment.acknowledge();
-    }
 }

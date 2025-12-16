@@ -29,6 +29,8 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest
       enable-auto-commit: false
+      max-retries: ${KAFKA_CONSUMER_MAX_RETRIES:3}
+      retry-interval-ms: ${KAFKA_CONSUMER_RETRY_INTERVAL_MS:5000}
       properties:
         spring.json.trusted.packages: "*"
     listener:
@@ -57,18 +59,24 @@ management:
     port: ${MANAGEMENT_PORT:8081}
 
 webhook:
-  encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
+  encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
   url-validation:
-    allow-private-ips: false
-    allowed-hosts: [test-receiver]
+    allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
+    allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
+  max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
 
 retry:
   scheduler:
-    poll-interval-ms: 10000
+    poll-interval-ms: ${RETRY_SCHEDULER_INTERVAL_MS:10000}
+    batch-size: ${RETRY_SCHEDULER_BATCH_SIZE:100}
+
+dlq:
+  monitoring:
+    interval-ms: ${DLQ_MONITORING_INTERVAL_MS:60000}
 
 logging:
   level:
     root: INFO
-    com.webhook.platform: DEBUG
+    com.webhook.platform: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.config;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,13 +12,16 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
 @EnableKafka
+@Slf4j
 public class KafkaConsumerConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")
@@ -25,6 +29,12 @@ public class KafkaConsumerConfig {
 
     @Value("${spring.kafka.consumer.group-id}")
     private String groupId;
+    
+    @Value("${kafka.consumer.max-retries:3}")
+    private int maxRetries;
+    
+    @Value("${kafka.consumer.retry-interval-ms:5000}")
+    private long retryIntervalMs;
 
     @Bean
     public ConsumerFactory<String, DeliveryMessage> consumerFactory() {
@@ -37,6 +47,8 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, DeliveryMessage.class.getName());
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 300000);
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
@@ -47,6 +59,24 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(consumerFactory());
         factory.setConcurrency(3);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+            (consumerRecord, exception) -> {
+                log.error("Message processing failed after {} retries. Topic: {}, Partition: {}, Offset: {}, Key: {}. Error: {}", 
+                    maxRetries, 
+                    consumerRecord.topic(), 
+                    consumerRecord.partition(), 
+                    consumerRecord.offset(), 
+                    consumerRecord.key(),
+                    exception.getMessage());
+            },
+            new FixedBackOff(retryIntervalMs, maxRetries)
+        );
+        
+        factory.setCommonErrorHandler(errorHandler);
+        
+        log.info("Kafka consumer configured with max retries: {}, retry interval: {}ms", maxRetries, retryIntervalMs);
+        
         return factory;
     }
 }

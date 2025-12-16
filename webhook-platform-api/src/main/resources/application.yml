@@ -63,11 +63,17 @@ outbox:
     poll-interval-ms: 1000
     batch-size: 100
 
+data-retention:
+  outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
+  delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
+  batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
+  cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
+
 webhook:
-  encryption-key: ${WEBHOOK_ENCRYPTION_KEY:development_master_key_32_chars}
+  encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
   url-validation:
-    allow-private-ips: true
-    allowed-hosts: [test-receiver]
+    allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
+    allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
@@ -75,9 +81,7 @@ cors:
 logging:
   level:
     root: INFO
-    com.webhook.platform: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql: TRACE
-    org.springframework.orm.jpa: DEBUG
+    com.webhook.platform: INFO
+    org.springframework.web: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

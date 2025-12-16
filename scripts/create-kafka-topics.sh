@@ -1,9 +1,12 @@
 #!/bin/bash
 
-KAFKA_CONTAINER="webhook-kafka"
-BOOTSTRAP_SERVER="localhost:9092"
+KAFKA_CONTAINER="${KAFKA_CONTAINER:-webhook-kafka}"
+BOOTSTRAP_SERVER="${KAFKA_BOOTSTRAP_SERVER:-localhost:9092}"
+REPLICATION_FACTOR="${KAFKA_REPLICATION_FACTOR:-1}"
+PARTITIONS="${KAFKA_PARTITIONS:-3}"
+MIN_ISR="${KAFKA_MIN_ISR:-1}"
 
-echo "Creating Kafka topics..."
+echo "Creating Kafka topics with replication-factor=$REPLICATION_FACTOR, partitions=$PARTITIONS, min.insync.replicas=$MIN_ISR"
 
 topics=(
   "deliveries.dispatch"
@@ -22,8 +25,10 @@ for topic in "${topics[@]}"; do
     --create \
     --bootstrap-server $BOOTSTRAP_SERVER \
     --topic $topic \
-    --partitions 3 \
-    --replication-factor 1 \
+    --partitions $PARTITIONS \
+    --replication-factor $REPLICATION_FACTOR \
+    --config min.insync.replicas=$MIN_ISR \
+    --config retention.ms=604800000 \
     --if-not-exists
 done
 
@@ -34,4 +39,14 @@ docker exec $KAFKA_CONTAINER kafka-topics.sh \
   --bootstrap-server $BOOTSTRAP_SERVER
 
 echo ""
+echo "Topic details:"
+for topic in "${topics[@]}"; do
+  docker exec $KAFKA_CONTAINER kafka-topics.sh \
+    --describe \
+    --bootstrap-server $BOOTSTRAP_SERVER \
+    --topic $topic
+done
+
+echo ""
 echo "Kafka topics created successfully!"
+echo "WARNING: For production, use KAFKA_REPLICATION_FACTOR=3 and KAFKA_MIN_ISR=2"

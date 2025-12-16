@@ -39,6 +39,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_NUM_PARTITIONS: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       CLUSTER_ID: webhook-kafka-cluster
     volumes:
       - kafka_data:/var/lib/kafka/data
@@ -50,6 +52,10 @@ services:
       start_period: 30s
     networks:
       - webhook-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   minio:
     image: minio/minio:latest
