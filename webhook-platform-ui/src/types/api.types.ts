@@ -16,12 +16,16 @@ export interface AuthResponse {
   expiresIn: number;
 }
 
-export interface CurrentUserResponse {
+export interface UserResponse {
   id: string;
   email: string;
-  fullName: string;
   status: string;
-  currentOrganization: OrganizationResponse;
+}
+
+export interface CurrentUserResponse {
+  user: UserResponse;
+  organization: OrganizationResponse;
+  role: 'OWNER' | 'DEVELOPER' | 'VIEWER';
 }
 
 export interface OrganizationResponse {

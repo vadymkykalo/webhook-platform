@@ -4,6 +4,7 @@ CREATE TABLE memberships (
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, organization_id)
 );
 

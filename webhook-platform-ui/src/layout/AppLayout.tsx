@@ -73,10 +73,10 @@ export default function AppLayout() {
           <div className="p-4 border-t">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.fullName}</p>
-                {user.currentOrganization && (
+                <p className="text-sm font-medium truncate">{user.user?.email}</p>
+                {user.organization && (
                   <p className="text-xs text-muted-foreground truncate">
-                    {user.currentOrganization.name}
+                    {user.organization.name}
                   </p>
                 )}
               </div>
@@ -150,10 +150,10 @@ export default function AppLayout() {
               <div className="p-4 border-t">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{user.fullName}</p>
-                    {user.currentOrganization && (
+                    <p className="text-sm font-medium truncate">{user.user?.email}</p>
+                    {user.organization && (
                       <p className="text-xs text-muted-foreground truncate">
-                        {user.currentOrganization.name}
+                        {user.organization.name}
                       </p>
                     )}
                   </div>

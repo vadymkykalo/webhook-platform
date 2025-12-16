@@ -29,9 +29,8 @@ export default function MembersPage() {
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(null);
 
-  const orgId = user?.currentOrganization?.id;
-  // Assuming current user is OWNER for now - backend should provide this in user object
-  const currentUserRole = 'OWNER' as MembershipRole;
+  const orgId = user?.organization?.id;
+  const currentUserRole = (user?.role || 'VIEWER') as MembershipRole;
   const isOwner = currentUserRole === 'OWNER';
 
   useEffect(() => {
@@ -173,7 +172,7 @@ export default function MembersPage() {
                 <TableRow key={member.userId}>
                   <TableCell>
                     <span className="font-medium">{member.email}</span>
-                    {member.userId === user?.id && (
+                    {member.userId === user?.user?.id && (
                       <Badge variant="outline" className="ml-2 text-xs">
                         You
                       </Badge>
@@ -208,7 +207,7 @@ export default function MembersPage() {
                   </TableCell>
                   {isOwner && (
                     <TableCell>
-                      {member.userId !== user?.id && (
+                      {member.userId !== user?.user?.id && (
                         <Button
                           variant="ghost"
                           size="icon"
