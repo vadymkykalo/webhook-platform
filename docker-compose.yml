@@ -145,6 +145,20 @@ services:
     networks:
       - webhook-network
 
+  ui:
+    build:
+      context: ./webhook-platform-ui
+      dockerfile: Dockerfile
+    container_name: webhook-ui
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8080
+    depends_on:
+      - api
+    networks:
+      - webhook-network
+
 volumes:
   postgres_data:
   kafka_data:
