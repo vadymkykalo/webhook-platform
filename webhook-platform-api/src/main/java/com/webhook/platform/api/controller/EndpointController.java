@@ -2,10 +2,13 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
+import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.EndpointService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,9 +28,15 @@ public class EndpointController {
     @PostMapping
     public ResponseEntity<EndpointResponse> createEndpoint(
             @PathVariable("projectId") UUID projectId,
-            @RequestBody EndpointRequest request) {
+            @RequestBody EndpointRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
         try {
-            EndpointResponse response = endpointService.createEndpoint(projectId, request);
+            JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+            RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            EndpointResponse response = endpointService.createEndpoint(projectId, request, jwtAuth.getOrganizationId());
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
             log.error("Failed to create endpoint for project {}: {}", projectId, e.getMessage(), e);
@@ -36,28 +45,53 @@ public class EndpointController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EndpointResponse> getEndpoint(@PathVariable("id") UUID id) {
-        EndpointResponse response = endpointService.getEndpoint(id);
+    public ResponseEntity<EndpointResponse> getEndpoint(
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        EndpointResponse response = endpointService.getEndpoint(id, jwtAuth.getOrganizationId());
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<List<EndpointResponse>> listEndpoints(@PathVariable("projectId") UUID projectId) {
-        List<EndpointResponse> response = endpointService.listEndpoints(projectId);
+    public ResponseEntity<List<EndpointResponse>> listEndpoints(
+            @PathVariable("projectId") UUID projectId,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        List<EndpointResponse> response = endpointService.listEndpoints(projectId, jwtAuth.getOrganizationId());
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
             @PathVariable("id") UUID id,
-            @RequestBody EndpointRequest request) {
-        EndpointResponse response = endpointService.updateEndpoint(id, request);
+            @RequestBody EndpointRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        EndpointResponse response = endpointService.updateEndpoint(id, request, jwtAuth.getOrganizationId());
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEndpoint(@PathVariable("id") UUID id) {
-        endpointService.deleteEndpoint(id);
+    public ResponseEntity<Void> deleteEndpoint(
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        endpointService.deleteEndpoint(id, jwtAuth.getOrganizationId());
         return ResponseEntity.noContent().build();
     }
 }

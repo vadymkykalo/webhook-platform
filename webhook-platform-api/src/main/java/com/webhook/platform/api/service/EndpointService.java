@@ -1,7 +1,9 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
+import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.common.security.UrlValidator;
@@ -19,23 +21,35 @@ import java.util.stream.Collectors;
 public class EndpointService {
 
     private final EndpointRepository endpointRepository;
+    private final ProjectRepository projectRepository;
     private final String encryptionKey;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
 
     public EndpointService(
             EndpointRepository endpointRepository,
+            ProjectRepository projectRepository,
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.endpointRepository = endpointRepository;
+        this.projectRepository = projectRepository;
         this.encryptionKey = encryptionKey;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
     }
 
+    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new RuntimeException("Access denied");
+        }
+    }
+
     @Transactional
-    public EndpointResponse createEndpoint(UUID projectId, EndpointRequest request) {
+    public EndpointResponse createEndpoint(UUID projectId, EndpointRequest request, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         
         CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(request.getSecret(), encryptionKey);
@@ -57,13 +71,15 @@ public class EndpointService {
         return mapToResponse(endpoint);
     }
 
-    public EndpointResponse getEndpoint(UUID id) {
+    public EndpointResponse getEndpoint(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
         return mapToResponse(endpoint);
     }
 
-    public List<EndpointResponse> listEndpoints(UUID projectId) {
+    public List<EndpointResponse> listEndpoints(UUID projectId, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         return endpointRepository.findAll().stream()
                 .filter(e -> e.getProjectId().equals(projectId))
                 .filter(e -> e.getDeletedAt() == null)
@@ -72,9 +88,10 @@ public class EndpointService {
     }
 
     @Transactional
-    public EndpointResponse updateEndpoint(UUID id, EndpointRequest request) {
+    public EndpointResponse updateEndpoint(UUID id, EndpointRequest request, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         
@@ -98,9 +115,10 @@ public class EndpointService {
     }
 
     @Transactional
-    public void deleteEndpoint(UUID id) {
+    public void deleteEndpoint(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         endpoint.setDeletedAt(Instant.now());
         endpointRepository.save(endpoint);

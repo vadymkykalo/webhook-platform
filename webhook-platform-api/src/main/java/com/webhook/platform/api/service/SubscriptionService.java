@@ -1,6 +1,8 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Subscription;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
@@ -15,13 +17,26 @@ import java.util.stream.Collectors;
 public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
+    private final ProjectRepository projectRepository;
 
-    public SubscriptionService(SubscriptionRepository subscriptionRepository) {
+    public SubscriptionService(
+            SubscriptionRepository subscriptionRepository,
+            ProjectRepository projectRepository) {
         this.subscriptionRepository = subscriptionRepository;
+        this.projectRepository = projectRepository;
+    }
+
+    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new RuntimeException("Access denied");
+        }
     }
 
     @Transactional
-    public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request) {
+    public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         Subscription subscription = Subscription.builder()
                 .projectId(projectId)
                 .endpointId(request.getEndpointId())
@@ -33,13 +48,15 @@ public class SubscriptionService {
         return mapToResponse(subscription);
     }
 
-    public SubscriptionResponse getSubscription(UUID id) {
+    public SubscriptionResponse getSubscription(UUID id, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Subscription not found"));
+        validateProjectOwnership(subscription.getProjectId(), organizationId);
         return mapToResponse(subscription);
     }
 
-    public List<SubscriptionResponse> listSubscriptions(UUID projectId) {
+    public List<SubscriptionResponse> listSubscriptions(UUID projectId, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         return subscriptionRepository.findAll().stream()
                 .filter(s -> s.getProjectId().equals(projectId))
                 .map(this::mapToResponse)
@@ -47,9 +64,10 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request) {
+    public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Subscription not found"));
+        validateProjectOwnership(subscription.getProjectId(), organizationId);
         
         if (request.getEndpointId() != null) {
             subscription.setEndpointId(request.getEndpointId());
@@ -66,7 +84,10 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public void deleteSubscription(UUID id) {
+    public void deleteSubscription(UUID id, UUID organizationId) {
+        Subscription subscription = subscriptionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+        validateProjectOwnership(subscription.getProjectId(), organizationId);
         subscriptionRepository.deleteById(id);
     }
 

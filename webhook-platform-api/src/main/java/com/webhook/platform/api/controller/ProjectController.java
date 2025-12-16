@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.ProjectService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,7 @@ public class ProjectController {
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
         ProjectResponse response = projectService.createProject(request, jwtAuth.getOrganizationId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -69,6 +71,7 @@ public class ProjectController {
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
         ProjectResponse response = projectService.updateProject(id, request, jwtAuth.getOrganizationId());
         return ResponseEntity.ok(response);
     }
@@ -82,6 +85,7 @@ public class ProjectController {
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
         projectService.deleteProject(id, jwtAuth.getOrganizationId());
         return ResponseEntity.noContent().build();
     }
