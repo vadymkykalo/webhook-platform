@@ -22,9 +22,10 @@ public class ProjectService {
     }
 
     @Transactional
-    public ProjectResponse createProject(ProjectRequest request) {
+    public ProjectResponse createProject(ProjectRequest request, UUID organizationId) {
         Project project = Project.builder()
                 .name(request.getName())
+                .organizationId(organizationId)
                 .description(request.getDescription())
                 .build();
         
@@ -32,23 +33,33 @@ public class ProjectService {
         return mapToResponse(project);
     }
 
-    public ProjectResponse getProject(UUID id) {
+    public ProjectResponse getProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+        
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new RuntimeException("Access denied");
+        }
+        
         return mapToResponse(project);
     }
 
-    public List<ProjectResponse> listProjects() {
+    public List<ProjectResponse> listProjects(UUID organizationId) {
         return projectRepository.findAll().stream()
                 .filter(p -> p.getDeletedAt() == null)
+                .filter(p -> p.getOrganizationId().equals(organizationId))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public ProjectResponse updateProject(UUID id, ProjectRequest request) {
+    public ProjectResponse updateProject(UUID id, ProjectRequest request, UUID organizationId) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+        
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new RuntimeException("Access denied");
+        }
         
         project.setName(request.getName());
         project.setDescription(request.getDescription());
@@ -58,9 +69,13 @@ public class ProjectService {
     }
 
     @Transactional
-    public void deleteProject(UUID id) {
+    public void deleteProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
+        
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new RuntimeException("Access denied");
+        }
         
         project.setDeletedAt(Instant.now());
         projectRepository.save(project);

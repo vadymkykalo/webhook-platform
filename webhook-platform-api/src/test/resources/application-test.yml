@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/webhook_test
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    clean-disabled: false
+
+jwt:
+  secret: test_jwt_secret_key_for_testing_webhook_platform_min_32_chars
+  access-token-expiration: 900000
+  refresh-token-expiration: 86400000
+
+webhook:
+  encryption-key: test_encryption_key_32_chars_12
+  url-validation:
+    allow-private-ips: true
+    allowed-hosts: []
