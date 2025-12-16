@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings } from 'lucide-react';
+import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse } from '../types/api.types';
@@ -166,7 +166,7 @@ export default function ProjectsPage() {
                       </CardDescription>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -174,6 +174,22 @@ export default function ProjectsPage() {
                     >
                       <Settings className="mr-2 h-4 w-4" />
                       Manage Endpoints
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${project.id}/events`)}
+                    >
+                      <Radio className="mr-2 h-4 w-4" />
+                      View Events
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${project.id}/deliveries`)}
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      View Deliveries
                     </Button>
                     <Button
                       variant="ghost"

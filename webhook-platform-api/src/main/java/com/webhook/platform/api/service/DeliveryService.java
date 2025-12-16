@@ -82,6 +82,20 @@ public class DeliveryService {
         return deliveries.map(this::mapToResponse);
     }
 
+    public Page<DeliveryResponse> listDeliveriesByProject(UUID projectId, UUID organizationId, Pageable pageable) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new RuntimeException("Access denied");
+        }
+        
+        List<Event> events = eventRepository.findByProjectId(projectId);
+        List<UUID> eventIds = events.stream().map(Event::getId).collect(Collectors.toList());
+        
+        Page<Delivery> deliveries = deliveryRepository.findByEventIdIn(eventIds, pageable);
+        return deliveries.map(this::mapToResponse);
+    }
+
     @Transactional
     public void replayDelivery(UUID deliveryId, UUID organizationId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)

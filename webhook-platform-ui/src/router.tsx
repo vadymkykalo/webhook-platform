@@ -5,6 +5,8 @@ import RegisterPage from './auth/RegisterPage';
 import ProtectedRoute from './auth/ProtectedRoute';
 import ProjectsPage from './pages/ProjectsPage';
 import EndpointsPage from './pages/EndpointsPage';
+import DeliveriesPage from './pages/DeliveriesPage';
+import EventsPage from './pages/EventsPage';
 
 export const router = createBrowserRouter([
   {
@@ -34,6 +36,14 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/endpoints',
         element: <EndpointsPage />,
+      },
+      {
+        path: 'projects/:projectId/deliveries',
+        element: <DeliveriesPage />,
+      },
+      {
+        path: 'projects/:projectId/events',
+        element: <EventsPage />,
       },
     ],
   },

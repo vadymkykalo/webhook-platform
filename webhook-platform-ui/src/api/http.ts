@@ -35,8 +35,8 @@ class HttpClient {
     return response.data;
   }
 
-  async post<T>(url: string, data?: unknown): Promise<T> {
-    const response = await this.client.post<T>(url, data);
+  async post<T>(url: string, data?: unknown, headers?: Record<string, string>): Promise<T> {
+    const response = await this.client.post<T>(url, data, { headers });
     return response.data;
   }
 

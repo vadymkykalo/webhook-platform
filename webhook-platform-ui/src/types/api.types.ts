@@ -62,3 +62,46 @@ export interface EndpointResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface DeliveryResponse {
+  id: string;
+  eventId: string;
+  endpointId: string;
+  subscriptionId: string;
+  status: 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ';
+  attemptCount: number;
+  maxAttempts: number;
+  nextRetryAt?: string;
+  lastAttemptAt?: string;
+  succeededAt?: string;
+  failedAt?: string;
+  createdAt: string;
+}
+
+export interface DeliveryAttemptResponse {
+  id: string;
+  deliveryId: string;
+  attemptNumber: number;
+  httpStatusCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  durationMs?: number;
+  createdAt: string;
+}
+
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
+
+export interface EventResponse {
+  id: string;
+  projectId: string;
+  eventType: string;
+  payload: string;
+  createdAt: string;
+  deliveriesCreated?: number;
+}

@@ -47,6 +47,19 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/projects/{projectId}")
+    public ResponseEntity<Page<DeliveryResponse>> listDeliveriesByProject(
+            @PathVariable("projectId") UUID projectId,
+            Pageable pageable,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        Page<DeliveryResponse> response = deliveryService.listDeliveriesByProject(projectId, jwtAuth.getOrganizationId(), pageable);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/{id}/replay")
     public ResponseEntity<Void> replayDelivery(
             @PathVariable("id") UUID id,
