@@ -29,7 +29,9 @@ export default function AppLayout() {
         <h2 style={{ margin: 0 }}>Webhook Platform</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <span>{user.fullName}</span>
-          <span style={{ color: '#aaa' }}>({user.currentOrganization.name})</span>
+          {user.currentOrganization && (
+            <span style={{ color: '#aaa' }}>({user.currentOrganization.name})</span>
+          )}
           <button
             onClick={handleLogout}
             style={{
