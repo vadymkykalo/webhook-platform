@@ -29,7 +29,7 @@ public class ProjectService {
                 .description(request.getDescription())
                 .build();
         
-        project = projectRepository.save(project);
+        project = projectRepository.saveAndFlush(project);
         return mapToResponse(project);
     }
 

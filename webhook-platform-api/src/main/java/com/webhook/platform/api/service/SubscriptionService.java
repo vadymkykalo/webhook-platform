@@ -44,7 +44,7 @@ public class SubscriptionService {
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
                 .build();
         
-        subscription = subscriptionRepository.save(subscription);
+        subscription = subscriptionRepository.saveAndFlush(subscription);
         return mapToResponse(subscription);
     }
 
@@ -79,7 +79,7 @@ public class SubscriptionService {
             subscription.setEnabled(request.getEnabled());
         }
         
-        subscription = subscriptionRepository.save(subscription);
+        subscription = subscriptionRepository.saveAndFlush(subscription);
         return mapToResponse(subscription);
     }
 

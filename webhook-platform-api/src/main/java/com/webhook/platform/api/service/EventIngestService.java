@@ -58,7 +58,7 @@ public class EventIngestService {
         }
 
         Event event = createEvent(projectId, request, idempotencyKey);
-        eventRepository.save(event);
+        event = eventRepository.saveAndFlush(event);
         Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 

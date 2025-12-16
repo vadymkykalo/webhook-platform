@@ -67,7 +67,7 @@ public class EndpointService {
             endpoint.setEnabled(request.getEnabled());
         }
         
-        endpoint = endpointRepository.save(endpoint);
+        endpoint = endpointRepository.saveAndFlush(endpoint);
         return mapToResponse(endpoint);
     }
 
@@ -109,7 +109,7 @@ public class EndpointService {
         }
         
         endpoint.setRateLimitPerSecond(request.getRateLimitPerSecond());
-        endpoint = endpointRepository.save(endpoint);
+        endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponse(endpoint);
     }
@@ -135,7 +135,7 @@ public class EndpointService {
         
         endpoint.setSecretEncrypted(encrypted.getCiphertext());
         endpoint.setSecretIv(encrypted.getIv());
-        endpoint = endpointRepository.save(endpoint);
+        endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponseWithSecret(endpoint, newSecret);
     }

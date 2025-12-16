@@ -84,7 +84,7 @@ public class EventService {
         }
 
         Event event = createEvent(projectId, request);
-        eventRepository.save(event);
+        event = eventRepository.saveAndFlush(event);
         log.info("Created test event: {} for project: {}", event.getId(), projectId);
 
         List<Subscription> subscriptions = subscriptionRepository
