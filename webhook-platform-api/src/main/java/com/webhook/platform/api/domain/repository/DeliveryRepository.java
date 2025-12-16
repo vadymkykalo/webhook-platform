@@ -12,4 +12,5 @@ import java.util.UUID;
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSpecificationExecutor<Delivery> {
     Page<Delivery> findByEventId(UUID eventId, Pageable pageable);
+    Page<Delivery> findByEventIdIn(java.util.List<UUID> eventIds, Pageable pageable);
 }

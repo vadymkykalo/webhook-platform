@@ -8,4 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
+    java.util.List<Endpoint> findByProjectId(UUID projectId);
 }
