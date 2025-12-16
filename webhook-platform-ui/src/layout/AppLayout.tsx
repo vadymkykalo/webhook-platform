@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Menu, X, LogOut, FolderKanban, Webhook, Radio, Send, Users } from 'lucide-react';
+import { Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings, BookOpen } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 
 const navItems = [
-  { name: 'Projects', path: '/projects', icon: FolderKanban, disabled: false },
-  { name: 'Members', path: '/members', icon: Users, disabled: false },
-  { name: 'Endpoints', path: '/endpoints', icon: Webhook, disabled: true },
-  { name: 'Events', path: '/events', icon: Radio, disabled: true },
-  { name: 'Deliveries', path: '/deliveries', icon: Send, disabled: true },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Projects', path: '/projects', icon: FolderKanban },
+  { name: 'Members', path: '/members', icon: Users },
+  { name: 'Settings', path: '/settings', icon: Settings },
+  { name: 'Documentation', path: '/docs', icon: BookOpen },
 ];
 
 export default function AppLayout() {
@@ -48,20 +48,13 @@ export default function AppLayout() {
               return (
                 <Link
                   key={item.path}
-                  to={item.disabled ? '#' : item.path}
+                  to={item.path}
                   className={cn(
                     "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
-                      : item.disabled
-                      ? "text-muted-foreground cursor-not-allowed opacity-50"
                       : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
-                  onClick={(e) => {
-                    if (item.disabled) {
-                      e.preventDefault();
-                    }
-                  }}
                 >
                   <Icon className="mr-3 h-5 w-5" />
                   {item.name}
@@ -123,22 +116,14 @@ export default function AppLayout() {
                   return (
                     <Link
                       key={item.path}
-                      to={item.disabled ? '#' : item.path}
+                      to={item.path}
                       className={cn(
                         "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                         isActive
                           ? "bg-primary text-primary-foreground"
-                          : item.disabled
-                          ? "text-muted-foreground cursor-not-allowed opacity-50"
                           : "text-foreground hover:bg-accent hover:text-accent-foreground"
                       )}
-                      onClick={(e) => {
-                        if (item.disabled) {
-                          e.preventDefault();
-                        } else {
-                          setSidebarOpen(false);
-                        }
-                      }}
+                      onClick={() => setSidebarOpen(false)}
                     >
                       <Icon className="mr-3 h-5 w-5" />
                       {item.name}

@@ -3,6 +3,7 @@ import AppLayout from './layout/AppLayout';
 import LoginPage from './auth/LoginPage';
 import RegisterPage from './auth/RegisterPage';
 import ProtectedRoute from './auth/ProtectedRoute';
+import DashboardPage from './pages/DashboardPage';
 import ProjectsPage from './pages/ProjectsPage';
 import EndpointsPage from './pages/EndpointsPage';
 import DeliveriesPage from './pages/DeliveriesPage';
@@ -10,11 +11,13 @@ import EventsPage from './pages/EventsPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import MembersPage from './pages/MembersPage';
 import ApiKeysPage from './pages/ApiKeysPage';
+import SettingsPage from './pages/SettingsPage';
+import DocumentationPage from './pages/DocumentationPage';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/login" replace />,
+    element: <Navigate to="/dashboard" replace />,
   },
   {
     path: '/login',
@@ -32,6 +35,10 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      {
+        path: 'dashboard',
+        element: <DashboardPage />,
+      },
       {
         path: 'projects',
         element: <ProjectsPage />,
@@ -59,6 +66,14 @@ export const router = createBrowserRouter([
       {
         path: 'members',
         element: <MembersPage />,
+      },
+      {
+        path: 'settings',
+        element: <SettingsPage />,
+      },
+      {
+        path: 'docs',
+        element: <DocumentationPage />,
       },
     ],
   },
