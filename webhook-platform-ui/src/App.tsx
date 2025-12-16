@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { AuthContext, AuthState } from './auth/auth.store';
 import { router } from './router';
 import { http } from './api/http';
@@ -33,6 +34,7 @@ export default function App() {
   return (
     <AuthContext.Provider value={authState}>
       <RouterProvider router={router} />
+      <Toaster position="top-right" richColors />
     </AuthContext.Provider>
   );
 }
