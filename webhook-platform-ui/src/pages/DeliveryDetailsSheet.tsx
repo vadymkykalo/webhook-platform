@@ -281,6 +281,45 @@ export default function DeliveryDetailsSheet({
                             )}
                           </div>
 
+                          {attempt.requestHeaders && (
+                            <details className="mt-2">
+                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                                Request Headers
+                              </summary>
+                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
+                                {JSON.stringify(JSON.parse(attempt.requestHeaders), null, 2)}
+                              </pre>
+                            </details>
+                          )}
+
+                          {attempt.requestBody && (
+                            <details className="mt-2">
+                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                                Request Body
+                              </summary>
+                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
+                                {(() => {
+                                  try {
+                                    return JSON.stringify(JSON.parse(attempt.requestBody), null, 2);
+                                  } catch {
+                                    return attempt.requestBody;
+                                  }
+                                })()}
+                              </pre>
+                            </details>
+                          )}
+
+                          {attempt.responseHeaders && (
+                            <details className="mt-2">
+                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                                Response Headers
+                              </summary>
+                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
+                                {JSON.stringify(JSON.parse(attempt.responseHeaders), null, 2)}
+                              </pre>
+                            </details>
+                          )}
+
                           {attempt.errorMessage && (
                             <div className="mt-2">
                               <span className="text-sm text-muted-foreground">Error:</span>
@@ -291,12 +330,20 @@ export default function DeliveryDetailsSheet({
                           )}
 
                           {attempt.responseBody && (
-                            <div className="mt-2">
-                              <span className="text-sm text-muted-foreground">Response:</span>
-                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
-                                {attempt.responseBody}
+                            <details className="mt-2">
+                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
+                                Response Body
+                              </summary>
+                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
+                                {(() => {
+                                  try {
+                                    return JSON.stringify(JSON.parse(attempt.responseBody), null, 2);
+                                  } catch {
+                                    return attempt.responseBody;
+                                  }
+                                })()}
                               </pre>
-                            </div>
+                            </details>
                           )}
                         </div>
                       ))}

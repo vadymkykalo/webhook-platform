@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
+import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.EndpointService;
@@ -110,14 +111,14 @@ public class EndpointController {
     }
 
     @PostMapping("/{id}/test")
-    public ResponseEntity<com.webhook.platform.api.dto.EndpointTestResponse> testEndpoint(
+    public ResponseEntity<EndpointTestResponse> testEndpoint(
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        com.webhook.platform.api.dto.EndpointTestResponse response = endpointService.testEndpoint(id, jwtAuth.getOrganizationId());
+        EndpointTestResponse response = endpointService.testEndpoint(id, jwtAuth.getOrganizationId());
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }

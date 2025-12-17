@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -40,13 +42,13 @@ public class DlqMonitoringService {
             Map<TopicPartition, Long> endOffsets = adminClient
                 .listOffsets(Collections.singletonMap(
                     new TopicPartition(KafkaTopics.DELIVERIES_DLQ, 0),
-                    org.apache.kafka.clients.admin.OffsetSpec.latest()
+                    OffsetSpec.latest()
                 ))
                 .all()
                 .get()
                 .entrySet()
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                     Map.Entry::getKey,
                     e -> e.getValue().offset()
                 ));

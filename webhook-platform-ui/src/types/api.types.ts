@@ -87,7 +87,10 @@ export interface DeliveryAttemptResponse {
   id: string;
   deliveryId: string;
   attemptNumber: number;
+  requestHeaders?: string;
+  requestBody?: string;
   httpStatusCode?: number;
+  responseHeaders?: string;
   responseBody?: string;
   errorMessage?: string;
   durationMs?: number;

@@ -20,7 +20,9 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -135,7 +137,7 @@ public class WebhookDeliveryService {
             UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
         } catch (UrlValidator.InvalidUrlException e) {
             log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
-            saveAttempt(delivery, null, null, "SSRF_PROTECTION: " + e.getMessage(), 
+            saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(), 
                     (int) (System.currentTimeMillis() - startTime));
             markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
             concurrencyControlService.release(endpoint.getId());
@@ -147,6 +149,10 @@ public class WebhookDeliveryService {
         long timestamp = System.currentTimeMillis();
 
         String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
+
+        // Capture request headers
+        String requestHeaders = buildRequestHeadersJson(signature, event.getId().toString(), 
+                delivery.getId().toString(), String.valueOf(timestamp));
 
         try {
             Timer.Sample sample = Timer.start(meterRegistry);
@@ -160,13 +166,18 @@ public class WebhookDeliveryService {
                     .bodyValue(body)
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
+                        
+                        // Capture response headers
+                        String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
+                        
                         return response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
                                 .map(responseBody -> {
                                     sample.stop(Timer.builder("webhook_delivery_latency_ms")
                                         .tag("status_code", String.valueOf(status))
                                         .register(meterRegistry));
-                                    handleResponse(delivery, status, responseBody, 
+                                    handleResponse(delivery, status, responseBody, responseHeaders,
+                                            requestHeaders, body, 
                                             (int) (System.currentTimeMillis() - startTime));
                                     return status;
                                 });
@@ -174,27 +185,30 @@ public class WebhookDeliveryService {
                     .timeout(Duration.ofSeconds(30))
                     .onErrorResume(e -> {
                         log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
-                        handleError(delivery, e, (int) (System.currentTimeMillis() - startTime));
+                        handleError(delivery, e, requestHeaders, body, 
+                                (int) (System.currentTimeMillis() - startTime));
                         return Mono.just(0);
                     })
                     .block();
 
         } catch (Exception e) {
             log.error("Unexpected error during delivery {}: {}", delivery.getId(), e.getMessage(), e);
-            handleError(delivery, e, (int) (System.currentTimeMillis() - startTime));
+            handleError(delivery, e, requestHeaders, body, 
+                    (int) (System.currentTimeMillis() - startTime));
         } finally {
             concurrencyControlService.release(endpoint.getId());
         }
     }
 
-    private void handleResponse(Delivery delivery, int statusCode, String responseBody, int durationMs) {
+    private void handleResponse(Delivery delivery, int statusCode, String responseBody, 
+                               String responseHeaders, String requestHeaders, String requestBody, int durationMs) {
         String result = (statusCode >= 200 && statusCode < 300) ? "success" : "failure";
         Counter.builder("webhook_delivery_attempts_total")
             .tag("result", result)
             .tag("status_code", String.valueOf(statusCode))
             .register(meterRegistry).increment();
         
-        saveAttempt(delivery, statusCode, responseBody, null, durationMs);
+        saveAttempt(delivery, statusCode, responseBody, responseHeaders, requestHeaders, requestBody, null, durationMs);
 
         if (statusCode >= 200 && statusCode < 300) {
             markAsSuccess(delivery);
@@ -205,13 +219,14 @@ public class WebhookDeliveryService {
         }
     }
 
-    private void handleError(Delivery delivery, Throwable error, int durationMs) {
+    private void handleError(Delivery delivery, Throwable error, String requestHeaders, 
+                            String requestBody, int durationMs) {
         Counter.builder("webhook_delivery_attempts_total")
             .tag("result", "error")
             .tag("status_code", "0")
             .register(meterRegistry).increment();
         
-        saveAttempt(delivery, null, null, error.getMessage(), durationMs);
+        saveAttempt(delivery, null, null, null, requestHeaders, requestBody, error.getMessage(), durationMs);
         scheduleRetry(delivery);
     }
 
@@ -257,18 +272,47 @@ public class WebhookDeliveryService {
     }
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 
+                            String responseHeaders, String requestHeaders, String requestBody,
                             String errorMessage, int durationMs) {
         DeliveryAttempt attempt = DeliveryAttempt.builder()
                 .deliveryId(delivery.getId())
                 .attemptNumber(delivery.getAttemptCount())
+                .requestHeaders(requestHeaders)
+                .requestBody(truncate(requestBody, 100000)) // 100KB limit
                 .httpStatusCode(statusCode)
-                .responseBody(responseBody != null && responseBody.length() > 1000 
-                        ? responseBody.substring(0, 1000) 
-                        : responseBody)
+                .responseHeaders(responseHeaders)
+                .responseBody(truncate(responseBody, 100000)) // 100KB limit
                 .errorMessage(errorMessage)
                 .durationMs(durationMs)
                 .build();
         deliveryAttemptRepository.save(attempt);
+    }
+    
+    private String truncate(String str, int maxLength) {
+        if (str == null || str.length() <= maxLength) {
+            return str;
+        }
+        return str.substring(0, maxLength);
+    }
+    
+    private String buildRequestHeadersJson(String signature, String eventId, String deliveryId, String timestamp) {
+        return String.format("{\"Content-Type\":\"application/json\",\"X-Signature\":\"%s\",\"X-Event-Id\":\"%s\",\"X-Delivery-Id\":\"%s\",\"X-Timestamp\":\"%s\",\"User-Agent\":\"WebhookPlatform/1.0\"}", 
+                signature, eventId, deliveryId, timestamp);
+    }
+    
+    private String buildResponseHeadersJson(org.springframework.http.HttpHeaders headers) {
+        try {
+            Map<String, String> headerMap = new HashMap<>();
+            headers.forEach((key, values) -> {
+                if (values != null && !values.isEmpty()) {
+                    headerMap.put(key, values.get(0));
+                }
+            });
+            return new ObjectMapper().writeValueAsString(headerMap);
+        } catch (Exception e) {
+            log.warn("Failed to serialize response headers: {}", e.getMessage());
+            return "{}";
+        }
     }
 
     private String decryptSecret(Endpoint endpoint) {

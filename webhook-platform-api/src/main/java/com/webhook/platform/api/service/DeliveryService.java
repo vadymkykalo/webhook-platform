@@ -286,12 +286,22 @@ public class DeliveryService {
                 .id(attempt.getId())
                 .deliveryId(attempt.getDeliveryId())
                 .attemptNumber(attempt.getAttemptNumber())
+                .requestHeaders(attempt.getRequestHeaders())
+                .requestBody(truncate(attempt.getRequestBody(), 100000)) // 100KB limit
                 .httpStatusCode(attempt.getHttpStatusCode())
-                .responseBody(attempt.getResponseBody())
+                .responseHeaders(attempt.getResponseHeaders())
+                .responseBody(truncate(attempt.getResponseBody(), 100000)) // 100KB limit
                 .errorMessage(attempt.getErrorMessage())
                 .durationMs(attempt.getDurationMs())
                 .createdAt(attempt.getCreatedAt())
                 .build();
+    }
+    
+    private String truncate(String str, int maxLength) {
+        if (str == null || str.length() <= maxLength) {
+            return str;
+        }
+        return str.substring(0, maxLength) + "... (truncated at " + maxLength + " characters)";
     }
 
     private DeliveryResponse mapToResponse(Delivery delivery) {

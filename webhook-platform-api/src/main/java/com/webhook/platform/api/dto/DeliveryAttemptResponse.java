@@ -16,7 +16,10 @@ public class DeliveryAttemptResponse {
     private UUID id;
     private UUID deliveryId;
     private Integer attemptNumber;
+    private String requestHeaders;
+    private String requestBody;
     private Integer httpStatusCode;
+    private String responseHeaders;
     private String responseBody;
     private String errorMessage;
     private Integer durationMs;

@@ -11,6 +11,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -53,7 +54,7 @@ public class DashboardService {
         }
         
         // Get all deliveries for these events
-        List<Delivery> allDeliveries = deliveryRepository.findByEventIdIn(eventIds, org.springframework.data.domain.Pageable.unpaged()).getContent();
+        List<Delivery> allDeliveries = deliveryRepository.findByEventIdIn(eventIds, Pageable.unpaged()).getContent();
         
         // Calculate delivery stats
         DashboardStatsResponse.DeliveryStats deliveryStats = calculateDeliveryStats(allDeliveries);

@@ -26,8 +26,17 @@ public class DeliveryAttempt {
     @Column(name = "attempt_number", nullable = false)
     private Integer attemptNumber;
 
+    @Column(name = "request_headers", columnDefinition = "jsonb")
+    private String requestHeaders;
+
+    @Column(name = "request_body", columnDefinition = "TEXT")
+    private String requestBody;
+
     @Column(name = "http_status_code")
     private Integer httpStatusCode;
+
+    @Column(name = "response_headers", columnDefinition = "jsonb")
+    private String responseHeaders;
 
     @Column(name = "response_body", columnDefinition = "TEXT")
     private String responseBody;
