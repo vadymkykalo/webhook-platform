@@ -21,7 +21,7 @@ topics=(
 
 for topic in "${topics[@]}"; do
   echo "Creating topic: $topic"
-  docker exec $KAFKA_CONTAINER kafka-topics.sh \
+  docker exec $KAFKA_CONTAINER /opt/kafka/bin/kafka-topics.sh \
     --create \
     --bootstrap-server $BOOTSTRAP_SERVER \
     --topic $topic \
@@ -34,14 +34,14 @@ done
 
 echo ""
 echo "Listing all topics:"
-docker exec $KAFKA_CONTAINER kafka-topics.sh \
+docker exec $KAFKA_CONTAINER /opt/kafka/bin/kafka-topics.sh \
   --list \
   --bootstrap-server $BOOTSTRAP_SERVER
 
 echo ""
 echo "Topic details:"
 for topic in "${topics[@]}"; do
-  docker exec $KAFKA_CONTAINER kafka-topics.sh \
+  docker exec $KAFKA_CONTAINER /opt/kafka/bin/kafka-topics.sh \
     --describe \
     --bootstrap-server $BOOTSTRAP_SERVER \
     --topic $topic

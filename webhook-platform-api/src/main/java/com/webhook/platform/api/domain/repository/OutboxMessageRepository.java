@@ -19,7 +19,7 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     @Query(value = "SELECT * FROM outbox_messages WHERE status = :status ORDER BY created_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<OutboxMessage> findPendingBatchForUpdate(@Param("status") String status, @Param("limit") int limit);
     
-    @Query(value = "SELECT * FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries ORDER BY updated_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    @Query(value = "SELECT * FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries ORDER BY created_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<OutboxMessage> findFailedMessagesForRetry(@Param("status") String status, @Param("maxRetries") int maxRetries, @Param("limit") int limit);
     
     @Modifying
