@@ -47,16 +47,16 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4 py-8">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4 py-8">
+      <Card className="w-full max-w-md shadow-xl border-gray-200">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Webhook className="h-8 w-8 text-primary" />
+            <div className="p-3 rounded-full bg-gray-900">
+              <Webhook className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Create an account</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-3xl font-bold text-gray-900">Create an account</CardTitle>
+          <CardDescription className="text-gray-600">
             Get started with your webhook platform
           </CardDescription>
         </CardHeader>
@@ -119,16 +119,16 @@ export default function RegisterPage() {
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full bg-gray-900 hover:bg-gray-800 text-white font-medium py-6 rounded-lg transition-all hover:scale-105" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? 'Creating account...' : 'Create account'}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary hover:underline font-medium">
+            <Link to="/login" className="text-gray-900 hover:underline font-semibold">
               Sign in
             </Link>
           </p>
