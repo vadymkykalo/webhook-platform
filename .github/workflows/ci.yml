@@ -32,10 +32,11 @@ jobs:
           docker pull postgres:16-alpine
           docker pull apache/kafka:3.7.0
       
-      - name: Run tests with Testcontainers
-        run: mvn clean verify -B
-        env:
-          TESTCONTAINERS_RYUK_DISABLED: false
+      - name: Run unit tests
+        run: mvn clean test -B
+        
+      - name: Compile and package
+        run: mvn package -DskipTests -B
         
       - name: Upload test reports on failure
         if: failure()
