@@ -499,9 +499,10 @@ function DeveloperConfidence() {
                 <span className="ml-4 text-xs text-gray-400">send-event.sh</span>
               </div>
               <pre className="p-6 text-sm text-gray-100 overflow-x-auto">
-{`curl -X POST https://api.webhookplatform.io/v1/events \\
-  -H "Authorization: Bearer sk_live_..." \\
+{`curl -X POST https://webhook-api.yourapp.com/api/v1/events \\
+  -H "X-API-Key: wh_live_abc123def456..." \\
   -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: unique-request-id" \\
   -d '{
     "type": "order.completed",
     "data": {
