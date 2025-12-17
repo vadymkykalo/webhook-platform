@@ -31,6 +31,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!.env.dist
 
 # === Docker ===
 **/docker-data/
@@ -58,3 +59,8 @@ pnpm-debug.log*
 application-local.yml
 application-dev.yml
 application-prod.yml
+
+# === Backups ===
+backups/
+*.sql
+*.sql.gz

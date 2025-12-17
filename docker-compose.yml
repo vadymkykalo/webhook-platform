@@ -2,26 +2,29 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: webhook-postgres
+    profiles:
+      - embedded-db
     environment:
-      POSTGRES_DB: webhook_platform
-      POSTGRES_USER: webhook_user
-      POSTGRES_PASSWORD: webhook_pass
+      POSTGRES_DB: ${POSTGRES_DB:-webhook_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-webhook_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_VOLUME_NAME:-webhook_pgdata}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U webhook_user -d webhook_platform"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-webhook_user} -d ${POSTGRES_DB:-webhook_platform}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - webhook-network
+    restart: unless-stopped
 
   kafka:
-    image: apache/kafka:3.7.0
+    image: ${KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: webhook-kafka
     ports:
       - "9092:9092"
@@ -52,6 +55,7 @@ services:
       start_period: 30s
     networks:
       - webhook-network
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -61,12 +65,14 @@ services:
     image: minio/minio:latest
     container_name: webhook-minio
     command: server /data --console-address ":9001"
+    profiles:
+      - minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     environment:
-      MINIO_ROOT_USER: minio_admin
-      MINIO_ROOT_PASSWORD: minio_password
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_password}
     volumes:
       - minio_data:/data
     healthcheck:
@@ -76,26 +82,45 @@ services:
       retries: 5
     networks:
       - webhook-network
+    restart: unless-stopped
 
   api:
     build:
-      context: ./webhook-platform-api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./webhook-platform-api/Dockerfile
+    image: webhook-platform-api:${API_IMAGE_TAG:-latest}
     container_name: webhook-api
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: webhook_platform
-      DB_USER: webhook_user
-      DB_PASSWORD: webhook_pass
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-webhook_platform}
+      DB_USER: ${DB_USER:-webhook_user}
+      DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
+      DB_SSL_MODE: ${DB_SSL_MODE:-disable}
+      DB_JDBC_URL: ${DB_JDBC_URL:-}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-10}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-5}
+      DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SERVER_PORT: 8080
-      WEBHOOK_ENCRYPTION_KEY: development_master_key_32_chars
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      DATA_RETENTION_OUTBOX_DAYS: ${DATA_RETENTION_OUTBOX_DAYS:-7}
+      DATA_RETENTION_ATTEMPTS_DAYS: ${DATA_RETENTION_ATTEMPTS_DAYS:-90}
+      DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY: ${DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY:-10}
+      DATA_RETENTION_BATCH_SIZE: ${DATA_RETENTION_BATCH_SIZE:-1000}
+      DATA_RETENTION_CRON: ${DATA_RETENTION_CRON:-0 0 2 * * *}
+      DATA_RETENTION_LIMIT_CRON: ${DATA_RETENTION_LIMIT_CRON:-0 */30 * * * *}
+      EVENT_INGESTION_RATE_LIMIT_PER_SECOND: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:-100}
+      WEBHOOK_ALLOW_PRIVATE_IPS: ${WEBHOOK_ALLOW_PRIVATE_IPS:-false}
+      WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
+      APP_ENV: ${APP_ENV:-development}
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
     healthcheck:
@@ -106,25 +131,33 @@ services:
       start_period: 30s
     networks:
       - webhook-network
+    restart: unless-stopped
 
   worker:
     build:
-      context: ./webhook-platform-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./webhook-platform-worker/Dockerfile
+    image: webhook-platform-worker:${WORKER_IMAGE_TAG:-latest}
     container_name: webhook-worker
     ports:
-      - "8081:8081"
+      - "${WORKER_PORT:-8081}:8081"
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: webhook_platform
-      DB_USER: webhook_user
-      DB_PASSWORD: webhook_pass
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-webhook_platform}
+      DB_USER: ${DB_USER:-webhook_user}
+      DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
+      DB_SSL_MODE: ${DB_SSL_MODE:-disable}
+      DB_JDBC_URL: ${DB_JDBC_URL:-}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-10}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-5}
+      DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       MANAGEMENT_PORT: 8081
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_ENV: ${APP_ENV:-development}
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
     healthcheck:
@@ -135,23 +168,27 @@ services:
       start_period: 30s
     networks:
       - webhook-network
+    restart: unless-stopped
 
   ui:
     build:
       context: ./webhook-platform-ui
       dockerfile: Dockerfile
+    image: webhook-platform-ui:${UI_IMAGE_TAG:-latest}
     container_name: webhook-ui
     ports:
-      - "5173:5173"
+      - "${UI_PORT:-5173}:5173"
     environment:
-      VITE_API_URL: http://localhost:8080
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
     depends_on:
       - api
     networks:
       - webhook-network
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
+  webhook_pgdata:
+    name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}
   kafka_data:
   minio_data:
 

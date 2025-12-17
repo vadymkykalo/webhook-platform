@@ -69,29 +69,57 @@ This architecture prevents event loss during downstream failures. The outbox ens
 
 7. **Manual replay** - Admin can replay individual or bulk deliveries via API, which resets attempt counter and republishes to dispatch topic.
 
-## Quick start
+## Deployment
 
-Prerequisites: Docker, Docker Compose, Maven, JDK 17.
+The platform supports two deployment modes:
+
+**Embedded DB** - PostgreSQL runs in Docker. Recommended for self-hosted deployments, development, and testing.
+
+**External DB** - Connect to managed PostgreSQL (AWS RDS, Google Cloud SQL, Azure Database). Recommended for cloud/production deployments.
+
+### Self-hosted (Embedded DB)
+
+Prerequisites: Docker, Docker Compose.
 
 ```bash
-mvn clean package -DskipTests
-docker compose up -d
+# Start with defaults (development mode)
+make up
+
+# Access UI at http://localhost:5173
 ```
 
-Create Kafka topics:
+This automatically creates `.env` from `.env.dist` with working development defaults. Data persists in Docker volume `webhook_pgdata`.
+
+**For production:** Edit `.env` and change `WEBHOOK_ENCRYPTION_KEY` and `JWT_SECRET` before starting.
+
+### Cloud/Production (External DB)
+
+Prerequisites: Docker, Docker Compose, PostgreSQL instance.
 
 ```bash
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.dispatch --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.1m --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.5m --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.15m --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.1h --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.6h --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.24h --partitions 3 --replication-factor 1
-docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.dlq --partitions 3 --replication-factor 1
+# Initialize configuration
+make init
+
+# Edit .env for external DB mode:
+#   DB_MODE=external
+#   DB_HOST=your-db-host.example.com
+#   DB_PORT=5432
+#   DB_NAME=webhook_platform
+#   DB_USER=webhook_user
+#   DB_PASSWORD=<secure password>
+#   DB_SSL_MODE=require
+#   WEBHOOK_ENCRYPTION_KEY=<32+ character string>
+#   JWT_SECRET=<32+ character string>
+#   KAFKA_BOOTSTRAP_SERVERS=<your-kafka-cluster>:9092
+#   APP_ENV=production
+
+# Start services (without embedded postgres)
+make up-external-db
 ```
 
-Access UI at `http://localhost:5173` and register:
+Migrations run automatically on API startup. Access UI at `http://localhost:5173`.
+
+### First user registration
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/register \
@@ -101,19 +129,27 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 
 ## Configuration
 
-**`WEBHOOK_ENCRYPTION_KEY`** - AES master key for encrypting webhook secrets in database. Must be set. System will fail to start if missing. Use 32+ characters.
+All configuration via environment variables in `.env` file. Copy `.env.dist` to `.env` and configure.
 
-**`KAFKA_BOOTSTRAP_SERVERS`** - Kafka connection string. Defaults to localhost:9092. Worker and API must both reach Kafka or startup will fail after retry exhaustion.
+**Required secrets (must change):**
+- `WEBHOOK_ENCRYPTION_KEY` - AES master key for webhook secrets (32+ chars)
+- `JWT_SECRET` - JWT signing key (32+ chars)
 
-**`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`** - PostgreSQL connection parameters. System validates connection at startup. Flyway migrations run automatically and will fail startup if schema is inconsistent.
+**Database mode:**
+- `DB_MODE=embedded` - PostgreSQL in Docker (self-hosted)
+- `DB_MODE=external` - External PostgreSQL (cloud/prod)
 
-**`DATA_RETENTION_OUTBOX_DAYS`** - Days to keep published outbox messages (default 7). Cleanup runs daily at 2 AM via scheduled job.
+**External DB settings:**
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `DB_SSL_MODE` - require|verify-full|disable
+- `DB_JDBC_URL` - Optional full JDBC URL override
 
-**`DATA_RETENTION_ATTEMPTS_DAYS`** - Days to keep delivery attempts (default 90). Cleanup runs daily at 2 AM via scheduled job.
+**Data retention (optional):**
+- `DATA_RETENTION_OUTBOX_DAYS=7` - Cleanup published outbox messages
+- `DATA_RETENTION_ATTEMPTS_DAYS=90` - Cleanup old delivery attempts
+- `DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY=10` - Limit per delivery
 
-**`DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY`** - Maximum attempts to retain per delivery (default 10). Keeps most recent N attempts. Cleanup runs every 30 minutes.
-
-If `WEBHOOK_ENCRYPTION_KEY` is missing, system fails at startup. If database is unreachable, system enters readiness probe failure state but continues liveness checks. If Kafka is unavailable, consumers retry indefinitely while health checks report degraded state.
+System fails fast if required secrets are missing or contain placeholder values in production mode (`APP_ENV=production`).
 
 ## Operational guarantees & limits
 
@@ -165,10 +201,42 @@ Tests run against actual PostgreSQL and Kafka, not mocks. This validates schema 
 
 **Explicitly out of scope**: Webhook endpoint verification, payload transformations, custom retry policies per subscription, batch delivery API, OAuth2 for webhook endpoints, geo-distributed deployment patterns.
 
+## Operations
+
+**Available commands:**
+
+```bash
+make up                  # Start (embedded DB)
+make up-external-db      # Start (external DB)
+make down                # Stop services
+make logs                # Follow all logs
+make health              # Check service health
+make backup-db           # Backup embedded DB
+make restore-db FILE=... # Restore embedded DB
+make rebuild             # Rebuild and restart
+make doctor              # Run diagnostics
+make nuke CONFIRM=YES    # Destroy everything (requires confirmation)
+```
+
+**Persistence:**
+- Embedded mode: Data in Docker volume `webhook_pgdata`
+- External mode: Data in managed database
+
+**Backups (embedded only):**
+```bash
+# Create backup
+make backup-db
+
+# Restore from backup
+make restore-db FILE=backups/webhook_platform_20241217_120000.sql.gz
+```
+
+**Warning:** `make nuke` deletes all data including volumes. Cannot be undone. Requires explicit `CONFIRM=YES`.
+
 ## Contribution & license
 
 Standard GitHub workflow: fork, branch, test, pull request. Ensure integration tests pass before submitting. Use conventional commit messages.
 
-Requires JDK 17, Maven 3.8+, Docker for integration tests.
+No local Maven or npm builds required. All builds happen in Docker via `make build`.
 
 Licensed under MIT.

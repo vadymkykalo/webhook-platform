@@ -1,18 +1,14 @@
-import { ArrowLeft, CheckCircle2, Code2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/auth.store';
 
 export default function QuickstartPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 5;
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Navigation />
       <div className="max-w-6xl mx-auto px-6 py-16">
-        <Header totalSteps={totalSteps} />
-        <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
+        <Header />
         <StepContainer>
           <Step1 />
           <Step2 />
@@ -69,7 +65,7 @@ function Navigation() {
   );
 }
 
-function Header({ totalSteps }: { totalSteps: number }) {
+function Header() {
   return (
     <div className="mb-16">
       <Link
@@ -84,44 +80,6 @@ function Header({ totalSteps }: { totalSteps: number }) {
         <p className="text-xl text-gray-600">
           Get your first webhook delivered in under 5 minutes.
         </p>
-      </div>
-    </div>
-  );
-}
-
-function ProgressBar({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) {
-  return (
-    <div className="mb-16">
-      <div className="flex items-center justify-between mb-3">
-        {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
-          <div key={step} className="flex-1 relative">
-            <div className="flex items-center">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                  step <= currentStep
-                    ? 'bg-gray-900 text-white scale-110'
-                    : 'bg-gray-200 text-gray-400'
-                }`}
-              >
-                {step <= currentStep - 1 ? (
-                  <CheckCircle2 className="h-5 w-5" />
-                ) : (
-                  step
-                )}
-              </div>
-              {step < totalSteps && (
-                <div
-                  className={`flex-1 h-1 mx-2 transition-all ${
-                    step < currentStep ? 'bg-gray-900' : 'bg-gray-200'
-                  }`}
-                />
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="text-center text-sm text-gray-500">
-        Step {currentStep} of {totalSteps}
       </div>
     </div>
   );

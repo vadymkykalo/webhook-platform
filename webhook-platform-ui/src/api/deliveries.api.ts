@@ -1,5 +1,5 @@
 import { http } from './http';
-import type { DeliveryResponse, PageResponse } from '../types/api.types';
+import type { DeliveryResponse, DeliveryAttemptResponse, PageResponse } from '../types/api.types';
 
 export interface DeliveryFilters {
   page?: number;

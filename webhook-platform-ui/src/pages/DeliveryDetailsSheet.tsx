@@ -246,7 +246,7 @@ export default function DeliveryDetailsSheet({
                     </p>
                   ) : (
                     <div className="space-y-4">
-                      {attempts.map((attempt, index) => (
+                      {attempts.map((attempt) => (
                         <div
                           key={attempt.id}
                           className="border rounded-lg p-4 space-y-2"

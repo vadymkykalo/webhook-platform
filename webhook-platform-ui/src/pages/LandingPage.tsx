@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, Lock, RefreshCw, Shield, Zap, Clock, Activity, AlertCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/auth.store';
