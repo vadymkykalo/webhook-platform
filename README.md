@@ -129,27 +129,110 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 
 ## Configuration
 
-All configuration via environment variables in `.env` file. Copy `.env.dist` to `.env` and configure.
+All configuration managed through `.env` file. Auto-created from `.env.dist` on first `make up`.
 
-**Required secrets (must change):**
-- `WEBHOOK_ENCRYPTION_KEY` - AES master key for webhook secrets (32+ chars)
-- `JWT_SECRET` - JWT signing key (32+ chars)
+### Environment Variables Reference
 
-**Database mode:**
-- `DB_MODE=embedded` - PostgreSQL in Docker (self-hosted)
-- `DB_MODE=external` - External PostgreSQL (cloud/prod)
+**Application Mode:**
+- `APP_ENV` - Environment mode: `development` (default) or `production`. Production mode enforces strict secret validation.
 
-**External DB settings:**
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- `DB_SSL_MODE` - require|verify-full|disable
-- `DB_JDBC_URL` - Optional full JDBC URL override
+**Database - Mode Selection:**
+- `DB_MODE` - Database deployment mode:
+  - `embedded` (default) - PostgreSQL runs in Docker container, ideal for self-hosted
+  - `external` - Connect to external/managed PostgreSQL, ideal for cloud deployment
 
-**Data retention (optional):**
-- `DATA_RETENTION_OUTBOX_DAYS=7` - Cleanup published outbox messages
-- `DATA_RETENTION_ATTEMPTS_DAYS=90` - Cleanup old delivery attempts
-- `DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY=10` - Limit per delivery
+**Database - Embedded Mode (when DB_MODE=embedded):**
+- `POSTGRES_IMAGE` - PostgreSQL Docker image (default: `postgres:16-alpine`)
+- `POSTGRES_DB` - Database name (default: `webhook_platform`)
+- `POSTGRES_USER` - Database user (default: `webhook_user`)
+- `POSTGRES_PASSWORD` - Database password (**change for production**, default: `webhook_dev_pass_12345`)
+- `POSTGRES_PORT` - Exposed port (default: `5432`)
+- `POSTGRES_VOLUME_NAME` - Docker volume name (default: `webhook_pgdata`)
 
-System fails fast if required secrets are missing or contain placeholder values in production mode (`APP_ENV=production`).
+**Database - External Mode (when DB_MODE=external):**
+- `DB_HOST` - Database hostname (for embedded: `postgres`, for external: your DB host)
+- `DB_PORT` - Database port (default: `5432`)
+- `DB_NAME` - Database name (default: `webhook_platform`)
+- `DB_USER` - Database username (default: `webhook_user`)
+- `DB_PASSWORD` - Database password (**required for external mode**)
+- `DB_SSL_MODE` - SSL mode: `disable` (dev), `require`, or `verify-full` (production)
+- `DB_JDBC_URL` - Optional: Full JDBC URL override (if set, individual DB_* vars ignored)
+- `DB_POOL_MAX_SIZE` - Connection pool max size (default: `10`)
+- `DB_POOL_MIN_IDLE` - Connection pool min idle (default: `5`)
+- `DB_POOL_CONNECTION_TIMEOUT` - Connection timeout in ms (default: `30000`)
+
+**Kafka Configuration:**
+- `KAFKA_BOOTSTRAP_SERVERS` - Kafka connection string (default: `kafka:9092` for embedded)
+- `KAFKA_IMAGE` - Kafka Docker image (default: `apache/kafka:3.7.0`)
+
+**Security (CRITICAL - Must Change for Production):**
+- `WEBHOOK_ENCRYPTION_KEY` - AES-256 master key for encrypting webhook secrets. **Minimum 32 characters**. (**default dev value: `dev_encryption_key_32_chars_min`**)
+- `JWT_SECRET` - Secret for signing JWT tokens. **Minimum 32 characters**. (**default dev value: `dev_jwt_secret_key_32_chars_minimum`**)
+
+**API Service:**
+- `API_PORT` - API HTTP port (default: `8080`)
+- `API_IMAGE_TAG` - Docker image tag (default: `latest`)
+
+**Worker Service:**
+- `WORKER_PORT` - Worker management port (default: `8081`)
+- `WORKER_IMAGE_TAG` - Docker image tag (default: `latest`)
+
+**UI Service:**
+- `UI_PORT` - UI HTTP port (default: `5173`)
+- `UI_IMAGE_TAG` - Docker image tag (default: `latest`)
+
+**MinIO (Optional - for future file attachments):**
+- `MINIO_ROOT_USER` - MinIO admin username (default: `minio_admin`)
+- `MINIO_ROOT_PASSWORD` - MinIO admin password (**change for production**, default: `minio_dev_password_12345`)
+- `MINIO_PORT` - MinIO API port (default: `9000`)
+- `MINIO_CONSOLE_PORT` - MinIO console port (default: `9001`)
+
+**Data Retention Policies:**
+- `DATA_RETENTION_OUTBOX_DAYS` - Days to keep published outbox messages (default: `7`)
+- `DATA_RETENTION_ATTEMPTS_DAYS` - Days to keep delivery attempts (default: `90`)
+- `DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY` - Max attempts to retain per delivery (default: `10`)
+
+### Configuration Examples
+
+**Development (default):**
+```bash
+make up
+# Uses embedded PostgreSQL + Kafka, development secrets
+```
+
+**Production with embedded database:**
+```bash
+# Edit .env:
+APP_ENV=production
+WEBHOOK_ENCRYPTION_KEY=<your-secure-32-char-key>
+JWT_SECRET=<your-secure-32-char-key>
+POSTGRES_PASSWORD=<strong-password>
+
+make up
+```
+
+**Production with external database:**
+```bash
+# Edit .env:
+APP_ENV=production
+DB_MODE=external
+DB_HOST=your-db.rds.amazonaws.com
+DB_PASSWORD=<your-db-password>
+DB_SSL_MODE=require
+WEBHOOK_ENCRYPTION_KEY=<your-secure-32-char-key>
+JWT_SECRET=<your-secure-32-char-key>
+
+make up-external-db
+```
+
+### Security Validation
+
+System performs startup validation:
+- In `production` mode: Fails if secrets contain default/placeholder values
+- Validates `WEBHOOK_ENCRYPTION_KEY` and `JWT_SECRET` are 32+ characters
+- Checks database connectivity before starting services
+
+Validation errors halt startup to prevent insecure deployments.
 
 ## Operational guarantees & limits
 
@@ -201,37 +284,268 @@ Tests run against actual PostgreSQL and Kafka, not mocks. This validates schema 
 
 **Explicitly out of scope**: Webhook endpoint verification, payload transformations, custom retry policies per subscription, batch delivery API, OAuth2 for webhook endpoints, geo-distributed deployment patterns.
 
-## Operations
+## Makefile Commands Reference
 
-**Available commands:**
+### Lifecycle Management
 
+**`make init`**
+- Creates `.env` from `.env.dist` if not exists
+- Safe to run multiple times (skips if `.env` already exists)
+- Automatically called by `make up`
+
+**`make up`**
+- Start all services in **embedded database mode** (default for self-hosted)
+- Auto-creates `.env`, builds Docker images, starts PostgreSQL + Kafka + API + Worker + UI
+- Creates Kafka topics automatically
+- Waits for services to become healthy
+- **First-time run:** Takes 5-10 minutes (Maven/npm downloads dependencies)
+- **Subsequent runs:** Fast (uses cached layers)
+
+**`make up-external-db`**
+- Start services in **external database mode**
+- Does NOT start PostgreSQL container
+- Requires `DB_MODE=external` and valid `DB_HOST`, `DB_PASSWORD` in `.env`
+- Use for cloud deployments with managed databases (RDS, Cloud SQL, etc.)
+
+**`make down`**
+- Stop all services gracefully
+- Preserves data (volumes not deleted)
+- Safe to run multiple times
+- Fallback commands included for cases where docker-compose fails
+
+**`make stop`**
+- Alias for `make down`
+
+**`make clean`**
+- Stop services and remove containers
+- **Keeps volumes** (data preserved)
+- **Keeps images** (build cache preserved)
+- Use when containers are in a bad state
+
+### Building & Rebuilding
+
+**`make build`**
+- Build Docker images for API, Worker, UI
+- Uses multi-stage builds (Maven/npm run inside Docker)
+- **No local Java or Node.js required**
+- Caches layers for faster rebuilds
+
+**`make rebuild`**
+- Full rebuild with no cache (embedded DB mode)
+- Equivalent to: `make down && make build --no-cache && make up`
+- Use when Dockerfiles or dependencies change
+- Takes longer (re-downloads all dependencies)
+
+**`make rebuild-external-db`**
+- Full rebuild with no cache (external DB mode)
+- Same as `rebuild` but for external database deployments
+
+### Development Commands (Fast Iteration)
+
+**`make dev-api`**
+- Quick rebuild API with cache + restart + follow logs
+- **Fast** - uses Docker layer cache (rebuilds only changed code)
+- Best for active API development
+- Example: Changed controller → `make dev-api` → see logs immediately
+
+**`make dev-worker`**
+- Quick rebuild Worker with cache + restart + follow logs
+- **Fast** - uses Docker layer cache
+- Best for active Worker development
+- Example: Changed retry logic → `make dev-worker` → see logs immediately
+
+**`make dev-ui`**
+- Quick rebuild UI with cache + restart + follow logs
+- **Fast** - uses Docker layer cache
+- Best for active UI development
+- Example: Changed React component → `make dev-ui` → see logs immediately
+
+**`make rebuild-api`**
+- Rebuild ONLY API service (no cache, clean build)
+- Faster than full `make rebuild` (doesn't rebuild Worker/UI)
+- Use when API dependencies changed
+
+**`make rebuild-worker`**
+- Rebuild ONLY Worker service (no cache, clean build)
+- Faster than full `make rebuild` (doesn't rebuild API/UI)
+- Use when Worker dependencies changed
+
+**`make rebuild-ui`**
+- Rebuild ONLY UI service (no cache, clean build)
+- Faster than full `make rebuild` (doesn't rebuild API/Worker)
+- Use when UI npm packages changed
+
+**`make restart-api`**
+- Restart API container without rebuild
+- **Instant** - no compilation, just container restart
+- Use when testing config changes
+
+**`make restart-worker`**
+- Restart Worker container without rebuild
+- **Instant** - no compilation, just container restart
+
+**`make restart-ui`**
+- Restart UI container without rebuild
+- **Instant** - no compilation, just container restart
+
+### Monitoring & Debugging
+
+**`make logs`**
+- Follow logs for all services (API, Worker, UI, Kafka, PostgreSQL)
+- Press `Ctrl+C` to stop following
+
+**`make logs-api`**
+- Follow API service logs only
+
+**`make logs-worker`**
+- Follow Worker service logs only
+
+**`make logs-ui`**
+- Follow UI service logs only
+
+**`make health`**
+- Check health status of API and Worker services
+- Hits `/actuator/health` endpoints
+- Returns HTTP status codes
+
+### Kafka Operations
+
+**`make create-topics`**
+- Create all required Kafka topics (idempotent)
+- Topics: `deliveries.dispatch`, retry topics (`1m`, `5m`, `15m`, `1h`, `6h`, `24h`), `deliveries.dlq`
+- Safe to run multiple times (uses `--if-not-exists`)
+- Automatically called by `make up`
+
+### Database Operations (Embedded Mode Only)
+
+**`make shell-db`**
+- Open PostgreSQL interactive shell (psql)
+- Direct access to database for queries/debugging
+- Requires embedded mode (won't work with external DB)
+
+**`make backup-db`**
+- Create compressed database backup
+- Saves to `./backups/webhook_platform_YYYYMMDD_HHMMSS.sql.gz`
+- Uses `pg_dump` inside PostgreSQL container
+- **Only works with embedded database mode**
+- Example: `make backup-db` → creates `backups/webhook_platform_20241217_153022.sql.gz`
+
+**`make restore-db FILE=<path>`**
+- Restore database from compressed backup
+- Drops existing database and recreates
+- **Destructive operation** - all current data is replaced
+- Requires: `FILE=backups/webhook_platform_YYYYMMDD_HHMMSS.sql.gz`
+- Example: `make restore-db FILE=backups/webhook_platform_20241217_153022.sql.gz`
+
+### Diagnostics & Validation
+
+**`make doctor`**
+- Run system diagnostics
+- Checks:
+  - Docker installed and running
+  - Docker Compose available (v1 or v2)
+  - `.env` file exists
+  - Required environment variables set (if external DB mode)
+  - Secrets validation (if production mode)
+- Use when troubleshooting deployment issues
+
+### Destructive Operations
+
+**`make nuke CONFIRM=YES`**
+- **⚠️ DANGER: Destroys everything**
+- Stops all services
+- Removes all containers
+- **Deletes all volumes** (all data lost permanently)
+- Removes Docker networks
+- Removes built images
+- **Cannot be undone**
+- Requires explicit confirmation: `CONFIRM=YES`
+- Use only for complete clean slate (e.g., switching databases)
+
+Example:
 ```bash
-make up                  # Start (embedded DB)
-make up-external-db      # Start (external DB)
-make down                # Stop services
-make logs                # Follow all logs
-make health              # Check service health
-make backup-db           # Backup embedded DB
-make restore-db FILE=... # Restore embedded DB
-make rebuild             # Rebuild and restart
-make doctor              # Run diagnostics
-make nuke CONFIRM=YES    # Destroy everything (requires confirmation)
+make nuke CONFIRM=YES
 ```
 
-**Persistence:**
-- Embedded mode: Data in Docker volume `webhook_pgdata`
-- External mode: Data in managed database
+### Operational Workflows
 
-**Backups (embedded only):**
+**First-time setup (self-hosted):**
 ```bash
-# Create backup
+make up              # Creates .env, builds images, starts everything
+# Access UI at http://localhost:5173
+```
+
+**Daily development:**
+```bash
+make up              # Start
+make logs            # Watch logs
+make down            # Stop
+```
+
+**Code changes (fast iteration):**
+```bash
+# Working on API:
+make dev-api         # Rebuild API (with cache) + follow logs
+
+# Working on Worker:
+make dev-worker      # Rebuild Worker (with cache) + follow logs
+
+# Working on UI:
+make dev-ui          # Rebuild UI (with cache) + follow logs
+
+# Full rebuild when dependencies change:
+make rebuild-api     # Only API (no cache)
+make rebuild-worker  # Only Worker (no cache)
+make rebuild-ui      # Only UI (no cache)
+
+# Full system rebuild:
+make rebuild         # All services (no cache)
+```
+
+**Production deployment:**
+```bash
+# 1. Edit .env with production values
+nano .env
+
+# 2. Validate configuration
+make doctor
+
+# 3. Start services
+make up-external-db  # If using external DB
+# OR
+make up              # If using embedded DB
+
+# 4. Check health
+make health
+```
+
+**Backup & restore:**
+```bash
+# Backup before maintenance
 make backup-db
 
-# Restore from backup
-make restore-db FILE=backups/webhook_platform_20241217_120000.sql.gz
+# Restore if needed
+make restore-db FILE=backups/webhook_platform_20241217_153022.sql.gz
 ```
 
-**Warning:** `make nuke` deletes all data including volumes. Cannot be undone. Requires explicit `CONFIRM=YES`.
+**Clean slate:**
+```bash
+make nuke CONFIRM=YES
+make up
+```
+
+### Persistence & Data Safety
+
+**Embedded mode:**
+- Data stored in Docker volume: `webhook_pgdata`
+- Survives `make down` and `make clean`
+- Only deleted by `make nuke CONFIRM=YES`
+- Backup recommended: `make backup-db`
+
+**External mode:**
+- Data in managed database
+- Not affected by any make commands
+- Backup via cloud provider tools
 
 ## Contribution & license
 

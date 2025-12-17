@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health
+.PHONY: help up up-external-db down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui
 
 # Default target
 .DEFAULT_GOAL := help
@@ -93,6 +93,61 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 	@sleep 10
 	@$(MAKE) create-topics
 	@echo "$(GREEN)✓ Rebuild complete$(NC)"
+
+##@ Development (Fast Rebuilds)
+rebuild-api: ## Rebuild only API service (fast)
+	@echo "$(GREEN)Rebuilding API...$(NC)"
+	@$(DOCKER_COMPOSE) build --no-cache api
+	@$(DOCKER_COMPOSE) up -d api
+	@echo "$(GREEN)✓ API rebuilt and restarted$(NC)"
+
+rebuild-worker: ## Rebuild only Worker service (fast)
+	@echo "$(GREEN)Rebuilding Worker...$(NC)"
+	@$(DOCKER_COMPOSE) build --no-cache worker
+	@$(DOCKER_COMPOSE) up -d worker
+	@echo "$(GREEN)✓ Worker rebuilt and restarted$(NC)"
+
+rebuild-ui: ## Rebuild only UI service (fast)
+	@echo "$(GREEN)Rebuilding UI...$(NC)"
+	@$(DOCKER_COMPOSE) build --no-cache ui
+	@$(DOCKER_COMPOSE) up -d ui
+	@echo "$(GREEN)✓ UI rebuilt and restarted$(NC)"
+
+restart-api: ## Restart API service (no rebuild)
+	@echo "$(GREEN)Restarting API...$(NC)"
+	@docker restart webhook-api
+	@echo "$(GREEN)✓ API restarted$(NC)"
+
+restart-worker: ## Restart Worker service (no rebuild)
+	@echo "$(GREEN)Restarting Worker...$(NC)"
+	@docker restart webhook-worker
+	@echo "$(GREEN)✓ Worker restarted$(NC)"
+
+restart-ui: ## Restart UI service (no rebuild)
+	@echo "$(GREEN)Restarting UI...$(NC)"
+	@docker restart webhook-ui
+	@echo "$(GREEN)✓ UI restarted$(NC)"
+
+dev-api: ## Quick dev: rebuild API with cache + restart
+	@echo "$(GREEN)Quick rebuild API (with cache)...$(NC)"
+	@$(DOCKER_COMPOSE) build api
+	@$(DOCKER_COMPOSE) up -d api
+	@echo "$(GREEN)✓ API ready$(NC)"
+	@$(MAKE) logs-api
+
+dev-worker: ## Quick dev: rebuild Worker with cache + restart
+	@echo "$(GREEN)Quick rebuild Worker (with cache)...$(NC)"
+	@$(DOCKER_COMPOSE) build worker
+	@$(DOCKER_COMPOSE) up -d worker
+	@echo "$(GREEN)✓ Worker ready$(NC)"
+	@$(MAKE) logs-worker
+
+dev-ui: ## Quick dev: rebuild UI with cache + restart
+	@echo "$(GREEN)Quick rebuild UI (with cache)...$(NC)"
+	@$(DOCKER_COMPOSE) build ui
+	@$(DOCKER_COMPOSE) up -d ui
+	@echo "$(GREEN)✓ UI ready$(NC)"
+	@$(MAKE) logs-ui
 
 ##@ Kafka
 create-topics: ## Create Kafka topics (idempotent)
