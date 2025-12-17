@@ -24,14 +24,38 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      - name: Run tests
+      - name: Grant Docker socket permissions
+        run: sudo chmod 666 /var/run/docker.sock
+      
+      - name: Pull required Docker images for Testcontainers
+        run: |
+          docker pull postgres:16-alpine
+          docker pull apache/kafka:3.7.0
+      
+      - name: Run tests with Testcontainers
         run: mvn clean verify -B
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: false
+        
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+          retention-days: 5
         
       - name: Test Summary
         if: always()
         run: |
           echo "### Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          if [ -f webhook-platform-api/target/surefire-reports/TEST-*.xml ]; then
+            echo "✅ Tests executed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Tests failed or did not run" >> $GITHUB_STEP_SUMMARY
+          fi
   
   docker-build:
     name: Verify Docker Builds
