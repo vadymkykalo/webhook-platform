@@ -1,365 +1,169 @@
-# Webhook & Event Delivery Platform
+# Webhook Platform
 
-Production-ready webhook delivery system with Kafka-based retry mechanism, transactional outbox pattern, HMAC signatures, and comprehensive management API.
+Distributed webhook delivery system with at-least-once guarantees, multi-tenant isolation, and automated retry handling.
+
+## What it is
+
+This platform handles reliable webhook delivery at scale using the transactional outbox pattern. Events are written to PostgreSQL, published to Kafka, and delivered to configured HTTP endpoints with HMAC signatures and exponential backoff retries.
+
+Built for production use where delivery reliability, tenant isolation, and observability matter. The architecture separates ingestion from delivery to prevent backpressure and enables independent scaling of both concerns.
 
 ## Features
 
-✅ **Reliable Event Delivery** - At-least-once delivery with transactional outbox  
-✅ **Smart Retry Logic** - Exponential backoff (1m → 24h) with 7 retry attempts  
-✅ **HMAC Signatures** - SHA-256 webhook security with timestamp validation  
-✅ **Idempotency** - Duplicate event prevention via `Idempotency-Key` header  
-✅ **Fan-out** - Multiple webhooks per event with subscription management  
-✅ **Dead Letter Queue** - Failed deliveries captured for manual replay  
-✅ **Management API** - Full CRUD for projects, endpoints, subscriptions, deliveries  
-✅ **Secret Encryption** - AES-GCM encryption for webhook secrets  
-✅ **Audit Trail** - Complete delivery attempt history  
-✅ **Ordering Guarantee** - Per-endpoint message ordering via Kafka partitioning  
+- Transactional outbox pattern for guaranteed event publishing
+- HMAC-SHA256 webhook signatures with timestamp validation
+- Exponential backoff retry strategy (1m to 24h, 7 attempts)
+- Single and bulk delivery replay for manual intervention
+- Per-project rate limiting using token bucket algorithm
+- Organization-based multi-tenant isolation with JWT authentication
+- Automated data retention policies for outbox and delivery attempts
+- Admin dashboard with delivery statistics and endpoint health metrics
+- Idempotent event ingestion via header-based deduplication
+- Dead letter queue for exhausted retry deliveries
 
-## Tech Stack
+## Architecture overview
 
-- **Java 17** - Modern JVM features
-- **Spring Boot 3.2** - Production-grade framework
-- **PostgreSQL 16** - Source of truth with JSONB support
-- **Apache Kafka 3.7** - Message bus with KRaft mode
-- **Maven** - Multi-module project structure
-- **Docker Compose** - Local development environment
-- **WebClient** - Non-blocking HTTP for webhook delivery
-- **Flyway** - Database migrations
+The platform consists of five components that together provide reliable webhook delivery.
 
-## Architecture
+**API service** receives HTTP events, writes them transactionally to PostgreSQL alongside delivery records, and runs a scheduled publisher that moves pending messages to Kafka topics.
 
-```
-┌─────────────┐         ┌──────────────┐         ┌─────────────┐
-│   Producer  │────────▶│   API (8080) │────────▶│  PostgreSQL │
-└─────────────┘  REST   └──────────────┘  Write  └─────────────┘
-                              │                          │
-                              │ Outbox Publisher         │
-                              ▼                          │
-                         ┌─────────┐                     │
-                         │  Kafka  │                     │
-                         │ Topics  │                     │
-                         └─────────┘                     │
-                              │                          │
-                              ▼                          │
-                    ┌──────────────────┐                 │
-                    │  Worker (8081)   │────────────────┘
-                    │  - Dispatch      │      Read
-                    │  - Retry (6)     │
-                    │  - DLQ           │
-                    └──────────────────┘
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │  Webhook Targets │
-                    └──────────────────┘
-```
+**Worker service** consumes from Kafka, executes HTTP POST requests to webhook endpoints with HMAC signatures, records attempt details, and publishes failed deliveries to time-delayed retry topics or the dead letter queue.
 
-## Project Structure
+**Message broker** (Kafka) decouples ingestion from delivery and provides natural time-based retry scheduling through multiple topics with different consumer lag patterns.
+
+**Database** (PostgreSQL) is the source of truth for all state: events, deliveries, attempts, endpoints, subscriptions, and tenant configuration.
+
+**UI** (React) provides management interface for projects, endpoints, subscriptions, and delivery inspection.
 
 ```
-webhook-platform/
-├── webhook-platform-common/      # Shared utilities, DTOs, constants
-│   ├── util/
-│   │   ├── CryptoUtils.java      # AES-GCM encryption, API key hashing
-│   │   └── WebhookSignatureUtils.java  # HMAC signature generation
-│   └── dto/
-│       └── DeliveryMessage.java  # Kafka message format
-│
-├── webhook-platform-api/         # REST API + Outbox Publisher
-│   ├── controller/               # REST endpoints
-│   ├── service/                  # Business logic
-│   ├── security/                 # API key authentication
-│   ├── domain/                   # JPA entities + repositories
-│   └── resources/
-│       └── db/migration/         # Flyway SQL scripts
-│
-├── webhook-platform-worker/      # Kafka Consumer + HTTP Delivery
-│   ├── consumer/                 # Kafka listeners
-│   ├── service/
-│   │   ├── WebhookDeliveryService.java  # HTTP POST with signatures
-│   │   └── RetrySchedulerService.java   # Retry polling
-│   └── domain/                   # JPA entities + repositories
-│
-└── scripts/
-    ├── setup.sh                  # One-command setup
-    ├── e2e-test.sh              # End-to-end test suite
-    └── create-kafka-topics.sh   # Kafka topic creation
+Client → API → Outbox → Kafka → Worker → Webhook Endpoint
+                  ↓        ↓         ↓
+              PostgreSQL (events, deliveries, attempts)
 ```
 
-## Quick Start
+This architecture prevents event loss during downstream failures. The outbox ensures events reach Kafka before acknowledgment. Kafka persistence ensures delivery attempts survive worker crashes. The retry scheduler in the worker polls the database for deliveries needing retry and republishes them to appropriate time-delayed topics.
 
-### Automated Setup
+## Repository structure
+
+**`/webhook-platform-api`** - Spring Boot REST API. Handles event ingestion with rate limiting and idempotency checks, manages projects/endpoints/subscriptions, provides delivery query and replay operations, runs the outbox publisher scheduler, contains Flyway migrations.
+
+**`/webhook-platform-worker`** - Spring Boot Kafka consumer. Listens to dispatch and retry topics, executes webhook HTTP delivery with signature generation, records delivery attempts with full request/response data, runs retry scheduler that polls database for deliveries needing retry.
+
+**`/webhook-platform-ui`** - React TypeScript application. Dashboard for delivery statistics, project and endpoint management, subscription configuration, delivery history with filtering.
+
+**`/webhook-platform-common`** - Shared Java utilities. Crypto functions for AES-GCM encryption and HMAC signature generation, DTO classes for Kafka messages, common constants.
+
+**`/scripts`** - Automation scripts. `setup.sh` builds and starts all services with topic creation, `e2e-test.sh` runs full delivery flow validation, `create-kafka-topics.sh` creates dispatch, retry, and DLQ topics.
+
+## How it works
+
+1. **Event ingestion** - Client sends event via REST API with API key authentication. System checks rate limit (100 events/second per project by default), validates idempotency key if provided, writes event to database.
+
+2. **Delivery creation** - Transaction finds all active subscriptions matching event type, creates delivery records in PENDING status for each matching endpoint, writes outbox message in same transaction.
+
+3. **Async processing** - Outbox publisher polls every 1 second for PENDING messages, publishes to `deliveries.dispatch` topic, marks as PUBLISHED in database.
+
+4. **Initial delivery attempt** - Worker consumes message, loads delivery and endpoint data, decrypts webhook secret, generates HMAC signature, executes HTTP POST with 30-second timeout, records attempt with status code and response.
+
+5. **Retry handling** - On 5xx or timeout, worker calculates next retry time using exponential backoff, updates delivery status to RETRY, publishes to time-delayed retry topic (1m, 5m, 15m, 1h, 6h, 24h).
+
+6. **Failure handling** - On 4xx (except 408, 425, 429), marks delivery as FAILED. After 7 total attempts, publishes to DLQ topic and marks delivery as DLQ status.
+
+7. **Manual replay** - Admin can replay individual or bulk deliveries via API, which resets attempt counter and republishes to dispatch topic.
+
+## Quick start
+
+Prerequisites: Docker, Docker Compose, Maven, JDK 17.
 
 ```bash
-# Build, start services, create topics
-bash scripts/setup.sh
-
-# Run end-to-end test
-bash scripts/e2e-test.sh
-```
-
-### Manual Setup
-
-```bash
-# 1. Build
 mvn clean package -DskipTests
-
-# 2. Start services
 docker compose up -d
-
-# 3. Wait for services (~30s)
 sleep 30
-
-# 4. Create Kafka topics
 bash scripts/create-kafka-topics.sh
-
-# 5. Health checks
-curl http://localhost:8080/actuator/health
-curl http://localhost:8081/actuator/health
 ```
 
-## Usage
+UI available at `http://localhost:5173`
 
-### 1. Create Project & Endpoint
+Send first event:
 
 ```bash
-# Create project
-PROJECT_ID=$(curl -s -X POST http://localhost:8080/api/v1/projects \
+curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"My Project","description":"Production webhooks"}' | jq -r '.id')
+  -d '{"email":"test@example.com","password":"test123","organizationName":"Test Org"}'
 
-# Create webhook endpoint
-ENDPOINT_ID=$(curl -s -X POST http://localhost:8080/api/v1/projects/$PROJECT_ID/endpoints \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url":"https://your-webhook-url.com/webhook",
-    "secret":"your_webhook_secret_key",
-    "enabled":true
-  }' | jq -r '.id')
-
-# Create subscription
-curl -X POST http://localhost:8080/api/v1/projects/$PROJECT_ID/subscriptions \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"endpointId\":\"$ENDPOINT_ID\",
-    \"eventType\":\"user.created\",
-    \"enabled\":true
-  }"
+# Use returned token for authenticated requests
 ```
-
-### 2. Generate API Key
-
-```bash
-# Insert API key into database (hash of "your_api_key")
-docker exec -it webhook-postgres psql -U webhook_user -d webhook_platform << EOF
-INSERT INTO api_keys (id, project_id, name, key_hash, key_prefix, created_at)
-VALUES (
-  gen_random_uuid(),
-  '$PROJECT_ID',
-  'Production Key',
-  encode(digest('your_api_key', 'sha256'), 'base64'),
-  'your_api',
-  CURRENT_TIMESTAMP
-);
-EOF
-```
-
-### 3. Send Events
-
-```bash
-# Send event
-curl -X POST http://localhost:8080/api/v1/events \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your_api_key" \
-  -d '{
-    "type": "user.created",
-    "data": {
-      "userId": "user123",
-      "email": "user@example.com",
-      "timestamp": "2024-01-15T10:30:00Z"
-    }
-  }'
-
-# With idempotency
-curl -X POST http://localhost:8080/api/v1/events \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your_api_key" \
-  -H "Idempotency-Key: unique-request-id" \
-  -d '{"type":"order.completed","data":{"orderId":"order456"}}'
-```
-
-### 4. Query Deliveries
-
-```bash
-# List deliveries
-curl "http://localhost:8080/api/v1/deliveries?page=0&size=20"
-
-# Get delivery details
-curl http://localhost:8080/api/v1/deliveries/{delivery_id}
-
-# Replay failed delivery
-curl -X POST http://localhost:8080/api/v1/deliveries/{delivery_id}/replay
-```
-
-## Webhook Payload
-
-Your webhook endpoint receives:
-
-**Headers:**
-```
-X-Signature: t=1702654321000,v1=abc123def456...
-X-Event-Id: uuid-of-event
-X-Delivery-Id: uuid-of-delivery
-X-Timestamp: 1702654321000
-Content-Type: application/json
-```
-
-**Body:** Original event data (JSON)
-
-**Signature Verification:**
-```java
-String signature = HMAC_SHA256(secret, timestamp + "." + body);
-```
-
-## Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| API | 8080 | REST API, event ingestion, management |
-| Worker | 8081 | Management/health only |
-| PostgreSQL | 5432 | Database |
-| Kafka | 9092 | Message broker |
-| MinIO | 9000/9001 | Object storage (future use) |
-
-## Kafka Topics
-
-| Topic | Purpose | Delay |
-|-------|---------|-------|
-| `deliveries.dispatch` | Initial delivery | Immediate |
-| `deliveries.retry.1m` | First retry | 1 minute |
-| `deliveries.retry.5m` | Second retry | 5 minutes |
-| `deliveries.retry.15m` | Third retry | 15 minutes |
-| `deliveries.retry.1h` | Fourth retry | 1 hour |
-| `deliveries.retry.6h` | Fifth retry | 6 hours |
-| `deliveries.retry.24h` | Sixth retry | 24 hours |
-| `deliveries.dlq` | Dead letter queue | Manual replay |
 
 ## Configuration
 
-### Environment Variables
+**`WEBHOOK_ENCRYPTION_KEY`** - AES master key for encrypting webhook secrets in database. Must be set. System will fail to start if missing. Use 32+ characters.
 
-```bash
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=webhook_platform
-DB_USER=webhook_user
-DB_PASSWORD=webhook_pass
+**`KAFKA_BOOTSTRAP_SERVERS`** - Kafka connection string. Defaults to localhost:9092. Worker and API must both reach Kafka or startup will fail after retry exhaustion.
 
-# Kafka
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+**`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`** - PostgreSQL connection parameters. System validates connection at startup. Flyway migrations run automatically and will fail startup if schema is inconsistent.
 
-# Security
-WEBHOOK_ENCRYPTION_KEY=your-32-char-master-key-here
+**`DATA_RETENTION_OUTBOX_DAYS`** - Days to keep published outbox messages (default 7). Cleanup runs daily at 2 AM via scheduled job.
 
-# Ports
-SERVER_PORT=8080
-MANAGEMENT_PORT=8081
-```
+**`DATA_RETENTION_ATTEMPTS_DAYS`** - Days to keep delivery attempts (default 90). Cleanup runs daily at 2 AM via scheduled job.
 
-### Application Properties
+**`DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY`** - Maximum attempts to retain per delivery (default 10). Keeps most recent N attempts. Cleanup runs every 30 minutes.
 
-```yaml
-# API (application.yml)
-outbox:
-  publisher:
-    poll-interval-ms: 1000
+If `WEBHOOK_ENCRYPTION_KEY` is missing, system fails at startup. If database is unreachable, system enters readiness probe failure state but continues liveness checks. If Kafka is unavailable, consumers retry indefinitely while health checks report degraded state.
 
-# Worker (application.yml)
-retry:
-  scheduler:
-    poll-interval-ms: 10000
-```
+## Operational guarantees & limits
 
-## Monitoring
+**Delivery semantics** - At-least-once delivery. Duplicate deliveries are possible during network partitions or worker crashes. Consumers should implement idempotency using `X-Delivery-Id` header.
 
-### Health Endpoints
+**Retention policy** - Published outbox messages deleted after 7 days. Delivery attempts deleted after 90 days or when exceeding 10 attempts per delivery (keeps most recent). Deliveries and events persist indefinitely.
 
-```bash
-# Liveness
-curl http://localhost:8080/actuator/health/liveness
-curl http://localhost:8081/actuator/health/liveness
+**Payload limits** - No hard limit enforced at ingestion. Large payloads increase memory usage and HTTP timeout risk. Recommended maximum 1 MB per event.
 
-# Readiness
-curl http://localhost:8080/actuator/health/readiness
-curl http://localhost:8081/actuator/health/readiness
+**Rate limits** - 100 events per second per project by default (configurable). Rate limit enforced at ingestion before database write. Exceeded requests receive 429 status with retry-after header.
 
-# Metrics (Prometheus)
-curl http://localhost:8080/actuator/metrics
-curl http://localhost:8081/actuator/metrics
-```
+**Retry limits** - 7 total delivery attempts over ~31 hours. After exhaustion, delivery moves to DLQ and requires manual replay.
 
-### Database Queries
+**Timeout** - 30 seconds per HTTP delivery attempt. Non-configurable.
 
-```bash
-# Delivery statistics
-docker exec -it webhook-postgres psql -U webhook_user -d webhook_platform \
-  -c "SELECT status, COUNT(*) FROM deliveries GROUP BY status;"
+## Security model
 
-# Recent attempts
-docker exec -it webhook-postgres psql -U webhook_user -d webhook_platform \
-  -c "SELECT http_status_code, COUNT(*) FROM delivery_attempts GROUP BY http_status_code;"
+**API authentication** - JWT-based authentication for management endpoints. Projects, endpoints, and subscriptions are scoped to organizations. Users belong to organizations via membership table with role-based access control.
 
-# Outbox lag
-docker exec -it webhook-postgres psql -U webhook_user -d webhook_platform \
-  -c "SELECT status, COUNT(*) FROM outbox_messages GROUP BY status;"
-```
+**Event ingestion authentication** - API key authentication via `X-API-Key` header. Keys are hashed using SHA-256 and stored without plaintext. Each key is scoped to a single project.
 
-## Documentation
+**Webhook signatures** - Each webhook receives HMAC-SHA256 signature in `X-Signature` header formatted as `t=<timestamp>,v1=<hmac>`. HMAC is computed over concatenation of timestamp and request body. Prevents replay attacks via timestamp validation on receiver side.
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed system design
-- **[TEST_ITERATION_2.md](TEST_ITERATION_2.md)** - Auth & ingestion tests
-- **[TEST_ITERATION_3.md](TEST_ITERATION_3.md)** - Outbox publisher tests
-- **[TEST_ITERATION_4.md](TEST_ITERATION_4.md)** - Worker & retry tests
-- **[TEST_ITERATION_5.md](TEST_ITERATION_5.md)** - Management API tests
+**Secret storage** - Webhook secrets encrypted using AES-GCM with master key from environment variable. Encryption includes random IV stored alongside ciphertext. Decryption occurs only in worker during delivery.
 
-## Development
+**Tenant isolation** - All queries filtered by organization ID extracted from JWT. Database constraints prevent cross-tenant data access. Organizations are fully isolated with no shared resources.
 
-```bash
-# Run tests
-mvn test
+## Testing & quality
 
-# Build without Docker
-mvn clean package -DskipTests
+Integration tests use Testcontainers with PostgreSQL and Kafka containers. Tests cover authentication flows, organization isolation enforcement, outbox publisher behavior, retry scheduler logic, concurrent cleanup operations with ShedLock, and data retention policies.
 
-# View logs
-docker logs webhook-api -f
-docker logs webhook-worker -f
+Test coverage includes:
 
-# Database shell
-docker exec -it webhook-postgres psql -U webhook_user -d webhook_platform
+- JWT authentication with organization context
+- Role-based access control enforcement
+- Multi-tenant isolation verification (cross-organization access attempts fail)
+- Outbox message lifecycle (creation, publishing, cleanup)
+- Retry scheduler polling and topic selection
+- Data retention cleanup with batch processing
+- Distributed lock behavior for scheduled jobs
 
-# Kafka console consumer
-docker exec -it webhook-kafka kafka-console-consumer.sh \
-  --bootstrap-server localhost:9092 \
-  --topic deliveries.dispatch \
-  --from-beginning
-```
+Tests run against actual PostgreSQL and Kafka, not mocks. This validates schema migrations, Kafka consumer configurations, and transactional behavior. Build fails if any integration test fails.
 
-## Production Considerations
+## Status & roadmap
 
-- [ ] Replace permitAll() with proper authentication for management API
-- [ ] Configure PostgreSQL connection pooling for scale
-- [ ] Set up Kafka replication factor > 1
-- [ ] Configure proper WEBHOOK_ENCRYPTION_KEY (32+ chars)
-- [ ] Enable SSL/TLS for all services
-- [ ] Set up monitoring and alerting
-- [ ] Configure log aggregation
-- [ ] Implement rate limiting per endpoint
-- [ ] Add SSRF protection (IP allowlist/blocklist)
-- [ ] Set up regular database backups
-- [ ] Configure resource limits in Docker/K8s
+**Stable components**: Event ingestion, transactional outbox, Kafka-based delivery, retry mechanism, HMAC signatures, multi-tenant isolation, JWT authentication, data retention.
 
-## License
+**Evolving components**: UI dashboard (functional but minimal), observability (basic health checks and metrics exposed, no alerting), rate limiting (per-project only, not per-endpoint).
 
-MIT
+**Explicitly out of scope**: Webhook endpoint verification, payload transformations, custom retry policies per subscription, batch delivery API, OAuth2 for webhook endpoints, geo-distributed deployment patterns.
+
+## Contribution & license
+
+Standard GitHub workflow: fork, branch, test, pull request. Ensure integration tests pass before submitting. Use conventional commit messages.
+
+Requires JDK 17, Maven 3.8+, Docker for integration tests.
+
+Licensed under MIT.
