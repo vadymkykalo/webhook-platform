@@ -16,21 +16,32 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
     List<DeliveryAttempt> findByDeliveryIdOrderByAttemptNumberAsc(UUID deliveryId);
     
     @Modifying
-    @Query(value = "DELETE FROM delivery_attempts WHERE id IN (SELECT id FROM delivery_attempts WHERE created_at < :cutoffTime ORDER BY created_at ASC LIMIT :limit)", nativeQuery = true)
+    @Query(value = """
+        WITH rows_to_delete AS (
+            SELECT id 
+            FROM delivery_attempts 
+            WHERE created_at < :cutoffTime 
+            ORDER BY created_at ASC 
+            LIMIT :limit
+        )
+        DELETE FROM delivery_attempts 
+        WHERE id IN (SELECT id FROM rows_to_delete)
+        """, nativeQuery = true)
     int deleteOldAttempts(@Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
     
     @Modifying
     @Query(value = """
-        DELETE FROM delivery_attempts 
-        WHERE id IN (
+        WITH rows_to_delete AS (
             SELECT id FROM (
                 SELECT id, 
                        ROW_NUMBER() OVER (PARTITION BY delivery_id ORDER BY attempt_number DESC) as rn
                 FROM delivery_attempts
             ) t
             WHERE t.rn > :maxAttemptsPerDelivery
+            LIMIT :limit
         )
-        LIMIT :limit
+        DELETE FROM delivery_attempts 
+        WHERE id IN (SELECT id FROM rows_to_delete)
         """, nativeQuery = true)
     int deleteExcessAttemptsPerDelivery(@Param("maxAttemptsPerDelivery") int maxAttemptsPerDelivery, @Param("limit") int limit);
     

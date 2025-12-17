@@ -6,6 +6,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class DataRetentionService {
     }
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
+    @SchedulerLock(name = "cleanupPublishedOutboxMessages", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     @Transactional
     public void cleanupPublishedOutboxMessages() {
         Instant cutoffTime = Instant.now().minusSeconds(outboxRetentionDays * 86400L);
@@ -79,6 +81,7 @@ public class DataRetentionService {
     }
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
+    @SchedulerLock(name = "cleanupOldDeliveryAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     @Transactional
     public void cleanupOldDeliveryAttempts() {
         Instant cutoffTime = Instant.now().minusSeconds(deliveryAttemptsRetentionDays * 86400L);
@@ -111,6 +114,7 @@ public class DataRetentionService {
     }
     
     @Scheduled(cron = "${data-retention.limit-enforcement-cron:0 */30 * * * *}")
+    @SchedulerLock(name = "enforcePerDeliveryAttemptLimits", lockAtMostFor = "29m", lockAtLeastFor = "1m")
     @Transactional
     public void enforcePerDeliveryAttemptLimits() {
         log.info("Starting per-delivery attempt limit enforcement (max {} per delivery)", maxAttemptsPerDelivery);
