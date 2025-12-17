@@ -66,8 +66,10 @@ outbox:
 data-retention:
   outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
   delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
+  max-attempts-per-delivery: ${DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY:10}
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
+  limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
