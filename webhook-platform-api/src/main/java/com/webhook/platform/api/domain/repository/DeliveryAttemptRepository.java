@@ -15,7 +15,7 @@ import java.util.UUID;
 public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt, UUID> {
     List<DeliveryAttempt> findByDeliveryIdOrderByAttemptNumberAsc(UUID deliveryId);
     
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query(value = """
         WITH rows_to_delete AS (
             SELECT id 
@@ -29,7 +29,7 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         """, nativeQuery = true)
     int deleteOldAttempts(@Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
     
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query(value = """
         WITH rows_to_delete AS (
             SELECT id FROM (
