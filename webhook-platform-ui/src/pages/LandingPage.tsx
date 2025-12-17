@@ -8,6 +8,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white">
       <Navigation />
       <Hero />
+      <ArchitectureShowcase />
       <TrustThroughVisuals />
       <VisibilityAndControl />
       <HowItWorks />
@@ -196,6 +197,116 @@ function DashboardMockup() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ArchitectureShowcase() {
+  const [activeStep, setActiveStep] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveStep((prev) => (prev + 1) % 7);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const components = [
+    { name: 'Client', sub: 'POST /events' },
+    { name: 'API', sub: 'Spring Boot' },
+    { name: 'DB', sub: 'Event + Outbox' },
+    { name: 'Publisher', sub: 'Scheduled' },
+    { name: 'Kafka', sub: 'Queue' },
+    { name: 'Worker', sub: 'Consumer' },
+    { name: 'Endpoint', sub: 'HMAC' },
+  ];
+
+  return (
+    <section className="py-24 bg-gradient-to-b from-gray-50 to-white">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            Battle-tested architecture
+          </h2>
+          <p className="text-xl text-gray-600">
+            Transactional outbox pattern for zero data loss
+          </p>
+        </div>
+
+        <div className="flex items-center justify-center gap-6 mb-12 text-sm text-gray-600">
+          <span>Spring Boot</span>
+          <span className="text-gray-300">·</span>
+          <span>PostgreSQL</span>
+          <span className="text-gray-300">·</span>
+          <span>Apache Kafka</span>
+          <span className="text-gray-300">·</span>
+          <span>React</span>
+        </div>
+
+        <div className="relative">
+          <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl blur-2xl"></div>
+          <div className="relative bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+            <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <div className="text-xs font-medium text-gray-500">Architecture Flow</div>
+              <div className="w-16"></div>
+            </div>
+            
+            <div className="p-12">
+              <div className="flex items-center justify-center mb-12">
+                {components.map((component, index) => (
+                  <div key={index} className="flex items-center">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`w-24 h-24 rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-500 ${
+                          activeStep === index
+                            ? 'border-blue-300 bg-blue-50 scale-110'
+                            : 'border-gray-200 bg-white hover:border-gray-300'
+                        }`}
+                      >
+                        <div className={`text-lg font-semibold mb-1 ${activeStep === index ? 'text-blue-900' : 'text-gray-900'}`}>
+                          {component.name}
+                        </div>
+                        <div className={`text-xs ${activeStep === index ? 'text-blue-700' : 'text-gray-500'}`}>
+                          {component.sub}
+                        </div>
+                      </div>
+                    </div>
+                    {index < components.length - 1 && (
+                      <div className={`w-12 h-0.5 mx-4 transition-all duration-500 ${
+                        activeStep === index ? 'bg-blue-500' : 'bg-gray-300'
+                      }`}></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-all">
+                  <div className="font-semibold text-gray-900 mb-2">Atomic writes</div>
+                  <div className="text-sm text-gray-600">Single transaction ensures consistency</div>
+                </div>
+                <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-all">
+                  <div className="font-semibold text-gray-900 mb-2">Zero data loss</div>
+                  <div className="text-sm text-gray-600">Events never lost during failures</div>
+                </div>
+                <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-all">
+                  <div className="font-semibold text-gray-900 mb-2">At-least-once</div>
+                  <div className="text-sm text-gray-600">Automatic retry with backoff</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 text-xs text-gray-500 text-center">
+              Transactional outbox • Zero data loss • Automatic retry
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

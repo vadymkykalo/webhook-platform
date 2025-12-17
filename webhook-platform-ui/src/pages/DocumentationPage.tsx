@@ -219,7 +219,7 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
         
         <h3 className="text-lg font-semibold text-gray-900 mb-3">Header Format</h3>
         <CodeBlock language="curl" setLanguage={() => {}}>
-{`Authorization: Bearer sk_live_1234567890abcdef`}
+{`X-API-Key: wh_live_1234567890abcdef`}
         </CodeBlock>
         
         <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -282,7 +282,7 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
 {`{
   "id": "123e4567-e89b-12d3-a456-426614174002",
   "name": "Production API Key",
-  "key": "sk_live_1234567890abcdef",
+  "key": "wh_live_1234567890abcdef",
   "createdAt": "2024-12-16T19:01:00Z"
 }`}
         </ResponseBlock>
@@ -351,7 +351,7 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
 
         <h3 className="text-lg font-semibold text-gray-900 mb-3">Headers</h3>
         <ParamTable params={[
-          { name: 'Authorization', type: 'string', required: true, description: 'Bearer API key' },
+          { name: 'X-API-Key', type: 'string', required: true, description: 'API key for authentication' },
           { name: 'Content-Type', type: 'string', required: true, description: 'application/json' },
           { name: 'Idempotency-Key', type: 'string', required: false, description: 'Unique key to prevent duplicate processing' },
         ]} />
@@ -990,7 +990,7 @@ subscription = response.json()`,
     },
     sendEvent: {
       curl: `curl -X POST http://localhost:8080/api/v1/events \\
-  -H "Authorization: Bearer sk_live_YOUR_API_KEY" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -H "Idempotency-Key: unique-request-id" \\
   -d '{
@@ -1004,7 +1004,7 @@ subscription = response.json()`,
       node: `const response = await fetch('http://localhost:8080/api/v1/events', {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer sk_live_YOUR_API_KEY',
+    'X-API-Key': 'wh_live_YOUR_API_KEY',
     'Content-Type': 'application/json',
     'Idempotency-Key': 'unique-request-id'
   },
@@ -1023,7 +1023,7 @@ const event = await response.json();`,
 response = requests.post(
     'http://localhost:8080/api/v1/events',
     headers={
-        'Authorization': 'Bearer sk_live_YOUR_API_KEY',
+        'X-API-Key': 'wh_live_YOUR_API_KEY',
         'Idempotency-Key': 'unique-request-id'
     },
     json={
