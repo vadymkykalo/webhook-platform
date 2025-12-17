@@ -8,6 +8,126 @@ This platform handles reliable webhook delivery at scale using the transactional
 
 Built for production use where delivery reliability, tenant isolation, and observability matter. The architecture separates ingestion from delivery to prevent backpressure and enables independent scaling of both concerns.
 
+## How It Works
+
+### Event Flow: From Your App to Customer Endpoints
+
+```mermaid
+sequenceDiagram
+    participant YourApp as Your Application
+    participant API as Webhook Platform
+    participant Customer as Customer Endpoint
+    
+    YourApp->>API: POST /events<br/>(order.completed)
+    API-->>YourApp: 202 Accepted
+    Note over API: Event saved in database
+    
+    API->>Customer: POST /webhook<br/>+ HMAC signature
+    
+    alt Successful Delivery
+        Customer-->>API: 200 OK
+        Note over API,Customer: Delivery marked SUCCESS
+    else Temporary Failure
+        Customer-->>API: 503 Service Unavailable
+        Note over API: Auto-retry after 1m
+        API->>Customer: POST /webhook (retry #2)
+        Customer-->>API: 200 OK
+        Note over API,Customer: Delivery SUCCESS on retry
+    else Permanent Failure
+        Customer-->>API: 404 Not Found
+        Note over API: Retries: 1m, 5m, 15m, 1h, 6h, 24h
+        Note over API: After 7 attempts → Dead Letter Queue
+    end
+```
+
+### What You Get
+
+```mermaid
+graph LR
+    A[Send Event] --> B[Guaranteed Storage]
+    B --> C[Auto Retries]
+    C --> D[Delivery Dashboard]
+    D --> E[Customer Receives]
+    
+    style A fill:#e1f5ff
+    style B fill:#d4edda
+    style C fill:#fff3cd
+    style D fill:#f8d7da
+    style E fill:#d1ecf1
+```
+
+**Business Value:**
+- **Reliability**: Events never lost, even if customer endpoint is down
+- **Visibility**: See every delivery attempt, response code, and timing
+- **Control**: Manually replay failed deliveries when customer fixes their endpoint
+- **Security**: HMAC signatures prevent unauthorized webhook injection
+- **Scale**: Handle millions of events per day without blocking your application
+
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph "Your Infrastructure"
+        App[Your Application]
+    end
+    
+    subgraph "Webhook Platform"
+        API[API Service<br/>Event Ingestion]
+        DB[(PostgreSQL<br/>Events & Deliveries)]
+        Kafka[Kafka<br/>Message Queue]
+        Worker[Worker Service<br/>HTTP Delivery]
+        UI[Admin Dashboard<br/>Monitoring & Replay]
+    end
+    
+    subgraph "Customer Infrastructure"
+        Customer1[Customer A Endpoint]
+        Customer2[Customer B Endpoint]
+        Customer3[Customer C Endpoint]
+    end
+    
+    App -->|POST /events| API
+    API -->|Write| DB
+    API -->|Publish| Kafka
+    Kafka -->|Consume| Worker
+    Worker -->|Read/Update| DB
+    Worker -->|POST with HMAC| Customer1
+    Worker -->|POST with HMAC| Customer2
+    Worker -->|POST with HMAC| Customer3
+    UI -->|Query Stats| DB
+    
+    style API fill:#4CAF50
+    style Worker fill:#2196F3
+    style UI fill:#FF9800
+    style DB fill:#9C27B0
+    style Kafka fill:#F44336
+```
+
+### Retry Strategy Visualization
+
+```mermaid
+gantt
+    title Automatic Retry Timeline for Failed Delivery
+    dateFormat X
+    axisFormat %Mm %Ss
+    
+    section Delivery Attempts
+    Attempt 1 (immediate)     :0, 10s
+    Wait 1m                   :10s, 60s
+    Attempt 2 (1m)            :70s, 10s
+    Wait 5m                   :80s, 300s
+    Attempt 3 (5m)            :380s, 10s
+    Wait 15m                  :390s, 900s
+    Attempt 4 (15m)           :1290s, 10s
+    Wait 1h                   :1300s, 3600s
+    Attempt 5 (1h)            :4900s, 10s
+    Wait 6h                   :4910s, 21600s
+    Attempt 6 (6h)            :26510s, 10s
+    Wait 24h                  :26520s, 86400s
+    Attempt 7 (24h - final)   :112920s, 10s
+```
+
+**Total retry window**: ~31 hours across 7 attempts. After that, delivery moves to Dead Letter Queue for manual review.
+
 ## Features
 
 - Transactional outbox pattern for guaranteed event publishing
