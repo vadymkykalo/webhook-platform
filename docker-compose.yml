@@ -172,8 +172,8 @@ services:
 
   ui:
     build:
-      context: ./webhook-platform-ui
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./webhook-platform-ui/Dockerfile
     image: webhook-platform-ui:${UI_IMAGE_TAG:-latest}
     container_name: webhook-ui
     ports:

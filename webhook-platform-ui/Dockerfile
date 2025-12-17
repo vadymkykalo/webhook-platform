@@ -3,14 +3,14 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (build context is project root)
+COPY webhook-platform-ui/package*.json ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy source
-COPY . .
+# Copy UI source files
+COPY webhook-platform-ui/ .
 
 # Build for production
 RUN npm run build
@@ -21,7 +21,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package files for production dependencies
-COPY package*.json ./
+COPY webhook-platform-ui/package*.json ./
 
 # Install only production dependencies
 RUN npm ci --production
