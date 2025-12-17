@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Webhook, Loader2 } from 'lucide-react';
+import { Webhook, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -48,7 +48,15 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4 py-8">
-      <Card className="w-full max-w-md shadow-xl border-gray-200">
+      <div className="w-full max-w-md">
+        <Link
+          to="/"
+          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to home
+        </Link>
+      <Card className="w-full shadow-xl border-gray-200">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="p-3 rounded-full bg-gray-900">
@@ -134,6 +142,7 @@ export default function RegisterPage() {
           </p>
         </CardFooter>
       </Card>
+      </div>
     </div>
   );
 }

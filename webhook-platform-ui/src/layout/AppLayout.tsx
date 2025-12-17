@@ -35,10 +35,10 @@ export default function AppLayout() {
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar - Desktop */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r bg-card">
-          <div className="flex items-center h-16 px-6 border-b">
+          <Link to="/" className="flex items-center h-16 px-6 border-b hover:bg-accent/50 transition-colors">
             <Webhook className="h-6 w-6 text-primary mr-2" />
             <span className="text-lg font-semibold">Webhook Platform</span>
-          </div>
+          </Link>
           
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navItems.map((item) => {
@@ -95,10 +95,10 @@ export default function AppLayout() {
             />
             <aside className="fixed inset-y-0 left-0 w-64 bg-card border-r flex flex-col">
               <div className="flex items-center justify-between h-16 px-6 border-b">
-                <div className="flex items-center">
+                <Link to="/" className="flex items-center hover:opacity-80 transition-opacity" onClick={() => setSidebarOpen(false)}>
                   <Webhook className="h-6 w-6 text-primary mr-2" />
                   <span className="text-lg font-semibold">Webhook Platform</span>
-                </div>
+                </Link>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -168,10 +168,10 @@ export default function AppLayout() {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex items-center ml-4">
+            <Link to="/" className="flex items-center ml-4 hover:opacity-80 transition-opacity">
               <Webhook className="h-6 w-6 text-primary mr-2" />
               <span className="text-lg font-semibold">Webhook Platform</span>
-            </div>
+            </Link>
           </header>
 
           {/* Page content */}
