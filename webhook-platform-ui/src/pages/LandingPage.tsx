@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle2, Code2, Eye, Lock, RefreshCw, Shield, Zap, Clock, Activity, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../auth/auth.store';
 
 export default function LandingPage() {
   return (
@@ -18,6 +19,8 @@ export default function LandingPage() {
 }
 
 function Navigation() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <nav className="border-b border-gray-200 bg-white">
       <div className="max-w-7xl mx-auto px-6 py-4">
@@ -42,12 +45,29 @@ function Navigation() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <Link
-              to="/login"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Sign in
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                to="/projects"
+                className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-all hover:scale-105"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  Get started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
