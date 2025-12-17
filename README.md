@@ -53,8 +53,6 @@ This architecture prevents event loss during downstream failures. The outbox ens
 
 **`/webhook-platform-common`** - Shared Java utilities. Crypto functions for AES-GCM encryption and HMAC signature generation, DTO classes for Kafka messages, common constants.
 
-**`/scripts`** - Automation scripts. `setup.sh` builds and starts all services with topic creation, `e2e-test.sh` runs full delivery flow validation, `create-kafka-topics.sh` creates dispatch, retry, and DLQ topics.
-
 ## How it works
 
 1. **Event ingestion** - Client sends event via REST API with API key authentication. System checks rate limit (100 events/second per project by default), validates idempotency key if provided, writes event to database.
@@ -78,20 +76,27 @@ Prerequisites: Docker, Docker Compose, Maven, JDK 17.
 ```bash
 mvn clean package -DskipTests
 docker compose up -d
-sleep 30
-bash scripts/create-kafka-topics.sh
 ```
 
-UI available at `http://localhost:5173`
+Create Kafka topics:
 
-Send first event:
+```bash
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.dispatch --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.1m --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.5m --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.15m --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.1h --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.6h --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.retry.24h --partitions 3 --replication-factor 1
+docker exec -it webhook-kafka kafka-topics.sh --bootstrap-server localhost:9092 --create --topic deliveries.dlq --partitions 3 --replication-factor 1
+```
+
+Access UI at `http://localhost:5173` and register:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"test123","organizationName":"Test Org"}'
-
-# Use returned token for authenticated requests
+  -d '{"email":"admin@example.com","password":"secure_password","organizationName":"Your Company"}'
 ```
 
 ## Configuration

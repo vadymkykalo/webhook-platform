@@ -136,22 +136,6 @@ services:
     networks:
       - webhook-network
 
-  test-receiver:
-    build:
-      context: ./webhook-platform-test-receiver
-      dockerfile: Dockerfile
-    container_name: webhook-test-receiver
-    ports:
-      - "8082:8082"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/requests"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - webhook-network
-
   ui:
     build:
       context: ./webhook-platform-ui
