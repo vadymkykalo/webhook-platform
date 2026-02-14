@@ -41,7 +41,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS:-12}
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       CLUSTER_ID: webhook-kafka-cluster
@@ -61,8 +61,25 @@ services:
         limits:
           memory: 1G
 
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: webhook-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - webhook-network
+    restart: unless-stopped
+
   minio:
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-01-16T16-07-38Z}
     container_name: webhook-minio
     command: server /data --console-address ":9001"
     profiles:
@@ -120,8 +137,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       METRICS_ENABLED: ${METRICS_ENABLED:-true}
       APP_ENV: ${APP_ENV:-development}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
     depends_on:
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health/liveness"]
@@ -157,8 +178,12 @@ services:
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       APP_ENV: ${APP_ENV:-development}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
     depends_on:
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health/liveness"]
@@ -190,6 +215,7 @@ volumes:
   webhook_pgdata:
     name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}
   kafka_data:
+  redis_data:
   minio_data:
 
 networks:

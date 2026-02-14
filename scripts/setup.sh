@@ -10,14 +10,14 @@ echo ""
 # Build
 echo "Building project..."
 mvn clean package -DskipTests -q
-echo "✓ Build complete"
+echo " Build complete"
 echo ""
 
 # Start services
 echo "Starting services..."
 docker-compose down -v
 docker-compose up -d
-echo "✓ Services started"
+echo " Services started"
 echo ""
 
 # Wait for services

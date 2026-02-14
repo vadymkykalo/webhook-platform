@@ -37,8 +37,8 @@ public class WebhookDeliveryService {
     private final String encryptionKey;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
-    private final RateLimiterService rateLimiterService;
-    private final ConcurrencyControlService concurrencyControlService;
+    private final RedisRateLimiterService rateLimiterService;
+    private final RedisConcurrencyControlService concurrencyControlService;
     private final MeterRegistry meterRegistry;
 
     public WebhookDeliveryService(
@@ -50,8 +50,8 @@ public class WebhookDeliveryService {
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
-            RateLimiterService rateLimiterService,
-            ConcurrencyControlService concurrencyControlService,
+            RedisRateLimiterService rateLimiterService,
+            RedisConcurrencyControlService concurrencyControlService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper) {
         this.deliveryRepository = deliveryRepository;

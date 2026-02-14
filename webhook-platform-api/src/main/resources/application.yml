@@ -2,15 +2,20 @@ spring:
   application:
     name: webhook-platform-api
   
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:webhook_platform}
     username: ${DB_USER:webhook_user}
     password: ${DB_PASSWORD:webhook_pass}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT:30000}
   
   jpa:
     hibernate:
@@ -70,6 +75,10 @@ data-retention:
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
   limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
+
+event:
+  ingestion:
+    rate-limit-per-second: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:100}
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}

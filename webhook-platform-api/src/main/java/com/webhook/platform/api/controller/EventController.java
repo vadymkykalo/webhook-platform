@@ -4,7 +4,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.service.EventIngestService;
-import com.webhook.platform.api.service.EventRateLimiterService;
+import com.webhook.platform.api.service.RedisRateLimiterService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,11 +18,11 @@ public class EventController {
 
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private final EventIngestService eventIngestService;
-    private final EventRateLimiterService rateLimiterService;
+    private final RedisRateLimiterService rateLimiterService;
 
     public EventController(
             EventIngestService eventIngestService,
-            EventRateLimiterService rateLimiterService) {
+            RedisRateLimiterService rateLimiterService) {
         this.eventIngestService = eventIngestService;
         this.rateLimiterService = rateLimiterService;
     }
