@@ -150,54 +150,44 @@ public class WebhookDeliveryService {
 
         String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
 
-        // Capture request headers
         String requestHeaders = buildRequestHeadersJson(signature, event.getId().toString(), 
                 delivery.getId().toString(), String.valueOf(timestamp));
 
-        try {
-            Timer.Sample sample = Timer.start(meterRegistry);
-            Integer statusCode = webClient.post()
-                    .uri(endpoint.getUrl())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Signature", signature)
-                    .header("X-Event-Id", event.getId().toString())
-                    .header("X-Delivery-Id", delivery.getId().toString())
-                    .header("X-Timestamp", String.valueOf(timestamp))
-                    .bodyValue(body)
-                    .exchangeToMono(response -> {
-                        int status = response.statusCode().value();
-                        
-                        // Capture response headers
-                        String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
-                        
-                        return response.bodyToMono(String.class)
-                                .defaultIfEmpty("")
-                                .map(responseBody -> {
-                                    sample.stop(Timer.builder("webhook_delivery_latency_ms")
-                                        .tag("status_code", String.valueOf(status))
-                                        .register(meterRegistry));
-                                    handleResponse(delivery, status, responseBody, responseHeaders,
-                                            requestHeaders, body, 
-                                            (int) (System.currentTimeMillis() - startTime));
-                                    return status;
-                                });
-                    })
-                    .timeout(Duration.ofSeconds(30))
-                    .onErrorResume(e -> {
-                        log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
-                        handleError(delivery, e, requestHeaders, body, 
-                                (int) (System.currentTimeMillis() - startTime));
-                        return Mono.just(0);
-                    })
-                    .block();
-
-        } catch (Exception e) {
-            log.error("Unexpected error during delivery {}: {}", delivery.getId(), e.getMessage(), e);
-            handleError(delivery, e, requestHeaders, body, 
-                    (int) (System.currentTimeMillis() - startTime));
-        } finally {
-            concurrencyControlService.release(endpoint.getId());
-        }
+        Timer.Sample sample = Timer.start(meterRegistry);
+        
+        webClient.post()
+                .uri(endpoint.getUrl())
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("X-Signature", signature)
+                .header("X-Event-Id", event.getId().toString())
+                .header("X-Delivery-Id", delivery.getId().toString())
+                .header("X-Timestamp", String.valueOf(timestamp))
+                .bodyValue(body)
+                .exchangeToMono(response -> {
+                    int status = response.statusCode().value();
+                    String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
+                    
+                    return response.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .map(responseBody -> {
+                                sample.stop(Timer.builder("webhook_delivery_latency_ms")
+                                    .tag("status_code", String.valueOf(status))
+                                    .register(meterRegistry));
+                                handleResponse(delivery, status, responseBody, responseHeaders,
+                                        requestHeaders, body, 
+                                        (int) (System.currentTimeMillis() - startTime));
+                                return status;
+                            });
+                })
+                .timeout(Duration.ofSeconds(30))
+                .doFinally(signal -> concurrencyControlService.release(endpoint.getId()))
+                .onErrorResume(e -> {
+                    log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
+                    handleError(delivery, e, requestHeaders, body, 
+                            (int) (System.currentTimeMillis() - startTime));
+                    return Mono.just(0);
+                })
+                .subscribe();
     }
 
     private void handleResponse(Delivery delivery, int statusCode, String responseBody, 
