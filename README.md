@@ -667,10 +667,9 @@ make up
 - Not affected by any make commands
 - Backup via cloud provider tools
 
-## Contribution & license
+## Contribution
 
 Standard GitHub workflow: fork, branch, test, pull request. Ensure integration tests pass before submitting. Use conventional commit messages.
 
 No local Maven or npm builds required. All builds happen in Docker via `make build`.
 
-Licensed under MIT.
