@@ -135,7 +135,7 @@ public class TestEndpointService {
                 .userAgent(request.getHeader("User-Agent"))
                 .build();
 
-        captured = capturedRequestRepository.save(captured);
+        captured = capturedRequestRepository.saveAndFlush(captured);
 
         endpoint.setRequestCount(endpoint.getRequestCount() + 1);
         testEndpointRepository.save(endpoint);

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.Map;
 
 @RestController
@@ -31,7 +32,7 @@ public class WebhookCaptureController {
                 "success", true,
                 "message", "Request captured",
                 "requestId", captured.getId(),
-                "receivedAt", captured.getReceivedAt().toString()
+                "receivedAt", captured.getReceivedAt() != null ? captured.getReceivedAt().toString() : Instant.now().toString()
         ));
     }
 }
