@@ -4,8 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.filter.CorrelationIdFilter;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -115,11 +120,23 @@ public class OutboxPublisherService {
                 DeliveryMessage.class
         );
 
-        kafkaTemplate.send(message.getKafkaTopic(), message.getKafkaKey(), deliveryMessage)
-                .get(10, TimeUnit.SECONDS);
+        String correlationId = CorrelationIdFilter.getCurrentCorrelationId();
+        if (correlationId == null) {
+            correlationId = UUID.randomUUID().toString();
+        }
+
+        ProducerRecord<String, DeliveryMessage> record = new ProducerRecord<>(
+                message.getKafkaTopic(),
+                null,
+                message.getKafkaKey(),
+                deliveryMessage
+        );
+        record.headers().add(new RecordHeader("X-Correlation-ID", correlationId.getBytes(StandardCharsets.UTF_8)));
+
+        kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
         
-        log.debug("Published message {} to topic {} with key {}",
-                message.getId(), message.getKafkaTopic(), message.getKafkaKey());
+        log.debug("Published message {} to topic {} with key {} correlationId={}",
+                message.getId(), message.getKafkaTopic(), message.getKafkaKey(), correlationId);
     }
 
     private void markAsPublished(OutboxMessage message) {

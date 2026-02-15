@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -308,7 +309,7 @@ public class WebhookDeliveryService {
                 signature, eventId, deliveryId, timestamp);
     }
     
-    private String buildResponseHeadersJson(org.springframework.http.HttpHeaders headers) {
+    private String buildResponseHeadersJson(HttpHeaders headers) {
         try {
             Map<String, String> headerMap = new HashMap<>();
             headers.forEach((key, values) -> {

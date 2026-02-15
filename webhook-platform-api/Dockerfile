@@ -14,9 +14,23 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
+# Create non-root user for security
+RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
+USER appuser
+
 # Copy JAR from build stage
 COPY --from=build /workspace/webhook-platform-api/target/webhook-platform-api-*.jar app.jar
 
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# JVM tuning for containers
+ENV JAVA_OPTS="-XX:+UseContainerSupport \
+    -XX:MaxRAMPercentage=75.0 \
+    -XX:InitialRAMPercentage=50.0 \
+    -XX:+UseG1GC \
+    -XX:+UseStringDeduplication \
+    -XX:+OptimizeStringConcat \
+    -Djava.security.egd=file:/dev/./urandom \
+    -Dfile.encoding=UTF-8"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
