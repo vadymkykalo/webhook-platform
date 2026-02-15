@@ -124,6 +124,15 @@ public class WebhookDeliveryService {
             return;
         }
 
+        // Block deliveries to unverified endpoints (SSRF protection)
+        if (endpoint.getVerificationStatus() != Endpoint.VerificationStatus.VERIFIED 
+                && endpoint.getVerificationStatus() != Endpoint.VerificationStatus.SKIPPED) {
+            log.warn("Endpoint {} not verified (status: {}), blocking delivery {}", 
+                    endpoint.getId(), endpoint.getVerificationStatus(), delivery.getId());
+            markAsFailed(delivery, "Endpoint not verified - verification required before receiving webhooks");
+            return;
+        }
+
         Optional<Event> eventOpt = eventRepository.findById(delivery.getEventId());
         if (eventOpt.isEmpty()) {
             log.error("Event not found: {}", delivery.getEventId());

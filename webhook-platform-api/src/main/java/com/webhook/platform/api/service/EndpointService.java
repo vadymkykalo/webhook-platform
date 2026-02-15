@@ -65,7 +65,12 @@ public class EndpointService {
         validateProjectOwnership(projectId, organizationId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(request.getSecret(), encryptionKey);
+        // Auto-generate secret if not provided
+        String secret = request.getSecret();
+        if (secret == null || secret.isBlank()) {
+            secret = CryptoUtils.generateSecureToken(32);
+        }
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey);
         
         Endpoint endpoint = Endpoint.builder()
                 .projectId(projectId)
@@ -82,7 +87,7 @@ public class EndpointService {
         }
         
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        return mapToResponse(endpoint);
+        return mapToResponseWithSecret(endpoint, secret);
     }
 
     public EndpointResponse getEndpoint(UUID id, UUID organizationId) {
