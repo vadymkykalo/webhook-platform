@@ -2,6 +2,8 @@ package com.webhook.platform.worker.domain.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
@@ -26,6 +28,7 @@ public class DeliveryAttempt {
     @Column(name = "attempt_number", nullable = false)
     private Integer attemptNumber;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "request_headers", columnDefinition = "jsonb")
     private String requestHeaders;
 
@@ -35,6 +38,7 @@ public class DeliveryAttempt {
     @Column(name = "http_status_code")
     private Integer httpStatusCode;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "response_headers", columnDefinition = "jsonb")
     private String responseHeaders;
 
