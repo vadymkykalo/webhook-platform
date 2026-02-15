@@ -44,9 +44,11 @@ public class OutboxMessage {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private OutboxStatus status = OutboxStatus.PENDING;
 
     @Column(name = "retry_count", nullable = false)
+    @Builder.Default
     private Integer retryCount = 0;
 
     @Column(name = "error_message", columnDefinition = "TEXT")

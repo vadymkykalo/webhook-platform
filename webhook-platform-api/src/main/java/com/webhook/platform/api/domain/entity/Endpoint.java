@@ -46,9 +46,11 @@ public class Endpoint {
     private Instant secretRotatedAt;
 
     @Column(name = "secret_rotation_grace_period_hours")
+    @Builder.Default
     private Integer secretRotationGracePeriodHours = 24;
 
     @Column(name = "enabled", nullable = false)
+    @Builder.Default
     private Boolean enabled = true;
 
     @Column(name = "rate_limit_per_second")
