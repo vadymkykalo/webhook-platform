@@ -69,7 +69,7 @@ public class TestEndpointService {
                 .expiresAt(Instant.now().plus(ttlHours, ChronoUnit.HOURS))
                 .build();
 
-        endpoint = testEndpointRepository.save(endpoint);
+        endpoint = testEndpointRepository.saveAndFlush(endpoint);
         log.info("Created test endpoint {} for project {}", slug, projectId);
 
         return mapToResponse(endpoint);
