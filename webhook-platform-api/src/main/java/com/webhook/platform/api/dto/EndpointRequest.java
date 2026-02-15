@@ -29,4 +29,6 @@ public class EndpointRequest {
     @Min(value = 1, message = "Rate limit must be at least 1")
     @Max(value = 10000, message = "Rate limit must be at most 10000")
     private Integer rateLimitPerSecond;
+
+    private String allowedSourceIps;
 }

@@ -9,11 +9,14 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt, UUID> {
     List<DeliveryAttempt> findByDeliveryIdOrderByAttemptNumberAsc(UUID deliveryId);
+    
+    Optional<DeliveryAttempt> findTopByDeliveryIdOrderByAttemptNumberDesc(UUID deliveryId);
     
     @Modifying(clearAutomatically = true)
     @Query(value = """

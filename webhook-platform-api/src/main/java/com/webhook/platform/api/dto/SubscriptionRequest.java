@@ -31,4 +31,8 @@ public class SubscriptionRequest {
     private Integer timeoutSeconds;
 
     private String retryDelays;
+
+    private String payloadTemplate;
+
+    private String customHeaders;
 }

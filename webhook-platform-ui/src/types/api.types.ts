@@ -54,6 +54,7 @@ export interface EndpointRequest {
   secret?: string;
   enabled?: boolean;
   rateLimitPerSecond?: number;
+  allowedSourceIps?: string;
 }
 
 export interface EndpointResponse {
@@ -63,6 +64,7 @@ export interface EndpointResponse {
   description?: string;
   enabled: boolean;
   rateLimitPerSecond?: number;
+  allowedSourceIps?: string;
   createdAt: string;
   updatedAt: string;
   secret?: string;

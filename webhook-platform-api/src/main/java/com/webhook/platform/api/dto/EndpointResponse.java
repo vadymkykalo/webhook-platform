@@ -19,6 +19,7 @@ public class EndpointResponse {
     private String description;
     private Boolean enabled;
     private Integer rateLimitPerSecond;
+    private String allowedSourceIps;
     private Instant createdAt;
     private Instant updatedAt;
     private String secret;

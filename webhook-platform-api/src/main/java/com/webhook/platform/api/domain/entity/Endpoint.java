@@ -54,6 +54,9 @@ public class Endpoint {
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
 
+    @Column(name = "allowed_source_ips", columnDefinition = "TEXT")
+    private String allowedSourceIps;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

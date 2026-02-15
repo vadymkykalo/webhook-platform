@@ -39,6 +39,7 @@ export default function EndpointsPage() {
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
   const [rateLimitPerSecond, setRateLimitPerSecond] = useState<number | undefined>(undefined);
+  const [allowedSourceIps, setAllowedSourceIps] = useState('');
   const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -88,11 +89,13 @@ export default function EndpointsPage() {
         enabled: true, 
         secret,
         rateLimitPerSecond: rateLimitPerSecond || undefined,
+        allowedSourceIps: allowedSourceIps || undefined,
       });
       setShowCreateDialog(false);
       setUrl('');
       setDescription('');
       setRateLimitPerSecond(undefined);
+      setAllowedSourceIps('');
       setNewSecret(secret);
       toast.success('Endpoint created successfully');
       loadData();
@@ -428,6 +431,19 @@ export default function EndpointsPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Maximum requests per second (leave empty for no limit)
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="allowedSourceIps">Allowed Source IPs (optional)</Label>
+                <Input
+                  id="allowedSourceIps"
+                  placeholder="192.168.1.1, 10.0.0.0/8"
+                  value={allowedSourceIps}
+                  onChange={(e) => setAllowedSourceIps(e.target.value)}
+                  disabled={creating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated IPs or CIDR ranges. Leave empty to allow all.
                 </p>
               </div>
             </div>

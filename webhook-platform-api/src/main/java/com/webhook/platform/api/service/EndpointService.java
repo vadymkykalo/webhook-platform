@@ -74,6 +74,7 @@ public class EndpointService {
                 .secretEncrypted(encrypted.getCiphertext())
                 .secretIv(encrypted.getIv())
                 .rateLimitPerSecond(request.getRateLimitPerSecond())
+                .allowedSourceIps(request.getAllowedSourceIps())
                 .build();
         
         if (request.getEnabled() != null) {
@@ -122,6 +123,11 @@ public class EndpointService {
         }
         
         endpoint.setRateLimitPerSecond(request.getRateLimitPerSecond());
+        
+        if (request.getAllowedSourceIps() != null) {
+            endpoint.setAllowedSourceIps(request.getAllowedSourceIps());
+        }
+        
         endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponse(endpoint);
@@ -251,6 +257,7 @@ public class EndpointService {
                 .description(endpoint.getDescription())
                 .enabled(endpoint.getEnabled())
                 .rateLimitPerSecond(endpoint.getRateLimitPerSecond())
+                .allowedSourceIps(endpoint.getAllowedSourceIps())
                 .createdAt(endpoint.getCreatedAt())
                 .updatedAt(endpoint.getUpdatedAt())
                 .secret(secret)

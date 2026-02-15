@@ -119,6 +119,8 @@ public class EventIngestService {
                 .orderingEnabled(orderingEnabled)
                 .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
                 .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
+                .payloadTemplate(subscription.getPayloadTemplate())
+                .customHeaders(subscription.getCustomHeaders())
                 .build();
     }
 

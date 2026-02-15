@@ -53,6 +53,12 @@ public class Delivery {
     @Column(name = "retry_delays", columnDefinition = "TEXT")
     private String retryDelays = "60,300,900,3600,21600,86400";
 
+    @Column(name = "payload_template", columnDefinition = "TEXT")
+    private String payloadTemplate;
+
+    @Column(name = "custom_headers", columnDefinition = "TEXT")
+    private String customHeaders;
+
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 

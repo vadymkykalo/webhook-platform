@@ -16,6 +16,7 @@ import DocumentationPage from './pages/DocumentationPage';
 import LandingPage from './pages/LandingPage';
 import QuickstartPage from './pages/QuickstartPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import DlqPage from './pages/DlqPage';
 
 export const router = createBrowserRouter([
   {
@@ -77,6 +78,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/analytics',
         element: <AnalyticsPage />,
+      },
+      {
+        path: 'projects/:projectId/dlq',
+        element: <DlqPage />,
       },
       {
         path: 'members',

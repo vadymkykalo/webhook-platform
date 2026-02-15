@@ -8,6 +8,8 @@ export interface SubscriptionRequest {
   maxAttempts?: number;
   timeoutSeconds?: number;
   retryDelays?: string;
+  payloadTemplate?: string;
+  customHeaders?: string;
 }
 
 export interface SubscriptionResponse {
@@ -20,6 +22,8 @@ export interface SubscriptionResponse {
   maxAttempts: number;
   timeoutSeconds: number;
   retryDelays: string;
+  payloadTemplate: string | null;
+  customHeaders: string | null;
   createdAt: string;
   updatedAt: string;
 }

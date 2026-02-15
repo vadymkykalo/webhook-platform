@@ -47,6 +47,8 @@ public class WebhookDeliveryService {
     private final MeterRegistry meterRegistry;
     private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
+    private final PayloadTransformService payloadTransformService;
+    private final IpAllowlistService ipAllowlistService;
 
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
@@ -63,7 +65,9 @@ public class WebhookDeliveryService {
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper,
             OrderingBufferService orderingBufferService,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate) {
+            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
+            PayloadTransformService payloadTransformService,
+            IpAllowlistService ipAllowlistService) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -80,6 +84,8 @@ public class WebhookDeliveryService {
         this.meterRegistry = meterRegistry;
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
+        this.payloadTransformService = payloadTransformService;
+        this.ipAllowlistService = ipAllowlistService;
     }
 
     @Transactional
@@ -174,7 +180,8 @@ public class WebhookDeliveryService {
         }
         
         String secret = decryptSecret(endpoint);
-        String body = event.getPayload();
+        String originalPayload = event.getPayload();
+        String body = payloadTransformService.transform(originalPayload, delivery.getPayloadTemplate());
         long timestamp = System.currentTimeMillis();
 
         String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
@@ -188,15 +195,19 @@ public class WebhookDeliveryService {
                 ? String.valueOf(delivery.getSequenceNumber()) 
                 : "0";
         
-        webClient.post()
+        var requestSpec = webClient.post()
                 .uri(endpoint.getUrl())
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("X-Signature", signature)
                 .header("X-Event-Id", event.getId().toString())
                 .header("X-Delivery-Id", delivery.getId().toString())
                 .header("X-Timestamp", String.valueOf(timestamp))
-                .header("X-Sequence-Number", sequenceHeader)
-                .bodyValue(body)
+                .header("X-Sequence-Number", sequenceHeader);
+        
+        // Add custom headers if configured
+        addCustomHeaders(requestSpec, delivery.getCustomHeaders());
+        
+        requestSpec.bodyValue(body)
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();
                     String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
@@ -442,6 +453,28 @@ public class WebhookDeliveryService {
         } catch (Exception e) {
             log.error("Failed to decrypt secret for endpoint {}", endpoint.getId());
             return "fallback_secret";
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addCustomHeaders(WebClient.RequestBodySpec requestSpec, String customHeadersJson) {
+        if (customHeadersJson == null || customHeadersJson.isBlank()) {
+            return;
+        }
+        try {
+            Map<String, String> headers = new ObjectMapper().readValue(customHeadersJson, Map.class);
+            headers.forEach((key, value) -> {
+                if (key != null && value != null && !key.isBlank()) {
+                    // Skip headers that could cause security issues
+                    String keyLower = key.toLowerCase();
+                    if (!keyLower.equals("host") && !keyLower.equals("content-length") 
+                            && !keyLower.equals("transfer-encoding")) {
+                        requestSpec.header(key, value);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Failed to parse custom headers: {}", e.getMessage());
         }
     }
 }

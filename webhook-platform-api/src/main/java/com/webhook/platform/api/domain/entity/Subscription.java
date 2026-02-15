@@ -45,6 +45,12 @@ public class Subscription {
     @Column(name = "retry_delays", columnDefinition = "TEXT")
     private String retryDelays = "60,300,900,3600,21600,86400";
 
+    @Column(name = "payload_template", columnDefinition = "TEXT")
+    private String payloadTemplate;
+
+    @Column(name = "custom_headers", columnDefinition = "TEXT")
+    private String customHeaders;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -12,18 +12,16 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SubscriptionResponse {
-    private UUID id;
-    private UUID projectId;
+public class DlqItemResponse {
+    private UUID deliveryId;
+    private UUID eventId;
     private UUID endpointId;
+    private UUID subscriptionId;
     private String eventType;
-    private Boolean enabled;
-    private Boolean orderingEnabled;
+    private String endpointUrl;
+    private Integer attemptCount;
     private Integer maxAttempts;
-    private Integer timeoutSeconds;
-    private String retryDelays;
-    private String payloadTemplate;
-    private String customHeaders;
+    private String lastError;
+    private Instant failedAt;
     private Instant createdAt;
-    private Instant updatedAt;
 }

@@ -41,6 +41,8 @@ export default function CreateSubscriptionModal({
   const [maxAttempts, setMaxAttempts] = useState(7);
   const [timeoutSeconds, setTimeoutSeconds] = useState(30);
   const [retryDelays, setRetryDelays] = useState('60,300,900,3600,21600,86400');
+  const [payloadTemplate, setPayloadTemplate] = useState('');
+  const [customHeaders, setCustomHeaders] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -54,6 +56,8 @@ export default function CreateSubscriptionModal({
       setMaxAttempts(subscription.maxAttempts || 7);
       setTimeoutSeconds(subscription.timeoutSeconds || 30);
       setRetryDelays(subscription.retryDelays || '60,300,900,3600,21600,86400');
+      setPayloadTemplate(subscription.payloadTemplate || '');
+      setCustomHeaders(subscription.customHeaders || '');
     } else {
       setEndpointId('');
       setEventType('');
@@ -62,6 +66,8 @@ export default function CreateSubscriptionModal({
       setMaxAttempts(7);
       setTimeoutSeconds(30);
       setRetryDelays('60,300,900,3600,21600,86400');
+      setPayloadTemplate('');
+      setCustomHeaders('');
     }
     setErrors({});
     setShowAdvanced(false);
@@ -100,6 +106,8 @@ export default function CreateSubscriptionModal({
         maxAttempts,
         timeoutSeconds,
         retryDelays,
+        payloadTemplate: payloadTemplate || undefined,
+        customHeaders: customHeaders || undefined,
       };
 
       if (subscription) {
@@ -272,6 +280,35 @@ export default function CreateSubscriptionModal({
                   />
                   <p className="text-xs text-muted-foreground">
                     Comma-separated delays in seconds. Default: 1m, 5m, 15m, 1h, 6h, 24h
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payloadTemplate">Payload Template (JSON)</Label>
+                  <textarea
+                    id="payloadTemplate"
+                    className="w-full h-32 p-2 text-sm font-mono border rounded-md bg-background resize-y"
+                    placeholder={`{\n  "event_id": "\${$.id}",\n  "data": "\${$.data}"\n}`}
+                    value={payloadTemplate}
+                    onChange={(e) => setPayloadTemplate(e.target.value)}
+                    disabled={saving}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    JSON template with JSONPath expressions in <code className="bg-muted px-1 rounded">${'{'}$.path{'}'}</code> syntax.
+                    Leave empty to send original payload.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customHeaders">Custom Headers (JSON)</Label>
+                  <textarea
+                    id="customHeaders"
+                    className="w-full h-24 p-2 text-sm font-mono border rounded-md bg-background resize-y"
+                    placeholder={`{\n  "X-Api-Key": "your-api-key",\n  "Authorization": "Bearer token"\n}`}
+                    value={customHeaders}
+                    onChange={(e) => setCustomHeaders(e.target.value)}
+                    disabled={saving}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    JSON object with header name/value pairs. Added to each webhook request.
                   </p>
                 </div>
               </div>

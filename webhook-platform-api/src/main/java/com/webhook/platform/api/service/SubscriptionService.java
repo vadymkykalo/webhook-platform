@@ -46,6 +46,8 @@ public class SubscriptionService {
                 .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts() : 7)
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600,86400")
+                .payloadTemplate(request.getPayloadTemplate())
+                .customHeaders(request.getCustomHeaders())
                 .build();
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
@@ -94,6 +96,12 @@ public class SubscriptionService {
         if (request.getRetryDelays() != null) {
             subscription.setRetryDelays(request.getRetryDelays());
         }
+        if (request.getPayloadTemplate() != null) {
+            subscription.setPayloadTemplate(request.getPayloadTemplate());
+        }
+        if (request.getCustomHeaders() != null) {
+            subscription.setCustomHeaders(request.getCustomHeaders());
+        }
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
         return mapToResponse(subscription);
@@ -118,6 +126,8 @@ public class SubscriptionService {
                 .maxAttempts(subscription.getMaxAttempts())
                 .timeoutSeconds(subscription.getTimeoutSeconds())
                 .retryDelays(subscription.getRetryDelays())
+                .payloadTemplate(subscription.getPayloadTemplate())
+                .customHeaders(subscription.getCustomHeaders())
                 .createdAt(subscription.getCreatedAt())
                 .updatedAt(subscription.getUpdatedAt())
                 .build();
