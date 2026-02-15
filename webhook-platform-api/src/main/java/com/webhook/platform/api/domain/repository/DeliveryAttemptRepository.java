@@ -47,4 +47,62 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
     
     @Query(value = "SELECT COUNT(*) FROM delivery_attempts", nativeQuery = true)
     long countAllAttempts();
+
+    @Query(value = """
+        SELECT AVG(da.duration_ms) FROM delivery_attempts da
+        JOIN deliveries d ON da.delivery_id = d.id
+        JOIN events e ON d.event_id = e.id
+        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        """, nativeQuery = true)
+    Double findAverageLatencyByProjectIdAndAttemptedAtBetween(
+            @Param("projectId") UUID projectId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    @Query(value = """
+        SELECT PERCENTILE_CONT(:percentile) WITHIN GROUP (ORDER BY da.duration_ms)
+        FROM delivery_attempts da
+        JOIN deliveries d ON da.delivery_id = d.id
+        JOIN events e ON d.event_id = e.id
+        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        """, nativeQuery = true)
+    Long findLatencyPercentileByProjectId(
+            @Param("projectId") UUID projectId,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("percentile") double percentile);
+
+    @Query(value = """
+        SELECT 
+            TO_CHAR(DATE_TRUNC('hour', da.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
+            COUNT(*) as total,
+            AVG(da.duration_ms) as avg_latency
+        FROM delivery_attempts da
+        JOIN deliveries d ON da.delivery_id = d.id
+        JOIN events e ON d.event_id = e.id
+        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        GROUP BY DATE_TRUNC('hour', da.created_at)
+        ORDER BY ts
+        """, nativeQuery = true)
+    List<Object[]> findLatencyTimeSeriesByHour(
+            @Param("projectId") UUID projectId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    @Query(value = """
+        SELECT 
+            TO_CHAR(DATE_TRUNC('day', da.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
+            COUNT(*) as total,
+            AVG(da.duration_ms) as avg_latency
+        FROM delivery_attempts da
+        JOIN deliveries d ON da.delivery_id = d.id
+        JOIN events e ON d.event_id = e.id
+        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        GROUP BY DATE_TRUNC('day', da.created_at)
+        ORDER BY ts
+        """, nativeQuery = true)
+    List<Object[]> findLatencyTimeSeriesByDay(
+            @Param("projectId") UUID projectId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
 }

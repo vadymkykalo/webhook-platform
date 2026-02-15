@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import { dashboardApi, type DashboardStats } from '../api/dashboard.api';
@@ -81,20 +81,31 @@ export default function DashboardPage() {
             Overview of your webhook platform activity
           </p>
         </div>
-        {projects.length > 0 && (
-          <div className="w-64">
-            <Select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
+        <div className="flex items-center gap-3">
+          {selectedProjectId && (
+            <button
+              onClick={() => navigate(`/projects/${selectedProjectId}/analytics`)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </button>
+          )}
+          {projects.length > 0 && (
+            <div className="w-64">
+              <Select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+              >
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       {!selectedProject ? (

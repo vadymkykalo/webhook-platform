@@ -31,8 +31,75 @@ export interface EndpointHealth {
   successRate: number;
 }
 
+export interface AnalyticsData {
+  timeRange: {
+    from: string;
+    to: string;
+    granularity: string;
+  };
+  overview: {
+    totalEvents: number;
+    totalDeliveries: number;
+    successfulDeliveries: number;
+    failedDeliveries: number;
+    successRate: number;
+    avgLatencyMs: number;
+    p50LatencyMs: number;
+    p95LatencyMs: number;
+    p99LatencyMs: number;
+    eventsPerSecond: number;
+    deliveriesPerSecond: number;
+  };
+  deliveryTimeSeries: TimeSeriesPoint[];
+  latencyTimeSeries: TimeSeriesPoint[];
+  eventTypeBreakdown: EventTypeBreakdown[];
+  endpointPerformance: EndpointPerformance[];
+  latencyPercentiles: {
+    p50: number;
+    p75: number;
+    p90: number;
+    p95: number;
+    p99: number;
+    max: number;
+  };
+}
+
+export interface TimeSeriesPoint {
+  timestamp: string;
+  total: number;
+  success: number;
+  failed: number;
+  avgLatencyMs?: number;
+}
+
+export interface EventTypeBreakdown {
+  eventType: string;
+  count: number;
+  percentage: number;
+  successCount: number;
+  successRate: number;
+}
+
+export interface EndpointPerformance {
+  endpointId: string;
+  url: string;
+  enabled: boolean;
+  totalDeliveries: number;
+  successfulDeliveries: number;
+  failedDeliveries: number;
+  successRate: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  lastDeliveryAt: string | null;
+  status: 'HEALTHY' | 'DEGRADED' | 'FAILING';
+}
+
 export const dashboardApi = {
   getProjectStats: (projectId: string): Promise<DashboardStats> => {
     return http.get<DashboardStats>(`/api/v1/dashboard/projects/${projectId}`);
+  },
+
+  getAnalytics: (projectId: string, period: string = '24h'): Promise<AnalyticsData> => {
+    return http.get<AnalyticsData>(`/api/v1/dashboard/projects/${projectId}/analytics?period=${period}`);
   },
 };

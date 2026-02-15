@@ -15,6 +15,7 @@ import SettingsPage from './pages/SettingsPage';
 import DocumentationPage from './pages/DocumentationPage';
 import LandingPage from './pages/LandingPage';
 import QuickstartPage from './pages/QuickstartPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 export const router = createBrowserRouter([
   {
@@ -72,6 +73,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/api-keys',
         element: <ApiKeysPage />,
+      },
+      {
+        path: 'projects/:projectId/analytics',
+        element: <AnalyticsPage />,
       },
       {
         path: 'members',
