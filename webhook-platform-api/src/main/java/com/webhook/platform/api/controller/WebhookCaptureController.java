@@ -22,7 +22,7 @@ public class WebhookCaptureController {
     @RequestMapping(value = "/{slug}", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
     @Operation(summary = "Capture webhook request", description = "Captures any HTTP request sent to this test endpoint")
     public ResponseEntity<Map<String, Object>> captureRequest(
-            @PathVariable String slug,
+            @PathVariable("slug") String slug,
             HttpServletRequest request) {
         
         CapturedRequestResponse captured = testEndpointService.captureRequest(slug, request);
