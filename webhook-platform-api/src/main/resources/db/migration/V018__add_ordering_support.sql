@@ -12,16 +12,16 @@ ALTER TABLE deliveries ADD COLUMN ordering_enabled BOOLEAN NOT NULL DEFAULT fals
 ALTER TABLE subscriptions ADD COLUMN ordering_enabled BOOLEAN NOT NULL DEFAULT false;
 
 -- Index for worker ordering queries (find pending deliveries by endpoint and sequence)
-CREATE INDEX CONCURRENTLY idx_deliveries_endpoint_seq 
+CREATE INDEX IF NOT EXISTS idx_deliveries_endpoint_seq 
 ON deliveries (endpoint_id, sequence_number) 
 WHERE status IN ('PENDING', 'PROCESSING');
 
 -- Index for gap detection (find oldest pending delivery for a sequence)
-CREATE INDEX CONCURRENTLY idx_deliveries_endpoint_pending_seq
+CREATE INDEX IF NOT EXISTS idx_deliveries_endpoint_pending_seq
 ON deliveries (endpoint_id, sequence_number, created_at)
 WHERE status = 'PENDING' AND ordering_enabled = true;
 
 -- Unique constraint for ordered deliveries (prevent duplicate sequences per endpoint)
-CREATE UNIQUE INDEX CONCURRENTLY idx_deliveries_endpoint_seq_unique
+CREATE UNIQUE INDEX IF NOT EXISTS idx_deliveries_endpoint_seq_unique
 ON deliveries (endpoint_id, sequence_number)
 WHERE ordering_enabled = true AND sequence_number IS NOT NULL;
