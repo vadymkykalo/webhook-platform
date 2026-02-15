@@ -5,6 +5,10 @@ import com.webhook.platform.api.dto.ProjectResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.ProjectService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,6 +19,8 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/projects")
+@Tag(name = "Projects", description = "Project management")
+@SecurityRequirement(name = "bearerAuth")
 public class ProjectController {
 
     private final ProjectService projectService;
@@ -23,6 +29,8 @@ public class ProjectController {
         this.projectService = projectService;
     }
 
+    @Operation(summary = "Create project", description = "Creates a new project in the organization")
+    @ApiResponse(responseCode = "201", description = "Project created")
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(
             @RequestBody ProjectRequest request,
@@ -37,6 +45,7 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Operation(summary = "Get project", description = "Returns project details by ID")
     @GetMapping("/{id}")
     public ResponseEntity<ProjectResponse> getProject(
             @PathVariable("id") UUID id,
@@ -50,6 +59,7 @@ public class ProjectController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "List projects", description = "Returns all projects in the organization")
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
@@ -61,6 +71,7 @@ public class ProjectController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Update project", description = "Updates project details")
     @PutMapping("/{id}")
     public ResponseEntity<ProjectResponse> updateProject(
             @PathVariable("id") UUID id,
@@ -76,6 +87,8 @@ public class ProjectController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Delete project", description = "Deletes a project and all associated resources")
+    @ApiResponse(responseCode = "204", description = "Project deleted")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProject(
             @PathVariable("id") UUID id,

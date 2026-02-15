@@ -5,6 +5,10 @@ import com.webhook.platform.api.dto.SubscriptionResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.SubscriptionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,6 +19,8 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/subscriptions")
+@Tag(name = "Subscriptions", description = "Event type subscriptions")
+@SecurityRequirement(name = "bearerAuth")
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
@@ -23,6 +29,8 @@ public class SubscriptionController {
         this.subscriptionService = subscriptionService;
     }
 
+    @Operation(summary = "Create subscription", description = "Subscribes an endpoint to specific event types")
+    @ApiResponse(responseCode = "201", description = "Subscription created")
     @PostMapping
     public ResponseEntity<SubscriptionResponse> createSubscription(
             @PathVariable("projectId") UUID projectId,
@@ -37,6 +45,7 @@ public class SubscriptionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Operation(summary = "Get subscription", description = "Returns subscription details")
     @GetMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> getSubscription(
             @PathVariable("id") UUID id,
@@ -49,6 +58,7 @@ public class SubscriptionController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "List subscriptions", description = "Returns all subscriptions for the project")
     @GetMapping
     public ResponseEntity<List<SubscriptionResponse>> listSubscriptions(
             @PathVariable("projectId") UUID projectId,
@@ -61,6 +71,7 @@ public class SubscriptionController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Update subscription", description = "Updates subscription configuration")
     @PutMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> updateSubscription(
             @PathVariable("id") UUID id,
@@ -75,6 +86,8 @@ public class SubscriptionController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Delete subscription", description = "Removes a subscription")
+    @ApiResponse(responseCode = "204", description = "Subscription deleted")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSubscription(
             @PathVariable("id") UUID id,

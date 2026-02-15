@@ -5,6 +5,10 @@ import com.webhook.platform.api.dto.ApiKeyResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.ApiKeyService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +21,8 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/api-keys")
+@Tag(name = "API Keys", description = "API key management for event ingestion")
+@SecurityRequirement(name = "bearerAuth")
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
@@ -25,6 +31,8 @@ public class ApiKeyController {
         this.apiKeyService = apiKeyService;
     }
 
+    @Operation(summary = "Create API key", description = "Generates a new API key for event ingestion. The key is shown only once.")
+    @ApiResponse(responseCode = "201", description = "API key created")
     @PostMapping
     public ResponseEntity<ApiKeyResponse> createApiKey(
             @PathVariable("projectId") UUID projectId,
@@ -42,6 +50,7 @@ public class ApiKeyController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Operation(summary = "List API keys", description = "Returns all API keys for the project (keys are masked)")
     @GetMapping
     public ResponseEntity<List<ApiKeyResponse>> listApiKeys(
             @PathVariable("projectId") UUID projectId,
@@ -55,6 +64,8 @@ public class ApiKeyController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Revoke API key", description = "Permanently revokes an API key")
+    @ApiResponse(responseCode = "204", description = "API key revoked")
     @DeleteMapping("/{apiKeyId}")
     public ResponseEntity<Void> revokeApiKey(
             @PathVariable("projectId") UUID projectId,

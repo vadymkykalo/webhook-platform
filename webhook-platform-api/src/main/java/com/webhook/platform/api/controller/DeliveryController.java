@@ -6,6 +6,11 @@ import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.DeliveryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/deliveries")
+@Tag(name = "Deliveries", description = "Delivery status and replay operations")
+@SecurityRequirement(name = "bearerAuth")
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
@@ -30,6 +37,7 @@ public class DeliveryController {
         this.deliveryService = deliveryService;
     }
 
+    @Operation(summary = "Get delivery", description = "Returns delivery details by ID")
     @GetMapping("/{id}")
     public ResponseEntity<DeliveryResponse> getDelivery(
             @PathVariable("id") UUID id,
@@ -42,6 +50,7 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "List deliveries", description = "Returns paginated list of deliveries")
     @GetMapping
     public ResponseEntity<Page<DeliveryResponse>> listDeliveries(
             @RequestParam(value = "eventId", required = false) UUID eventId,
@@ -55,6 +64,7 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "List deliveries by project", description = "Returns paginated deliveries with filtering")
     @GetMapping("/projects/{projectId}")
     public ResponseEntity<Page<DeliveryResponse>> listDeliveriesByProject(
             @PathVariable("projectId") UUID projectId,
@@ -77,6 +87,8 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Replay delivery", description = "Re-sends a failed delivery")
+    @ApiResponse(responseCode = "202", description = "Replay initiated")
     @PostMapping("/{id}/replay")
     public ResponseEntity<Void> replayDelivery(
             @PathVariable("id") UUID id,
@@ -90,6 +102,7 @@ public class DeliveryController {
         return ResponseEntity.accepted().build();
     }
 
+    @Operation(summary = "Get delivery attempts", description = "Returns all delivery attempts with request/response details")
     @GetMapping("/{id}/attempts")
     public ResponseEntity<List<DeliveryAttemptResponse>> getDeliveryAttempts(
             @PathVariable("id") UUID id,
@@ -102,6 +115,8 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Bulk replay deliveries", description = "Re-sends multiple failed deliveries at once")
+    @ApiResponse(responseCode = "202", description = "Bulk replay initiated")
     @PostMapping("/bulk-replay")
     public ResponseEntity<com.webhook.platform.api.dto.BulkReplayResponse> bulkReplayDeliveries(
             @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,

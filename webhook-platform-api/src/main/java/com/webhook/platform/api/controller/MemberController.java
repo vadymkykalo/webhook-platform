@@ -5,6 +5,10 @@ import com.webhook.platform.api.dto.ChangeMemberRoleRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.MembershipService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +21,8 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/orgs/{orgId}/members")
+@Tag(name = "Organizations", description = "Organization member management")
+@SecurityRequirement(name = "bearerAuth")
 public class MemberController {
 
     private final MembershipService membershipService;
@@ -25,6 +31,7 @@ public class MemberController {
         this.membershipService = membershipService;
     }
 
+    @Operation(summary = "List members", description = "Returns all members of the organization")
     @GetMapping
     public ResponseEntity<List<MemberResponse>> getMembers(
             @PathVariable("orgId") UUID orgId,
@@ -37,6 +44,8 @@ public class MemberController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Add member", description = "Invites a user to the organization")
+    @ApiResponse(responseCode = "201", description = "Member added")
     @PostMapping
     public ResponseEntity<MemberResponse> addMember(
             @PathVariable("orgId") UUID orgId,
@@ -55,6 +64,7 @@ public class MemberController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Operation(summary = "Change member role", description = "Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)")
     @PatchMapping("/{userId}")
     public ResponseEntity<MemberResponse> changeMemberRole(
             @PathVariable("orgId") UUID orgId,
@@ -75,6 +85,8 @@ public class MemberController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Remove member", description = "Removes a member from the organization")
+    @ApiResponse(responseCode = "204", description = "Member removed")
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMember(
             @PathVariable("orgId") UUID orgId,

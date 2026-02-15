@@ -6,6 +6,10 @@ import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.EndpointService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +22,8 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/endpoints")
+@Tag(name = "Endpoints", description = "Webhook endpoint configuration")
+@SecurityRequirement(name = "bearerAuth")
 public class EndpointController {
 
     private final EndpointService endpointService;
@@ -26,6 +32,8 @@ public class EndpointController {
         this.endpointService = endpointService;
     }
 
+    @Operation(summary = "Create endpoint", description = "Creates a new webhook endpoint for the project")
+    @ApiResponse(responseCode = "201", description = "Endpoint created")
     @PostMapping
     public ResponseEntity<EndpointResponse> createEndpoint(
             @PathVariable("projectId") UUID projectId,
@@ -45,6 +53,7 @@ public class EndpointController {
         }
     }
 
+    @Operation(summary = "Get endpoint", description = "Returns endpoint details by ID")
     @GetMapping("/{id}")
     public ResponseEntity<EndpointResponse> getEndpoint(
             @PathVariable("id") UUID id,
@@ -57,6 +66,7 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "List endpoints", description = "Returns all endpoints for the project")
     @GetMapping
     public ResponseEntity<List<EndpointResponse>> listEndpoints(
             @PathVariable("projectId") UUID projectId,
@@ -69,6 +79,7 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Update endpoint", description = "Updates endpoint configuration")
     @PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
             @PathVariable("id") UUID id,
@@ -83,6 +94,8 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Delete endpoint", description = "Deletes an endpoint")
+    @ApiResponse(responseCode = "204", description = "Endpoint deleted")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEndpoint(
             @PathVariable("id") UUID id,
@@ -96,6 +109,7 @@ public class EndpointController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Rotate secret", description = "Generates a new webhook signing secret")
     @PostMapping("/{id}/rotate-secret")
     public ResponseEntity<EndpointResponse> rotateSecret(
             @PathVariable("id") UUID id,
@@ -110,6 +124,7 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Test endpoint", description = "Sends a test webhook to verify endpoint connectivity")
     @PostMapping("/{id}/test")
     public ResponseEntity<EndpointTestResponse> testEndpoint(
             @PathVariable("id") UUID id,
