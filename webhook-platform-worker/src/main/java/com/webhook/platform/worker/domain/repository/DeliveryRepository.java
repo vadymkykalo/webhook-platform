@@ -9,12 +9,19 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
+
+    @Modifying
+    @Query("UPDATE Delivery d SET d.status = 'PENDING', d.nextRetryAt = CURRENT_TIMESTAMP " +
+           "WHERE d.status = 'PROCESSING' AND d.lastAttemptAt < :threshold")
+    int resetStuckDeliveries(@Param("threshold") Instant threshold);
     
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(value = "SELECT d FROM Delivery d WHERE d.status = :status AND d.nextRetryAt IS NOT NULL AND d.nextRetryAt <= :now ORDER BY d.nextRetryAt ASC")

@@ -84,6 +84,10 @@ ordering:
   delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
   buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
 
+stuck-delivery:
+  threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
+  check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
+
 logging:
   level:
     root: INFO
