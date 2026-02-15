@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight, Zap, ShieldCheck } from 'lucide-react';
+import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { endpointsApi } from '../api/endpoints.api';
 import { projectsApi } from '../api/projects.api';
@@ -53,6 +53,8 @@ export default function EndpointsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
   const [mtlsEndpoint, setMtlsEndpoint] = useState<EndpointResponse | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [skippingId, setSkippingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -205,6 +207,75 @@ export default function EndpointsPage() {
     setTestResult(null);
   };
 
+  const handleVerify = async (endpointId: string) => {
+    if (!projectId) return;
+    
+    setVerifyingId(endpointId);
+    try {
+      const result = await endpointsApi.verify(projectId, endpointId);
+      if (result.success) {
+        toast.success('Endpoint verified successfully!');
+        loadData();
+      } else {
+        toast.error(`Verification failed: ${result.message}`);
+        loadData();
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to verify endpoint');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const handleSkipVerification = async (endpointId: string) => {
+    if (!projectId) return;
+    
+    setSkippingId(endpointId);
+    try {
+      await endpointsApi.skipVerification(projectId, endpointId, 'Manually skipped by user');
+      toast.success('Verification skipped');
+      loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to skip verification');
+    } finally {
+      setSkippingId(null);
+    }
+  };
+
+  const getVerificationBadge = (status?: string) => {
+    switch (status) {
+      case 'VERIFIED':
+        return (
+          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
+            <CheckCircle className="mr-1 h-3 w-3" />
+            Verified
+          </span>
+        );
+      case 'FAILED':
+        return (
+          <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
+            <AlertCircle className="mr-1 h-3 w-3" />
+            Failed
+          </span>
+        );
+      case 'SKIPPED':
+        return (
+          <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700">
+            <ShieldOff className="mr-1 h-3 w-3" />
+            Skipped
+          </span>
+        );
+      case 'PENDING':
+      default:
+        return (
+          <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
+            <Clock className="mr-1 h-3 w-3" />
+            Pending
+          </span>
+        );
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-US', {
@@ -314,6 +385,7 @@ export default function EndpointsPage() {
                             mTLS
                           </span>
                         )}
+                        {getVerificationBadge(endpoint.verificationStatus)}
                       </div>
                     </CardTitle>
                     {endpoint.description && (
@@ -390,6 +462,52 @@ export default function EndpointsPage() {
                     </div>
                   )}
                 </div>
+                
+                {(endpoint.verificationStatus === 'PENDING' || endpoint.verificationStatus === 'FAILED') && (
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 mr-4">
+                        <p className="text-sm font-medium">
+                          {endpoint.verificationStatus === 'PENDING' 
+                            ? 'Endpoint verification required' 
+                            : 'Verification failed - retry?'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Your endpoint must respond to: <code className="bg-muted px-1 rounded">POST {"{"}"type": "webhook.verification", "challenge": "..."{"}"}.</code>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Return the <code className="bg-muted px-1 rounded">challenge</code> value in your response body.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSkipVerification(endpoint.id)}
+                          disabled={skippingId === endpoint.id}
+                        >
+                          {skippingId === endpoint.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Skip'
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleVerify(endpoint.id)}
+                          disabled={verifyingId === endpoint.id}
+                        >
+                          {verifyingId === endpoint.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                          )}
+                          Verify Now
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

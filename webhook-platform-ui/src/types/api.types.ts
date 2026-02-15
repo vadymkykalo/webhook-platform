@@ -66,6 +66,10 @@ export interface EndpointResponse {
   rateLimitPerSecond?: number;
   allowedSourceIps?: string;
   mtlsEnabled?: boolean;
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'FAILED' | 'SKIPPED';
+  verificationAttemptedAt?: string;
+  verificationCompletedAt?: string;
+  verificationSkipReason?: string;
   createdAt: string;
   updatedAt: string;
   secret?: string;

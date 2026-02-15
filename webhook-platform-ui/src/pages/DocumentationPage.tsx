@@ -765,6 +765,42 @@ function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProp
           {getCodeExample('verifySignature', activeLanguage)}
         </CodeBlock>
       </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Endpoint Verification</h2>
+        <p className="text-gray-600 mb-6">
+          When you register an endpoint, we send a verification challenge to confirm you own the URL.
+        </p>
+
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Challenge Request</h3>
+        <p className="text-gray-600 mb-4">We POST a JSON payload with type <code className="bg-gray-100 px-2 py-1 rounded">webhook.verification</code>:</p>
+        <ResponseBlock>
+{`POST https://your-endpoint.com/webhooks
+Content-Type: application/json
+
+{
+  "type": "webhook.verification",
+  "challenge": "whc_abc123xyz789...",
+  "timestamp": "2024-01-15T10:30:00Z"
+}`}
+        </ResponseBlock>
+
+        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Expected Response</h3>
+        <p className="text-gray-600 mb-4">Return the <code className="bg-gray-100 px-2 py-1 rounded">challenge</code> value in your response:</p>
+        <ResponseBlock>
+{`HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "challenge": "whc_abc123xyz789..."
+}`}
+        </ResponseBlock>
+
+        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Implementation Examples</h3>
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
+          {getCodeExample('endpointVerification', activeLanguage)}
+        </CodeBlock>
+      </div>
     </div>
   );
 }
@@ -1523,6 +1559,34 @@ response = requests.post(
     json={'projectId': 'project-uuid', 'status': 'FAILED'}
 )
 result = response.json()`,
+    },
+    endpointVerification: {
+      curl: `# Your endpoint receives:
+# POST with {"type": "webhook.verification", "challenge": "whc_..."}
+# You must return the challenge value in response`,
+      node: `app.post('/webhooks', (req, res) => {
+  // Handle verification challenge
+  if (req.body.type === 'webhook.verification') {
+    return res.json({ challenge: req.body.challenge });
+  }
+  
+  // Process normal webhooks
+  console.log('Received:', req.body);
+  res.status(200).send('OK');
+});`,
+      python: `from flask import Flask, request, jsonify
+
+@app.post("/webhooks")
+def handle_webhook():
+    data = request.json
+    
+    # Handle verification challenge
+    if data.get("type") == "webhook.verification":
+        return jsonify({"challenge": data["challenge"]})
+    
+    # Process normal webhooks
+    print("Received:", data)
+    return {"status": "ok"}`,
     },
   };
 

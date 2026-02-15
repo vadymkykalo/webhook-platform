@@ -21,6 +21,10 @@ public class EndpointResponse {
     private Integer rateLimitPerSecond;
     private String allowedSourceIps;
     private Boolean mtlsEnabled;
+    private String verificationStatus;
+    private Instant verificationAttemptedAt;
+    private Instant verificationCompletedAt;
+    private String verificationSkipReason;
     private Instant createdAt;
     private Instant updatedAt;
     private String secret;

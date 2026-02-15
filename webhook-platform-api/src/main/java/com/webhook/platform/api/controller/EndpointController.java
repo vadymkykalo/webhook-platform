@@ -6,6 +6,7 @@ import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.EndpointService;
+import com.webhook.platform.api.service.EndpointVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,9 +29,11 @@ import java.util.UUID;
 public class EndpointController {
 
     private final EndpointService endpointService;
+    private final EndpointVerificationService verificationService;
 
-    public EndpointController(EndpointService endpointService) {
+    public EndpointController(EndpointService endpointService, EndpointVerificationService verificationService) {
         this.endpointService = endpointService;
+        this.verificationService = verificationService;
     }
 
     @Operation(summary = "Create endpoint", description = "Creates a new webhook endpoint for the project")
@@ -171,4 +174,48 @@ public class EndpointController {
         log.info("Disabled mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "Verify endpoint", description = "Sends a verification challenge to the endpoint")
+    @PostMapping("/{id}/verify")
+    public ResponseEntity<VerificationResponse> verifyEndpoint(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        
+        var result = verificationService.verify(id);
+        log.info("Verification attempt for endpoint {}: success={}", id, result.success());
+        
+        return ResponseEntity.ok(new VerificationResponse(
+                result.success(),
+                result.message(),
+                result.endpoint().getVerificationStatus().name()
+        ));
+    }
+
+    @Operation(summary = "Skip verification", description = "Skips verification for trusted endpoints (admin only)")
+    @PostMapping("/{id}/skip-verification")
+    public ResponseEntity<EndpointResponse> skipVerification(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
+            @RequestBody(required = false) SkipVerificationRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        
+        String reason = request != null ? request.reason() : "Skipped by administrator";
+        var endpoint = verificationService.skipVerification(id, reason);
+        log.info("Skipped verification for endpoint {}: {}", id, reason);
+        
+        return ResponseEntity.ok(endpointService.getEndpoint(id, jwtAuth.getOrganizationId()));
+    }
+
+    public record VerificationResponse(boolean success, String message, String status) {}
+    public record SkipVerificationRequest(String reason) {}
 }

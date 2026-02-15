@@ -46,10 +46,24 @@ export const endpointsApi = {
   disableMtls: (projectId: string, id: string): Promise<EndpointResponse> => {
     return http.delete<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/mtls`);
   },
+
+  verify: (projectId: string, id: string): Promise<VerificationResponse> => {
+    return http.post<VerificationResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/verify`);
+  },
+
+  skipVerification: (projectId: string, id: string, reason?: string): Promise<EndpointResponse> => {
+    return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/skip-verification`, { reason });
+  },
 };
 
 export interface MtlsConfigRequest {
   clientCert: string;
   clientKey: string;
   caCert?: string;
+}
+
+export interface VerificationResponse {
+  success: boolean;
+  message: string;
+  status: 'PENDING' | 'VERIFIED' | 'FAILED' | 'SKIPPED';
 }

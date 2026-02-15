@@ -78,6 +78,23 @@ public class Endpoint {
     @Column(name = "ca_cert", columnDefinition = "TEXT")
     private String caCert;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status", nullable = false, length = 32)
+    @Builder.Default
+    private VerificationStatus verificationStatus = VerificationStatus.PENDING;
+
+    @Column(name = "verification_token", length = 64)
+    private String verificationToken;
+
+    @Column(name = "verification_attempted_at")
+    private Instant verificationAttemptedAt;
+
+    @Column(name = "verification_completed_at")
+    private Instant verificationCompletedAt;
+
+    @Column(name = "verification_skip_reason", length = 255)
+    private String verificationSkipReason;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -92,4 +109,11 @@ public class Endpoint {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", insertable = false, updatable = false)
     private Project project;
+
+    public enum VerificationStatus {
+        PENDING,
+        VERIFIED,
+        FAILED,
+        SKIPPED
+    }
 }
