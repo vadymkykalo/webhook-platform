@@ -1,48 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  AreaChart,
-  BarList,
-  DonutChart,
-  Card,
-  Metric,
-  Text,
-  Flex,
-  Grid,
-  Title,
-  Badge,
-  ProgressBar,
-  TabGroup,
-  TabList,
-  Tab,
-  Color,
-} from '@tremor/react';
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell, Legend
+} from 'recharts';
 import {
-  ArrowLeft, RefreshCw, TrendingUp,
-  Zap, Clock, CheckCircle, XCircle, AlertTriangle
+  ArrowLeft, RefreshCw, TrendingUp, Activity,
+  Clock, CheckCircle2, XCircle, AlertTriangle, Zap, Server
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dashboardApi, type AnalyticsData } from '../api/dashboard.api';
 
-const periodLabels = {
-  '24h': 'Last 24 hours',
-  '7d': 'Last 7 days', 
-  '30d': 'Last 30 days',
+const CHART_COLORS = {
+  success: '#22c55e',
+  failed: '#ef4444',
+  latency: '#6366f1',
+  primary: '#3b82f6',
 };
+
+const PIE_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export default function AnalyticsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [periodIndex, setPeriodIndex] = useState(0);
-  const periods = ['24h', '7d', '30d'] as const;
-  const period = periods[periodIndex];
+  const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('24h');
 
   useEffect(() => {
-    if (projectId) {
-      loadAnalytics();
-    }
+    if (projectId) loadAnalytics();
   }, [projectId, period]);
 
   const loadAnalytics = async () => {
@@ -58,343 +44,348 @@ export default function AnalyticsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, Color> = {
-      HEALTHY: 'emerald',
-      DEGRADED: 'yellow',
-      FAILING: 'red',
-    };
-    return colors[status] || 'gray';
-  };
-
   if (loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
-        <div className="h-10 w-48 bg-tremor-background-subtle animate-pulse rounded-lg" />
-        <Grid numItemsMd={2} numItemsLg={4} className="gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="h-32 animate-pulse bg-tremor-background-subtle" />
-          ))}
-        </Grid>
-        <Card className="h-80 animate-pulse bg-tremor-background-subtle" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="h-12 w-72 bg-white/50 dark:bg-slate-800/50 animate-pulse rounded-xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-36 bg-white/50 dark:bg-slate-800/50 animate-pulse rounded-2xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="h-80 bg-white/50 dark:bg-slate-800/50 animate-pulse rounded-2xl" />
+            <div className="h-80 bg-white/50 dark:bg-slate-800/50 animate-pulse rounded-2xl" />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!analytics) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <Card className="p-12 text-center">
-          <AlertTriangle className="h-12 w-12 mx-auto text-tremor-content-subtle mb-4" />
-          <Title>No Analytics Data</Title>
-          <Text className="mt-2">Start sending events to see analytics</Text>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-16 w-16 mx-auto text-amber-500 mb-4" />
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">No Data Available</h2>
+          <p className="text-slate-500 dark:text-slate-400">Start sending webhook events to see analytics</p>
+        </div>
       </div>
     );
   }
 
   const { overview, deliveryTimeSeries, latencyTimeSeries, eventTypeBreakdown, endpointPerformance, latencyPercentiles } = analytics;
-
-  const chartData = deliveryTimeSeries.map(point => ({
-    date: new Date(point.timestamp).toLocaleString([], { 
-      month: 'short', 
-      day: 'numeric',
-      hour: period === '24h' ? '2-digit' : undefined,
-      minute: period === '24h' ? '2-digit' : undefined,
-    }),
-    Success: point.success,
-    Failed: point.failed,
-  }));
-
-  const latencyData = latencyTimeSeries.map(point => ({
-    date: new Date(point.timestamp).toLocaleString([], { 
-      month: 'short', 
-      day: 'numeric',
-      hour: period === '24h' ? '2-digit' : undefined,
-      minute: period === '24h' ? '2-digit' : undefined,
-    }),
-    'Avg Latency (ms)': point.avgLatencyMs || 0,
-  }));
-
-  const eventTypeData = eventTypeBreakdown.map(e => ({
-    name: e.eventType,
-    value: e.count,
-  }));
-
-  const percentileData = [
-    { name: 'p50', value: latencyPercentiles.p50 },
-    { name: 'p75', value: latencyPercentiles.p75 },
-    { name: 'p90', value: latencyPercentiles.p90 },
-    { name: 'p95', value: latencyPercentiles.p95 },
-    { name: 'p99', value: latencyPercentiles.p99 },
-  ];
-
-  const hasData = overview.totalDeliveries > 0;
+  const hasDeliveryData = deliveryTimeSeries.length > 0;
+  const hasLatencyData = latencyTimeSeries.length > 0 && latencyTimeSeries.some(d => d.avgLatencyMs && d.avgLatencyMs > 0);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <Flex justifyContent="between" alignItems="center">
-        <Flex alignItems="center" className="gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-tremor-background-subtle rounded-lg transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-tremor-content" />
-          </button>
-          <div>
-            <Title className="text-2xl font-bold">Analytics Dashboard</Title>
-            <Text className="text-tremor-content-subtle">{periodLabels[period]}</Text>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2.5 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all"
+            >
+              <ArrowLeft className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+            </button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 dark:text-white">
+                Analytics Dashboard
+              </h1>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                Real-time webhook delivery metrics
+              </p>
+            </div>
           </div>
-        </Flex>
-        <Flex className="gap-3">
-          <TabGroup index={periodIndex} onIndexChange={setPeriodIndex}>
-            <TabList variant="solid">
-              <Tab>24h</Tab>
-              <Tab>7d</Tab>
-              <Tab>30d</Tab>
-            </TabList>
-          </TabGroup>
-          <button
-            onClick={loadAnalytics}
-            className="p-2 hover:bg-tremor-background-subtle rounded-lg transition-colors"
-          >
-            <RefreshCw className="h-5 w-5 text-tremor-content" />
-          </button>
-        </Flex>
-      </Flex>
-
-      {/* KPI Cards */}
-      <Grid numItemsMd={2} numItemsLg={4} className="gap-6">
-        <Card decoration="top" decorationColor="emerald">
-          <Flex alignItems="start">
-            <div>
-              <Text>Success Rate</Text>
-              <Metric className="text-emerald-600">{overview.successRate}%</Metric>
+          
+          <div className="flex items-center gap-3">
+            <div className="inline-flex bg-white dark:bg-slate-800 rounded-xl p-1 shadow-sm">
+              {(['24h', '7d', '30d'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    period === p
+                      ? 'bg-blue-500 text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
-            <Badge color="emerald" icon={CheckCircle}>
-              {overview.successfulDeliveries.toLocaleString()}
-            </Badge>
-          </Flex>
-          <ProgressBar value={overview.successRate} color="emerald" className="mt-4" />
-        </Card>
+            <button
+              onClick={loadAnalytics}
+              className="p-2.5 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all"
+            >
+              <RefreshCw className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+            </button>
+          </div>
+        </div>
 
-        <Card decoration="top" decorationColor="blue">
-          <Flex alignItems="start">
-            <div>
-              <Text>Avg Latency</Text>
-              <Metric>{Math.round(overview.avgLatencyMs)}ms</Metric>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-5 text-white shadow-lg shadow-emerald-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-emerald-100 text-sm font-medium">Success Rate</span>
+              <CheckCircle2 className="h-5 w-5 text-emerald-200" />
             </div>
-            <Badge color="blue" icon={Clock}>
-              p95: {overview.p95LatencyMs}ms
-            </Badge>
-          </Flex>
-          <Flex className="mt-4 gap-2">
-            <Text className="text-xs">p50: {overview.p50LatencyMs}ms</Text>
-            <Text className="text-xs text-tremor-content-subtle">•</Text>
-            <Text className="text-xs">p99: {overview.p99LatencyMs}ms</Text>
-          </Flex>
-        </Card>
-
-        <Card decoration="top" decorationColor="amber">
-          <Flex alignItems="start">
-            <div>
-              <Text>Throughput</Text>
-              <Metric>{overview.deliveriesPerSecond.toFixed(3)}/s</Metric>
+            <div className="text-4xl font-bold mb-1">{overview.successRate}%</div>
+            <div className="text-emerald-100 text-sm">
+              {overview.successfulDeliveries.toLocaleString()} of {overview.totalDeliveries.toLocaleString()}
             </div>
-            <Badge color="amber" icon={Zap}>
-              {overview.totalDeliveries.toLocaleString()} total
-            </Badge>
-          </Flex>
-          <Flex className="mt-4 gap-2">
-            <Text className="text-xs">{overview.totalEvents.toLocaleString()} events</Text>
-          </Flex>
-        </Card>
+          </div>
 
-        <Card decoration="top" decorationColor="red">
-          <Flex alignItems="start">
-            <div>
-              <Text>Failed</Text>
-              <Metric className="text-red-600">{overview.failedDeliveries.toLocaleString()}</Metric>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-blue-100 text-sm font-medium">Avg Latency</span>
+              <Clock className="h-5 w-5 text-blue-200" />
             </div>
-            <Badge color="red" icon={XCircle}>
-              {overview.totalDeliveries > 0 
-                ? ((overview.failedDeliveries / overview.totalDeliveries) * 100).toFixed(1)
-                : 0}%
-            </Badge>
-          </Flex>
-          <ProgressBar 
-            value={overview.totalDeliveries > 0 ? (overview.failedDeliveries / overview.totalDeliveries) * 100 : 0} 
-            color="red" 
-            className="mt-4" 
-          />
-        </Card>
-      </Grid>
+            <div className="text-4xl font-bold mb-1">{Math.round(overview.avgLatencyMs)}ms</div>
+            <div className="text-blue-100 text-sm">
+              p95: {overview.p95LatencyMs}ms · p99: {overview.p99LatencyMs}ms
+            </div>
+          </div>
 
-      {/* Charts Row */}
-      <Grid numItemsMd={2} className="gap-6">
-        <Card>
-          <Title>Delivery Volume</Title>
-          <Text>Success vs Failed deliveries over time</Text>
-          {hasData && chartData.length > 0 ? (
-            <AreaChart
-              className="h-72 mt-4"
-              data={chartData}
-              index="date"
-              categories={['Success', 'Failed']}
-              colors={['emerald', 'red']}
-              valueFormatter={(v) => v.toLocaleString()}
-              showAnimation
-              showLegend
-              showGridLines
-              curveType="monotone"
-            />
-          ) : (
-            <div className="h-72 flex items-center justify-center">
-              <div className="text-center">
-                <TrendingUp className="h-12 w-12 mx-auto text-tremor-content-subtle mb-3" />
-                <Text>No delivery data yet</Text>
-                <Text className="text-tremor-content-subtle text-sm">Send some events to see the chart</Text>
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl p-5 text-white shadow-lg shadow-amber-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-amber-100 text-sm font-medium">Throughput</span>
+              <Zap className="h-5 w-5 text-amber-200" />
+            </div>
+            <div className="text-4xl font-bold mb-1">{overview.deliveriesPerSecond.toFixed(2)}</div>
+            <div className="text-amber-100 text-sm">
+              deliveries/sec · {overview.totalEvents.toLocaleString()} events
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-5 text-white shadow-lg shadow-red-500/20">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-red-100 text-sm font-medium">Failed</span>
+              <XCircle className="h-5 w-5 text-red-200" />
+            </div>
+            <div className="text-4xl font-bold mb-1">{overview.failedDeliveries.toLocaleString()}</div>
+            <div className="text-red-100 text-sm">
+              {overview.totalDeliveries > 0 ? ((overview.failedDeliveries / overview.totalDeliveries) * 100).toFixed(1) : 0}% failure rate
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Delivery Volume */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800 dark:text-white">Delivery Volume</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Success vs Failed over time</p>
               </div>
             </div>
-          )}
-        </Card>
-
-        <Card>
-          <Title>Response Latency</Title>
-          <Text>Average latency over time</Text>
-          {hasData && latencyData.length > 0 ? (
-            <AreaChart
-              className="h-72 mt-4"
-              data={latencyData}
-              index="date"
-              categories={['Avg Latency (ms)']}
-              colors={['indigo']}
-              valueFormatter={(v) => `${Math.round(v)}ms`}
-              showAnimation
-              showGridLines
-              curveType="monotone"
-            />
-          ) : (
-            <div className="h-72 flex items-center justify-center">
-              <div className="text-center">
-                <Clock className="h-12 w-12 mx-auto text-tremor-content-subtle mb-3" />
-                <Text>No latency data yet</Text>
-                <Text className="text-tremor-content-subtle text-sm">Metrics will appear after deliveries</Text>
-              </div>
-            </div>
-          )}
-        </Card>
-      </Grid>
-
-      {/* Bottom Row */}
-      <Grid numItemsMd={2} className="gap-6">
-        <Card>
-          <Title>Event Types Distribution</Title>
-          <Text>Breakdown by event type</Text>
-          {eventTypeData.length > 0 ? (
-            <DonutChart
-              className="h-60 mt-4"
-              data={eventTypeData}
-              category="value"
-              index="name"
-              colors={['emerald', 'amber', 'rose', 'indigo', 'violet', 'cyan']}
-              valueFormatter={(v) => v.toLocaleString()}
-              showAnimation
-            />
-          ) : (
-            <div className="h-60 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-24 h-24 mx-auto rounded-full border-4 border-dashed border-tremor-border mb-3" />
-                <Text>No events recorded</Text>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card>
-          <Title>Latency Percentiles</Title>
-          <Text>Response time distribution</Text>
-          {hasData ? (
-            <BarList
-              data={percentileData}
-              className="mt-4"
-              valueFormatter={(v: number) => `${v}ms`}
-              color="indigo"
-            />
-          ) : (
-            <div className="h-60 flex items-center justify-center">
-              <div className="text-center">
-                <div className="space-y-2 mb-3">
-                  {[80, 60, 40, 20].map((w) => (
-                    <div key={w} className="h-3 bg-tremor-background-subtle rounded" style={{width: `${w}%`, marginLeft: 'auto', marginRight: 'auto'}} />
-                  ))}
+            {hasDeliveryData ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={deliveryTimeSeries}>
+                  <defs>
+                    <linearGradient id="successGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.success} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={CHART_COLORS.success} stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="failedGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.failed} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={CHART_COLORS.failed} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="timestamp" tickFormatter={(t) => new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} stroke="#94a3b8" fontSize={12} />
+                  <YAxis stroke="#94a3b8" fontSize={12} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }} />
+                  <Area type="monotone" dataKey="success" stroke={CHART_COLORS.success} fill="url(#successGrad)" strokeWidth={2} name="Success" />
+                  <Area type="monotone" dataKey="failed" stroke={CHART_COLORS.failed} fill="url(#failedGrad)" strokeWidth={2} name="Failed" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center">
+                <div className="text-center">
+                  <TrendingUp className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                  <p className="text-slate-500 dark:text-slate-400 font-medium">No delivery data yet</p>
+                  <p className="text-slate-400 dark:text-slate-500 text-sm">Send events to see the chart</p>
                 </div>
-                <Text>No latency data</Text>
+              </div>
+            )}
+          </div>
+
+          {/* Latency Chart */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+                <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800 dark:text-white">Response Latency</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">Average latency over time</p>
+              </div>
+            </div>
+            {hasLatencyData ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={latencyTimeSeries}>
+                  <defs>
+                    <linearGradient id="latencyGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.latency} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={CHART_COLORS.latency} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="timestamp" tickFormatter={(t) => new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} stroke="#94a3b8" fontSize={12} />
+                  <YAxis stroke="#94a3b8" fontSize={12} unit="ms" />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }} formatter={(v: number) => [`${Math.round(v)}ms`, 'Latency']} />
+                  <Area type="monotone" dataKey="avgLatencyMs" stroke={CHART_COLORS.latency} fill="url(#latencyGrad)" strokeWidth={2} name="Latency" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center">
+                <div className="text-center">
+                  <Clock className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                  <p className="text-slate-500 dark:text-slate-400 font-medium">No latency data yet</p>
+                  <p className="text-slate-400 dark:text-slate-500 text-sm">Metrics appear after deliveries</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Event Types */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold text-slate-800 dark:text-white mb-1">Event Types</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Distribution by type</p>
+            {eventTypeBreakdown.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={eventTypeBreakdown} dataKey="count" nameKey="eventType" cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2}>
+                    {eventTypeBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-20 h-20 mx-auto rounded-full border-4 border-dashed border-slate-200 dark:border-slate-700 mb-3" />
+                  <p className="text-slate-500 dark:text-slate-400">No events recorded</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Latency Percentiles */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
+            <h3 className="font-semibold text-slate-800 dark:text-white mb-1">Latency Percentiles</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">Response time distribution</p>
+            {overview.totalDeliveries > 0 ? (
+              <div className="space-y-4">
+                {[
+                  { label: 'p50', value: latencyPercentiles.p50, color: 'bg-blue-500' },
+                  { label: 'p75', value: latencyPercentiles.p75, color: 'bg-indigo-500' },
+                  { label: 'p90', value: latencyPercentiles.p90, color: 'bg-violet-500' },
+                  { label: 'p95', value: latencyPercentiles.p95, color: 'bg-purple-500' },
+                  { label: 'p99', value: latencyPercentiles.p99, color: 'bg-fuchsia-500' },
+                ].map(({ label, value, color }) => {
+                  const max = Math.max(latencyPercentiles.p99, 1);
+                  const pct = (value / max) * 100;
+                  return (
+                    <div key={label} className="flex items-center gap-4">
+                      <span className="w-10 text-sm font-medium text-slate-600 dark:text-slate-300">{label}</span>
+                      <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-16 text-right text-sm font-mono text-slate-600 dark:text-slate-300">{value}ms</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center">
+                <div className="text-center">
+                  <div className="space-y-2 mb-3">
+                    {[90, 70, 50, 30].map((w) => (
+                      <div key={w} className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full mx-auto" style={{ width: `${w}%` }} />
+                    ))}
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400">No latency data</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Endpoint Performance */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+              <Server className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800 dark:text-white">Endpoint Performance</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Health status and metrics</p>
+            </div>
+          </div>
+          {endpointPerformance.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="text-left py-3 px-4 text-slate-500 dark:text-slate-400 text-sm font-medium">Endpoint</th>
+                    <th className="text-left py-3 px-4 text-slate-500 dark:text-slate-400 text-sm font-medium">Status</th>
+                    <th className="text-right py-3 px-4 text-slate-500 dark:text-slate-400 text-sm font-medium">Deliveries</th>
+                    <th className="text-right py-3 px-4 text-slate-500 dark:text-slate-400 text-sm font-medium">Success</th>
+                    <th className="text-right py-3 px-4 text-slate-500 dark:text-slate-400 text-sm font-medium">Latency</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {endpointPerformance.map((ep) => (
+                    <tr key={ep.endpointId} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${ep.enabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          <span className="font-medium text-slate-700 dark:text-slate-200 truncate max-w-xs">{ep.url}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
+                          ep.status === 'HEALTHY' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          ep.status === 'DEGRADED' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>{ep.status}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-700 dark:text-slate-300">{ep.totalDeliveries.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right">
+                        <span className={ep.successRate >= 99 ? 'text-emerald-600' : ep.successRate >= 95 ? 'text-amber-600' : 'text-red-600'}>
+                          {ep.successRate}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-700 dark:text-slate-300">{Math.round(ep.avgLatencyMs)}ms</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center">
+              <div className="text-center">
+                <Server className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-slate-500 dark:text-slate-400">No endpoint data available</p>
               </div>
             </div>
           )}
-        </Card>
-      </Grid>
-
-      {/* Endpoint Performance */}
-      <Card>
-        <Title>Endpoint Performance</Title>
-        <Text>Health status and metrics by endpoint</Text>
-        {endpointPerformance.length > 0 ? (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-tremor-border">
-                  <th className="text-left py-3 px-4 text-tremor-content-subtle text-sm font-medium">Endpoint</th>
-                  <th className="text-left py-3 px-4 text-tremor-content-subtle text-sm font-medium">Status</th>
-                  <th className="text-right py-3 px-4 text-tremor-content-subtle text-sm font-medium">Deliveries</th>
-                  <th className="text-right py-3 px-4 text-tremor-content-subtle text-sm font-medium">Success Rate</th>
-                  <th className="text-right py-3 px-4 text-tremor-content-subtle text-sm font-medium">Avg Latency</th>
-                  <th className="text-right py-3 px-4 text-tremor-content-subtle text-sm font-medium">p95</th>
-                </tr>
-              </thead>
-              <tbody>
-                {endpointPerformance.map((ep) => (
-                  <tr key={ep.endpointId} className="border-b border-tremor-border hover:bg-tremor-background-subtle transition-colors">
-                    <td className="py-3 px-4">
-                      <Flex alignItems="center" className="gap-2">
-                        <div className={`w-2 h-2 rounded-full ${ep.enabled ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                        <Text className="truncate max-w-xs font-medium">{ep.url}</Text>
-                      </Flex>
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge color={getStatusBadge(ep.status)}>{ep.status}</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Text className="font-mono">{ep.totalDeliveries.toLocaleString()}</Text>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Text className={ep.successRate >= 99 ? 'text-emerald-600' : ep.successRate >= 95 ? 'text-amber-600' : 'text-red-600'}>
-                        {ep.successRate}%
-                      </Text>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Text className="font-mono">{Math.round(ep.avgLatencyMs)}ms</Text>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Text className="font-mono">{ep.p95LatencyMs}ms</Text>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="h-40 flex items-center justify-center">
-            <div className="text-center">
-              <AlertTriangle className="h-10 w-10 mx-auto text-tremor-content-subtle mb-3" />
-              <Text>No endpoint data available</Text>
-              <Text className="text-tremor-content-subtle text-sm">Configure endpoints to see metrics</Text>
-            </div>
-          </div>
-        )}
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
