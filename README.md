@@ -16,6 +16,8 @@ make up
 
 Open http://localhost:5173 - done. All services start automatically.
 
+📖 **API Documentation**: http://localhost:8080/swagger-ui.html
+
 ## What it is
 
 This platform handles reliable webhook delivery at scale using the transactional outbox pattern. Events are written to PostgreSQL, published to Kafka, and delivered to configured HTTP endpoints with HMAC signatures and exponential backoff retries.
