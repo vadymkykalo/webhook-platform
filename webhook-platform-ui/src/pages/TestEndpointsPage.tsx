@@ -149,15 +149,15 @@ export default function TestEndpointsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold">Test Endpoints</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Test Endpoints</h1>
+          <p className="text-muted-foreground mt-1">
             Create temporary endpoints to capture and inspect webhook requests
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={creating}>
+        <Button onClick={handleCreate} disabled={creating} size="lg">
           {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
           Create Test Endpoint
         </Button>

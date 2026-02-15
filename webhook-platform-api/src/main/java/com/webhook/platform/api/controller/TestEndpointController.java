@@ -26,7 +26,7 @@ public class TestEndpointController {
     @PostMapping
     @Operation(summary = "Create a test endpoint", description = "Creates a temporary endpoint to capture webhook requests")
     public ResponseEntity<TestEndpointResponse> create(
-            @PathVariable UUID projectId,
+            @PathVariable("projectId") UUID projectId,
             @RequestBody(required = false) TestEndpointRequest request) {
         if (request == null) {
             request = new TestEndpointRequest();
@@ -36,23 +36,23 @@ public class TestEndpointController {
 
     @GetMapping
     @Operation(summary = "List test endpoints", description = "Lists all test endpoints for a project")
-    public ResponseEntity<List<TestEndpointResponse>> list(@PathVariable UUID projectId) {
+    public ResponseEntity<List<TestEndpointResponse>> list(@PathVariable("projectId") UUID projectId) {
         return ResponseEntity.ok(testEndpointService.list(projectId));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get test endpoint", description = "Gets a specific test endpoint by ID")
     public ResponseEntity<TestEndpointResponse> get(
-            @PathVariable UUID projectId,
-            @PathVariable UUID id) {
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id) {
         return ResponseEntity.ok(testEndpointService.get(projectId, id));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete test endpoint", description = "Deletes a test endpoint and all captured requests")
     public ResponseEntity<Void> delete(
-            @PathVariable UUID projectId,
-            @PathVariable UUID id) {
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id) {
         testEndpointService.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
@@ -60,8 +60,8 @@ public class TestEndpointController {
     @GetMapping("/{id}/requests")
     @Operation(summary = "Get captured requests", description = "Lists all requests captured by a test endpoint")
     public ResponseEntity<Page<CapturedRequestResponse>> getRequests(
-            @PathVariable UUID projectId,
-            @PathVariable UUID id,
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
             Pageable pageable) {
         return ResponseEntity.ok(testEndpointService.getRequests(projectId, id, pageable));
     }
@@ -69,8 +69,8 @@ public class TestEndpointController {
     @DeleteMapping("/{id}/requests")
     @Operation(summary = "Clear captured requests", description = "Deletes all requests captured by a test endpoint")
     public ResponseEntity<Void> clearRequests(
-            @PathVariable UUID projectId,
-            @PathVariable UUID id) {
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id) {
         testEndpointService.clearRequests(projectId, id);
         return ResponseEntity.noContent().build();
     }

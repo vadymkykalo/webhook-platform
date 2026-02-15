@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Link as LinkIcon, Key } from 'lucide-react';
+import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Link as LinkIcon, Key, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse } from '../types/api.types';
@@ -206,6 +206,14 @@ export default function ProjectsPage() {
                     >
                       <Send className="mr-2 h-4 w-4" />
                       Deliveries
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/projects/${project.id}/test-endpoints`)}
+                    >
+                      <FlaskConical className="mr-2 h-4 w-4" />
+                      Test
                     </Button>
                     <Button
                       variant="ghost"
