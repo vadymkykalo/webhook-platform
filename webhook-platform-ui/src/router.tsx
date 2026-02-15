@@ -17,6 +17,7 @@ import LandingPage from './pages/LandingPage';
 import QuickstartPage from './pages/QuickstartPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DlqPage from './pages/DlqPage';
+import TestEndpointsPage from './pages/TestEndpointsPage';
 
 export const router = createBrowserRouter([
   {
@@ -82,6 +83,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/dlq',
         element: <DlqPage />,
+      },
+      {
+        path: 'projects/:projectId/test-endpoints',
+        element: <TestEndpointsPage />,
       },
       {
         path: 'members',
