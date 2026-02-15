@@ -39,6 +39,7 @@ public class WebhookDeliveryService {
     private final List<String> allowedHosts;
     private final RedisRateLimiterService rateLimiterService;
     private final RedisConcurrencyControlService concurrencyControlService;
+    private final CircuitBreakerService circuitBreakerService;
     private final MeterRegistry meterRegistry;
 
     public WebhookDeliveryService(
@@ -52,6 +53,7 @@ public class WebhookDeliveryService {
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             RedisRateLimiterService rateLimiterService,
             RedisConcurrencyControlService concurrencyControlService,
+            CircuitBreakerService circuitBreakerService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper) {
         this.deliveryRepository = deliveryRepository;
@@ -66,6 +68,7 @@ public class WebhookDeliveryService {
         this.allowedHosts = allowedHosts;
         this.rateLimiterService = rateLimiterService;
         this.concurrencyControlService = concurrencyControlService;
+        this.circuitBreakerService = circuitBreakerService;
         this.meterRegistry = meterRegistry;
     }
 
@@ -116,6 +119,15 @@ public class WebhookDeliveryService {
 
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
         long startTime = System.currentTimeMillis();
+        
+        if (!circuitBreakerService.isCallPermitted(endpoint.getId())) {
+            log.warn("CircuitBreaker OPEN for endpoint {}, rescheduling delivery {}", endpoint.getId(), delivery.getId());
+            saveAttempt(delivery, null, null, null, null, null, "CIRCUIT_BREAKER_OPEN", 0);
+            delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+            delivery.setNextRetryAt(Instant.now().plusSeconds(30));
+            deliveryRepository.save(delivery);
+            return;
+        }
         
         if (!rateLimiterService.tryAcquire(endpoint.getId(), endpoint.getRateLimitPerSecond())) {
             log.warn("Rate limited for endpoint {}, rescheduling delivery {}", endpoint.getId(), delivery.getId());
@@ -201,10 +213,15 @@ public class WebhookDeliveryService {
         saveAttempt(delivery, statusCode, responseBody, responseHeaders, requestHeaders, requestBody, null, durationMs);
 
         if (statusCode >= 200 && statusCode < 300) {
+            circuitBreakerService.recordSuccess(delivery.getEndpointId(), durationMs);
             markAsSuccess(delivery);
         } else if (isRetryable(statusCode)) {
+            circuitBreakerService.recordFailure(delivery.getEndpointId(), 
+                    new RuntimeException("HTTP " + statusCode));
             scheduleRetry(delivery);
         } else {
+            circuitBreakerService.recordFailure(delivery.getEndpointId(), 
+                    new RuntimeException("Non-retryable HTTP " + statusCode));
             markAsFailed(delivery, "Non-retryable status code: " + statusCode);
         }
     }
@@ -216,6 +233,7 @@ public class WebhookDeliveryService {
             .tag("status_code", "0")
             .register(meterRegistry).increment();
         
+        circuitBreakerService.recordFailure(delivery.getEndpointId(), error);
         saveAttempt(delivery, null, null, null, requestHeaders, requestBody, error.getMessage(), durationMs);
         scheduleRetry(delivery);
     }

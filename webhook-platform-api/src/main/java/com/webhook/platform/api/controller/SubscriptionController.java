@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -34,7 +35,7 @@ public class SubscriptionController {
     @PostMapping
     public ResponseEntity<SubscriptionResponse> createSubscription(
             @PathVariable("projectId") UUID projectId,
-            @RequestBody SubscriptionRequest request,
+            @Valid @RequestBody SubscriptionRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");
@@ -75,7 +76,7 @@ public class SubscriptionController {
     @PutMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> updateSubscription(
             @PathVariable("id") UUID id,
-            @RequestBody SubscriptionRequest request,
+            @Valid @RequestBody SubscriptionRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");

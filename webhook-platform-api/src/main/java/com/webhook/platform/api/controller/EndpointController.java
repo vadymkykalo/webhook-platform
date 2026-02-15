@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,7 +38,7 @@ public class EndpointController {
     @PostMapping
     public ResponseEntity<EndpointResponse> createEndpoint(
             @PathVariable("projectId") UUID projectId,
-            @RequestBody EndpointRequest request,
+            @Valid @RequestBody EndpointRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");
@@ -83,7 +84,7 @@ public class EndpointController {
     @PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
             @PathVariable("id") UUID id,
-            @RequestBody EndpointRequest request,
+            @Valid @RequestBody EndpointRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");

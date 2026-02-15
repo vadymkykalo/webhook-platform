@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -65,7 +66,7 @@ public class ProjectEventsController {
     @PostMapping("/test")
     public ResponseEntity<EventResponse> sendTestEvent(
             @PathVariable("projectId") UUID projectId,
-            @RequestBody EventIngestRequest request,
+            @Valid @RequestBody EventIngestRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");

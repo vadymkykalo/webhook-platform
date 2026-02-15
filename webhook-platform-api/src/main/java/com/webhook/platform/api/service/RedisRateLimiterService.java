@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.dto.RateLimitInfo;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -74,6 +76,33 @@ public class RedisRateLimiterService {
             return Math.max(1, limiter.availablePermits() > 0 ? 0 : 1);
         } catch (Exception e) {
             return 1;
+        }
+    }
+
+    public RateLimitInfo getRateLimitInfo(UUID projectId) {
+        return getRateLimitInfo(projectId, defaultRateLimit);
+    }
+
+    public RateLimitInfo getRateLimitInfo(UUID projectId, int ratePerSecond) {
+        try {
+            String key = KEY_PREFIX + projectId;
+            RRateLimiter limiter = redissonClient.getRateLimiter(key);
+            long available = limiter.availablePermits();
+            int remaining = (int) Math.max(0, Math.min(available, ratePerSecond));
+            long resetTimestamp = Instant.now().plusSeconds(1).getEpochSecond();
+            
+            return RateLimitInfo.builder()
+                    .limit(ratePerSecond)
+                    .remaining(remaining)
+                    .resetTimestamp(resetTimestamp)
+                    .build();
+        } catch (Exception e) {
+            log.debug("Unable to get rate limit info: {}", e.getMessage());
+            return RateLimitInfo.builder()
+                    .limit(ratePerSecond)
+                    .remaining(ratePerSecond)
+                    .resetTimestamp(Instant.now().plusSeconds(1).getEpochSecond())
+                    .build();
         }
     }
 

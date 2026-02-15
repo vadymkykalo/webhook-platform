@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -119,7 +120,7 @@ public class DeliveryController {
     @ApiResponse(responseCode = "202", description = "Bulk replay initiated")
     @PostMapping("/bulk-replay")
     public ResponseEntity<com.webhook.platform.api.dto.BulkReplayResponse> bulkReplayDeliveries(
-            @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,
+            @Valid @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");

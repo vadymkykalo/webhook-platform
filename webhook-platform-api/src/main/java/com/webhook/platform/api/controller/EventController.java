@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.dto.RateLimitInfo;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.service.EventIngestService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,7 +48,7 @@ public class EventController {
     })
     @PostMapping
     public ResponseEntity<EventIngestResponse> ingestEvent(
-            @RequestBody EventIngestRequest request,
+            @Valid @RequestBody EventIngestRequest request,
             @Parameter(description = "Unique key for idempotent event ingestion")
             @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             Authentication authentication) {
@@ -57,11 +59,15 @@ public class EventController {
 
         ApiKeyAuthenticationToken apiKeyAuth = (ApiKeyAuthenticationToken) authentication;
         
+        RateLimitInfo rateLimitInfo = rateLimiterService.getRateLimitInfo(apiKeyAuth.getProjectId());
+        
         if (!rateLimiterService.tryAcquire(apiKeyAuth.getProjectId())) {
-            long retryAfter = rateLimiterService.getSecondsToWaitForRefill(apiKeyAuth.getProjectId());
             log.warn("Rate limit exceeded for project: {}", apiKeyAuth.getProjectId());
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .header("Retry-After", String.valueOf(retryAfter))
+                    .header("X-RateLimit-Limit", String.valueOf(rateLimitInfo.getLimit()))
+                    .header("X-RateLimit-Remaining", "0")
+                    .header("X-RateLimit-Reset", String.valueOf(rateLimitInfo.getResetTimestamp()))
+                    .header("Retry-After", "1")
                     .build();
         }
         
@@ -73,6 +79,11 @@ public class EventController {
                 idempotencyKey
         );
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        RateLimitInfo updatedInfo = rateLimiterService.getRateLimitInfo(apiKeyAuth.getProjectId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header("X-RateLimit-Limit", String.valueOf(updatedInfo.getLimit()))
+                .header("X-RateLimit-Remaining", String.valueOf(updatedInfo.getRemaining()))
+                .header("X-RateLimit-Reset", String.valueOf(updatedInfo.getResetTimestamp()))
+                .body(response);
     }
 }

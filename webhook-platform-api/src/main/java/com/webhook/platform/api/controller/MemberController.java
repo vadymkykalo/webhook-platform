@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,7 +50,7 @@ public class MemberController {
     @PostMapping
     public ResponseEntity<MemberResponse> addMember(
             @PathVariable("orgId") UUID orgId,
-            @RequestBody AddMemberRequest request,
+            @Valid @RequestBody AddMemberRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");
@@ -69,7 +70,7 @@ public class MemberController {
     public ResponseEntity<MemberResponse> changeMemberRole(
             @PathVariable("orgId") UUID orgId,
             @PathVariable("userId") UUID userId,
-            @RequestBody ChangeMemberRoleRequest request,
+            @Valid @RequestBody ChangeMemberRoleRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new RuntimeException("Authentication required");
