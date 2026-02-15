@@ -16,7 +16,7 @@ make up
 
 Open http://localhost:5173 - done. All services start automatically.
 
-📖 **API Documentation**: http://localhost:8080/swagger-ui.html
+**API Documentation**: http://localhost:8080/swagger-ui.html
 
 ## What it is
 
