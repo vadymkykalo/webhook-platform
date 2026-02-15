@@ -4,6 +4,10 @@ export interface SubscriptionRequest {
   endpointId: string;
   eventType: string;
   enabled: boolean;
+  orderingEnabled?: boolean;
+  maxAttempts?: number;
+  timeoutSeconds?: number;
+  retryDelays?: string;
 }
 
 export interface SubscriptionResponse {
@@ -12,6 +16,10 @@ export interface SubscriptionResponse {
   endpointId: string;
   eventType: string;
   enabled: boolean;
+  orderingEnabled: boolean;
+  maxAttempts: number;
+  timeoutSeconds: number;
+  retryDelays: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +39,10 @@ export const subscriptionsApi = {
 
   update: (projectId: string, subscriptionId: string, request: SubscriptionRequest): Promise<SubscriptionResponse> => {
     return http.put<SubscriptionResponse>(`/api/v1/projects/${projectId}/subscriptions/${subscriptionId}`, request);
+  },
+
+  patch: (projectId: string, subscriptionId: string, request: Partial<SubscriptionRequest>): Promise<SubscriptionResponse> => {
+    return http.patch<SubscriptionResponse>(`/api/v1/projects/${projectId}/subscriptions/${subscriptionId}`, request);
   },
 
   delete: (projectId: string, subscriptionId: string): Promise<void> => {

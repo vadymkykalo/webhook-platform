@@ -79,6 +79,11 @@ dlq:
   monitoring:
     interval-ms: ${DLQ_MONITORING_INTERVAL_MS:60000}
 
+ordering:
+  gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}
+  delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
+  buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
+
 logging:
   level:
     root: INFO

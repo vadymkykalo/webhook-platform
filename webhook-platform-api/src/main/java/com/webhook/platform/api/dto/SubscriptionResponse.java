@@ -18,6 +18,10 @@ public class SubscriptionResponse {
     private UUID endpointId;
     private String eventType;
     private Boolean enabled;
+    private Boolean orderingEnabled;
+    private Integer maxAttempts;
+    private Integer timeoutSeconds;
+    private String retryDelays;
     private Instant createdAt;
     private Instant updatedAt;
 }

@@ -37,6 +37,11 @@ export default function CreateSubscriptionModal({
   const [endpointId, setEndpointId] = useState('');
   const [eventType, setEventType] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [orderingEnabled, setOrderingEnabled] = useState(false);
+  const [maxAttempts, setMaxAttempts] = useState(7);
+  const [timeoutSeconds, setTimeoutSeconds] = useState(30);
+  const [retryDelays, setRetryDelays] = useState('60,300,900,3600,21600,86400');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -45,12 +50,21 @@ export default function CreateSubscriptionModal({
       setEndpointId(subscription.endpointId);
       setEventType(subscription.eventType);
       setEnabled(subscription.enabled);
+      setOrderingEnabled(subscription.orderingEnabled || false);
+      setMaxAttempts(subscription.maxAttempts || 7);
+      setTimeoutSeconds(subscription.timeoutSeconds || 30);
+      setRetryDelays(subscription.retryDelays || '60,300,900,3600,21600,86400');
     } else {
       setEndpointId('');
       setEventType('');
       setEnabled(true);
+      setOrderingEnabled(false);
+      setMaxAttempts(7);
+      setTimeoutSeconds(30);
+      setRetryDelays('60,300,900,3600,21600,86400');
     }
     setErrors({});
+    setShowAdvanced(false);
   }, [subscription, open]);
 
   const validate = (): boolean => {
@@ -82,6 +96,10 @@ export default function CreateSubscriptionModal({
         endpointId,
         eventType: eventType.trim(),
         enabled,
+        orderingEnabled,
+        maxAttempts,
+        timeoutSeconds,
+        retryDelays,
       };
 
       if (subscription) {
@@ -183,6 +201,81 @@ export default function CreateSubscriptionModal({
                 </div>
               </div>
             </div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="orderingEnabled"
+                  checked={orderingEnabled}
+                  onCheckedChange={setOrderingEnabled}
+                  disabled={saving}
+                />
+                <div>
+                  <Label htmlFor="orderingEnabled" className="cursor-pointer">
+                    FIFO Ordering
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {orderingEnabled
+                      ? 'Events delivered in strict order (slower)'
+                      : 'Events delivered as fast as possible'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="text-sm text-primary hover:underline"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              {showAdvanced ? '▼ Hide' : '▶ Show'} Advanced Retry Settings
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-4 p-4 border rounded-md bg-muted/30">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="maxAttempts">Max Attempts</Label>
+                    <Input
+                      id="maxAttempts"
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={maxAttempts}
+                      onChange={(e) => setMaxAttempts(parseInt(e.target.value) || 7)}
+                      disabled={saving}
+                    />
+                    <p className="text-xs text-muted-foreground">1-20 attempts</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="timeoutSeconds">Timeout (seconds)</Label>
+                    <Input
+                      id="timeoutSeconds"
+                      type="number"
+                      min={5}
+                      max={120}
+                      value={timeoutSeconds}
+                      onChange={(e) => setTimeoutSeconds(parseInt(e.target.value) || 30)}
+                      disabled={saving}
+                    />
+                    <p className="text-xs text-muted-foreground">5-120 seconds</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="retryDelays">Retry Delays (seconds)</Label>
+                  <Input
+                    id="retryDelays"
+                    placeholder="60,300,900,3600,21600,86400"
+                    value={retryDelays}
+                    onChange={(e) => setRetryDelays(e.target.value)}
+                    disabled={saving}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated delays in seconds. Default: 1m, 5m, 15m, 1h, 6h, 24h
+                  </p>
+                </div>
+              </div>
+            )}
 
             {!subscription && (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3">

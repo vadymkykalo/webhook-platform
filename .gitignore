@@ -62,5 +62,3 @@ application-prod.yml
 
 # === Backups ===
 backups/
-*.sql
-*.sql.gz

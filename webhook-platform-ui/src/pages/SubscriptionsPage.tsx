@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, Link as LinkIcon, Plus, Loader2, Trash2, Settings } from 'lucide-react';
+import { ChevronRight, Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
@@ -70,12 +70,22 @@ export default function SubscriptionsPage() {
 
   const handleToggleEnabled = async (subscription: SubscriptionResponse) => {
     try {
-      await subscriptionsApi.update(projectId!, subscription.id, {
-        endpointId: subscription.endpointId,
-        eventType: subscription.eventType,
+      await subscriptionsApi.patch(projectId!, subscription.id, {
         enabled: !subscription.enabled,
       });
       toast.success(`Subscription ${!subscription.enabled ? 'enabled' : 'disabled'}`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update subscription');
+    }
+  };
+
+  const handleToggleOrdering = async (subscription: SubscriptionResponse) => {
+    try {
+      await subscriptionsApi.patch(projectId!, subscription.id, {
+        orderingEnabled: !subscription.orderingEnabled,
+      });
+      toast.success(`FIFO ordering ${!subscription.orderingEnabled ? 'enabled' : 'disabled'}`);
       loadData();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to update subscription');
@@ -251,6 +261,7 @@ export default function SubscriptionsPage() {
                 <TableHead>Event Type</TableHead>
                 <TableHead>Endpoint</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Ordering</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
@@ -279,6 +290,20 @@ export default function SubscriptionsPage() {
                       <Badge variant={subscription.enabled ? 'success' : 'secondary'}>
                         {subscription.enabled ? 'Enabled' : 'Disabled'}
                       </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={subscription.orderingEnabled}
+                        onCheckedChange={() => handleToggleOrdering(subscription)}
+                      />
+                      {subscription.orderingEnabled && (
+                        <Badge variant="outline" className="gap-1">
+                          <ListOrdered className="h-3 w-3" />
+                          FIFO
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>

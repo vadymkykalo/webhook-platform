@@ -11,9 +11,11 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
+import com.webhook.platform.common.constants.KafkaTopics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -25,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -42,6 +45,8 @@ public class WebhookDeliveryService {
     private final RedisConcurrencyControlService concurrencyControlService;
     private final CircuitBreakerService circuitBreakerService;
     private final MeterRegistry meterRegistry;
+    private final OrderingBufferService orderingBufferService;
+    private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
 
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
@@ -56,7 +61,9 @@ public class WebhookDeliveryService {
             RedisConcurrencyControlService concurrencyControlService,
             CircuitBreakerService circuitBreakerService,
             MeterRegistry meterRegistry,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            OrderingBufferService orderingBufferService,
+            KafkaTemplate<String, DeliveryMessage> kafkaTemplate) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -71,6 +78,8 @@ public class WebhookDeliveryService {
         this.concurrencyControlService = concurrencyControlService;
         this.circuitBreakerService = circuitBreakerService;
         this.meterRegistry = meterRegistry;
+        this.orderingBufferService = orderingBufferService;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Transactional
@@ -86,6 +95,13 @@ public class WebhookDeliveryService {
         if (delivery.getStatus() == Delivery.DeliveryStatus.SUCCESS) {
             log.info("Delivery already succeeded: {}", delivery.getId());
             return;
+        }
+
+        // Check ordering constraints for ordered deliveries
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            if (!canDeliverWithOrdering(delivery)) {
+                return; // Delivery buffered or rescheduled
+            }
         }
 
         Optional<Endpoint> endpointOpt = endpointRepository.findById(delivery.getEndpointId());
@@ -168,6 +184,10 @@ public class WebhookDeliveryService {
 
         Timer.Sample sample = Timer.start(meterRegistry);
         
+        String sequenceHeader = delivery.getSequenceNumber() != null 
+                ? String.valueOf(delivery.getSequenceNumber()) 
+                : "0";
+        
         webClient.post()
                 .uri(endpoint.getUrl())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -175,6 +195,7 @@ public class WebhookDeliveryService {
                 .header("X-Event-Id", event.getId().toString())
                 .header("X-Delivery-Id", delivery.getId().toString())
                 .header("X-Timestamp", String.valueOf(timestamp))
+                .header("X-Sequence-Number", sequenceHeader)
                 .bodyValue(body)
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();
@@ -192,7 +213,7 @@ public class WebhookDeliveryService {
                                 return status;
                             });
                 })
-                .timeout(Duration.ofSeconds(30))
+                .timeout(Duration.ofSeconds(delivery.getTimeoutSeconds() != null ? delivery.getTimeoutSeconds() : 30))
                 .doFinally(signal -> concurrencyControlService.release(endpoint.getId()))
                 .onErrorResume(e -> {
                     log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
@@ -250,7 +271,7 @@ public class WebhookDeliveryService {
             delivery.setFailedAt(Instant.now());
         } else {
             delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-            delivery.setNextRetryAt(calculateNextRetry(delivery.getAttemptCount()));
+            delivery.setNextRetryAt(calculateNextRetry(delivery.getAttemptCount(), delivery.getRetryDelays()));
             log.info("Scheduled retry {} for delivery {} at {}", 
                     delivery.getAttemptCount(), delivery.getId(), delivery.getNextRetryAt());
         }
@@ -258,10 +279,27 @@ public class WebhookDeliveryService {
         deliveryRepository.save(delivery);
     }
 
-    private Instant calculateNextRetry(int attemptCount) {
-        long[] delays = {60, 300, 900, 3600, 21600, 86400};
+    private Instant calculateNextRetry(int attemptCount, String retryDelaysStr) {
+        long[] delays = parseRetryDelays(retryDelaysStr);
         int index = Math.min(attemptCount - 1, delays.length - 1);
         return Instant.now().plusSeconds(delays[index]);
+    }
+
+    private long[] parseRetryDelays(String retryDelaysStr) {
+        if (retryDelaysStr == null || retryDelaysStr.isEmpty()) {
+            return new long[]{60, 300, 900, 3600, 21600, 86400};
+        }
+        try {
+            String[] parts = retryDelaysStr.split(",");
+            long[] delays = new long[parts.length];
+            for (int i = 0; i < parts.length; i++) {
+                delays[i] = Long.parseLong(parts[i].trim());
+            }
+            return delays;
+        } catch (NumberFormatException e) {
+            log.warn("Invalid retry delays format: {}, using defaults", retryDelaysStr);
+            return new long[]{60, 300, 900, 3600, 21600, 86400};
+        }
     }
 
     private void markAsSuccess(Delivery delivery) {
@@ -270,6 +308,76 @@ public class WebhookDeliveryService {
         delivery.setUpdatedAt(Instant.now());
         deliveryRepository.save(delivery);
         log.info("Delivery {} succeeded after {} attempts", delivery.getId(), delivery.getAttemptCount());
+        
+        // For ordered deliveries, advance sequence and trigger buffered deliveries
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+            triggerBufferedDeliveries(delivery.getEndpointId());
+        }
+    }
+    
+    /**
+     * Checks if a delivery can proceed based on ordering constraints.
+     * Returns true if delivery can proceed, false if it was buffered/rescheduled.
+     */
+    private boolean canDeliverWithOrdering(Delivery delivery) {
+        UUID endpointId = delivery.getEndpointId();
+        long sequenceNumber = delivery.getSequenceNumber();
+        
+        if (orderingBufferService.canDeliver(endpointId, sequenceNumber)) {
+            return true;
+        }
+        
+        // Check if we should proceed due to gap timeout
+        Instant oldestPending = deliveryRepository.findOldestPendingCreatedAt(
+                endpointId, sequenceNumber - 1);
+        
+        if (orderingBufferService.isGapTimedOut(oldestPending)) {
+            log.warn("Gap timeout for endpoint {}, proceeding with seq={} without seq={}", 
+                    endpointId, sequenceNumber, sequenceNumber - 1);
+            meterRegistry.counter("webhook_ordering_gap_timeout_total").increment();
+            return true;
+        }
+        
+        // Buffer the delivery and reschedule
+        log.info("Buffering delivery {} (seq={}) waiting for seq={}", 
+                delivery.getId(), sequenceNumber, sequenceNumber - 1);
+        orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
+        
+        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+        delivery.setNextRetryAt(Instant.now().plusSeconds(5));
+        delivery.setUpdatedAt(Instant.now());
+        deliveryRepository.save(delivery);
+        
+        return false;
+    }
+    
+    /**
+     * Triggers buffered deliveries that are now ready after a sequence was delivered.
+     */
+    private void triggerBufferedDeliveries(UUID endpointId) {
+        List<UUID> readyDeliveries = orderingBufferService.getReadyDeliveries(endpointId);
+        
+        for (UUID deliveryId : readyDeliveries) {
+            Optional<Delivery> deliveryOpt = deliveryRepository.findById(deliveryId);
+            if (deliveryOpt.isPresent()) {
+                Delivery delivery = deliveryOpt.get();
+                DeliveryMessage message = DeliveryMessage.builder()
+                        .deliveryId(delivery.getId())
+                        .eventId(delivery.getEventId())
+                        .endpointId(delivery.getEndpointId())
+                        .subscriptionId(delivery.getSubscriptionId())
+                        .status(delivery.getStatus().name())
+                        .attemptCount(delivery.getAttemptCount())
+                        .sequenceNumber(delivery.getSequenceNumber())
+                        .orderingEnabled(delivery.getOrderingEnabled())
+                        .build();
+                
+                kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(), message);
+                log.info("Triggered buffered delivery {} (seq={}) for endpoint {}", 
+                        deliveryId, delivery.getSequenceNumber(), endpointId);
+            }
+        }
     }
 
     private void markAsFailed(Delivery delivery, String reason) {

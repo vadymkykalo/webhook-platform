@@ -33,6 +33,18 @@ public class Subscription {
     @Column(nullable = false)
     private Boolean enabled = true;
 
+    @Column(name = "ordering_enabled", nullable = false)
+    private Boolean orderingEnabled = false;
+
+    @Column(name = "max_attempts")
+    private Integer maxAttempts = 7;
+
+    @Column(name = "timeout_seconds")
+    private Integer timeoutSeconds = 30;
+
+    @Column(name = "retry_delays", columnDefinition = "TEXT")
+    private String retryDelays = "60,300,900,3600,21600,86400";
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

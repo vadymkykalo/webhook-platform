@@ -23,4 +23,16 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("now") Instant now,
             Pageable pageable
     );
+
+    @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.status IN ('PENDING', 'PROCESSING')")
+    Instant findOldestPendingCreatedAt(
+            @Param("endpointId") UUID endpointId,
+            @Param("sequenceNumber") Long sequenceNumber
+    );
+
+    @Query("SELECT d FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.orderingEnabled = true")
+    List<Delivery> findByEndpointIdAndSequenceNumber(
+            @Param("endpointId") UUID endpointId,
+            @Param("sequenceNumber") Long sequenceNumber
+    );
 }

@@ -37,6 +37,18 @@ public class Delivery {
     @Column(name = "max_attempts", nullable = false)
     private Integer maxAttempts;
 
+    @Column(name = "sequence_number")
+    private Long sequenceNumber;
+
+    @Column(name = "ordering_enabled", nullable = false)
+    private Boolean orderingEnabled = false;
+
+    @Column(name = "timeout_seconds")
+    private Integer timeoutSeconds = 30;
+
+    @Column(name = "retry_delays", columnDefinition = "TEXT")
+    private String retryDelays = "60,300,900,3600,21600,86400";
+
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 

@@ -26,6 +26,9 @@ public class Event {
     @Column(name = "event_type", nullable = false)
     private String eventType;
 
+    @Column(name = "sequence_number")
+    private Long sequenceNumber;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;

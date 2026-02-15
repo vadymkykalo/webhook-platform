@@ -31,6 +31,9 @@ public class Event {
     @Column(name = "idempotency_key")
     private String idempotencyKey;
 
+    @Column(name = "sequence_number")
+    private Long sequenceNumber;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;

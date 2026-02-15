@@ -29,6 +29,7 @@ public class EventIngestService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final SequenceGeneratorService sequenceGeneratorService;
 
     public EventIngestService(
             EventRepository eventRepository,
@@ -36,13 +37,15 @@ public class EventIngestService {
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            SequenceGeneratorService sequenceGeneratorService) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.sequenceGeneratorService = sequenceGeneratorService;
     }
 
     @Transactional
@@ -68,7 +71,15 @@ public class EventIngestService {
 
         int deliveriesCreated = 0;
         for (Subscription subscription : subscriptions) {
-            Delivery delivery = createDelivery(event, subscription);
+            Long sequenceNumber = null;
+            boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
+            
+            if (orderingEnabled) {
+                sequenceNumber = sequenceGeneratorService.nextSequence(subscription.getEndpointId());
+                log.debug("Generated sequence {} for endpoint {}", sequenceNumber, subscription.getEndpointId());
+            }
+            
+            Delivery delivery = createDelivery(event, subscription, sequenceNumber, orderingEnabled);
             deliveryRepository.save(delivery);
 
             OutboxMessage outboxMessage = createOutboxMessage(delivery);
@@ -96,14 +107,18 @@ public class EventIngestService {
         }
     }
 
-    private Delivery createDelivery(Event event, Subscription subscription) {
+    private Delivery createDelivery(Event event, Subscription subscription, Long sequenceNumber, boolean orderingEnabled) {
         return Delivery.builder()
                 .eventId(event.getId())
                 .endpointId(subscription.getEndpointId())
                 .subscriptionId(subscription.getId())
                 .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
-                .maxAttempts(7)
+                .maxAttempts(subscription.getMaxAttempts() != null ? subscription.getMaxAttempts() : 7)
+                .sequenceNumber(sequenceNumber)
+                .orderingEnabled(orderingEnabled)
+                .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
+                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
                 .build();
     }
 
@@ -116,6 +131,8 @@ public class EventIngestService {
                     .subscriptionId(delivery.getSubscriptionId())
                     .status(delivery.getStatus().name())
                     .attemptCount(delivery.getAttemptCount())
+                    .sequenceNumber(delivery.getSequenceNumber())
+                    .orderingEnabled(delivery.getOrderingEnabled())
                     .build();
             
             String payload = objectMapper.writeValueAsString(deliveryMessage);

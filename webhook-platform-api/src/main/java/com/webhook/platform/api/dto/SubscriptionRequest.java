@@ -23,4 +23,12 @@ public class SubscriptionRequest {
     private String eventType;
 
     private Boolean enabled;
+    
+    private Boolean orderingEnabled;
+
+    private Integer maxAttempts;
+
+    private Integer timeoutSeconds;
+
+    private String retryDelays;
 }

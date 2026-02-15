@@ -42,6 +42,10 @@ public class SubscriptionService {
                 .endpointId(request.getEndpointId())
                 .eventType(request.getEventType())
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
+                .orderingEnabled(request.getOrderingEnabled() != null ? request.getOrderingEnabled() : false)
+                .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts() : 7)
+                .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
+                .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600,86400")
                 .build();
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
@@ -78,6 +82,18 @@ public class SubscriptionService {
         if (request.getEnabled() != null) {
             subscription.setEnabled(request.getEnabled());
         }
+        if (request.getOrderingEnabled() != null) {
+            subscription.setOrderingEnabled(request.getOrderingEnabled());
+        }
+        if (request.getMaxAttempts() != null) {
+            subscription.setMaxAttempts(request.getMaxAttempts());
+        }
+        if (request.getTimeoutSeconds() != null) {
+            subscription.setTimeoutSeconds(request.getTimeoutSeconds());
+        }
+        if (request.getRetryDelays() != null) {
+            subscription.setRetryDelays(request.getRetryDelays());
+        }
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
         return mapToResponse(subscription);
@@ -98,6 +114,10 @@ public class SubscriptionService {
                 .endpointId(subscription.getEndpointId())
                 .eventType(subscription.getEventType())
                 .enabled(subscription.getEnabled())
+                .orderingEnabled(subscription.getOrderingEnabled())
+                .maxAttempts(subscription.getMaxAttempts())
+                .timeoutSeconds(subscription.getTimeoutSeconds())
+                .retryDelays(subscription.getRetryDelays())
                 .createdAt(subscription.getCreatedAt())
                 .updatedAt(subscription.getUpdatedAt())
                 .build();

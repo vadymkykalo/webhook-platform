@@ -87,6 +87,21 @@ public class SubscriptionController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Patch subscription", description = "Partially updates subscription (e.g., toggle ordering)")
+    @PatchMapping("/{id}")
+    public ResponseEntity<SubscriptionResponse> patchSubscription(
+            @PathVariable("id") UUID id,
+            @RequestBody SubscriptionRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, jwtAuth.getOrganizationId());
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "Delete subscription", description = "Removes a subscription")
     @ApiResponse(responseCode = "204", description = "Subscription deleted")
     @DeleteMapping("/{id}")

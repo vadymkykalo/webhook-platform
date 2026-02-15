@@ -18,4 +18,6 @@ public class DeliveryMessage {
     private UUID subscriptionId;
     private String status;
     private Integer attemptCount;
+    private Long sequenceNumber;
+    private Boolean orderingEnabled;
 }
