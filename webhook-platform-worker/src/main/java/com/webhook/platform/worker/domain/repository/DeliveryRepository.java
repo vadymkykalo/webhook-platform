@@ -19,7 +19,9 @@ import java.util.UUID;
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
     @Modifying
-    @Query("UPDATE Delivery d SET d.status = 'PENDING', d.nextRetryAt = CURRENT_TIMESTAMP " +
+    @Query("UPDATE Delivery d SET d.status = 'PENDING', " +
+           "d.nextRetryAt = CURRENT_TIMESTAMP, " +
+           "d.attemptCount = CASE WHEN d.attemptCount > 0 THEN d.attemptCount - 1 ELSE 0 END " +
            "WHERE d.status = 'PROCESSING' AND d.lastAttemptAt < :threshold")
     int resetStuckDeliveries(@Param("threshold") Instant threshold);
     
