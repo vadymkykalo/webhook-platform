@@ -48,7 +48,6 @@ public class WebhookDeliveryService {
     private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final PayloadTransformService payloadTransformService;
-    private final IpAllowlistService ipAllowlistService;
 
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
@@ -66,8 +65,7 @@ public class WebhookDeliveryService {
             ObjectMapper objectMapper,
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
-            PayloadTransformService payloadTransformService,
-            IpAllowlistService ipAllowlistService) {
+            PayloadTransformService payloadTransformService) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -85,7 +83,6 @@ public class WebhookDeliveryService {
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
         this.payloadTransformService = payloadTransformService;
-        this.ipAllowlistService = ipAllowlistService;
     }
 
     @Transactional

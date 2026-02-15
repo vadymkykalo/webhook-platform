@@ -443,7 +443,8 @@ export default function EndpointsPage() {
                   disabled={creating}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Comma-separated IPs or CIDR ranges. Leave empty to allow all.
+                  For documentation only. Record which IPs your endpoint expects webhooks from.
+                  This helps with compliance audits and firewall configuration.
                 </p>
               </div>
             </div>
