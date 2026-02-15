@@ -149,7 +149,8 @@ public class WebhookDeliveryService {
             return;
         }
         
-        if (!rateLimiterService.tryAcquire(endpoint.getId(), endpoint.getRateLimitPerSecond())) {
+        Integer rateLimit = endpoint.getRateLimitPerSecond();
+        if (rateLimit != null && !rateLimiterService.tryAcquire(endpoint.getId(), rateLimit)) {
             log.warn("Rate limited for endpoint {}, rescheduling delivery {}", endpoint.getId(), delivery.getId());
             delivery.setStatus(Delivery.DeliveryStatus.PENDING);
             delivery.setNextRetryAt(Instant.now().plusSeconds(1));
