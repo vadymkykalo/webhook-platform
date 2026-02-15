@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { testEndpointsApi, TestEndpointResponse, CapturedRequestResponse } from '../api/testEndpoints.api';
 import { Button } from '../components/ui/button';
