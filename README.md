@@ -200,6 +200,77 @@ Client → API → Outbox → Kafka → Worker → Webhook Endpoint
 
 This architecture prevents event loss during downstream failures. The outbox ensures events reach Kafka before acknowledgment. Kafka persistence ensures delivery attempts survive worker crashes. The retry scheduler in the worker polls the database for deliveries needing retry and republishes them to appropriate time-delayed topics.
 
+## SDKs
+
+Official client libraries for integrating with Webhook Platform:
+
+### Node.js
+
+```bash
+npm install @webhook-platform/node
+```
+
+```typescript
+import { WebhookPlatform } from '@webhook-platform/node';
+
+const client = new WebhookPlatform({ apiKey: 'wh_live_xxx' });
+
+// Send event
+const event = await client.events.send({
+  type: 'order.completed',
+  data: { orderId: '123', amount: 99.99 }
+});
+
+// Verify incoming webhook
+import { verifySignature } from '@webhook-platform/node';
+verifySignature(payload, signature, secret);
+```
+
+### Python
+
+```bash
+pip install webhook-platform
+```
+
+```python
+from webhook_platform import WebhookPlatform, Event
+
+client = WebhookPlatform(api_key="wh_live_xxx")
+
+# Send event
+event = client.events.send(
+    Event(type="order.completed", data={"order_id": "123"})
+)
+
+# Verify incoming webhook
+from webhook_platform import verify_signature
+verify_signature(payload, signature, secret)
+```
+
+### PHP
+
+```bash
+composer require webhook-platform/php
+```
+
+```php
+use WebhookPlatform\WebhookPlatform;
+
+$client = new WebhookPlatform(apiKey: 'wh_live_xxx');
+
+// Send event
+$event = $client->events->send(
+    type: 'order.completed',
+    data: ['orderId' => '123']
+);
+
+// Verify incoming webhook
+use WebhookPlatform\Webhook;
+Webhook::verifySignature($payload, $signature, $secret);
+```
+
+See [Node.js SDK](./sdks/node/README.md), [Python SDK](./sdks/python/README.md), and [PHP SDK](./sdks/php/README.md) for complete API reference.
+
 ## Repository structure
 
 **`/webhook-platform-api`** - Spring Boot REST API. Handles event ingestion with rate limiting and idempotency checks, manages projects/endpoints/subscriptions, provides delivery query and replay operations, runs the outbox publisher scheduler, contains Flyway migrations.
@@ -209,6 +280,12 @@ This architecture prevents event loss during downstream failures. The outbox ens
 **`/webhook-platform-ui`** - React TypeScript application. Dashboard for delivery statistics, project and endpoint management, subscription configuration, delivery history with filtering.
 
 **`/webhook-platform-common`** - Shared Java utilities. Crypto functions for AES-GCM encryption and HMAC signature generation, DTO classes for Kafka messages, common constants.
+
+**`/sdks/node`** - Official Node.js/TypeScript SDK with full type definitions.
+
+**`/sdks/python`** - Official Python SDK with type hints.
+
+**`/sdks/php`** - Official PHP 8.1+ SDK with Laravel/Symfony examples.
 
 ## How it works
 
