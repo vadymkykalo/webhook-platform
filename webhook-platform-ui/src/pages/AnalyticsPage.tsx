@@ -18,7 +18,7 @@ import {
   Color,
 } from '@tremor/react';
 import {
-  ArrowLeft, RefreshCw, TrendingUp, TrendingDown,
+  ArrowLeft, RefreshCw, TrendingUp,
   Zap, Clock, CheckCircle, XCircle, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
             <BarList
               data={percentileData}
               className="mt-4"
-              valueFormatter={(v) => `${v}ms`}
+              valueFormatter={(v: number) => `${v}ms`}
               color="indigo"
             />
           ) : (
