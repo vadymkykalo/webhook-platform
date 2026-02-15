@@ -38,7 +38,7 @@ function Sidebar({ activeSection, setActiveSection }: { activeSection: string; s
     { id: 'subscriptions-api', label: 'Subscriptions API', icon: RefreshCw },
     { id: 'deliveries-api', label: 'Deliveries API', icon: CheckCircle2 },
     { id: 'webhook-security', label: 'Webhook Security', icon: Shield },
-    { id: 'errors', label: 'Errors', icon: Code },
+    { id: 'errors', label: 'Errors & Rate Limits', icon: Code },
   ];
 
   return (
@@ -449,6 +449,50 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       />
 
       <APIEndpoint
+        method="GET"
+        path="/api/v1/projects/{projectId}/endpoints/{id}"
+        title="Get Endpoint"
+        description="Returns endpoint details by ID."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="getEndpoint"
+        response={`{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "url": "https://api.customer.com/webhooks",
+  "description": "Production webhooks",
+  "secret": "whsec_1234567890abcdef",
+  "enabled": true,
+  "createdAt": "2024-12-16T19:00:00Z"
+}`}
+      />
+
+      <APIEndpoint
+        method="PUT"
+        path="/api/v1/projects/{projectId}/endpoints/{id}"
+        title="Update Endpoint"
+        description="Updates endpoint configuration."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="updateEndpoint"
+        response={`{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "url": "https://api.customer.com/webhooks/v2",
+  "enabled": true
+}`}
+      />
+
+      <APIEndpoint
+        method="DELETE"
+        path="/api/v1/projects/{projectId}/endpoints/{id}"
+        title="Delete Endpoint"
+        description="Deletes an endpoint and all its subscriptions."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="deleteEndpoint"
+        response="204 No Content"
+      />
+
+      <APIEndpoint
         method="POST"
         path="/api/v1/projects/{projectId}/endpoints/{id}/rotate-secret"
         title="Rotate Secret"
@@ -459,6 +503,22 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
         response={`{
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "secret": "whsec_newSecretValue123"
+}`}
+      />
+
+      <APIEndpoint
+        method="POST"
+        path="/api/v1/projects/{projectId}/endpoints/{id}/test"
+        title="Test Endpoint"
+        description="Sends a test webhook to verify endpoint connectivity."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="testEndpoint"
+        response={`{
+  "success": true,
+  "httpStatus": 200,
+  "latencyMs": 124,
+  "errorMessage": null
 }`}
       />
     </div>
@@ -490,6 +550,67 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
   "enabled": true,
   "createdAt": "2024-12-16T19:00:00Z"
 }`}
+      />
+
+      <APIEndpoint
+        method="GET"
+        path="/api/v1/projects/{projectId}/subscriptions"
+        title="List Subscriptions"
+        description="Get all subscriptions for a project."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="listSubscriptions"
+        response={`[
+  {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "endpointId": "123e4567-e89b-12d3-a456-426614174001",
+    "eventTypes": ["order.completed"],
+    "enabled": true
+  }
+]`}
+      />
+
+      <APIEndpoint
+        method="GET"
+        path="/api/v1/projects/{projectId}/subscriptions/{id}"
+        title="Get Subscription"
+        description="Returns subscription details."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="getSubscription"
+        response={`{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "endpointId": "123e4567-e89b-12d3-a456-426614174001",
+  "eventTypes": ["order.completed", "order.cancelled"],
+  "enabled": true,
+  "createdAt": "2024-12-16T19:00:00Z"
+}`}
+      />
+
+      <APIEndpoint
+        method="PUT"
+        path="/api/v1/projects/{projectId}/subscriptions/{id}"
+        title="Update Subscription"
+        description="Updates subscription event types or enabled status."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="updateSubscription"
+        response={`{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "eventTypes": ["order.completed", "order.shipped"],
+  "enabled": true
+}`}
+      />
+
+      <APIEndpoint
+        method="DELETE"
+        path="/api/v1/projects/{projectId}/subscriptions/{id}"
+        title="Delete Subscription"
+        description="Removes a subscription."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="deleteSubscription"
+        response="204 No Content"
       />
     </div>
   );
@@ -531,6 +652,39 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
 }`}
       />
 
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Query Parameters</h3>
+        <ParamTable params={[
+          { name: 'status', type: 'string', required: false, description: 'Filter by status: PENDING, SUCCESS, FAILED, DEAD_LETTER' },
+          { name: 'endpointId', type: 'uuid', required: false, description: 'Filter by endpoint' },
+          { name: 'fromDate', type: 'ISO 8601', required: false, description: 'Start date filter' },
+          { name: 'toDate', type: 'ISO 8601', required: false, description: 'End date filter' },
+          { name: 'page', type: 'integer', required: false, description: 'Page number (0-indexed)' },
+          { name: 'size', type: 'integer', required: false, description: 'Page size (default 20)' },
+        ]} />
+      </div>
+
+      <APIEndpoint
+        method="GET"
+        path="/api/v1/deliveries/{id}"
+        title="Get Delivery"
+        description="Returns delivery details by ID."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="getDelivery"
+        response={`{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "eventId": "123e4567-e89b-12d3-a456-426614174001",
+  "endpointId": "123e4567-e89b-12d3-a456-426614174002",
+  "status": "SUCCESS",
+  "attemptCount": 1,
+  "maxAttempts": 7,
+  "nextAttemptAt": null,
+  "createdAt": "2024-12-16T19:00:00Z",
+  "succeededAt": "2024-12-16T19:00:01Z"
+}`}
+      />
+
       <APIEndpoint
         method="GET"
         path="/api/v1/deliveries/{id}/attempts"
@@ -561,6 +715,22 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
         setActiveLanguage={setActiveLanguage}
         example="replayDelivery"
         response="202 Accepted"
+      />
+
+      <APIEndpoint
+        method="POST"
+        path="/api/v1/deliveries/bulk-replay"
+        title="Bulk Replay"
+        description="Re-send multiple failed deliveries at once. Filter by status, endpoint, or provide specific delivery IDs."
+        activeLanguage={activeLanguage}
+        setActiveLanguage={setActiveLanguage}
+        example="bulkReplay"
+        response={`{
+  "totalRequested": 10,
+  "replayed": 8,
+  "skipped": 2,
+  "message": "Bulk replay initiated for 8 deliveries"
+}`}
       />
     </div>
   );
@@ -603,10 +773,28 @@ function Errors() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Errors</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">Errors & Rate Limits</h1>
         <p className="text-xl text-gray-600">
-          HTTP status codes and error responses.
+          HTTP status codes, error responses, and rate limiting.
         </p>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Rate Limiting</h2>
+        <p className="text-gray-600 mb-4">
+          The Events API is rate limited to protect the platform. Rate limit information is included in response headers.
+        </p>
+        <ParamTable params={[
+          { name: 'X-RateLimit-Limit', type: 'integer', required: true, description: 'Maximum requests per second' },
+          { name: 'X-RateLimit-Remaining', type: 'integer', required: true, description: 'Remaining requests in current window' },
+          { name: 'X-RateLimit-Reset', type: 'timestamp', required: true, description: 'Unix timestamp when limit resets' },
+        ]} />
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="font-semibold text-amber-900 text-sm">Rate Limit Exceeded (429)</div>
+          <div className="text-amber-700 text-sm mt-1">
+            When rate limited, wait until X-RateLimit-Reset timestamp before retrying.
+          </div>
+        </div>
       </div>
 
       <div>
@@ -621,17 +809,37 @@ function Errors() {
       </div>
 
       <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Validation Errors</h2>
+        <p className="text-gray-600 mb-4">
+          When request validation fails, you'll receive detailed field-level errors.
+        </p>
+        <ResponseBlock>
+{`{
+  "error": "Validation failed",
+  "message": "Invalid request parameters",
+  "status": 400,
+  "fieldErrors": {
+    "type": "Event type is required",
+    "data": "Event data cannot be empty"
+  }
+}`}
+        </ResponseBlock>
+      </div>
+
+      <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-6">HTTP Status Codes</h2>
         <div className="space-y-4">
           <ErrorCode code="200" title="OK" description="Request succeeded" />
           <ErrorCode code="201" title="Created" description="Resource created successfully" />
-          <ErrorCode code="202" title="Accepted" description="Request accepted for processing" />
-          <ErrorCode code="400" title="Bad Request" description="Invalid request format or parameters" />
+          <ErrorCode code="202" title="Accepted" description="Request accepted for processing (async)" />
+          <ErrorCode code="204" title="No Content" description="Resource deleted successfully" />
+          <ErrorCode code="400" title="Bad Request" description="Invalid request format or validation failed" />
           <ErrorCode code="401" title="Unauthorized" description="Invalid or missing authentication" />
-          <ErrorCode code="403" title="Forbidden" description="Insufficient permissions" />
+          <ErrorCode code="403" title="Forbidden" description="Insufficient permissions for this action" />
           <ErrorCode code="404" title="Not Found" description="Resource not found" />
-          <ErrorCode code="429" title="Too Many Requests" description="Rate limit exceeded" />
-          <ErrorCode code="500" title="Internal Server Error" description="Server error" />
+          <ErrorCode code="409" title="Conflict" description="Resource already exists (idempotency)" />
+          <ErrorCode code="429" title="Too Many Requests" description="Rate limit exceeded - check headers" />
+          <ErrorCode code="500" title="Internal Server Error" description="Server error - contact support" />
           <ErrorCode code="503" title="Service Unavailable" description="Service temporarily unavailable" />
         </div>
       </div>
@@ -1155,6 +1363,166 @@ response = requests.post(
     f'http://localhost:8080/api/v1/deliveries/{delivery_id}/replay',
     headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
 )`,
+    },
+    getEndpoint: {
+      curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}\`, {
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});
+const endpoint = await response.json();`,
+      python: `import requests
+
+response = requests.get(
+    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)
+endpoint = response.json()`,
+    },
+    updateEndpoint: {
+      curl: `curl -X PUT http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"url": "https://api.customer.com/webhooks/v2", "enabled": true}'`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}\`, {
+  method: 'PUT',
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ url: 'https://api.customer.com/webhooks/v2', enabled: true })
+});`,
+      python: `import requests
+
+response = requests.put(
+    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
+    json={'url': 'https://api.customer.com/webhooks/v2', 'enabled': True}
+)`,
+    },
+    deleteEndpoint: {
+      curl: `curl -X DELETE http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}\`, {
+  method: 'DELETE',
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});`,
+      python: `import requests
+
+response = requests.delete(
+    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)`,
+    },
+    testEndpoint: {
+      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id}/test \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}/test\`, {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});
+const result = await response.json();`,
+      python: `import requests
+
+response = requests.post(
+    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}/test',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)
+result = response.json()`,
+    },
+    listSubscriptions: {
+      curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions\`, {
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});
+const subscriptions = await response.json();`,
+      python: `import requests
+
+response = requests.get(
+    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)
+subscriptions = response.json()`,
+    },
+    getSubscription: {
+      curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});
+const subscription = await response.json();`,
+      python: `import requests
+
+response = requests.get(
+    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)
+subscription = response.json()`,
+    },
+    updateSubscription: {
+      curl: `curl -X PUT http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"eventTypes": ["order.completed", "order.shipped"], "enabled": true}'`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
+  method: 'PUT',
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ eventTypes: ['order.completed', 'order.shipped'], enabled: true })
+});`,
+      python: `import requests
+
+response = requests.put(
+    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
+    json={'eventTypes': ['order.completed', 'order.shipped'], 'enabled': True}
+)`,
+    },
+    deleteSubscription: {
+      curl: `curl -X DELETE http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
+  method: 'DELETE',
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});`,
+      python: `import requests
+
+response = requests.delete(
+    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)`,
+    },
+    getDelivery: {
+      curl: `curl -X GET http://localhost:8080/api/v1/deliveries/{deliveryId} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
+      node: `const response = await fetch(\`http://localhost:8080/api/v1/deliveries/\${deliveryId}\`, {
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
+});
+const delivery = await response.json();`,
+      python: `import requests
+
+response = requests.get(
+    f'http://localhost:8080/api/v1/deliveries/{delivery_id}',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
+)
+delivery = response.json()`,
+    },
+    bulkReplay: {
+      curl: `curl -X POST http://localhost:8080/api/v1/deliveries/bulk-replay \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"projectId": "project-uuid", "status": "FAILED"}'`,
+      node: `const response = await fetch('http://localhost:8080/api/v1/deliveries/bulk-replay', {
+  method: 'POST',
+  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
+  body: JSON.stringify({ projectId: 'project-uuid', status: 'FAILED' })
+});
+const result = await response.json();`,
+      python: `import requests
+
+response = requests.post(
+    'http://localhost:8080/api/v1/deliveries/bulk-replay',
+    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
+    json={'projectId': 'project-uuid', 'status': 'FAILED'}
+)
+result = response.json()`,
     },
   };
 
