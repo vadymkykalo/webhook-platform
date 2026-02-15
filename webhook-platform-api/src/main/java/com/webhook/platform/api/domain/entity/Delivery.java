@@ -33,24 +33,30 @@ public class Delivery {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private DeliveryStatus status = DeliveryStatus.PENDING;
 
     @Column(name = "attempt_count", nullable = false)
+    @Builder.Default
     private Integer attemptCount = 0;
 
     @Column(name = "max_attempts", nullable = false)
+    @Builder.Default
     private Integer maxAttempts = 7;
 
     @Column(name = "sequence_number")
     private Long sequenceNumber;
 
     @Column(name = "ordering_enabled", nullable = false)
+    @Builder.Default
     private Boolean orderingEnabled = false;
 
     @Column(name = "timeout_seconds")
+    @Builder.Default
     private Integer timeoutSeconds = 30;
 
     @Column(name = "retry_delays", columnDefinition = "TEXT")
+    @Builder.Default
     private String retryDelays = "60,300,900,3600,21600,86400";
 
     @Column(name = "payload_template", columnDefinition = "TEXT")

@@ -31,18 +31,23 @@ public class Subscription {
     private String eventType;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean enabled = true;
 
     @Column(name = "ordering_enabled", nullable = false)
+    @Builder.Default
     private Boolean orderingEnabled = false;
 
     @Column(name = "max_attempts")
+    @Builder.Default
     private Integer maxAttempts = 7;
 
     @Column(name = "timeout_seconds")
+    @Builder.Default
     private Integer timeoutSeconds = 30;
 
     @Column(name = "retry_delays", columnDefinition = "TEXT")
+    @Builder.Default
     private String retryDelays = "60,300,900,3600,21600,86400";
 
     @Column(name = "payload_template", columnDefinition = "TEXT")
