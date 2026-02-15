@@ -258,9 +258,60 @@ public class EndpointService {
                 .enabled(endpoint.getEnabled())
                 .rateLimitPerSecond(endpoint.getRateLimitPerSecond())
                 .allowedSourceIps(endpoint.getAllowedSourceIps())
+                .mtlsEnabled(endpoint.getMtlsEnabled())
                 .createdAt(endpoint.getCreatedAt())
                 .updatedAt(endpoint.getUpdatedAt())
                 .secret(secret)
                 .build();
+    }
+
+    @Transactional
+    public EndpointResponse configureMtls(UUID projectId, UUID endpointId, 
+            com.webhook.platform.api.dto.MtlsConfigRequest request, UUID organizationId) {
+        Endpoint endpoint = endpointRepository.findById(endpointId)
+                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
+
+        if (!endpoint.getProjectId().equals(projectId)) {
+            throw new RuntimeException("Endpoint not found in project");
+        }
+
+        CryptoUtils.EncryptedData encryptedCert = CryptoUtils.encryptSecret(request.getClientCert(), encryptionKey);
+        CryptoUtils.EncryptedData encryptedKey = CryptoUtils.encryptSecret(request.getClientKey(), encryptionKey);
+
+        endpoint.setMtlsEnabled(true);
+        endpoint.setClientCertEncrypted(encryptedCert.getCiphertext());
+        endpoint.setClientCertIv(encryptedCert.getIv());
+        endpoint.setClientKeyEncrypted(encryptedKey.getCiphertext());
+        endpoint.setClientKeyIv(encryptedKey.getIv());
+        endpoint.setCaCert(request.getCaCert());
+
+        endpoint = endpointRepository.saveAndFlush(endpoint);
+        log.info("Configured mTLS for endpoint {}", endpointId);
+
+        return mapToResponse(endpoint);
+    }
+
+    @Transactional
+    public EndpointResponse disableMtls(UUID projectId, UUID endpointId, UUID organizationId) {
+        Endpoint endpoint = endpointRepository.findById(endpointId)
+                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        validateProjectOwnership(endpoint.getProjectId(), organizationId);
+
+        if (!endpoint.getProjectId().equals(projectId)) {
+            throw new RuntimeException("Endpoint not found in project");
+        }
+
+        endpoint.setMtlsEnabled(false);
+        endpoint.setClientCertEncrypted(null);
+        endpoint.setClientCertIv(null);
+        endpoint.setClientKeyEncrypted(null);
+        endpoint.setClientKeyIv(null);
+        endpoint.setCaCert(null);
+
+        endpoint = endpointRepository.saveAndFlush(endpoint);
+        log.info("Disabled mTLS for endpoint {}", endpointId);
+
+        return mapToResponse(endpoint);
     }
 }

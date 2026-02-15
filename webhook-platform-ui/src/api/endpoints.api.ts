@@ -38,4 +38,18 @@ export const endpointsApi = {
   test: (projectId: string, id: string): Promise<EndpointTestResponse> => {
     return http.post<EndpointTestResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/test`);
   },
+
+  configureMtls: (projectId: string, id: string, data: MtlsConfigRequest): Promise<EndpointResponse> => {
+    return http.post<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/mtls`, data);
+  },
+
+  disableMtls: (projectId: string, id: string): Promise<EndpointResponse> => {
+    return http.delete<EndpointResponse>(`/api/v1/projects/${projectId}/endpoints/${id}/mtls`);
+  },
 };
+
+export interface MtlsConfigRequest {
+  clientCert: string;
+  clientKey: string;
+  caCert?: string;
+}

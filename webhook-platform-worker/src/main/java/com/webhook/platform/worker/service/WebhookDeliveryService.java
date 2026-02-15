@@ -37,7 +37,8 @@ public class WebhookDeliveryService {
     private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
-    private final WebClient webClient;
+    private final WebClient defaultWebClient;
+    private final MtlsWebClientFactory mtlsWebClientFactory;
     private final String encryptionKey;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
@@ -55,6 +56,7 @@ public class WebhookDeliveryService {
             EventRepository eventRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
             WebClient.Builder webClientBuilder,
+            MtlsWebClientFactory mtlsWebClientFactory,
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
@@ -70,9 +72,10 @@ public class WebhookDeliveryService {
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
-        this.webClient = webClientBuilder
+        this.defaultWebClient = webClientBuilder
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
+        this.mtlsWebClientFactory = mtlsWebClientFactory;
         this.encryptionKey = encryptionKey;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
@@ -193,7 +196,11 @@ public class WebhookDeliveryService {
                 ? String.valueOf(delivery.getSequenceNumber()) 
                 : "0";
         
-        var requestSpec = webClient.post()
+        WebClient client = Boolean.TRUE.equals(endpoint.getMtlsEnabled()) 
+                ? mtlsWebClientFactory.getWebClient(endpoint) 
+                : defaultWebClient;
+        
+        var requestSpec = client.post()
                 .uri(endpoint.getUrl())
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("X-Signature", signature)

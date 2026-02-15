@@ -38,4 +38,22 @@ public class Endpoint {
 
     @Column(name = "allowed_source_ips", columnDefinition = "TEXT")
     private String allowedSourceIps;
+
+    @Column(name = "mtls_enabled", nullable = false)
+    private Boolean mtlsEnabled = false;
+
+    @Column(name = "client_cert_encrypted", columnDefinition = "TEXT")
+    private String clientCertEncrypted;
+
+    @Column(name = "client_cert_iv", columnDefinition = "TEXT")
+    private String clientCertIv;
+
+    @Column(name = "client_key_encrypted", columnDefinition = "TEXT")
+    private String clientKeyEncrypted;
+
+    @Column(name = "client_key_iv", columnDefinition = "TEXT")
+    private String clientKeyIv;
+
+    @Column(name = "ca_cert", columnDefinition = "TEXT")
+    private String caCert;
 }

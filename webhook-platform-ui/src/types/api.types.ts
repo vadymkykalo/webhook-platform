@@ -65,6 +65,7 @@ export interface EndpointResponse {
   enabled: boolean;
   rateLimitPerSecond?: number;
   allowedSourceIps?: string;
+  mtlsEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
   secret?: string;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight, Zap } from 'lucide-react';
+import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight, Zap, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { endpointsApi } from '../api/endpoints.api';
 import { projectsApi } from '../api/projects.api';
@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import MtlsConfigModal from '../components/MtlsConfigModal';
 
 export default function EndpointsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -51,6 +52,7 @@ export default function EndpointsPage() {
   const [testId, setTestId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
+  const [mtlsEndpoint, setMtlsEndpoint] = useState<EndpointResponse | null>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -306,6 +308,12 @@ export default function EndpointsPage() {
                             Disabled
                           </span>
                         )}
+                        {endpoint.mtlsEnabled && (
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                            <ShieldCheck className="mr-1 h-3 w-3" />
+                            mTLS
+                          </span>
+                        )}
                       </div>
                     </CardTitle>
                     {endpoint.description && (
@@ -347,6 +355,14 @@ export default function EndpointsPage() {
                       title="Rotate Secret"
                     >
                       <RefreshCw className="h-4 w-4 text-blue-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setMtlsEndpoint(endpoint)}
+                      title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}
+                    >
+                      <ShieldCheck className={`h-4 w-4 ${endpoint.mtlsEnabled ? 'text-blue-600' : 'text-gray-400'}`} />
                     </Button>
                     <Button
                       variant="ghost"
@@ -641,6 +657,19 @@ export default function EndpointsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {mtlsEndpoint && projectId && (
+        <MtlsConfigModal
+          open={!!mtlsEndpoint}
+          onOpenChange={(open) => !open && setMtlsEndpoint(null)}
+          projectId={projectId}
+          endpoint={mtlsEndpoint}
+          onUpdate={(updated) => {
+            setEndpoints(endpoints.map(e => e.id === updated.id ? updated : e));
+            setMtlsEndpoint(null);
+          }}
+        />
+      )}
     </div>
   );
 }

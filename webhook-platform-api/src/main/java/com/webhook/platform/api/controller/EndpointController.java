@@ -138,4 +138,37 @@ public class EndpointController {
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "Configure mTLS", description = "Configures mutual TLS for the endpoint")
+    @PostMapping("/{id}/mtls")
+    public ResponseEntity<EndpointResponse> configureMtls(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody com.webhook.platform.api.dto.MtlsConfigRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        EndpointResponse response = endpointService.configureMtls(projectId, id, request, jwtAuth.getOrganizationId());
+        log.info("Configured mTLS for endpoint {}", id);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Disable mTLS", description = "Disables mutual TLS for the endpoint")
+    @DeleteMapping("/{id}/mtls")
+    public ResponseEntity<EndpointResponse> disableMtls(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new RuntimeException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        EndpointResponse response = endpointService.disableMtls(projectId, id, jwtAuth.getOrganizationId());
+        log.info("Disabled mTLS for endpoint {}", id);
+        return ResponseEntity.ok(response);
+    }
 }

@@ -20,6 +20,7 @@ public class EndpointResponse {
     private Boolean enabled;
     private Integer rateLimitPerSecond;
     private String allowedSourceIps;
+    private Boolean mtlsEnabled;
     private Instant createdAt;
     private Instant updatedAt;
     private String secret;
