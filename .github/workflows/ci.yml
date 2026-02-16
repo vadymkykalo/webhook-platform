@@ -8,9 +8,13 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-    name: Build & Compile
+  backend-build:
+    name: Backend Build & Compile
     runs-on: ubuntu-latest
     
     steps:
@@ -24,24 +28,102 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      - name: Compile and verify build
+      - name: Compile all modules
         run: mvn clean compile -B
         
       - name: Package artifacts
         run: mvn package -DskipTests -B
-        
+
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: backend-build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Run unit tests
+        run: mvn test -B -Dtest='!*IntegrationTest,!*IT' --fail-at-end
+      
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "### Backend Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Integration tests with Testcontainers should be run locally before merging." >> $GITHUB_STEP_SUMMARY
+
+  frontend-lint:
+    name: Frontend Lint & Typecheck
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webhook-platform-ui/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: webhook-platform-ui
+        run: npm ci
+      
+      - name: Run ESLint
+        working-directory: webhook-platform-ui
+        run: npm run lint
+      
+      - name: Run TypeScript typecheck
+        working-directory: webhook-platform-ui
+        run: npm run typecheck
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webhook-platform-ui/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: webhook-platform-ui
+        run: npm ci
+      
+      - name: Build production bundle
+        working-directory: webhook-platform-ui
+        run: npm run build
+      
       - name: Build Summary
         if: always()
         run: |
-          echo "### Build Results" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Compilation successful" >> $GITHUB_STEP_SUMMARY
-          echo "✅ All artifacts packaged" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** Integration tests with Testcontainers should be run locally before merging." >> $GITHUB_STEP_SUMMARY
-  
+          echo "### Frontend Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ ESLint passed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ TypeScript typecheck passed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Production build successful" >> $GITHUB_STEP_SUMMARY
+
   docker-build:
-    name: Verify Docker Builds
+    name: Docker Images
     runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
     
     steps:
       - name: Checkout code

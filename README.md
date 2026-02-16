@@ -1,6 +1,12 @@
 # Webhook Platform
 
-[![Java](https://img.shields.io/badge/Java-17-orange)]() [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-green)]() [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)]() [![Kafka](https://img.shields.io/badge/Kafka-3.7-231F20)]() [![Redis](https://img.shields.io/badge/Redis-7-DC382D)]()
+[![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Java](https://img.shields.io/badge/Java-17-orange)]()
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-green)]()
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)]()
+[![Kafka](https://img.shields.io/badge/Kafka-3.7-231F20)]()
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D)]()
 
 **Enterprise-grade distributed webhook delivery system** with at-least-once guarantees, horizontal scaling, and sub-second latency.
 
