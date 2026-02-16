@@ -11,6 +11,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.springframework.kafka.support.SendResult;
 
 import java.time.Instant;
@@ -73,9 +76,12 @@ class OutboxPublisherServiceTest {
         when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
                 .thenReturn(deliveryMessage);
         
-        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(null);
-        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class)))
-                .thenReturn(future);
+        @SuppressWarnings("unchecked")
+        SendResult<String, DeliveryMessage> sendResult = mock(SendResult.class);
+        RecordMetadata metadata = new RecordMetadata(new TopicPartition("test-topic", 0), 0, 0, 0L, 0, 0);
+        when(sendResult.getRecordMetadata()).thenReturn(metadata);
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
 
         service.publishPendingMessages();
 
