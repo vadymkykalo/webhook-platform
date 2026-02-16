@@ -12,11 +12,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import org.springframework.kafka.support.SendResult;
+
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -34,18 +37,24 @@ class RetrySchedulerServiceTest {
     private RetrySchedulerService retrySchedulerService;
 
     private final int batchSize = 100;
+    private final long sendTimeoutSeconds = 30;
+    private final long rescheduleDelaySeconds = 60;
 
     @BeforeEach
     void setUp() {
-        retrySchedulerService = new RetrySchedulerService(deliveryRepository, kafkaTemplate, batchSize);
+        retrySchedulerService = new RetrySchedulerService(
+                deliveryRepository, 
+                kafkaTemplate, 
+                batchSize, 
+                sendTimeoutSeconds, 
+                rescheduleDelaySeconds
+        );
     }
 
     @Test
     void scheduleRetries_shouldLoadOnlyDueDeliveries() {
         // Arrange
         Instant now = Instant.now();
-        Instant future = now.plusSeconds(3600);
-        
         Delivery dueDelivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
         
         when(deliveryRepository.findPendingRetriesForUpdate(
@@ -53,6 +62,9 @@ class RetrySchedulerServiceTest {
                 any(Instant.class),
                 any(PageRequest.class)
         )).thenReturn(Collections.singletonList(dueDelivery));
+        
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
         // Act
         retrySchedulerService.scheduleRetries();
@@ -84,13 +96,16 @@ class RetrySchedulerServiceTest {
                 any(Instant.class),
                 any(PageRequest.class)
         )).thenReturn(deliveries);
+        
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
         // Act
         retrySchedulerService.scheduleRetries();
 
         // Assert
         verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any(DeliveryMessage.class));
-        verify(deliveryRepository, times(3)).save(any(Delivery.class));
+        verify(deliveryRepository).saveAll(anyList());
     }
 
     @Test
@@ -104,14 +119,18 @@ class RetrySchedulerServiceTest {
                 any(Instant.class),
                 any(PageRequest.class)
         )).thenReturn(Collections.singletonList(delivery));
+        
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
         // Act
         retrySchedulerService.scheduleRetries();
 
         // Assert
-        ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
-        verify(deliveryRepository).save(deliveryCaptor.capture());
-        assertNull(deliveryCaptor.getValue().getNextRetryAt());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
+        verify(deliveryRepository).saveAll(deliveryCaptor.capture());
+        assertNull(deliveryCaptor.getValue().get(0).getNextRetryAt());
     }
 
     @Test
@@ -128,7 +147,7 @@ class RetrySchedulerServiceTest {
 
         // Assert
         verify(kafkaTemplate, never()).send(anyString(), anyString(), any(DeliveryMessage.class));
-        verify(deliveryRepository, never()).save(any(Delivery.class));
+        verify(deliveryRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -143,10 +162,18 @@ class RetrySchedulerServiceTest {
                 any(PageRequest.class)
         )).thenReturn(Collections.singletonList(delivery));
         
-        doThrow(new RuntimeException("Kafka error")).when(kafkaTemplate).send(anyString(), anyString(), any(DeliveryMessage.class));
+        CompletableFuture<SendResult<String, DeliveryMessage>> failedFuture = new CompletableFuture<>();
+        failedFuture.completeExceptionally(new RuntimeException("Kafka error"));
+        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(failedFuture);
 
-        // Act & Assert - should not throw exception
+        // Act & Assert - should not throw exception, delivery should be rescheduled
         assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries());
+        
+        // Verify failed delivery is saved with new nextRetryAt
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
+        verify(deliveryRepository).saveAll(deliveryCaptor.capture());
+        assertNotNull(deliveryCaptor.getValue().get(0).getNextRetryAt());
     }
 
     @Test
@@ -158,6 +185,9 @@ class RetrySchedulerServiceTest {
         Delivery delivery1 = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
         Delivery delivery2 = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(10));
         Delivery delivery6 = createDelivery(UUID.randomUUID(), 6, now.minusSeconds(10));
+        
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
         
         when(deliveryRepository.findPendingRetriesForUpdate(
                 any(Delivery.DeliveryStatus.class),
