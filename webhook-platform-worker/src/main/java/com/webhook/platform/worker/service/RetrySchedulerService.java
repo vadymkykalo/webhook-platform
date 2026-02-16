@@ -65,7 +65,7 @@ public class RetrySchedulerService {
 
         log.info("Found {} deliveries ready for retry (batch size: {})", pendingRetries.size(), batchSize);
 
-        // Phase 1: Send all messages asynchronously (non-blocking, highload-friendly)
+        // Send all messages asynchronously (non-blocking, highload-friendly)
         Map<UUID, CompletableFuture<SendResult<String, DeliveryMessage>>> futures = new HashMap<>();
         Map<UUID, String> deliveryTopics = new HashMap<>();
         
