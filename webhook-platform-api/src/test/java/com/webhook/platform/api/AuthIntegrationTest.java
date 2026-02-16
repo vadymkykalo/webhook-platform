@@ -18,7 +18,8 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     public void testRegisterLoginAndGetCurrentUser() throws Exception {

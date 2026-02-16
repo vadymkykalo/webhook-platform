@@ -21,7 +21,8 @@ public class MembershipRbacTest extends AbstractIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     public void testDeveloperCannotAddMembers() throws Exception {

@@ -24,15 +24,32 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+import com.webhook.platform.api.dto.RateLimitInfo;
+import com.webhook.platform.api.service.RedisRateLimiterService;
+import com.webhook.platform.api.service.SequenceGeneratorService;
+import org.redisson.api.RedissonClient;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration"
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,org.redisson.spring.starter.RedissonAutoConfigurationV2"
     }
 )
 @Testcontainers
 public class ShedLockConcurrencyTest {
+
+    @MockBean
+    private RedissonClient redissonClient;
+
+    @MockBean
+    private SequenceGeneratorService sequenceGeneratorService;
+
+    @MockBean
+    private RedisRateLimiterService redisRateLimiterService;
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
