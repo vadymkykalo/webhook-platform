@@ -162,6 +162,7 @@ class DeliveryRepositoryTest {
                 .status(status)
                 .attemptCount(1)
                 .maxAttempts(7)
+                .orderingEnabled(false)
                 .nextRetryAt(nextRetryAt)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
