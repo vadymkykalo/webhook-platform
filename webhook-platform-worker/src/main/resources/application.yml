@@ -72,8 +72,10 @@ webhook:
 
 retry:
   scheduler:
-    poll-interval-ms: ${RETRY_SCHEDULER_INTERVAL_MS:10000}
+    poll-interval-ms: ${RETRY_SCHEDULER_POLL_INTERVAL_MS:10000}
     batch-size: ${RETRY_SCHEDULER_BATCH_SIZE:100}
+    send-timeout-seconds: ${RETRY_SCHEDULER_SEND_TIMEOUT_SECONDS:30}
+    reschedule-delay-seconds: ${RETRY_SCHEDULER_RESCHEDULE_DELAY_SECONDS:60}
 
 dlq:
   monitoring:
