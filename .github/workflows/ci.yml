@@ -79,6 +79,7 @@ jobs:
         run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false --fail-at-end
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
+          DOCKER_API_VERSION: "1.44"
       
       - name: Integration Test Summary
         if: always()
