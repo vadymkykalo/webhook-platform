@@ -1,11 +1,14 @@
 package com.webhook.platform.api;
 
+import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
+import com.webhook.platform.api.service.TestEndpointCleanupService;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -20,6 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 )
 @Testcontainers
 @AutoConfigureMockMvc
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class AbstractIntegrationTest {
 
     @MockBean
@@ -30,6 +34,12 @@ public abstract class AbstractIntegrationTest {
 
     @MockBean
     protected RedisRateLimiterService redisRateLimiterService;
+
+    @MockBean
+    protected OutboxPublisherService outboxPublisherService;
+
+    @MockBean
+    protected TestEndpointCleanupService testEndpointCleanupService;
 
     @Container
     protected static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")

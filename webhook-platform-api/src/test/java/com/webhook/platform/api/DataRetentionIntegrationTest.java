@@ -24,10 +24,13 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
+import com.webhook.platform.api.service.TestEndpointCleanupService;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.annotation.DirtiesContext;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
@@ -36,6 +39,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
     }
 )
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class DataRetentionIntegrationTest {
 
     @MockBean
@@ -46,6 +50,12 @@ public class DataRetentionIntegrationTest {
 
     @MockBean
     private RedisRateLimiterService redisRateLimiterService;
+
+    @MockBean
+    private OutboxPublisherService outboxPublisherService;
+
+    @MockBean
+    private TestEndpointCleanupService testEndpointCleanupService;
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")

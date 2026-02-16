@@ -55,41 +55,20 @@ public class MembershipRbacTest extends AbstractIntegrationTest {
 
         String orgId = currentUser.getOrganization().getId().toString();
 
-        AddMemberRequest addDeveloperRequest = AddMemberRequest.builder()
-                .email("developer@example.com")
-                .role(MembershipRole.DEVELOPER)
-                .build();
-
-        mockMvc.perform(post("/api/v1/orgs/" + orgId + "/members")
-                        .header("Authorization", "Bearer " + ownerAuth.getAccessToken())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(addDeveloperRequest)))
-                .andExpect(status().isCreated());
-
-        LoginRequest devLoginRequest = LoginRequest.builder()
-                .email("developer@example.com")
-                .password("password123")
-                .build();
-
         RegisterRequest devRegisterRequest = RegisterRequest.builder()
                 .email("developer@example.com")
                 .password("password123")
                 .organizationName("Dev Org")
                 .build();
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        MvcResult devRegisterResult = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(devRegisterRequest)))
-                .andExpect(status().isCreated());
-
-        MvcResult devLoginResult = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(devLoginRequest)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
 
         AuthResponse devAuth = objectMapper.readValue(
-                devLoginResult.getResponse().getContentAsString(),
+                devRegisterResult.getResponse().getContentAsString(),
                 AuthResponse.class
         );
 

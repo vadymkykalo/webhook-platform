@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.stream.Collectors;
 
@@ -27,6 +28,18 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST.value()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(
+            ResponseStatusException ex) {
+        log.warn("Response status exception: {} {}", ex.getStatusCode(), ex.getReason());
+        ErrorResponse error = new ErrorResponse(
+                ex.getStatusCode().is4xxClientError() ? "client_error" : "server_error",
+                ex.getReason() != null ? ex.getReason() : ex.getMessage(),
+                ex.getStatusCode().value()
+        );
+        return ResponseEntity.status(ex.getStatusCode()).body(error);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
