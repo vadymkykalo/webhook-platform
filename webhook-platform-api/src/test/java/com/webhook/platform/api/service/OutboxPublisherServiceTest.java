@@ -78,8 +78,6 @@ class OutboxPublisherServiceTest {
         
         @SuppressWarnings("unchecked")
         SendResult<String, DeliveryMessage> sendResult = mock(SendResult.class);
-        RecordMetadata metadata = new RecordMetadata(new TopicPartition("test-topic", 0), 0, 0, 0L, 0, 0);
-        when(sendResult.getRecordMetadata()).thenReturn(metadata);
         CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
 
