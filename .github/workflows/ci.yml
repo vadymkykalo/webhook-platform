@@ -51,7 +51,7 @@ jobs:
           cache: 'maven'
       
       - name: Run unit tests
-        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest' --fail-at-end
+        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' --fail-at-end
       
       - name: Test Summary
         if: always()
@@ -76,7 +76,9 @@ jobs:
           cache: 'maven'
       
       - name: Run integration tests with Testcontainers
-        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT' -DfailIfNoTests=false --fail-at-end
+        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false --fail-at-end
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: true
       
       - name: Integration Test Summary
         if: always()
