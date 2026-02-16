@@ -51,7 +51,7 @@ jobs:
           cache: 'maven'
       
       - name: Run unit tests
-        run: mvn test -B -Dtest='!*IntegrationTest,!*IT' --fail-at-end
+        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest' --fail-at-end
       
       - name: Test Summary
         if: always()

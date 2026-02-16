@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.springframework.kafka.support.SendResult;
 
 import java.time.Instant;
@@ -63,7 +65,8 @@ class RetrySchedulerServiceTest {
                 any(PageRequest.class)
         )).thenReturn(Collections.singletonList(dueDelivery));
         
-        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        SendResult<String, DeliveryMessage> sendResult = mockSendResult();
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
         // Act
@@ -97,7 +100,8 @@ class RetrySchedulerServiceTest {
                 any(PageRequest.class)
         )).thenReturn(deliveries);
         
-        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        SendResult<String, DeliveryMessage> sendResult = mockSendResult();
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
         // Act
@@ -120,7 +124,8 @@ class RetrySchedulerServiceTest {
                 any(PageRequest.class)
         )).thenReturn(Collections.singletonList(delivery));
         
-        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        SendResult<String, DeliveryMessage> sendResult = mockSendResult();
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
         // Act
@@ -186,7 +191,8 @@ class RetrySchedulerServiceTest {
         Delivery delivery2 = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(10));
         Delivery delivery6 = createDelivery(UUID.randomUUID(), 6, now.minusSeconds(10));
         
-        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(mock(SendResult.class));
+        SendResult<String, DeliveryMessage> sendResult = mockSendResult();
+        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
         
         when(deliveryRepository.findPendingRetriesForUpdate(
@@ -226,5 +232,14 @@ class RetrySchedulerServiceTest {
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
+    }
+    
+    @SuppressWarnings("unchecked")
+    private SendResult<String, DeliveryMessage> mockSendResult() {
+        SendResult<String, DeliveryMessage> sendResult = mock(SendResult.class);
+        RecordMetadata metadata = new RecordMetadata(
+                new TopicPartition("test-topic", 0), 0, 0, 0L, 0, 0);
+        when(sendResult.getRecordMetadata()).thenReturn(metadata);
+        return sendResult;
     }
 }
