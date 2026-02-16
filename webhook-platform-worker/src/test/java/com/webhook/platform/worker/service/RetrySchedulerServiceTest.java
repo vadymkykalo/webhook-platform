@@ -228,6 +228,7 @@ class RetrySchedulerServiceTest {
                 .status(Delivery.DeliveryStatus.PENDING)
                 .attemptCount(attemptCount)
                 .maxAttempts(7)
+                .orderingEnabled(false)
                 .nextRetryAt(nextRetryAt)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
