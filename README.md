@@ -147,22 +147,22 @@ graph TB
 gantt
     title Automatic Retry Timeline for Failed Delivery
     dateFormat X
-    axisFormat %Mm %Ss
+    axisFormat %M:%S
     
     section Delivery Attempts
-    Attempt 1 (immediate)     :0, 10s
-    Wait 1m                   :10s, 60s
-    Attempt 2 (1m)            :70s, 10s
-    Wait 5m                   :80s, 300s
-    Attempt 3 (5m)            :380s, 10s
-    Wait 15m                  :390s, 900s
-    Attempt 4 (15m)           :1290s, 10s
-    Wait 1h                   :1300s, 3600s
-    Attempt 5 (1h)            :4900s, 10s
-    Wait 6h                   :4910s, 21600s
-    Attempt 6 (6h)            :26510s, 10s
-    Wait 24h                  :26520s, 86400s
-    Attempt 7 (24h - final)   :112920s, 10s
+    Attempt 1 (immediate)     :0, 10
+    Wait 1m                   :10, 70
+    Attempt 2 (1m)            :70, 80
+    Wait 5m                   :80, 380
+    Attempt 3 (5m)            :380, 390
+    Wait 15m                  :390, 1290
+    Attempt 4 (15m)           :1290, 1300
+    Wait 1h                   :1300, 4900
+    Attempt 5 (1h)            :4900, 4910
+    Wait 6h                   :4910, 26510
+    Attempt 6 (6h)            :26510, 26520
+    Wait 24h                  :26520, 112920
+    Attempt 7 (24h - final)   :112920, 112930
 ```
 
 **Total retry window**: ~31 hours across 7 attempts. After that, delivery moves to Dead Letter Queue for manual review.
