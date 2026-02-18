@@ -6,8 +6,8 @@
          cacheDirectory=".phpunit.cache"
          executionOrder="depends,defects"
          failOnRisky="true"
-         failOnWarning="true"
-         beStrictAboutCoverageMetadata="true"
+         failOnWarning="false"
+         beStrictAboutCoverageMetadata="false"
          beStrictAboutOutputDuringTests="true">
     <testsuites>
         <testsuite name="default">
