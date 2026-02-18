@@ -7,6 +7,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Instant;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -39,7 +40,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 ApiKey apiKey = apiKeyOpt.get();
                 
                 if (apiKey.getRevokedAt() == null && 
-                    (apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(java.time.Instant.now()))) {
+                    (apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(Instant.now()))) {
                     
                     ApiKeyAuthenticationToken authentication = new ApiKeyAuthenticationToken(
                             apiKeyValue,
