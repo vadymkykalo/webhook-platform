@@ -397,6 +397,11 @@ export default function EndpointsPage() {
                     <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}>
                       <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
                     </Button>
+                    {endpoint.verificationStatus !== 'VERIFIED' && (
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title="Verify endpoint" disabled={verifyingId === endpoint.id}>
+                        {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
