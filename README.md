@@ -20,17 +20,7 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 
 **UI**: http://localhost:5173 | **API Docs**: http://localhost:8080/swagger-ui.html
 
-## Why Webhook Platform?
-
-| | Hosted (Svix, Hookdeck) | DIY | **Webhook Platform** |
-|---|:---:|:---:|:---:|
-| **Self-hosted** | ❌ | ✅ | ✅ |
-| **Production-ready** | ✅ | ❌ | ✅ |
-| **No vendor lock-in** | ❌ | ✅ | ✅ |
-| **5-minute setup** | ✅ | ❌ | ✅ |
-| **Full control** | ❌ | ✅ | ✅ |
-
-**Use cases**: SaaS event notifications, payment webhooks, e-commerce order updates, CI/CD triggers, IoT event streaming.
+Self-hosted alternative to Svix/Hookdeck. Send events, get reliable delivery with retries, HMAC signatures, and full observability. Production-ready in 5 minutes.
 
 ## Architecture
 
