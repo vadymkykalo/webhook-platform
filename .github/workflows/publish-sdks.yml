@@ -113,9 +113,13 @@ jobs:
       # Packagist auto-updates from GitHub via webhook
       # Just trigger the update API
       - name: Trigger Packagist update
-        if: ${{ secrets.PACKAGIST_TOKEN != '' }}
+        env:
+          PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+          PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}&autoUpdated=1" \
-            -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}'
+          if [ -n "$PACKAGIST_TOKEN" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}&autoUpdated=1" \
+              -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}'
+          fi
