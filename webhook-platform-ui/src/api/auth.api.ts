@@ -13,4 +13,8 @@ export const authApi = {
   getCurrentUser: (): Promise<CurrentUserResponse> => {
     return http.get<CurrentUserResponse>('/api/v1/auth/me');
   },
+
+  refresh: (refreshToken: string): Promise<AuthResponse> => {
+    return http.post<AuthResponse>('/api/v1/auth/refresh', { refreshToken });
+  },
 };

@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.dto.DlqRetryRequest;
 import com.webhook.platform.api.dto.DlqStatsResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.DlqService;
@@ -114,7 +115,7 @@ public class DlqController {
 
     private JwtAuthenticationToken validateAuth(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         return (JwtAuthenticationToken) authentication;
     }

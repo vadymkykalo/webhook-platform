@@ -26,6 +26,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -47,9 +50,9 @@ public class DlqService {
 
     public void validateProjectOwnership(UUID projectId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
     }
 
@@ -66,10 +69,10 @@ public class DlqService {
     public DlqItemResponse getDlqItem(UUID projectId, UUID deliveryId, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
         Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
         
         if (delivery.getStatus() != DeliveryStatus.DLQ) {
-            throw new RuntimeException("Delivery is not in DLQ");
+            throw new IllegalArgumentException("Delivery is not in DLQ");
         }
         
         return mapToResponse(delivery);

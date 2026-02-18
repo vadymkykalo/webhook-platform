@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.SubscriptionService;
@@ -38,7 +39,7 @@ public class SubscriptionController {
             @Valid @RequestBody SubscriptionRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -52,7 +53,7 @@ public class SubscriptionController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         SubscriptionResponse response = subscriptionService.getSubscription(id, jwtAuth.getOrganizationId());
@@ -65,7 +66,7 @@ public class SubscriptionController {
             @PathVariable("projectId") UUID projectId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         List<SubscriptionResponse> response = subscriptionService.listSubscriptions(projectId, jwtAuth.getOrganizationId());
@@ -79,7 +80,7 @@ public class SubscriptionController {
             @Valid @RequestBody SubscriptionRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -94,7 +95,7 @@ public class SubscriptionController {
             @RequestBody SubscriptionRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -109,7 +110,7 @@ public class SubscriptionController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());

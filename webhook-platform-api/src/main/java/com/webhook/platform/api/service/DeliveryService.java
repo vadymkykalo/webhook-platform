@@ -27,6 +27,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,17 +62,17 @@ public class DeliveryService {
 
     private void validateDeliveryAccess(Delivery delivery, UUID organizationId) {
         Event event = eventRepository.findById(delivery.getEventId())
-                .orElseThrow(() -> new RuntimeException("Event not found"));
+                .orElseThrow(() -> new NotFoundException("Event not found"));
         Project project = projectRepository.findById(event.getProjectId())
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
     }
 
     public DeliveryResponse getDelivery(UUID id, UUID organizationId) {
         Delivery delivery = deliveryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, organizationId);
         return mapToResponse(delivery);
     }
@@ -78,15 +81,15 @@ public class DeliveryService {
         Page<Delivery> deliveries;
         if (eventId != null) {
             Event event = eventRepository.findById(eventId)
-                    .orElseThrow(() -> new RuntimeException("Event not found"));
+                    .orElseThrow(() -> new NotFoundException("Event not found"));
             Project project = projectRepository.findById(event.getProjectId())
-                    .orElseThrow(() -> new RuntimeException("Project not found"));
+                    .orElseThrow(() -> new NotFoundException("Project not found"));
             if (!project.getOrganizationId().equals(organizationId)) {
-                throw new RuntimeException("Access denied");
+                throw new ForbiddenException("Access denied");
             }
             deliveries = deliveryRepository.findByEventId(eventId, pageable);
         } else {
-            throw new RuntimeException("eventId parameter is required");
+            throw new IllegalArgumentException("eventId parameter is required");
         }
         return deliveries.map(this::mapToResponse);
     }
@@ -101,10 +104,10 @@ public class DeliveryService {
             Pageable pageable
     ) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
 
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         List<UUID> eventIds = eventRepository.findByProjectId(projectId)
@@ -131,11 +134,11 @@ public class DeliveryService {
     @Transactional
     public void replayDelivery(UUID deliveryId, UUID organizationId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, organizationId);
         
         if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
-            throw new RuntimeException("Cannot replay successful delivery");
+            throw new IllegalArgumentException("Cannot replay successful delivery");
         }
         
         delivery.setStatus(DeliveryStatus.PENDING);
@@ -176,7 +179,7 @@ public class DeliveryService {
 
     public List<DeliveryAttemptResponse> getDeliveryAttempts(UUID deliveryId, UUID organizationId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, organizationId);
         
         List<DeliveryAttempt> attempts = deliveryAttemptRepository
@@ -210,10 +213,10 @@ public class DeliveryService {
             deliveriesToReplay = collected;
         } else if (projectIdFilter != null) {
             Project project = projectRepository.findById(projectIdFilter)
-                    .orElseThrow(() -> new RuntimeException("Project not found"));
+                    .orElseThrow(() -> new NotFoundException("Project not found"));
             
             if (!project.getOrganizationId().equals(organizationId)) {
-                throw new RuntimeException("Access denied");
+                throw new ForbiddenException("Access denied");
             }
             
             List<UUID> eventIds = eventRepository.findByProjectId(projectIdFilter)

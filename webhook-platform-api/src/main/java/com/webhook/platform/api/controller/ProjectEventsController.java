@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.EventService;
@@ -40,7 +41,7 @@ public class ProjectEventsController {
             Pageable pageable,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         Page<EventResponse> response = eventService.listEvents(projectId, jwtAuth.getOrganizationId(), pageable);
@@ -54,7 +55,7 @@ public class ProjectEventsController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         EventResponse response = eventService.getEvent(projectId, id, jwtAuth.getOrganizationId());
@@ -69,7 +70,7 @@ public class ProjectEventsController {
             @Valid @RequestBody EventIngestRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());

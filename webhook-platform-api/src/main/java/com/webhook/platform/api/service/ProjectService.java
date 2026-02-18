@@ -7,6 +7,9 @@ import com.webhook.platform.api.dto.ProjectResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -35,10 +38,10 @@ public class ProjectService {
 
     public ProjectResponse getProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         
         return mapToResponse(project);
@@ -55,10 +58,10 @@ public class ProjectService {
     @Transactional
     public ProjectResponse updateProject(UUID id, ProjectRequest request, UUID organizationId) {
         Project project = projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         
         project.setName(request.getName());
@@ -71,10 +74,10 @@ public class ProjectService {
     @Transactional
     public void deleteProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         
         project.setDeletedAt(Instant.now());

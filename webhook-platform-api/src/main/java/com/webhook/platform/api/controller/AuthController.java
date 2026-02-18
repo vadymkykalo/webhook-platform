@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.CurrentUserResponse;
 import com.webhook.platform.api.dto.LoginRequest;
+import com.webhook.platform.api.dto.RefreshTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +64,22 @@ public class AuthController {
         }
     }
 
+    @Operation(summary = "Refresh token", description = "Exchanges a valid refresh token for new access and refresh tokens")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tokens refreshed successfully"),
+            @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token")
+    })
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        try {
+            AuthResponse response = authService.refreshToken(request.getRefreshToken());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Token refresh failed: {}", e.getMessage());
+            throw e;
+        }
+    }
+
     @Operation(summary = "Get current user", description = "Returns information about the authenticated user")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -71,7 +89,7 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<CurrentUserResponse> getCurrentUser(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;

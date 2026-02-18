@@ -9,6 +9,7 @@ import type { CurrentUserResponse } from './types/api.types';
 export default function App() {
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Restore auth state on mount
@@ -16,16 +17,20 @@ export default function App() {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
     
+    const storedRefreshToken = localStorage.getItem('refresh_token');
     if (storedToken && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
+        setRefreshToken(storedRefreshToken);
         setUser(parsedUser);
         http.setToken(storedToken);
+        http.setRefreshToken(storedRefreshToken);
       } catch (err) {
         console.error('Failed to restore auth state:', err);
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('refresh_token');
       }
     }
     setLoading(false);
@@ -37,22 +42,43 @@ export default function App() {
     }
   }, [token]);
 
+  useEffect(() => {
+    http.setRefreshToken(refreshToken);
+  }, [refreshToken]);
+
+  useEffect(() => {
+    http.setOnLogout(() => {
+      setToken(null);
+      setRefreshToken(null);
+      setUser(null);
+    });
+    return () => http.setOnLogout(null);
+  }, []);
+
   const authState: AuthState = {
     user,
     token,
+    refreshToken,
     isAuthenticated: !!user && !!token,
-    login: (newToken: string, newUser: CurrentUserResponse) => {
+    login: (newToken: string, newRefreshToken: string, newUser: CurrentUserResponse) => {
       setToken(newToken);
+      setRefreshToken(newRefreshToken);
       setUser(newUser);
+      http.setToken(newToken);
+      http.setRefreshToken(newRefreshToken);
       localStorage.setItem('auth_token', newToken);
+      localStorage.setItem('refresh_token', newRefreshToken);
       localStorage.setItem('auth_user', JSON.stringify(newUser));
     },
     logout: () => {
       setToken(null);
+      setRefreshToken(null);
       setUser(null);
       http.setToken(null);
+      http.setRefreshToken(null);
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
+      localStorage.removeItem('refresh_token');
     },
   };
 

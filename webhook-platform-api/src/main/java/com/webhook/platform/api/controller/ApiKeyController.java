@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.ApiKeyService;
@@ -40,7 +41,7 @@ public class ApiKeyController {
             @Valid @RequestBody ApiKeyRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -57,7 +58,7 @@ public class ApiKeyController {
             @PathVariable("projectId") UUID projectId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -73,7 +74,7 @@ public class ApiKeyController {
             @PathVariable("apiKeyId") UUID apiKeyId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;

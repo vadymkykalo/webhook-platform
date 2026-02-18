@@ -7,6 +7,9 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import org.springframework.stereotype.Service;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,7 +33,7 @@ public class OrganizationService {
         return memberships.stream()
                 .map(membership -> {
                     Organization org = organizationRepository.findById(membership.getOrganizationId())
-                            .orElseThrow(() -> new RuntimeException("Organization not found"));
+                            .orElseThrow(() -> new NotFoundException("Organization not found"));
                     return OrganizationResponse.builder()
                             .id(org.getId())
                             .name(org.getName())
@@ -42,11 +45,11 @@ public class OrganizationService {
 
     public OrganizationResponse getOrganization(UUID orgId, UUID userId) {
         if (!membershipRepository.existsByUserIdAndOrganizationId(userId, orgId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         Organization organization = organizationRepository.findById(orgId)
-                .orElseThrow(() -> new RuntimeException("Organization not found"));
+                .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         return OrganizationResponse.builder()
                 .id(organization.getId())

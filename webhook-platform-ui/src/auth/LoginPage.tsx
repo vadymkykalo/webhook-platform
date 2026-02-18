@@ -25,8 +25,9 @@ export default function LoginPage() {
     try {
       const authResponse = await authApi.login({ email, password });
       http.setToken(authResponse.accessToken);
+      http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
-      login(authResponse.accessToken, user);
+      login(authResponse.accessToken, authResponse.refreshToken, user);
       toast.success('Welcome back!');
       navigate('/projects');
     } catch (err: any) {

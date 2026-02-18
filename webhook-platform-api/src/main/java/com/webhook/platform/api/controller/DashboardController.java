@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.AnalyticsResponse;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.AnalyticsService;
 import com.webhook.platform.api.service.DashboardService;
@@ -37,7 +38,7 @@ public class DashboardController {
             @PathVariable("projectId") UUID projectId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         
@@ -54,7 +55,7 @@ public class DashboardController {
             @Parameter(description = "Time period: 24h, 7d, 30d") @RequestParam(name = "period", defaultValue = "24h") String period,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         

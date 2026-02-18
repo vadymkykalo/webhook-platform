@@ -11,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
@@ -35,10 +38,10 @@ public class ApiKeyService {
     @Transactional
     public ApiKeyResponse createApiKey(UUID projectId, ApiKeyRequest request, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
 
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Project does not belong to your organization");
+            throw new ForbiddenException("Project does not belong to your organization");
         }
 
         String plainKey = generateApiKey();
@@ -61,10 +64,10 @@ public class ApiKeyService {
     @Transactional(readOnly = true)
     public List<ApiKeyResponse> listApiKeys(UUID projectId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
 
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Project does not belong to your organization");
+            throw new ForbiddenException("Project does not belong to your organization");
         }
 
         List<ApiKey> apiKeys = apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId);
@@ -76,17 +79,17 @@ public class ApiKeyService {
     @Transactional
     public void revokeApiKey(UUID projectId, UUID apiKeyId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
 
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Project does not belong to your organization");
+            throw new ForbiddenException("Project does not belong to your organization");
         }
 
         ApiKey apiKey = apiKeyRepository.findByIdAndProjectId(apiKeyId, projectId)
-                .orElseThrow(() -> new RuntimeException("API key not found"));
+                .orElseThrow(() -> new NotFoundException("API key not found"));
 
         if (apiKey.getRevokedAt() != null) {
-            throw new RuntimeException("API key is already revoked");
+            throw new IllegalArgumentException("API key is already revoked");
         }
 
         apiKey.setRevokedAt(Instant.now());

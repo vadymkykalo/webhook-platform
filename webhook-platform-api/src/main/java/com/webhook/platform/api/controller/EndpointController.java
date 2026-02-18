@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.api.dto.EndpointTestResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.EndpointService;
@@ -44,7 +45,7 @@ public class EndpointController {
             @Valid @RequestBody EndpointRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         try {
             JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -63,7 +64,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         EndpointResponse response = endpointService.getEndpoint(id, jwtAuth.getOrganizationId());
@@ -76,7 +77,7 @@ public class EndpointController {
             @PathVariable("projectId") UUID projectId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         List<EndpointResponse> response = endpointService.listEndpoints(projectId, jwtAuth.getOrganizationId());
@@ -90,7 +91,7 @@ public class EndpointController {
             @Valid @RequestBody EndpointRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -105,7 +106,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -119,7 +120,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -134,7 +135,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         EndpointTestResponse response = endpointService.testEndpoint(id, jwtAuth.getOrganizationId());
@@ -150,7 +151,7 @@ public class EndpointController {
             @Valid @RequestBody com.webhook.platform.api.dto.MtlsConfigRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -166,7 +167,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -182,7 +183,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         
@@ -204,7 +205,7 @@ public class EndpointController {
             @RequestBody(required = false) SkipVerificationRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());

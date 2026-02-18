@@ -15,6 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -40,7 +43,7 @@ public class MembershipService {
         return memberships.stream()
                 .map(membership -> {
                     User user = userRepository.findById(membership.getUserId())
-                            .orElseThrow(() -> new RuntimeException("User not found"));
+                            .orElseThrow(() -> new NotFoundException("User not found"));
                     return MemberResponse.builder()
                             .userId(user.getId())
                             .email(user.getEmail())
@@ -55,7 +58,7 @@ public class MembershipService {
     @Transactional
     public MemberResponse addMember(UUID organizationId, AddMemberRequest request, MembershipRole requestingRole) {
         if (requestingRole != MembershipRole.OWNER) {
-            throw new RuntimeException("Only owners can add members");
+            throw new ForbiddenException("Only owners can add members");
         }
 
         String temporaryPassword = null;
@@ -73,7 +76,7 @@ public class MembershipService {
                 });
 
         if (membershipRepository.existsByUserIdAndOrganizationId(user.getId(), organizationId)) {
-            throw new RuntimeException("User is already a member");
+            throw new IllegalArgumentException("User is already a member");
         }
 
         if (isNewUser) {
@@ -129,7 +132,7 @@ public class MembershipService {
         membershipRepository.save(membership);
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         return MemberResponse.builder()
                 .userId(user.getId())

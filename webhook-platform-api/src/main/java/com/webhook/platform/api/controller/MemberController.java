@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.ChangeMemberRoleRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,7 +39,7 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         List<MemberResponse> response = membershipService.getOrganizationMembers(orgId);
@@ -53,7 +54,7 @@ public class MemberController {
             @Valid @RequestBody AddMemberRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -73,7 +74,7 @@ public class MemberController {
             @Valid @RequestBody ChangeMemberRoleRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -94,7 +95,7 @@ public class MemberController {
             @PathVariable("userId") UUID userId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
