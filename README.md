@@ -25,22 +25,6 @@ make up
 
 ---
 
-## Features
-
-- **Reliable delivery** — transactional outbox → Kafka → Worker, at-least-once semantics
-- **FIFO ordering** — per-endpoint sequence numbers with Redis ordering buffer
-- **Retries & DLQ** — configurable delays per subscription (1m → 5m → 15m → 1h → 6h → 24h), Dead Letter Queue
-- **Security** — HMAC-SHA256 signatures, AES-GCM encrypted secrets, secret rotation, mTLS, endpoint verification, JWT auth
-- **Multi-tenancy** — Organizations → Projects → Endpoints → Subscriptions, RBAC
-- **Rate limiting** — Redis token-bucket per project
-- **Observability** — Prometheus metrics, full request/response attempt history, live dashboard
-- **Payload transforms** — per-subscription templates and custom headers
-- **Test endpoints** — built-in Request Bin for capturing webhook payloads
-- **Data retention** — automated cleanup of outbox messages and delivery attempts
-- **Horizontal scale** — stateless services, 12 Kafka partitions, `FOR UPDATE SKIP LOCKED`
-
----
-
 ## Architecture
 
 ```mermaid
@@ -92,6 +76,18 @@ graph TB
 | **PostgreSQL** | 5432 | Persistent storage |
 | **Kafka** | 9092 | Message broker (dispatch + 6 retry delay topics + DLQ) |
 | **Redis** | 6379 | Rate limiting, FIFO ordering buffer |
+
+---
+
+## Features
+
+- Transactional outbox → Kafka → at-least-once delivery
+- FIFO ordering per endpoint (Redis ordering buffer)
+- Retries with configurable delays + Dead Letter Queue
+- HMAC-SHA256 signatures, AES-GCM secrets, mTLS, endpoint verification
+- Multi-tenant: Organizations → Projects → Endpoints → Subscriptions (RBAC)
+- Redis rate limiting, Prometheus metrics, built-in Request Bin
+- Horizontal scaling: stateless services, 12 Kafka partitions
 
 ---
 
