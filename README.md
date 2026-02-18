@@ -9,30 +9,21 @@
 [![Kafka](https://img.shields.io/badge/Kafka-3.7-231F20)]()
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D)]()
 
-**Distributed webhook delivery platform** with at-least-once guarantees, automatic retries, and horizontal scaling.
+Production-grade webhook delivery infrastructure with **at-least-once guarantees**, FIFO ordering, automatic retries, HMAC signatures, and horizontal scaling. Self-hosted alternative to Svix / Hookdeck.
 
 <div align="center">
   <img src="docs/screenshot.png" alt="Webhook Platform Dashboard" width="800">
 </div>
 
 ```bash
-git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform && make up
+git clone https://github.com/vadymkykalo/webhook-platform.git
+cd webhook-platform
+make up
 ```
 
-**UI**: http://localhost:5173 | **API Docs**: http://localhost:8080/swagger-ui.html
+**Dashboard** → http://localhost:5173 &nbsp;|&nbsp; **API Docs** → http://localhost:8080/swagger-ui.html
 
-Self-hosted alternative to Svix/Hookdeck. Send events, get reliable delivery with retries, HMAC signatures, and full observability. Production-ready in 5 minutes.
-
-## Requirements
-
-| Dependency | Version | Notes |
-|------------|---------|-------|
-| **Docker** | 20.10+ | Container runtime |
-| **Docker Compose** | v2.0+ (or v1.29+) | Service orchestration |
-| **make** | any | Build automation |
-| **git** | any | Clone repository |
-
-> **Note**: All other dependencies (Java, PostgreSQL, Kafka, Redis) run inside Docker containers — no local installation needed.
+---
 
 ## Architecture
 
@@ -43,31 +34,31 @@ graph TB
     end
     
     subgraph "Webhook Platform"
-        API[API Service<br/>Event Ingestion]
-        DB[(PostgreSQL<br/>Events & Deliveries)]
-        Redis[(Redis<br/>Rate Limiting)]
-        Kafka[Kafka<br/>Message Queue]
-        Worker[Worker Service<br/>HTTP Delivery]
-        UI[Admin Dashboard<br/>Monitoring & Replay]
+        UI[Dashboard<br/>React + Vite]
+        API[API Service<br/>Spring Boot]
+        DB[(PostgreSQL<br/>Events · Deliveries · Outbox)]
+        Redis[(Redis<br/>Rate Limits · Ordering Buffer)]
+        Kafka[Kafka<br/>Delivery Dispatch · Retry Topics · DLQ]
+        Worker[Worker Service<br/>Spring Boot]
     end
     
-    subgraph "Customer Infrastructure"
-        Customer1[Customer A Endpoint]
-        Customer2[Customer B Endpoint]
-        Customer3[Customer C Endpoint]
+    subgraph "Customer Endpoints"
+        EP1[Endpoint A]
+        EP2[Endpoint B]
+        EP3[Endpoint C]
     end
     
-    App -->|POST /events| API
-    API -->|Rate Limit| Redis
-    API -->|Write| DB
-    API -->|Publish| Kafka
+    App -->|POST /api/v1/events| API
+    UI  -->|REST API| API
+    API -->|Rate Limit Check| Redis
+    API -->|Transactional Write| DB
+    API -->|Outbox Publish| Kafka
     Kafka -->|Consume| Worker
-    Worker -->|Concurrency| Redis
     Worker -->|Read/Update| DB
-    Worker -->|POST with HMAC| Customer1
-    Worker -->|POST with HMAC| Customer2
-    Worker -->|POST with HMAC| Customer3
-    UI -->|Query Stats| DB
+    Worker -->|Ordering Buffer| Redis
+    Worker -->|POST + HMAC-SHA256| EP1
+    Worker -->|POST + HMAC-SHA256| EP2
+    Worker -->|POST + HMAC-SHA256| EP3
     
     style API fill:#4CAF50
     style Worker fill:#2196F3
@@ -77,87 +68,142 @@ graph TB
     style Redis fill:#DC382D
 ```
 
-## How It Works
+| Service | Port | Role |
+|---------|------|------|
+| **API** | 8080 | Event ingestion, REST API, outbox publisher, Flyway migrations |
+| **Worker** | 8081 | Kafka consumer, HTTP delivery, retry scheduling, stuck delivery recovery |
+| **UI** | 5173 | Admin dashboard (React / Vite / TailwindCSS / shadcn/ui) |
+| **PostgreSQL** | 5432 | Persistent storage |
+| **Kafka** | 9092 | Message broker (dispatch + 6 retry delay topics + DLQ) |
+| **Redis** | 6379 | Rate limiting, FIFO ordering buffer |
 
-```mermaid
-sequenceDiagram
-    participant YourApp as Your Application
-    participant API as Webhook Platform
-    participant Customer as Customer Endpoint
-    
-    YourApp->>API: POST /events<br/>(order.completed)
-    API-->>YourApp: 202 Accepted
-    Note over API: Event saved in database
-    
-    API->>Customer: POST /webhook<br/>+ HMAC signature
-    
-    alt Successful Delivery
-        Customer-->>API: 200 OK
-        Note over API,Customer: Delivery marked SUCCESS
-    else Temporary Failure
-        Customer-->>API: 503 Service Unavailable
-        Note over API: Auto-retry after 1m
-        API->>Customer: POST /webhook (retry #2)
-        Customer-->>API: 200 OK
-        Note over API,Customer: Delivery SUCCESS on retry
-    else Permanent Failure
-        Customer-->>API: 404 Not Found
-        Note over API: Retries: 1m, 5m, 15m, 1h, 6h, 24h
-        Note over API: After 7 attempts → Dead Letter Queue
-    end
-```
-
-**Retry strategy**: 7 attempts over ~31 hours (1m → 5m → 15m → 1h → 6h → 24h), then Dead Letter Queue.
+---
 
 ## Features
 
-| Category | Details |
-|----------|---------|
-| **Delivery** | Transactional outbox, at-least-once semantics, 30s timeout per attempt |
-| **Retry** | Exponential backoff (1m to 24h), 7 attempts, DLQ for exhausted deliveries |
-| **Security** | HMAC-SHA256 signatures, AES-GCM encrypted secrets, JWT auth, multi-tenant isolation |
-| **Scale** | Redis rate limiting (100 req/s default), 12 Kafka partitions, stateless horizontal scaling |
-| **Observability** | Prometheus metrics, delivery dashboard, attempt history with full request/response |
+- Transactional outbox → Kafka → at-least-once delivery
+- FIFO ordering per endpoint (Redis ordering buffer)
+- Retries with configurable delays + Dead Letter Queue
+- HMAC-SHA256 signatures, AES-GCM secrets, mTLS, endpoint verification
+- Multi-tenant: Organizations → Projects → Endpoints → Subscriptions (RBAC)
+- Redis rate limiting, Prometheus metrics, built-in Request Bin
+- Horizontal scaling: stateless services, 12 Kafka partitions
+
+---
+
+## Quick Start
+
+**Prerequisites:** Docker 20.10+, Docker Compose v2+, make.
+Everything else runs inside containers.
+
+```bash
+git clone https://github.com/vadymkykalo/webhook-platform.git
+cd webhook-platform
+make up        # build, start, create Kafka topics, run migrations
+```
+
+Open http://localhost:5173, register, create a project + API key, then:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "order.completed", "payload": {"orderId": "12345"}}'
+```
+
+---
+
+## Deployment
+
+### Development
+
+```bash
+make up          # Start all services
+make down        # Stop (data preserved)
+make logs        # Follow logs
+```
+
+### Production
+
+```bash
+cp .env.dist .env   # then edit .env
+make up             # or: make up-external-db (for managed DB)
+make health         # verify all services are UP
+```
+
+All environment variables are documented in [`.env.dist`](./.env.dist).
+
+## Make Commands
+
+Run `make help` for the full list. Key commands:
+
+```bash
+make up                   # Start everything from scratch
+make down                 # Stop (keeps data)
+make nuke CONFIRM=YES     # Destroy everything (containers, volumes, images)
+make health               # Check service health
+make logs                 # Follow all logs
+make dev-api              # Quick rebuild API + tail logs
+make backup-db            # Backup database to ./backups/
+make doctor               # Pre-flight diagnostics
+```
+
+---
 
 ## SDKs
 
-| Language | Install | Docs |
+| Language | Package | Docs |
 |----------|---------|------|
 | **Node.js** | `npm install @webhook-platform/node` | [README](./sdks/node/README.md) |
 | **Python** | `pip install webhook-platform` | [README](./sdks/python/README.md) |
 | **PHP** | `composer require webhook-platform/php` | [README](./sdks/php/README.md) |
 
-## Deployment
+All SDKs include signature verification, error handling, and idempotency support.
 
-```bash
-# Development
-make up                    # Start all services
-make down                  # Stop
-make logs                  # View logs
+---
 
-# Production - edit .env first:
-# APP_ENV=production
-# WEBHOOK_ENCRYPTION_KEY=<32+ chars>
-# JWT_SECRET=<32+ chars>
-make up
+## How Delivery Works
+
+```mermaid
+sequenceDiagram
+    participant App as Your Application
+    participant API as API Service
+    participant DB as PostgreSQL
+    participant Kafka as Kafka
+    participant Worker as Worker
+    participant EP as Customer Endpoint
+    
+    App->>API: POST /events
+    API-->>App: 202 Accepted
+    API->>DB: INSERT event + deliveries + outbox (single TX)
+    
+    Note over API: Outbox publisher polls every 100ms
+    API->>Kafka: Publish DeliveryMessage
+    API->>DB: Mark outbox PUBLISHED
+    
+    Kafka->>Worker: Consume from deliveries.dispatch
+    Worker->>DB: Load delivery + endpoint + secret
+    Worker->>EP: POST payload + HMAC-SHA256 signature
+    
+    alt 2xx Response
+        EP-->>Worker: 200 OK
+        Worker->>DB: Status = SUCCESS
+    else 4xx/5xx / Timeout
+        EP-->>Worker: 503 / timeout
+        Worker->>Kafka: Publish to deliveries.retry.1m
+        Note over Worker: Retry delays: 1m → 5m → 15m → 1h → 6h → 24h
+    else All retries exhausted
+        Worker->>Kafka: Publish to deliveries.dlq
+        Worker->>DB: Status = DLQ
+    end
 ```
 
-Register at http://localhost:5173 or via API. Configuration: [`.env.dist`](./.env.dist)
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `make up` | Start all services |
-| `make down` | Stop services |
-| `make logs` | Follow logs |
-| `make dev-api` | Rebuild + restart API |
-| `make dev-worker` | Rebuild + restart Worker |
-| `make dev-ui` | Rebuild + restart UI |
-| `make backup-db` | Backup database |
-| `make doctor` | Diagnostics |
-| `make nuke CONFIRM=YES` | Delete everything |
+---
 
 ## Contributing
 
-Fork → branch → test → PR. All builds run in Docker (`make build`).
+Fork → branch → test → PR. All CI checks must pass. See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## License
+
+[MIT](./LICENSE) © Vadym Kykalo
