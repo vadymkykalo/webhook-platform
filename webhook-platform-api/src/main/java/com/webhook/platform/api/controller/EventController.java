@@ -6,6 +6,7 @@ import com.webhook.platform.api.dto.RateLimitInfo;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.service.EventIngestService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
+import com.webhook.platform.api.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,7 +48,7 @@ public class EventController {
             @ApiResponse(responseCode = "429", description = "Rate limit exceeded")
     })
     @PostMapping
-    public ResponseEntity<EventIngestResponse> ingestEvent(
+    public ResponseEntity<?> ingestEvent(
             @Valid @RequestBody EventIngestRequest request,
             @Parameter(description = "Unique key for idempotent event ingestion")
             @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
@@ -63,12 +64,18 @@ public class EventController {
         
         if (!rateLimiterService.tryAcquire(apiKeyAuth.getProjectId())) {
             log.warn("Rate limit exceeded for project: {}", apiKeyAuth.getProjectId());
+            long retryAfter = rateLimiterService.getSecondsToWaitForRefill(apiKeyAuth.getProjectId());
+            ErrorResponse errorBody = new ErrorResponse(
+                    "rate_limit_exceeded",
+                    "Too many requests. Please retry after " + retryAfter + " seconds.",
+                    HttpStatus.TOO_MANY_REQUESTS.value()
+            );
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("X-RateLimit-Limit", String.valueOf(rateLimitInfo.getLimit()))
                     .header("X-RateLimit-Remaining", "0")
                     .header("X-RateLimit-Reset", String.valueOf(rateLimitInfo.getResetTimestamp()))
-                    .header("Retry-After", "1")
-                    .build();
+                    .header("Retry-After", String.valueOf(retryAfter))
+                    .body(errorBody);
         }
         
         log.info("Ingesting event type: {} for project: {}", request.getType(), apiKeyAuth.getProjectId());

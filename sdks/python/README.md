@@ -90,12 +90,12 @@ print(f"Test {'passed' if result.success else 'failed'}: {result.latency_ms}ms")
 ```python
 from webhook_platform import SubscriptionCreateParams
 
-# Subscribe endpoint to event types
+# Subscribe endpoint to an event type
 subscription = client.subscriptions.create(
     project_id,
     SubscriptionCreateParams(
         endpoint_id=endpoint.id,
-        event_types=["order.completed", "order.cancelled"],
+        event_type="order.completed",
         enabled=True,
     ),
 )
@@ -107,7 +107,7 @@ subscriptions = client.subscriptions.list(project_id)
 client.subscriptions.update(
     project_id,
     subscription_id,
-    event_types=["order.*"],
+    event_type="order.shipped",
 )
 
 # Delete subscription

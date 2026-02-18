@@ -4,7 +4,7 @@ import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRigh
 import { toast } from 'sonner';
 import { testEndpointsApi, TestEndpointResponse, CapturedRequestResponse } from '../api/testEndpoints.api';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,12 +122,12 @@ export default function TestEndpointsPage() {
 
   const getMethodColor = (method: string) => {
     switch (method.toUpperCase()) {
-      case 'GET': return 'bg-green-100 text-green-800';
-      case 'POST': return 'bg-blue-100 text-blue-800';
-      case 'PUT': return 'bg-yellow-100 text-yellow-800';
-      case 'PATCH': return 'bg-orange-100 text-orange-800';
-      case 'DELETE': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'GET': return 'bg-success/10 text-success';
+      case 'POST': return 'bg-blue-500/10 text-blue-600';
+      case 'PUT': return 'bg-warning/10 text-warning';
+      case 'PATCH': return 'bg-warning/10 text-warning';
+      case 'DELETE': return 'bg-destructive/10 text-destructive';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -142,86 +142,72 @@ export default function TestEndpointsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-36 bg-muted animate-pulse rounded-lg" />
+            <div className="h-4 w-64 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-44 bg-muted animate-pulse rounded-lg" />
+        </div>
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-28 bg-muted animate-pulse rounded-xl" />)}</div>
+          <div className="h-64 bg-muted animate-pulse rounded-xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Test Endpoints</h1>
-          <p className="text-muted-foreground mt-1">
-            Create temporary endpoints to capture and inspect webhook requests
+          <h1 className="text-title tracking-tight">Test Endpoints</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Temporary endpoints to capture and inspect webhook requests
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={creating} size="lg">
-          {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+        <Button onClick={handleCreate} disabled={creating}>
+          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           Create Test Endpoint
         </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Endpoints List */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Endpoints</h2>
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Endpoints</p>
           {endpoints.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No test endpoints yet. Create one to start capturing requests.
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-xl">
+              <p className="text-sm text-muted-foreground">No test endpoints yet</p>
+            </div>
           ) : (
             endpoints.map((endpoint) => (
               <Card 
                 key={endpoint.id}
-                className={`cursor-pointer transition-colors ${selectedEndpoint === endpoint.id ? 'border-primary' : 'hover:border-muted-foreground/50'}`}
+                className={`cursor-pointer transition-all ${selectedEndpoint === endpoint.id ? 'ring-2 ring-primary/50 border-primary' : ''}`}
                 onClick={() => setSelectedEndpoint(endpoint.id)}
               >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-sm font-mono truncate">
-                        {endpoint.slug}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-2 mt-1">
-                        <Clock className="h-3 w-3" />
-                        {getTimeRemaining(endpoint.expiresAt)}
-                      </CardDescription>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-mono font-semibold truncate">{endpoint.slug}</p>
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Clock className="h-3 w-3" /> {getTimeRemaining(endpoint.expiresAt)}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyToClipboard(endpoint.url);
-                        }}
-                      >
-                        <Copy className="h-4 w-4" />
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyToClipboard(endpoint.url); }}>
+                        <Copy className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteId(endpoint.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} className="text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center gap-2 text-xs">
-                    <code className="bg-muted px-2 py-1 rounded text-xs truncate flex-1">
-                      {endpoint.url}
-                    </code>
-                    <span className="bg-primary/10 text-primary px-2 py-1 rounded font-medium">
-                      {endpoint.requestCount} requests
+                  <div className="flex items-center gap-2 mt-2">
+                    <code className="bg-muted px-2 py-1 rounded text-[11px] truncate flex-1 font-mono">{endpoint.url}</code>
+                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0">
+                      {endpoint.requestCount} req
                     </span>
                   </div>
                 </CardContent>
@@ -230,96 +216,61 @@ export default function TestEndpointsPage() {
           )}
         </div>
 
-        {/* Captured Requests */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Captured Requests</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Captured Requests</p>
             {selectedEndpoint && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadRequests(selectedEndpoint)}
-                disabled={loadingRequests}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loadingRequests ? 'animate-spin' : ''}`} />
-                Refresh
+              <Button variant="outline" size="sm" onClick={() => loadRequests(selectedEndpoint)} disabled={loadingRequests}>
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingRequests ? 'animate-spin' : ''}`} /> Refresh
               </Button>
             )}
           </div>
 
           {!selectedEndpoint ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Select an endpoint to view captured requests
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-xl">
+              <p className="text-sm text-muted-foreground">Select an endpoint to view requests</p>
+            </div>
           ) : loadingRequests ? (
             <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : requests.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No requests captured yet. Send a request to the endpoint URL.
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-xl">
+              <p className="text-sm text-muted-foreground">No requests captured yet</p>
+            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 animate-fade-in">
               {requests.map((req) => (
                 <Card key={req.id}>
-                  <CardHeader 
-                    className="py-3 cursor-pointer"
+                  <div
+                    className="p-3 cursor-pointer flex items-center gap-3"
                     onClick={() => setExpandedRequest(expandedRequest === req.id ? null : req.id)}
                   >
-                    <div className="flex items-center gap-3">
-                      {expandedRequest === req.id ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${getMethodColor(req.method)}`}>
-                        {req.method}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(req.receivedAt)}
-                      </span>
-                      {req.sourceIp && (
-                        <span className="text-xs text-muted-foreground ml-auto">
-                          {req.sourceIp}
-                        </span>
-                      )}
-                    </div>
-                  </CardHeader>
+                    {expandedRequest === req.id ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${getMethodColor(req.method)}`}>{req.method}</span>
+                    <span className="text-[11px] text-muted-foreground">{formatDate(req.receivedAt)}</span>
+                    {req.sourceIp && <span className="text-[11px] text-muted-foreground ml-auto">{req.sourceIp}</span>}
+                  </div>
                   {expandedRequest === req.id && (
-                    <CardContent className="pt-0 space-y-4">
+                    <CardContent className="pt-0 pb-4 space-y-3">
                       {req.headers && (
                         <div>
-                          <h4 className="text-sm font-medium mb-2">Headers</h4>
-                          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto max-h-40">
-                            {JSON.stringify(parseHeaders(req.headers), null, 2)}
-                          </pre>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Headers</p>
+                          <pre className="bg-muted/50 border p-3 rounded-lg text-[11px] font-mono overflow-x-auto max-h-40">{JSON.stringify(parseHeaders(req.headers), null, 2)}</pre>
                         </div>
                       )}
                       {req.body && (
                         <div>
-                          <h4 className="text-sm font-medium mb-2">Body</h4>
-                          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto max-h-60">
-                            {(() => {
-                              try {
-                                return JSON.stringify(JSON.parse(req.body), null, 2);
-                              } catch {
-                                return req.body;
-                              }
-                            })()}
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Body</p>
+                          <pre className="bg-muted/50 border p-3 rounded-lg text-[11px] font-mono overflow-x-auto max-h-60">
+                            {(() => { try { return JSON.stringify(JSON.parse(req.body), null, 2); } catch { return req.body; } })()}
                           </pre>
                         </div>
                       )}
                       {req.queryString && (
                         <div>
-                          <h4 className="text-sm font-medium mb-2">Query String</h4>
-                          <code className="bg-muted px-2 py-1 rounded text-xs">
-                            ?{req.queryString}
-                          </code>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Query String</p>
+                          <code className="bg-muted/50 border px-2 py-1 rounded text-[11px] font-mono">?{req.queryString}</code>
                         </div>
                       )}
                     </CardContent>

@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -18,15 +20,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(
             MethodArgumentNotValidException ex) {
-        String errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(fe ->
+                fieldErrors.put(fe.getField(), fe.getDefaultMessage()));
+        
+        String summary = fieldErrors.entrySet().stream()
+                .map(e -> e.getKey() + ": " + e.getValue())
                 .collect(Collectors.joining(", "));
-        log.warn("Validation failed: {}", errors);
-        ErrorResponse error = new ErrorResponse(
-                "validation_error",
-                errors,
-                HttpStatus.BAD_REQUEST.value()
-        );
+        log.warn("Validation failed: {}", summary);
+        
+        ErrorResponse error = ErrorResponse.builder()
+                .error("validation_error")
+                .message("Invalid request parameters")
+                .status(HttpStatus.BAD_REQUEST.value())
+                .fieldErrors(fieldErrors)
+                .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 

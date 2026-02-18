@@ -7,9 +7,10 @@ from enum import Enum
 
 class DeliveryStatus(str, Enum):
     PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
-    DEAD_LETTER = "DEAD_LETTER"
+    DLQ = "DLQ"
 
 
 @dataclass
@@ -98,33 +99,68 @@ class EndpointUpdateParams:
 class Subscription:
     id: str
     endpoint_id: str
-    event_types: List[str]
+    event_type: str
     enabled: bool
     created_at: str
+    project_id: Optional[str] = None
+    ordering_enabled: bool = False
+    max_attempts: int = 7
+    timeout_seconds: int = 30
+    retry_delays: Optional[str] = None
+    payload_template: Optional[str] = None
+    custom_headers: Optional[str] = None
+    updated_at: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Subscription":
         return cls(
             id=data["id"],
             endpoint_id=data["endpointId"],
-            event_types=data["eventTypes"],
+            event_type=data["eventType"],
             enabled=data["enabled"],
             created_at=data["createdAt"],
+            project_id=data.get("projectId"),
+            ordering_enabled=data.get("orderingEnabled", False),
+            max_attempts=data.get("maxAttempts", 7),
+            timeout_seconds=data.get("timeoutSeconds", 30),
+            retry_delays=data.get("retryDelays"),
+            payload_template=data.get("payloadTemplate"),
+            custom_headers=data.get("customHeaders"),
+            updated_at=data.get("updatedAt"),
         )
 
 
 @dataclass
 class SubscriptionCreateParams:
     endpoint_id: str
-    event_types: List[str]
+    event_type: str
     enabled: bool = True
+    ordering_enabled: Optional[bool] = None
+    max_attempts: Optional[int] = None
+    timeout_seconds: Optional[int] = None
+    retry_delays: Optional[str] = None
+    payload_template: Optional[str] = None
+    custom_headers: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result: Dict[str, Any] = {
             "endpointId": self.endpoint_id,
-            "eventTypes": self.event_types,
+            "eventType": self.event_type,
             "enabled": self.enabled,
         }
+        if self.ordering_enabled is not None:
+            result["orderingEnabled"] = self.ordering_enabled
+        if self.max_attempts is not None:
+            result["maxAttempts"] = self.max_attempts
+        if self.timeout_seconds is not None:
+            result["timeoutSeconds"] = self.timeout_seconds
+        if self.retry_delays is not None:
+            result["retryDelays"] = self.retry_delays
+        if self.payload_template is not None:
+            result["payloadTemplate"] = self.payload_template
+        if self.custom_headers is not None:
+            result["customHeaders"] = self.custom_headers
+        return result
 
 
 @dataclass

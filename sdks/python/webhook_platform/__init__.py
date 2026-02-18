@@ -20,13 +20,14 @@ from .types import (
     Delivery,
     DeliveryAttempt,
     DeliveryListParams,
+    DeliveryStatus,
     PaginatedResponse,
     EndpointTestResult,
     RateLimitInfo,
     WebhookEvent,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     "WebhookPlatform",
     "WebhookPlatformError",
@@ -47,6 +48,7 @@ __all__ = [
     "Delivery",
     "DeliveryAttempt",
     "DeliveryListParams",
+    "DeliveryStatus",
     "PaginatedResponse",
     "EndpointTestResult",
     "RateLimitInfo",

@@ -26,10 +26,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-title tracking-tight">Settings</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Manage your account and organization settings
         </p>
       </div>

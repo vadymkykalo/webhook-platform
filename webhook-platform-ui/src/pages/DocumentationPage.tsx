@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -6,12 +6,18 @@ export default function DocumentationPage() {
   const [activeSection, setActiveSection] = useState('overview');
   const [activeLanguage, setActiveLanguage] = useState<'curl' | 'node' | 'python'>('curl');
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       <div className="flex">
-        <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
-        <main className="flex-1 pl-64">
-          <div className="max-w-4xl mx-auto px-8 py-12">
+        <Sidebar activeSection={activeSection} setActiveSection={(s) => { setActiveSection(s); setMobileNavOpen(false); }} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+        <main className="flex-1 lg:pl-64">
+          <div className="sticky top-0 z-30 lg:hidden h-14 border-b border-border/50 bg-card/80 glass flex items-center px-4 gap-3">
+            <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
+            <span className="text-sm font-semibold">Documentation</span>
+          </div>
+          <div className="max-w-4xl mx-auto px-6 lg:px-8 py-10">
             {activeSection === 'overview' && <Overview />}
             {activeSection === 'authentication' && <Authentication activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'getting-started' && <GettingStarted activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
@@ -28,7 +34,7 @@ export default function DocumentationPage() {
   );
 }
 
-function Sidebar({ activeSection, setActiveSection }: { activeSection: string; setActiveSection: (section: string) => void }) {
+function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }: { activeSection: string; setActiveSection: (section: string) => void; mobileOpen: boolean; onMobileClose: () => void }) {
   const sections = [
     { id: 'overview', label: 'Overview', icon: Book },
     { id: 'authentication', label: 'Authentication', icon: Key },
@@ -41,31 +47,59 @@ function Sidebar({ activeSection, setActiveSection }: { activeSection: string; s
     { id: 'errors', label: 'Errors & Rate Limits', icon: Code },
   ];
 
-  return (
-    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-gray-200 bg-white overflow-y-auto">
-      <div className="p-6">
-        <Link to="/" className="flex items-center space-x-2 mb-8">
-          <div className="text-xl font-bold text-gray-900">Webhook Platform</div>
+  const navContent = (
+    <div className="p-5">
+      <Link to="/" className="flex items-center gap-2.5 mb-8">
+        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+          <Webhook className="h-4 w-4 text-primary-foreground" />
+        </div>
+        <span className="text-base font-bold tracking-tight">Hookflow</span>
+      </Link>
+      <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">API Documentation</p>
+      <nav className="space-y-0.5">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            onClick={() => setActiveSection(section.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+              activeSection === section.id
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            <section.icon className={`h-4 w-4 ${activeSection === section.id ? 'text-primary' : ''}`} />
+            <span>{section.label}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="mt-8 pt-6 border-t border-border/50">
+        <Link to="/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
+          <ArrowRight className="h-4 w-4" /> Go to Dashboard
         </Link>
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">API Documentation</div>
-        <nav className="space-y-1">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                activeSection === section.id
-                  ? 'bg-gray-900 text-white'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <section.icon className="h-4 w-4" />
-              <span>{section.label}</span>
-            </button>
-          ))}
-        </nav>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:block fixed left-0 top-0 h-screen w-64 border-r border-border/50 bg-card/50 overflow-y-auto">
+        {navContent}
+      </aside>
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onMobileClose} />
+          <aside className="fixed inset-y-0 left-0 w-72 bg-card border-r shadow-elevated animate-slide-in-left">
+            <div className="flex items-center justify-between p-4 border-b border-border/50">
+              <span className="text-sm font-semibold">Navigation</span>
+              <button onClick={onMobileClose} className="p-1.5 rounded-lg hover:bg-accent"><X className="h-4 w-4" /></button>
+            </div>
+            {navContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -153,9 +187,9 @@ function Overview() {
 
 function ConceptCard({ title, description }: { title: string; description: string }) {
   return (
-    <div className="border-l-4 border-gray-900 pl-4">
-      <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-      <p className="text-gray-600 text-sm">{description}</p>
+    <div className="border-l-2 border-primary pl-4">
+      <h3 className="font-semibold text-sm mb-0.5">{title}</h3>
+      <p className="text-muted-foreground text-sm">{description}</p>
     </div>
   );
 }
@@ -546,8 +580,10 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
         response={`{
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "endpointId": "123e4567-e89b-12d3-a456-426614174001",
-  "eventTypes": ["order.completed", "order.cancelled"],
+  "eventType": "order.completed",
   "enabled": true,
+  "orderingEnabled": false,
+  "maxAttempts": 7,
   "createdAt": "2024-12-16T19:00:00Z"
 }`}
       />
@@ -564,7 +600,7 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
   {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "endpointId": "123e4567-e89b-12d3-a456-426614174001",
-    "eventTypes": ["order.completed"],
+    "eventType": "order.completed",
     "enabled": true
   }
 ]`}
@@ -581,8 +617,10 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
         response={`{
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "endpointId": "123e4567-e89b-12d3-a456-426614174001",
-  "eventTypes": ["order.completed", "order.cancelled"],
+  "eventType": "order.completed",
   "enabled": true,
+  "orderingEnabled": false,
+  "maxAttempts": 7,
   "createdAt": "2024-12-16T19:00:00Z"
 }`}
       />
@@ -591,13 +629,13 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
         method="PUT"
         path="/api/v1/projects/{projectId}/subscriptions/{id}"
         title="Update Subscription"
-        description="Updates subscription event types or enabled status."
+        description="Updates subscription configuration."
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="updateSubscription"
         response={`{
   "id": "123e4567-e89b-12d3-a456-426614174000",
-  "eventTypes": ["order.completed", "order.shipped"],
+  "eventType": "order.completed",
   "enabled": true
 }`}
       />
@@ -655,7 +693,7 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">Query Parameters</h3>
         <ParamTable params={[
-          { name: 'status', type: 'string', required: false, description: 'Filter by status: PENDING, SUCCESS, FAILED, DEAD_LETTER' },
+          { name: 'status', type: 'string', required: false, description: 'Filter by status: PENDING, PROCESSING, SUCCESS, FAILED, DLQ' },
           { name: 'endpointId', type: 'uuid', required: false, description: 'Filter by endpoint' },
           { name: 'fromDate', type: 'ISO 8601', required: false, description: 'Start date filter' },
           { name: 'toDate', type: 'ISO 8601', required: false, description: 'End date filter' },
@@ -824,6 +862,7 @@ function Errors() {
           { name: 'X-RateLimit-Limit', type: 'integer', required: true, description: 'Maximum requests per second' },
           { name: 'X-RateLimit-Remaining', type: 'integer', required: true, description: 'Remaining requests in current window' },
           { name: 'X-RateLimit-Reset', type: 'timestamp', required: true, description: 'Unix timestamp when limit resets' },
+          { name: 'Retry-After', type: 'integer', required: true, description: 'Seconds to wait before retrying (only on 429)' },
         ]} />
         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <div className="font-semibold text-amber-900 text-sm">Rate Limit Exceeded (429)</div>
@@ -851,7 +890,7 @@ function Errors() {
         </p>
         <ResponseBlock>
 {`{
-  "error": "Validation failed",
+  "error": "validation_error",
   "message": "Invalid request parameters",
   "status": 400,
   "fieldErrors": {
@@ -876,7 +915,6 @@ function Errors() {
           <ErrorCode code="409" title="Conflict" description="Resource already exists (idempotency)" />
           <ErrorCode code="429" title="Too Many Requests" description="Rate limit exceeded - check headers" />
           <ErrorCode code="500" title="Internal Server Error" description="Server error - contact support" />
-          <ErrorCode code="503" title="Service Unavailable" description="Service temporarily unavailable" />
         </div>
       </div>
     </div>
@@ -890,18 +928,18 @@ type LanguageTabsProps = {
 
 function HTTPMethod({ method, path }: { method: string; path: string }) {
   const methodColors: Record<string, string> = {
-    GET: 'bg-blue-100 text-blue-800',
-    POST: 'bg-green-100 text-green-800',
-    PUT: 'bg-amber-100 text-amber-800',
-    DELETE: 'bg-red-100 text-red-800',
+    GET: 'bg-blue-500/10 text-blue-600',
+    POST: 'bg-success/10 text-success',
+    PUT: 'bg-warning/10 text-warning',
+    DELETE: 'bg-destructive/10 text-destructive',
   };
 
   return (
-    <div className="flex items-center space-x-3 mb-4">
-      <span className={`px-3 py-1 rounded-md text-xs font-semibold ${methodColors[method]}`}>
+    <div className="flex items-center gap-3 mb-4">
+      <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide ${methodColors[method]}`}>
         {method}
       </span>
-      <code className="text-sm font-mono text-gray-900">{path}</code>
+      <code className="text-sm font-mono text-foreground">{path}</code>
     </div>
   );
 }
@@ -917,16 +955,16 @@ function CodeBlock({ language, setLanguage, children }: { language: 'curl' | 'no
 
   return (
     <div className="my-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex space-x-2">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex gap-1">
           {(['curl', 'node', 'python'] as const).map((lang) => (
             <button
               key={lang}
               onClick={() => setLanguage(lang)}
-              className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
                 language === lang
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
               }`}
             >
               {lang === 'curl' ? 'cURL' : lang === 'node' ? 'Node.js' : 'Python'}
@@ -935,13 +973,13 @@ function CodeBlock({ language, setLanguage, children }: { language: 'curl' | 'no
         </div>
         <button
           onClick={handleCopy}
-          className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          {copied ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+          {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
       </div>
-      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
-        <code className="text-sm">{children}</code>
+      <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto border border-white/5">
+        <code className="text-[13px] font-mono leading-relaxed">{children}</code>
       </pre>
     </div>
   );
@@ -950,9 +988,9 @@ function CodeBlock({ language, setLanguage, children }: { language: 'curl' | 'no
 function ResponseBlock({ children }: { children: string }) {
   return (
     <div className="my-4">
-      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Response</div>
-      <pre className="bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-lg overflow-x-auto">
-        <code className="text-sm">{children}</code>
+      <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Response</div>
+      <pre className="bg-muted/50 border text-foreground p-4 rounded-lg overflow-x-auto">
+        <code className="text-[13px] font-mono leading-relaxed">{children}</code>
       </pre>
     </div>
   );
@@ -961,28 +999,28 @@ function ResponseBlock({ children }: { children: string }) {
 function ParamTable({ params }: { params: Array<{ name: string; type: string; required: boolean; description: string }> }) {
   return (
     <div className="my-4 overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-border border rounded-lg overflow-hidden">
+        <thead className="bg-muted/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Parameter</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Required</th>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
+            <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Parameter</th>
+            <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Type</th>
+            <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Required</th>
+            <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Description</th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-card divide-y divide-border">
           {params.map((param, index) => (
-            <tr key={index} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-sm font-mono text-gray-900">{param.name}</td>
-              <td className="px-4 py-3 text-sm text-gray-600">{param.type}</td>
-              <td className="px-4 py-3 text-sm">
+            <tr key={index} className="hover:bg-muted/30 transition-colors">
+              <td className="px-4 py-2.5 text-[13px] font-mono font-medium">{param.name}</td>
+              <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{param.type}</td>
+              <td className="px-4 py-2.5">
                 {param.required ? (
-                  <span className="text-xs font-medium text-red-600">Required</span>
+                  <span className="text-[11px] font-medium text-destructive">Required</span>
                 ) : (
-                  <span className="text-xs font-medium text-gray-400">Optional</span>
+                  <span className="text-[11px] font-medium text-muted-foreground">Optional</span>
                 )}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">{param.description}</td>
+              <td className="px-4 py-2.5 text-[13px] text-muted-foreground">{param.description}</td>
             </tr>
           ))}
         </tbody>
@@ -993,12 +1031,12 @@ function ParamTable({ params }: { params: Array<{ name: string; type: string; re
 
 function StepSection({ number, title, children }: { number: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="border-l-4 border-gray-900 pl-6">
-      <div className="flex items-center space-x-3 mb-4">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-sm font-semibold">
+    <div className="border-l-2 border-primary/30 pl-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
           {number}
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+        <h2 className="text-xl font-bold">{title}</h2>
       </div>
       {children}
     </div>
@@ -1025,10 +1063,10 @@ function APIEndpoint({
   response: string;
 }) {
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">{title}</h2>
+    <div className="border-b border-border/50 pb-10 last:border-0">
+      <h2 className="text-xl font-bold mb-3">{title}</h2>
       <HTTPMethod method={method} path={path} />
-      <p className="text-gray-600 mb-6">{description}</p>
+      <p className="text-sm text-muted-foreground mb-5">{description}</p>
       <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
         {getCodeExample(example, activeLanguage)}
       </CodeBlock>
@@ -1038,12 +1076,13 @@ function APIEndpoint({
 }
 
 function ErrorCode({ code, title, description }: { code: string; title: string; description: string }) {
+  const codeColor = code.startsWith('2') ? 'bg-success/10 text-success' : code.startsWith('4') ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive';
   return (
-    <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-      <code className="flex-shrink-0 px-3 py-1 bg-gray-900 text-white text-sm font-mono rounded">{code}</code>
+    <div className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
+      <code className={`flex-shrink-0 px-2.5 py-1 text-[11px] font-mono font-bold rounded-md ${codeColor}`}>{code}</code>
       <div>
-        <div className="font-semibold text-gray-900">{title}</div>
-        <div className="text-sm text-gray-600">{description}</div>
+        <div className="text-sm font-semibold">{title}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
       </div>
     </div>
   );
@@ -1203,7 +1242,7 @@ endpoint = response.json()`,
   -H "Content-Type: application/json" \\
   -d '{
     "endpointId": "endpoint-uuid",
-    "eventTypes": ["order.completed", "order.cancelled"],
+    "eventType": "order.completed",
     "enabled": true
   }'`,
       node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions\`, {
@@ -1214,7 +1253,7 @@ endpoint = response.json()`,
   },
   body: JSON.stringify({
     endpointId: 'endpoint-uuid',
-    eventTypes: ['order.completed', 'order.cancelled'],
+    eventType: 'order.completed',
     enabled: true
   })
 });
@@ -1226,7 +1265,7 @@ response = requests.post(
     headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
     json={
         'endpointId': 'endpoint-uuid',
-        'eventTypes': ['order.completed', 'order.cancelled'],
+        'eventType': 'order.completed',
         'enabled': True
     }
 )
@@ -1497,18 +1536,18 @@ subscription = response.json()`,
       curl: `curl -X PUT http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
   -H "Content-Type: application/json" \\
-  -d '{"eventTypes": ["order.completed", "order.shipped"], "enabled": true}'`,
+  -d '{"eventType": "order.completed", "enabled": true}'`,
       node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
   method: 'PUT',
   headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ eventTypes: ['order.completed', 'order.shipped'], enabled: true })
+  body: JSON.stringify({ eventType: 'order.completed', enabled: true })
 });`,
       python: `import requests
 
 response = requests.put(
     f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
     headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    json={'eventTypes': ['order.completed', 'order.shipped'], 'enabled': True}
+    json={'eventType': 'order.completed', 'enabled': True}
 )`,
     },
     deleteSubscription: {

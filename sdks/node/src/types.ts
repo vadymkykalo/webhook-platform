@@ -18,12 +18,17 @@ export interface EventResponse {
 
 export interface Endpoint {
   id: string;
+  projectId: string;
   url: string;
   description?: string;
-  secret: string;
+  secret?: string;
   enabled: boolean;
   rateLimitPerSecond?: number;
+  allowedSourceIps?: string;
+  mtlsEnabled?: boolean;
+  verificationStatus?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface EndpointCreateParams {
@@ -42,31 +47,48 @@ export interface EndpointUpdateParams {
 
 export interface Subscription {
   id: string;
+  projectId: string;
   endpointId: string;
-  eventTypes: string[];
+  eventType: string;
   enabled: boolean;
+  orderingEnabled: boolean;
+  maxAttempts: number;
+  timeoutSeconds: number;
+  retryDelays?: string;
+  payloadTemplate?: string;
+  customHeaders?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface SubscriptionCreateParams {
   endpointId: string;
-  eventTypes: string[];
+  eventType: string;
   enabled?: boolean;
+  orderingEnabled?: boolean;
+  maxAttempts?: number;
+  timeoutSeconds?: number;
+  retryDelays?: string;
+  payloadTemplate?: string;
+  customHeaders?: string;
 }
 
 export interface Delivery {
   id: string;
   eventId: string;
   endpointId: string;
+  subscriptionId: string;
   status: DeliveryStatus;
   attemptCount: number;
   maxAttempts: number;
-  nextAttemptAt?: string;
-  createdAt: string;
+  nextRetryAt?: string;
+  lastAttemptAt?: string;
   succeededAt?: string;
+  failedAt?: string;
+  createdAt: string;
 }
 
-export type DeliveryStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'DEAD_LETTER';
+export type DeliveryStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'DLQ';
 
 export interface DeliveryAttempt {
   id: string;

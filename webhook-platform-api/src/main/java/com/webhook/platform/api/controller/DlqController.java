@@ -36,9 +36,9 @@ public class DlqController {
     @GetMapping
     public ResponseEntity<Page<DlqItemResponse>> listDlqItems(
             @PathVariable("projectId") UUID projectId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) UUID endpointId,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size,
+            @RequestParam(name = "endpointId", required = false) UUID endpointId,
             Authentication authentication) {
         JwtAuthenticationToken jwtAuth = validateAuth(authentication);
         dlqService.validateProjectOwnership(projectId, jwtAuth.getOrganizationId());

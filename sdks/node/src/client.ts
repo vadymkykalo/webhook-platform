@@ -27,7 +27,7 @@ import {
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.0.0';
+const SDK_VERSION = '1.1.0';
 
 export class WebhookPlatform {
   private readonly apiKey: string;

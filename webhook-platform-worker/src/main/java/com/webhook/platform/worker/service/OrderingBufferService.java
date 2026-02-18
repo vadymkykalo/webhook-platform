@@ -110,7 +110,11 @@ public class OrderingBufferService {
         buffer.add(sequenceNumber, deliveryId.toString());
         buffer.expire(bufferTtl);
         
-        log.debug("Buffered delivery {} (seq={}) for endpoint {}", deliveryId, sequenceNumber, endpointId);
+        int bufferSize = buffer.size();
+        log.debug("Buffered delivery {} (seq={}) for endpoint {}, buffer size: {}", deliveryId, sequenceNumber, endpointId, bufferSize);
+        if (bufferSize > 100) {
+            log.warn("Ordering buffer growing large for endpoint {}: {} deliveries buffered", endpointId, bufferSize);
+        }
         meterRegistry.counter("webhook_ordering_buffered_total").increment();
         meterRegistry.gauge("webhook_ordering_buffer_size", buffer, RScoredSortedSet::size);
     }
