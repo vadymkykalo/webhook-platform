@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, ChevronRight, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { endpointsApi } from '../api/endpoints.api';
 import { projectsApi } from '../api/projects.api';
@@ -9,7 +9,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,6 @@ import MtlsConfigModal from '../components/MtlsConfigModal';
 
 export default function EndpointsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -246,31 +245,27 @@ export default function EndpointsPage() {
     switch (status) {
       case 'VERIFIED':
         return (
-          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-            <CheckCircle className="mr-1 h-3 w-3" />
-            Verified
+          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+            <CheckCircle className="h-3 w-3" /> Verified
           </span>
         );
       case 'FAILED':
         return (
-          <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
-            <AlertCircle className="mr-1 h-3 w-3" />
-            Failed
+          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+            <AlertCircle className="h-3 w-3" /> Failed
           </span>
         );
       case 'SKIPPED':
         return (
-          <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700">
-            <ShieldOff className="mr-1 h-3 w-3" />
-            Skipped
+          <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
+            <ShieldOff className="h-3 w-3" /> Skipped
           </span>
         );
       case 'PENDING':
       default:
         return (
-          <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-700">
-            <Clock className="mr-1 h-3 w-3" />
-            Pending
+          <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
+            <Clock className="h-3 w-3" /> Pending
           </span>
         );
     }
@@ -289,15 +284,19 @@ export default function EndpointsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="space-y-4">
-          <div className="h-8 w-96 bg-muted animate-pulse rounded" />
-          <div className="h-4 w-64 bg-muted animate-pulse rounded" />
-          <div className="grid gap-4 mt-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
-            ))}
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+        <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-32 bg-muted animate-pulse rounded-lg" />
+            <div className="h-4 w-64 bg-muted animate-pulse rounded" />
           </div>
+          <div className="h-10 w-36 bg-muted animate-pulse rounded-lg" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-muted animate-pulse rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -305,8 +304,11 @@ export default function EndpointsPage() {
 
   if (!project) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="text-center py-16">
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <Webhook className="h-7 w-7 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">Project not found</p>
         </div>
       </div>
@@ -314,195 +316,116 @@ export default function EndpointsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex items-center text-sm text-muted-foreground mb-6">
-        <button
-          onClick={() => navigate('/projects')}
-          className="hover:text-foreground transition-colors"
-        >
-          Projects
-        </button>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground font-medium">{project.name}</span>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground">Endpoints</span>
-      </div>
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Endpoints</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage webhook endpoints for {project.name}
+          <h1 className="text-title tracking-tight">Endpoints</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage webhook endpoints for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} size="lg">
-          <Plus className="mr-2 h-4 w-4" />
-          New Endpoint
+        <Button onClick={() => setShowCreateDialog(true)}>
+          <Plus className="h-4 w-4" /> New Endpoint
         </Button>
       </div>
 
       {endpoints.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-primary/10 p-4 mb-4">
-              <Webhook className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">No endpoints yet</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-sm">
-              Create your first endpoint to start receiving webhooks
-            </p>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First Endpoint
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+            <Webhook className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No endpoints yet</h3>
+          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
+            Create your first endpoint to start receiving webhooks
+          </p>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" /> Create endpoint
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-3 animate-fade-in">
           {endpoints.map((endpoint) => (
-            <Card key={endpoint.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl flex items-center gap-3">
-                      <Webhook className="h-5 w-5 text-primary" />
-                      <div className="flex items-center gap-2">
-                        {endpoint.url}
+            <Card key={endpoint.id} className="overflow-hidden">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      endpoint.enabled ? 'bg-success/10' : 'bg-muted'
+                    }`}>
+                      <Webhook className={`h-4 w-4 ${endpoint.enabled ? 'text-success' : 'text-muted-foreground'}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold truncate">{endpoint.url}</p>
                         {endpoint.enabled ? (
-                          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
-                            <Power className="mr-1 h-3 w-3" />
-                            Enabled
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
+                            <Power className="h-3 w-3" /> Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                            <PowerOff className="mr-1 h-3 w-3" />
-                            Disabled
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            <PowerOff className="h-3 w-3" /> Disabled
                           </span>
                         )}
                         {endpoint.mtlsEnabled && (
-                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
-                            <ShieldCheck className="mr-1 h-3 w-3" />
-                            mTLS
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                            <ShieldCheck className="h-3 w-3" /> mTLS
                           </span>
                         )}
                         {getVerificationBadge(endpoint.verificationStatus)}
                       </div>
-                    </CardTitle>
-                    {endpoint.description && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {endpoint.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleTest(endpoint.id)}
-                      title="Test Endpoint"
-                      disabled={testing && testId === endpoint.id}
-                    >
-                      {testing && testId === endpoint.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Zap className="h-4 w-4 text-purple-600" />
+                      {endpoint.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{endpoint.description}</p>
                       )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setToggleId(endpoint.id)}
-                      title={endpoint.enabled ? 'Disable' : 'Enable'}
-                    >
-                      {endpoint.enabled ? (
-                        <PowerOff className="h-4 w-4 text-orange-600" />
-                      ) : (
-                        <Power className="h-4 w-4 text-green-600" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRotateId(endpoint.id)}
-                      title="Rotate Secret"
-                    >
-                      <RefreshCw className="h-4 w-4 text-blue-600" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setMtlsEndpoint(endpoint)}
-                      title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}
-                    >
-                      <ShieldCheck className={`h-4 w-4 ${endpoint.mtlsEnabled ? 'text-blue-600' : 'text-gray-400'}`} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteId(endpoint.id)}
-                      title="Delete Endpoint"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center text-muted-foreground">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Created on {formatDate(endpoint.createdAt)}
-                  </div>
-                  {endpoint.rateLimitPerSecond && (
-                    <div className="flex items-center text-muted-foreground">
-                      <span className="font-medium text-foreground mr-2">
-                        Rate Limit:
-                      </span>
-                      {endpoint.rateLimitPerSecond} req/s
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(endpoint.createdAt)}</span>
+                        {endpoint.rateLimitPerSecond && (
+                          <span>{endpoint.rateLimitPerSecond} req/s</span>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title="Test" disabled={testing && testId === endpoint.id}>
+                      {testing && testId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? 'Disable' : 'Enable'}>
+                      {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title="Rotate Secret">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}>
+                      <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </Button>
+                    {endpoint.verificationStatus !== 'VERIFIED' && (
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title="Verify endpoint" disabled={verifyingId === endpoint.id}>
+                        {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-                
+
                 {(endpoint.verificationStatus === 'PENDING' || endpoint.verificationStatus === 'FAILED') && (
-                  <div className="mt-4 p-3 bg-muted/50 rounded-lg border">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 mr-4">
-                        <p className="text-sm font-medium">
-                          {endpoint.verificationStatus === 'PENDING' 
-                            ? 'Endpoint verification required' 
-                            : 'Verification failed - retry?'}
+                  <div className="mt-4 p-3 bg-accent/50 rounded-lg border border-primary/10">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold">
+                          {endpoint.verificationStatus === 'PENDING' ? 'Endpoint verification required' : 'Verification failed — retry?'}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Your endpoint must respond to: <code className="bg-muted px-1 rounded">POST {"{"}"type": "webhook.verification", "challenge": "..."{"}"}.</code>
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Return the <code className="bg-muted px-1 rounded">challenge</code> value in your response body.
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Respond to <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">POST</code> with the challenge value.
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSkipVerification(endpoint.id)}
-                          disabled={skippingId === endpoint.id}
-                        >
-                          {skippingId === endpoint.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            'Skip'
-                          )}
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => handleSkipVerification(endpoint.id)} disabled={skippingId === endpoint.id}>
+                          {skippingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Skip'}
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleVerify(endpoint.id)}
-                          disabled={verifyingId === endpoint.id}
-                        >
-                          {verifyingId === endpoint.id ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                          )}
-                          Verify Now
+                        <Button size="sm" onClick={() => handleVerify(endpoint.id)} disabled={verifyingId === endpoint.id}>
+                          {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                          Verify
                         </Button>
                       </div>
                     </div>

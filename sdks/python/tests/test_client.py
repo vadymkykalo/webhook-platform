@@ -192,25 +192,25 @@ class TestTypeClasses:
         data = {
             "id": "sub_123",
             "endpointId": "ep_456",
-            "eventTypes": ["order.completed", "order.cancelled"],
+            "eventType": "order.completed",
             "enabled": True,
             "createdAt": "2024-01-01T00:00:00Z",
         }
         subscription = Subscription.from_dict(data)
         assert subscription.id == "sub_123"
         assert subscription.endpoint_id == "ep_456"
-        assert subscription.event_types == ["order.completed", "order.cancelled"]
+        assert subscription.event_type == "order.completed"
 
     def test_subscription_create_params_to_dict(self):
         """SubscriptionCreateParams should convert to dict correctly."""
         params = SubscriptionCreateParams(
             endpoint_id="ep_123",
-            event_types=["order.completed"],
+            event_type="order.completed",
             enabled=True,
         )
         data = params.to_dict()
         assert data["endpointId"] == "ep_123"
-        assert data["eventTypes"] == ["order.completed"]
+        assert data["eventType"] == "order.completed"
         assert data["enabled"] is True
 
     def test_delivery_from_dict(self):

@@ -99,8 +99,7 @@ public class EndpointService {
 
     public List<EndpointResponse> listEndpoints(UUID projectId, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
-        return endpointRepository.findAll().stream()
-                .filter(e -> e.getProjectId().equals(projectId))
+        return endpointRepository.findByProjectId(projectId).stream()
                 .filter(e -> e.getDeletedAt() == null)
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

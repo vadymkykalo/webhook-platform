@@ -81,7 +81,7 @@ public class Endpoint {
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 32)
     @Builder.Default
-    private VerificationStatus verificationStatus = VerificationStatus.PENDING;
+    private VerificationStatus verificationStatus = VerificationStatus.SKIPPED;
 
     @Column(name = "verification_token", length = 64)
     private String verificationToken;

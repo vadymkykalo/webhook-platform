@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import { dlqApi, DlqItemResponse, DlqStatsResponse } from '../api/dlq.api';
 import { endpointsApi } from '../api/endpoints.api';
 import type { ProjectResponse, EndpointResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Badge } from '../components/ui/badge';
 import { Select } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import {
@@ -25,7 +24,6 @@ import {
 
 export default function DlqPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [items, setItems] = useState<DlqItemResponse[]>([]);
   const [stats, setStats] = useState<DlqStatsResponse | null>(null);
@@ -131,19 +129,29 @@ export default function DlqPage() {
 
   if (loading && !project) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="space-y-4">
-          <div className="h-8 w-96 bg-muted animate-pulse rounded" />
-          <div className="h-4 w-64 bg-muted animate-pulse rounded" />
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-44 bg-muted animate-pulse rounded-lg" />
+            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-28 bg-muted animate-pulse rounded-lg" />
         </div>
+        <div className="grid grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
+        </div>
+        <div className="h-[300px] bg-muted animate-pulse rounded-xl" />
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="text-center py-16">
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <AlertTriangle className="h-7 w-7 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">Project not found</p>
         </div>
       </div>
@@ -151,173 +159,112 @@ export default function DlqPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex items-center text-sm text-muted-foreground mb-6">
-        <button onClick={() => navigate('/projects')} className="hover:text-foreground transition-colors">
-          Projects
-        </button>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground font-medium">{project.name}</span>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground">Dead Letter Queue</span>
-      </div>
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <AlertTriangle className="h-8 w-8 text-destructive" />
-            Dead Letter Queue
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Failed deliveries that exceeded max retry attempts
+          <h1 className="text-title tracking-tight">Dead Letter Queue</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Failed deliveries for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
         <div className="flex gap-2">
           {selectedIds.size > 0 && (
-            <Button onClick={handleRetrySelected} disabled={retrying}>
-              {retrying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Retry Selected ({selectedIds.size})
+            <Button onClick={handleRetrySelected} disabled={retrying} size="sm">
+              {retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Retry ({selectedIds.size})
             </Button>
           )}
-          <Button variant="destructive" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Purge All
+          <Button variant="destructive" size="sm" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
+            <Trash2 className="h-3.5 w-3.5" /> Purge All
           </Button>
         </div>
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Items</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.totalItems}</div>
+            <CardContent className="p-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Items</p>
+              <p className="text-2xl font-bold text-destructive mt-1">{stats.totalItems}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Last 24 Hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.last24Hours}</div>
+            <CardContent className="p-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Last 24 Hours</p>
+              <p className="text-2xl font-bold mt-1">{stats.last24Hours}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Last 7 Days</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.last7Days}</div>
+            <CardContent className="p-4">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Last 7 Days</p>
+              <p className="text-2xl font-bold mt-1">{stats.last7Days}</p>
             </CardContent>
           </Card>
         </div>
       )}
 
       <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="space-y-2 flex-1">
-              <Label htmlFor="endpointFilter">Filter by Endpoint</Label>
-              <Select
-                id="endpointFilter"
-                value={endpointFilter}
-                onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}
-              >
+        <CardContent className="p-4">
+          <div className="flex items-end gap-3">
+            <div className="space-y-1.5 flex-1">
+              <Label htmlFor="endpointFilter" className="text-xs">Filter by Endpoint</Label>
+              <Select id="endpointFilter" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
                 <option value="">All endpoints</option>
-                {endpoints.map(endpoint => (
-                  <option key={endpoint.id} value={endpoint.id}>
-                    {endpoint.url}
-                  </option>
-                ))}
+                {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
               </Select>
             </div>
-            <Button variant="outline" onClick={loadData} className="mt-6">
-              <RefreshCw className="h-4 w-4" />
+            <Button variant="outline" size="icon-sm" onClick={loadData} title="Refresh">
+              <RefreshCw className="h-3.5 w-3.5" />
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {items.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-green-100 p-4 mb-4">
-              <CheckSquare className="h-10 w-10 text-green-600" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">No items in DLQ</h3>
-            <p className="text-muted-foreground text-center">
-              All deliveries are being processed successfully
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
+          <div className="h-16 w-16 rounded-2xl bg-success/10 flex items-center justify-center mb-6">
+            <CheckSquare className="h-8 w-8 text-success" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No items in DLQ</h3>
+          <p className="text-sm text-muted-foreground text-center">
+            All deliveries are being processed successfully
+          </p>
+        </div>
       ) : (
-        <>
-          <Card>
+        <div className="animate-fade-in">
+          <Card className="overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
+                  <TableHead className="w-10">
                     <button onClick={toggleSelectAll} className="p-1">
-                      {selectedIds.size === items.length ? (
-                        <CheckSquare className="h-4 w-4" />
-                      ) : (
-                        <Square className="h-4 w-4" />
-                      )}
+                      {selectedIds.size === items.length ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground" />}
                     </button>
                   </TableHead>
-                  <TableHead>Event Type</TableHead>
-                  <TableHead>Endpoint</TableHead>
-                  <TableHead>Attempts</TableHead>
-                  <TableHead>Last Error</TableHead>
-                  <TableHead>Failed At</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="text-xs">Event Type</TableHead>
+                  <TableHead className="text-xs">Endpoint</TableHead>
+                  <TableHead className="text-xs">Attempts</TableHead>
+                  <TableHead className="text-xs">Last Error</TableHead>
+                  <TableHead className="text-xs">Failed At</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
-                  <TableRow key={item.deliveryId}>
+                  <TableRow key={item.deliveryId} className="hover:bg-muted/30">
                     <TableCell>
                       <button onClick={() => toggleSelect(item.deliveryId)} className="p-1">
-                        {selectedIds.has(item.deliveryId) ? (
-                          <CheckSquare className="h-4 w-4 text-primary" />
-                        ) : (
-                          <Square className="h-4 w-4" />
-                        )}
+                        {selectedIds.has(item.deliveryId) ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground" />}
                       </button>
                     </TableCell>
+                    <TableCell><code className="text-[13px] font-mono">{item.eventType}</code></TableCell>
+                    <TableCell><span className="font-mono text-[13px] truncate max-w-[180px] block">{item.endpointUrl}</span></TableCell>
+                    <TableCell><span className="text-sm font-medium">{item.attemptCount}<span className="text-muted-foreground">/{item.maxAttempts}</span></span></TableCell>
+                    <TableCell><span className="text-[13px] text-destructive truncate max-w-[180px] block">{item.lastError || 'Unknown error'}</span></TableCell>
+                    <TableCell><span className="text-[13px] text-muted-foreground">{new Date(item.failedAt).toLocaleString()}</span></TableCell>
                     <TableCell>
-                      <code className="text-sm font-mono">{item.eventType}</code>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm truncate max-w-[200px] block">
-                        {item.endpointUrl}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {item.attemptCount}/{item.maxAttempts}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-destructive truncate max-w-[200px] block">
-                        {item.lastError || 'Unknown error'}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(item.failedAt).toLocaleString()}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRetrySingle(item.deliveryId)}
-                        disabled={retrying}
-                      >
-                        <RefreshCw className="h-4 w-4" />
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title="Retry">
+                        <RefreshCw className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -327,27 +274,15 @@ export default function DlqPage() {
           </Card>
 
           {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Previous
-              </Button>
-              <span className="flex items-center px-4">
-                Page {page + 1} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-              >
-                Next
-              </Button>
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-xs text-muted-foreground">Page {page + 1} of {totalPages}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
+              </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>

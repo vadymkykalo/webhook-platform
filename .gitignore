@@ -60,5 +60,22 @@ application-local.yml
 application-dev.yml
 application-prod.yml
 
+# === PHP SDK ===
+sdks/php/vendor/
+sdks/php/.phpunit.cache/
+sdks/php/composer.lock
+
+# === Python SDK ===
+sdks/python/__pycache__/
+sdks/python/**/__pycache__/
+sdks/python/*.egg-info/
+sdks/python/**/*.egg-info/
+sdks/python/.pytest_cache/
+sdks/python/**/.mypy_cache/
+
+# === Node SDK (dist already covered above) ===
+sdks/node/dist/
+sdks/node/coverage/
+
 # === Backups ===
 backups/

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
@@ -28,7 +28,6 @@ import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
 
 export default function SubscriptionsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionResponse[]>([]);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
@@ -141,19 +140,26 @@ export default function SubscriptionsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="space-y-4">
-          <div className="h-8 w-96 bg-muted animate-pulse rounded" />
-          <div className="h-4 w-64 bg-muted animate-pulse rounded" />
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-36 bg-muted animate-pulse rounded-lg" />
+            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-40 bg-muted animate-pulse rounded-lg" />
         </div>
+        <div className="h-[400px] bg-muted animate-pulse rounded-xl" />
       </div>
     );
   }
 
   if (!project) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="text-center py-16">
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <LinkIcon className="h-7 w-7 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">Project not found</p>
         </div>
       </div>
@@ -161,67 +167,36 @@ export default function SubscriptionsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex items-center text-sm text-muted-foreground mb-6">
-        <button
-          onClick={() => navigate('/projects')}
-          className="hover:text-foreground transition-colors"
-        >
-          Projects
-        </button>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground font-medium">{project.name}</span>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground">Subscriptions</span>
-      </div>
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Subscriptions</h1>
-          <p className="text-muted-foreground mt-1">
-            Route event types to webhook endpoints
+          <h1 className="text-title tracking-tight">Subscriptions</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Route event types to endpoints for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} size="lg">
-          <Plus className="mr-2 h-4 w-4" />
-          Create Subscription
+        <Button onClick={() => setShowCreateModal(true)}>
+          <Plus className="h-4 w-4" /> Create Subscription
         </Button>
       </div>
 
       <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="eventTypeFilter">Event Type</Label>
-              <Input
-                id="eventTypeFilter"
-                placeholder="Filter by event type..."
-                value={eventTypeFilter}
-                onChange={(e) => setEventTypeFilter(e.target.value)}
-              />
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="eventTypeFilter" className="text-xs">Event Type</Label>
+              <Input id="eventTypeFilter" placeholder="Filter by event type..." value={eventTypeFilter} onChange={(e) => setEventTypeFilter(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="endpointFilter">Endpoint</Label>
-              <Select
-                id="endpointFilter"
-                value={endpointFilter}
-                onChange={(e) => setEndpointFilter(e.target.value)}
-              >
+            <div className="space-y-1.5">
+              <Label htmlFor="endpointFilter" className="text-xs">Endpoint</Label>
+              <Select id="endpointFilter" value={endpointFilter} onChange={(e) => setEndpointFilter(e.target.value)}>
                 <option value="">All endpoints</option>
-                {endpoints.map(endpoint => (
-                  <option key={endpoint.id} value={endpoint.id}>
-                    {endpoint.url}
-                  </option>
-                ))}
+                {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="statusFilter">Status</Label>
-              <Select
-                id="statusFilter"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
+            <div className="space-y-1.5">
+              <Label htmlFor="statusFilter" className="text-xs">Status</Label>
+              <Select id="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">All statuses</option>
                 <option value="enabled">Enabled</option>
                 <option value="disabled">Disabled</option>
@@ -232,102 +207,70 @@ export default function SubscriptionsPage() {
       </Card>
 
       {filteredSubscriptions.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-primary/10 p-4 mb-4">
-              <LinkIcon className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">
-              {subscriptions.length === 0 ? 'No subscriptions yet' : 'No matching subscriptions'}
-            </h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-sm">
-              {subscriptions.length === 0
-                ? 'Create a subscription to route events to your endpoints'
-                : 'Try adjusting your filters to see more results'}
-            </p>
-            {subscriptions.length === 0 && (
-              <Button onClick={() => setShowCreateModal(true)} size="lg">
-                <Plus className="mr-2 h-4 w-4" />
-                Create Your First Subscription
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+            <LinkIcon className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">
+            {subscriptions.length === 0 ? 'No subscriptions yet' : 'No matching subscriptions'}
+          </h3>
+          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
+            {subscriptions.length === 0
+              ? 'Create a subscription to route events to your endpoints'
+              : 'Try adjusting your filters'}
+          </p>
+          {subscriptions.length === 0 && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4" /> Create Subscription
+            </Button>
+          )}
+        </div>
       ) : (
-        <Card>
+        <Card className="overflow-hidden animate-fade-in">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Event Type</TableHead>
-                <TableHead>Endpoint</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Ordering</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead className="text-xs">Event Type</TableHead>
+                <TableHead className="text-xs">Endpoint</TableHead>
+                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Ordering</TableHead>
+                <TableHead className="text-xs">Created</TableHead>
+                <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSubscriptions.map((subscription) => (
-                <TableRow key={subscription.id}>
+                <TableRow key={subscription.id} className="hover:bg-muted/30">
                   <TableCell>
-                    <code className="text-sm font-mono font-medium">
-                      {subscription.eventType}
-                    </code>
+                    <code className="text-[13px] font-mono font-medium">{subscription.eventType}</code>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm">
-                        {getEndpointName(subscription.endpointId)}
-                      </span>
+                    <span className="font-mono text-[13px] truncate max-w-[200px] block">{getEndpointName(subscription.endpointId)}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={subscription.enabled} onCheckedChange={() => handleToggleEnabled(subscription)} />
+                      <Badge variant={subscription.enabled ? 'success' : 'secondary'}>{subscription.enabled ? 'On' : 'Off'}</Badge>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Switch
-                        checked={subscription.enabled}
-                        onCheckedChange={() => handleToggleEnabled(subscription)}
-                      />
-                      <Badge variant={subscription.enabled ? 'success' : 'secondary'}>
-                        {subscription.enabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={subscription.orderingEnabled}
-                        onCheckedChange={() => handleToggleOrdering(subscription)}
-                      />
+                      <Switch checked={subscription.orderingEnabled} onCheckedChange={() => handleToggleOrdering(subscription)} />
                       {subscription.orderingEnabled && (
-                        <Badge variant="outline" className="gap-1">
-                          <ListOrdered className="h-3 w-3" />
-                          FIFO
-                        </Badge>
+                        <Badge variant="outline" className="gap-1 text-[10px]"><ListOrdered className="h-3 w-3" />FIFO</Badge>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(subscription.createdAt).toLocaleDateString()}
-                    </span>
+                    <span className="text-[13px] text-muted-foreground">{new Date(subscription.createdAt).toLocaleDateString()}</span>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(subscription)}
-                        title="Edit subscription"
-                      >
-                        <Settings className="h-4 w-4" />
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title="Edit">
+                        <Settings className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteId(subscription.id)}
-                        title="Delete subscription"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                      <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </TableCell>

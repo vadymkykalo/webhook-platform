@@ -22,6 +22,7 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,7 +33,9 @@ public class MtlsWebClientFactory {
 
     private final String encryptionKey;
     private final WebClient.Builder webClientBuilder;
-    private final Map<UUID, WebClient> mtlsClientCache = new ConcurrentHashMap<>();
+    private final Map<UUID, CachedClient> mtlsClientCache = new ConcurrentHashMap<>();
+
+    private record CachedClient(WebClient webClient, Instant updatedAt) {}
 
     public MtlsWebClientFactory(
             @Value("${webhook.encryption-key}") String encryptionKey,
@@ -46,14 +49,30 @@ public class MtlsWebClientFactory {
             return webClientBuilder.build();
         }
 
-        return mtlsClientCache.computeIfAbsent(endpoint.getId(), id -> {
-            try {
-                return createMtlsWebClient(endpoint);
-            } catch (Exception e) {
-                log.error("Failed to create mTLS WebClient for endpoint {}: {}", id, e.getMessage());
-                throw new RuntimeException("Failed to create mTLS client", e);
-            }
-        });
+        CachedClient cached = mtlsClientCache.get(endpoint.getId());
+        Instant endpointUpdatedAt = endpoint.getUpdatedAt();
+        
+        // Invalidate cache if endpoint was updated after cache entry was created
+        if (cached != null && endpointUpdatedAt != null 
+                && cached.updatedAt() != null 
+                && endpointUpdatedAt.isAfter(cached.updatedAt())) {
+            log.info("mTLS config changed for endpoint {}, invalidating cached client", endpoint.getId());
+            mtlsClientCache.remove(endpoint.getId());
+            cached = null;
+        }
+        
+        if (cached != null) {
+            return cached.webClient();
+        }
+        
+        try {
+            WebClient client = createMtlsWebClient(endpoint);
+            mtlsClientCache.put(endpoint.getId(), new CachedClient(client, endpointUpdatedAt));
+            return client;
+        } catch (Exception e) {
+            log.error("Failed to create mTLS WebClient for endpoint {}: {}", endpoint.getId(), e.getMessage());
+            throw new RuntimeException("Failed to create mTLS client", e);
+        }
     }
 
     public void invalidateCache(UUID endpointId) {

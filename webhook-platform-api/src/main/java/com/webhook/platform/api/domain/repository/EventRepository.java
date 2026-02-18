@@ -24,6 +24,21 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     @Query(value = """
         SELECT 
+            CAST(e.id AS text),
+            e.event_type,
+            e.created_at,
+            COUNT(d.id) as delivery_count
+        FROM events e
+        LEFT JOIN deliveries d ON d.event_id = e.id
+        WHERE e.project_id = :projectId
+        GROUP BY e.id, e.event_type, e.created_at
+        ORDER BY e.created_at DESC
+        LIMIT 10
+        """, nativeQuery = true)
+    List<Object[]> findRecentEventsWithDeliveryCount(@Param("projectId") UUID projectId);
+
+    @Query(value = """
+        SELECT 
             e.event_type as event_type,
             COUNT(*) as event_count,
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as success_count

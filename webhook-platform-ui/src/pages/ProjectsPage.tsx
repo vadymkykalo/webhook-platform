@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Link as LinkIcon, Key, FlaskConical } from 'lucide-react';
+import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse } from '../types/api.types';
@@ -104,140 +104,100 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="space-y-4">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-          <div className="h-4 w-96 bg-muted animate-pulse rounded" />
-          <div className="grid gap-4 mt-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
-            ))}
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-32 bg-muted animate-pulse rounded-lg" />
+            <div className="h-4 w-64 bg-muted animate-pulse rounded" />
           </div>
+          <div className="h-10 w-32 bg-muted animate-pulse rounded-lg" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-48 bg-muted animate-pulse rounded-xl" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-title tracking-tight">Projects</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage your webhook projects and integrations
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} size="lg">
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setShowCreateDialog(true)}>
+          <Plus className="h-4 w-4" />
           New Project
         </Button>
       </div>
 
       {projects.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-primary/10 p-4 mb-4">
-              <FolderKanban className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-sm">
-              Get started by creating your first project to manage webhooks and integrations
-            </p>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First Project
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+            <FolderKanban className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
+            Get started by creating your first project to manage webhooks and integrations
+          </p>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" />
+            Create your first project
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
           {projects.map((project) => (
-            <Card key={project.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={project.id}
+              className="group cursor-pointer hover:border-primary/20 transition-all"
+              onClick={() => navigate(`/projects/${project.id}/endpoints`)}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <FolderKanban className="h-5 w-5 text-primary" />
-                      {project.name}
-                    </CardTitle>
-                    {project.description && (
-                      <CardDescription className="mt-2">
-                        {project.description}
-                      </CardDescription>
-                    )}
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/15 transition-colors">
+                    <FolderKanban className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}/api-keys`)}
-                    >
-                      <Key className="mr-2 h-4 w-4" />
-                      API Keys
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopyId(project.id)} title="Copy ID">
+                      <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}/endpoints`)}
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      Endpoints
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}/subscriptions`)}
-                    >
-                      <LinkIcon className="mr-2 h-4 w-4" />
-                      Subscriptions
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}/events`)}
-                    >
-                      <Radio className="mr-2 h-4 w-4" />
-                      Events
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}/deliveries`)}
-                    >
-                      <Send className="mr-2 h-4 w-4" />
-                      Deliveries
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/projects/${project.id}/test-endpoints`)}
-                    >
-                      <FlaskConical className="mr-2 h-4 w-4" />
-                      Test
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleCopyId(project.id)}
-                      title="Copy Project ID"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteId(project.id)}
-                      title="Delete Project"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                    <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
+                <CardTitle className="text-base">{project.name}</CardTitle>
+                {project.description && (
+                  <CardDescription className="text-xs line-clamp-2 mt-1">{project.description}</CardDescription>
+                )}
               </CardHeader>
               <CardContent>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Created on {formatDate(project.createdAt)}
+                <div className="flex items-center text-[11px] text-muted-foreground mb-4">
+                  <Calendar className="mr-1.5 h-3 w-3" />
+                  Created {formatDate(project.createdAt)}
+                </div>
+                <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  {[
+                    { label: 'Endpoints', path: `/projects/${project.id}/endpoints`, icon: Settings },
+                    { label: 'Events', path: `/projects/${project.id}/events`, icon: Radio },
+                    { label: 'Keys', path: `/projects/${project.id}/api-keys`, icon: Key },
+                    { label: 'Deliveries', path: `/projects/${project.id}/deliveries`, icon: Send },
+                  ].map((action) => (
+                    <button
+                      key={action.label}
+                      onClick={() => navigate(action.path)}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md bg-muted hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <action.icon className="h-3 w-3" />
+                      {action.label}
+                    </button>
+                  ))}
                 </div>
               </CardContent>
             </Card>

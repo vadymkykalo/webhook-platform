@@ -57,9 +57,12 @@ public class Endpoint {
     @Column(name = "ca_cert", columnDefinition = "TEXT")
     private String caCert;
 
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 32)
-    private VerificationStatus verificationStatus = VerificationStatus.PENDING;
+    private VerificationStatus verificationStatus = VerificationStatus.SKIPPED;
 
     public enum VerificationStatus {
         PENDING,

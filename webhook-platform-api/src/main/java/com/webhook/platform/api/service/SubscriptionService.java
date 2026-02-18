@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
@@ -18,12 +19,15 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final ProjectRepository projectRepository;
+    private final ObjectMapper objectMapper;
 
     public SubscriptionService(
             SubscriptionRepository subscriptionRepository,
-            ProjectRepository projectRepository) {
+            ProjectRepository projectRepository,
+            ObjectMapper objectMapper) {
         this.subscriptionRepository = subscriptionRepository;
         this.projectRepository = projectRepository;
+        this.objectMapper = objectMapper;
     }
 
     private void validateProjectOwnership(UUID projectId, UUID organizationId) {
@@ -37,6 +41,7 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
+        validatePayloadTemplate(request.getPayloadTemplate());
         Subscription subscription = Subscription.builder()
                 .projectId(projectId)
                 .endpointId(request.getEndpointId())
@@ -63,8 +68,7 @@ public class SubscriptionService {
 
     public List<SubscriptionResponse> listSubscriptions(UUID projectId, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
-        return subscriptionRepository.findAll().stream()
-                .filter(s -> s.getProjectId().equals(projectId))
+        return subscriptionRepository.findByProjectId(projectId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -97,6 +101,7 @@ public class SubscriptionService {
             subscription.setRetryDelays(request.getRetryDelays());
         }
         if (request.getPayloadTemplate() != null) {
+            validatePayloadTemplate(request.getPayloadTemplate());
             subscription.setPayloadTemplate(request.getPayloadTemplate());
         }
         if (request.getCustomHeaders() != null) {
@@ -113,6 +118,17 @@ public class SubscriptionService {
                 .orElseThrow(() -> new RuntimeException("Subscription not found"));
         validateProjectOwnership(subscription.getProjectId(), organizationId);
         subscriptionRepository.deleteById(id);
+    }
+
+    private void validatePayloadTemplate(String template) {
+        if (template == null || template.isBlank()) {
+            return;
+        }
+        try {
+            objectMapper.readTree(template);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid payload template: not valid JSON - " + e.getMessage());
+        }
     }
 
     private SubscriptionResponse mapToResponse(Subscription subscription) {
