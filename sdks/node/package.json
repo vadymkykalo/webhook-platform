@@ -20,7 +20,7 @@
     "events",
     "delivery"
   ],
-  "author": "Webhook Platform",
+  "author": "Vadym Kykalo <vadymkykalo@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",

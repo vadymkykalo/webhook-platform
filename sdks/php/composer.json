@@ -7,8 +7,8 @@
     "keywords": ["webhook", "webhooks", "api", "events", "delivery"],
     "authors": [
         {
-            "name": "Webhook Platform",
-            "email": "hello@webhook-platform.com"
+            "name": "Vadym Kykalo",
+            "email": "vadymkykalo@gmail.com"
         }
     ],
     "require": {
