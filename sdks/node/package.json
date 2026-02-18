@@ -1,6 +1,6 @@
 {
   "name": "@webhook-platform/node",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Official Node.js SDK for Webhook Platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,7 +20,7 @@
     "events",
     "delivery"
   ],
-  "author": "Webhook Platform",
+  "author": "Vadym Kykalo <vadymkykalo@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
