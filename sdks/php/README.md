@@ -278,6 +278,21 @@ $client = new WebhookPlatform(
 );
 ```
 
+## Development
+
+### Running Tests
+
+**Local (requires PHP 8.1+):**
+```bash
+composer install
+composer test
+```
+
+**Docker:**
+```bash
+docker run --rm -v $(pwd):/app -w /app composer:2 sh -c "composer install && composer test"
+```
+
 ## License
 
 MIT

@@ -249,6 +249,21 @@ from webhook_platform import (
 )
 ```
 
+## Development
+
+### Running Tests
+
+**Local (requires Python 3.8+):**
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+**Docker:**
+```bash
+docker run --rm -v $(pwd):/app -w /app python:3.11-slim sh -c "pip install -e '.[dev]' && pytest"
+```
+
 ## License
 
 MIT

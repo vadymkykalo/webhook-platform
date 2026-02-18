@@ -226,6 +226,27 @@ import type {
 } from '@webhook-platform/node';
 ```
 
+## Development
+
+### Running Tests
+
+**Local (requires Node.js 16+):**
+```bash
+npm install
+npm test
+```
+
+**Docker:**
+```bash
+docker run --rm -v $(pwd):/app -w /app node:20-alpine sh -c "npm install && npm test"
+```
+
+### Building
+
+```bash
+npm run build
+```
+
 ## License
 
 MIT

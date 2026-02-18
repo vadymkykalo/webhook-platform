@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+tests/__init__.py
+tests/test_client.py
+tests/test_webhooks.py
+webhook_platform/__init__.py
+webhook_platform/client.py
+webhook_platform/errors.py
+webhook_platform/types.py
+webhook_platform/webhooks.py
+webhook_platform.egg-info/PKG-INFO
+webhook_platform.egg-info/SOURCES.txt
+webhook_platform.egg-info/dependency_links.txt
+webhook_platform.egg-info/requires.txt
+webhook_platform.egg-info/top_level.txt

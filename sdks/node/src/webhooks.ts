@@ -77,12 +77,10 @@ export function verifySignature(
     .update(signedPayload)
     .digest('hex');
 
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(sig),
-    Buffer.from(expectedSignature)
-  );
+  const sigBuffer = Buffer.from(sig);
+  const expectedBuffer = Buffer.from(expectedSignature);
 
-  if (!isValid) {
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
     throw new WebhookPlatformError('Invalid signature', 400, 'invalid_signature');
   }
 
