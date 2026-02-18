@@ -16,6 +16,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -53,9 +56,9 @@ public class EventService {
 
     public Page<EventResponse> listEvents(UUID projectId, UUID organizationId, Pageable pageable) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         
         Page<Event> events = eventRepository.findByProjectId(projectId, pageable);
@@ -64,15 +67,15 @@ public class EventService {
 
     public EventResponse getEvent(UUID projectId, UUID eventId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         
         Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new RuntimeException("Event not found"));
+                .orElseThrow(() -> new NotFoundException("Event not found"));
         if (!event.getProjectId().equals(projectId)) {
-            throw new RuntimeException("Event does not belong to this project");
+            throw new ForbiddenException("Event does not belong to this project");
         }
         
         return mapToResponse(event);
@@ -81,9 +84,9 @@ public class EventService {
     @Transactional
     public EventResponse sendTestEvent(UUID projectId, EventIngestRequest request, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
 
         Event event = createEvent(projectId, request);

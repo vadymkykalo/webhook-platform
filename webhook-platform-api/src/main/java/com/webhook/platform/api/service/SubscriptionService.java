@@ -10,6 +10,9 @@ import com.webhook.platform.api.dto.SubscriptionResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,9 +35,9 @@ public class SubscriptionService {
 
     private void validateProjectOwnership(UUID projectId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
     }
 
@@ -61,7 +64,7 @@ public class SubscriptionService {
 
     public SubscriptionResponse getSubscription(UUID id, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+                .orElseThrow(() -> new NotFoundException("Subscription not found"));
         validateProjectOwnership(subscription.getProjectId(), organizationId);
         return mapToResponse(subscription);
     }
@@ -76,7 +79,7 @@ public class SubscriptionService {
     @Transactional
     public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+                .orElseThrow(() -> new NotFoundException("Subscription not found"));
         validateProjectOwnership(subscription.getProjectId(), organizationId);
         
         if (request.getEndpointId() != null) {
@@ -115,7 +118,7 @@ public class SubscriptionService {
     @Transactional
     public void deleteSubscription(UUID id, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+                .orElseThrow(() -> new NotFoundException("Subscription not found"));
         validateProjectOwnership(subscription.getProjectId(), organizationId);
         subscriptionRepository.deleteById(id);
     }
@@ -127,7 +130,7 @@ public class SubscriptionService {
         try {
             objectMapper.readTree(template);
         } catch (Exception e) {
-            throw new RuntimeException("Invalid payload template: not valid JSON - " + e.getMessage());
+            throw new IllegalArgumentException("Invalid payload template: not valid JSON - " + e.getMessage());
         }
     }
 

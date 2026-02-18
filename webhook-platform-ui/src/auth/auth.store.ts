@@ -4,7 +4,8 @@ import type { CurrentUserResponse } from '../types/api.types';
 export interface AuthState {
   user: CurrentUserResponse | null;
   token: string | null;
-  login: (token: string, user: CurrentUserResponse) => void;
+  refreshToken: string | null;
+  login: (token: string, refreshToken: string, user: CurrentUserResponse) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }

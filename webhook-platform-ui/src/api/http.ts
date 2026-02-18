@@ -1,10 +1,17 @@
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+type OnRefreshedCallback = (token: string) => void;
+type OnLogoutCallback = () => void;
 
 class HttpClient {
   private client: AxiosInstance;
   private token: string | null = null;
+  private refreshToken: string | null = null;
+  private isRefreshing = false;
+  private refreshSubscribers: OnRefreshedCallback[] = [];
+  private onLogout: OnLogoutCallback | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -20,6 +27,67 @@ class HttpClient {
       }
       return config;
     });
+
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          this.refreshToken &&
+          !originalRequest.url?.includes('/api/v1/auth/refresh') &&
+          !originalRequest.url?.includes('/api/v1/auth/login')
+        ) {
+          if (this.isRefreshing) {
+            return new Promise((resolve) => {
+              this.refreshSubscribers.push((newToken: string) => {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                resolve(this.client(originalRequest));
+              });
+            });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const response = await this.client.post('/api/v1/auth/refresh', {
+              refreshToken: this.refreshToken,
+            });
+
+            const { accessToken, refreshToken: newRefreshToken } = response.data;
+
+            this.token = accessToken;
+            this.refreshToken = newRefreshToken;
+            localStorage.setItem('auth_token', accessToken);
+            localStorage.setItem('refresh_token', newRefreshToken);
+
+            this.refreshSubscribers.forEach((cb) => cb(accessToken));
+            this.refreshSubscribers = [];
+
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            return this.client(originalRequest);
+          } catch (refreshError) {
+            this.refreshSubscribers = [];
+            this.token = null;
+            this.refreshToken = null;
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+            localStorage.removeItem('refresh_token');
+            if (this.onLogout) {
+              this.onLogout();
+            }
+            return Promise.reject(refreshError);
+          } finally {
+            this.isRefreshing = false;
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
   }
 
   setToken(token: string | null) {
@@ -28,6 +96,18 @@ class HttpClient {
 
   getToken(): string | null {
     return this.token;
+  }
+
+  setRefreshToken(refreshToken: string | null) {
+    this.refreshToken = refreshToken;
+  }
+
+  getRefreshToken(): string | null {
+    return this.refreshToken;
+  }
+
+  setOnLogout(callback: OnLogoutCallback | null) {
+    this.onLogout = callback;
   }
 
   async get<T>(url: string): Promise<T> {

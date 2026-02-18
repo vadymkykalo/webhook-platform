@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.ProjectService;
@@ -37,7 +38,7 @@ public class ProjectController {
             @Valid @RequestBody ProjectRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -52,7 +53,7 @@ public class ProjectController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -64,7 +65,7 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -79,7 +80,7 @@ public class ProjectController {
             @Valid @RequestBody ProjectRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -95,7 +96,7 @@ public class ProjectController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;

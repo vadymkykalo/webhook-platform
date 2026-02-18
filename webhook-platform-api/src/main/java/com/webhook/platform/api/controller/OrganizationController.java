@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.OrganizationResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.OrganizationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +32,7 @@ public class OrganizationController {
     @GetMapping
     public ResponseEntity<List<OrganizationResponse>> getUserOrganizations(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
@@ -45,7 +46,7 @@ public class OrganizationController {
             @PathVariable("orgId") UUID orgId,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;

@@ -88,7 +88,6 @@ public class WebhookDeliveryService {
         this.payloadTransformService = payloadTransformService;
     }
 
-    @Transactional
     public void processDelivery(DeliveryMessage message) {
         Optional<Delivery> deliveryOpt = deliveryRepository.findById(message.getDeliveryId());
         if (deliveryOpt.isEmpty()) {
@@ -221,32 +220,33 @@ public class WebhookDeliveryService {
         // Add custom headers if configured
         addCustomHeaders(requestSpec, delivery.getCustomHeaders());
         
-        requestSpec.bodyValue(body)
-                .exchangeToMono(response -> {
-                    int status = response.statusCode().value();
-                    String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
-                    
-                    return response.bodyToMono(String.class)
-                            .defaultIfEmpty("")
-                            .map(responseBody -> {
-                                sample.stop(Timer.builder("webhook_delivery_latency_ms")
-                                    .tag("status_code", String.valueOf(status))
-                                    .register(meterRegistry));
-                                handleResponse(delivery, status, responseBody, responseHeaders,
-                                        requestHeaders, body, 
-                                        (int) (System.currentTimeMillis() - startTime));
-                                return status;
-                            });
-                })
-                .timeout(Duration.ofSeconds(delivery.getTimeoutSeconds() != null ? delivery.getTimeoutSeconds() : 30))
-                .doFinally(signal -> concurrencyControlService.release(endpoint.getId()))
-                .onErrorResume(e -> {
-                    log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
-                    handleError(delivery, e, requestHeaders, body, 
-                            (int) (System.currentTimeMillis() - startTime));
-                    return Mono.just(0);
-                })
-                .subscribe();
+        try {
+            requestSpec.bodyValue(body)
+                    .exchangeToMono(response -> {
+                        int status = response.statusCode().value();
+                        String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
+
+                        return response.bodyToMono(String.class)
+                                .defaultIfEmpty("")
+                                .map(responseBody -> {
+                                    sample.stop(Timer.builder("webhook_delivery_latency_ms")
+                                        .tag("status_code", String.valueOf(status))
+                                        .register(meterRegistry));
+                                    handleResponse(delivery, status, responseBody, responseHeaders,
+                                            requestHeaders, body,
+                                            (int) (System.currentTimeMillis() - startTime));
+                                    return status;
+                                });
+                    })
+                    .timeout(Duration.ofSeconds(delivery.getTimeoutSeconds() != null ? delivery.getTimeoutSeconds() : 30))
+                    .block();
+        } catch (Exception e) {
+            log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
+            handleError(delivery, e, requestHeaders, body,
+                    (int) (System.currentTimeMillis() - startTime));
+        } finally {
+            concurrencyControlService.release(endpoint.getId());
+        }
     }
 
     private void handleResponse(Delivery delivery, int statusCode, String responseBody, 
@@ -479,8 +479,8 @@ public class WebhookDeliveryService {
                     encryptionKey
             );
         } catch (Exception e) {
-            log.error("Failed to decrypt secret for endpoint {}", endpoint.getId());
-            return "fallback_secret";
+            throw new RuntimeException("Failed to decrypt secret for endpoint " + endpoint.getId() + 
+                    ". Check WEBHOOK_ENCRYPTION_KEY configuration.", e);
         }
     }
 

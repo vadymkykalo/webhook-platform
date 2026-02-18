@@ -62,40 +62,45 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorizedException(
+            UnauthorizedException ex, WebRequest request) {
+        log.warn("Unauthorized: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                "unauthorized",
+                ex.getMessage(),
+                HttpStatus.UNAUTHORIZED.value()
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbiddenException(
+            ForbiddenException ex, WebRequest request) {
+        log.warn("Forbidden: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                "forbidden",
+                ex.getMessage(),
+                HttpStatus.FORBIDDEN.value()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFoundException(
+            NotFoundException ex, WebRequest request) {
+        log.warn("Not found: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                "not_found",
+                ex.getMessage(),
+                HttpStatus.NOT_FOUND.value()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(
             RuntimeException ex, WebRequest request) {
-        
-        if (ex.getMessage() != null && ex.getMessage().contains("Authentication required")) {
-            log.error("Unauthorized: {}", ex.getMessage());
-            ErrorResponse error = new ErrorResponse(
-                    "unauthorized",
-                    "Authentication required",
-                    HttpStatus.UNAUTHORIZED.value()
-            );
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
-        }
-        
-        if (ex.getMessage() != null && ex.getMessage().contains("Insufficient permissions")) {
-            log.error("Forbidden: {}", ex.getMessage());
-            ErrorResponse error = new ErrorResponse(
-                    "forbidden",
-                    "Insufficient permissions",
-                    HttpStatus.FORBIDDEN.value()
-            );
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
-        }
-        
-        if (ex.getMessage() != null && ex.getMessage().contains("not found")) {
-            log.error("Not found: {}", ex.getMessage());
-            ErrorResponse error = new ErrorResponse(
-                    "not_found",
-                    ex.getMessage(),
-                    HttpStatus.NOT_FOUND.value()
-            );
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-        }
-        
         log.error("Internal server error: {}", ex.getMessage(), ex);
         ErrorResponse error = new ErrorResponse(
                 "internal_error",

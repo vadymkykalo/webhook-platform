@@ -32,8 +32,9 @@ export default function RegisterPage() {
         organizationName,
       });
       http.setToken(authResponse.accessToken);
+      http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
-      login(authResponse.accessToken, user);
+      login(authResponse.accessToken, authResponse.refreshToken, user);
       toast.success('Account created successfully!');
       navigate('/projects');
     } catch (err: any) {

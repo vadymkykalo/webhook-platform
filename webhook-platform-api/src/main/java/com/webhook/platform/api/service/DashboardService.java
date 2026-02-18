@@ -10,6 +10,9 @@ import com.webhook.platform.api.dto.DashboardStatsResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,10 +38,10 @@ public class DashboardService {
     
     public DashboardStatsResponse getProjectStats(UUID projectId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
         
         // Calculate delivery stats using DB-level counts

@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import com.webhook.platform.api.exception.ForbiddenException;
+import com.webhook.platform.api.exception.NotFoundException;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -54,9 +57,9 @@ public class EndpointService {
 
     private void validateProjectOwnership(UUID projectId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
-            throw new RuntimeException("Access denied");
+            throw new ForbiddenException("Access denied");
         }
     }
 
@@ -92,7 +95,7 @@ public class EndpointService {
 
     public EndpointResponse getEndpoint(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         return mapToResponse(endpoint);
     }
@@ -108,7 +111,7 @@ public class EndpointService {
     @Transactional
     public EndpointResponse updateEndpoint(UUID id, EndpointRequest request, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
@@ -140,7 +143,7 @@ public class EndpointService {
     @Transactional
     public void deleteEndpoint(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         endpoint.setDeletedAt(Instant.now());
@@ -150,7 +153,7 @@ public class EndpointService {
     @Transactional
     public EndpointResponse rotateSecret(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         String newSecret = CryptoUtils.generateSecureToken(32);
@@ -165,7 +168,7 @@ public class EndpointService {
 
     public EndpointTestResponse testEndpoint(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         if (!endpoint.getEnabled()) {
@@ -277,11 +280,11 @@ public class EndpointService {
     public EndpointResponse configureMtls(UUID projectId, UUID endpointId, 
             com.webhook.platform.api.dto.MtlsConfigRequest request, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(endpointId)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
 
         if (!endpoint.getProjectId().equals(projectId)) {
-            throw new RuntimeException("Endpoint not found in project");
+            throw new NotFoundException("Endpoint not found in project");
         }
 
         CryptoUtils.EncryptedData encryptedCert = CryptoUtils.encryptSecret(request.getClientCert(), encryptionKey);
@@ -303,11 +306,11 @@ public class EndpointService {
     @Transactional
     public EndpointResponse disableMtls(UUID projectId, UUID endpointId, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(endpointId)
-                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
 
         if (!endpoint.getProjectId().equals(projectId)) {
-            throw new RuntimeException("Endpoint not found in project");
+            throw new NotFoundException("Endpoint not found in project");
         }
 
         endpoint.setMtlsEnabled(false);

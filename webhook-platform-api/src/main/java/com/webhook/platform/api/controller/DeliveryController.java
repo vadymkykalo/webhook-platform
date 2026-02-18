@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
 import com.webhook.platform.api.service.DeliveryService;
@@ -44,7 +45,7 @@ public class DeliveryController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         DeliveryResponse response = deliveryService.getDelivery(id, jwtAuth.getOrganizationId());
@@ -58,7 +59,7 @@ public class DeliveryController {
             Pageable pageable,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         Page<DeliveryResponse> response = deliveryService.listDeliveries(eventId, jwtAuth.getOrganizationId(), pageable);
@@ -76,7 +77,7 @@ public class DeliveryController {
             Pageable pageable,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         
@@ -95,7 +96,7 @@ public class DeliveryController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
@@ -109,7 +110,7 @@ public class DeliveryController {
             @PathVariable("id") UUID id,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, jwtAuth.getOrganizationId());
@@ -123,7 +124,7 @@ public class DeliveryController {
             @Valid @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new RuntimeException("Authentication required");
+            throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
         RbacUtil.requireWriteAccess(jwtAuth.getRole());
