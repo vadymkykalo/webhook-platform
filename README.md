@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Java](https://img.shields.io/badge/Java-17-orange)]()
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-green)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)]()
@@ -21,6 +22,17 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 **UI**: http://localhost:5173 | **API Docs**: http://localhost:8080/swagger-ui.html
 
 Self-hosted alternative to Svix/Hookdeck. Send events, get reliable delivery with retries, HMAC signatures, and full observability. Production-ready in 5 minutes.
+
+## Requirements
+
+| Dependency | Version | Notes |
+|------------|---------|-------|
+| **Docker** | 20.10+ | Container runtime |
+| **Docker Compose** | v2.0+ (or v1.29+) | Service orchestration |
+| **make** | any | Build automation |
+| **git** | any | Clone repository |
+
+> **Note**: All other dependencies (Java, PostgreSQL, Kafka, Redis) run inside Docker containers — no local installation needed.
 
 ## Architecture
 
