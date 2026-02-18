@@ -3,7 +3,7 @@
     "description": "Official PHP SDK for Webhook Platform",
     "type": "library",
     "license": "MIT",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "keywords": ["webhook", "webhooks", "api", "events", "delivery"],
     "authors": [
         {

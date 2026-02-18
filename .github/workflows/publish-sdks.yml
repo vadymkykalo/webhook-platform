@@ -108,7 +108,7 @@ jobs:
         run: composer install --prefer-dist --no-progress
 
       - name: Run tests
-        run: composer test
+        run: vendor/bin/phpunit --no-coverage
 
       # Packagist auto-updates from GitHub via webhook
       # Just trigger the update API
