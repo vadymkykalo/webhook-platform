@@ -32,7 +32,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             TO_CHAR(DATE_TRUNC('hour', d.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as success,
-            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DEAD_LETTER')) as failed
+            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed
         FROM deliveries d
         JOIN events e ON d.event_id = e.id
         WHERE e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
@@ -49,7 +49,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             TO_CHAR(DATE_TRUNC('day', d.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ts,
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as success,
-            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DEAD_LETTER')) as failed
+            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed
         FROM deliveries d
         JOIN events e ON d.event_id = e.id
         WHERE e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
@@ -68,7 +68,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             e.enabled,
             COUNT(d.*) as total_deliveries,
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as successful,
-            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DEAD_LETTER')) as failed,
+            COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed,
             AVG(da.duration_ms) as avg_latency,
             PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY da.duration_ms) as p95_latency,
             MAX(d.created_at) as last_delivery
@@ -99,6 +99,23 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     long countDlqByProjectIdSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
 
     List<Delivery> findByIdInAndStatus(List<UUID> ids, DeliveryStatus status);
+
+    @Query(value = """
+        SELECT CAST(d.status AS text), COUNT(*)
+        FROM deliveries d
+        JOIN events e ON d.event_id = e.id
+        WHERE e.project_id = :projectId
+        GROUP BY d.status
+        """, nativeQuery = true)
+    List<Object[]> countByProjectIdGroupByStatus(@Param("projectId") UUID projectId);
+
+    @Query(value = """
+        SELECT d.endpoint_id, CAST(d.status AS text), COUNT(*)
+        FROM deliveries d
+        WHERE d.endpoint_id IN :endpointIds
+        GROUP BY d.endpoint_id, d.status
+        """, nativeQuery = true)
+    List<Object[]> countByEndpointIdsGroupByEndpointAndStatus(@Param("endpointIds") List<UUID> endpointIds);
 
     @Modifying
     @Query("DELETE FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")

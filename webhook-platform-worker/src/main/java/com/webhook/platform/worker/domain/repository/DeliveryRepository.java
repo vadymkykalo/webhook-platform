@@ -38,10 +38,4 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("endpointId") UUID endpointId,
             @Param("sequenceNumber") Long sequenceNumber
     );
-
-    @Query("SELECT d FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.orderingEnabled = true")
-    List<Delivery> findByEndpointIdAndSequenceNumber(
-            @Param("endpointId") UUID endpointId,
-            @Param("sequenceNumber") Long sequenceNumber
-    );
 }

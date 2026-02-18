@@ -28,7 +28,7 @@ from .errors import (
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 30
-SDK_VERSION = "1.0.0"
+SDK_VERSION = "1.1.0"
 
 
 class WebhookPlatform:
@@ -261,15 +261,33 @@ class Subscriptions:
         self,
         project_id: str,
         subscription_id: str,
-        event_types: Optional[List[str]] = None,
+        event_type: Optional[str] = None,
         enabled: Optional[bool] = None,
+        ordering_enabled: Optional[bool] = None,
+        max_attempts: Optional[int] = None,
+        timeout_seconds: Optional[int] = None,
+        retry_delays: Optional[str] = None,
+        payload_template: Optional[str] = None,
+        custom_headers: Optional[str] = None,
     ) -> Subscription:
         """Update subscription."""
         body: Dict[str, Any] = {}
-        if event_types is not None:
-            body["eventTypes"] = event_types
+        if event_type is not None:
+            body["eventType"] = event_type
         if enabled is not None:
             body["enabled"] = enabled
+        if ordering_enabled is not None:
+            body["orderingEnabled"] = ordering_enabled
+        if max_attempts is not None:
+            body["maxAttempts"] = max_attempts
+        if timeout_seconds is not None:
+            body["timeoutSeconds"] = timeout_seconds
+        if retry_delays is not None:
+            body["retryDelays"] = retry_delays
+        if payload_template is not None:
+            body["payloadTemplate"] = payload_template
+        if custom_headers is not None:
+            body["customHeaders"] = custom_headers
 
         data = self._client._request(
             "PUT",

@@ -11,6 +11,8 @@ use WebhookPlatform\Api\Deliveries;
 
 class WebhookPlatform
 {
+    private const SDK_VERSION = '1.1.0';
+
     private string $apiKey;
     private string $baseUrl;
     private int $timeout;
@@ -55,7 +57,7 @@ class WebhookPlatform
         $headers = [
             'X-API-Key: ' . $this->apiKey,
             'Content-Type: application/json',
-            'User-Agent: webhook-platform-php/1.0.0',
+            'User-Agent: webhook-platform-php/' . self::SDK_VERSION,
         ];
 
         if ($idempotencyKey) {

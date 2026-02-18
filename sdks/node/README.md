@@ -77,10 +77,10 @@ console.log(`Test ${result.success ? 'passed' : 'failed'}: ${result.latencyMs}ms
 ### Subscriptions
 
 ```typescript
-// Subscribe endpoint to event types
+// Subscribe endpoint to an event type
 const subscription = await client.subscriptions.create(projectId, {
   endpointId: endpoint.id,
-  eventTypes: ['order.completed', 'order.cancelled'],
+  eventType: 'order.completed',
   enabled: true,
 });
 
@@ -89,7 +89,8 @@ const subscriptions = await client.subscriptions.list(projectId);
 
 // Update subscription
 await client.subscriptions.update(projectId, subscriptionId, {
-  eventTypes: ['order.*'],
+  eventType: 'order.shipped',
+  enabled: true,
 });
 
 // Delete subscription

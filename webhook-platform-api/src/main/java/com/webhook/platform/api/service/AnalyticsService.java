@@ -183,7 +183,9 @@ public class AnalyticsService {
                             : 0;
 
                     String status;
-                    if (successRate >= 99) {
+                    if (totalDeliveries == 0) {
+                        status = "HEALTHY";
+                    } else if (successRate >= 99) {
                         status = "HEALTHY";
                     } else if (successRate >= 95) {
                         status = "DEGRADED";

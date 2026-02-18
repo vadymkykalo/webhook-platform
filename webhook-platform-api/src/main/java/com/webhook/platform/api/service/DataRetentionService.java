@@ -78,6 +78,18 @@ public class DataRetentionService {
         } else {
             log.debug("Outbox cleanup: no old messages to delete");
         }
+        
+        // Also clean up permanently failed messages (exhausted retries)
+        int failedDeleted = 0;
+        do {
+            deletedInBatch = outboxMessageRepository.deleteOldPublishedMessages(
+                    "FAILED", cutoffTime, batchSize);
+            failedDeleted += deletedInBatch;
+        } while (deletedInBatch >= batchSize);
+        
+        if (failedDeleted > 0) {
+            log.info("Cleanup completed: deleted {} permanently failed outbox messages", failedDeleted);
+        }
     }
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Key, Calendar, Loader2, Trash2, Copy, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiKeysApi, ApiKeyResponse } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
@@ -8,7 +8,7 @@ import type { ProjectResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +30,6 @@ import {
 
 export default function ApiKeysPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,15 +142,18 @@ export default function ApiKeysPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="space-y-4">
-          <div className="h-8 w-96 bg-muted animate-pulse rounded" />
-          <div className="h-4 w-64 bg-muted animate-pulse rounded" />
-          <div className="grid gap-4 mt-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
-            ))}
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-28 bg-muted animate-pulse rounded-lg" />
+            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
           </div>
+          <div className="h-10 w-36 bg-muted animate-pulse rounded-lg" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -159,8 +161,11 @@ export default function ApiKeysPage() {
 
   if (!project) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="text-center py-16">
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <Key className="h-7 w-7 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">Project not found</p>
         </div>
       </div>
@@ -168,87 +173,54 @@ export default function ApiKeysPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex items-center text-sm text-muted-foreground mb-6">
-        <button
-          onClick={() => navigate('/projects')}
-          className="hover:text-foreground transition-colors"
-        >
-          Projects
-        </button>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground font-medium">{project.name}</span>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground">API Keys</span>
-      </div>
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage API keys for sending events to {project.name}
+          <h1 className="text-title tracking-tight">API Keys</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage API keys for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} size="lg">
-          <Plus className="mr-2 h-4 w-4" />
-          Create API Key
+        <Button onClick={() => setShowCreateDialog(true)}>
+          <Plus className="h-4 w-4" /> Create API Key
         </Button>
       </div>
 
       {apiKeys.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-primary/10 p-4 mb-4">
-              <Key className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">No API keys yet</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-sm">
-              Create your first API key to start sending events to this project
-            </p>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Your First API Key
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+            <Key className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No API keys yet</h3>
+          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
+            Create your first API key to start sending events
+          </p>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" /> Create API Key
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-3 animate-fade-in">
           {apiKeys.map((apiKey) => (
-            <Card key={apiKey.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl flex items-center gap-3">
-                      <Key className="h-5 w-5 text-primary" />
-                      <div className="flex flex-col gap-1">
-                        <span>{apiKey.name}</span>
-                        <code className="text-sm font-mono text-muted-foreground font-normal">
-                          {apiKey.keyPrefix}...
-                        </code>
+            <Card key={apiKey.id}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Key className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{apiKey.name}</p>
+                      <code className="text-[13px] font-mono text-muted-foreground">{apiKey.keyPrefix}...</code>
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(apiKey.createdAt)}</span>
+                        <span>Last used: {formatRelativeTime(apiKey.lastUsedAt)}</span>
                       </div>
-                    </CardTitle>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRevokeId(apiKey.id)}
-                      title="Revoke API Key"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center text-muted-foreground">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Created {formatDate(apiKey.createdAt)}
-                  </div>
-                  <div className="flex items-center text-muted-foreground">
-                    Last used: {formatRelativeTime(apiKey.lastUsedAt)}
-                  </div>
+                  <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title="Revoke" className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>

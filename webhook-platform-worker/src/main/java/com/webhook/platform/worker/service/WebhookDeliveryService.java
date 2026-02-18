@@ -294,6 +294,13 @@ public class WebhookDeliveryService {
             log.warn("Max attempts reached for delivery {}, moving to DLQ", delivery.getId());
             delivery.setStatus(Delivery.DeliveryStatus.DLQ);
             delivery.setFailedAt(Instant.now());
+            
+            // For ordered deliveries, advance sequence and release buffered deliveries
+            if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+                orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
+                orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+                triggerBufferedDeliveries(delivery.getEndpointId());
+            }
         } else {
             delivery.setStatus(Delivery.DeliveryStatus.PENDING);
             delivery.setNextRetryAt(calculateNextRetry(delivery.getAttemptCount(), delivery.getRetryDelays()));
@@ -411,6 +418,13 @@ public class WebhookDeliveryService {
         delivery.setUpdatedAt(Instant.now());
         deliveryRepository.save(delivery);
         log.error("Delivery {} failed: {}", delivery.getId(), reason);
+        
+        // For ordered deliveries, advance sequence and release buffered deliveries
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
+            orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+            triggerBufferedDeliveries(delivery.getEndpointId());
+        }
     }
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 

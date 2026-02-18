@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { deliveriesApi } from '../api/deliveries.api';
 import { projectsApi } from '../api/projects.api';
@@ -39,7 +39,6 @@ const DATE_RANGE_OPTIONS = [
 
 export default function DeliveriesPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryResponse[]>([]);
@@ -210,8 +209,11 @@ export default function DeliveriesPage() {
 
   if (!project) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="text-center py-16">
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
+            <Send className="h-7 w-7 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">Project not found</p>
         </div>
       </div>
@@ -219,98 +221,46 @@ export default function DeliveriesPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex items-center text-sm text-muted-foreground mb-6">
-        <button
-          onClick={() => navigate('/projects')}
-          className="hover:text-foreground transition-colors"
-        >
-          Projects
-        </button>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground font-medium">{project.name}</span>
-        <ChevronRight className="h-4 w-4 mx-2" />
-        <span className="text-foreground">Deliveries</span>
-      </div>
-
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Deliveries</h1>
-        <p className="text-muted-foreground mt-1">
-          Track webhook delivery attempts and failures
+        <h1 className="text-title tracking-tight">Deliveries</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Track webhook delivery attempts for <span className="font-medium text-foreground">{project.name}</span>
         </p>
       </div>
 
       <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                id="status"
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(0);
-                }}
-              >
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="status" className="text-xs">Status</Label>
+              <Select id="status" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
+                {STATUS_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="endpoint">Endpoint</Label>
-              <Select
-                id="endpoint"
-                value={endpointFilter}
-                onChange={(e) => {
-                  setEndpointFilter(e.target.value);
-                  setPage(0);
-                }}
-              >
+            <div className="space-y-1.5">
+              <Label htmlFor="endpoint" className="text-xs">Endpoint</Label>
+              <Select id="endpoint" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
                 <option value="">All Endpoints</option>
-                {endpoints.map(endpoint => (
-                  <option key={endpoint.id} value={endpoint.id}>
-                    {endpoint.url}
-                  </option>
-                ))}
+                {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dateRange">Date Range</Label>
-              <Select
-                id="dateRange"
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-              >
-                {DATE_RANGE_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
+            <div className="space-y-1.5">
+              <Label htmlFor="dateRange" className="text-xs">Date Range</Label>
+              <Select id="dateRange" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+                {DATE_RANGE_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="search">Search by ID</Label>
-              <Input
-                id="search"
-                placeholder="Enter delivery ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="space-y-1.5">
+              <Label htmlFor="search" className="text-xs">Search by ID</Label>
+              <Input id="search" placeholder="Enter delivery ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
           {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleBulkReplay} 
-                disabled={bulkReplaying}
-                variant="outline"
-                className="gap-2"
-              >
-                {bulkReplaying && <RefreshCw className="h-4 w-4 animate-spin" />}
-                {bulkReplaying ? 'Replaying...' : `Replay All ${statusFilter} Deliveries`}
+            <div className="flex justify-end mt-3">
+              <Button onClick={handleBulkReplay} disabled={bulkReplaying} variant="outline" size="sm">
+                {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                {bulkReplaying ? 'Replaying...' : `Replay All ${statusFilter}`}
               </Button>
             </div>
           )}
@@ -318,82 +268,57 @@ export default function DeliveriesPage() {
       </Card>
 
       {loading ? (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-16 bg-muted animate-pulse rounded" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />
+          ))}
+        </div>
       ) : filteredDeliveries.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="rounded-full bg-primary/10 p-4 mb-4">
-              <Send className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">No deliveries yet</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-sm">
-              Webhook deliveries will appear here once events are sent to your endpoints
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+            <Send className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No deliveries found</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            Deliveries will appear here once events are sent to your endpoints
+          </p>
+        </div>
       ) : (
-        <>
-          <Card>
+        <div className="animate-fade-in">
+          <Card className="overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Endpoint</TableHead>
-                  <TableHead>Attempts</TableHead>
-                  <TableHead>Next Retry</TableHead>
+                  <TableHead className="text-xs">Created</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Endpoint</TableHead>
+                  <TableHead className="text-xs">Attempts</TableHead>
+                  <TableHead className="text-xs">Next Retry</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDeliveries.map((delivery) => (
-                  <TableRow key={delivery.id}>
+                  <TableRow key={delivery.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedDeliveryId(delivery.id)}>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium">
-                          {formatRelativeTime(delivery.createdAt)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatExactTime(delivery.createdAt)}
-                        </span>
+                        <span className="text-sm font-medium">{formatRelativeTime(delivery.createdAt)}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatExactTime(delivery.createdAt)}</span>
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(delivery.status)}</TableCell>
                     <TableCell>
-                      <span className="font-mono text-sm">
-                        {getEndpointName(delivery.endpointId)}
-                      </span>
+                      <span className="font-mono text-[13px] truncate max-w-[200px] block">{getEndpointName(delivery.endpointId)}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="font-medium">
-                        {delivery.attemptCount} / {delivery.maxAttempts}
-                      </span>
+                      <span className="text-sm font-medium">{delivery.attemptCount}<span className="text-muted-foreground">/{delivery.maxAttempts}</span></span>
                     </TableCell>
                     <TableCell>
-                      {delivery.nextRetryAt ? (
-                        <span className="text-sm text-muted-foreground">
-                          {formatRelativeTime(delivery.nextRetryAt)}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
+                      <span className="text-[13px] text-muted-foreground">{delivery.nextRetryAt ? formatRelativeTime(delivery.nextRetryAt) : '—'}</span>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedDeliveryId(delivery.id)}
-                        title="View details"
-                      >
-                        <Eye className="h-4 w-4" />
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title="View details">
+                        <Eye className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -404,30 +329,16 @@ export default function DeliveriesPage() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
-              <p className="text-sm text-muted-foreground">
-                Showing {page * pageSize + 1} to {Math.min((page + 1) * pageSize, totalElements)} of {totalElements} deliveries
+              <p className="text-xs text-muted-foreground">
+                Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalElements)} of {totalElements}
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                >
-                  Next
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       <DeliveryDetailsSheet
