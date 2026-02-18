@@ -1,0 +1,121 @@
+name: Publish SDKs
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      sdk:
+        description: 'SDK to publish (node, python, php, all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - node
+          - python
+          - php
+
+jobs:
+  publish-node:
+    name: Publish Node.js SDK to npm
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'release' || 
+      github.event.inputs.sdk == 'all' || 
+      github.event.inputs.sdk == 'node'
+    defaults:
+      run:
+        working-directory: sdks/node
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-python:
+    name: Publish Python SDK to PyPI
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'release' || 
+      github.event.inputs.sdk == 'all' || 
+      github.event.inputs.sdk == 'python'
+    defaults:
+      run:
+        working-directory: sdks/python
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install build twine
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload dist/*
+
+  publish-php:
+    name: Publish PHP SDK to Packagist
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'release' || 
+      github.event.inputs.sdk == 'all' || 
+      github.event.inputs.sdk == 'php'
+    defaults:
+      run:
+        working-directory: sdks/php
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Run tests
+        run: composer test
+
+      # Packagist auto-updates from GitHub via webhook
+      # Just trigger the update API
+      - name: Trigger Packagist update
+        if: ${{ secrets.PACKAGIST_TOKEN != '' }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            "https://packagist.org/api/update-package?username=${{ secrets.PACKAGIST_USERNAME }}&apiToken=${{ secrets.PACKAGIST_TOKEN }}&autoUpdated=1" \
+            -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}'
