@@ -25,7 +25,7 @@ public class OrganizationIsolationTest extends AbstractIntegrationTest {
     public void testProjectIsolationBetweenOrganizations() throws Exception {
         RegisterRequest user1Request = RegisterRequest.builder()
                 .email("user1@example.com")
-                .password("password123")
+                .password("Test1234!")
                 .organizationName("Org 1")
                 .build();
 
@@ -42,7 +42,7 @@ public class OrganizationIsolationTest extends AbstractIntegrationTest {
 
         RegisterRequest user2Request = RegisterRequest.builder()
                 .email("user2@example.com")
-                .password("password123")
+                .password("Test1234!")
                 .organizationName("Org 2")
                 .build();
 

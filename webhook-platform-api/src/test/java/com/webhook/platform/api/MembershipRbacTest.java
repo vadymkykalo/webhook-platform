@@ -28,7 +28,7 @@ public class MembershipRbacTest extends AbstractIntegrationTest {
     public void testDeveloperCannotAddMembers() throws Exception {
         RegisterRequest ownerRequest = RegisterRequest.builder()
                 .email("owner@example.com")
-                .password("password123")
+                .password("Test1234!")
                 .organizationName("Test Org")
                 .build();
 
@@ -57,7 +57,7 @@ public class MembershipRbacTest extends AbstractIntegrationTest {
 
         RegisterRequest devRegisterRequest = RegisterRequest.builder()
                 .email("developer@example.com")
-                .password("password123")
+                .password("Test1234!")
                 .organizationName("Dev Org")
                 .build();
 
