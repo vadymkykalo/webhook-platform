@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MtlsWebClientFactory {
 
     private final String encryptionKey;
+    private final String encryptionSalt;
     private final WebClient.Builder webClientBuilder;
     private final Map<UUID, CachedClient> mtlsClientCache = new ConcurrentHashMap<>();
 
@@ -39,8 +40,10 @@ public class MtlsWebClientFactory {
 
     public MtlsWebClientFactory(
             @Value("${webhook.encryption-key}") String encryptionKey,
+            @Value("${webhook.encryption-salt}") String encryptionSalt,
             WebClient.Builder webClientBuilder) {
         this.encryptionKey = encryptionKey;
+        this.encryptionSalt = encryptionSalt;
         this.webClientBuilder = webClientBuilder;
     }
 
@@ -84,12 +87,14 @@ public class MtlsWebClientFactory {
         String clientCert = CryptoUtils.decryptSecret(
                 endpoint.getClientCertEncrypted(),
                 endpoint.getClientCertIv(),
-                encryptionKey
+                encryptionKey,
+                encryptionSalt
         );
         String clientKey = CryptoUtils.decryptSecret(
                 endpoint.getClientKeyEncrypted(),
                 endpoint.getClientKeyIv(),
-                encryptionKey
+                encryptionKey,
+                encryptionSalt
         );
 
         X509Certificate certificate = loadCertificate(clientCert);

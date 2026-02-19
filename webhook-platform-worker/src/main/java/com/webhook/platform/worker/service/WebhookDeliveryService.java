@@ -40,6 +40,7 @@ public class WebhookDeliveryService {
     private final WebClient defaultWebClient;
     private final MtlsWebClientFactory mtlsWebClientFactory;
     private final String encryptionKey;
+    private final String encryptionSalt;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
     private final RedisRateLimiterService rateLimiterService;
@@ -58,6 +59,7 @@ public class WebhookDeliveryService {
             WebClient.Builder webClientBuilder,
             MtlsWebClientFactory mtlsWebClientFactory,
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
+            @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             RedisRateLimiterService rateLimiterService,
@@ -77,6 +79,7 @@ public class WebhookDeliveryService {
                 .build();
         this.mtlsWebClientFactory = mtlsWebClientFactory;
         this.encryptionKey = encryptionKey;
+        this.encryptionSalt = encryptionSalt;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
         this.rateLimiterService = rateLimiterService;
@@ -476,7 +479,8 @@ public class WebhookDeliveryService {
             return CryptoUtils.decryptSecret(
                     endpoint.getSecretEncrypted(),
                     endpoint.getSecretIv(),
-                    encryptionKey
+                    encryptionKey,
+                    encryptionSalt
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to decrypt secret for endpoint " + endpoint.getId() + 

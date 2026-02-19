@@ -1,13 +1,15 @@
 package com.webhook.platform.common.util;
 
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.security.spec.KeySpec;
 import java.util.Base64;
 
 public class CryptoUtils {
@@ -16,6 +18,8 @@ public class CryptoUtils {
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
     private static final String HASH_ALGORITHM = "SHA-256";
+    private static final int PBKDF2_ITERATIONS = 65536;
+    private static final int AES_KEY_LENGTH_BITS = 256;
 
     public static String hashApiKey(String apiKey) {
         try {
@@ -27,13 +31,13 @@ public class CryptoUtils {
         }
     }
 
-    public static EncryptedData encryptSecret(String plaintext, String masterKey) {
+    public static EncryptedData encryptSecret(String plaintext, String masterKey, String salt) {
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             SecureRandom random = new SecureRandom();
             random.nextBytes(iv);
 
-            SecretKey key = deriveKey(masterKey);
+            SecretKey key = deriveKey(masterKey, salt);
             Cipher cipher = Cipher.getInstance(AES_ALGORITHM);
             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.ENCRYPT_MODE, key, spec);
@@ -49,12 +53,12 @@ public class CryptoUtils {
         }
     }
 
-    public static String decryptSecret(String ciphertext, String iv, String masterKey) {
+    public static String decryptSecret(String ciphertext, String iv, String masterKey, String salt) {
         try {
             byte[] ciphertextBytes = Base64.getDecoder().decode(ciphertext);
             byte[] ivBytes = Base64.getDecoder().decode(iv);
 
-            SecretKey key = deriveKey(masterKey);
+            SecretKey key = deriveKey(masterKey, salt);
             Cipher cipher = Cipher.getInstance(AES_ALGORITHM);
             GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, ivBytes);
             cipher.init(Cipher.DECRYPT_MODE, key, spec);
@@ -73,12 +77,11 @@ public class CryptoUtils {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private static SecretKey deriveKey(String masterKey) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance(HASH_ALGORITHM);
-        byte[] keyBytes = digest.digest(masterKey.getBytes(StandardCharsets.UTF_8));
-        byte[] key16 = new byte[16];
-        System.arraycopy(keyBytes, 0, key16, 0, 16);
-        return new SecretKeySpec(key16, "AES");
+    private static SecretKey deriveKey(String masterKey, String salt) throws Exception {
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec spec = new PBEKeySpec(masterKey.toCharArray(), salt.getBytes(StandardCharsets.UTF_8), PBKDF2_ITERATIONS, AES_KEY_LENGTH_BITS);
+        SecretKey tmp = factory.generateSecret(spec);
+        return new SecretKeySpec(tmp.getEncoded(), "AES");
     }
 
     public static class EncryptedData {

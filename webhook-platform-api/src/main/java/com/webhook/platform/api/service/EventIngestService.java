@@ -12,6 +12,7 @@ import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +30,7 @@ public class EventIngestService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
+    private final long maxPayloadSizeBytes;
 
     public EventIngestService(
             EventRepository eventRepository,
@@ -37,7 +39,8 @@ public class EventIngestService {
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
-            SequenceGeneratorService sequenceGeneratorService) {
+            SequenceGeneratorService sequenceGeneratorService,
+            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
@@ -45,6 +48,7 @@ public class EventIngestService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
+        this.maxPayloadSizeBytes = maxPayloadSizeBytes;
     }
 
     @Transactional
@@ -95,12 +99,21 @@ public class EventIngestService {
     private Event createEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
         try {
             String payload = objectMapper.writeValueAsString(request.getData());
+
+            if (payload.length() > maxPayloadSizeBytes) {
+                throw new IllegalArgumentException(
+                        "Event payload size (" + payload.length() + " bytes) exceeds maximum allowed size ("
+                                + maxPayloadSizeBytes + " bytes)");
+            }
+
             return Event.builder()
                     .projectId(projectId)
                     .eventType(request.getType())
                     .idempotencyKey(idempotencyKey)
                     .payload(payload)
                     .build();
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize event payload", e);
         }
