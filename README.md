@@ -12,7 +12,7 @@
 Production-grade webhook delivery infrastructure with **at-least-once guarantees**, FIFO ordering, automatic retries, HMAC signatures, and horizontal scaling. Self-hosted alternative to Svix / Hookdeck.
 
 <div align="center">
-  <img src="docs/screenshot.png" alt="Webhook Platform Dashboard" width="800">
+  <img src="docs/screenshot.png" alt="Webhook Platform Dashboard" width="100%">
 </div>
 
 ```bash
@@ -70,12 +70,12 @@ graph TB
 
 | Service | Port | Role |
 |---------|------|------|
-| **API** | 8080 | Event ingestion, REST API, outbox publisher, Flyway migrations |
-| **Worker** | 8081 | Kafka consumer, HTTP delivery, retry scheduling, stuck delivery recovery |
-| **UI** | 5173 | Admin dashboard (React / Vite / TailwindCSS / shadcn/ui) |
-| **PostgreSQL** | 5432 | Persistent storage |
-| **Kafka** | 9092 | Message broker (dispatch + 6 retry delay topics + DLQ) |
-| **Redis** | 6379 | Rate limiting, FIFO ordering buffer |
+| **API** | `0.0.0.0:8080` | Event ingestion, REST API, outbox publisher, Flyway migrations |
+| **Worker** | `0.0.0.0:8081` | Kafka consumer, HTTP delivery, retry scheduling, stuck delivery recovery |
+| **UI** | `0.0.0.0:5173` | Admin dashboard (React / Vite / TailwindCSS / shadcn/ui) — nginx |
+| **PostgreSQL** | `127.0.0.1:5432` | Persistent storage (localhost only) |
+| **Kafka** | `127.0.0.1:9092` | Message broker (dispatch + 6 retry delay topics + DLQ, localhost only) |
+| **Redis** | `127.0.0.1:6379` | Rate limiting, FIFO ordering buffer (localhost only, requirepass) |
 
 ---
 
