@@ -4,6 +4,8 @@ import { Toaster } from 'sonner';
 import { AuthContext, AuthState } from './auth/auth.store';
 import { router } from './router';
 import { http } from './api/http';
+import { authApi } from './api/auth.api';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import type { CurrentUserResponse } from './types/api.types';
 
 export default function App() {
@@ -71,7 +73,7 @@ export default function App() {
       localStorage.setItem('auth_user', JSON.stringify(newUser));
     },
     logout: () => {
-      http.post('/api/v1/auth/logout', { refreshToken }).catch(() => {});
+      authApi.logout(refreshToken || '').catch(() => {});
       setToken(null);
       setRefreshToken(null);
       setUser(null);
@@ -95,9 +97,11 @@ export default function App() {
   }
 
   return (
-    <AuthContext.Provider value={authState}>
-      <RouterProvider router={router} />
-      <Toaster position="top-right" richColors />
-    </AuthContext.Provider>
+    <ErrorBoundary>
+      <AuthContext.Provider value={authState}>
+        <RouterProvider router={router} />
+        <Toaster position="top-right" richColors />
+      </AuthContext.Provider>
+    </ErrorBoundary>
   );
 }

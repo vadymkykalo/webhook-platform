@@ -73,7 +73,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
         ))}
       </nav>
       <div className="mt-8 pt-6 border-t border-border/50">
-        <Link to="/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
+        <Link to="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
           <ArrowRight className="h-4 w-4" /> Go to Dashboard
         </Link>
       </div>

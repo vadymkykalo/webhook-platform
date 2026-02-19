@@ -40,7 +40,7 @@ function Navigation() {
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
               <Link
-                to="/projects"
+                to="/admin/projects"
                 className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-all hover:scale-105"
               >
                 Go to Dashboard
@@ -490,14 +490,14 @@ function FinalCTA() {
           </p>
           <div className="flex items-center justify-center space-x-4">
             <Link
-              to="/dashboard"
+              to="/admin/dashboard"
               className="inline-flex items-center px-8 py-4 bg-white text-gray-900 text-base font-semibold rounded-lg hover:bg-gray-100 transition-all hover:scale-105 shadow-xl"
             >
               Continue to dashboard
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
             <Link
-              to="/members"
+              to="/admin/members"
               className="inline-flex items-center px-8 py-4 border-2 border-white/20 text-white text-base font-semibold rounded-lg hover:bg-white/10 transition-colors"
             >
               Invite your team

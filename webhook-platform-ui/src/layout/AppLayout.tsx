@@ -19,25 +19,25 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Projects', path: '/projects', icon: FolderKanban },
+  { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+  { name: 'Projects', path: '/admin/projects', icon: FolderKanban },
 ];
 
 const orgNav: NavItem[] = [
-  { name: 'Members', path: '/members', icon: Users },
-  { name: 'Audit Log', path: '/audit-log', icon: FileText },
-  { name: 'Settings', path: '/settings', icon: Settings },
+  { name: 'Members', path: '/admin/members', icon: Users },
+  { name: 'Audit Log', path: '/admin/audit-log', icon: FileText },
+  { name: 'Settings', path: '/admin/settings', icon: Settings },
 ];
 
 const getProjectNav = (projectId: string): NavItem[] => [
-  { name: 'Endpoints', path: `/projects/${projectId}/endpoints`, icon: Webhook },
-  { name: 'Events', path: `/projects/${projectId}/events`, icon: Radio },
-  { name: 'Deliveries', path: `/projects/${projectId}/deliveries`, icon: Send },
-  { name: 'Subscriptions', path: `/projects/${projectId}/subscriptions`, icon: Bell },
-  { name: 'API Keys', path: `/projects/${projectId}/api-keys`, icon: Key },
-  { name: 'Analytics', path: `/projects/${projectId}/analytics`, icon: BarChart3 },
-  { name: 'Dead Letter Queue', path: `/projects/${projectId}/dlq`, icon: AlertTriangle },
-  { name: 'Test Endpoints', path: `/projects/${projectId}/test-endpoints`, icon: TestTube },
+  { name: 'Endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
+  { name: 'Events', path: `/admin/projects/${projectId}/events`, icon: Radio },
+  { name: 'Deliveries', path: `/admin/projects/${projectId}/deliveries`, icon: Send },
+  { name: 'Subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
+  { name: 'API Keys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
+  { name: 'Analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
+  { name: 'Dead Letter Queue', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
+  { name: 'Test Endpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -256,8 +256,8 @@ export default function AppLayout() {
 
             {/* Breadcrumb */}
             <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Link to="/dashboard" className="hover:text-foreground transition-colors">Home</Link>
-              {location.pathname !== '/dashboard' && (
+              <Link to="/admin/dashboard" className="hover:text-foreground transition-colors">Home</Link>
+              {location.pathname !== '/admin/dashboard' && (
                 <>
                   <ChevronRight className="h-3.5 w-3.5" />
                   <span className="text-foreground font-medium capitalize">

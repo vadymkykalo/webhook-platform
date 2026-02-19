@@ -120,7 +120,7 @@ export default function RegisterPage() {
                 </p>
               </div>
               <div className="space-y-3">
-                <Button onClick={() => navigate('/dashboard')} className="w-full">
+                <Button onClick={() => navigate('/admin/dashboard')} className="w-full">
                   Continue to Dashboard
                 </Button>
                 <Button

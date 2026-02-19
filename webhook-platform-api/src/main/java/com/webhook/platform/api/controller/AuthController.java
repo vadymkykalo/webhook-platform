@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.AuthResponse;
+import com.webhook.platform.api.dto.ChangePasswordRequest;
 import com.webhook.platform.api.dto.CurrentUserResponse;
 import com.webhook.platform.api.dto.LoginRequest;
 import com.webhook.platform.api.dto.LogoutRequest;
@@ -136,6 +137,25 @@ public class AuthController {
     @PostMapping("/resend-verification")
     public ResponseEntity<Void> resendVerification(@RequestParam("email") String email) {
         authService.resendVerification(email);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Change password", description = "Changes the authenticated user's password")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password changed successfully"),
+            @ApiResponse(responseCode = "400", description = "Current password incorrect or validation failed"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new UnauthorizedException("Authentication required");
+        }
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        authService.changePassword(jwtAuth.getUserId(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok().build();
     }
 

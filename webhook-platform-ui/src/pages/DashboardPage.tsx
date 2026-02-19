@@ -120,7 +120,7 @@ export default function DashboardPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/projects/${selectedProjectId}/analytics`)}
+              onClick={() => navigate(`/admin/projects/${selectedProjectId}/analytics`)}
             >
               <BarChart3 className="h-4 w-4" /> Analytics
             </Button>
@@ -151,7 +151,7 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
             Create your first project to start sending webhooks and monitoring deliveries.
           </p>
-          <Button onClick={() => navigate('/projects')}>
+          <Button onClick={() => navigate('/admin/projects')}>
             <Plus className="h-4 w-4" /> Create project
           </Button>
         </div>
@@ -213,7 +213,7 @@ export default function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(`/projects/${selectedProjectId}/events`)}
+                    onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
                     className="text-xs"
                   >
                     View all <ArrowRight className="h-3 w-3" />
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                       <div
                         key={event.id}
                         className="flex items-center justify-between p-2.5 rounded-lg hover:bg-accent cursor-pointer transition-colors group"
-                        onClick={() => navigate(`/projects/${selectedProjectId}/events`)}
+                        onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -274,7 +274,7 @@ export default function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(`/projects/${selectedProjectId}/endpoints`)}
+                    onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
                     className="text-xs"
                   >
                     View all <ArrowRight className="h-3 w-3" />
@@ -302,7 +302,7 @@ export default function DashboardPage() {
                       <div
                         key={endpoint.id}
                         className="flex items-center justify-between p-2.5 rounded-lg hover:bg-accent cursor-pointer transition-colors"
-                        onClick={() => navigate(`/projects/${selectedProjectId}/endpoints`)}
+                        onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className={`h-2 w-2 rounded-full flex-shrink-0 ${endpoint.enabled ? 'bg-success' : 'bg-muted-foreground/30'}`} />

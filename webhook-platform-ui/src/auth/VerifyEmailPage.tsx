@@ -45,7 +45,7 @@ export default function VerifyEmailPage() {
             <p className="text-sm text-muted-foreground">
               Your email has been successfully verified. You can now use all features.
             </p>
-            <Button onClick={() => navigate('/dashboard')} className="mt-4">
+            <Button onClick={() => navigate('/admin/dashboard')} className="mt-4">
               Go to Dashboard
             </Button>
           </>

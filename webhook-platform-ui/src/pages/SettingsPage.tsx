@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/auth.store';
-import { User, Building2, Loader2 } from 'lucide-react';
+import { authApi } from '../api/auth.api';
+import { User, Building2, Loader2, KeyRound, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,18 +11,42 @@ import { Separator } from '../components/ui/separator';
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+
+    setChangingPassword(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Profile settings saved');
+      await authApi.changePassword(currentPassword, newPassword);
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password changed successfully');
     } catch (err: any) {
-      toast.error('Failed to save settings');
+      const msg = err.response?.data?.message || 'Failed to change password';
+      setPasswordError(msg);
+      toast.error(msg);
     } finally {
-      setSaving(false);
+      setChangingPassword(false);
     }
   };
 
@@ -39,14 +64,14 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
-              <CardTitle>Profile Settings</CardTitle>
+              <CardTitle>Profile</CardTitle>
             </div>
             <CardDescription>
-              Update your personal information
+              Your account information
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSaveProfile} className="space-y-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -56,9 +81,6 @@ export default function SettingsPage() {
                   disabled
                   className="bg-muted"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Email cannot be changed
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -71,12 +93,95 @@ export default function SettingsPage() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="status">Account status</Label>
+                <Input
+                  id="status"
+                  value={user?.user?.status || ''}
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              <CardTitle>Change Password</CardTitle>
+            </div>
+            <CardDescription>
+              Update your account password
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currentPassword">Current password</Label>
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  disabled={changingPassword}
+                  placeholder="••••••••"
+                  className="max-w-md"
+                />
+              </div>
+
               <Separator />
 
-              <div className="flex justify-end">
-                <Button type="submit" disabled={saving}>
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {saving ? 'Saving...' : 'Save Changes'}
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New password</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  disabled={changingPassword}
+                  placeholder="••••••••"
+                  className="max-w-md"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Min 8 characters, must include uppercase, lowercase, digit, and special character
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm new password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={changingPassword}
+                  placeholder="••••••••"
+                  className="max-w-md"
+                />
+              </div>
+
+              {passwordError && (
+                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3 max-w-md">
+                  {passwordError}
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 max-w-md">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Password changed successfully
+                </div>
+              )}
+
+              <div>
+                <Button type="submit" disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}>
+                  {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {changingPassword ? 'Changing...' : 'Change password'}
                 </Button>
               </div>
             </form>

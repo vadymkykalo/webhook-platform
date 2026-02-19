@@ -29,7 +29,7 @@ export default function LoginPage() {
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
       toast.success('Welcome back!');
-      navigate('/projects');
+      navigate('/admin/projects');
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Login failed. Please try again.';
       setError(errorMessage);

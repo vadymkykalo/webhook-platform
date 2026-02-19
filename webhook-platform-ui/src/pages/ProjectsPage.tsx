@@ -156,7 +156,7 @@ export default function ProjectsPage() {
             <Card
               key={project.id}
               className="group cursor-pointer hover:border-primary/20 transition-all"
-              onClick={() => navigate(`/projects/${project.id}/endpoints`)}
+              onClick={() => navigate(`/admin/projects/${project.id}/endpoints`)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -184,10 +184,10 @@ export default function ProjectsPage() {
                 </div>
                 <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
                   {[
-                    { label: 'Endpoints', path: `/projects/${project.id}/endpoints`, icon: Settings },
-                    { label: 'Events', path: `/projects/${project.id}/events`, icon: Radio },
-                    { label: 'Keys', path: `/projects/${project.id}/api-keys`, icon: Key },
-                    { label: 'Deliveries', path: `/projects/${project.id}/deliveries`, icon: Send },
+                    { label: 'Endpoints', path: `/admin/projects/${project.id}/endpoints`, icon: Settings },
+                    { label: 'Events', path: `/admin/projects/${project.id}/events`, icon: Radio },
+                    { label: 'Keys', path: `/admin/projects/${project.id}/api-keys`, icon: Key },
+                    { label: 'Deliveries', path: `/admin/projects/${project.id}/deliveries`, icon: Send },
                   ].map((action) => (
                     <button
                       key={action.label}

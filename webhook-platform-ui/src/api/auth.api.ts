@@ -25,4 +25,12 @@ export const authApi = {
   resendVerification: (email: string): Promise<void> => {
     return http.post<void>(`/api/v1/auth/resend-verification?email=${encodeURIComponent(email)}`);
   },
+
+  changePassword: (currentPassword: string, newPassword: string): Promise<void> => {
+    return http.post<void>('/api/v1/auth/change-password', { currentPassword, newPassword });
+  },
+
+  logout: (refreshToken: string): Promise<void> => {
+    return http.post<void>('/api/v1/auth/logout', { refreshToken });
+  },
 };

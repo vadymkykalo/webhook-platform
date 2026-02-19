@@ -50,7 +50,7 @@ function Navigation() {
         </div>
         <div className="flex items-center gap-3">
           {isAuthenticated ? (
-            <Link to="/projects">
+            <Link to="/admin/projects">
               <Button size="sm">Go to Dashboard <ArrowRight className="h-3.5 w-3.5" /></Button>
             </Link>
           ) : (
@@ -984,7 +984,7 @@ function Footer() {
             <ul className="space-y-2">
               <li><Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</Link></li>
               <li><Link to="/register" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Create account</Link></li>
-              <li><Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Dashboard</Link></li>
+              <li><Link to="/admin/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Dashboard</Link></li>
             </ul>
           </div>
           <div>
