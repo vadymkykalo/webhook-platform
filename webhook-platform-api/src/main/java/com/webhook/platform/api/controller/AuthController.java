@@ -116,6 +116,29 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Verify email", description = "Verifies user email with the token sent to their email")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Email verified successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token")
+    })
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(@RequestParam("token") String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Resend verification email", description = "Sends a new verification email to the user")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Verification email sent"),
+            @ApiResponse(responseCode = "400", description = "Email already verified"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Void> resendVerification(@RequestParam("email") String email) {
+        authService.resendVerification(email);
+        return ResponseEntity.ok().build();
+    }
+
     @Operation(summary = "Get current user", description = "Returns information about the authenticated user")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({

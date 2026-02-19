@@ -147,6 +147,15 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-webhook_redis_pass}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@hookflow.dev}
+      EMAIL_BASE_URL: ${EMAIL_BASE_URL:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-false}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
       JAVA_OPTS: ${API_JAVA_OPTS:-}
     depends_on:
       kafka:

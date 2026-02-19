@@ -31,6 +31,16 @@ public class User {
     @Column(nullable = false)
     private UserStatus status;
 
+    @Builder.Default
+    @Column(name = "email_verified", nullable = false)
+    private Boolean emailVerified = false;
+
+    @Column(name = "verification_token", length = 64)
+    private String verificationToken;
+
+    @Column(name = "verification_token_expires_at")
+    private Instant verificationTokenExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

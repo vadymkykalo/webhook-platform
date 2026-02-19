@@ -17,4 +17,12 @@ export const authApi = {
   refresh: (refreshToken: string): Promise<AuthResponse> => {
     return http.post<AuthResponse>('/api/v1/auth/refresh', { refreshToken });
   },
+
+  verifyEmail: (token: string): Promise<void> => {
+    return http.post<void>(`/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`);
+  },
+
+  resendVerification: (email: string): Promise<void> => {
+    return http.post<void>(`/api/v1/auth/resend-verification?email=${encodeURIComponent(email)}`);
+  },
 };

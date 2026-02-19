@@ -3,9 +3,10 @@ import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-
 import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
-  Bell, Search, ChevronsLeft, FileText
+  Bell, Search, ChevronsLeft, FileText, Mail, Loader2
 } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
+import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -88,6 +89,21 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
 
   const projectId = params.projectId || location.pathname.match(/\/projects\/([^/]+)/)?.[1];
+  const [resending, setResending] = useState(false);
+  const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
+
+  const handleResendVerification = async () => {
+    if (!user?.user?.email) return;
+    setResending(true);
+    try {
+      await authApi.resendVerification(user.user.email);
+      toast.success('Verification email sent!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to resend');
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -265,6 +281,26 @@ export default function AppLayout() {
               </Link>
             </div>
           </header>
+
+          {/* Email verification banner */}
+          {needsVerification && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-amber-800 text-sm">
+                <Mail className="h-4 w-4 flex-shrink-0" />
+                <span>Please verify your email <strong>{user?.user?.email}</strong> to unlock all features.</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResendVerification}
+                disabled={resending}
+                className="flex-shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
+              >
+                {resending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                {resending ? 'Sending...' : 'Resend email'}
+              </Button>
+            </div>
+          )}
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto bg-muted/30">

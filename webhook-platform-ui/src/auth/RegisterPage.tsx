@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Webhook, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Webhook, Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -16,6 +16,8 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const [resending, setResending] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -35,14 +37,26 @@ export default function RegisterPage() {
       http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
-      toast.success('Account created successfully!');
-      navigate('/projects');
+      toast.success('Account created! Please verify your email.');
+      setRegistered(true);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await authApi.resendVerification(email);
+      toast.success('Verification email sent!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to resend verification email');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -92,6 +106,39 @@ export default function RegisterPage() {
       {/* Right panel - form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12 bg-background">
         <div className="w-full max-w-[420px] animate-fade-in-up">
+
+          {registered ? (
+            <div className="text-center space-y-6">
+              <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight mb-2">Check your email</h1>
+                <p className="text-muted-foreground">
+                  We've sent a verification link to <strong>{email}</strong>.
+                  Click it to activate your account.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <Button onClick={() => navigate('/dashboard')} className="w-full">
+                  Continue to Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="w-full"
+                >
+                  {resending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {resending ? 'Sending...' : 'Resend verification email'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Didn't receive it? Check your spam folder or click resend above.
+              </p>
+            </div>
+          ) : (
+          <>
           <Link
             to="/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
@@ -199,6 +246,8 @@ export default function RegisterPage() {
               Sign in
             </Link>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

@@ -12,7 +12,6 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -81,7 +80,6 @@ public class AuditLogAspect {
         }
     }
 
-    @Transactional
     public void saveAuditLog(String action, String resourceType, UUID resourceId,
                               UUID userId, UUID orgId, String status, String errorMessage, int durationMs) {
         try {

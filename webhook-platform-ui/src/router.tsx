@@ -19,6 +19,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import DlqPage from './pages/DlqPage';
 import TestEndpointsPage from './pages/TestEndpointsPage';
 import AuditLogPage from './pages/AuditLogPage';
+import VerifyEmailPage from './auth/VerifyEmailPage';
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,10 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/verify-email',
+    element: <VerifyEmailPage />,
   },
   {
     path: '/',

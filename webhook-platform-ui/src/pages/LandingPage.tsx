@@ -664,59 +664,257 @@ function DeveloperConfidence() {
 
 function HowItWorks() {
   const [activeStep, setActiveStep] = useState(0);
+  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => setActiveStep((prev) => (prev + 1) % 5), 2500);
+    if (hoveredStep !== null) return;
+    const interval = setInterval(() => setActiveStep((prev) => (prev + 1) % 3), 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [hoveredStep]);
+
+  const current = hoveredStep ?? activeStep;
 
   const steps = [
-    { label: 'Your system', icon: Code2 },
-    { label: 'Events API', icon: Zap },
-    { label: 'Queue', icon: Activity },
-    { label: 'Workers', icon: RefreshCw },
-    { label: 'Endpoint', icon: CheckCircle2 },
+    {
+      num: '01',
+      title: 'Send an event',
+      desc: 'One API call. That\'s it. We persist atomically and queue for delivery.',
+      color: '#8B5CF6',
+      details: ['API key auth', 'Idempotency built-in', 'Payload up to 256KB'],
+    },
+    {
+      num: '02',
+      title: 'We deliver reliably',
+      desc: 'HMAC-signed payloads, exponential backoff, automatic retries across multiple intervals.',
+      color: '#10B981',
+      details: ['HMAC-SHA256 signatures', 'Up to 7 retry intervals', 'Configurable timeouts'],
+    },
+    {
+      num: '03',
+      title: 'You stay in control',
+      desc: 'Full observability dashboard. See every attempt, replay failures, track success rates.',
+      color: '#F59E0B',
+      details: ['Real-time delivery feed', 'One-click replay', 'Analytics & metrics'],
+    },
   ];
 
   return (
-    <section className="py-24 bg-muted/30">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-24 bg-muted/30 relative overflow-hidden">
+      <div className="absolute top-1/2 left-0 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+      <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-purple-500/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
         <div className="text-center mb-16">
-          <h2 className="text-headline mb-4">How it <span className="gradient-text">works</span></h2>
-          <p className="text-body-lg text-muted-foreground">Simple integration. Reliable delivery.</p>
-        </div>
-        <div className="bg-card rounded-xl border shadow-elevated p-8 lg:p-12">
-          <div className="hidden md:flex items-center justify-between relative mb-12">
-            {steps.map((step, index) => (
-              <div key={index} className="flex flex-col items-center relative z-10">
-                <div className={`w-14 h-14 lg:w-16 lg:h-16 rounded-xl flex items-center justify-center transition-all duration-500 ${
-                  activeStep === index
-                    ? 'bg-primary scale-110 shadow-glow'
-                    : activeStep > index
-                    ? 'bg-success'
-                    : 'bg-muted'
-                }`}>
-                  <step.icon className={`h-6 w-6 lg:h-7 lg:w-7 ${activeStep >= index ? 'text-white' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="mt-3 text-sm font-medium text-center">{step.label}</div>
-              </div>
-            ))}
-            <div className="absolute top-7 lg:top-8 left-0 right-0 h-1 bg-muted -z-0 rounded-full">
-              <div className="h-full bg-primary rounded-full transition-all duration-700 ease-out" style={{ width: `${(activeStep / (steps.length - 1)) * 100}%` }} />
-            </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+            <Zap className="h-3 w-3" />
+            Three steps to production
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              { step: '1', title: 'Send events', desc: 'POST to our API with your API key. One request is all it takes.' },
-              { step: '2', title: 'We deliver', desc: 'Automatic retries, exponential backoff, HMAC signatures included.' },
-              { step: '3', title: 'You monitor', desc: 'See every delivery attempt in real-time from the dashboard.' },
-            ].map((item) => (
-              <div key={item.step} className="text-center p-4">
-                <div className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary text-sm font-bold mb-3">{item.step}</div>
-                <div className="text-base font-semibold mb-1">{item.title}</div>
-                <p className="text-sm text-muted-foreground">{item.desc}</p>
+          <h2 className="text-headline mb-4">How it <span className="gradient-text">works</span></h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            From first API call to full observability in under 5 minutes
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-[380px_1fr] gap-8 lg:gap-12 items-start">
+          {/* Left: Timeline */}
+          <div className="space-y-3">
+            {steps.map((step, index) => (
+              <div
+                key={index}
+                className={`group relative p-5 rounded-2xl border cursor-pointer transition-all duration-500 ${
+                  current === index
+                    ? 'bg-card border-primary/30 shadow-lg'
+                    : 'bg-card/50 border-transparent hover:bg-card hover:border-border'
+                }`}
+                onClick={() => { setActiveStep(index); setHoveredStep(null); }}
+                onMouseEnter={() => setHoveredStep(index)}
+                onMouseLeave={() => setHoveredStep(null)}
+              >
+                {current === index && (
+                  <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full" style={{ background: step.color }} />
+                )}
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold tracking-wider transition-all duration-500 ${
+                      current === index ? 'text-white scale-110' : 'bg-muted text-muted-foreground'
+                    }`}
+                    style={current === index ? { background: step.color, boxShadow: `0 4px 20px ${step.color}40` } : {}}
+                  >
+                    {step.num}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold mb-1">{step.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+                    <div className={`mt-3 space-y-1.5 overflow-hidden transition-all duration-500 ${
+                      current === index ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                    }`}>
+                      {step.details.map((detail) => (
+                        <div key={detail} className="flex items-center gap-2 text-xs">
+                          <div className="h-1 w-1 rounded-full flex-shrink-0" style={{ background: step.color }} />
+                          <span className="text-muted-foreground">{detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {current === index && (
+                  <div className="absolute bottom-0 left-5 right-5 h-px">
+                    <div className="h-full rounded-full animate-pulse" style={{ background: `linear-gradient(90deg, transparent, ${step.color}30, transparent)` }} />
+                  </div>
+                )}
               </div>
             ))}
+          </div>
+
+          {/* Right: Live preview */}
+          <div className="relative">
+            <div className="absolute -inset-4 bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent rounded-3xl blur-2xl pointer-events-none" />
+            <div className="relative bg-card rounded-2xl border shadow-elevated overflow-hidden">
+              <div className="bg-muted/50 border-b px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400/80" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400/80" />
+                  <div className="w-3 h-3 rounded-full bg-green-400/80" />
+                </div>
+                <div className="flex items-center gap-2">
+                  {steps.map((s, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 rounded-full transition-all duration-500 ${
+                        current === i ? 'w-6' : 'w-1.5'
+                      }`}
+                      style={{ background: current === i ? s.color : '#d1d5db' }}
+                    />
+                  ))}
+                </div>
+                <div className="w-16" />
+              </div>
+
+              <div className="relative min-h-[380px]">
+                {/* Step 1: Code */}
+                <div className={`absolute inset-0 p-6 transition-all duration-500 ${
+                  current === 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                }`}>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Send your first event</div>
+                  <div className="bg-slate-900 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2 border-b border-white/10 flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-white/40">POST</span>
+                      <span className="text-[10px] font-mono text-green-400">/api/v1/events</span>
+                    </div>
+                    <pre className="p-4 text-[12px] font-mono text-white/80 leading-relaxed overflow-x-auto">{`{
+  "type": "order.completed",
+  "data": {
+    "order_id": "ord_12345",
+    "amount": 99.99,
+    "customer": "cus_abc"
+  }
+}`}</pre>
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" style={{ width: '100%', animation: 'shimmer 2s ease-in-out infinite' }} />
+                    </div>
+                    <span className="text-xs font-mono text-green-600 font-semibold">201 Created</span>
+                  </div>
+                  <div className="mt-4 p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                    <div className="flex items-center gap-2 text-xs text-green-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <span className="font-medium">Event accepted</span>
+                      <span className="text-green-600/60 ml-auto font-mono">evt_8f3k2m · 3 deliveries queued</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 2: Delivery */}
+                <div className={`absolute inset-0 p-6 transition-all duration-500 ${
+                  current === 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                }`}>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Live delivery pipeline</div>
+                  <div className="space-y-3">
+                    {[
+                      { endpoint: 'api.acme.com/hooks', status: 'delivered', code: 200, latency: '89ms', sig: true },
+                      { endpoint: 'hooks.partner.io/v2', status: 'retrying', code: 503, latency: '5002ms', sig: true, retryIn: '60s' },
+                      { endpoint: 'notify.internal.dev', status: 'delivered', code: 200, latency: '45ms', sig: true },
+                    ].map((d, i) => (
+                      <div key={i} className={`p-4 rounded-xl border transition-all duration-300 ${
+                        d.status === 'retrying' ? 'border-amber-200 bg-amber-50/50' : 'border-border bg-card'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {d.status === 'delivered' ? (
+                              <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                              </div>
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center animate-pulse">
+                                <Clock className="h-3.5 w-3.5 text-amber-600" />
+                              </div>
+                            )}
+                            <span className="text-sm font-medium font-mono">{d.endpoint}</span>
+                          </div>
+                          <span className={`text-xs font-mono font-bold ${d.code === 200 ? 'text-green-600' : 'text-amber-600'}`}>{d.code}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-[11px] text-muted-foreground pl-8">
+                          <span>{d.latency}</span>
+                          {d.sig && <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> HMAC signed</span>}
+                          {d.retryIn && <span className="text-amber-600 font-medium">Retry in {d.retryIn}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 3: Monitor */}
+                <div className={`absolute inset-0 p-6 transition-all duration-500 ${
+                  current === 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                }`}>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Dashboard overview</div>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {[
+                      { label: 'Success rate', value: '99.7%', color: 'text-green-600', bg: 'bg-green-50' },
+                      { label: 'Avg latency', value: '124ms', color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { label: 'Events today', value: '12,847', color: 'text-violet-600', bg: 'bg-violet-50' },
+                    ].map((stat) => (
+                      <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
+                        <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-muted/30 rounded-xl p-4 border">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-semibold">Delivery volume (24h)</span>
+                      <span className="text-[10px] text-muted-foreground">Updated live</span>
+                    </div>
+                    <div className="flex items-end gap-[3px] h-20">
+                      {[40, 55, 45, 70, 65, 80, 75, 90, 85, 95, 88, 92, 78, 85, 90, 70, 60, 75, 80, 85, 90, 95, 88, 92].map((h, i) => (
+                        <div
+                          key={i}
+                          className="flex-1 rounded-sm transition-all duration-700"
+                          style={{
+                            height: `${h}%`,
+                            background: i >= 22 ? '#8B5CF6' : i >= 20 ? '#a78bfa' : '#e2e8f0',
+                            opacity: current === 2 ? 1 : 0,
+                            transitionDelay: `${i * 30}ms`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex justify-between mt-2 text-[9px] text-muted-foreground">
+                      <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>Now</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button size="sm" variant="outline" className="text-xs h-7">
+                      <RefreshCw className="h-3 w-3" /> Replay failed
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs h-7">
+                      <Eye className="h-3 w-3" /> View all
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
