@@ -218,6 +218,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 className="h-11"
               />
+              <p className="text-[11px] text-muted-foreground">Must include uppercase, lowercase, digit, and special character (@$!%*?&-_#)</p>
             </div>
 
             {error && (
