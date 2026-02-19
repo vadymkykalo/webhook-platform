@@ -151,6 +151,32 @@
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@keyframes data-packet {
+  0% { left: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.marquee-track {
+  display: flex;
+  animation: marquee 30s linear infinite;
+  width: max-content;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
