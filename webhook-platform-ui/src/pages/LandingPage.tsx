@@ -1,8 +1,9 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, Moon, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
+import { getTheme, setTheme } from '../lib/theme';
 
 export default function LandingPage() {
   return (
@@ -24,6 +25,7 @@ export default function LandingPage() {
 function Navigation() {
   const { isAuthenticated } = useAuth();
   const [scrolled, setScrolled] = useState(false);
+  const [, setThemeToggle] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -49,6 +51,13 @@ function Navigation() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => { const next = getTheme() === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeToggle(p => !p); }}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title="Toggle theme"
+          >
+            {typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           {isAuthenticated ? (
             <Link to="/admin/projects">
               <Button size="sm">Go to Dashboard <ArrowRight className="h-3.5 w-3.5" /></Button>

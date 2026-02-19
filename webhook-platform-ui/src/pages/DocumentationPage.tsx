@@ -1,6 +1,7 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getTheme, setTheme } from '../lib/theme';
 
 export default function DocumentationPage() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -15,7 +16,8 @@ export default function DocumentationPage() {
         <main className="flex-1 lg:pl-64">
           <div className="sticky top-0 z-30 lg:hidden h-14 border-b border-border/50 bg-card/80 glass flex items-center px-4 gap-3">
             <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
-            <span className="text-sm font-semibold">Documentation</span>
+            <span className="text-sm font-semibold flex-1">Documentation</span>
+            <ThemeToggle />
           </div>
           <div className="max-w-4xl mx-auto px-6 lg:px-8 py-10">
             {activeSection === 'overview' && <Overview />}
@@ -31,6 +33,21 @@ export default function DocumentationPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+function ThemeToggle() {
+  const [, setToggle] = useState(false);
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  return (
+    <button
+      onClick={() => { setTheme(getTheme() === 'dark' ? 'light' : 'dark'); setToggle(p => !p); }}
+      className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent w-full"
+      title="Toggle theme"
+    >
+      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
+    </button>
   );
 }
 
@@ -72,10 +89,11 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
           </button>
         ))}
       </nav>
-      <div className="mt-8 pt-6 border-t border-border/50">
+      <div className="mt-8 pt-6 border-t border-border/50 space-y-1">
         <Link to="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
           <ArrowRight className="h-4 w-4" /> Go to Dashboard
         </Link>
+        <ThemeToggle />
       </div>
     </div>
   );
