@@ -51,6 +51,14 @@ public class WebhookDeliveryService {
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final PayloadTransformService payloadTransformService;
 
+    private final Counter deliverySuccessCounter;
+    private final Counter deliveryFailureCounter;
+    private final Counter deliveryErrorCounter;
+    private final Counter orderingGapTimeoutCounter;
+    private final Timer deliveryLatency2xx;
+    private final Timer deliveryLatency4xx;
+    private final Timer deliveryLatency5xx;
+
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
             EndpointRepository endpointRepository,
@@ -89,6 +97,24 @@ public class WebhookDeliveryService {
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
         this.payloadTransformService = payloadTransformService;
+
+        this.deliverySuccessCounter = Counter.builder("webhook_delivery_attempts_total")
+                .tag("result", "success").tag("status_class", "2xx")
+                .register(meterRegistry);
+        this.deliveryFailureCounter = Counter.builder("webhook_delivery_attempts_total")
+                .tag("result", "failure").tag("status_class", "non_2xx")
+                .register(meterRegistry);
+        this.deliveryErrorCounter = Counter.builder("webhook_delivery_attempts_total")
+                .tag("result", "error").tag("status_class", "none")
+                .register(meterRegistry);
+        this.orderingGapTimeoutCounter = Counter.builder("webhook_ordering_gap_timeout_total")
+                .register(meterRegistry);
+        this.deliveryLatency2xx = Timer.builder("webhook_delivery_latency_ms")
+                .tag("status_class", "2xx").register(meterRegistry);
+        this.deliveryLatency4xx = Timer.builder("webhook_delivery_latency_ms")
+                .tag("status_class", "4xx").register(meterRegistry);
+        this.deliveryLatency5xx = Timer.builder("webhook_delivery_latency_ms")
+                .tag("status_class", "5xx").register(meterRegistry);
     }
 
     public void processDelivery(DeliveryMessage message) {
@@ -232,9 +258,7 @@ public class WebhookDeliveryService {
                         return response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
                                 .map(responseBody -> {
-                                    sample.stop(Timer.builder("webhook_delivery_latency_ms")
-                                        .tag("status_code", String.valueOf(status))
-                                        .register(meterRegistry));
+                                    sample.stop(timerForStatus(status));
                                     handleResponse(delivery, status, responseBody, responseHeaders,
                                             requestHeaders, body,
                                             (int) (System.currentTimeMillis() - startTime));
@@ -255,10 +279,11 @@ public class WebhookDeliveryService {
     private void handleResponse(Delivery delivery, int statusCode, String responseBody, 
                                String responseHeaders, String requestHeaders, String requestBody, int durationMs) {
         String result = (statusCode >= 200 && statusCode < 300) ? "success" : "failure";
-        Counter.builder("webhook_delivery_attempts_total")
-            .tag("result", result)
-            .tag("status_code", String.valueOf(statusCode))
-            .register(meterRegistry).increment();
+        if ("success".equals(result)) {
+            deliverySuccessCounter.increment();
+        } else {
+            deliveryFailureCounter.increment();
+        }
         
         saveAttempt(delivery, statusCode, responseBody, responseHeaders, requestHeaders, requestBody, null, durationMs);
 
@@ -278,14 +303,17 @@ public class WebhookDeliveryService {
 
     private void handleError(Delivery delivery, Throwable error, String requestHeaders, 
                             String requestBody, int durationMs) {
-        Counter.builder("webhook_delivery_attempts_total")
-            .tag("result", "error")
-            .tag("status_code", "0")
-            .register(meterRegistry).increment();
+        deliveryErrorCounter.increment();
         
         circuitBreakerService.recordFailure(delivery.getEndpointId(), error);
         saveAttempt(delivery, null, null, null, requestHeaders, requestBody, error.getMessage(), durationMs);
         scheduleRetry(delivery);
+    }
+
+    private Timer timerForStatus(int statusCode) {
+        if (statusCode >= 200 && statusCode < 300) return deliveryLatency2xx;
+        if (statusCode >= 400 && statusCode < 500) return deliveryLatency4xx;
+        return deliveryLatency5xx;
     }
 
     private boolean isRetryable(int statusCode) {
@@ -370,7 +398,7 @@ public class WebhookDeliveryService {
         if (orderingBufferService.isGapTimedOut(oldestPending)) {
             log.warn("Gap timeout for endpoint {}, proceeding with seq={} without seq={}", 
                     endpointId, sequenceNumber, sequenceNumber - 1);
-            meterRegistry.counter("webhook_ordering_gap_timeout_total").increment();
+            orderingGapTimeoutCounter.increment();
             return true;
         }
         
