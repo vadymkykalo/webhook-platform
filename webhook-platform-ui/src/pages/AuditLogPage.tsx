@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import { auditLogApi, AuditLogEntry, AuditLogPage as AuditLogPageData } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
 import {
@@ -75,8 +75,16 @@ export default function AuditLogPage() {
 
       <div className="border rounded-lg bg-card overflow-hidden">
         {loading && !data ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="p-4 space-y-3">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+                <div className="h-4 flex-1 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+              </div>
+            ))}
           </div>
         ) : !data || data.content.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">

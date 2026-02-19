@@ -3,13 +3,15 @@ import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-
 import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
-  Bell, Search, ChevronsLeft, FileText, Mail, Loader2
+  Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun
 } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { CommandPalette } from '../components/CommandPalette';
+import { getTheme, setTheme } from '../lib/theme';
 
 interface NavItem {
   name: string;
@@ -87,8 +89,9 @@ export default function AppLayout() {
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [, setThemeIcon] = useState(false);
 
-  const projectId = params.projectId || location.pathname.match(/\/projects\/([^/]+)/)?.[1];
+  const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
   const [resending, setResending] = useState(false);
   const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
 
@@ -271,7 +274,22 @@ export default function AppLayout() {
 
             {/* Header actions */}
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="Search">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground gap-2 hidden sm:inline-flex"
+                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              >
+                <Search className="h-4 w-4" />
+                <span className="text-xs">Search</span>
+                <kbd className="ml-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground sm:hidden"
+                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              >
                 <Search className="h-4 w-4" />
               </Button>
               <Link to="/docs">
@@ -279,6 +297,20 @@ export default function AppLayout() {
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                title="Toggle theme"
+                onClick={() => {
+                  const current = getTheme();
+                  const next = current === 'dark' ? 'light' : 'dark';
+                  setTheme(next);
+                  setThemeIcon(prev => !prev);
+                }}
+              >
+                {document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
             </div>
           </header>
 
@@ -310,6 +342,7 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
+      <CommandPalette />
     </div>
   );
 }
