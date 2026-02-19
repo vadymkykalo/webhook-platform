@@ -16,23 +16,14 @@ COPY webhook-platform-ui/ .
 RUN npm run build
 
 # Runtime stage
-FROM node:18-alpine
-
-WORKDIR /app
-
-# Copy package files for production dependencies
-COPY webhook-platform-ui/package*.json ./
-
-# Install only production dependencies
-RUN npm ci --production
+FROM nginx:1.25-alpine
 
 # Copy built assets from build stage
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Install serve for static file serving
-RUN npm install -g serve
+# Copy nginx config
+COPY webhook-platform-ui/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 5173
 
-# Serve built app
-CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["nginx", "-g", "daemon off;"]
