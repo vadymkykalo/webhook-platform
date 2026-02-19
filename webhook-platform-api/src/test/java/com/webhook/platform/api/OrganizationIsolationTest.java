@@ -81,7 +81,7 @@ public class OrganizationIsolationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/projects/" + project.getId())
                         .header("Authorization", "Bearer " + user2Auth.getAccessToken()))
-                .andExpect(status().is5xxServerError());
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/api/v1/projects")
                         .header("Authorization", "Bearer " + user1Auth.getAccessToken()))
