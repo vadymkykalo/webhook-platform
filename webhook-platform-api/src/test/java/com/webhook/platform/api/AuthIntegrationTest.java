@@ -25,7 +25,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     public void testRegisterLoginAndGetCurrentUser() throws Exception {
         RegisterRequest registerRequest = RegisterRequest.builder()
                 .email("test@example.com")
-                .password("password123")
+                .password("Test1234!")
                 .organizationName("Test Company")
                 .build();
 
@@ -52,7 +52,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
 
         LoginRequest loginRequest = LoginRequest.builder()
                 .email("test@example.com")
-                .password("password123")
+                .password("Test1234!")
                 .build();
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -67,7 +67,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     public void testLoginWithInvalidCredentials() throws Exception {
         LoginRequest loginRequest = LoginRequest.builder()
                 .email("nonexistent@example.com")
-                .password("wrongpassword")
+                .password("WrongPass1!")
                 .build();
 
         mockMvc.perform(post("/api/v1/auth/login")

@@ -28,10 +28,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.webhook.platform.api.dto.RateLimitInfo;
+import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
+import com.webhook.platform.api.service.TokenBlacklistService;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.annotation.DirtiesContext;
@@ -61,6 +63,12 @@ public class ShedLockConcurrencyTest {
     @MockBean
     private TestEndpointCleanupService testEndpointCleanupService;
 
+    @MockBean
+    private AuthRateLimiterService authRateLimiterService;
+
+    @MockBean
+    private TokenBlacklistService tokenBlacklistService;
+
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
             .withDatabaseName("testdb")
@@ -75,7 +83,8 @@ public class ShedLockConcurrencyTest {
         registry.add("data-retention.max-attempts-per-delivery", () -> "10");
         registry.add("data-retention.delivery-attempts-retention-days", () -> "90");
         registry.add("data-retention.batch-size", () -> "1000");
-        registry.add("webhook.encryption-key", () -> "test_encryption_key_32_chars__");
+        registry.add("webhook.encryption-key", () -> "test_encryption_key_32_chars_pad_extra");
+        registry.add("webhook.encryption-salt", () -> "test_salt_for_integration_tests");
         registry.add("jwt.secret", () -> "test_jwt_secret_key_minimum_32_chars_required_here");
         registry.add("jwt.expiration-ms", () -> "3600000");
     }
