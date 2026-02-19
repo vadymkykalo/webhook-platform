@@ -83,7 +83,7 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
 }
 
 export default function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -94,6 +94,14 @@ export default function AppLayout() {
   const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
   const [resending, setResending] = useState(false);
   const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
+
+  useEffect(() => {
+    authApi.getCurrentUser().then((freshUser) => {
+      if (freshUser.user?.status !== user?.user?.status) {
+        updateUser(freshUser);
+      }
+    }).catch(() => {});
+  }, [location.pathname]);
 
   const handleResendVerification = async () => {
     if (!user?.user?.email) return;
@@ -316,8 +324,8 @@ export default function AppLayout() {
 
           {/* Email verification banner */}
           {needsVerification && (
-            <div className="bg-amber-50 border-b border-amber-200 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-amber-800 text-sm">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/40 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
                 <Mail className="h-4 w-4 flex-shrink-0" />
                 <span>Please verify your email <strong>{user?.user?.email}</strong> to unlock all features.</span>
               </div>
@@ -326,7 +334,7 @@ export default function AppLayout() {
                 size="sm"
                 onClick={handleResendVerification}
                 disabled={resending}
-                className="flex-shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
+                className="flex-shrink-0 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40"
               >
                 {resending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                 {resending ? 'Sending...' : 'Resend email'}

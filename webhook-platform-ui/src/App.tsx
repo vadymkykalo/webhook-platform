@@ -83,6 +83,10 @@ export default function App() {
       localStorage.removeItem('auth_user');
       localStorage.removeItem('refresh_token');
     },
+    updateUser: (newUser: CurrentUserResponse) => {
+      setUser(newUser);
+      localStorage.setItem('auth_user', JSON.stringify(newUser));
+    },
   };
 
   if (loading) {
