@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+!.env.dist
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Build artifacts
+**/target/
+**/node_modules/
+**/dist/
+**/.cache/
+
+# Docker
+docker-compose*.yml
+.dockerignore
+
+# Documentation and scripts
+*.md
+LICENSE
+backups/
+scripts/
+
+# OS files
+.DS_Store
+Thumbs.db
