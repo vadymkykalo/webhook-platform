@@ -12,11 +12,12 @@ import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
@@ -35,6 +36,7 @@ public class EndpointService {
     private final ProjectRepository projectRepository;
     private final WebClient webClient;
     private final String encryptionKey;
+    private final String encryptionSalt;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
 
@@ -43,6 +45,7 @@ public class EndpointService {
             ProjectRepository projectRepository,
             WebClient.Builder webClientBuilder,
             @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
+            @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.endpointRepository = endpointRepository;
@@ -51,6 +54,7 @@ public class EndpointService {
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-Test")
                 .build();
         this.encryptionKey = encryptionKey;
+        this.encryptionSalt = encryptionSalt;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
     }
@@ -73,7 +77,7 @@ public class EndpointService {
         if (secret == null || secret.isBlank()) {
             secret = CryptoUtils.generateSecureToken(32);
         }
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
         
         Endpoint endpoint = Endpoint.builder()
                 .projectId(projectId)
@@ -108,6 +112,12 @@ public class EndpointService {
                 .collect(Collectors.toList());
     }
 
+    public Page<EndpointResponse> listEndpoints(UUID projectId, UUID organizationId, Pageable pageable) {
+        validateProjectOwnership(projectId, organizationId);
+        return endpointRepository.findByProjectIdAndDeletedAtIsNull(projectId, pageable)
+                .map(this::mapToResponse);
+    }
+
     @Transactional
     public EndpointResponse updateEndpoint(UUID id, EndpointRequest request, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
@@ -120,7 +130,7 @@ public class EndpointService {
         endpoint.setDescription(request.getDescription());
         
         if (request.getSecret() != null && !request.getSecret().isEmpty()) {
-            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(request.getSecret(), encryptionKey);
+            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(request.getSecret(), encryptionKey, encryptionSalt);
             endpoint.setSecretEncrypted(encrypted.getCiphertext());
             endpoint.setSecretIv(encrypted.getIv());
         }
@@ -157,7 +167,7 @@ public class EndpointService {
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         String newSecret = CryptoUtils.generateSecureToken(32);
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(newSecret, encryptionKey);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(newSecret, encryptionKey, encryptionSalt);
         
         endpoint.setSecretEncrypted(encrypted.getCiphertext());
         endpoint.setSecretIv(encrypted.getIv());
@@ -191,7 +201,8 @@ public class EndpointService {
         String secret = CryptoUtils.decryptSecret(
                 endpoint.getSecretEncrypted(),
                 endpoint.getSecretIv(),
-                encryptionKey
+                encryptionKey,
+                encryptionSalt
         );
         
         String testPayload = "{\"test\":true,\"message\":\"This is a test webhook\",\"timestamp\":\"" 
@@ -287,8 +298,8 @@ public class EndpointService {
             throw new NotFoundException("Endpoint not found in project");
         }
 
-        CryptoUtils.EncryptedData encryptedCert = CryptoUtils.encryptSecret(request.getClientCert(), encryptionKey);
-        CryptoUtils.EncryptedData encryptedKey = CryptoUtils.encryptSecret(request.getClientKey(), encryptionKey);
+        CryptoUtils.EncryptedData encryptedCert = CryptoUtils.encryptSecret(request.getClientCert(), encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encryptedKey = CryptoUtils.encryptSecret(request.getClientKey(), encryptionKey, encryptionSalt);
 
         endpoint.setMtlsEnabled(true);
         endpoint.setClientCertEncrypted(encryptedCert.getCiphertext());

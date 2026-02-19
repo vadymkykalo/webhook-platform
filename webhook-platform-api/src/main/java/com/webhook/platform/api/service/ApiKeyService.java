@@ -8,6 +8,8 @@ import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
 import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +76,19 @@ public class ApiKeyService {
         return apiKeys.stream()
                 .map(key -> mapToResponse(key, null))
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ApiKeyResponse> listApiKeys(UUID projectId, UUID organizationId, Pageable pageable) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found"));
+
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new ForbiddenException("Project does not belong to your organization");
+        }
+
+        return apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId, pageable)
+                .map(key -> mapToResponse(key, null));
     }
 
     @Transactional

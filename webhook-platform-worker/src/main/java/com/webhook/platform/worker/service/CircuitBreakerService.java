@@ -1,28 +1,47 @@
 package com.webhook.platform.worker.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Slf4j
 public class CircuitBreakerService {
 
     private final CircuitBreakerRegistry circuitBreakerRegistry;
-    private final ConcurrentMap<UUID, CircuitBreaker> endpointBreakers = new ConcurrentHashMap<>();
-    private final MeterRegistry meterRegistry;
+    private final Cache<UUID, CircuitBreaker> endpointBreakers;
+    private final Counter stateTransitionCounter;
+    private final Counter rejectedCounter;
 
     public CircuitBreakerService(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-        
+        this.stateTransitionCounter = Counter.builder("circuit_breaker_state_transitions_total")
+                .description("Circuit breaker state transitions")
+                .register(meterRegistry);
+        this.rejectedCounter = Counter.builder("circuit_breaker_rejected_total")
+                .description("Calls rejected by open circuit breaker")
+                .register(meterRegistry);
+
+        this.endpointBreakers = Caffeine.newBuilder()
+                .maximumSize(10_000)
+                .expireAfterAccess(Duration.ofHours(1))
+                .removalListener((UUID key, CircuitBreaker breaker, RemovalCause cause) -> {
+                    if (key != null) {
+                        log.debug("Evicted CircuitBreaker for endpoint {} (cause: {})", key, cause);
+                    }
+                })
+                .recordStats()
+                .build();
+
         CircuitBreakerConfig defaultConfig = CircuitBreakerConfig.custom()
                 .failureRateThreshold(50)
                 .slowCallRateThreshold(80)
@@ -38,7 +57,7 @@ public class CircuitBreakerService {
     }
 
     public CircuitBreaker getCircuitBreaker(UUID endpointId) {
-        return endpointBreakers.computeIfAbsent(endpointId, id -> {
+        return endpointBreakers.get(endpointId, id -> {
             String name = "endpoint-" + id.toString().substring(0, 8);
             CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker(name);
             
@@ -49,11 +68,7 @@ public class CircuitBreakerService {
                                 event.getStateTransition().getFromState(),
                                 event.getStateTransition().getToState());
                         
-                        meterRegistry.counter("circuit_breaker_state_transitions_total",
-                                "endpoint", name,
-                                "from", event.getStateTransition().getFromState().name(),
-                                "to", event.getStateTransition().getToState().name()
-                        ).increment();
+                        stateTransitionCounter.increment();
                     })
                     .onError(event -> {
                         log.debug("CircuitBreaker {} recorded error: {}",
@@ -71,9 +86,7 @@ public class CircuitBreakerService {
         
         if (!permitted) {
             log.warn("CircuitBreaker OPEN for endpoint {}, rejecting call", endpointId);
-            meterRegistry.counter("circuit_breaker_rejected_total",
-                    "endpoint", "endpoint-" + endpointId.toString().substring(0, 8)
-            ).increment();
+            rejectedCounter.increment();
         }
         
         return permitted;
@@ -94,7 +107,7 @@ public class CircuitBreakerService {
     }
 
     public void reset(UUID endpointId) {
-        CircuitBreaker breaker = endpointBreakers.get(endpointId);
+        CircuitBreaker breaker = endpointBreakers.getIfPresent(endpointId);
         if (breaker != null) {
             breaker.reset();
             log.info("Reset CircuitBreaker for endpoint: {}", endpointId);

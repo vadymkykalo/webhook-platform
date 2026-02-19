@@ -1,5 +1,5 @@
 import { http } from './http';
-import type { EndpointRequest, EndpointResponse } from '../types/api.types';
+import type { EndpointRequest, EndpointResponse, PageResponse } from '../types/api.types';
 
 export interface EndpointTestResponse {
   success: boolean;
@@ -12,7 +12,12 @@ export interface EndpointTestResponse {
 
 export const endpointsApi = {
   list: (projectId: string): Promise<EndpointResponse[]> => {
-    return http.get<EndpointResponse[]>(`/api/v1/projects/${projectId}/endpoints`);
+    return http.get<PageResponse<EndpointResponse>>(`/api/v1/projects/${projectId}/endpoints?size=1000`)
+      .then(page => page.content);
+  },
+
+  listPaged: (projectId: string, page = 0, size = 20): Promise<PageResponse<EndpointResponse>> => {
+    return http.get<PageResponse<EndpointResponse>>(`/api/v1/projects/${projectId}/endpoints?page=${page}&size=${size}`);
   },
 
   create: (projectId: string, data: EndpointRequest): Promise<EndpointResponse> => {

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff } from 'lucide-react';
+import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { endpointsApi } from '../api/endpoints.api';
 import { projectsApi } from '../api/projects.api';
-import type { EndpointResponse, ProjectResponse } from '../types/api.types';
+import type { EndpointResponse, ProjectResponse, PageResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -54,12 +54,15 @@ export default function EndpointsPage() {
   const [mtlsEndpoint, setMtlsEndpoint] = useState<EndpointResponse | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [skippingId, setSkippingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageInfo, setPageInfo] = useState<PageResponse<EndpointResponse> | null>(null);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (projectId) {
       loadData();
     }
-  }, [projectId]);
+  }, [projectId, currentPage]);
 
   const loadData = async () => {
     if (!projectId) return;
@@ -68,10 +71,11 @@ export default function EndpointsPage() {
       setLoading(true);
       const [projectData, endpointsData] = await Promise.all([
         projectsApi.get(projectId),
-        endpointsApi.list(projectId),
+        endpointsApi.listPaged(projectId, currentPage, PAGE_SIZE),
       ]);
       setProject(projectData);
-      setEndpoints(endpointsData);
+      setEndpoints(endpointsData.content);
+      setPageInfo(endpointsData);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to load data');
     } finally {
@@ -434,6 +438,35 @@ export default function EndpointsPage() {
               </CardContent>
             </Card>
           ))}
+
+          {pageInfo && pageInfo.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements)} of {pageInfo.totalElements}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  disabled={pageInfo.first}
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  {currentPage + 1} / {pageInfo.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={pageInfo.last}
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

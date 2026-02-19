@@ -1,9 +1,8 @@
 package com.webhook.platform.common.validation;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
@@ -25,7 +24,7 @@ public class EncryptionKeyValidator {
     @Value("${webhook.encryption-key}")
     private String encryptionKey;
 
-    @EventListener(ApplicationReadyEvent.class)
+    @PostConstruct
     public void validateEncryptionKey() {
         if (encryptionKey == null || encryptionKey.trim().isEmpty()) {
             throw new IllegalStateException(

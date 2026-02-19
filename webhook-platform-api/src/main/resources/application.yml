@@ -6,6 +6,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:webhook_redis_pass}
   
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:webhook_platform}
@@ -42,6 +43,9 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
+  tomcat:
+    max-swallow-size: 1MB
+    max-http-form-content-size: 1MB
 
 management:
   endpoints:
@@ -76,12 +80,19 @@ data-retention:
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
   limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
 
+auth:
+  rate-limit:
+    login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
+    register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
+
 event:
   ingestion:
     rate-limit-per-second: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:100}
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
+  encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
+  max-payload-size-bytes: ${WEBHOOK_MAX_PAYLOAD_SIZE_BYTES:262144}
   url-validation:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
