@@ -214,6 +214,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    stop_grace_period: 35s
     networks:
       - webhook-network
     restart: unless-stopped

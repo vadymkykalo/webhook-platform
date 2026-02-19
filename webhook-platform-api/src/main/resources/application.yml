@@ -1,6 +1,8 @@
 spring:
   application:
     name: webhook-platform-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   
   data:
     redis:
@@ -116,8 +118,6 @@ springdoc:
 
 logging:
   level:
-    root: INFO
-    com.webhook.platform: INFO
+    root: ${LOG_LEVEL:INFO}
+    com.webhook.platform: ${LOG_LEVEL:INFO}
     org.springframework.web: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId:-}] %-5level %logger{36} - %msg%n"

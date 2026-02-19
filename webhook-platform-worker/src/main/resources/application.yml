@@ -1,6 +1,11 @@
+server:
+  shutdown: graceful
+
 spring:
   application:
     name: webhook-platform-worker
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   
   data:
     redis:
@@ -94,7 +99,5 @@ stuck-delivery:
 
 logging:
   level:
-    root: INFO
-    com.webhook.platform: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId:-}] %-5level %logger{36} - %msg%n"
+    root: ${LOG_LEVEL:INFO}
+    com.webhook.platform: ${LOG_LEVEL:INFO}

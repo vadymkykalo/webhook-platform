@@ -1,6 +1,8 @@
 package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
@@ -41,6 +43,7 @@ public class SubscriptionService {
         }
     }
 
+    @Auditable(action = AuditAction.CREATE, resourceType = "Subscription")
     @Transactional
     public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
@@ -76,6 +79,7 @@ public class SubscriptionService {
                 .collect(Collectors.toList());
     }
 
+    @Auditable(action = AuditAction.UPDATE, resourceType = "Subscription")
     @Transactional
     public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)
@@ -115,6 +119,7 @@ public class SubscriptionService {
         return mapToResponse(subscription);
     }
 
+    @Auditable(action = AuditAction.DELETE, resourceType = "Subscription")
     @Transactional
     public void deleteSubscription(UUID id, UUID organizationId) {
         Subscription subscription = subscriptionRepository.findById(id)

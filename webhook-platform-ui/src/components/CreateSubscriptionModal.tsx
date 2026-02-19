@@ -81,8 +81,14 @@ export default function CreateSubscriptionModal({
     }
     if (!eventType.trim()) {
       newErrors.eventType = 'Event type is required';
-    } else if (!/^[a-z0-9._-]+$/i.test(eventType)) {
-      newErrors.eventType = 'Use only letters, numbers, dots, hyphens, and underscores';
+    } else if (!/^[a-z][a-z0-9_.]*$/.test(eventType)) {
+      newErrors.eventType = 'Must start with lowercase letter, only lowercase, digits, dots, underscores';
+    }
+    if (maxAttempts < 1 || maxAttempts > 20) {
+      newErrors.maxAttempts = 'Must be between 1 and 20';
+    }
+    if (timeoutSeconds < 1 || timeoutSeconds > 60) {
+      newErrors.timeoutSeconds = 'Must be between 1 and 60';
     }
 
     setErrors(newErrors);
@@ -253,20 +259,28 @@ export default function CreateSubscriptionModal({
                       onChange={(e) => setMaxAttempts(parseInt(e.target.value) || 7)}
                       disabled={saving}
                     />
-                    <p className="text-xs text-muted-foreground">1-20 attempts</p>
+                    {errors.maxAttempts ? (
+                      <p className="text-xs text-destructive">{errors.maxAttempts}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">1–20 attempts</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="timeoutSeconds">Timeout (seconds)</Label>
                     <Input
                       id="timeoutSeconds"
                       type="number"
-                      min={5}
-                      max={120}
+                      min={1}
+                      max={60}
                       value={timeoutSeconds}
                       onChange={(e) => setTimeoutSeconds(parseInt(e.target.value) || 30)}
                       disabled={saving}
                     />
-                    <p className="text-xs text-muted-foreground">5-120 seconds</p>
+                    {errors.timeoutSeconds ? (
+                      <p className="text-xs text-destructive">{errors.timeoutSeconds}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">1–60 seconds</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2">

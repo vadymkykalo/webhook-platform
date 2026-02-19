@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-
 import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
-  Bell, Search, ChevronsLeft
+  Bell, Search, ChevronsLeft, FileText
 } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
@@ -24,6 +24,7 @@ const mainNav: NavItem[] = [
 
 const orgNav: NavItem[] = [
   { name: 'Members', path: '/members', icon: Users },
+  { name: 'Audit Log', path: '/audit-log', icon: FileText },
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
 

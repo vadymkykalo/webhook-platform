@@ -18,6 +18,7 @@ import QuickstartPage from './pages/QuickstartPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DlqPage from './pages/DlqPage';
 import TestEndpointsPage from './pages/TestEndpointsPage';
+import AuditLogPage from './pages/AuditLogPage';
 
 export const router = createBrowserRouter([
   {
@@ -91,6 +92,10 @@ export const router = createBrowserRouter([
       {
         path: 'members',
         element: <MembersPage />,
+      },
+      {
+        path: 'audit-log',
+        element: <AuditLogPage />,
       },
       {
         path: 'settings',

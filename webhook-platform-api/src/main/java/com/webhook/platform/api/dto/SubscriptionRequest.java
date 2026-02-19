@@ -1,5 +1,7 @@
 package com.webhook.platform.api.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -26,8 +28,12 @@ public class SubscriptionRequest {
     
     private Boolean orderingEnabled;
 
+    @Min(value = 1, message = "maxAttempts must be at least 1")
+    @Max(value = 20, message = "maxAttempts must be at most 20")
     private Integer maxAttempts;
 
+    @Min(value = 1, message = "timeoutSeconds must be at least 1")
+    @Max(value = 60, message = "timeoutSeconds must be at most 60")
     private Integer timeoutSeconds;
 
     private String retryDelays;
