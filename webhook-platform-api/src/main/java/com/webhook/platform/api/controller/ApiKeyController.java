@@ -12,12 +12,14 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -52,17 +54,18 @@ public class ApiKeyController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "List API keys", description = "Returns all API keys for the project (keys are masked)")
+    @Operation(summary = "List API keys", description = "Returns paginated API keys for the project (keys are masked)")
     @GetMapping
-    public ResponseEntity<List<ApiKeyResponse>> listApiKeys(
+    public ResponseEntity<Page<ApiKeyResponse>> listApiKeys(
             @PathVariable("projectId") UUID projectId,
+            @PageableDefault(size = 20) Pageable pageable,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new UnauthorizedException("Authentication required");
         }
 
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        List<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, jwtAuth.getOrganizationId());
+        Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, jwtAuth.getOrganizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 

@@ -12,6 +12,8 @@ import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,6 +110,12 @@ public class EndpointService {
                 .filter(e -> e.getDeletedAt() == null)
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    public Page<EndpointResponse> listEndpoints(UUID projectId, UUID organizationId, Pageable pageable) {
+        validateProjectOwnership(projectId, organizationId);
+        return endpointRepository.findByProjectIdAndDeletedAtIsNull(projectId, pageable)
+                .map(this::mapToResponse);
     }
 
     @Transactional

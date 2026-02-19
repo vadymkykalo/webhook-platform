@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff } from 'lucide-react';
+import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiKeysApi, ApiKeyResponse } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
-import type { ProjectResponse } from '../types/api.types';
+import type { ProjectResponse, PageResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -40,12 +40,15 @@ export default function ApiKeysPage() {
   const [revoking, setRevoking] = useState(false);
   const [newApiKey, setNewApiKey] = useState<ApiKeyResponse | null>(null);
   const [showKey, setShowKey] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageInfo, setPageInfo] = useState<PageResponse<ApiKeyResponse> | null>(null);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (projectId) {
       loadData();
     }
-  }, [projectId]);
+  }, [projectId, currentPage]);
 
   const loadData = async () => {
     if (!projectId) return;
@@ -54,10 +57,11 @@ export default function ApiKeysPage() {
       setLoading(true);
       const [projectData, apiKeysData] = await Promise.all([
         projectsApi.get(projectId),
-        apiKeysApi.list(projectId),
+        apiKeysApi.listPaged(projectId, currentPage, PAGE_SIZE),
       ]);
       setProject(projectData);
-      setApiKeys(apiKeysData);
+      setApiKeys(apiKeysData.content);
+      setPageInfo(apiKeysData);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to load data');
     } finally {
@@ -225,6 +229,35 @@ export default function ApiKeysPage() {
               </CardContent>
             </Card>
           ))}
+
+          {pageInfo && pageInfo.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements)} of {pageInfo.totalElements}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  disabled={pageInfo.first}
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  {currentPage + 1} / {pageInfo.totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={pageInfo.last}
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

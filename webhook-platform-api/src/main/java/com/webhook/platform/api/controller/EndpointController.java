@@ -14,12 +14,14 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -71,16 +73,17 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "List endpoints", description = "Returns all endpoints for the project")
+    @Operation(summary = "List endpoints", description = "Returns paginated endpoints for the project")
     @GetMapping
-    public ResponseEntity<List<EndpointResponse>> listEndpoints(
+    public ResponseEntity<Page<EndpointResponse>> listEndpoints(
             @PathVariable("projectId") UUID projectId,
+            @PageableDefault(size = 20) Pageable pageable,
             Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken)) {
             throw new UnauthorizedException("Authentication required");
         }
         JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        List<EndpointResponse> response = endpointService.listEndpoints(projectId, jwtAuth.getOrganizationId());
+        Page<EndpointResponse> response = endpointService.listEndpoints(projectId, jwtAuth.getOrganizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
