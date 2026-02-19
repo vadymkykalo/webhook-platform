@@ -191,14 +191,36 @@ function DashboardMockup() {
 }
 
 function LogoCloud() {
-  const techs = ['Spring Boot', 'PostgreSQL', 'Apache Kafka', 'Redis', 'React', 'Docker'];
+  const logos = [
+    { name: 'Spring Boot', src: '/logos/springboot.svg' },
+    { name: 'PostgreSQL', src: '/logos/postgresql.svg' },
+    { name: 'Apache Kafka', src: '/logos/apachekafka.svg' },
+    { name: 'Redis', src: '/logos/redis.svg' },
+    { name: 'React', src: '/logos/react.svg' },
+    { name: 'Docker', src: '/logos/docker.svg' },
+    { name: 'TypeScript', src: '/logos/typescript.svg' },
+  ];
+
+  const track = [...logos, ...logos];
+
   return (
-    <section className="py-12 border-y border-border/50">
-      <div className="max-w-7xl mx-auto px-6">
-        <p className="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-6">Built with battle-tested technology</p>
-        <div className="flex items-center justify-center gap-8 md:gap-12 flex-wrap">
-          {techs.map((t) => (
-            <span key={t} className="text-sm font-medium text-muted-foreground/70 hover:text-foreground transition-colors">{t}</span>
+    <section className="py-14 border-y border-border/50 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6 mb-8">
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          Built with battle-tested technology
+        </p>
+      </div>
+      <div className="relative">
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+        <div className="marquee-track">
+          {track.map((logo, i) => (
+            <div key={`${logo.name}-${i}`} className="group flex flex-col items-center gap-3 px-8 md:px-10 flex-shrink-0 cursor-default select-none">
+              <div className="h-14 w-14 flex items-center justify-center rounded-xl border border-border/50 bg-card shadow-sm transition-all duration-500 group-hover:scale-110 group-hover:shadow-lg group-hover:-translate-y-1.5">
+                <img src={logo.src} alt={logo.name} className="h-8 w-8 object-contain transition-all duration-500 opacity-60 grayscale group-hover:opacity-100 group-hover:grayscale-0" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground/60 transition-colors duration-300 group-hover:text-foreground whitespace-nowrap">{logo.name}</span>
+            </div>
           ))}
         </div>
       </div>
@@ -244,67 +266,205 @@ function Features() {
   );
 }
 
+function ArchNode({ name, sub, logoSrc, icon, color, isActive, onClick }: {
+  name: string; sub: string; logoSrc?: string; icon?: React.ReactNode; color: string;
+  isActive: boolean; onClick: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center cursor-pointer group" onClick={onClick}>
+      <div
+        className={`relative w-[5.5rem] h-[5.5rem] lg:w-[6.5rem] lg:h-[6.5rem] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-700 ${
+          isActive
+            ? 'border-transparent scale-110 shadow-xl'
+            : 'border-border bg-card hover:border-primary/20 hover:shadow-md hover:-translate-y-0.5'
+        }`}
+        style={isActive ? {
+          borderColor: `${color}40`,
+          background: `linear-gradient(135deg, ${color}08, ${color}15)`,
+          boxShadow: `0 0 30px ${color}20, 0 4px 20px ${color}10`,
+        } : {}}
+      >
+        {isActive && (
+          <div className="absolute inset-0 rounded-2xl" style={{
+            background: `radial-gradient(circle at 50% 0%, ${color}15, transparent 70%)`,
+          }} />
+        )}
+        {logoSrc ? (
+          <img
+            src={logoSrc}
+            alt={name}
+            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 object-contain transition-all duration-500 ${
+              isActive ? 'opacity-100 grayscale-0' : 'opacity-50 grayscale group-hover:opacity-80 group-hover:grayscale-0'
+            }`}
+          />
+        ) : (
+          <div
+            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 transition-all duration-500 [&>svg]:w-full [&>svg]:h-full ${
+              isActive ? '' : 'text-muted-foreground/60 group-hover:text-foreground/80'
+            }`}
+            style={isActive ? { color } : {}}
+          >
+            {icon}
+          </div>
+        )}
+        <div className={`text-[11px] lg:text-xs font-bold tracking-wide transition-colors duration-500 ${
+          isActive ? 'text-foreground' : 'text-foreground/80'
+        }`}>
+          {name}
+        </div>
+        <div className={`text-[9px] lg:text-[10px] transition-colors duration-500 ${
+          isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'
+        }`}>
+          {sub}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnimatedConnector({ isActive, isPast, color, delay }: { isActive: boolean; isPast: boolean; color: string; delay: number }) {
+  return (
+    <div className="relative w-8 lg:w-14 h-8 mx-0.5 lg:mx-1 flex items-center">
+      <div className={`w-full h-[2px] rounded-full transition-all duration-700 ${
+        isPast ? 'bg-primary/40' : 'bg-border'
+      }`} />
+      {(isActive || isPast) && (
+        <div
+          className="absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full"
+          style={{
+            background: color,
+            boxShadow: `0 0 8px ${color}, 0 0 16px ${color}80`,
+            animation: `data-packet 1.5s ease-in-out ${delay}s infinite`,
+          }}
+        />
+      )}
+      {isPast && (
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full h-[2px] rounded-full bg-gradient-to-r from-primary/20 via-primary/50 to-primary/20" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ArchitectureShowcase() {
   const [activeStep, setActiveStep] = useState(0);
+  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => setActiveStep((prev) => (prev + 1) % 7), 2500);
+    if (hoveredStep !== null) return;
+    const interval = setInterval(() => setActiveStep((prev) => (prev + 1) % 7), 2200);
     return () => clearInterval(interval);
-  }, []);
+  }, [hoveredStep]);
 
   const components = [
-    { name: 'Client', sub: 'POST /events' },
-    { name: 'API', sub: 'Spring Boot' },
-    { name: 'DB', sub: 'Event + Outbox' },
-    { name: 'Publisher', sub: 'Scheduled' },
-    { name: 'Kafka', sub: 'Queue' },
-    { name: 'Worker', sub: 'Consumer' },
-    { name: 'Endpoint', sub: 'HMAC' },
+    { name: 'Client', sub: 'POST /events', color: '#8B5CF6',
+      icon: <Code2 className="w-full h-full" /> },
+    { name: 'API', sub: 'Spring Boot', color: '#6DB33F',
+      logoSrc: '/logos/springboot.svg' },
+    { name: 'DB', sub: 'Event + Outbox', color: '#4169E1',
+      logoSrc: '/logos/postgresql.svg' },
+    { name: 'Publisher', sub: 'Scheduled', color: '#F59E0B',
+      icon: <Clock className="w-full h-full" /> },
+    { name: 'Kafka', sub: 'Queue', color: '#231F20',
+      logoSrc: '/logos/apachekafka.svg' },
+    { name: 'Worker', sub: 'Consumer', color: '#10B981',
+      icon: <RefreshCw className="w-full h-full" /> },
+    { name: 'Endpoint', sub: 'HMAC', color: '#EF4444',
+      icon: <Lock className="w-full h-full" /> },
   ];
 
+  const current = hoveredStep ?? activeStep;
+
   return (
-    <section id="architecture" className="py-24 bg-muted/30">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="architecture" className="py-24 bg-muted/30 relative overflow-hidden">
+      <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
         <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+            <Activity className="h-3 w-3" />
+            Transactional outbox pattern
+          </div>
           <h2 className="text-headline mb-4">Battle-tested <span className="gradient-text">architecture</span></h2>
-          <p className="text-body-lg text-muted-foreground">Transactional outbox pattern for zero data loss</p>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            Every event is persisted atomically, published reliably, and delivered with full observability
+          </p>
         </div>
 
         <div className="relative">
-          <div className="absolute -inset-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-2xl blur-2xl" />
-          <div className="relative bg-card rounded-xl border shadow-elevated overflow-hidden">
-            <div className="bg-muted/50 border-b px-4 py-3 flex items-center justify-between">
+          <div className="absolute -inset-4 bg-gradient-to-r from-primary/10 via-purple-500/5 to-primary/10 rounded-3xl blur-2xl" />
+          <div className="relative bg-card/80 backdrop-blur-sm rounded-2xl border shadow-elevated overflow-hidden">
+            <div className="bg-muted/50 border-b px-5 py-3.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-400" />
-                <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                <div className="w-3 h-3 rounded-full bg-green-400" />
+                <div className="w-3 h-3 rounded-full bg-red-400/80" />
+                <div className="w-3 h-3 rounded-full bg-yellow-400/80" />
+                <div className="w-3 h-3 rounded-full bg-green-400/80" />
               </div>
-              <div className="text-xs font-medium text-muted-foreground">Architecture Flow</div>
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                </span>
+                Architecture Flow
+              </div>
               <div className="w-16" />
             </div>
 
-            <div className="p-8 lg:p-12">
-              <div className="hidden md:flex items-center justify-center mb-12">
+            <div className="p-6 lg:p-10">
+              <div className="hidden md:flex items-center justify-center mb-10">
                 {components.map((component, index) => (
                   <div key={index} className="flex items-center">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-20 h-20 lg:w-24 lg:h-24 rounded-xl border-2 flex flex-col items-center justify-center transition-all duration-500 ${
-                        activeStep === index
-                          ? 'border-primary/50 bg-accent scale-110 shadow-glow'
-                          : 'border-border bg-card hover:border-primary/20'
-                      }`}>
-                        <div className={`text-sm lg:text-base font-semibold mb-0.5 ${activeStep === index ? 'text-primary' : 'text-foreground'}`}>
-                          {component.name}
-                        </div>
-                        <div className={`text-[10px] lg:text-xs ${activeStep === index ? 'text-primary/70' : 'text-muted-foreground'}`}>
-                          {component.sub}
-                        </div>
-                      </div>
+                    <div
+                      onMouseEnter={() => setHoveredStep(index)}
+                      onMouseLeave={() => setHoveredStep(null)}
+                      style={{ animation: current === index ? 'float 3s ease-in-out infinite' : 'none' }}
+                    >
+                      <ArchNode
+                        name={component.name}
+                        sub={component.sub}
+                        logoSrc={component.logoSrc}
+                        icon={component.icon}
+                        color={component.color}
+                        isActive={current === index}
+                        onClick={() => setActiveStep(index)}
+                      />
                     </div>
                     {index < components.length - 1 && (
-                      <div className={`w-6 lg:w-12 h-0.5 mx-1 lg:mx-2 transition-all duration-500 rounded-full ${
-                        activeStep > index ? 'bg-primary' : activeStep === index ? 'bg-primary/50' : 'bg-border'
-                      }`} />
+                      <AnimatedConnector
+                        isActive={current === index}
+                        isPast={current > index}
+                        color={components[index].color}
+                        delay={index * 0.15}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Mobile: vertical list */}
+              <div className="md:hidden space-y-3 mb-8">
+                {components.map((component, index) => (
+                  <div
+                    key={index}
+                    className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 ${
+                      current === index ? 'border-primary/30 bg-accent shadow-sm' : 'border-transparent'
+                    }`}
+                    onClick={() => setActiveStep(index)}
+                  >
+                    <div className="h-10 w-10 rounded-lg flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5"
+                      style={{ background: `${component.color}15`, color: component.color }}>
+                      {component.logoSrc
+                        ? <img src={component.logoSrc} alt={component.name} className="h-5 w-5 object-contain" />
+                        : component.icon}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold">{component.name}</div>
+                      <div className="text-xs text-muted-foreground">{component.sub}</div>
+                    </div>
+                    {index < components.length - 1 && (
+                      <ArrowRight className="h-4 w-4 text-muted-foreground/30 ml-auto" />
                     )}
                   </div>
                 ))}
@@ -312,13 +472,16 @@ function ArchitectureShowcase() {
 
               <div className="grid md:grid-cols-3 gap-4">
                 {[
-                  { title: 'Atomic writes', desc: 'Single transaction ensures consistency' },
-                  { title: 'Zero data loss', desc: 'Events never lost during failures' },
-                  { title: 'At-least-once', desc: 'Automatic retry with exponential backoff' },
+                  { title: 'Atomic writes', desc: 'Single transaction ensures consistency', icon: <Shield className="h-4 w-4" /> },
+                  { title: 'Zero data loss', desc: 'Events never lost during failures', icon: <CheckCircle2 className="h-4 w-4" /> },
+                  { title: 'At-least-once', desc: 'Automatic retry with exponential backoff', icon: <RefreshCw className="h-4 w-4" /> },
                 ].map((item) => (
-                  <div key={item.title} className="p-4 rounded-lg border bg-muted/30 hover:bg-accent hover:border-primary/20 transition-all">
-                    <div className="font-semibold text-sm mb-1">{item.title}</div>
-                    <div className="text-xs text-muted-foreground">{item.desc}</div>
+                  <div key={item.title} className="group p-5 rounded-xl border bg-gradient-to-br from-muted/30 to-transparent hover:from-accent hover:to-accent/50 hover:border-primary/20 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="text-primary/70 group-hover:text-primary transition-colors">{item.icon}</div>
+                      <div className="font-semibold text-sm">{item.title}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground leading-relaxed">{item.desc}</div>
                   </div>
                 ))}
               </div>
