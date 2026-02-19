@@ -274,12 +274,12 @@ export WEBHOOK_BASE_URL="https://your-api.com/api/v1"`,
       </div>
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { name: 'Node.js', pkg: '@webhook-platform/node', url: 'https://www.npmjs.com/package/@webhook-platform/node', icon: '🟢' },
-          { name: 'Python', pkg: 'webhook-platform', url: 'https://pypi.org/project/webhook-platform/', icon: '🐍' },
-          { name: 'PHP', pkg: 'webhook-platform/php', url: 'https://packagist.org/packages/webhook-platform/php', icon: '🐘' },
+          { name: 'Node.js', pkg: '@webhook-platform/node', url: 'https://www.npmjs.com/package/@webhook-platform/node', logo: '/logos/nodejs.svg' },
+          { name: 'Python', pkg: 'webhook-platform', url: 'https://pypi.org/project/webhook-platform/', logo: '/logos/python.svg' },
+          { name: 'PHP', pkg: 'webhook-platform/php', url: 'https://packagist.org/packages/webhook-platform/php', logo: '/logos/php.svg' },
         ].map(sdk => (
           <a key={sdk.name} href={sdk.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-md transition-all group">
-            <span className="text-2xl">{sdk.icon}</span>
+            <img src={sdk.logo} alt={sdk.name} className="h-7 w-7" />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{sdk.name}</div>
               <div className="text-xs text-muted-foreground truncate font-mono">{sdk.pkg}</div>
@@ -753,7 +753,7 @@ function SDKSection() {
             name: 'Node.js / TypeScript',
             pkg: '@webhook-platform/node',
             url: 'https://www.npmjs.com/package/@webhook-platform/node',
-            icon: '🟢',
+            logo: '/logos/nodejs.svg',
             install: 'npm install @webhook-platform/node',
             badge: 'npm',
           },
@@ -761,7 +761,7 @@ function SDKSection() {
             name: 'Python',
             pkg: 'webhook-platform',
             url: 'https://pypi.org/project/webhook-platform/',
-            icon: '🐍',
+            logo: '/logos/python.svg',
             install: 'pip install webhook-platform',
             badge: 'PyPI',
           },
@@ -769,7 +769,7 @@ function SDKSection() {
             name: 'PHP',
             pkg: 'webhook-platform/php',
             url: 'https://packagist.org/packages/webhook-platform/php',
-            icon: '🐘',
+            logo: '/logos/php.svg',
             install: 'composer require webhook-platform/php',
             badge: 'Packagist',
           },
@@ -777,7 +777,7 @@ function SDKSection() {
           <a key={sdk.name} href={sdk.url} target="_blank" rel="noopener noreferrer"
             className="block bg-card rounded-xl border border-border p-6 hover:border-primary/30 hover:shadow-xl transition-all group">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-3xl">{sdk.icon}</span>
+              <img src={sdk.logo} alt={sdk.name} className="h-9 w-9" />
               <span className="text-xs px-2 py-1 bg-muted rounded-md text-muted-foreground font-mono">{sdk.badge}</span>
             </div>
             <div className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors mb-1">{sdk.name}</div>

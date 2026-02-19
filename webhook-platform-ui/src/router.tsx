@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
+import PublicLayout from './layout/PublicLayout';
 import LoginPage from './auth/LoginPage';
 import RegisterPage from './auth/RegisterPage';
 import ProtectedRoute from './auth/ProtectedRoute';
@@ -24,16 +25,17 @@ import NotFoundPage from './pages/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <LandingPage />,
-  },
-  {
-    path: '/quickstart',
-    element: <QuickstartPage />,
-  },
-  {
-    path: '/docs',
-    element: <DocumentationPage />,
+    element: <PublicLayout />,
+    children: [
+      {
+        path: '/',
+        element: <LandingPage />,
+      },
+      {
+        path: '/quickstart',
+        element: <QuickstartPage />,
+      },
+    ],
   },
   {
     path: '/login',
@@ -46,6 +48,10 @@ export const router = createBrowserRouter([
   {
     path: '/verify-email',
     element: <VerifyEmailPage />,
+  },
+  {
+    path: '/docs',
+    element: <DocumentationPage />,
   },
   {
     path: '/admin',
