@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.CurrentUserResponse;
 import com.webhook.platform.api.dto.LoginRequest;
+import com.webhook.platform.api.dto.LogoutRequest;
 import com.webhook.platform.api.dto.RefreshTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.exception.UnauthorizedException;
@@ -95,6 +96,24 @@ public class AuthController {
             log.error("Token refresh failed: {}", e.getMessage());
             throw e;
         }
+    }
+
+    @Operation(summary = "Logout", description = "Revokes access and refresh tokens")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Logged out successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody(required = false) LogoutRequest request,
+                                       HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        String accessToken = (authHeader != null && authHeader.startsWith("Bearer "))
+                ? authHeader.substring(7) : null;
+        String refreshToken = (request != null) ? request.getRefreshToken() : null;
+
+        authService.logout(accessToken, refreshToken);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Get current user", description = "Returns information about the authenticated user")

@@ -26,17 +26,20 @@ public class AuthService {
     private final MembershipRepository membershipRepository;
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final TokenBlacklistService tokenBlacklistService;
 
     public AuthService(
             UserRepository userRepository,
             OrganizationRepository organizationRepository,
             MembershipRepository membershipRepository,
-            JwtUtil jwtUtil) {
+            JwtUtil jwtUtil,
+            TokenBlacklistService tokenBlacklistService) {
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
         this.jwtUtil = jwtUtil;
         this.passwordEncoder = new BCryptPasswordEncoder();
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Transactional
@@ -103,6 +106,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
 
+        String oldJti = jwtUtil.getJtiFromToken(refreshToken);
+        if (tokenBlacklistService.isBlacklisted(oldJti)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token has been revoked");
+        }
+
         UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
@@ -115,6 +123,8 @@ public class AuthService {
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
 
+        tokenBlacklistService.blacklist(oldJti, jwtUtil.getExpirationFromToken(refreshToken));
+
         String newAccessToken = jwtUtil.generateAccessToken(user.getId(), membership.getOrganizationId(), membership.getRole());
         String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
 
@@ -122,6 +132,19 @@ public class AuthService {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .build();
+    }
+
+    public void logout(String accessToken, String refreshToken) {
+        if (accessToken != null && jwtUtil.validateToken(accessToken)) {
+            tokenBlacklistService.blacklist(
+                    jwtUtil.getJtiFromToken(accessToken),
+                    jwtUtil.getExpirationFromToken(accessToken));
+        }
+        if (refreshToken != null && jwtUtil.validateToken(refreshToken)) {
+            tokenBlacklistService.blacklist(
+                    jwtUtil.getJtiFromToken(refreshToken),
+                    jwtUtil.getExpirationFromToken(refreshToken));
+        }
     }
 
     public CurrentUserResponse getCurrentUser(UUID userId, UUID organizationId, MembershipRole role) {

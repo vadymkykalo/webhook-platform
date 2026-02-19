@@ -71,6 +71,7 @@ export default function App() {
       localStorage.setItem('auth_user', JSON.stringify(newUser));
     },
     logout: () => {
+      http.post('/api/v1/auth/logout', { refreshToken }).catch(() => {});
       setToken(null);
       setRefreshToken(null);
       setUser(null);

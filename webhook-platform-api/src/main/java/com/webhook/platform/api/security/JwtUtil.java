@@ -37,6 +37,7 @@ public class JwtUtil {
         claims.put("role", role.name());
         
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .claims(claims)
                 .subject(userId.toString())
                 .issuedAt(new Date())
@@ -47,6 +48,7 @@ public class JwtUtil {
 
     public String generateRefreshToken(UUID userId) {
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(userId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
@@ -75,6 +77,21 @@ public class JwtUtil {
     public MembershipRole getRoleFromToken(String token) {
         Claims claims = parseToken(token);
         return MembershipRole.valueOf(claims.get("role", String.class));
+    }
+
+    public String getJtiFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.getId();
+    }
+
+    public Date getExpirationFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.getExpiration();
+    }
+
+    public Date getIssuedAtFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims.getIssuedAt();
     }
 
     public boolean validateToken(String token) {
