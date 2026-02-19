@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { auditLogApi, AuditLogEntry, AuditLogPage } from '../api/auditLog.api';
-import { Badge } from '../components/ui/badge';
+import { auditLogApi, AuditLogEntry, AuditLogPage as AuditLogPageData } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
 import {
   Table,
@@ -40,7 +39,7 @@ function shortId(id: string | null) {
 }
 
 export default function AuditLogPage() {
-  const [data, setData] = useState<AuditLogPage | null>(null);
+  const [data, setData] = useState<AuditLogPageData | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
 
