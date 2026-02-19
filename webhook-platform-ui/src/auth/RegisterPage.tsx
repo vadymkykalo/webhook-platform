@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Webhook, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Webhook, Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -16,6 +16,8 @@ export default function RegisterPage() {
   const [organizationName, setOrganizationName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const [resending, setResending] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -35,8 +37,8 @@ export default function RegisterPage() {
       http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
-      toast.success('Account created successfully!');
-      navigate('/projects');
+      toast.success('Account created! Please verify your email.');
+      setRegistered(true);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
       setError(errorMessage);
@@ -46,10 +48,22 @@ export default function RegisterPage() {
     }
   };
 
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await authApi.resendVerification(email);
+      toast.success('Verification email sent!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to resend verification email');
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-purple-700 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-purple-700 dark:from-primary/30 dark:via-primary/20 dark:to-purple-900/40 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <Link to="/" className="flex items-center gap-3">
@@ -92,6 +106,39 @@ export default function RegisterPage() {
       {/* Right panel - form */}
       <div className="flex-1 flex items-center justify-center px-6 py-12 bg-background">
         <div className="w-full max-w-[420px] animate-fade-in-up">
+
+          {registered ? (
+            <div className="text-center space-y-6">
+              <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight mb-2">Check your email</h1>
+                <p className="text-muted-foreground">
+                  We've sent a verification link to <strong>{email}</strong>.
+                  Click it to activate your account.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <Button onClick={() => navigate('/admin/dashboard')} className="w-full">
+                  Continue to Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="w-full"
+                >
+                  {resending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {resending ? 'Sending...' : 'Resend verification email'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Didn't receive it? Check your spam folder or click resend above.
+              </p>
+            </div>
+          ) : (
+          <>
           <Link
             to="/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
@@ -171,6 +218,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 className="h-11"
               />
+              <p className="text-[11px] text-muted-foreground">Must include uppercase, lowercase, digit, and special character (@$!%*?&-_#)</p>
             </div>
 
             {error && (
@@ -199,6 +247,8 @@ export default function RegisterPage() {
               Sign in
             </Link>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

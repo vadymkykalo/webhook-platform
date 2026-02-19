@@ -17,9 +17,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+
+import jakarta.annotation.PreDestroy;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @Slf4j
@@ -58,6 +59,9 @@ public class WebhookDeliveryService {
     private final Timer deliveryLatency2xx;
     private final Timer deliveryLatency4xx;
     private final Timer deliveryLatency5xx;
+
+    private final AtomicInteger inFlightCount = new AtomicInteger(0);
+    private volatile boolean shuttingDown = false;
 
     public WebhookDeliveryService(
             DeliveryRepository deliveryRepository,
@@ -117,7 +121,41 @@ public class WebhookDeliveryService {
                 .tag("status_class", "5xx").register(meterRegistry);
     }
 
+    @PreDestroy
+    public void onShutdown() {
+        shuttingDown = true;
+        log.info("Graceful shutdown initiated, waiting for {} in-flight deliveries...", inFlightCount.get());
+        long deadline = System.currentTimeMillis() + 25_000;
+        while (inFlightCount.get() > 0 && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        int remaining = inFlightCount.get();
+        if (remaining > 0) {
+            log.warn("Shutdown with {} in-flight deliveries still running", remaining);
+        } else {
+            log.info("All in-flight deliveries completed, shutting down cleanly");
+        }
+    }
+
     public void processDelivery(DeliveryMessage message) {
+        if (shuttingDown) {
+            log.warn("Shutdown in progress, rejecting new delivery: {}", message.getDeliveryId());
+            return;
+        }
+        inFlightCount.incrementAndGet();
+        try {
+            doProcessDelivery(message);
+        } finally {
+            inFlightCount.decrementAndGet();
+        }
+    }
+
+    private void doProcessDelivery(DeliveryMessage message) {
         Optional<Delivery> deliveryOpt = deliveryRepository.findById(message.getDeliveryId());
         if (deliveryOpt.isEmpty()) {
             log.error("Delivery not found: {}", message.getDeliveryId());
@@ -265,7 +303,7 @@ public class WebhookDeliveryService {
                                     return status;
                                 });
                     })
-                    .timeout(Duration.ofSeconds(delivery.getTimeoutSeconds() != null ? delivery.getTimeoutSeconds() : 30))
+                    .timeout(Duration.ofSeconds(clampTimeout(delivery.getTimeoutSeconds())))
                     .block();
         } catch (Exception e) {
             log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
@@ -536,5 +574,12 @@ public class WebhookDeliveryService {
         } catch (Exception e) {
             log.warn("Failed to parse custom headers: {}", e.getMessage());
         }
+    }
+
+    private int clampTimeout(Integer timeoutSeconds) {
+        if (timeoutSeconds == null) {
+            return 30;
+        }
+        return Math.max(1, Math.min(60, timeoutSeconds));
     }
 }

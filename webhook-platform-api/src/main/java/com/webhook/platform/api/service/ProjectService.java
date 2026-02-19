@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ProjectRequest;
@@ -24,6 +26,7 @@ public class ProjectService {
         this.projectRepository = projectRepository;
     }
 
+    @Auditable(action = AuditAction.CREATE, resourceType = "Project")
     @Transactional
     public ProjectResponse createProject(ProjectRequest request, UUID organizationId) {
         Project project = Project.builder()
@@ -55,6 +58,7 @@ public class ProjectService {
                 .collect(Collectors.toList());
     }
 
+    @Auditable(action = AuditAction.UPDATE, resourceType = "Project")
     @Transactional
     public ProjectResponse updateProject(UUID id, ProjectRequest request, UUID organizationId) {
         Project project = projectRepository.findById(id)
@@ -71,6 +75,7 @@ public class ProjectService {
         return mapToResponse(project);
     }
 
+    @Auditable(action = AuditAction.DELETE, resourceType = "Project")
     @Transactional
     public void deleteProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)

@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.ApiKey;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.ApiKeyRepository;
@@ -37,6 +39,7 @@ public class ApiKeyService {
         this.projectRepository = projectRepository;
     }
 
+    @Auditable(action = AuditAction.CREATE, resourceType = "ApiKey")
     @Transactional
     public ApiKeyResponse createApiKey(UUID projectId, ApiKeyRequest request, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
@@ -91,6 +94,7 @@ public class ApiKeyService {
                 .map(key -> mapToResponse(key, null));
     }
 
+    @Auditable(action = AuditAction.REVOKE, resourceType = "ApiKey")
     @Transactional
     public void revokeApiKey(UUID projectId, UUID apiKeyId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)

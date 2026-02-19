@@ -98,6 +98,9 @@
     -webkit-backdrop-filter: blur(12px) saturate(180%);
     background-color: hsla(0, 0%, 100%, 0.72);
   }
+  .dark .glass {
+    background-color: hsla(222, 47%, 6%, 0.72);
+  }
   .glass-dark {
     backdrop-filter: blur(12px) saturate(180%);
     -webkit-backdrop-filter: blur(12px) saturate(180%);

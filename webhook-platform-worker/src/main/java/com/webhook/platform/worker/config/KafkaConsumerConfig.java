@@ -59,6 +59,7 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(consumerFactory());
         factory.setConcurrency(3);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        factory.getContainerProperties().setShutdownTimeout(30_000L);
         
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
             (consumerRecord, exception) -> {

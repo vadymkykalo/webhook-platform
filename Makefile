@@ -176,6 +176,9 @@ logs-worker: ## Follow logs for Worker service
 logs-ui: ## Follow logs for UI service
 	@$(DOCKER_COMPOSE) logs -f ui
 
+verify-link: ## Show last email verification link from API logs
+	@$(DOCKER_COMPOSE) logs api 2>&1 | grep "Verify URL:" | tail -1 | sed 's/.*Verify URL: //'
+
 health: ## Check health of all services
 	@echo "$(GREEN)Checking service health...$(NC)"
 	@echo "API:    $$(curl -s http://localhost:8080/actuator/health/liveness | jq -r .status 2>/dev/null || echo 'DOWN')"

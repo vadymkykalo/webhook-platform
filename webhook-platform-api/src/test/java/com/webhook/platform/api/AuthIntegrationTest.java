@@ -1,6 +1,8 @@
 package com.webhook.platform.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.domain.entity.User;
+import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,9 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Test
     public void testRegisterLoginAndGetCurrentUser() throws Exception {
         RegisterRequest registerRequest = RegisterRequest.builder()
@@ -35,6 +40,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").exists())
                 .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.emailVerified").value(false))
                 .andReturn();
 
         AuthResponse authResponse = objectMapper.readValue(
@@ -46,9 +52,21 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + authResponse.getAccessToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.email").value("test@example.com"))
-                .andExpect(jsonPath("$.user.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.user.status").value("PENDING_VERIFICATION"))
                 .andExpect(jsonPath("$.organization.name").value("Test Company"))
                 .andExpect(jsonPath("$.role").value("OWNER"));
+
+        User user = userRepository.findByEmail("test@example.com").orElseThrow();
+        String verificationToken = user.getVerificationToken();
+
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .param("token", verificationToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + authResponse.getAccessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.status").value("ACTIVE"));
 
         LoginRequest loginRequest = LoginRequest.builder()
                 .email("test@example.com")
@@ -60,7 +78,8 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
-                .andExpect(jsonPath("$.refreshToken").exists());
+                .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.emailVerified").value(true));
     }
 
     @Test

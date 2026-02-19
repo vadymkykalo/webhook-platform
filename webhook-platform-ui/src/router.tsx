@@ -18,6 +18,9 @@ import QuickstartPage from './pages/QuickstartPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import DlqPage from './pages/DlqPage';
 import TestEndpointsPage from './pages/TestEndpointsPage';
+import AuditLogPage from './pages/AuditLogPage';
+import VerifyEmailPage from './auth/VerifyEmailPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
@@ -41,7 +44,11 @@ export const router = createBrowserRouter([
     element: <RegisterPage />,
   },
   {
-    path: '/',
+    path: '/verify-email',
+    element: <VerifyEmailPage />,
+  },
+  {
+    path: '/admin',
     element: (
       <ProtectedRoute>
         <AppLayout />
@@ -93,9 +100,21 @@ export const router = createBrowserRouter([
         element: <MembersPage />,
       },
       {
+        path: 'audit-log',
+        element: <AuditLogPage />,
+      },
+      {
         path: 'settings',
         element: <SettingsPage />,
       },
+      {
+        path: '*',
+        element: <NotFoundPage />,
+      },
     ],
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]);

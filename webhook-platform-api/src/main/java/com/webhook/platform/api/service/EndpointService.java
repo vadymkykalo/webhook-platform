@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
@@ -67,6 +69,7 @@ public class EndpointService {
         }
     }
 
+    @Auditable(action = AuditAction.CREATE, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse createEndpoint(UUID projectId, EndpointRequest request, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
@@ -118,6 +121,7 @@ public class EndpointService {
                 .map(this::mapToResponse);
     }
 
+    @Auditable(action = AuditAction.UPDATE, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse updateEndpoint(UUID id, EndpointRequest request, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
@@ -150,6 +154,7 @@ public class EndpointService {
         return mapToResponse(endpoint);
     }
 
+    @Auditable(action = AuditAction.DELETE, resourceType = "Endpoint")
     @Transactional
     public void deleteEndpoint(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)
@@ -160,6 +165,7 @@ public class EndpointService {
         endpointRepository.save(endpoint);
     }
 
+    @Auditable(action = AuditAction.ROTATE_SECRET, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse rotateSecret(UUID id, UUID organizationId) {
         Endpoint endpoint = endpointRepository.findById(id)

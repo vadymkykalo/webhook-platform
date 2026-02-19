@@ -7,6 +7,7 @@ export interface AuthState {
   refreshToken: string | null;
   login: (token: string, refreshToken: string, user: CurrentUserResponse) => void;
   logout: () => void;
+  updateUser: (user: CurrentUserResponse) => void;
   isAuthenticated: boolean;
 }
 

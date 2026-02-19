@@ -170,7 +170,7 @@ export default function EventsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/projects/${projectId}/deliveries`)} title="View deliveries">
+                      <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title="View deliveries">
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>

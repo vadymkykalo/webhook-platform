@@ -25,6 +25,7 @@ export interface AuthResponse {
   refreshToken: string;
   tokenType: string;
   expiresIn: number;
+  emailVerified?: boolean;
 }
 
 export interface UserResponse {

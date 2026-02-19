@@ -3,12 +3,15 @@ import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-
 import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
-  Bell, Search, ChevronsLeft
+  Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun
 } from 'lucide-react';
 import { useAuth } from '../auth/auth.store';
+import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { CommandPalette } from '../components/CommandPalette';
+import { getTheme, setTheme } from '../lib/theme';
 
 interface NavItem {
   name: string;
@@ -18,24 +21,25 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Projects', path: '/projects', icon: FolderKanban },
+  { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+  { name: 'Projects', path: '/admin/projects', icon: FolderKanban },
 ];
 
 const orgNav: NavItem[] = [
-  { name: 'Members', path: '/members', icon: Users },
-  { name: 'Settings', path: '/settings', icon: Settings },
+  { name: 'Members', path: '/admin/members', icon: Users },
+  { name: 'Audit Log', path: '/admin/audit-log', icon: FileText },
+  { name: 'Settings', path: '/admin/settings', icon: Settings },
 ];
 
 const getProjectNav = (projectId: string): NavItem[] => [
-  { name: 'Endpoints', path: `/projects/${projectId}/endpoints`, icon: Webhook },
-  { name: 'Events', path: `/projects/${projectId}/events`, icon: Radio },
-  { name: 'Deliveries', path: `/projects/${projectId}/deliveries`, icon: Send },
-  { name: 'Subscriptions', path: `/projects/${projectId}/subscriptions`, icon: Bell },
-  { name: 'API Keys', path: `/projects/${projectId}/api-keys`, icon: Key },
-  { name: 'Analytics', path: `/projects/${projectId}/analytics`, icon: BarChart3 },
-  { name: 'Dead Letter Queue', path: `/projects/${projectId}/dlq`, icon: AlertTriangle },
-  { name: 'Test Endpoints', path: `/projects/${projectId}/test-endpoints`, icon: TestTube },
+  { name: 'Endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
+  { name: 'Events', path: `/admin/projects/${projectId}/events`, icon: Radio },
+  { name: 'Deliveries', path: `/admin/projects/${projectId}/deliveries`, icon: Send },
+  { name: 'Subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
+  { name: 'API Keys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
+  { name: 'Analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
+  { name: 'Dead Letter Queue', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
+  { name: 'Test Endpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -79,14 +83,38 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
 }
 
 export default function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [, setThemeIcon] = useState(false);
 
-  const projectId = params.projectId || location.pathname.match(/\/projects\/([^/]+)/)?.[1];
+  const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
+  const [resending, setResending] = useState(false);
+  const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
+
+  useEffect(() => {
+    authApi.getCurrentUser().then((freshUser) => {
+      if (freshUser.user?.status !== user?.user?.status) {
+        updateUser(freshUser);
+      }
+    }).catch(() => {});
+  }, [location.pathname]);
+
+  const handleResendVerification = async () => {
+    if (!user?.user?.email) return;
+    setResending(true);
+    try {
+      await authApi.resendVerification(user.user.email);
+      toast.success('Verification email sent!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to resend');
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -239,8 +267,8 @@ export default function AppLayout() {
 
             {/* Breadcrumb */}
             <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Link to="/dashboard" className="hover:text-foreground transition-colors">Home</Link>
-              {location.pathname !== '/dashboard' && (
+              <Link to="/admin/dashboard" className="hover:text-foreground transition-colors">Home</Link>
+              {location.pathname !== '/admin/dashboard' && (
                 <>
                   <ChevronRight className="h-3.5 w-3.5" />
                   <span className="text-foreground font-medium capitalize">
@@ -254,7 +282,22 @@ export default function AppLayout() {
 
             {/* Header actions */}
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="Search">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground gap-2 hidden sm:inline-flex"
+                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              >
+                <Search className="h-4 w-4" />
+                <span className="text-xs">Search</span>
+                <kbd className="ml-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground sm:hidden"
+                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              >
                 <Search className="h-4 w-4" />
               </Button>
               <Link to="/docs">
@@ -262,8 +305,42 @@ export default function AppLayout() {
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                title="Toggle theme"
+                onClick={() => {
+                  const current = getTheme();
+                  const next = current === 'dark' ? 'light' : 'dark';
+                  setTheme(next);
+                  setThemeIcon(prev => !prev);
+                }}
+              >
+                {document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
             </div>
           </header>
+
+          {/* Email verification banner */}
+          {needsVerification && (
+            <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/40 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
+                <Mail className="h-4 w-4 flex-shrink-0" />
+                <span>Please verify your email <strong>{user?.user?.email}</strong> to unlock all features.</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResendVerification}
+                disabled={resending}
+                className="flex-shrink-0 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+              >
+                {resending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                {resending ? 'Sending...' : 'Resend email'}
+              </Button>
+            </div>
+          )}
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto bg-muted/30">
@@ -273,6 +350,7 @@ export default function AppLayout() {
           </main>
         </div>
       </div>
+      <CommandPalette />
     </div>
   );
 }

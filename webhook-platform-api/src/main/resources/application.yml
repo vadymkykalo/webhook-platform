@@ -1,6 +1,8 @@
 spring:
   application:
     name: webhook-platform-api
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   
   data:
     redis:
@@ -106,6 +108,21 @@ test-endpoint:
   max-ttl-hours: ${TEST_ENDPOINT_MAX_TTL_HOURS:72}
   cleanup-interval-ms: ${TEST_ENDPOINT_CLEANUP_INTERVAL_MS:3600000}
 
+app:
+  email:
+    enabled: ${EMAIL_ENABLED:false}
+    from: ${EMAIL_FROM:noreply@hookflow.dev}
+    base-url: ${EMAIL_BASE_URL:http://localhost:5173}
+
+spring.mail:
+  host: ${SMTP_HOST:localhost}
+  port: ${SMTP_PORT:1025}
+  username: ${SMTP_USERNAME:}
+  password: ${SMTP_PASSWORD:}
+  properties:
+    mail.smtp.auth: ${SMTP_AUTH:false}
+    mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+
 springdoc:
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:true}
@@ -116,8 +133,6 @@ springdoc:
 
 logging:
   level:
-    root: INFO
-    com.webhook.platform: INFO
+    root: ${LOG_LEVEL:INFO}
+    com.webhook.platform: ${LOG_LEVEL:INFO}
     org.springframework.web: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId:-}] %-5level %logger{36} - %msg%n"
