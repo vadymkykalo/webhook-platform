@@ -6,6 +6,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:webhook_redis_pass}
   
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:webhook_platform}
@@ -78,6 +79,11 @@ data-retention:
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
   limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
+
+auth:
+  rate-limit:
+    login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
+    register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
 
 event:
   ingestion:

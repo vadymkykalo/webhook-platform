@@ -27,8 +27,8 @@ services:
     image: ${KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: webhook-kafka
     ports:
-      - "9092:9092"
-      - "9093:9093"
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:9093:9093"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -65,12 +65,12 @@ services:
     image: ${REDIS_IMAGE:-redis:7-alpine}
     container_name: webhook-redis
     ports:
-      - "${REDIS_PORT:-6379}:6379"
-    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy allkeys-lru
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-webhook_redis_pass}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-webhook_redis_pass}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -133,6 +133,8 @@ services:
       DATA_RETENTION_CRON: ${DATA_RETENTION_CRON:-0 0 2 * * *}
       DATA_RETENTION_LIMIT_CRON: ${DATA_RETENTION_LIMIT_CRON:-0 */30 * * * *}
       EVENT_INGESTION_RATE_LIMIT_PER_SECOND: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:-100}
+      AUTH_RATE_LIMIT_LOGIN_PER_MINUTE: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:-10}
+      AUTH_RATE_LIMIT_REGISTER_PER_MINUTE: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:-5}
       WEBHOOK_ALLOW_PRIVATE_IPS: ${WEBHOOK_ALLOW_PRIVATE_IPS:-true}
       WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
@@ -146,6 +148,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-webhook_redis_pass}
       JAVA_OPTS: ${API_JAVA_OPTS:-}
     depends_on:
       kafka:
@@ -191,6 +194,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-webhook_redis_pass}
       ORDERING_GAP_TIMEOUT_SECONDS: ${ORDERING_GAP_TIMEOUT_SECONDS:-60}
       ORDERING_DELIVERED_SEQ_TTL_HOURS: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:-24}
       ORDERING_BUFFER_TTL_MINUTES: ${ORDERING_BUFFER_TTL_MINUTES:-10}
