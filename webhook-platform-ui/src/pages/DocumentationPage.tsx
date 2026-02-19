@@ -1661,25 +1661,71 @@ def handle_webhook():
   return examples[type]?.[language] || `// Example not available for ${language}`;
 }
 
-function SDKs() {
-  const [activeLang, setActiveLang] = useState<'node' | 'python' | 'php'>('node');
+function NodeIcon({ className }: { className?: string }) {
+  return <img src="/logos/nodejs.svg" alt="Node.js" className={className} />;
+}
 
-  const sdks = [
-    {
-      id: 'node' as const,
-      name: 'Node.js / TypeScript',
-      pkg: '@webhook-platform/node',
-      url: 'https://www.npmjs.com/package/@webhook-platform/node',
-      badge: 'npm',
-      icon: '🟢',
-      install: 'npm install @webhook-platform/node',
-      init: `import { WebhookPlatform } from '@webhook-platform/node';
+function PythonIcon({ className }: { className?: string }) {
+  return <img src="/logos/python.svg" alt="Python" className={className} />;
+}
+
+function PhpIcon({ className }: { className?: string }) {
+  return <img src="/logos/php.svg" alt="PHP" className={className} />;
+}
+
+function SdkCodeBlock({ label, children, copyText }: { label: string; children: React.ReactNode; copyText?: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(copyText || '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-[#0d1117]">
+      <div className="px-4 py-2 border-b border-white/[0.06] flex items-center justify-between">
+        <span className="text-[11px] font-mono text-white/30">{label}</span>
+        {copyText && (
+          <button onClick={handleCopy} className="text-white/30 hover:text-white/60 transition-colors">
+            {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+        )}
+      </div>
+      <pre className="p-4 text-[13px] font-mono overflow-x-auto leading-relaxed">{children}</pre>
+    </div>
+  );
+}
+
+function SDKs() {
+  const [activeLang, setActiveLang] = useState<'node' | 'python' | 'php' | 'curl'>('node');
+  const [activeSection, setActiveSDKSection] = useState('quickstart');
+
+  const tabs = [
+    { id: 'node' as const, name: 'Node.js', icon: NodeIcon },
+    { id: 'python' as const, name: 'Python', icon: PythonIcon },
+    { id: 'php' as const, name: 'PHP', icon: PhpIcon },
+  ];
+
+  const sections = [
+    { id: 'quickstart', label: 'Quick Start' },
+    { id: 'events', label: 'Events' },
+    { id: 'endpoints', label: 'Endpoints' },
+    { id: 'subscriptions', label: 'Subscriptions' },
+    { id: 'deliveries', label: 'Deliveries' },
+    { id: 'verify', label: 'Signature Verification' },
+    { id: 'errors', label: 'Error Handling' },
+  ];
+
+  const code: Record<string, Record<string, { code: string; label: string }>> = {
+    quickstart: {
+      node: { label: 'typescript', code: `import { WebhookPlatform } from '@webhook-platform/node';
 
 const client = new WebhookPlatform({
   apiKey: 'wh_live_your_api_key',
-  baseUrl: 'https://your-api.com/api/v1', // optional
-});`,
-      sendEvent: `const event = await client.events.send({
+  baseUrl: 'http://localhost:8080', // optional
+});
+
+// Send an event
+const event = await client.events.send({
   type: 'order.completed',
   data: {
     orderId: 'ord_12345',
@@ -1688,199 +1734,600 @@ const client = new WebhookPlatform({
   },
 });
 
-console.log(event.eventId);          // "evt_..."
-console.log(event.deliveriesCreated); // 1`,
-      verify: `import { verifySignature } from '@webhook-platform/node';
-
-app.post('/webhooks', (req, res) => {
-  const isValid = verifySignature({
-    payload: req.body.toString(),
-    signature: req.headers['x-signature'],
-    timestamp: req.headers['x-timestamp'],
-    secret: process.env.WEBHOOK_SECRET,
-  });
-
-  if (!isValid) return res.status(401).json({ error: 'Invalid signature' });
-
-  const event = JSON.parse(req.body.toString());
-  // handle event...
-  res.json({ received: true });
-});`,
-    },
-    {
-      id: 'python' as const,
-      name: 'Python',
-      pkg: 'webhook-platform',
-      url: 'https://pypi.org/project/webhook-platform/',
-      badge: 'PyPI',
-      icon: '🐍',
-      install: 'pip install webhook-platform',
-      init: `from webhook_platform import WebhookPlatform
+console.log(\`Event created: \${event.eventId}\`);
+console.log(\`Deliveries created: \${event.deliveriesCreated}\`);` },
+      python: { label: 'python', code: `from webhook_platform import WebhookPlatform, Event
 
 client = WebhookPlatform(
     api_key="wh_live_your_api_key",
-    base_url="https://your-api.com/api/v1",  # optional
-)`,
-      sendEvent: `event = client.events.send({
-    "type": "order.completed",
-    "data": {
-        "orderId": "ord_12345",
-        "amount": 99.99,
-        "currency": "USD",
-    },
-})
+    base_url="http://localhost:8080",  # optional
+)
 
-print(event["eventId"])           # "evt_..."
-print(event["deliveriesCreated"]) # 1`,
-      verify: `from webhook_platform import verify_signature
-
-@app.route('/webhooks', methods=['POST'])
-def handle_webhook():
-    is_valid = verify_signature(
-        payload=request.get_data(as_text=True),
-        signature=request.headers.get('X-Signature'),
-        timestamp=request.headers.get('X-Timestamp'),
-        secret=os.environ['WEBHOOK_SECRET'],
+# Send an event
+event = client.events.send(
+    Event(
+        type="order.completed",
+        data={
+            "order_id": "ord_12345",
+            "amount": 99.99,
+            "currency": "USD",
+        },
     )
+)
 
-    if not is_valid:
-        return jsonify({"error": "Invalid signature"}), 401
-
-    event = request.get_json()
-    # handle event...
-    return jsonify({"received": True})`,
-    },
-    {
-      id: 'php' as const,
-      name: 'PHP',
-      pkg: 'webhook-platform/php',
-      url: 'https://packagist.org/packages/webhook-platform/php',
-      badge: 'Packagist',
-      icon: '🐘',
-      install: 'composer require webhook-platform/php',
-      init: `<?php
+print(f"Event created: {event.event_id}")
+print(f"Deliveries created: {event.deliveries_created}")` },
+      php: { label: 'php', code: `<?php
 use WebhookPlatform\\WebhookPlatform;
 
-$client = new WebhookPlatform([
-    'apiKey' => 'wh_live_your_api_key',
-    'baseUrl' => 'https://your-api.com/api/v1', // optional
-]);`,
-      sendEvent: `$event = $client->events->send([
-    'type' => 'order.completed',
-    'data' => [
+$client = new WebhookPlatform(
+    apiKey: 'wh_live_your_api_key',
+    baseUrl: 'http://localhost:8080' // optional
+);
+
+// Send an event
+$event = $client->events->send(
+    type: 'order.completed',
+    data: [
         'orderId' => 'ord_12345',
         'amount' => 99.99,
         'currency' => 'USD',
-    ],
-]);
-
-echo $event['eventId'];           // "evt_..."
-echo $event['deliveriesCreated']; // 1`,
-      verify: `<?php
-use WebhookPlatform\\Webhook;
-
-$payload = file_get_contents('php://input');
-
-$isValid = Webhook::verifySignature(
-    payload: $payload,
-    signature: $_SERVER['HTTP_X_SIGNATURE'] ?? '',
-    timestamp: $_SERVER['HTTP_X_TIMESTAMP'] ?? '',
-    secret: getenv('WEBHOOK_SECRET'),
+    ]
 );
 
-if (!$isValid) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Invalid signature']);
-    exit;
+echo "Event created: {$event['eventId']}\\n";
+echo "Deliveries created: {$event['deliveriesCreated']}\\n";` },
+      curl: { label: 'bash', code: `# Send an event
+curl -X POST http://localhost:8080/api/v1/events \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "type": "order.completed",
+    "data": {
+      "orderId": "ord_12345",
+      "amount": 99.99,
+      "currency": "USD"
+    }
+  }'` },
+    },
+    events: {
+      node: { label: 'typescript', code: `// Send event with idempotency key
+const event = await client.events.send(
+  { type: 'order.completed', data: { orderId: '123' } },
+  'unique-idempotency-key'
+);` },
+      python: { label: 'python', code: `from webhook_platform import Event
+
+# Send event with idempotency key
+event = client.events.send(
+    Event(type="order.completed", data={"order_id": "123"}),
+    idempotency_key="unique-key",
+)` },
+      php: { label: 'php', code: `// Send event with idempotency key
+$event = $client->events->send(
+    type: 'order.completed',
+    data: ['orderId' => '123'],
+    idempotencyKey: 'unique-key'
+);` },
+      curl: { label: 'bash', code: `# Send event with idempotency key
+curl -X POST http://localhost:8080/api/v1/events \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: unique-key" \\
+  -d '{"type":"order.completed","data":{"orderId":"123"}}'` },
+    },
+    endpoints: {
+      node: { label: 'typescript', code: `// Create endpoint
+const endpoint = await client.endpoints.create(projectId, {
+  url: 'https://api.example.com/webhooks',
+  description: 'Production webhooks',
+  enabled: true,
+});
+
+// List endpoints
+const endpoints = await client.endpoints.list(projectId);
+
+// Update endpoint
+await client.endpoints.update(projectId, endpointId, {
+  enabled: false,
+});
+
+// Delete endpoint
+await client.endpoints.delete(projectId, endpointId);
+
+// Rotate secret
+const updated = await client.endpoints.rotateSecret(projectId, endpointId);
+console.log(\`New secret: \${updated.secret}\`);
+
+// Test endpoint connectivity
+const result = await client.endpoints.test(projectId, endpointId);
+console.log(\`Test \${result.success ? 'passed' : 'failed'}: \${result.latencyMs}ms\`);` },
+      python: { label: 'python', code: `from webhook_platform import EndpointCreateParams, EndpointUpdateParams
+
+# Create endpoint
+endpoint = client.endpoints.create(
+    project_id,
+    EndpointCreateParams(
+        url="https://api.example.com/webhooks",
+        description="Production webhooks",
+        enabled=True,
+    ),
+)
+
+# List endpoints
+endpoints = client.endpoints.list(project_id)
+
+# Update endpoint
+client.endpoints.update(
+    project_id, endpoint_id,
+    EndpointUpdateParams(enabled=False),
+)
+
+# Delete endpoint
+client.endpoints.delete(project_id, endpoint_id)
+
+# Rotate secret
+updated = client.endpoints.rotate_secret(project_id, endpoint_id)
+print(f"New secret: {updated.secret}")
+
+# Test endpoint connectivity
+result = client.endpoints.test(project_id, endpoint_id)
+print(f"Test {'passed' if result.success else 'failed'}: {result.latency_ms}ms")` },
+      php: { label: 'php', code: `// Create endpoint
+$endpoint = $client->endpoints->create($projectId, [
+    'url' => 'https://api.example.com/webhooks',
+    'description' => 'Production webhooks',
+    'enabled' => true,
+]);
+
+// List endpoints
+$endpoints = $client->endpoints->list($projectId);
+
+// Update endpoint
+$client->endpoints->update($projectId, $endpointId, [
+    'enabled' => false,
+]);
+
+// Delete endpoint
+$client->endpoints->delete($projectId, $endpointId);
+
+// Rotate secret
+$updated = $client->endpoints->rotateSecret($projectId, $endpointId);
+echo "New secret: {$updated['secret']}\\n";
+
+// Test endpoint connectivity
+$result = $client->endpoints->test($projectId, $endpointId);
+$status = $result['success'] ? 'passed' : 'failed';
+echo "Test {$status}: {$result['latencyMs']}ms\\n";` },
+      curl: { label: 'bash', code: `# Create endpoint
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"url":"https://api.example.com/webhooks","description":"Production","enabled":true}'
+
+# List endpoints
+curl http://localhost:8080/api/v1/projects/{projectId}/endpoints \\
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Rotate secret
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id}/rotate-secret \\
+  -H "Authorization: Bearer YOUR_API_KEY"` },
+    },
+    subscriptions: {
+      node: { label: 'typescript', code: `// Subscribe endpoint to event type
+const subscription = await client.subscriptions.create(projectId, {
+  endpointId: endpoint.id,
+  eventType: 'order.completed',
+  enabled: true,
+});
+
+// List subscriptions
+const subscriptions = await client.subscriptions.list(projectId);
+
+// Update subscription
+await client.subscriptions.update(projectId, subscriptionId, {
+  eventType: 'order.shipped',
+  enabled: true,
+});
+
+// Delete subscription
+await client.subscriptions.delete(projectId, subscriptionId);` },
+      python: { label: 'python', code: `from webhook_platform import SubscriptionCreateParams
+
+# Subscribe endpoint to event type
+subscription = client.subscriptions.create(
+    project_id,
+    SubscriptionCreateParams(
+        endpoint_id=endpoint.id,
+        event_type="order.completed",
+        enabled=True,
+    ),
+)
+
+# List subscriptions
+subscriptions = client.subscriptions.list(project_id)
+
+# Update subscription
+client.subscriptions.update(
+    project_id, subscription_id,
+    event_type="order.shipped",
+)
+
+# Delete subscription
+client.subscriptions.delete(project_id, subscription_id)` },
+      php: { label: 'php', code: `// Subscribe endpoint to event type
+$subscription = $client->subscriptions->create($projectId, [
+    'endpointId' => $endpoint['id'],
+    'eventType' => 'order.completed',
+    'enabled' => true,
+]);
+
+// List subscriptions
+$subscriptions = $client->subscriptions->list($projectId);
+
+// Update subscription
+$client->subscriptions->update($projectId, $subscriptionId, [
+    'eventType' => 'order.shipped',
+    'enabled' => true,
+]);
+
+// Delete subscription
+$client->subscriptions->delete($projectId, $subscriptionId);` },
+      curl: { label: 'bash', code: `# Create subscription
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"endpointId":"endpoint-uuid","eventType":"order.completed","enabled":true}'
+
+# List subscriptions
+curl http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
+  -H "Authorization: Bearer YOUR_API_KEY"` },
+    },
+    deliveries: {
+      node: { label: 'typescript', code: `// List deliveries with filters
+const deliveries = await client.deliveries.list(projectId, {
+  status: 'FAILED',
+  page: 0,
+  size: 20,
+});
+
+console.log(\`Total failed: \${deliveries.totalElements}\`);
+
+// Get delivery attempts
+const attempts = await client.deliveries.getAttempts(deliveryId);
+for (const attempt of attempts) {
+  console.log(\`Attempt \${attempt.attemptNumber}: \${attempt.httpStatus} (\${attempt.latencyMs}ms)\`);
 }
 
-$event = json_decode($payload, true);
-// handle event...
-http_response_code(200);
-echo json_encode(['received' => true]);`,
+// Replay failed delivery
+await client.deliveries.replay(deliveryId);` },
+      python: { label: 'python', code: `from webhook_platform import DeliveryListParams, DeliveryStatus
+
+# List deliveries with filters
+deliveries = client.deliveries.list(
+    project_id,
+    DeliveryListParams(status=DeliveryStatus.FAILED, page=0, size=20),
+)
+
+print(f"Total failed: {deliveries.total_elements}")
+
+# Get delivery attempts
+attempts = client.deliveries.get_attempts(delivery_id)
+for attempt in attempts:
+    print(f"Attempt {attempt.attempt_number}: {attempt.http_status} ({attempt.latency_ms}ms)")
+
+# Replay failed delivery
+client.deliveries.replay(delivery_id)` },
+      php: { label: 'php', code: `// List deliveries with filters
+$deliveries = $client->deliveries->list($projectId, [
+    'status' => 'FAILED',
+    'page' => 0,
+    'size' => 20,
+]);
+
+echo "Total failed: {$deliveries['totalElements']}\\n";
+
+// Get delivery attempts
+$attempts = $client->deliveries->getAttempts($deliveryId);
+foreach ($attempts as $attempt) {
+    echo "Attempt {$attempt['attemptNumber']}: {$attempt['httpStatus']} ({$attempt['latencyMs']}ms)\\n";
+}
+
+// Replay failed delivery
+$client->deliveries->replay($deliveryId);` },
+      curl: { label: 'bash', code: `# List failed deliveries
+curl "http://localhost:8080/api/v1/projects/{projectId}/deliveries?status=FAILED&page=0&size=20" \\
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Get delivery attempts
+curl http://localhost:8080/api/v1/deliveries/{deliveryId}/attempts \\
+  -H "Authorization: Bearer YOUR_API_KEY"
+
+# Replay a delivery
+curl -X POST http://localhost:8080/api/v1/deliveries/{deliveryId}/replay \\
+  -H "Authorization: Bearer YOUR_API_KEY"` },
     },
+    verify: {
+      node: { label: 'typescript', code: `import { verifySignature, constructEvent } from '@webhook-platform/node';
+
+app.post('/webhooks', (req, res) => {
+  const payload = req.body; // raw body string
+  const signature = req.headers['x-signature'];
+  const secret = process.env.WEBHOOK_SECRET;
+
+  try {
+    // Option 1: Just verify
+    verifySignature(payload, signature, secret);
+
+    // Option 2: Verify and parse
+    const event = constructEvent(payload, req.headers, secret);
+
+    console.log(\`Received \${event.type}:\`, event.data);
+
+    switch (event.type) {
+      case 'order.completed':
+        handleOrderCompleted(event.data);
+        break;
+    }
+
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('Webhook verification failed:', err.message);
+    res.status(400).send('Invalid signature');
+  }
+});` },
+      python: { label: 'python', code: `from webhook_platform import verify_signature, construct_event, WebhookPlatformError
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route("/webhooks", methods=["POST"])
+def handle_webhook():
+    payload = request.get_data(as_text=True)
+    headers = dict(request.headers)
+    secret = os.environ["WEBHOOK_SECRET"]
+
+    try:
+        # Option 1: Just verify
+        verify_signature(payload, headers.get("X-Signature", ""), secret)
+
+        # Option 2: Verify and parse
+        event = construct_event(payload, headers, secret)
+
+        print(f"Received {event.type}: {event.data}")
+
+        if event.type == "order.completed":
+            handle_order_completed(event.data)
+
+        return "OK", 200
+
+    except WebhookPlatformError as e:
+        print(f"Webhook verification failed: {e.message}")
+        return "Invalid signature", 400` },
+      php: { label: 'php', code: `<?php
+use WebhookPlatform\\Webhook;
+use WebhookPlatform\\Exception\\WebhookPlatformException;
+
+$payload = file_get_contents('php://input');
+$headers = getallheaders();
+$secret = getenv('WEBHOOK_SECRET');
+
+try {
+    // Option 1: Just verify
+    Webhook::verifySignature($payload, $headers['X-Signature'] ?? '', $secret);
+
+    // Option 2: Verify and parse
+    $event = Webhook::constructEvent($payload, $headers, $secret);
+
+    echo "Received {$event['type']}: " . json_encode($event['data']) . "\\n";
+
+    switch ($event['type']) {
+        case 'order.completed':
+            handleOrderCompleted($event['data']);
+            break;
+    }
+
+    http_response_code(200);
+    echo 'OK';
+
+} catch (WebhookPlatformException $e) {
+    error_log("Webhook verification failed: {$e->getMessage()}");
+    http_response_code(400);
+    echo 'Invalid signature';
+}` },
+      curl: { label: 'bash', code: `# Verify signature manually (HMAC-SHA256)
+# The platform signs: timestamp.payload
+# Header: X-Signature = t=<timestamp>,v1=<hmac>
+
+PAYLOAD='{"type":"order.completed","data":{"orderId":"123"}}'
+SECRET="whsec_your_endpoint_secret"
+TIMESTAMP=$(date +%s)
+
+SIGNATURE=$(echo -n "\${TIMESTAMP}.\${PAYLOAD}" | openssl dgst -sha256 -hmac "\${SECRET}" | cut -d' ' -f2)
+
+curl -X POST http://localhost:3000/webhooks \\
+  -H "Content-Type: application/json" \\
+  -H "X-Signature: t=\${TIMESTAMP},v1=\${SIGNATURE}" \\
+  -d "\${PAYLOAD}"` },
+    },
+    errors: {
+      node: { label: 'typescript', code: `import {
+  WebhookPlatformError,
+  RateLimitError,
+  AuthenticationError,
+  ValidationError
+} from '@webhook-platform/node';
+
+try {
+  await client.events.send({ type: 'test', data: {} });
+} catch (err) {
+  if (err instanceof RateLimitError) {
+    console.log(\`Rate limited. Retry after \${err.retryAfter}ms\`);
+    await sleep(err.retryAfter);
+  } else if (err instanceof AuthenticationError) {
+    console.error('Invalid API key');
+  } else if (err instanceof ValidationError) {
+    console.error('Validation failed:', err.fieldErrors);
+  } else if (err instanceof WebhookPlatformError) {
+    console.error(\`Error \${err.status}: \${err.message}\`);
+  }
+}` },
+      python: { label: 'python', code: `from webhook_platform import (
+    WebhookPlatformError,
+    RateLimitError,
+    AuthenticationError,
+    ValidationError,
+)
+
+try:
+    client.events.send(Event(type="test", data={}))
+except RateLimitError as e:
+    print(f"Rate limited. Retry after {e.retry_after_ms}ms")
+    time.sleep(e.retry_after_ms / 1000)
+except AuthenticationError:
+    print("Invalid API key")
+except ValidationError as e:
+    print(f"Validation failed: {e.field_errors}")
+except WebhookPlatformError as e:
+    print(f"Error {e.status}: {e.message}")` },
+      php: { label: 'php', code: `<?php
+use WebhookPlatform\\Exception\\WebhookPlatformException;
+use WebhookPlatform\\Exception\\RateLimitException;
+use WebhookPlatform\\Exception\\AuthenticationException;
+use WebhookPlatform\\Exception\\ValidationException;
+
+try {
+    $client->events->send(type: 'test', data: []);
+} catch (RateLimitException $e) {
+    echo "Rate limited. Retry after {$e->getRetryAfterMs()}ms\\n";
+    usleep($e->getRetryAfterMs() * 1000);
+} catch (AuthenticationException $e) {
+    echo "Invalid API key\\n";
+} catch (ValidationException $e) {
+    echo "Validation failed: " . json_encode($e->getFieldErrors()) . "\\n";
+} catch (WebhookPlatformException $e) {
+    echo "Error {$e->getStatusCode()}: {$e->getMessage()}\\n";
+}` },
+      curl: { label: 'bash', code: `# HTTP status codes:
+# 200 — Success
+# 201 — Created
+# 400 — Validation error (check "message" field)
+# 401 — Invalid or missing API key
+# 404 — Resource not found
+# 409 — Conflict (idempotency key reuse)
+# 429 — Rate limited (check Retry-After header)
+# 500 — Server error
+
+# Example: check for rate limit
+RESPONSE=$(curl -s -w "\\n%{http_code}" -X POST \\
+  http://localhost:8080/api/v1/events \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"type":"test","data":{}}')
+
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+if [ "$HTTP_CODE" = "429" ]; then
+  echo "Rate limited — wait and retry"
+fi` },
+    },
+  };
+
+  const sdkMeta = [
+    { id: 'node' as const, name: 'Node.js / TypeScript', pkg: '@webhook-platform/node', url: 'https://www.npmjs.com/package/@webhook-platform/node', badge: 'npm', install: 'npm install @webhook-platform/node', icon: NodeIcon },
+    { id: 'python' as const, name: 'Python', pkg: 'webhook-platform', url: 'https://pypi.org/project/webhook-platform/', badge: 'PyPI', install: 'pip install webhook-platform', icon: PythonIcon },
+    { id: 'php' as const, name: 'PHP', pkg: 'webhook-platform/php', url: 'https://packagist.org/packages/webhook-platform/php', badge: 'Packagist', install: 'composer require webhook-platform/php', icon: PhpIcon },
   ];
 
-  const active = sdks.find(s => s.id === activeLang)!;
+  const activeCode = code[activeSection]?.[activeLang];
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
       <div>
         <h1 className="text-4xl font-bold text-foreground mb-4">SDKs</h1>
-        <p className="text-xl text-muted-foreground">
-          Official client libraries for Node.js, Python, and PHP.
+        <p className="text-lg text-muted-foreground">
+          Official client libraries for Node.js, Python, and PHP — with full TypeScript / type-hint support.
         </p>
       </div>
 
+      {/* SDK cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {sdks.map(sdk => (
-          <button
-            key={sdk.id}
-            onClick={() => setActiveLang(sdk.id)}
-            className={`text-left p-5 rounded-xl border transition-all ${
-              activeLang === sdk.id
-                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                : 'border-border bg-card hover:border-primary/30 hover:shadow-md'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-2xl">{sdk.icon}</span>
-              <span className="text-[10px] px-2 py-0.5 bg-muted rounded-md text-muted-foreground font-mono uppercase">{sdk.badge}</span>
+        {sdkMeta.map(sdk => (
+          <a key={sdk.id} href={sdk.url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-4 p-5 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
+            <sdk.icon className="h-10 w-10 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{sdk.name}</div>
+              <div className="text-xs text-muted-foreground font-mono truncate">{sdk.pkg}</div>
             </div>
-            <div className="text-sm font-semibold text-foreground mb-0.5">{sdk.name}</div>
-            <div className="text-xs text-muted-foreground font-mono">{sdk.pkg}</div>
-          </button>
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] px-2 py-0.5 bg-muted rounded-md text-muted-foreground font-mono uppercase">{sdk.badge}</span>
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
+          </a>
         ))}
       </div>
 
+      {/* Installation */}
       <div>
         <h2 className="text-2xl font-bold text-foreground mb-4">Installation</h2>
-        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
-          <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
-            <span className="text-xs text-white/40">terminal</span>
-            <a href={active.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-              {active.badge} <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-          <pre className="p-4 text-[13px] text-slate-100 font-mono"><span className="text-slate-500">$ </span>{active.install}</pre>
+        <div className="space-y-2">
+          {sdkMeta.map(sdk => (
+            <SdkCodeBlock key={sdk.id} label="terminal" copyText={sdk.install}>
+              <code className="text-emerald-400">$ </code><code className="text-slate-200">{sdk.install}</code>
+            </SdkCodeBlock>
+          ))}
         </div>
       </div>
 
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Initialize the client</h2>
-        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
-          <pre className="p-4 text-[13px] text-slate-100 font-mono overflow-x-auto leading-relaxed"><code>{active.init}</code></pre>
+      {/* Section nav */}
+      <div className="border-b border-border">
+        <div className="flex gap-1 overflow-x-auto pb-px">
+          {sections.map(s => (
+            <button key={s.id} onClick={() => setActiveSDKSection(s.id)}
+              className={`px-3 py-2 text-[13px] font-medium whitespace-nowrap border-b-2 transition-colors ${
+                activeSection === s.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}>{s.label}</button>
+          ))}
         </div>
       </div>
 
+      {/* Language tabs + code */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Send an event</h2>
-        <p className="text-muted-foreground mb-4">Use the client to send events. Deliveries are created automatically for all subscribed endpoints.</p>
-        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
-          <pre className="p-4 text-[13px] text-slate-100 font-mono overflow-x-auto leading-relaxed"><code>{active.sendEvent}</code></pre>
+        <div className="flex gap-1 mb-4">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveLang(t.id)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                activeLang === t.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'
+              }`}>
+              <t.icon className="h-4 w-4" />
+              {t.name}
+            </button>
+          ))}
+          <button onClick={() => setActiveLang('curl')}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+              activeLang === 'curl' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted'
+            }`}>
+            <Code className="h-4 w-4" />
+            cURL
+          </button>
         </div>
+
+        {activeCode && (
+          <SdkCodeBlock label={activeCode.label} copyText={activeCode.code}>
+            <code className="text-slate-200">{activeCode.code}</code>
+          </SdkCodeBlock>
+        )}
       </div>
 
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Verify webhook signatures</h2>
-        <p className="text-muted-foreground mb-4">Every SDK includes a helper to verify HMAC-SHA256 signatures on incoming webhooks.</p>
-        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
-          <pre className="p-4 text-[13px] text-slate-100 font-mono overflow-x-auto leading-relaxed"><code>{active.verify}</code></pre>
-        </div>
-      </div>
-
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Package links</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {sdks.map(sdk => (
+      {/* Package links footer */}
+      <div className="pt-4 border-t border-border/50">
+        <div className="flex flex-wrap gap-4">
+          {sdkMeta.map(sdk => (
             <a key={sdk.id} href={sdk.url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-4 p-4 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
-              <span className="text-3xl">{sdk.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{sdk.name}</div>
-                <div className="text-xs text-muted-foreground font-mono truncate">{sdk.pkg}</div>
-              </div>
-              <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+              <sdk.icon className="h-4 w-4" />
+              {sdk.pkg}
+              <ExternalLink className="h-3 w-3" />
             </a>
           ))}
         </div>

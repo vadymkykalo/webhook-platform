@@ -6,10 +6,11 @@ import { Button } from '../components/ui/button';
 import { getTheme, setTheme } from '../lib/theme';
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      <Hero />
+      <Hero isAuthenticated={isAuthenticated} />
       <LogoCloud />
       <Features />
       <ArchitectureShowcase />
@@ -81,7 +82,7 @@ function Navigation() {
   );
 }
 
-function Hero() {
+function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
     <section className="relative overflow-hidden">
       {/* Background gradient orbs */}
@@ -105,9 +106,9 @@ function Hero() {
               You focus on building product.
             </p>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Link to="/register">
+              <Link to={isAuthenticated ? '/admin/dashboard' : '/register'}>
                 <Button size="lg" className="shadow-glow">
-                  Start for free <ArrowRight className="h-4 w-4" />
+                  {isAuthenticated ? 'Go to Dashboard' : 'Start for free'} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link to="/docs">
