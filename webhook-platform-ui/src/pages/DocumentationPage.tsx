@@ -1,10 +1,19 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, Moon, Sun } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, Moon, Sun, ExternalLink, Package } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { getTheme, setTheme } from '../lib/theme';
 
 export default function DocumentationPage() {
-  const [activeSection, setActiveSection] = useState('overview');
+  const location = useLocation();
+  const [activeSection, setActiveSection] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    return hash || 'overview';
+  });
+
+  useEffect(() => {
+    const hash = location.hash.replace('#', '');
+    if (hash) setActiveSection(hash);
+  }, [location.hash]);
   const [activeLanguage, setActiveLanguage] = useState<'curl' | 'node' | 'python'>('curl');
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -29,6 +38,7 @@ export default function DocumentationPage() {
             {activeSection === 'deliveries-api' && <DeliveriesAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'webhook-security' && <WebhookSecurity activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'errors' && <Errors />}
+            {activeSection === 'sdks' && <SDKs />}
           </div>
         </main>
       </div>
@@ -62,6 +72,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'deliveries-api', label: 'Deliveries API', icon: CheckCircle2 },
     { id: 'webhook-security', label: 'Webhook Security', icon: Shield },
     { id: 'errors', label: 'Errors & Rate Limits', icon: Code },
+    { id: 'sdks', label: 'SDKs', icon: Package },
   ];
 
   const navContent = (
@@ -125,24 +136,24 @@ function Overview() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">API Documentation</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">API Documentation</h1>
+        <p className="text-xl text-muted-foreground">
           Complete reference for integrating webhook delivery into your application.
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">What is Webhook Platform?</h2>
-        <p className="text-gray-600 leading-relaxed mb-4">
+        <h2 className="text-2xl font-bold text-foreground mb-4">What is Webhook Platform?</h2>
+        <p className="text-muted-foreground leading-relaxed mb-4">
           Webhook Platform is a reliable webhook delivery service that handles event routing, retries, and monitoring for your application.
         </p>
-        <p className="text-gray-600 leading-relaxed">
+        <p className="text-muted-foreground leading-relaxed">
           Send events via our API, and we'll deliver them to your configured endpoints with automatic retries, signatures, and full visibility.
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Core Concepts</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">Core Concepts</h2>
         <div className="space-y-6">
           <ConceptCard
             title="Event"
@@ -167,35 +178,35 @@ function Overview() {
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-xl p-8 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Event Flow</h3>
+      <div className="bg-muted/50 rounded-xl p-8 border border-border">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Event Flow</h3>
         <div className="flex items-center justify-between text-sm">
           <div className="text-center">
-            <div className="w-16 h-16 rounded-lg bg-gray-900 text-white flex items-center justify-center mb-2 mx-auto">
+            <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <Code className="h-8 w-8" />
             </div>
-            <div className="font-medium text-gray-900">Your system</div>
+            <div className="font-medium text-foreground">Your system</div>
           </div>
-          <ArrowRight className="h-6 w-6 text-gray-400" />
+          <ArrowRight className="h-6 w-6 text-muted-foreground/60" />
           <div className="text-center">
-            <div className="w-16 h-16 rounded-lg bg-gray-900 text-white flex items-center justify-center mb-2 mx-auto">
+            <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <Zap className="h-8 w-8" />
             </div>
-            <div className="font-medium text-gray-900">Events API</div>
+            <div className="font-medium text-foreground">Events API</div>
           </div>
-          <ArrowRight className="h-6 w-6 text-gray-400" />
+          <ArrowRight className="h-6 w-6 text-muted-foreground/60" />
           <div className="text-center">
-            <div className="w-16 h-16 rounded-lg bg-gray-900 text-white flex items-center justify-center mb-2 mx-auto">
+            <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <RefreshCw className="h-8 w-8" />
             </div>
-            <div className="font-medium text-gray-900">Delivery engine</div>
+            <div className="font-medium text-foreground">Delivery engine</div>
           </div>
-          <ArrowRight className="h-6 w-6 text-gray-400" />
+          <ArrowRight className="h-6 w-6 text-muted-foreground/60" />
           <div className="text-center">
-            <div className="w-16 h-16 rounded-lg bg-gray-900 text-white flex items-center justify-center mb-2 mx-auto">
+            <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <div className="font-medium text-gray-900">Customer endpoint</div>
+            <div className="font-medium text-foreground">Customer endpoint</div>
           </div>
         </div>
       </div>
@@ -216,19 +227,19 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Authentication</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Authentication</h1>
+        <p className="text-xl text-muted-foreground">
           Two authentication methods: JWT for dashboard access and API keys for event ingestion.
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">JWT Authentication (Dashboard API)</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-4">JWT Authentication (Dashboard API)</h2>
+        <p className="text-muted-foreground mb-6">
           Use JWT tokens to access dashboard endpoints like projects, endpoints, and deliveries.
         </p>
         
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Register</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Register</h3>
         <div className="mb-6">
           <HTTPMethod method="POST" path="/api/v1/auth/register" />
           <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
@@ -242,7 +253,7 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           </ResponseBlock>
         </div>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Login</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Login</h3>
         <div className="mb-6">
           <HTTPMethod method="POST" path="/api/v1/auth/login" />
           <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
@@ -256,20 +267,20 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           </ResponseBlock>
         </div>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Using JWT Token</h3>
-        <p className="text-gray-600 mb-4">Include the access token in the Authorization header for all authenticated requests:</p>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Using JWT Token</h3>
+        <p className="text-muted-foreground mb-4">Include the access token in the Authorization header for all authenticated requests:</p>
         <CodeBlock language="curl" setLanguage={() => {}}>
 {`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}
         </CodeBlock>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">API Key Authentication (Events API)</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-4">API Key Authentication (Events API)</h2>
+        <p className="text-muted-foreground mb-6">
           Use API keys to send events to the platform. Each project has its own API keys.
         </p>
         
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Header Format</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Header Format</h3>
         <CodeBlock language="curl" setLanguage={() => {}}>
 {`X-API-Key: wh_live_1234567890abcdef`}
         </CodeBlock>
@@ -294,14 +305,14 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Getting Started</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Getting Started</h1>
+        <p className="text-xl text-muted-foreground">
           Complete workflow from registration to sending your first webhook.
         </p>
       </div>
 
       <StepSection number="1" title="Register and Login">
-        <p className="text-gray-600 mb-4">Create an account and get your JWT token.</p>
+        <p className="text-muted-foreground mb-4">Create an account and get your JWT token.</p>
         <HTTPMethod method="POST" path="/api/v1/auth/register" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('register', activeLanguage)}
@@ -309,7 +320,7 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
       </StepSection>
 
       <StepSection number="2" title="Create a Project">
-        <p className="text-gray-600 mb-4">Projects organize your webhooks, endpoints, and events.</p>
+        <p className="text-muted-foreground mb-4">Projects organize your webhooks, endpoints, and events.</p>
         <HTTPMethod method="POST" path="/api/v1/projects" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createProject', activeLanguage)}
@@ -325,7 +336,7 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
       </StepSection>
 
       <StepSection number="3" title="Create an API Key">
-        <p className="text-gray-600 mb-4">Generate an API key to send events.</p>
+        <p className="text-muted-foreground mb-4">Generate an API key to send events.</p>
         <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/api-keys" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createApiKey', activeLanguage)}
@@ -341,7 +352,7 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
       </StepSection>
 
       <StepSection number="4" title="Create an Endpoint">
-        <p className="text-gray-600 mb-4">Add a URL where you want to receive webhooks.</p>
+        <p className="text-muted-foreground mb-4">Add a URL where you want to receive webhooks.</p>
         <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/endpoints" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createEndpoint', activeLanguage)}
@@ -358,7 +369,7 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
       </StepSection>
 
       <StepSection number="5" title="Create a Subscription">
-        <p className="text-gray-600 mb-4">Subscribe the endpoint to specific event types.</p>
+        <p className="text-muted-foreground mb-4">Subscribe the endpoint to specific event types.</p>
         <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/subscriptions" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createSubscription', activeLanguage)}
@@ -366,7 +377,7 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
       </StepSection>
 
       <StepSection number="6" title="Send an Event">
-        <p className="text-gray-600 mb-4">Send your first event using the API key.</p>
+        <p className="text-muted-foreground mb-4">Send your first event using the API key.</p>
         <HTTPMethod method="POST" path="/api/v1/events" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('sendEvent', activeLanguage)}
@@ -388,38 +399,38 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Events API</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Events API</h1>
+        <p className="text-xl text-muted-foreground">
           Send events that will be delivered to subscribed webhook endpoints.
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Send Event</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">Send Event</h2>
         <HTTPMethod method="POST" path="/api/v1/events" />
-        <p className="text-gray-600 mb-6">
+        <p className="text-muted-foreground mb-6">
           Send an event to be delivered to all subscribed endpoints. Events are processed asynchronously and queued for delivery.
         </p>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Headers</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Headers</h3>
         <ParamTable params={[
           { name: 'X-API-Key', type: 'string', required: true, description: 'API key for authentication' },
           { name: 'Content-Type', type: 'string', required: true, description: 'application/json' },
           { name: 'Idempotency-Key', type: 'string', required: false, description: 'Unique key to prevent duplicate processing' },
         ]} />
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Request Body</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Request Body</h3>
         <ParamTable params={[
           { name: 'type', type: 'string', required: true, description: 'Event type (e.g., "order.completed")' },
           { name: 'data', type: 'object', required: true, description: 'Event payload data' },
         ]} />
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Example</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Example</h3>
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('sendEvent', activeLanguage)}
         </CodeBlock>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Response</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Response</h3>
         <ResponseBlock>
 {`{
   "eventId": "123e4567-e89b-12d3-a456-426614174000",
@@ -429,7 +440,7 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
 }`}
         </ResponseBlock>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Response Fields</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Response Fields</h3>
         <ParamTable params={[
           { name: 'eventId', type: 'uuid', required: true, description: 'Unique event identifier' },
           { name: 'type', type: 'string', required: true, description: 'Event type echoed back' },
@@ -457,8 +468,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Endpoints API</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Endpoints API</h1>
+        <p className="text-xl text-muted-foreground">
           Manage webhook endpoints where events are delivered.
         </p>
       </div>
@@ -581,8 +592,8 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Subscriptions API</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Subscriptions API</h1>
+        <p className="text-xl text-muted-foreground">
           Route specific event types to endpoints.
         </p>
       </div>
@@ -676,8 +687,8 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Deliveries API</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Deliveries API</h1>
+        <p className="text-xl text-muted-foreground">
           Monitor and manage webhook deliveries.
         </p>
       </div>
@@ -709,7 +720,7 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       />
 
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Query Parameters</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Query Parameters</h3>
         <ParamTable params={[
           { name: 'status', type: 'string', required: false, description: 'Filter by status: PENDING, PROCESSING, SUCCESS, FAILED, DLQ' },
           { name: 'endpointId', type: 'uuid', required: false, description: 'Filter by endpoint' },
@@ -796,19 +807,19 @@ function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProp
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Webhook Security</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Webhook Security</h1>
+        <p className="text-xl text-muted-foreground">
           Verify webhook authenticity using HMAC signatures.
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Signature Verification</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-4">Signature Verification</h2>
+        <p className="text-muted-foreground mb-6">
           Every webhook includes an X-Signature header with an HMAC-SHA256 signature.
         </p>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Headers</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Headers</h3>
         <ParamTable params={[
           { name: 'X-Signature', type: 'string', required: true, description: 'Format: t=timestamp,v1=signature' },
           { name: 'X-Event-Id', type: 'uuid', required: true, description: 'Event identifier' },
@@ -816,20 +827,20 @@ function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProp
           { name: 'X-Timestamp', type: 'integer', required: true, description: 'Unix timestamp in milliseconds' },
         ]} />
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Verification Examples</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Verification Examples</h3>
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('verifySignature', activeLanguage)}
         </CodeBlock>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Endpoint Verification</h2>
-        <p className="text-gray-600 mb-6">
+        <h2 className="text-2xl font-bold text-foreground mb-4">Endpoint Verification</h2>
+        <p className="text-muted-foreground mb-6">
           When you register an endpoint, we send a verification challenge to confirm you own the URL.
         </p>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Challenge Request</h3>
-        <p className="text-gray-600 mb-4">We POST a JSON payload with type <code className="bg-gray-100 px-2 py-1 rounded">webhook.verification</code>:</p>
+        <h3 className="text-lg font-semibold text-foreground mb-3">Challenge Request</h3>
+        <p className="text-muted-foreground mb-4">We POST a JSON payload with type <code className="bg-muted px-2 py-1 rounded">webhook.verification</code>:</p>
         <ResponseBlock>
 {`POST https://your-endpoint.com/webhooks
 Content-Type: application/json
@@ -841,8 +852,8 @@ Content-Type: application/json
 }`}
         </ResponseBlock>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Expected Response</h3>
-        <p className="text-gray-600 mb-4">Return the <code className="bg-gray-100 px-2 py-1 rounded">challenge</code> value in your response:</p>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Expected Response</h3>
+        <p className="text-muted-foreground mb-4">Return the <code className="bg-muted px-2 py-1 rounded">challenge</code> value in your response:</p>
         <ResponseBlock>
 {`HTTP/1.1 200 OK
 Content-Type: application/json
@@ -852,7 +863,7 @@ Content-Type: application/json
 }`}
         </ResponseBlock>
 
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Implementation Examples</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Implementation Examples</h3>
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('endpointVerification', activeLanguage)}
         </CodeBlock>
@@ -865,15 +876,15 @@ function Errors() {
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Errors & Rate Limits</h1>
-        <p className="text-xl text-gray-600">
+        <h1 className="text-4xl font-bold text-foreground mb-4">Errors & Rate Limits</h1>
+        <p className="text-xl text-muted-foreground">
           HTTP status codes, error responses, and rate limiting.
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Rate Limiting</h2>
-        <p className="text-gray-600 mb-4">
+        <h2 className="text-2xl font-bold text-foreground mb-6">Rate Limiting</h2>
+        <p className="text-muted-foreground mb-4">
           The Events API is rate limited to protect the platform. Rate limit information is included in response headers.
         </p>
         <ParamTable params={[
@@ -891,7 +902,7 @@ function Errors() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Error Response Format</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">Error Response Format</h2>
         <ResponseBlock>
 {`{
   "error": "rate_limit_exceeded",
@@ -902,8 +913,8 @@ function Errors() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Validation Errors</h2>
-        <p className="text-gray-600 mb-4">
+        <h2 className="text-2xl font-bold text-foreground mb-6">Validation Errors</h2>
+        <p className="text-muted-foreground mb-4">
           When request validation fails, you'll receive detailed field-level errors.
         </p>
         <ResponseBlock>
@@ -920,7 +931,7 @@ function Errors() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">HTTP Status Codes</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">HTTP Status Codes</h2>
         <div className="space-y-4">
           <ErrorCode code="200" title="OK" description="Request succeeded" />
           <ErrorCode code="201" title="Created" description="Resource created successfully" />
@@ -1648,4 +1659,232 @@ def handle_webhook():
   };
 
   return examples[type]?.[language] || `// Example not available for ${language}`;
+}
+
+function SDKs() {
+  const [activeLang, setActiveLang] = useState<'node' | 'python' | 'php'>('node');
+
+  const sdks = [
+    {
+      id: 'node' as const,
+      name: 'Node.js / TypeScript',
+      pkg: '@webhook-platform/node',
+      url: 'https://www.npmjs.com/package/@webhook-platform/node',
+      badge: 'npm',
+      icon: '🟢',
+      install: 'npm install @webhook-platform/node',
+      init: `import { WebhookPlatform } from '@webhook-platform/node';
+
+const client = new WebhookPlatform({
+  apiKey: 'wh_live_your_api_key',
+  baseUrl: 'https://your-api.com/api/v1', // optional
+});`,
+      sendEvent: `const event = await client.events.send({
+  type: 'order.completed',
+  data: {
+    orderId: 'ord_12345',
+    amount: 99.99,
+    currency: 'USD',
+  },
+});
+
+console.log(event.eventId);          // "evt_..."
+console.log(event.deliveriesCreated); // 1`,
+      verify: `import { verifySignature } from '@webhook-platform/node';
+
+app.post('/webhooks', (req, res) => {
+  const isValid = verifySignature({
+    payload: req.body.toString(),
+    signature: req.headers['x-signature'],
+    timestamp: req.headers['x-timestamp'],
+    secret: process.env.WEBHOOK_SECRET,
+  });
+
+  if (!isValid) return res.status(401).json({ error: 'Invalid signature' });
+
+  const event = JSON.parse(req.body.toString());
+  // handle event...
+  res.json({ received: true });
+});`,
+    },
+    {
+      id: 'python' as const,
+      name: 'Python',
+      pkg: 'webhook-platform',
+      url: 'https://pypi.org/project/webhook-platform/',
+      badge: 'PyPI',
+      icon: '🐍',
+      install: 'pip install webhook-platform',
+      init: `from webhook_platform import WebhookPlatform
+
+client = WebhookPlatform(
+    api_key="wh_live_your_api_key",
+    base_url="https://your-api.com/api/v1",  # optional
+)`,
+      sendEvent: `event = client.events.send({
+    "type": "order.completed",
+    "data": {
+        "orderId": "ord_12345",
+        "amount": 99.99,
+        "currency": "USD",
+    },
+})
+
+print(event["eventId"])           # "evt_..."
+print(event["deliveriesCreated"]) # 1`,
+      verify: `from webhook_platform import verify_signature
+
+@app.route('/webhooks', methods=['POST'])
+def handle_webhook():
+    is_valid = verify_signature(
+        payload=request.get_data(as_text=True),
+        signature=request.headers.get('X-Signature'),
+        timestamp=request.headers.get('X-Timestamp'),
+        secret=os.environ['WEBHOOK_SECRET'],
+    )
+
+    if not is_valid:
+        return jsonify({"error": "Invalid signature"}), 401
+
+    event = request.get_json()
+    # handle event...
+    return jsonify({"received": True})`,
+    },
+    {
+      id: 'php' as const,
+      name: 'PHP',
+      pkg: 'webhook-platform/php',
+      url: 'https://packagist.org/packages/webhook-platform/php',
+      badge: 'Packagist',
+      icon: '🐘',
+      install: 'composer require webhook-platform/php',
+      init: `<?php
+use WebhookPlatform\\WebhookPlatform;
+
+$client = new WebhookPlatform([
+    'apiKey' => 'wh_live_your_api_key',
+    'baseUrl' => 'https://your-api.com/api/v1', // optional
+]);`,
+      sendEvent: `$event = $client->events->send([
+    'type' => 'order.completed',
+    'data' => [
+        'orderId' => 'ord_12345',
+        'amount' => 99.99,
+        'currency' => 'USD',
+    ],
+]);
+
+echo $event['eventId'];           // "evt_..."
+echo $event['deliveriesCreated']; // 1`,
+      verify: `<?php
+use WebhookPlatform\\Webhook;
+
+$payload = file_get_contents('php://input');
+
+$isValid = Webhook::verifySignature(
+    payload: $payload,
+    signature: $_SERVER['HTTP_X_SIGNATURE'] ?? '',
+    timestamp: $_SERVER['HTTP_X_TIMESTAMP'] ?? '',
+    secret: getenv('WEBHOOK_SECRET'),
+);
+
+if (!$isValid) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Invalid signature']);
+    exit;
+}
+
+$event = json_decode($payload, true);
+// handle event...
+http_response_code(200);
+echo json_encode(['received' => true]);`,
+    },
+  ];
+
+  const active = sdks.find(s => s.id === activeLang)!;
+
+  return (
+    <div className="space-y-12">
+      <div>
+        <h1 className="text-4xl font-bold text-foreground mb-4">SDKs</h1>
+        <p className="text-xl text-muted-foreground">
+          Official client libraries for Node.js, Python, and PHP.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {sdks.map(sdk => (
+          <button
+            key={sdk.id}
+            onClick={() => setActiveLang(sdk.id)}
+            className={`text-left p-5 rounded-xl border transition-all ${
+              activeLang === sdk.id
+                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                : 'border-border bg-card hover:border-primary/30 hover:shadow-md'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-2xl">{sdk.icon}</span>
+              <span className="text-[10px] px-2 py-0.5 bg-muted rounded-md text-muted-foreground font-mono uppercase">{sdk.badge}</span>
+            </div>
+            <div className="text-sm font-semibold text-foreground mb-0.5">{sdk.name}</div>
+            <div className="text-xs text-muted-foreground font-mono">{sdk.pkg}</div>
+          </button>
+        ))}
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Installation</h2>
+        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
+          <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
+            <span className="text-xs text-white/40">terminal</span>
+            <a href={active.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              {active.badge} <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <pre className="p-4 text-[13px] text-slate-100 font-mono"><span className="text-slate-500">$ </span>{active.install}</pre>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Initialize the client</h2>
+        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
+          <pre className="p-4 text-[13px] text-slate-100 font-mono overflow-x-auto leading-relaxed"><code>{active.init}</code></pre>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Send an event</h2>
+        <p className="text-muted-foreground mb-4">Use the client to send events. Deliveries are created automatically for all subscribed endpoints.</p>
+        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
+          <pre className="p-4 text-[13px] text-slate-100 font-mono overflow-x-auto leading-relaxed"><code>{active.sendEvent}</code></pre>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Verify webhook signatures</h2>
+        <p className="text-muted-foreground mb-4">Every SDK includes a helper to verify HMAC-SHA256 signatures on incoming webhooks.</p>
+        <div className="bg-slate-950 rounded-xl overflow-hidden border border-border">
+          <pre className="p-4 text-[13px] text-slate-100 font-mono overflow-x-auto leading-relaxed"><code>{active.verify}</code></pre>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-6">Package links</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {sdks.map(sdk => (
+            <a key={sdk.id} href={sdk.url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-4 p-4 bg-card rounded-xl border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
+              <span className="text-3xl">{sdk.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{sdk.name}</div>
+                <div className="text-xs text-muted-foreground font-mono truncate">{sdk.pkg}</div>
+              </div>
+              <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

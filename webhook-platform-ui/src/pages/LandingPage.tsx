@@ -48,16 +48,21 @@ function Navigation() {
             <a href="#architecture" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Architecture</a>
             <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
             <Link to="/quickstart" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Quickstart</Link>
+            <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">SDKs</Link>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => { const next = getTheme() === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeToggle(p => !p); }}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); const next = getTheme() === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeToggle(p => !p); }}
+            className="relative z-10 text-muted-foreground hover:text-foreground"
             title="Toggle theme"
           >
             {typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          </Button>
+          <div className="w-px h-5 bg-border mx-1" />
           {isAuthenticated ? (
             <Link to="/admin/projects">
               <Button size="sm">Go to Dashboard <ArrowRight className="h-3.5 w-3.5" /></Button>
@@ -997,11 +1002,11 @@ function Footer() {
             </ul>
           </div>
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Legal</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">SDKs</h3>
             <ul className="space-y-2">
-              <li><a href="#security" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Security</a></li>
-              <li><a href="#privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</a></li>
-              <li><a href="#terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms</a></li>
+              <li><a href="https://www.npmjs.com/package/@webhook-platform/node" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Node.js / TypeScript</a></li>
+              <li><a href="https://pypi.org/project/webhook-platform/" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Python</a></li>
+              <li><a href="https://packagist.org/packages/webhook-platform/php" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">PHP</a></li>
             </ul>
           </div>
         </div>
