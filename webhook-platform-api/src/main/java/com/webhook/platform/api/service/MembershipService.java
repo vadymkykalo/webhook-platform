@@ -38,12 +38,12 @@ public class MembershipService {
     }
 
     public List<MemberResponse> getOrganizationMembers(UUID organizationId) {
-        List<Membership> memberships = membershipRepository.findByOrganizationId(organizationId);
-        
-        return memberships.stream()
-                .map(membership -> {
-                    User user = userRepository.findById(membership.getUserId())
-                            .orElseThrow(() -> new NotFoundException("User not found"));
+        List<Object[]> rows = membershipRepository.findMembersWithUsers(organizationId);
+
+        return rows.stream()
+                .map(row -> {
+                    Membership membership = (Membership) row[0];
+                    User user = (User) row[1];
                     return MemberResponse.builder()
                             .userId(user.getId())
                             .email(user.getEmail())
@@ -63,7 +63,7 @@ public class MembershipService {
 
         String temporaryPassword = null;
         boolean isNewUser = !userRepository.existsByEmail(request.getEmail());
-        
+
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseGet(() -> {
                     String tempPass = generateTemporaryPassword();
@@ -107,7 +107,8 @@ public class MembershipService {
     }
 
     @Transactional
-    public MemberResponse changeMemberRole(UUID organizationId, UUID userId, MembershipRole newRole, MembershipRole requestingRole) {
+    public MemberResponse changeMemberRole(UUID organizationId, UUID userId, MembershipRole newRole,
+            MembershipRole requestingRole) {
         if (requestingRole != MembershipRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can change member roles");
         }
@@ -120,9 +121,7 @@ public class MembershipService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
         if (membership.getRole() == MembershipRole.OWNER) {
-            long ownerCount = membershipRepository.findByOrganizationId(organizationId).stream()
-                    .filter(m -> m.getRole() == MembershipRole.OWNER)
-                    .count();
+            long ownerCount = membershipRepository.countByOrganizationIdAndRole(organizationId, MembershipRole.OWNER);
             if (ownerCount <= 1) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot demote the last owner");
             }
@@ -153,9 +152,7 @@ public class MembershipService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
         if (membership.getRole() == MembershipRole.OWNER) {
-            long ownerCount = membershipRepository.findByOrganizationId(organizationId).stream()
-                    .filter(m -> m.getRole() == MembershipRole.OWNER)
-                    .count();
+            long ownerCount = membershipRepository.countByOrganizationIdAndRole(organizationId, MembershipRole.OWNER);
             if (ownerCount <= 1) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot remove the last owner");
             }

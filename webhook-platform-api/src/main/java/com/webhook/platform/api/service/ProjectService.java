@@ -34,7 +34,7 @@ public class ProjectService {
                 .organizationId(organizationId)
                 .description(request.getDescription())
                 .build();
-        
+
         project = projectRepository.saveAndFlush(project);
         return mapToResponse(project);
     }
@@ -42,18 +42,16 @@ public class ProjectService {
     public ProjectResponse getProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        
+
         if (!project.getOrganizationId().equals(organizationId)) {
             throw new ForbiddenException("Access denied");
         }
-        
+
         return mapToResponse(project);
     }
 
     public List<ProjectResponse> listProjects(UUID organizationId) {
-        return projectRepository.findAll().stream()
-                .filter(p -> p.getDeletedAt() == null)
-                .filter(p -> p.getOrganizationId().equals(organizationId))
+        return projectRepository.findByOrganizationIdAndDeletedAtIsNull(organizationId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -63,15 +61,15 @@ public class ProjectService {
     public ProjectResponse updateProject(UUID id, ProjectRequest request, UUID organizationId) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        
+
         if (!project.getOrganizationId().equals(organizationId)) {
             throw new ForbiddenException("Access denied");
         }
-        
+
         project.setName(request.getName());
         project.setDescription(request.getDescription());
         project = projectRepository.save(project);
-        
+
         return mapToResponse(project);
     }
 
@@ -80,11 +78,11 @@ public class ProjectService {
     public void deleteProject(UUID id, UUID organizationId) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        
+
         if (!project.getOrganizationId().equals(organizationId)) {
             throw new ForbiddenException("Access denied");
         }
-        
+
         project.setDeletedAt(Instant.now());
         projectRepository.save(project);
     }
