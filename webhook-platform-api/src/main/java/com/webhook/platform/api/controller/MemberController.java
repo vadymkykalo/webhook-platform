@@ -5,6 +5,7 @@ import com.webhook.platform.api.dto.ChangeMemberRoleRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.RequireOrgAccess;
 import com.webhook.platform.api.service.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -34,6 +35,7 @@ public class MemberController {
     }
 
     @Operation(summary = "List members", description = "Returns all members of the organization")
+    @RequireOrgAccess
     @GetMapping
     public ResponseEntity<List<MemberResponse>> getMembers(
             @PathVariable("orgId") UUID orgId,
@@ -48,6 +50,7 @@ public class MemberController {
 
     @Operation(summary = "Add member", description = "Invites a user to the organization")
     @ApiResponse(responseCode = "201", description = "Member added")
+    @RequireOrgAccess
     @PostMapping
     public ResponseEntity<MemberResponse> addMember(
             @PathVariable("orgId") UUID orgId,
@@ -61,12 +64,12 @@ public class MemberController {
         MemberResponse response = membershipService.addMember(
                 orgId,
                 request,
-                jwtAuth.getRole()
-        );
+                jwtAuth.getRole());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(summary = "Change member role", description = "Updates a member's role (OWNER, ADMIN, MEMBER, VIEWER)")
+    @RequireOrgAccess
     @PatchMapping("/{userId}")
     public ResponseEntity<MemberResponse> changeMemberRole(
             @PathVariable("orgId") UUID orgId,
@@ -82,13 +85,13 @@ public class MemberController {
                 orgId,
                 userId,
                 request.getRole(),
-                jwtAuth.getRole()
-        );
+                jwtAuth.getRole());
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Remove member", description = "Removes a member from the organization")
     @ApiResponse(responseCode = "204", description = "Member removed")
+    @RequireOrgAccess
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> removeMember(
             @PathVariable("orgId") UUID orgId,
