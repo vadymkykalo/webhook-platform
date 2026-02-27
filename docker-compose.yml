@@ -17,6 +17,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: "${POSTGRES_MEMORY_LIMIT:-1G}"
+        reservations:
+          memory: "256m"
     networks:
       - webhook-network
     restart: unless-stopped
@@ -51,13 +62,20 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-    networks:
-      - webhook-network
-    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: "${KAFKA_MEMORY_LIMIT:-1G}"
+        reservations:
+          memory: "512m"
+    networks:
+      - webhook-network
+    restart: unless-stopped
 
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
@@ -72,6 +90,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: "${REDIS_MEMORY_LIMIT:-512m}"
+        reservations:
+          memory: "64m"
     networks:
       - webhook-network
     restart: unless-stopped
@@ -95,6 +124,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: "${MINIO_MEMORY_LIMIT:-512m}"
+        reservations:
+          memory: "128m"
     networks:
       - webhook-network
     restart: unless-stopped
@@ -104,9 +144,8 @@ services:
       context: .
       dockerfile: ./webhook-platform-api/Dockerfile
     image: webhook-platform-api:${API_IMAGE_TAG:-latest}
-    container_name: webhook-api
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8080}:8080"
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -168,6 +207,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: "${API_MEMORY_LIMIT:-768m}"
+        reservations:
+          memory: "256m"
     networks:
       - webhook-network
     restart: unless-stopped
@@ -177,9 +227,6 @@ services:
       context: .
       dockerfile: ./webhook-platform-worker/Dockerfile
     image: webhook-platform-worker:${WORKER_IMAGE_TAG:-latest}
-    container_name: webhook-worker
-    ports:
-      - "${WORKER_PORT:-8081}:8081"
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -224,6 +271,17 @@ services:
       retries: 5
       start_period: 30s
     stop_grace_period: 35s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          memory: "${WORKER_MEMORY_LIMIT:-768m}"
+        reservations:
+          memory: "256m"
     networks:
       - webhook-network
     restart: unless-stopped
@@ -233,13 +291,23 @@ services:
       context: .
       dockerfile: ./webhook-platform-ui/Dockerfile
     image: webhook-platform-ui:${UI_IMAGE_TAG:-latest}
-    container_name: webhook-ui
     ports:
       - "${UI_PORT:-5173}:5173"
     environment:
       VITE_API_URL: ${VITE_API_URL:-}
     depends_on:
       - api
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: "${UI_MEMORY_LIMIT:-128m}"
+        reservations:
+          memory: "32m"
     networks:
       - webhook-network
     restart: unless-stopped

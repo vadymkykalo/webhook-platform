@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui
+.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link scale-worker
 
 # Default target
 .DEFAULT_GOAL := help
@@ -29,22 +29,21 @@ init: ## Initialize .env from .env.dist (if not exists)
 	@if [ ! -f .env ]; then \
 		echo "$(GREEN)Creating .env from .env.dist...$(NC)"; \
 		cp .env.dist .env; \
-		echo "$(YELLOW)⚠️  Using development defaults. CHANGE SECRETS FOR PRODUCTION!$(NC)"; \
+		echo "$(YELLOW)  Using development defaults. CHANGE SECRETS FOR PRODUCTION!$(NC)"; \
 	else \
 		echo "$(GREEN).env already exists, skipping...$(NC)"; \
 	fi
 
-up: init ## Start services (embedded DB mode - default for self-hosted)
+up: init ## Start services (embedded DB, dev mode)
 	@echo "$(GREEN)Starting services in embedded DB mode...$(NC)"
 	@$(MAKE) doctor
 	@$(DOCKER_COMPOSE) --profile embedded-db up -d --build
-	@echo "$(GREEN)Waiting for services to be healthy...$(NC)"
-	@sleep 10
+	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
-	@echo "$(GREEN) Services started successfully$(NC)"
+	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) health
 
-up-external-db: init ## Start services (external DB mode - for cloud/prod)
+up-external-db: init ## Start services (external DB, dev mode)
 	@echo "$(GREEN)Starting services in external DB mode...$(NC)"
 	@$(MAKE) doctor
 	@if [ -z "$(DB_HOST)" ] || [ "$(DB_HOST)" = "CHANGE_ME_DB_HOST" ]; then \
@@ -52,24 +51,47 @@ up-external-db: init ## Start services (external DB mode - for cloud/prod)
 		exit 1; \
 	fi
 	@$(DOCKER_COMPOSE) up -d --build
-	@echo "$(GREEN)Waiting for services to be healthy...$(NC)"
-	@sleep 10
+	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
-	@echo "$(GREEN) Services started successfully$(NC)"
+	@echo "$(GREEN)Services started successfully$(NC)"
+	@$(MAKE) health
+
+DOCKER_COMPOSE_PROD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml
+
+up-prod: init ## Start services (embedded DB, production mode)
+	@echo "$(GREEN)Starting services in PRODUCTION mode (embedded DB)...$(NC)"
+	@$(MAKE) doctor
+	@$(DOCKER_COMPOSE_PROD) --profile embedded-db up -d --no-build
+	@$(MAKE) wait-healthy
+	@$(MAKE) create-topics
+	@echo "$(GREEN)Production services started$(NC)"
+	@$(MAKE) health
+
+up-prod-external: init ## Start services (external DB, production mode)
+	@echo "$(GREEN)Starting services in PRODUCTION mode (external DB)...$(NC)"
+	@$(MAKE) doctor
+	@if [ -z "$(DB_HOST)" ] || [ "$(DB_HOST)" = "CHANGE_ME_DB_HOST" ]; then \
+		echo "$(RED)ERROR: DB_HOST must be set for external DB mode$(NC)"; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE_PROD) up -d --no-build
+	@$(MAKE) wait-healthy
+	@$(MAKE) create-topics
+	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
 
 down: ## Stop services (keeps data)
 	@echo "$(YELLOW)Stopping services...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db down 2>/dev/null || docker stop webhook-api webhook-worker webhook-ui webhook-postgres webhook-kafka webhook-minio 2>/dev/null || true
-	@echo "$(GREEN) Services stopped$(NC)"
+	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down 2>/dev/null || true
+	@echo "$(GREEN)Services stopped$(NC)"
 
 stop: ## Stop services (alias for down)
 	@$(MAKE) down
 
 clean: ## Stop services and remove containers (keeps volumes)
 	@echo "$(YELLOW)Cleaning up containers...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down --remove-orphans 2>/dev/null || docker rm -f webhook-api webhook-worker webhook-ui webhook-postgres webhook-kafka webhook-minio 2>/dev/null || true
-	@echo "$(GREEN) Cleanup complete (volumes preserved)$(NC)"
+	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down --remove-orphans 2>/dev/null || true
+	@echo "$(GREEN)Cleanup complete (volumes preserved)$(NC)"
 
 ##@ Build
 build: ## Build all Docker images
@@ -81,18 +103,18 @@ rebuild: ## Rebuild and restart services (embedded DB)
 	@$(DOCKER_COMPOSE) --profile embedded-db down
 	@$(DOCKER_COMPOSE) build --no-cache
 	@$(DOCKER_COMPOSE) --profile embedded-db up -d
-	@sleep 10
+	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
-	@echo "$(GREEN) Rebuild complete$(NC)"
+	@echo "$(GREEN)Rebuild complete$(NC)"
 
 rebuild-external-db: ## Rebuild and restart services (external DB)
 	@echo "$(GREEN)Rebuilding services (external DB mode)...$(NC)"
 	@$(DOCKER_COMPOSE) down
 	@$(DOCKER_COMPOSE) build --no-cache
 	@$(DOCKER_COMPOSE) up -d
-	@sleep 10
+	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
-	@echo "$(GREEN) Rebuild complete$(NC)"
+	@echo "$(GREEN)Rebuild complete$(NC)"
 
 ##@ Development (Fast Rebuilds)
 rebuild-api: ## Rebuild only API service (fast)
@@ -115,18 +137,18 @@ rebuild-ui: ## Rebuild only UI service (fast)
 
 restart-api: ## Restart API service (no rebuild)
 	@echo "$(GREEN)Restarting API...$(NC)"
-	@docker restart webhook-api
-	@echo "$(GREEN) API restarted$(NC)"
+	@$(DOCKER_COMPOSE) restart api
+	@echo "$(GREEN)API restarted$(NC)"
 
 restart-worker: ## Restart Worker service (no rebuild)
 	@echo "$(GREEN)Restarting Worker...$(NC)"
-	@docker restart webhook-worker
-	@echo "$(GREEN) Worker restarted$(NC)"
+	@$(DOCKER_COMPOSE) restart worker
+	@echo "$(GREEN)Worker restarted$(NC)"
 
 restart-ui: ## Restart UI service (no rebuild)
 	@echo "$(GREEN)Restarting UI...$(NC)"
-	@docker restart webhook-ui
-	@echo "$(GREEN) UI restarted$(NC)"
+	@$(DOCKER_COMPOSE) restart ui
+	@echo "$(GREEN)UI restarted$(NC)"
 
 dev-api: ## Quick dev: rebuild API with cache + restart
 	@echo "$(GREEN)Quick rebuild API (with cache)...$(NC)"
@@ -148,6 +170,16 @@ dev-ui: ## Quick dev: rebuild UI with cache + restart
 	@$(DOCKER_COMPOSE) up -d ui
 	@echo "$(GREEN) UI ready$(NC)"
 	@$(MAKE) logs-ui
+
+##@ Scaling
+scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
+	@if [ -z "$(N)" ]; then \
+		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-worker N=3$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Scaling worker to $(N) instances...$(NC)"
+	@$(DOCKER_COMPOSE) up -d --scale worker=$(N) --no-recreate
+	@echo "$(GREEN)Worker scaled to $(N) instances$(NC)"
 
 ##@ Kafka
 KAFKA_PARTITIONS ?= 12
@@ -179,20 +211,46 @@ logs-ui: ## Follow logs for UI service
 verify-link: ## Show last email verification link from API logs
 	@$(DOCKER_COMPOSE) logs api 2>&1 | grep "Verify URL:" | tail -1 | sed 's/.*Verify URL: //'
 
+WAIT_TIMEOUT ?= 120
+wait-healthy: ## Wait until API and Worker are healthy (max WAIT_TIMEOUT seconds)
+	@echo "$(GREEN)Waiting for services to become healthy (timeout: $(WAIT_TIMEOUT)s)...$(NC)"
+	@elapsed=0; \
+	while [ $$elapsed -lt $(WAIT_TIMEOUT) ]; do \
+		api_ok=$$(curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
+		worker_ok=$$($(DOCKER_COMPOSE) exec -T worker wget -q --spider http://localhost:8081/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
+		if [ "$$api_ok" = "1" ] && [ "$$worker_ok" = "1" ]; then \
+			echo ""; \
+			echo "$(GREEN)All services healthy after $${elapsed}s$(NC)"; \
+			exit 0; \
+		fi; \
+		sleep 5; \
+		elapsed=$$((elapsed + 5)); \
+		printf "\r  Waiting... %ds / $(WAIT_TIMEOUT)s (API=$$api_ok Worker=$$worker_ok)" $$elapsed; \
+	done; \
+	echo ""; \
+	echo "$(RED)ERROR: Services did not become healthy within $(WAIT_TIMEOUT)s$(NC)"; \
+	exit 1
+
 health: ## Check health of all services
 	@echo "$(GREEN)Checking service health...$(NC)"
-	@echo "API:    $$(curl -s http://localhost:8080/actuator/health/liveness | jq -r .status 2>/dev/null || echo 'DOWN')"
-	@echo "Worker: $$(curl -s http://localhost:8081/actuator/health/liveness | jq -r .status 2>/dev/null || echo 'DOWN')"
-	@echo "Redis:  $$(docker exec webhook-redis redis-cli ping 2>/dev/null || echo 'DOWN')"
-	@echo "UI:     $$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null)"
+	@echo "Postgres: $$(docker exec webhook-postgres pg_isready -U webhook_user 2>/dev/null && echo 'UP' || echo 'DOWN')"
+	@echo "Kafka:    $$(docker exec webhook-kafka nc -z localhost 9092 2>/dev/null && echo 'UP' || echo 'DOWN')"
+	@echo "Redis:    $$(docker exec webhook-redis redis-cli -a $${REDIS_PASSWORD:-webhook_redis_pass} ping 2>/dev/null | grep -q PONG && echo 'UP' || echo 'DOWN')"
+	@echo "API:      $$(curl -sf http://localhost:8080/actuator/health/liveness | jq -r .status 2>/dev/null || echo 'DOWN')"
+	@echo "Worker:   $$($(DOCKER_COMPOSE) exec -T worker wget -q -O - http://localhost:8081/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
+	@echo "UI:       $$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null || echo 'DOWN')"
 
 ##@ Database (Embedded Mode Only)
+POSTGRES_USER ?= webhook_user
+POSTGRES_DB   ?= webhook_platform
+BACKUP_DIR    ?= ./backups
+
 shell-db: ## Open psql shell in embedded database
 	@if [ "$(DB_MODE)" != "embedded" ]; then \
 		echo "$(RED)ERROR: This command only works in embedded DB mode$(NC)"; \
 		exit 1; \
 	fi
-	@docker exec -it webhook-postgres psql -U $(POSTGRES_USER:-webhook_user) -d $(POSTGRES_DB:-webhook_platform)
+	@docker exec -it webhook-postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
 backup-db: ## Backup embedded database to ./backups/
 	@if [ "$(DB_MODE)" != "embedded" ]; then \
@@ -200,10 +258,10 @@ backup-db: ## Backup embedded database to ./backups/
 		exit 1; \
 	fi
 	@echo "$(GREEN)Creating database backup...$(NC)"
-	@mkdir -p $(BACKUP_DIR:-./backups)
-	@docker exec webhook-postgres pg_dump -U $(POSTGRES_USER:-webhook_user) $(POSTGRES_DB:-webhook_platform) | gzip > $(BACKUP_DIR:-./backups)/webhook_platform_$$(date +%Y%m%d_%H%M%S).sql.gz
-	@echo "$(GREEN) Backup created in $(BACKUP_DIR:-./backups)/$(NC)"
-	@ls -lh $(BACKUP_DIR:-./backups)/ | tail -1
+	@mkdir -p $(BACKUP_DIR)
+	@docker exec webhook-postgres pg_dump -U $(POSTGRES_USER) $(POSTGRES_DB) | gzip > $(BACKUP_DIR)/webhook_platform_$$(date +%Y%m%d_%H%M%S).sql.gz
+	@echo "$(GREEN)Backup created in $(BACKUP_DIR)/$(NC)"
+	@ls -lh $(BACKUP_DIR)/ | tail -1
 
 restore-db: ## Restore embedded database from backup (usage: make restore-db FILE=backups/webhook_platform_20241217_120000.sql.gz)
 	@if [ "$(DB_MODE)" != "embedded" ]; then \
@@ -222,8 +280,8 @@ restore-db: ## Restore embedded database from backup (usage: make restore-db FIL
 	@echo "$(YELLOW)Press Ctrl+C to cancel, or Enter to continue...$(NC)"
 	@read confirm
 	@echo "$(GREEN)Restoring database from $(FILE)...$(NC)"
-	@gunzip -c $(FILE) | docker exec -i webhook-postgres psql -U $(POSTGRES_USER:-webhook_user) $(POSTGRES_DB:-webhook_platform)
-	@echo "$(GREEN) Database restored$(NC)"
+	@gunzip -c $(FILE) | docker exec -i webhook-postgres psql -U $(POSTGRES_USER) $(POSTGRES_DB)
+	@echo "$(GREEN)Database restored$(NC)"
 
 ##@ Diagnostics
 doctor: ## Run pre-flight checks
@@ -232,18 +290,34 @@ doctor: ## Run pre-flight checks
 	@$(DOCKER_COMPOSE) version > /dev/null || (echo "$(RED)ERROR: docker compose not found$(NC)" && exit 1)
 	@[ -f .env ] || (echo "$(YELLOW)WARNING: .env file not found. Copy .env.dist to .env$(NC)" && exit 1)
 	@if [ "$(APP_ENV)" = "production" ] || [ "$(APP_ENV)" = "prod" ]; then \
-		if [ "$(WEBHOOK_ENCRYPTION_KEY)" = "CHANGE_ME_32_CHAR_ENCRYPTION_KEY_HERE" ]; then \
-			echo "$(RED)ERROR: WEBHOOK_ENCRYPTION_KEY contains placeholder value in production mode$(NC)"; \
-			exit 1; \
+		echo "$(GREEN)Production mode detected — running strict checks...$(NC)"; \
+		fail=0; \
+		if echo "$(WEBHOOK_ENCRYPTION_KEY)" | grep -qi 'change_me\|dev_'; then \
+			echo "$(RED)ERROR: WEBHOOK_ENCRYPTION_KEY contains dev/placeholder value$(NC)"; fail=1; \
 		fi; \
-		if [ "$(JWT_SECRET)" = "CHANGE_ME_JWT_SECRET_KEY_MINIMUM_32_CHARS" ]; then \
-			echo "$(RED)ERROR: JWT_SECRET contains placeholder value in production mode$(NC)"; \
-			exit 1; \
+		if echo "$(JWT_SECRET)" | grep -qi 'change_me\|dev_'; then \
+			echo "$(RED)ERROR: JWT_SECRET contains dev/placeholder value$(NC)"; fail=1; \
 		fi; \
+		if echo "$(REDIS_PASSWORD)" | grep -qi 'webhook_redis_pass'; then \
+			echo "$(RED)ERROR: REDIS_PASSWORD is using the default dev value$(NC)"; fail=1; \
+		fi; \
+		if echo "$(POSTGRES_PASSWORD)" | grep -qi 'webhook_dev_pass\|webhook_pass'; then \
+			echo "$(RED)ERROR: POSTGRES_PASSWORD is using the default dev value$(NC)"; fail=1; \
+		fi; \
+		if [ "$(WEBHOOK_ALLOW_PRIVATE_IPS)" = "true" ]; then \
+			echo "$(YELLOW)WARNING: WEBHOOK_ALLOW_PRIVATE_IPS=true in production (SSRF risk)$(NC)"; \
+		fi; \
+		if [ "$(SWAGGER_ENABLED)" = "true" ]; then \
+			echo "$(YELLOW)WARNING: SWAGGER_ENABLED=true in production$(NC)"; \
+		fi; \
+		if [ "$(DB_SSL_MODE)" = "disable" ]; then \
+			echo "$(YELLOW)WARNING: DB_SSL_MODE=disable in production$(NC)"; \
+		fi; \
+		if [ $$fail -ne 0 ]; then exit 1; fi; \
 	fi
 	@if [ "$(DB_MODE)" = "external" ]; then \
-		if [ -z "$(DB_HOST)" ] || [ "$(DB_HOST)" = "CHANGE_ME_DB_HOST" ]; then \
-			echo "$(RED)ERROR: DB_HOST must be set for external DB mode$(NC)"; \
+		if [ -z "$(DB_HOST)" ] || [ "$(DB_HOST)" = "CHANGE_ME_DB_HOST" ] || [ "$(DB_HOST)" = "postgres" ]; then \
+			echo "$(RED)ERROR: DB_HOST must be set to a real host for external DB mode$(NC)"; \
 			exit 1; \
 		fi; \
 		if [ -z "$(DB_PASSWORD)" ] || [ "$(DB_PASSWORD)" = "CHANGE_ME_DB_PASSWORD" ]; then \
@@ -251,7 +325,7 @@ doctor: ## Run pre-flight checks
 			exit 1; \
 		fi; \
 	fi
-	@echo "$(GREEN) All checks passed$(NC)"
+	@echo "$(GREEN)All checks passed$(NC)"
 
 ##@ Danger Zone
 nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
@@ -275,10 +349,7 @@ nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 		exit 1; \
 	fi
 	@echo "$(RED)Destroying everything...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down -v --remove-orphans 2>/dev/null || true
-	@docker stop webhook-api webhook-worker webhook-ui webhook-postgres webhook-kafka webhook-redis webhook-minio 2>/dev/null || true
-	@docker rm -f webhook-api webhook-worker webhook-ui webhook-postgres webhook-kafka webhook-redis webhook-minio 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down -v --remove-orphans --rmi local 2>/dev/null || true
 	@docker volume rm webhook_pgdata kafka_data redis_data minio_data 2>/dev/null || true
 	@docker network rm webhook-platform_webhook-network 2>/dev/null || true
-	@docker rmi webhook-platform-api:latest webhook-platform-worker:latest webhook-platform-ui:latest 2>/dev/null || true
-	@echo "$(GREEN)✓ Nuclear option complete$(NC)"
+	@echo "$(GREEN)Nuclear option complete$(NC)"
