@@ -200,6 +200,27 @@ sequenceDiagram
 
 ---
 
+## Troubleshooting
+
+### Email verification in local development
+
+By default, email sending is disabled (`app.email.enabled=false`). After registration, the verification link is printed to the API service logs:
+
+```bash
+docker compose logs api | grep "Verify URL"
+```
+
+Open the printed URL in a browser to confirm the account.
+
+> **Tip:** You can also query the token directly from the database:
+> ```bash
+> docker compose exec postgres psql -U webhook -d webhook_platform \
+>   -c "SELECT verification_token FROM users WHERE email = 'your@email.com';"
+> ```
+> Then open: `http://localhost:5173/verify-email?token=<TOKEN>`
+
+---
+
 ## Contributing
 
 Fork → branch → test → PR. All CI checks must pass. See [CONTRIBUTING.md](./CONTRIBUTING.md).
