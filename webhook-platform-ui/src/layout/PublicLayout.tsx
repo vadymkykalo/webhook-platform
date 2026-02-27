@@ -60,7 +60,7 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Status</a>
-            <a href="#" className="hover:text-foreground transition-colors">GitHub</a>
+            <a href="https://github.com/vadymkykalo/webhook-platform" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
           </div>
         </div>
       </div>

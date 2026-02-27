@@ -70,12 +70,14 @@ graph TB
 
 | Service | Port | Role |
 |---------|------|------|
-| **API** | `0.0.0.0:8080` | Event ingestion, REST API, outbox publisher, Flyway migrations |
-| **Worker** | `0.0.0.0:8081` | Kafka consumer, HTTP delivery, retry scheduling, stuck delivery recovery |
-| **UI** | `0.0.0.0:5173` | Admin dashboard (React / Vite / TailwindCSS / shadcn/ui) — nginx |
+| **API** | `127.0.0.1:8080` | Event ingestion, REST API, outbox publisher, Flyway migrations |
+| **Worker** | `127.0.0.1:8081` | Kafka consumer, HTTP delivery, retry scheduling, stuck delivery recovery |
+| **UI** | `0.0.0.0:5173` | Admin dashboard (React / Vite / TailwindCSS / shadcn/ui) — nginx reverse proxy |
 | **PostgreSQL** | `127.0.0.1:5432` | Persistent storage (localhost only) |
 | **Kafka** | `127.0.0.1:9092` | Message broker (dispatch + 6 retry delay topics + DLQ, localhost only) |
 | **Redis** | `127.0.0.1:6379` | Rate limiting, FIFO ordering buffer (localhost only, requirepass) |
+
+> **Note:** In dev mode you can set `API_BIND=0.0.0.0` in `.env` to expose the API port directly. In production, all API traffic goes through the nginx reverse proxy on the UI container.
 
 ---
 
@@ -118,17 +120,19 @@ curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
 ### Development
 
 ```bash
-make up          # Start all services
-make down        # Stop (data preserved)
-make logs        # Follow logs
+make up              # Start all services (embedded PostgreSQL)
+make up-external-db  # Start with external/managed DB
+make down            # Stop (data preserved)
+make logs            # Follow logs
 ```
 
 ### Production
 
 ```bash
-cp .env.dist .env   # then edit .env
-make up             # or: make up-external-db (for managed DB)
-make health         # verify all services are UP
+cp .env.dist .env    # then edit .env — see checklist below
+make up-prod         # Start with production overrides (embedded DB)
+make up-prod-external  # Start with production overrides (external DB)
+make health          # Verify all services are UP
 ```
 
 All environment variables are documented in [`.env.dist`](./.env.dist).
@@ -138,14 +142,30 @@ All environment variables are documented in [`.env.dist`](./.env.dist).
 Run `make help` for the full list. Key commands:
 
 ```bash
-make up                   # Start everything from scratch
+# Lifecycle
+make up                   # Dev: build & start (embedded DB)
+make up-prod              # Prod: start with production overrides
+make up-prod-external     # Prod: start with external DB
 make down                 # Stop (keeps data)
 make nuke CONFIRM=YES     # Destroy everything (containers, volumes, images)
-make health               # Check service health
+
+# Monitoring
+make health               # Check all services (Postgres, Kafka, Redis, API, Worker, UI)
 make logs                 # Follow all logs
+make wait-healthy         # Wait until API + Worker are healthy
+
+# Development
 make dev-api              # Quick rebuild API + tail logs
+make dev-worker           # Quick rebuild Worker + tail logs
+make verify-link          # Show last email verification link from logs
+
+# Database
 make backup-db            # Backup database to ./backups/
-make doctor               # Pre-flight diagnostics
+make restore-db FILE=...  # Restore from backup
+make shell-db             # Open psql shell
+
+# Diagnostics
+make doctor               # Pre-flight checks (catches unsafe prod defaults)
 ```
 
 ---
@@ -204,20 +224,13 @@ sequenceDiagram
 
 ### Email verification in local development
 
-By default, email sending is disabled (`app.email.enabled=false`). After registration, the verification link is printed to the API service logs:
+By default, email sending is disabled (`EMAIL_ENABLED=false`). After registration, the verification link is printed to the API service logs. To get it:
 
 ```bash
-docker compose logs api | grep "Verify URL"
+make verify-link
 ```
 
 Open the printed URL in a browser to confirm the account.
-
-> **Tip:** You can also query the token directly from the database:
-> ```bash
-> docker compose exec postgres psql -U webhook -d webhook_platform \
->   -c "SELECT verification_token FROM users WHERE email = 'your@email.com';"
-> ```
-> Then open: `http://localhost:5173/verify-email?token=<TOKEN>`
 
 ---
 
