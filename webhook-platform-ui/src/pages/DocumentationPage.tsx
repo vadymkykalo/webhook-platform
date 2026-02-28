@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function DocumentationPage() {
   const { t } = useTranslation();
@@ -28,6 +29,7 @@ export default function DocumentationPage() {
           <div className="sticky top-0 z-30 lg:hidden h-14 border-b border-border/50 bg-card/80 glass flex items-center px-4 gap-3">
             <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
             <span className="text-sm font-semibold flex-1">{t('docsPage.mobileTitle')}</span>
+            <LanguageSwitcher />
             <ThemeToggle variant="icon" />
           </div>
           <div className="max-w-4xl mx-auto px-6 lg:px-8 py-10">
@@ -92,6 +94,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
         <Link to="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
           <ArrowRight className="h-4 w-4" /> {t('docsPage.sidebar.goToDashboard')}
         </Link>
+        <LanguageSwitcher variant="full" />
         <ThemeToggle variant="full" />
       </div>
     </div>

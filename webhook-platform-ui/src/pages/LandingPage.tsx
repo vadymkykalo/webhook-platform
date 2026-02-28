@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
@@ -53,6 +54,7 @@ function Navigation() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
           <ThemeToggle className="relative z-10 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" />
           <div className="w-px h-5 bg-border mx-1" />
           {isAuthenticated ? (

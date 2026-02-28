@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function QuickstartPage() {
   return (
@@ -44,6 +45,7 @@ function Navigation() {
           <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('quickstartPage.nav.docs')}</Link>
         </div>
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           <ThemeToggle />
           {isAuthenticated ? (
             <Link to="/admin/projects" className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-all">
