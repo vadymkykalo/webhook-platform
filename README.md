@@ -34,21 +34,9 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 
 ## Why Webhook Platform?
 
-Building reliable webhook delivery is deceptively hard. You need retries, ordering, signatures, rate limiting, dead letter queues, monitoring, and multi-tenancy — before writing a single line of business logic.
+Building reliable webhook delivery is harder than it looks. Retries, ordering, signatures, rate limiting, dead letter queues, monitoring, multi-tenancy — that's a lot of infrastructure before you write a single line of business logic.
 
-| | **Webhook Platform** | Svix | Hookdeck | DIY (cron + HTTP) |
-|---|:---:|:---:|:---:|:---:|
-| Self-hosted | Yes | Yes | No | Yes |
-| At-least-once delivery | Yes | Yes | Yes | No |
-| FIFO ordering | Yes | No | No | No |
-| Automatic retries (6 tiers) | Yes | Yes | Yes | Manual |
-| HMAC-SHA256 signatures | Yes | Yes | Yes | Manual |
-| mTLS support | Yes | No | No | Manual |
-| Built-in Request Bin | Yes | No | Yes | No |
-| Admin Dashboard | Yes | Yes | Yes | No |
-| Multi-tenant RBAC | Yes | Yes | No | No |
-| Dead Letter Queue + Reprocessing | Yes | Yes | Yes | No |
-| Free & open source | **MIT** | Enterprise | SaaS | — |
+There are great commercial solutions like [Svix](https://www.svix.com/) and [Hookdeck](https://hookdeck.com/) that solve this well. Webhook Platform is a fully open-source, MIT-licensed alternative you can self-host and own entirely. It includes FIFO ordering, mTLS, a built-in request bin, and a multi-tenant admin dashboard out of the box.
 
 ---
 
@@ -412,21 +400,6 @@ make dev-api              # Quick rebuild API + tail logs
 make verify-link          # Show email verification link from logs
 make nuke CONFIRM=YES     # Destroy everything
 ```
-
----
-
-## Roadmap
-
-- [ ] Go SDK
-- [ ] WebSocket / SSE — real-time delivery events in dashboard
-- [ ] OpenTelemetry tracing — distributed tracing across all services
-- [ ] Grafana dashboards — pre-built monitoring dashboards
-- [ ] Webhook transformations — modify payloads before delivery
-- [ ] Event replay — re-deliver historical events to new endpoints
-- [ ] Rate limit per endpoint — granular throttling
-- [ ] Custom retry strategies — configurable per subscription
-- [ ] Terraform provider — infrastructure as code
-- [ ] Kubernetes Helm chart — simplified K8s deployment
 
 ---
 
