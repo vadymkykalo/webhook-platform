@@ -3,6 +3,7 @@ package com.webhook.platform.api.config;
 import com.webhook.platform.api.security.ApiKeyAuthenticationFilter;
 import com.webhook.platform.api.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,55 +12,80 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final CorsConfigurationSource corsConfigurationSource;
+        private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+        private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final CorsConfigurationSource corsConfigurationSource;
+        private final boolean swaggerEnabled;
 
-    public SecurityConfig(
-            ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            @Qualifier("corsConfigurationSource") CorsConfigurationSource corsConfigurationSource) {
-        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.corsConfigurationSource = corsConfigurationSource;
-    }
+        public SecurityConfig(
+                        ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+                        JwtAuthenticationFilter jwtAuthenticationFilter,
+                        @Qualifier("corsConfigurationSource") CorsConfigurationSource corsConfigurationSource,
+                        @Value("${swagger.enabled:false}") boolean swaggerEnabled) {
+                this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
+                this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+                this.corsConfigurationSource = corsConfigurationSource;
+                this.swaggerEnabled = swaggerEnabled;
+        }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/actuator/**").authenticated()
-                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
-                        .requestMatchers("/hook/**").permitAll()
-                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
-                                "/api/v1/auth/verify-email", "/api/v1/auth/resend-verification").permitAll()
-                        .requestMatchers("/api/v1/auth/**").authenticated()
-                        .requestMatchers("/api/v1/orgs/**").authenticated()
-                        .requestMatchers("/api/v1/events").authenticated()
-                        .requestMatchers("/api/v1/projects/**").authenticated()
-                        .requestMatchers("/api/v1/deliveries/**").authenticated()
-                        .anyRequest().authenticated()
-                )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\":\"unauthorized\",\"message\":\"Authentication required\",\"status\":401}");
-                        })
-                )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(apiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        @Bean
+        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+                http
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                                .csrf(csrf -> csrf.disable())
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .headers(headers -> headers
+                                                .contentSecurityPolicy(csp -> csp
+                                                                .policyDirectives(
+                                                                                "default-src 'self'; frame-ancestors 'none'; form-action 'self'"))
+                                                .xssProtection(xss -> xss
+                                                                .headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
+                                                .frameOptions(frame -> frame.deny()))
+                                .authorizeHttpRequests(auth -> {
+                                        auth
+                                                        .requestMatchers("/actuator/health", "/actuator/health/**",
+                                                                        "/actuator/info")
+                                                        .permitAll()
+                                                        .requestMatchers("/actuator/**").authenticated()
+                                                        .requestMatchers("/hook/**").permitAll()
+                                                        .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
+                                                                        "/api/v1/auth/refresh",
+                                                                        "/api/v1/auth/verify-email",
+                                                                        "/api/v1/auth/resend-verification")
+                                                        .permitAll()
+                                                        .requestMatchers("/api/v1/auth/**").authenticated()
+                                                        .requestMatchers("/api/v1/orgs/**").authenticated()
+                                                        .requestMatchers("/api/v1/events").authenticated()
+                                                        .requestMatchers("/api/v1/projects/**").authenticated()
+                                                        .requestMatchers("/api/v1/deliveries/**").authenticated();
 
-        return http.build();
-    }
+                                        // Swagger access only when explicitly enabled
+                                        if (swaggerEnabled) {
+                                                auth.requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                                                                "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll();
+                                        }
+
+                                        auth.anyRequest().authenticated();
+                                })
+                                .exceptionHandling(ex -> ex
+                                                .authenticationEntryPoint((request, response, authException) -> {
+                                                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                                        response.setContentType("application/json");
+                                                        response.getWriter().write(
+                                                                        "{\"error\":\"unauthorized\",\"message\":\"Authentication required\",\"status\":401}");
+                                                }))
+                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                                .addFilterBefore(apiKeyAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class);
+
+                return http.build();
+        }
 }

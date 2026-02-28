@@ -46,9 +46,10 @@ public class AuthController {
     })
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
-                                                  HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowRegister(getClientIp(httpRequest))) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many registration attempts. Try again later.");
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many registration attempts. Try again later.");
         }
         try {
             AuthResponse response = authService.register(request);
@@ -66,9 +67,10 @@ public class AuthController {
     })
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
-                                               HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), request.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many login attempts. Try again later.");
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many login attempts. Try again later.");
         }
         try {
             AuthResponse response = authService.login(request);
@@ -86,7 +88,7 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request,
-                                                      HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest) {
         if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), null)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
@@ -107,10 +109,11 @@ public class AuthController {
     })
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestBody(required = false) LogoutRequest request,
-                                       HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest) {
         String authHeader = httpRequest.getHeader("Authorization");
         String accessToken = (authHeader != null && authHeader.startsWith("Bearer "))
-                ? authHeader.substring(7) : null;
+                ? authHeader.substring(7)
+                : null;
         String refreshToken = (request != null) ? request.getRefreshToken() : null;
 
         authService.logout(accessToken, refreshToken);
@@ -132,10 +135,15 @@ public class AuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Verification email sent"),
             @ApiResponse(responseCode = "400", description = "Email already verified"),
-            @ApiResponse(responseCode = "404", description = "User not found")
+            @ApiResponse(responseCode = "404", description = "User not found"),
+            @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     @PostMapping("/resend-verification")
-    public ResponseEntity<Void> resendVerification(@RequestParam("email") String email) {
+    public ResponseEntity<Void> resendVerification(@RequestParam("email") String email,
+            HttpServletRequest httpRequest) {
+        if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), email)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+        }
         authService.resendVerification(email);
         return ResponseEntity.ok().build();
     }
@@ -175,8 +183,7 @@ public class AuthController {
         CurrentUserResponse response = authService.getCurrentUser(
                 jwtAuth.getUserId(),
                 jwtAuth.getOrganizationId(),
-                jwtAuth.getRole()
-        );
+                jwtAuth.getRole());
         return ResponseEntity.ok(response);
     }
 

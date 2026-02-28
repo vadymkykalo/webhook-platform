@@ -22,9 +22,14 @@ public class JwtUtil {
     private final long refreshTokenExpiration;
 
     public JwtUtil(
-            @Value("${jwt.secret:webhook_platform_jwt_secret_key_min_32_chars_required_for_hs256}") String secret,
+            @Value("${jwt.secret}") String secret,
             @Value("${jwt.access-token-expiration:900000}") long accessTokenExpiration,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpiration) {
+        if (secret == null || secret.isBlank() || secret.length() < 32) {
+            throw new IllegalStateException(
+                    "JWT_SECRET must be set and at least 32 characters. " +
+                            "Set it via environment variable JWT_SECRET or property jwt.secret");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
@@ -35,7 +40,7 @@ public class JwtUtil {
         claims.put("userId", userId.toString());
         claims.put("organizationId", organizationId.toString());
         claims.put("role", role.name());
-        
+
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .claims(claims)
