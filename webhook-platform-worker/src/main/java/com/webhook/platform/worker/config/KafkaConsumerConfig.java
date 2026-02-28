@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.config;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.dto.IncomingForwardMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -38,15 +39,24 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConsumerFactory<String, DeliveryMessage> consumerFactory() {
+        return buildConsumerFactory(groupId, DeliveryMessage.class);
+    }
+
+    @Bean
+    public ConsumerFactory<String, IncomingForwardMessage> incomingForwardConsumerFactory() {
+        return buildConsumerFactory("incoming-forward-worker", IncomingForwardMessage.class);
+    }
+
+    private <T> ConsumerFactory<String, T> buildConsumerFactory(String consumerGroupId, Class<T> valueType) {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.webhook.platform.common.dto");
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, DeliveryMessage.class.getName());
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, valueType.getName());
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10);
         props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 300000);
         return new DefaultKafkaConsumerFactory<>(props);
@@ -57,6 +67,20 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, DeliveryMessage> factory = 
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
+        configureFactory(factory);
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, IncomingForwardMessage> incomingForwardListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, IncomingForwardMessage> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(incomingForwardConsumerFactory());
+        configureFactory(factory);
+        return factory;
+    }
+
+    private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory) {
         factory.setConcurrency(3);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.getContainerProperties().setShutdownTimeout(30_000L);
@@ -77,7 +101,5 @@ public class KafkaConsumerConfig {
         factory.setCommonErrorHandler(errorHandler);
         
         log.info("Kafka consumer configured with max retries: {}, retry interval: {}ms", maxRetries, retryIntervalMs);
-        
-        return factory;
     }
 }

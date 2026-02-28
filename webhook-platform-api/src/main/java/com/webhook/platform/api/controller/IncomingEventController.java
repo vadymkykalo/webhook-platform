@@ -1,0 +1,108 @@
+package com.webhook.platform.api.controller;
+
+import com.webhook.platform.api.dto.IncomingEventResponse;
+import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
+import com.webhook.platform.api.dto.ReplayEventResponse;
+import com.webhook.platform.api.exception.UnauthorizedException;
+import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.service.IncomingEventService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@Slf4j
+@RestController
+@RequestMapping("/api/v1/projects/{projectId}/incoming-events")
+@Tag(name = "Incoming Events", description = "Incoming webhook events monitoring")
+@SecurityRequirement(name = "bearerAuth")
+public class IncomingEventController {
+
+    private final IncomingEventService eventService;
+
+    public IncomingEventController(IncomingEventService eventService) {
+        this.eventService = eventService;
+    }
+
+    @Operation(summary = "List incoming events", description = "Returns paginated incoming events for the project")
+    @ApiResponse(responseCode = "200", description = "Events retrieved")
+    @GetMapping
+    public ResponseEntity<Page<IncomingEventResponse>> listEvents(
+            @PathVariable("projectId") UUID projectId,
+            @Parameter(description = "Filter by incoming source ID") @RequestParam(value = "sourceId", required = false) UUID sourceId,
+            @PageableDefault(size = 20, sort = "receivedAt") Pageable pageable,
+            Authentication authentication) {
+        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+        Page<IncomingEventResponse> response = eventService.listEvents(
+                projectId, jwtAuth.getOrganizationId(), sourceId, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Get incoming event", description = "Returns incoming event details by ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event retrieved"),
+            @ApiResponse(responseCode = "404", description = "Event not found")
+    })
+    @GetMapping("/{id}")
+    public ResponseEntity<IncomingEventResponse> getEvent(
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+        IncomingEventResponse response = eventService.getEvent(id, jwtAuth.getOrganizationId());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Get event forward attempts", description = "Returns forwarding attempts for an incoming event")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Attempts retrieved"),
+            @ApiResponse(responseCode = "404", description = "Event not found")
+    })
+    @GetMapping("/{id}/attempts")
+    public ResponseEntity<Page<IncomingForwardAttemptResponse>> getEventAttempts(
+            @PathVariable("id") UUID id,
+            @PageableDefault(size = 20) Pageable pageable,
+            Authentication authentication) {
+        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+        Page<IncomingForwardAttemptResponse> response = eventService.getEventAttempts(
+                id, jwtAuth.getOrganizationId(), pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Replay incoming event", description = "Re-sends the incoming event to all enabled destinations")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Event replayed"),
+            @ApiResponse(responseCode = "404", description = "Event not found")
+    })
+    @PostMapping("/{id}/replay")
+    public ResponseEntity<ReplayEventResponse> replayEvent(
+            @PathVariable("id") UUID id,
+            Authentication authentication) {
+        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        int replayed = eventService.replayEvent(id, jwtAuth.getOrganizationId());
+        return ResponseEntity.ok(ReplayEventResponse.builder()
+                .status("replayed")
+                .eventId(id)
+                .destinationsCount(replayed)
+                .build());
+    }
+
+    private JwtAuthenticationToken requireJwt(Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new UnauthorizedException("Authentication required");
+        }
+        return (JwtAuthenticationToken) authentication;
+    }
+}
