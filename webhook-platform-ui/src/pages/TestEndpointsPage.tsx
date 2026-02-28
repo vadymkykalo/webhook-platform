@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
+import { formatDateTime } from '../lib/date';
+import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import { testEndpointsApi, TestEndpointResponse, CapturedRequestResponse } from '../api/testEndpoints.api';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -51,7 +53,7 @@ export default function TestEndpointsPage() {
       const data = await testEndpointsApi.list(projectId);
       setEndpoints(data);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.loadFailed'));
+      showApiError(err, 'testEndpoints.toast.loadFailed', { retry: loadEndpoints });
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export default function TestEndpointsPage() {
       const data = await testEndpointsApi.getRequests(projectId, endpointId);
       setRequests(data.content);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.loadRequestsFailed'));
+      showApiError(err, 'testEndpoints.toast.loadRequestsFailed');
     } finally {
       setLoadingRequests(false);
     }
@@ -76,10 +78,10 @@ export default function TestEndpointsPage() {
       setCreating(true);
       const endpoint = await testEndpointsApi.create(projectId);
       setEndpoints([endpoint, ...endpoints]);
-      toast.success(t('testEndpoints.toast.created'));
+      showSuccess(t('testEndpoints.toast.created'));
       copyToClipboard(endpoint.url);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.createFailed'));
+      showApiError(err, 'testEndpoints.toast.createFailed');
     } finally {
       setCreating(false);
     }
@@ -95,9 +97,9 @@ export default function TestEndpointsPage() {
         setSelectedEndpoint(null);
         setRequests([]);
       }
-      toast.success(t('testEndpoints.toast.deleted'));
+      showSuccess(t('testEndpoints.toast.deleted'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.deleteFailed'));
+      showApiError(err, 'testEndpoints.toast.deleteFailed');
     } finally {
       setDeleting(false);
       setDeleteId(null);
@@ -106,12 +108,9 @@ export default function TestEndpointsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(t('testEndpoints.toast.urlCopied'));
+    showSuccess(t('testEndpoints.toast.urlCopied'));
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
 
   const getTimeRemaining = (expiresAt: string) => {
     const now = new Date();
@@ -146,19 +145,12 @@ export default function TestEndpointsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-36 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-64 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-44 bg-muted animate-pulse rounded-lg" />
-        </div>
+      <PageSkeleton>
         <div className="grid lg:grid-cols-2 gap-6">
-          <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-28 bg-muted animate-pulse rounded-xl" />)}</div>
+          <SkeletonRows count={2} height="h-28" />
           <div className="h-64 bg-muted animate-pulse rounded-xl" />
         </div>
-      </div>
+      </PageSkeleton>
     );
   }
 
@@ -256,7 +248,7 @@ export default function TestEndpointsPage() {
                   >
                     {expandedRequest === req.id ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                     <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${getMethodColor(req.method)}`}>{req.method}</span>
-                    <span className="text-[11px] text-muted-foreground">{formatDate(req.receivedAt)}</span>
+                    <span className="text-[11px] text-muted-foreground">{formatDateTime(req.receivedAt)}</span>
                     {req.sourceIp && <span className="text-[11px] text-muted-foreground ml-auto">{req.sourceIp}</span>}
                   </div>
                   {expandedRequest === req.id && (

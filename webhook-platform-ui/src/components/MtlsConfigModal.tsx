@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2, ShieldCheck, Upload, X, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
@@ -56,11 +56,11 @@ export default function MtlsConfigModal({
 
   const handleSave = async () => {
     if (!clientCert.trim()) {
-      toast.error('Client certificate is required');
+      showApiError(new Error('Client certificate is required'), 'toast.errors.validation');
       return;
     }
     if (!clientKey.trim()) {
-      toast.error('Client private key is required');
+      showApiError(new Error('Client private key is required'), 'toast.errors.validation');
       return;
     }
 
@@ -73,11 +73,11 @@ export default function MtlsConfigModal({
       };
       const updated = await endpointsApi.configureMtls(projectId, endpoint.id, data);
       onUpdate(updated);
-      toast.success('mTLS configured successfully');
+      showSuccess('mTLS configured successfully');
       onOpenChange(false);
       resetForm();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to configure mTLS');
+      showApiError(err, 'toast.errors.server');
     } finally {
       setSaving(false);
     }
@@ -88,11 +88,11 @@ export default function MtlsConfigModal({
       setDisabling(true);
       const updated = await endpointsApi.disableMtls(projectId, endpoint.id);
       onUpdate(updated);
-      toast.success('mTLS disabled');
+      showSuccess('mTLS disabled');
       onOpenChange(false);
       resetForm();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to disable mTLS');
+      showApiError(err, 'toast.errors.server');
     } finally {
       setDisabling(false);
     }

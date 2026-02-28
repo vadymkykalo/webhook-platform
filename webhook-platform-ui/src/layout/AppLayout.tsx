@@ -7,10 +7,13 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
+import { useProject } from '../api/queries';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
-import { toast } from 'sonner';
+import { type Role, hasMinRole } from '../auth/ProtectedRoute';
+import { usePermissions } from '../auth/usePermissions';
+import { showApiError, showSuccess } from '../lib/toast';
 import { CommandPalette } from '../components/CommandPalette';
 import { getTheme, setTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -20,6 +23,7 @@ interface NavItem {
   path: string;
   icon: React.ElementType;
   badge?: string;
+  requiredRole?: Role;
 }
 
 const mainNav: NavItem[] = [
@@ -28,9 +32,9 @@ const mainNav: NavItem[] = [
 ];
 
 const orgNav: NavItem[] = [
-  { nameKey: 'nav.members', path: '/admin/members', icon: Users },
+  { nameKey: 'nav.members', path: '/admin/members', icon: Users, requiredRole: 'OWNER' },
   { nameKey: 'nav.auditLog', path: '/admin/audit-log', icon: FileText },
-  { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings },
+  { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings, requiredRole: 'OWNER' },
 ];
 
 const getProjectNav = (projectId: string): NavItem[] => [
@@ -86,9 +90,107 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
   );
 }
 
+const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType }> = {
+  dashboard: { key: 'breadcrumb.dashboard', icon: LayoutDashboard },
+  projects: { key: 'breadcrumb.projects', icon: FolderKanban },
+  endpoints: { key: 'breadcrumb.endpoints', icon: Webhook },
+  events: { key: 'breadcrumb.events', icon: Radio },
+  deliveries: { key: 'breadcrumb.deliveries', icon: Send },
+  subscriptions: { key: 'breadcrumb.subscriptions', icon: Bell },
+  'api-keys': { key: 'breadcrumb.api-keys', icon: Key },
+  analytics: { key: 'breadcrumb.analytics', icon: BarChart3 },
+  dlq: { key: 'breadcrumb.dlq', icon: AlertTriangle },
+  'test-endpoints': { key: 'breadcrumb.test-endpoints', icon: TestTube },
+  members: { key: 'breadcrumb.members', icon: Users },
+  'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
+  settings: { key: 'breadcrumb.settings', icon: Settings },
+};
+
+function Breadcrumb({ projectId }: { projectId: string | undefined }) {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const { data: project } = useProject(projectId);
+
+  const crumbs: { label: string; to?: string; icon?: React.ElementType }[] = [];
+
+  // Always start with Home
+  const path = location.pathname;
+  if (path === '/admin/dashboard' || path === '/admin') {
+    // On dashboard — no extra crumbs
+    return (
+      <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
+        <LayoutDashboard className="h-3.5 w-3.5" />
+        <span className="text-foreground font-medium">{t('breadcrumb.dashboard')}</span>
+      </div>
+    );
+  }
+
+  // Parse: /admin/{section} or /admin/projects/{id}/{section}
+  const afterAdmin = path.replace(/^\/admin\/?/, '');
+  const parts = afterAdmin.split('/').filter(Boolean);
+
+  if (parts[0] === 'projects' && parts.length === 1) {
+    // /admin/projects
+    const seg = BREADCRUMB_SEGMENTS.projects;
+    crumbs.push({ label: t(seg.key), icon: seg.icon });
+  } else if (parts[0] === 'projects' && parts.length >= 2) {
+    // /admin/projects/:projectId/...
+    const seg = BREADCRUMB_SEGMENTS.projects;
+    crumbs.push({ label: t(seg.key), to: '/admin/projects', icon: seg.icon });
+    crumbs.push({
+      label: project?.name || '…',
+      to: projectId ? `/admin/projects/${projectId}/endpoints` : undefined,
+      icon: FolderKanban,
+    });
+    if (parts[2]) {
+      const segment = BREADCRUMB_SEGMENTS[parts[2]];
+      crumbs.push({
+        label: segment ? t(segment.key) : parts[2],
+        icon: segment?.icon,
+      });
+    }
+  } else {
+    // /admin/members, /admin/settings, etc.
+    const segment = BREADCRUMB_SEGMENTS[parts[0]];
+    crumbs.push({
+      label: segment ? t(segment.key) : parts[0],
+      icon: segment?.icon,
+    });
+  }
+
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground min-w-0">
+      <Link to="/admin/dashboard" className="hover:text-foreground transition-colors flex-shrink-0">
+        {t('nav.home')}
+      </Link>
+      {crumbs.map((crumb, i) => {
+        const Icon = crumb.icon;
+        const isLast = i === crumbs.length - 1;
+        return (
+          <span key={i} className="flex items-center gap-1.5 min-w-0">
+            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+            {crumb.to && !isLast ? (
+              <Link to={crumb.to} className="flex items-center gap-1 hover:text-foreground transition-colors truncate max-w-[160px]">
+                {Icon && <Icon className="h-3.5 w-3.5 flex-shrink-0" />}
+                {crumb.label}
+              </Link>
+            ) : (
+              <span className="flex items-center gap-1 text-foreground font-medium truncate max-w-[180px]">
+                {Icon && isLast && <Icon className="h-3.5 w-3.5 flex-shrink-0" />}
+                {crumb.label}
+              </span>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AppLayout() {
   const { t } = useTranslation();
   const { user, logout, updateUser } = useAuth();
+  const { role } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -113,9 +215,9 @@ export default function AppLayout() {
     setResending(true);
     try {
       await authApi.resendVerification(user.user.email);
-      toast.success(t('auth.verification.sent'));
+      showSuccess(t('auth.verification.sent'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('auth.verification.failed'));
+      showApiError(err, 'auth.verification.failed');
     } finally {
       setResending(false);
     }
@@ -123,7 +225,7 @@ export default function AppLayout() {
 
   const handleLogout = () => {
     logout();
-    toast.success(t('nav.loggedOut'));
+    showSuccess(t('nav.loggedOut'));
     navigate('/login');
   };
 
@@ -182,7 +284,7 @@ export default function AppLayout() {
         )}
 
         <SidebarSection label={collapsed && !isMobile ? "" : t('nav.organization')}>
-          {orgNav.map((item) => (
+          {orgNav.filter((item) => !item.requiredRole || hasMinRole(role, item.requiredRole)).map((item) => (
             <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
           ))}
         </SidebarSection>
@@ -271,17 +373,7 @@ export default function AppLayout() {
             </Button>
 
             {/* Breadcrumb */}
-            <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Link to="/admin/dashboard" className="hover:text-foreground transition-colors">{t('nav.home')}</Link>
-              {location.pathname !== '/admin/dashboard' && (
-                <>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                  <span className="text-foreground font-medium capitalize">
-                    {location.pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ')}
-                  </span>
-                </>
-              )}
-            </div>
+            <Breadcrumb projectId={projectId} />
 
             <div className="flex-1" />
 

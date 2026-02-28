@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Webhook, Loader2, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,11 +39,11 @@ export default function ResetPasswordPage() {
     try {
       await authApi.resetPassword(token!, password);
       setSuccess(true);
-      toast.success(t('auth.resetPassword.successToast'));
+      showSuccess(t('auth.resetPassword.successToast'));
     } catch (err: any) {
       const msg = err.response?.data?.message || t('auth.resetPassword.failed');
       setError(msg);
-      toast.error(msg);
+      showApiError(err, 'auth.resetPassword.failed');
     } finally {
       setLoading(false);
     }

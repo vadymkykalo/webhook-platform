@@ -181,6 +181,24 @@
   animation-play-state: paused;
 }
 
+/* Flow diagram SVG animated dashed paths */
+@keyframes flow-dash-svg {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -26; }
+}
+.flow-svg-path {
+  animation: flow-dash-svg 1s linear infinite;
+}
+
+/* Hub subtle pulse glow */
+@keyframes hub-glow {
+  0%, 100% { box-shadow: 0 8px 24px -4px hsl(var(--primary) / 0.2), 0 0 0 4px hsl(var(--primary) / 0.1); }
+  50% { box-shadow: 0 8px 32px -2px hsl(var(--primary) / 0.35), 0 0 0 6px hsl(var(--primary) / 0.15); }
+}
+.hub-pulse {
+  animation: hub-glow 3s ease-in-out infinite;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

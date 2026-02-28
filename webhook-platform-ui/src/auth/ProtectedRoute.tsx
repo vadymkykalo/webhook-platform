@@ -1,7 +1,10 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth.store';
 
-type Role = 'OWNER' | 'DEVELOPER' | 'VIEWER';
+const AccessDeniedPage = lazy(() => import('../pages/AccessDeniedPage'));
+
+export type Role = 'OWNER' | 'DEVELOPER' | 'VIEWER';
 
 const ROLE_HIERARCHY: Record<Role, number> = {
   VIEWER: 0,
@@ -25,9 +28,13 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   if (requiredRole) {
     const userRole = (user?.role || 'VIEWER') as Role;
     if (ROLE_HIERARCHY[userRole] < ROLE_HIERARCHY[requiredRole]) {
-      return <Navigate to="/admin/dashboard" replace />;
+      return <Suspense fallback={null}><AccessDeniedPage /></Suspense>;
     }
   }
 
   return <>{children}</>;
+}
+
+export function hasMinRole(current: Role, required: Role): boolean {
+  return ROLE_HIERARCHY[current] >= ROLE_HIERARCHY[required];
 }

@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Eye, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showSuccess } from '../lib/toast';
 import { useEvents } from '../api/queries';
+import { formatRelativeTime, formatDateTime } from '../lib/date';
+import PageSkeleton from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { projectsApi } from '../api/projects.api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
@@ -35,54 +38,18 @@ export default function EventsPage() {
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast.success(t('events.toast.idCopied'));
+    showSuccess(t('events.toast.idCopied'));
   };
 
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 60) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHour < 24) return `${diffHour}h ago`;
-    if (diffDay < 7) return `${diffDay}d ago`;
-
-    return date.toLocaleDateString();
-  };
-
-  const formatExactTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
 
   if (loading) {
-    return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-24 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-36 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="h-[400px] bg-muted animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageSkeleton maxWidth="max-w-7xl" />;
   }
 
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <Radio className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground">{t('common.error')}</p>
-        </div>
+        <EmptyState icon={Radio} title={t('common.error')} />
       </div>
     );
   }
@@ -102,20 +69,16 @@ export default function EventsPage() {
       </div>
 
       {events.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <Radio className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('events.noEvents')}</h3>
-          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            {t('events.noEventsDesc')}
-          </p>
-          {canSendEvents && (
+        <EmptyState
+          icon={Radio}
+          title={t('events.noEvents')}
+          description={t('events.noEventsDesc')}
+          action={canSendEvents ? (
             <Button onClick={() => setShowSendModal(true)}>
               <Plus className="h-4 w-4" /> {t('events.sendTest')}
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <div className="animate-fade-in">
           <Card className="overflow-hidden">
@@ -135,7 +98,7 @@ export default function EventsPage() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">{formatRelativeTime(event.createdAt)}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatExactTime(event.createdAt)}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
                       </div>
                     </TableCell>
                     <TableCell>

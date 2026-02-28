@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
-import { toast } from 'sonner';
+import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { eventsApi } from '../api/events.api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -57,7 +57,7 @@ export default function SendTestEventModal({
     e.preventDefault();
 
     if (!validateJson(payload)) {
-      toast.error('Please fix JSON errors before submitting');
+      showWarning('Please fix JSON errors before submitting');
       return;
     }
 
@@ -70,7 +70,7 @@ export default function SendTestEventModal({
         data,
       });
 
-      toast.success(
+      showSuccess(
         `Event sent successfully! Created ${response.deliveriesCreated || 0} deliveries.`,
         { duration: 5000 }
       );
@@ -80,7 +80,7 @@ export default function SendTestEventModal({
       onClose();
       onSuccess?.();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to send event');
+      showApiError(err, 'toast.errors.server');
     } finally {
       setSending(false);
     }

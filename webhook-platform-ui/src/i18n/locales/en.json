@@ -1,4 +1,23 @@
 {
+  "toast": {
+    "retry": "Retry",
+    "errors": {
+      "unauthorized": "Session expired. Please sign in again.",
+      "forbidden": "You don't have permission to perform this action.",
+      "notFound": "The requested resource was not found.",
+      "conflict": "This action conflicts with an existing resource.",
+      "validation": "Please check your input and try again.",
+      "tooManyRequests": "Too many requests. Please wait a moment.",
+      "server": "Something went wrong on our end. Please try again later.",
+      "network": "Network error. Check your connection and try again."
+    }
+  },
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
   "common": {
     "cancel": "Cancel",
     "delete": "Delete",
@@ -690,6 +709,20 @@
       "retry": "Retry"
     },
     "logoCloud": "Built with battle-tested technology",
+    "flowDiagram": {
+      "title": "See how",
+      "titleHighlight": " Hookflow works",
+      "subtitle": "Hookflow sits between your application and your customers' endpoints — handling delivery, retries, and observability.",
+      "tabSend": "Send webhooks",
+      "tabReceive": "Receive webhooks",
+      "sendSource": "YOUR APP",
+      "sendDesc": "Your app fires events → Hookflow reliably delivers to all registered endpoints with retries, signatures, and monitoring.",
+      "receiveDesc": "Third-party services send webhooks → Hookflow ingests, validates, and routes them to your application.",
+      "receiveDest": "YOUR API",
+      "retries": "Auto retries",
+      "signatures": "HMAC signed",
+      "monitoring": "Full observability"
+    },
     "features": {
       "title": "Everything you need for",
       "titleHighlight": "production webhooks",
@@ -781,7 +814,100 @@
       "title": "Start delivering webhooks reliably",
       "subtitle": "Sign up, configure endpoints, and send your first event in under 5 minutes.",
       "getStartedFree": "Get started free",
-      "viewQuickstart": "View quickstart"
+      "viewQuickstart": "View quickstart",
+      "talkToSales": "Talk to sales",
+      "contactSales": "Contact sales"
+    },
+    "socialProof": {
+      "title": "Built for",
+      "titleHighlight": " production workloads",
+      "subtitle": "Architectural guarantees backed by battle-tested patterns — not marketing promises.",
+      "stat1Value": "0",
+      "stat1Label": "Events lost",
+      "stat1Desc": "Transactional outbox pattern",
+      "stat2Value": "<5 min",
+      "stat2Label": "Time to integrate",
+      "stat2Desc": "First webhook delivered",
+      "stat3Value": "∞",
+      "stat3Label": "Horizontal scale",
+      "stat3Desc": "Kafka-backed workers",
+      "stat4Value": "100%",
+      "stat4Label": "Open source",
+      "stat4Desc": "Self-host or use our cloud",
+      "quote1": "We replaced 3 months of custom webhook code with Hookflow in an afternoon. Retries, signatures, monitoring — it just works.",
+      "quote1Author": "Alex Chen",
+      "quote1Role": "CTO at Acme Payments",
+      "quote2": "The observability alone is worth it. We can see every delivery attempt, debug failures in seconds, and replay with one click.",
+      "quote2Author": "Sarah Kim",
+      "quote2Role": "Lead Engineer at CloudShip",
+      "quote3": "Our team was spending 20% of sprint capacity maintaining webhook infrastructure. Now it's zero.",
+      "quote3Author": "Marcus Weber",
+      "quote3Role": "VP Engineering at DataSync"
+    },
+    "problem": {
+      "badge": "The problem",
+      "title": "Building webhooks in-house",
+      "titleHighlight": " costs more than you think",
+      "subtitle": "Most teams underestimate the complexity. What starts as a simple HTTP POST becomes months of engineering debt.",
+      "before": "Without Hookflow",
+      "after": "With Hookflow",
+      "item1Before": "Build custom retry logic from scratch",
+      "item1After": "Automatic exponential backoff, configurable per endpoint",
+      "item2Before": "No visibility into delivery failures",
+      "item2After": "Full attempt history with HTTP details",
+      "item3Before": "Manual signature implementation",
+      "item3After": "HMAC-SHA256 on every delivery, automatic",
+      "item4Before": "No replay capability when things break",
+      "item4After": "One-click replay from dashboard",
+      "item5Before": "Weeks of engineering time per quarter",
+      "item5After": "5-minute setup, zero maintenance",
+      "item6Before": "No dead letter queue or alerting",
+      "item6After": "DLQ + real-time monitoring built in",
+      "saveBadge": "Save 200+ engineering hours per year",
+      "saveDesc": "Stop reinventing webhook infrastructure. Ship features instead."
+    },
+    "integrations": {
+      "badge": "Integrations & SDKs",
+      "title": "Works with your",
+      "titleHighlight": " existing stack",
+      "subtitle": "Official SDKs, OpenAPI spec, and webhook delivery to any HTTP endpoint. Integrate in minutes, not days.",
+      "sdksTitle": "Official SDKs",
+      "sdksDesc": "Type-safe clients with built-in signature verification",
+      "nodeDesc": "npm install @hookflow/node",
+      "pythonDesc": "pip install hookflow",
+      "phpDesc": "composer require hookflow/php",
+      "restTitle": "REST API + OpenAPI",
+      "restDesc": "Full OpenAPI 3.0 spec. Generate clients in any language.",
+      "deliverTo": "Deliver webhooks to",
+      "deliverToDesc": "Any service with an HTTP endpoint. No vendor lock-in.",
+      "service1": "Stripe",
+      "service1Desc": "Payment webhooks",
+      "service2": "GitHub",
+      "service2Desc": "Repository events",
+      "service3": "Slack",
+      "service3Desc": "Team notifications",
+      "service4": "Twilio",
+      "service4Desc": "SMS & voice events",
+      "service5": "Salesforce",
+      "service5Desc": "CRM updates",
+      "service6": "Any HTTP endpoint",
+      "service6Desc": "No vendor lock-in"
+    },
+    "faq": {
+      "title": "Frequently asked",
+      "titleHighlight": " questions",
+      "q1": "How does Hookflow ensure reliable delivery?",
+      "a1": "Every event is persisted using a transactional outbox pattern — the event and outbox entry are written in a single database transaction. A publisher polls the outbox and sends events to Kafka. Workers consume from Kafka and deliver with automatic retries using exponential backoff. Zero events are lost, ever.",
+      "q2": "What happens when an endpoint is down?",
+      "a2": "Hookflow automatically retries with exponential backoff across multiple intervals. Failed deliveries land in the Dead Letter Queue where you can inspect, debug, and replay them with one click. You get full visibility into every attempt.",
+      "q3": "How do I verify webhook signatures?",
+      "a3": "Every delivery includes an X-Signature header with an HMAC-SHA256 hash. Each endpoint gets a unique signing secret. Our SDKs include built-in verification helpers, or you can compute the hash yourself with any HMAC library.",
+      "q4": "Can I self-host Hookflow?",
+      "a4": "Yes. Hookflow is fully open-source and ships as Docker containers. Run it on your own infrastructure with Docker Compose, Kubernetes, or any container orchestrator. You own your data completely.",
+      "q5": "What's included in the free tier?",
+      "a5": "The free tier includes unlimited projects, endpoints, and events. You get full access to all features: retries, HMAC signatures, analytics, DLQ, audit logs, and team management. No credit card required.",
+      "q6": "How long does it take to integrate?",
+      "a6": "Most teams are up and running in under 5 minutes. Create a project, register an endpoint, and send your first event with a single API call. Our quickstart guide walks you through every step."
     }
   },
   "quickstartPage": {
@@ -1064,6 +1190,12 @@
     "backToDashboard": "Back to Dashboard",
     "backToHome": "Back to Home"
   },
+  "accessDenied": {
+    "title": "Access Denied",
+    "description": "You don't have permission to view this page. Contact your organization owner to request access.",
+    "backToDashboard": "Back to Dashboard",
+    "yourRole": "Your role: {{role}}"
+  },
   "verifyEmail": {
     "verifying": "Verifying your email...",
     "pleaseWait": "Please wait a moment.",
@@ -1120,5 +1252,88 @@
       "tip4": "Inspect the error messages in delivery attempts below",
       "tip5": "Consider replaying the delivery after fixing the issue"
     }
+  },
+  "breadcrumb": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "endpoints": "Endpoints",
+    "events": "Events",
+    "deliveries": "Deliveries",
+    "subscriptions": "Subscriptions",
+    "api-keys": "API Keys",
+    "analytics": "Analytics",
+    "dlq": "Dead Letter Queue",
+    "test-endpoints": "Test Endpoints",
+    "members": "Members",
+    "audit-log": "Audit Log",
+    "settings": "Settings"
+  },
+  "onboarding": {
+    "title": "Getting Started",
+    "subtitle": "Complete these steps to set up your webhook infrastructure",
+    "dismiss": "Dismiss",
+    "collapsed": "{{completed}} of {{total}} completed",
+    "steps": {
+      "createProject": "Create a project",
+      "createProjectDesc": "Projects organize your endpoints, events, and API keys",
+      "createEndpoint": "Add a webhook endpoint",
+      "createEndpointDesc": "Register the URL where you want to receive webhooks",
+      "createSubscription": "Subscribe to event types",
+      "createSubscriptionDesc": "Link your endpoint to specific event types",
+      "createApiKey": "Generate an API key",
+      "createApiKeyDesc": "You'll need an API key to send events programmatically",
+      "sendEvent": "Send your first event",
+      "sendEventDesc": "Send a test event and see it delivered to your endpoint",
+      "checkDelivery": "Verify delivery",
+      "checkDeliveryDesc": "Check the delivery log to confirm your webhook was received"
+    },
+    "go": "Go",
+    "done": "Done",
+    "allDone": "You're all set! Your webhook infrastructure is ready.",
+    "allDoneAction": "View quickstart guide"
+  },
+  "commandPalette": {
+    "placeholder": "Search pages, projects...",
+    "noResults": "No results found",
+    "navigate": "navigate",
+    "open": "open",
+    "close": "close",
+    "groupNavigation": "Navigation",
+    "groupProjects": "Projects",
+    "openProjectEndpoints": "Open project endpoints",
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "members": "Members",
+    "auditLog": "Audit Log",
+    "settings": "Settings",
+    "documentation": "Documentation",
+    "endpoints": "Endpoints",
+    "events": "Events",
+    "deliveries": "Deliveries",
+    "subscriptions": "Subscriptions",
+    "apiKeys": "API Keys",
+    "analytics": "Analytics",
+    "dlq": "Dead Letter Queue",
+    "testEndpoints": "Test Endpoints"
+  },
+  "footer": {
+    "tagline": "Production-ready webhook infrastructure. Reliable delivery at any scale.",
+    "product": "Product",
+    "features": "Features",
+    "quickstart": "Quickstart",
+    "documentation": "Documentation",
+    "access": "Access",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "dashboard": "Dashboard",
+    "sdks": "SDKs",
+    "copyright": "© {{year}} Hookflow. Built for production systems.",
+    "status": "Status",
+    "github": "GitHub"
+  },
+  "quickstartStatus": {
+    "delivered": "Delivered",
+    "retrying": "Retrying",
+    "failed": "Failed"
   }
 }

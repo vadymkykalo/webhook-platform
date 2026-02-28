@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Webhook, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
       } else {
         setError(err.response?.data?.message || t('auth.forgotPassword.genericError'));
       }
-      toast.error(error || t('auth.forgotPassword.failedToast'));
+      showApiError(err, 'auth.forgotPassword.failedToast');
     } finally {
       setLoading(false);
     }

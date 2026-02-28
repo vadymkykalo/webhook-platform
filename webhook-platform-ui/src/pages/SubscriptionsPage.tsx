@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showSuccess } from '../lib/toast';
+import { formatDate } from '../lib/date';
+import PageSkeleton from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { SubscriptionResponse } from '../api/subscriptions.api';
 import { useProject, useSubscriptions, useEndpoints, usePatchSubscription, useDeleteSubscription, queryKeys } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -51,21 +54,21 @@ export default function SubscriptionsPage() {
   const handleToggleEnabled = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
       { id: subscription.id, data: { enabled: !subscription.enabled } },
-      { onSuccess: () => toast.success(!subscription.enabled ? t('subscriptions.toast.enabled') : t('subscriptions.toast.disabled')) }
+      { onSuccess: () => showSuccess(!subscription.enabled ? t('subscriptions.toast.enabled') : t('subscriptions.toast.disabled')) }
     );
   };
 
   const handleToggleOrdering = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
       { id: subscription.id, data: { orderingEnabled: !subscription.orderingEnabled } },
-      { onSuccess: () => toast.success(!subscription.orderingEnabled ? t('subscriptions.toast.fifoEnabled') : t('subscriptions.toast.fifoDisabled')) }
+      { onSuccess: () => showSuccess(!subscription.orderingEnabled ? t('subscriptions.toast.fifoEnabled') : t('subscriptions.toast.fifoDisabled')) }
     );
   };
 
   const handleDelete = () => {
     if (!deleteId || !projectId) return;
     deleteMutation.mutate(deleteId, {
-      onSuccess: () => { toast.success(t('subscriptions.toast.deleted')); setDeleteId(null); },
+      onSuccess: () => { showSuccess(t('subscriptions.toast.deleted')); setDeleteId(null); },
     });
   };
 
@@ -101,29 +104,13 @@ export default function SubscriptionsPage() {
   });
 
   if (loading) {
-    return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-36 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-40 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="h-[400px] bg-muted animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageSkeleton maxWidth="max-w-7xl" />;
   }
 
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <LinkIcon className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground">{t('subscriptions.projectNotFound')}</p>
-        </div>
+        <EmptyState icon={LinkIcon} title={t('subscriptions.projectNotFound')} />
       </div>
     );
   }
@@ -169,24 +156,16 @@ export default function SubscriptionsPage() {
       </Card>
 
       {filteredSubscriptions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <LinkIcon className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">
-            {subscriptions.length === 0 ? t('subscriptions.noSubscriptions') : t('subscriptions.noMatching')}
-          </h3>
-          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            {subscriptions.length === 0
-              ? t('subscriptions.noSubscriptionsDesc')
-              : t('subscriptions.noMatchingDesc')}
-          </p>
-          {subscriptions.length === 0 && canManageSubscriptions && (
+        <EmptyState
+          icon={LinkIcon}
+          title={subscriptions.length === 0 ? t('subscriptions.noSubscriptions') : t('subscriptions.noMatching')}
+          description={subscriptions.length === 0 ? t('subscriptions.noSubscriptionsDesc') : t('subscriptions.noMatchingDesc')}
+          action={subscriptions.length === 0 && canManageSubscriptions ? (
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <Card className="overflow-hidden animate-fade-in">
           <Table>
@@ -224,7 +203,7 @@ export default function SubscriptionsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-muted-foreground">{new Date(subscription.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[13px] text-muted-foreground">{formatDate(subscription.createdAt)}</span>
                   </TableCell>
                   {canManageSubscriptions && (
                     <TableCell>
