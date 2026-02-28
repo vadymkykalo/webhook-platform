@@ -1,0 +1,298 @@
+package com.webhook.platform.api.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.webhook.platform.api.domain.entity.IncomingDestination;
+import com.webhook.platform.api.domain.entity.IncomingEvent;
+import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
+import com.webhook.platform.api.domain.entity.IncomingSource;
+import com.webhook.platform.api.domain.entity.OutboxMessage;
+import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
+import com.webhook.platform.api.domain.repository.IncomingEventRepository;
+import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
+import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
+import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.common.enums.ForwardAttemptStatus;
+import com.webhook.platform.common.enums.IncomingAuthType;
+import com.webhook.platform.common.enums.IncomingSourceStatus;
+import com.webhook.platform.common.enums.ProviderType;
+import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.common.util.CryptoUtils;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class IngressServiceTest {
+
+    @Mock private IncomingSourceRepository sourceRepository;
+    @Mock private IncomingEventRepository eventRepository;
+    @Mock private IncomingDestinationRepository destinationRepository;
+    @Mock private IncomingForwardAttemptRepository forwardAttemptRepository;
+    @Mock private OutboxMessageRepository outboxMessageRepository;
+    @Mock private HttpServletRequest httpRequest;
+
+    private IngressService service;
+    private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final String encryptionKey = "test_encryption_key_32_chars_pad";
+    private final String encryptionSalt = "test_salt";
+
+    private final UUID sourceId = UUID.randomUUID();
+    private final UUID eventId = UUID.randomUUID();
+    private final UUID destId = UUID.randomUUID();
+
+    @BeforeEach
+    void setUp() {
+        service = new IngressService(
+                sourceRepository, eventRepository, destinationRepository,
+                forwardAttemptRepository, outboxMessageRepository,
+                objectMapper, meterRegistry, encryptionKey, encryptionSalt, 524288
+        );
+    }
+
+    private IncomingSource buildActiveSource() {
+        return IncomingSource.builder()
+                .id(sourceId).projectId(UUID.randomUUID())
+                .name("Test").slug("test").providerType(ProviderType.GENERIC)
+                .status(IncomingSourceStatus.ACTIVE)
+                .ingressPathToken("validtoken")
+                .verificationMode(VerificationMode.NONE)
+                .hmacHeaderName("X-Signature").hmacSignaturePrefix("")
+                .createdAt(Instant.now()).updatedAt(Instant.now())
+                .build();
+    }
+
+    private void stubHttpRequest() {
+        when(httpRequest.getMethod()).thenReturn("POST");
+        when(httpRequest.getRequestURI()).thenReturn("/ingress/validtoken");
+        when(httpRequest.getContentType()).thenReturn("application/json");
+        when(httpRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+        when(httpRequest.getHeaderNames()).thenReturn(Collections.enumeration(List.of("content-type")));
+        when(httpRequest.getHeader(anyString())).thenReturn(null);
+        when(httpRequest.getHeader("content-type")).thenReturn("application/json");
+    }
+
+    @Test
+    void receiveWebhook_success_noDestinations() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+
+        IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest);
+
+        assertThat(event.getId()).isEqualTo(eventId);
+        assertThat(event.getIncomingSourceId()).isEqualTo(sourceId);
+        assertThat(event.getBodyRaw()).isEqualTo("{\"test\":true}");
+        assertThat(event.getMethod()).isEqualTo("POST");
+        assertThat(event.getRequestId()).isNotNull();
+        assertThat(event.getBodySha256()).isNotNull();
+        assertThat(event.getVerified()).isNull(); // verification mode NONE
+
+        verify(forwardAttemptRepository, never()).saveAll(any());
+        verify(outboxMessageRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void receiveWebhook_success_withDestinations() {
+        IncomingSource source = buildActiveSource();
+        IncomingDestination dest = IncomingDestination.builder()
+                .id(destId).incomingSourceId(sourceId)
+                .url("https://example.com/hook")
+                .authType(IncomingAuthType.NONE)
+                .enabled(true).maxAttempts(5).timeoutSeconds(30)
+                .retryDelays("60,300")
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of(dest));
+        stubHttpRequest();
+
+        IncomingEvent event = service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest);
+
+        assertThat(event.getId()).isEqualTo(eventId);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<IncomingForwardAttempt>> attemptCaptor = ArgumentCaptor.forClass(List.class);
+        verify(forwardAttemptRepository).saveAll(attemptCaptor.capture());
+        List<IncomingForwardAttempt> attempts = attemptCaptor.getValue();
+        assertThat(attempts).hasSize(1);
+        assertThat(attempts.get(0).getDestinationId()).isEqualTo(destId);
+        assertThat(attempts.get(0).getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
+        assertThat(attempts.get(0).getAttemptNumber()).isEqualTo(1);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OutboxMessage>> outboxCaptor = ArgumentCaptor.forClass(List.class);
+        verify(outboxMessageRepository).saveAll(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue()).hasSize(1);
+    }
+
+    @Test
+    void receiveWebhook_invalidToken_throws() {
+        when(sourceRepository.findByIngressPathToken("invalid")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}", httpRequest))
+                .isInstanceOf(IngressService.SourceNotFoundException.class);
+    }
+
+    @Test
+    void receiveWebhook_disabledSource_throws() {
+        IncomingSource source = buildActiveSource();
+        source.setStatus(IncomingSourceStatus.DISABLED);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+                .isInstanceOf(IngressService.SourceDisabledException.class);
+    }
+
+    @Test
+    void receiveWebhook_payloadTooLarge_throws() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+
+        // Service configured with maxPayloadSizeBytes=524288, create larger body
+        String hugeBody = "x".repeat(600000);
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", hugeBody, httpRequest))
+                .isInstanceOf(IngressService.PayloadTooLargeException.class)
+                .hasMessageContaining("524288");
+    }
+
+    @Test
+    void receiveWebhook_hmacVerification_success() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"test\":true}";
+        // Compute expected HMAC
+        String expectedHmac = computeHmac(secret, body);
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(expectedHmac);
+
+        IncomingEvent event = service.receiveWebhook("validtoken", body, httpRequest);
+
+        assertThat(event.getVerified()).isTrue();
+        assertThat(event.getVerificationError()).isNull();
+    }
+
+    @Test
+    void receiveWebhook_hmacVerification_mismatch() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
+
+        IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest);
+
+        assertThat(event.getVerified()).isFalse();
+        assertThat(event.getVerificationError()).isEqualTo("Signature mismatch");
+    }
+
+    @Test
+    void receiveWebhook_nullBody_accepted() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+
+        IncomingEvent event = service.receiveWebhook("validtoken", null, httpRequest);
+
+        assertThat(event.getBodyRaw()).isNull();
+        assertThat(event.getBodySha256()).isNull();
+    }
+
+    @Test
+    void receiveWebhook_xForwardedFor_extractsClientIp() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Forwarded-For")).thenReturn("203.0.113.50, 70.41.3.18");
+
+        IncomingEvent event = service.receiveWebhook("validtoken", "{}", httpRequest);
+
+        assertThat(event.getClientIp()).isEqualTo("203.0.113.50");
+    }
+
+    private String computeHmac(String secret, String body) {
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(
+                    secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(keySpec);
+            byte[] hash = mac.doFinal(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

@@ -97,6 +97,11 @@ stuck-delivery:
   threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
   check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
 
+incoming-forward:
+  retry:
+    poll-interval-ms: ${INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS:10000}
+    batch-size: ${INCOMING_FORWARD_RETRY_BATCH_SIZE:50}
+
 logging:
   level:
     root: ${LOG_LEVEL:INFO}

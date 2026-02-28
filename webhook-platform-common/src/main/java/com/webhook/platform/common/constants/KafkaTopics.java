@@ -10,6 +10,10 @@ public final class KafkaTopics {
     public static final String DELIVERIES_RETRY_24H = "deliveries.retry.24h";
     public static final String DELIVERIES_DLQ = "deliveries.dlq";
 
+    // Incoming webhooks forwarding
+    public static final String INCOMING_FORWARD_DISPATCH = "incoming.forward.dispatch";
+    public static final String INCOMING_FORWARD_RETRY = "incoming.forward.retry";
+
     private KafkaTopics() {
     }
 }

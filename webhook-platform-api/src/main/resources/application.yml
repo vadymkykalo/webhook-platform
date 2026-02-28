@@ -101,6 +101,9 @@ webhook:
   url-validation:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
+  ingress-base-url: ${WEBHOOK_INGRESS_BASE_URL:http://localhost:8080}
+  incoming:
+    max-payload-size-bytes: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:524288}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
