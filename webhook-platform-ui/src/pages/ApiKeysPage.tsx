@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { apiKeysApi, ApiKeyResponse } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
@@ -30,6 +31,7 @@ import {
 import { usePermissions } from '../auth/usePermissions';
 
 export default function ApiKeysPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageApiKeys } = usePermissions();
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -65,7 +67,7 @@ export default function ApiKeysPage() {
       setApiKeys(apiKeysData.content);
       setPageInfo(apiKeysData);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load data');
+      toast.error(err.response?.data?.message || t('apiKeys.toast.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -81,10 +83,10 @@ export default function ApiKeysPage() {
       setShowCreateDialog(false);
       setName('');
       setNewApiKey(response);
-      toast.success('API key created successfully');
+      toast.success(t('apiKeys.toast.created'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create API key');
+      toast.error(err.response?.data?.message || t('apiKeys.toast.createFailed'));
     } finally {
       setCreating(false);
     }
@@ -96,11 +98,11 @@ export default function ApiKeysPage() {
     setRevoking(true);
     try {
       await apiKeysApi.revoke(projectId, revokeId);
-      toast.success('API key revoked successfully');
+      toast.success(t('apiKeys.toast.revoked'));
       setRevokeId(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to revoke API key');
+      toast.error(err.response?.data?.message || t('apiKeys.toast.revokeFailed'));
     } finally {
       setRevoking(false);
     }
@@ -108,7 +110,7 @@ export default function ApiKeysPage() {
 
   const handleCopyKey = (key: string) => {
     navigator.clipboard.writeText(key);
-    toast.success('API key copied to clipboard');
+    toast.success(t('apiKeys.toast.copied'));
   };
 
   const closeKeyDialog = () => {
@@ -128,7 +130,7 @@ export default function ApiKeysPage() {
   };
 
   const formatRelativeTime = (dateString: string | null) => {
-    if (!dateString) return 'Never';
+    if (!dateString) return t('apiKeys.never');
     
     const date = new Date(dateString);
     const now = new Date();
@@ -138,7 +140,7 @@ export default function ApiKeysPage() {
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
 
-    if (diffSec < 60) return 'Just now';
+    if (diffSec < 60) return t('apiKeys.justNow');
     if (diffMin < 60) return `${diffMin}m ago`;
     if (diffHour < 24) return `${diffHour}h ago`;
     if (diffDay < 7) return `${diffDay}d ago`;
@@ -172,7 +174,7 @@ export default function ApiKeysPage() {
           <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Key className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Project not found</p>
+          <p className="text-muted-foreground">{t('apiKeys.projectNotFound')}</p>
         </div>
       </div>
     );
@@ -182,14 +184,12 @@ export default function ApiKeysPage() {
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">API Keys</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage API keys for <span className="font-medium text-foreground">{project.name}</span>
-          </p>
+          <h1 className="text-title tracking-tight">{t('apiKeys.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('apiKeys.subtitle', { project: project.name }) }} />
         </div>
         {canManageApiKeys && (
           <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" /> Create API Key
+            <Plus className="h-4 w-4" /> {t('apiKeys.createKey')}
           </Button>
         )}
       </div>
@@ -199,15 +199,15 @@ export default function ApiKeysPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <Key className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No API keys yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('apiKeys.noKeys')}</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
             {canManageApiKeys
-              ? 'Create your first API key to start sending events'
-              : 'No API keys have been created yet. Ask a Developer or Owner to create one.'}
+              ? t('apiKeys.noKeysDesc')
+              : t('apiKeys.noKeysDescViewer')}
           </p>
           {canManageApiKeys && (
             <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" /> Create API Key
+              <Plus className="h-4 w-4" /> {t('apiKeys.createKey')}
             </Button>
           )}
         </div>
@@ -226,12 +226,12 @@ export default function ApiKeysPage() {
                       <code className="text-[13px] font-mono text-muted-foreground">{apiKey.keyPrefix}...</code>
                       <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(apiKey.createdAt)}</span>
-                        <span>Last used: {formatRelativeTime(apiKey.lastUsedAt)}</span>
+                        <span>{t('apiKeys.lastUsed')}: {formatRelativeTime(apiKey.lastUsedAt)}</span>
                       </div>
                     </div>
                   </div>
                   {canManageApiKeys && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title="Revoke" className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title={t('apiKeys.revoke')} className="text-muted-foreground hover:text-destructive flex-shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
@@ -243,7 +243,7 @@ export default function ApiKeysPage() {
           {pageInfo && pageInfo.totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
               <p className="text-sm text-muted-foreground">
-                Showing {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements)} of {pageInfo.totalElements}
+                {t('common.showing', { from: currentPage * PAGE_SIZE + 1, to: Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements), total: pageInfo.totalElements })}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -252,7 +252,7 @@ export default function ApiKeysPage() {
                   onClick={() => setCurrentPage(p => p - 1)}
                   disabled={pageInfo.first}
                 >
-                  <ChevronLeft className="h-4 w-4" /> Previous
+                  <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
                 </Button>
                 <span className="text-sm text-muted-foreground px-2">
                   {currentPage + 1} / {pageInfo.totalPages}
@@ -263,7 +263,7 @@ export default function ApiKeysPage() {
                   onClick={() => setCurrentPage(p => p + 1)}
                   disabled={pageInfo.last}
                 >
-                  Next <ChevronRight className="h-4 w-4" />
+                  {t('common.next')} <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -274,18 +274,18 @@ export default function ApiKeysPage() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New API Key</DialogTitle>
+            <DialogTitle>{t('apiKeys.createDialog.title')}</DialogTitle>
             <DialogDescription>
-              Add a new API key to send events to this project
+              {t('apiKeys.createDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Key Name</Label>
+                <Label htmlFor="name">{t('apiKeys.createDialog.name')}</Label>
                 <Input
                   id="name"
-                  placeholder="Production API Key"
+                  placeholder={t('apiKeys.createDialog.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -293,7 +293,7 @@ export default function ApiKeysPage() {
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
-                  A descriptive name to identify this API key
+                  {t('apiKeys.createDialog.nameHint')}
                 </p>
               </div>
             </div>
@@ -304,11 +304,11 @@ export default function ApiKeysPage() {
                 onClick={() => setShowCreateDialog(false)}
                 disabled={creating}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={creating}>
                 {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {creating ? 'Creating...' : 'Create API Key'}
+                {creating ? t('apiKeys.createDialog.submitting') : t('apiKeys.createDialog.submit')}
               </Button>
             </DialogFooter>
           </form>
@@ -318,21 +318,20 @@ export default function ApiKeysPage() {
       <AlertDialog open={!!revokeId} onOpenChange={(open) => !open && setRevokeId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke API Key?</AlertDialogTitle>
+            <AlertDialogTitle>{t('apiKeys.revokeDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This API key will stop working immediately
-              and all requests using it will be rejected.
+              {t('apiKeys.revokeDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={revoking}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={revoking}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRevoke}
               disabled={revoking}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {revoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {revoking ? 'Revoking...' : 'Revoke'}
+              {revoking ? t('apiKeys.revoking') : t('apiKeys.revoke')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -341,15 +340,15 @@ export default function ApiKeysPage() {
       <Dialog open={!!newApiKey} onOpenChange={closeKeyDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>API Key Created Successfully</DialogTitle>
+            <DialogTitle>{t('apiKeys.keyDialog.title')}</DialogTitle>
             <DialogDescription>
-              Save this API key securely. It won't be shown again.
+              {t('apiKeys.keyDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>API Key</Label>
+                <Label>{t('apiKeys.keyDialog.label')}</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     value={newApiKey?.key || ''}
@@ -361,7 +360,7 @@ export default function ApiKeysPage() {
                     variant="outline"
                     size="icon"
                     onClick={() => setShowKey(!showKey)}
-                    title={showKey ? 'Hide key' : 'Show key'}
+                    title={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
                   >
                     {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -369,13 +368,13 @@ export default function ApiKeysPage() {
                     variant="outline"
                     size="icon"
                     onClick={() => newApiKey?.key && handleCopyKey(newApiKey.key)}
-                    title="Copy key"
+                    title={t('apiKeys.keyDialog.copyKey')}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Use this key in the X-API-Key header when sending events
+                  {t('apiKeys.keyDialog.hint')}
                 </p>
               </div>
               <div className="bg-muted p-3 rounded-lg">
@@ -389,7 +388,7 @@ export default function ApiKeysPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={closeKeyDialog}>Done</Button>
+            <Button onClick={closeKeyDialog}>{t('apiKeys.keyDialog.done')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './i18n';
 import { initCSP } from './lib/csp';
 import { initTheme } from './lib/theme';
 import './index.css';

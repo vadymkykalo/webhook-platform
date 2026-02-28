@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useProjects, useDashboardStats } from '../api/queries';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
@@ -52,6 +53,7 @@ function SkeletonDashboard() {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: projects = [], isLoading: loading } = useProjects();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -76,9 +78,9 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-title tracking-tight">Dashboard</h1>
+          <h1 className="text-title tracking-tight">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Overview of your webhook platform activity
+            {t('dashboard.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -88,7 +90,7 @@ export default function DashboardPage() {
               size="sm"
               onClick={() => navigate(`/admin/projects/${selectedProjectId}/analytics`)}
             >
-              <BarChart3 className="h-4 w-4" /> Analytics
+              <BarChart3 className="h-4 w-4" /> {t('nav.analytics')}
             </Button>
           )}
           {projects.length > 0 && (
@@ -113,12 +115,12 @@ export default function DashboardPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <FolderKanban className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('dashboard.noProjects')}</h3>
           <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
-            Create your first project to start sending webhooks and monitoring deliveries.
+            {t('dashboard.noProjectsDesc')}
           </p>
           <Button onClick={() => navigate('/admin/projects')}>
-            <Plus className="h-4 w-4" /> Create project
+            <Plus className="h-4 w-4" /> {t('dashboard.createProject')}
           </Button>
         </div>
       ) : (
@@ -126,43 +128,43 @@ export default function DashboardPage() {
           {/* Stat Cards */}
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
             <StatCard
-              title="Total Deliveries"
+              title={t('dashboard.stats.totalDeliveries')}
               value={dashboardStats?.deliveryStats.totalDeliveries || 0}
               icon={Send}
               iconColor="bg-primary/10 text-primary"
-              subtitle="Webhook deliveries sent"
+              subtitle={t('dashboard.stats.totalDeliveriesDesc')}
               loading={statsLoading}
             />
             <StatCard
-              title="Successful"
+              title={t('dashboard.stats.successful')}
               value={dashboardStats?.deliveryStats.successfulDeliveries || 0}
               icon={CheckCircle2}
               iconColor="bg-success/10 text-success"
-              subtitle={`${dashboardStats?.deliveryStats.successRate || 0}% success rate`}
+              subtitle={t('dashboard.stats.successRate', { rate: dashboardStats?.deliveryStats.successRate || 0 })}
               loading={statsLoading}
             />
             <StatCard
-              title="Failed"
+              title={t('dashboard.stats.failed')}
               value={dashboardStats?.deliveryStats.failedDeliveries || 0}
               icon={AlertCircle}
               iconColor="bg-destructive/10 text-destructive"
-              subtitle="Retriable failures"
+              subtitle={t('dashboard.stats.failedDesc')}
               loading={statsLoading}
             />
             <StatCard
-              title="Dead Letter Queue"
+              title={t('dashboard.stats.dlq')}
               value={dashboardStats?.deliveryStats.dlqDeliveries || 0}
               icon={AlertTriangle}
               iconColor="bg-warning/10 text-warning"
-              subtitle="Max retries exceeded"
+              subtitle={t('dashboard.stats.dlqDesc')}
               loading={statsLoading}
             />
             <StatCard
-              title="Pending"
+              title={t('dashboard.stats.pending')}
               value={dashboardStats?.deliveryStats.pendingDeliveries || 0}
               icon={Clock}
               iconColor="bg-blue-500/10 text-blue-600"
-              subtitle="In progress"
+              subtitle={t('dashboard.stats.pendingDesc')}
               loading={statsLoading}
             />
           </div>
@@ -173,8 +175,8 @@ export default function DashboardPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base">Recent Events</CardTitle>
-                    <CardDescription className="text-xs">Latest webhook events</CardDescription>
+                    <CardTitle className="text-base">{t('dashboard.recentEvents.title')}</CardTitle>
+                    <CardDescription className="text-xs">{t('dashboard.recentEvents.subtitle')}</CardDescription>
                   </div>
                   <Button
                     variant="ghost"
@@ -182,7 +184,7 @@ export default function DashboardPage() {
                     onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
                     className="text-xs"
                   >
-                    View all <ArrowRight className="h-3 w-3" />
+                    {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
                   </Button>
                 </div>
               </CardHeader>
@@ -198,8 +200,8 @@ export default function DashboardPage() {
                     <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mb-3">
                       <Radio className="h-5 w-5 opacity-50" />
                     </div>
-                    <p className="text-sm font-medium">No recent events</p>
-                    <p className="text-xs mt-1">Events will appear here when sent</p>
+                    <p className="text-sm font-medium">{t('dashboard.recentEvents.empty')}</p>
+                    <p className="text-xs mt-1">{t('dashboard.recentEvents.emptyDesc')}</p>
                   </div>
                 ) : (
                   <div className="space-y-1">
@@ -221,7 +223,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                          {event.deliveryCount} {event.deliveryCount === 1 ? 'delivery' : 'deliveries'}
+                          {event.deliveryCount} {event.deliveryCount === 1 ? t('dashboard.recentEvents.delivery', { count: 1 }) : t('dashboard.recentEvents.delivery_other', { count: event.deliveryCount })}
                         </span>
                       </div>
                     ))}
@@ -234,8 +236,8 @@ export default function DashboardPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-base">Endpoint Health</CardTitle>
-                    <CardDescription className="text-xs">Top endpoints by volume</CardDescription>
+                    <CardTitle className="text-base">{t('dashboard.endpointHealth.title')}</CardTitle>
+                    <CardDescription className="text-xs">{t('dashboard.endpointHealth.subtitle')}</CardDescription>
                   </div>
                   <Button
                     variant="ghost"
@@ -243,7 +245,7 @@ export default function DashboardPage() {
                     onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
                     className="text-xs"
                   >
-                    View all <ArrowRight className="h-3 w-3" />
+                    {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
                   </Button>
                 </div>
               </CardHeader>
@@ -259,8 +261,8 @@ export default function DashboardPage() {
                     <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mb-3">
                       <Webhook className="h-5 w-5 opacity-50" />
                     </div>
-                    <p className="text-sm font-medium">No endpoints configured</p>
-                    <p className="text-xs mt-1">Add endpoints to start receiving webhooks</p>
+                    <p className="text-sm font-medium">{t('dashboard.endpointHealth.empty')}</p>
+                    <p className="text-xs mt-1">{t('dashboard.endpointHealth.emptyDesc')}</p>
                   </div>
                 ) : (
                   <div className="space-y-1">
@@ -275,10 +277,10 @@ export default function DashboardPage() {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{endpoint.url}</p>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>{endpoint.totalDeliveries} deliveries</span>
+                              <span>{t('dashboard.endpointHealth.deliveries', { count: endpoint.totalDeliveries })}</span>
                               <span>·</span>
                               <span className={endpoint.successRate >= 95 ? 'text-success' : endpoint.successRate >= 80 ? 'text-warning' : 'text-destructive'}>
-                                {endpoint.successRate}% success
+                                {t('dashboard.endpointHealth.success', { rate: endpoint.successRate })}
                               </span>
                             </div>
                           </div>
@@ -294,10 +296,10 @@ export default function DashboardPage() {
           {/* Quick Actions */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'Endpoints', path: `/admin/projects/${selectedProjectId}/endpoints`, icon: Webhook },
-              { label: 'Events', path: `/admin/projects/${selectedProjectId}/events`, icon: Radio },
-              { label: 'Deliveries', path: `/admin/projects/${selectedProjectId}/deliveries`, icon: Send },
-              { label: 'Dead Letter Queue', path: `/admin/projects/${selectedProjectId}/dlq`, icon: AlertTriangle },
+              { label: t('dashboard.quickActions.endpoints'), path: `/admin/projects/${selectedProjectId}/endpoints`, icon: Webhook },
+              { label: t('dashboard.quickActions.events'), path: `/admin/projects/${selectedProjectId}/events`, icon: Radio },
+              { label: t('dashboard.quickActions.deliveries'), path: `/admin/projects/${selectedProjectId}/deliveries`, icon: Send },
+              { label: t('dashboard.quickActions.dlq'), path: `/admin/projects/${selectedProjectId}/dlq`, icon: AlertTriangle },
             ].map((action) => (
               <button
                 key={action.label}
@@ -309,7 +311,7 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium">{action.label}</p>
-                  <p className="text-[11px] text-muted-foreground">Manage</p>
+                  <p className="text-[11px] text-muted-foreground">{t('common.manage')}</p>
                 </div>
               </button>
             ))}

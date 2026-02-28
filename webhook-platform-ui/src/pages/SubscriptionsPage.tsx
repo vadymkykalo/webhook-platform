@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { SubscriptionResponse } from '../api/subscriptions.api';
 import { useProject, useSubscriptions, useEndpoints, usePatchSubscription, useDeleteSubscription, queryKeys } from '../api/queries';
@@ -27,6 +28,7 @@ import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
 import { usePermissions } from '../auth/usePermissions';
 
 export default function SubscriptionsPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageSubscriptions } = usePermissions();
   const { data: project, isLoading: projectLoading } = useProject(projectId);
@@ -49,21 +51,21 @@ export default function SubscriptionsPage() {
   const handleToggleEnabled = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
       { id: subscription.id, data: { enabled: !subscription.enabled } },
-      { onSuccess: () => toast.success(`Subscription ${!subscription.enabled ? 'enabled' : 'disabled'}`) }
+      { onSuccess: () => toast.success(!subscription.enabled ? t('subscriptions.toast.enabled') : t('subscriptions.toast.disabled')) }
     );
   };
 
   const handleToggleOrdering = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
       { id: subscription.id, data: { orderingEnabled: !subscription.orderingEnabled } },
-      { onSuccess: () => toast.success(`FIFO ordering ${!subscription.orderingEnabled ? 'enabled' : 'disabled'}`) }
+      { onSuccess: () => toast.success(!subscription.orderingEnabled ? t('subscriptions.toast.fifoEnabled') : t('subscriptions.toast.fifoDisabled')) }
     );
   };
 
   const handleDelete = () => {
     if (!deleteId || !projectId) return;
     deleteMutation.mutate(deleteId, {
-      onSuccess: () => { toast.success('Subscription deleted successfully'); setDeleteId(null); },
+      onSuccess: () => { toast.success(t('subscriptions.toast.deleted')); setDeleteId(null); },
     });
   };
 
@@ -79,7 +81,7 @@ export default function SubscriptionsPage() {
 
   const getEndpointName = (endpointId: string) => {
     const endpoint = endpoints.find(e => e.id === endpointId);
-    return endpoint ? (endpoint.url || 'Unnamed endpoint') : 'Unknown endpoint';
+    return endpoint ? (endpoint.url || t('subscriptions.unnamed')) : t('subscriptions.unknown');
   };
 
   const filteredSubscriptions = subscriptions.filter(sub => {
@@ -120,7 +122,7 @@ export default function SubscriptionsPage() {
           <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <LinkIcon className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Project not found</p>
+          <p className="text-muted-foreground">{t('subscriptions.projectNotFound')}</p>
         </div>
       </div>
     );
@@ -130,14 +132,12 @@ export default function SubscriptionsPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Subscriptions</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Route event types to endpoints for <span className="font-medium text-foreground">{project.name}</span>
-          </p>
+          <h1 className="text-title tracking-tight">{t('subscriptions.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('subscriptions.subtitle', { project: project.name }) }} />
         </div>
         {canManageSubscriptions && (
           <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4" /> Create Subscription
+            <Plus className="h-4 w-4" /> {t('subscriptions.newSubscription')}
           </Button>
         )}
       </div>
@@ -146,22 +146,22 @@ export default function SubscriptionsPage() {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="eventTypeFilter" className="text-xs">Event Type</Label>
-              <Input id="eventTypeFilter" placeholder="Filter by event type..." value={eventTypeFilter} onChange={(e) => setEventTypeFilter(e.target.value)} />
+              <Label htmlFor="eventTypeFilter" className="text-xs">{t('subscriptions.eventType')}</Label>
+              <Input id="eventTypeFilter" placeholder={t('subscriptions.filterEventType')} value={eventTypeFilter} onChange={(e) => setEventTypeFilter(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="endpointFilter" className="text-xs">Endpoint</Label>
+              <Label htmlFor="endpointFilter" className="text-xs">{t('subscriptions.endpoint')}</Label>
               <Select id="endpointFilter" value={endpointFilter} onChange={(e) => setEndpointFilter(e.target.value)}>
-                <option value="">All endpoints</option>
+                <option value="">{t('subscriptions.allEndpoints')}</option>
                 {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="statusFilter" className="text-xs">Status</Label>
+              <Label htmlFor="statusFilter" className="text-xs">{t('subscriptions.status')}</Label>
               <Select id="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All statuses</option>
-                <option value="enabled">Enabled</option>
-                <option value="disabled">Disabled</option>
+                <option value="">{t('subscriptions.allStatuses')}</option>
+                <option value="enabled">{t('common.enabled')}</option>
+                <option value="disabled">{t('common.disabled')}</option>
               </Select>
             </div>
           </div>
@@ -174,16 +174,16 @@ export default function SubscriptionsPage() {
             <LinkIcon className="h-8 w-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold mb-2">
-            {subscriptions.length === 0 ? 'No subscriptions yet' : 'No matching subscriptions'}
+            {subscriptions.length === 0 ? t('subscriptions.noSubscriptions') : t('subscriptions.noMatching')}
           </h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
             {subscriptions.length === 0
-              ? 'Create a subscription to route events to your endpoints'
-              : 'Try adjusting your filters'}
+              ? t('subscriptions.noSubscriptionsDesc')
+              : t('subscriptions.noMatchingDesc')}
           </p>
           {subscriptions.length === 0 && canManageSubscriptions && (
             <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4" /> Create Subscription
+              <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
             </Button>
           )}
         </div>
@@ -192,11 +192,11 @@ export default function SubscriptionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">Event Type</TableHead>
-                <TableHead className="text-xs">Endpoint</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Ordering</TableHead>
-                <TableHead className="text-xs">Created</TableHead>
+                <TableHead className="text-xs">{t('subscriptions.eventType')}</TableHead>
+                <TableHead className="text-xs">{t('subscriptions.endpoint')}</TableHead>
+                <TableHead className="text-xs">{t('subscriptions.status')}</TableHead>
+                <TableHead className="text-xs">{t('subscriptions.ordering')}</TableHead>
+                <TableHead className="text-xs">{t('subscriptions.created')}</TableHead>
                 {canManageSubscriptions && <TableHead className="w-[80px]"></TableHead>}
               </TableRow>
             </TableHeader>
@@ -212,7 +212,7 @@ export default function SubscriptionsPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Switch checked={subscription.enabled} onCheckedChange={() => handleToggleEnabled(subscription)} disabled={!canManageSubscriptions} />
-                      <Badge variant={subscription.enabled ? 'success' : 'secondary'}>{subscription.enabled ? 'On' : 'Off'}</Badge>
+                      <Badge variant={subscription.enabled ? 'success' : 'secondary'}>{subscription.enabled ? t('common.on') : t('common.off')}</Badge>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -229,10 +229,10 @@ export default function SubscriptionsPage() {
                   {canManageSubscriptions && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title="Edit">
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title={t('common.edit')}>
                           <Settings className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -257,17 +257,16 @@ export default function SubscriptionsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Subscription?</AlertDialogTitle>
+            <AlertDialogTitle>{t('subscriptions.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This subscription will be permanently deleted. Events of this type will no longer be
-              delivered to the endpoint.
+              {t('subscriptions.deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

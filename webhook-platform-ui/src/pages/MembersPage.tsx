@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { UserPlus, Trash2, Loader2, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { type MembershipRole } from '../api/members.api';
 import { useMembers, useChangeMemberRole, useRemoveMember } from '../api/queries';
@@ -23,6 +24,7 @@ import {
 import AddMemberModal from '../components/AddMemberModal';
 
 export default function MembersPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { canManageMembers } = usePermissions();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -38,8 +40,8 @@ export default function MembersPage() {
     changeRole.mutate(
       { userId, role: newRole },
       {
-        onSuccess: () => toast.success('Member role updated successfully'),
-        onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to update member role'),
+        onSuccess: () => toast.success(t('members.toast.roleChanged')),
+        onError: (err: any) => toast.error(err.response?.data?.message || t('members.toast.roleChangeFailed')),
       }
     );
   };
@@ -48,10 +50,10 @@ export default function MembersPage() {
     if (!removeUserId) return;
     removeMember.mutate(removeUserId, {
       onSuccess: () => {
-        toast.success('Member removed successfully');
+        toast.success(t('members.toast.removed'));
         setRemoveUserId(null);
       },
-      onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to remove member'),
+      onError: (err: any) => toast.error(err.response?.data?.message || t('members.toast.removeFailed')),
     });
   };
 
@@ -91,14 +93,14 @@ export default function MembersPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Members</h1>
+          <h1 className="text-title tracking-tight">{t('members.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage access to this organization
+            {t('members.subtitle')}
           </p>
         </div>
         {canManageMembers && (
           <Button onClick={() => setShowAddModal(true)}>
-            <UserPlus className="h-4 w-4" /> Add Member
+            <UserPlus className="h-4 w-4" /> {t('members.addMember')}
           </Button>
         )}
       </div>
@@ -108,13 +110,13 @@ export default function MembersPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <Users className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No members yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('members.noMembers')}</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            You are the only member of this organization
+            {t('members.noMembersDesc')}
           </p>
           {canManageMembers && (
             <Button onClick={() => setShowAddModal(true)}>
-              <UserPlus className="h-4 w-4" /> Add member
+              <UserPlus className="h-4 w-4" /> {t('members.addMemberLower')}
             </Button>
           )}
         </div>
@@ -123,10 +125,10 @@ export default function MembersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">Email</TableHead>
-                <TableHead className="text-xs">Role</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Joined</TableHead>
+                <TableHead className="text-xs">{t('members.email')}</TableHead>
+                <TableHead className="text-xs">{t('members.role')}</TableHead>
+                <TableHead className="text-xs">{t('members.status')}</TableHead>
+                <TableHead className="text-xs">{t('members.joined')}</TableHead>
                 {canManageMembers && <TableHead className="w-[80px]"></TableHead>}
               </TableRow>
             </TableHeader>
@@ -141,7 +143,7 @@ export default function MembersPage() {
                       <div>
                         <span className="text-sm font-medium">{member.email}</span>
                         {member.userId === user?.user?.id && (
-                          <Badge variant="outline" className="ml-2 text-[10px] py-0">You</Badge>
+                          <Badge variant="outline" className="ml-2 text-[10px] py-0">{t('members.you')}</Badge>
                         )}
                       </div>
                     </div>
@@ -154,8 +156,8 @@ export default function MembersPage() {
                         disabled={changeRole.isPending}
                         className="w-32"
                       >
-                        <option value="DEVELOPER">Developer</option>
-                        <option value="VIEWER">Viewer</option>
+                        <option value="DEVELOPER">{t('members.roles.DEVELOPER')}</option>
+                        <option value="VIEWER">{t('members.roles.VIEWER')}</option>
                       </Select>
                     ) : (
                       <Badge variant={getRoleBadgeVariant(member.role)}>{member.role}</Badge>
@@ -170,7 +172,7 @@ export default function MembersPage() {
                   {canManageMembers && (
                     <TableCell>
                       {member.userId !== user?.user?.id && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => setRemoveUserId(member.userId)} title="Remove" className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setRemoveUserId(member.userId)} title={t('members.remove')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
@@ -195,21 +197,20 @@ export default function MembersPage() {
       <AlertDialog open={!!removeUserId} onOpenChange={() => setRemoveUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Member?</AlertDialogTitle>
+            <AlertDialogTitle>{t('members.removeDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This member will lose access to the organization and all its resources.
-              This action cannot be undone.
+              {t('members.removeDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={removeMember.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={removeMember.isPending}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemove}
               disabled={removeMember.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {removeMember.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {removeMember.isPending ? 'Removing...' : 'Remove'}
+              {removeMember.isPending ? t('members.removing') : t('members.remove')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

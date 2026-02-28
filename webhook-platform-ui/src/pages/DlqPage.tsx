@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { projectsApi } from '../api/projects.api';
 import { dlqApi, DlqItemResponse, DlqStatsResponse } from '../api/dlq.api';
@@ -24,6 +25,7 @@ import {
 import { usePermissions } from '../auth/usePermissions';
 
 export default function DlqPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageDlq } = usePermissions();
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -63,7 +65,7 @@ export default function DlqPage() {
       setEndpoints(endpointsData);
       setSelectedIds(new Set());
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load DLQ data');
+      toast.error(err.response?.data?.message || t('dlq.toast.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -73,10 +75,10 @@ export default function DlqPage() {
     try {
       setRetrying(true);
       await dlqApi.retrySingle(projectId!, deliveryId);
-      toast.success('Delivery queued for retry');
+      toast.success(t('dlq.toast.retried'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to retry delivery');
+      toast.error(err.response?.data?.message || t('dlq.toast.retryFailed'));
     } finally {
       setRetrying(false);
     }
@@ -88,10 +90,10 @@ export default function DlqPage() {
     try {
       setRetrying(true);
       const result = await dlqApi.retryBulk(projectId!, Array.from(selectedIds));
-      toast.success(`${result.retried} deliveries queued for retry`);
+      toast.success(t('dlq.toast.bulkRetried', { count: result.retried }));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to retry deliveries');
+      toast.error(err.response?.data?.message || t('dlq.toast.bulkRetryFailed'));
     } finally {
       setRetrying(false);
     }
@@ -101,11 +103,11 @@ export default function DlqPage() {
     try {
       setPurging(true);
       const result = await dlqApi.purgeAll(projectId!);
-      toast.success(`${result.purged} items purged from DLQ`);
+      toast.success(t('dlq.toast.purged', { count: result.purged }));
       setShowPurgeDialog(false);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to purge DLQ');
+      toast.error(err.response?.data?.message || t('dlq.toast.purgeFailed'));
     } finally {
       setPurging(false);
     }
@@ -154,7 +156,7 @@ export default function DlqPage() {
           <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <AlertTriangle className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Project not found</p>
+          <p className="text-muted-foreground">{t('dlq.projectNotFound')}</p>
         </div>
       </div>
     );
@@ -164,21 +166,19 @@ export default function DlqPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Dead Letter Queue</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Failed deliveries for <span className="font-medium text-foreground">{project.name}</span>
-          </p>
+          <h1 className="text-title tracking-tight">{t('dlq.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('dlq.subtitle', { project: project.name }) }} />
         </div>
         {canManageDlq && (
           <div className="flex gap-2">
             {selectedIds.size > 0 && (
               <Button onClick={handleRetrySelected} disabled={retrying} size="sm">
                 {retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Retry ({selectedIds.size})
+                {t('dlq.retryCount', { count: selectedIds.size })}
               </Button>
             )}
             <Button variant="destructive" size="sm" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
-              <Trash2 className="h-3.5 w-3.5" /> Purge All
+              <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
             </Button>
           </div>
         )}
@@ -188,19 +188,19 @@ export default function DlqPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <Card>
             <CardContent className="p-4">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total Items</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{t('dlq.totalItems')}</p>
               <p className="text-2xl font-bold text-destructive mt-1">{stats.totalItems}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Last 24 Hours</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{t('dlq.last24h')}</p>
               <p className="text-2xl font-bold mt-1">{stats.last24Hours}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Last 7 Days</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{t('dlq.last7d')}</p>
               <p className="text-2xl font-bold mt-1">{stats.last7Days}</p>
             </CardContent>
           </Card>
@@ -211,13 +211,13 @@ export default function DlqPage() {
         <CardContent className="p-4">
           <div className="flex items-end gap-3">
             <div className="space-y-1.5 flex-1">
-              <Label htmlFor="endpointFilter" className="text-xs">Filter by Endpoint</Label>
+              <Label htmlFor="endpointFilter" className="text-xs">{t('dlq.filterEndpoint')}</Label>
               <Select id="endpointFilter" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
-                <option value="">All endpoints</option>
+                <option value="">{t('dlq.allEndpoints')}</option>
                 {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
               </Select>
             </div>
-            <Button variant="outline" size="icon-sm" onClick={loadData} title="Refresh">
+            <Button variant="outline" size="icon-sm" onClick={loadData} title={t('analytics.refresh')}>
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -229,9 +229,9 @@ export default function DlqPage() {
           <div className="h-16 w-16 rounded-2xl bg-success/10 flex items-center justify-center mb-6">
             <CheckSquare className="h-8 w-8 text-success" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No items in DLQ</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('dlq.noItems')}</h3>
           <p className="text-sm text-muted-foreground text-center">
-            All deliveries are being processed successfully
+            {t('dlq.noItemsDesc')}
           </p>
         </div>
       ) : (
@@ -245,11 +245,11 @@ export default function DlqPage() {
                       {selectedIds.size === items.length ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground" />}
                     </button>
                   </TableHead>
-                  <TableHead className="text-xs">Event Type</TableHead>
-                  <TableHead className="text-xs">Endpoint</TableHead>
-                  <TableHead className="text-xs">Attempts</TableHead>
-                  <TableHead className="text-xs">Last Error</TableHead>
-                  <TableHead className="text-xs">Failed At</TableHead>
+                  <TableHead className="text-xs">{t('dlq.columns.eventType')}</TableHead>
+                  <TableHead className="text-xs">{t('dlq.columns.endpoint')}</TableHead>
+                  <TableHead className="text-xs">{t('dlq.columns.attempts')}</TableHead>
+                  <TableHead className="text-xs">{t('dlq.columns.lastError')}</TableHead>
+                  <TableHead className="text-xs">{t('dlq.columns.failedAt')}</TableHead>
                   {canManageDlq && <TableHead className="w-[60px]"></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -264,11 +264,11 @@ export default function DlqPage() {
                     <TableCell><code className="text-[13px] font-mono">{item.eventType}</code></TableCell>
                     <TableCell><span className="font-mono text-[13px] truncate max-w-[180px] block">{item.endpointUrl}</span></TableCell>
                     <TableCell><span className="text-sm font-medium">{item.attemptCount}<span className="text-muted-foreground">/{item.maxAttempts}</span></span></TableCell>
-                    <TableCell><span className="text-[13px] text-destructive truncate max-w-[180px] block">{item.lastError || 'Unknown error'}</span></TableCell>
+                    <TableCell><span className="text-[13px] text-destructive truncate max-w-[180px] block">{item.lastError || t('dlq.unknownError')}</span></TableCell>
                     <TableCell><span className="text-[13px] text-muted-foreground">{new Date(item.failedAt).toLocaleString()}</span></TableCell>
                     {canManageDlq && (
                       <TableCell>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title="Retry">
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title={t('dlq.retry')}>
                           <RefreshCw className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
@@ -283,8 +283,8 @@ export default function DlqPage() {
             <div className="flex items-center justify-between mt-4">
               <span className="text-xs text-muted-foreground">Page {page + 1} of {totalPages}</span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
               </div>
             </div>
           )}
@@ -294,21 +294,20 @@ export default function DlqPage() {
       <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Purge All DLQ Items?</AlertDialogTitle>
+            <AlertDialogTitle>{t('dlq.purgeDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete all {stats?.totalItems} items from the Dead Letter Queue.
-              This action cannot be undone.
+              {t('dlq.purgeDialog.description', { count: stats?.totalItems })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={purging}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={purging}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handlePurgeAll}
               disabled={purging}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {purging && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {purging ? 'Purging...' : 'Purge All'}
+              {purging ? t('dlq.purging') : t('dlq.purgeAll')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

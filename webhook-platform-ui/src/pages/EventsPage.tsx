@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Eye, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useEvents } from '../api/queries';
 import { projectsApi } from '../api/projects.api';
@@ -12,6 +13,7 @@ import SendTestEventModal from '../components/SendTestEventModal';
 import { usePermissions } from '../auth/usePermissions';
 
 export default function EventsPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -33,7 +35,7 @@ export default function EventsPage() {
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast.success('Event ID copied to clipboard');
+    toast.success(t('events.toast.idCopied'));
   };
 
   const formatRelativeTime = (dateString: string) => {
@@ -79,7 +81,7 @@ export default function EventsPage() {
           <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Radio className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Project not found</p>
+          <p className="text-muted-foreground">{t('common.error')}</p>
         </div>
       </div>
     );
@@ -89,14 +91,12 @@ export default function EventsPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Events</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Webhook events for <span className="font-medium text-foreground">{project.name}</span>
-          </p>
+          <h1 className="text-title tracking-tight">{t('events.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('events.subtitle', { project: project.name }) }} />
         </div>
         {canSendEvents && (
           <Button onClick={() => setShowSendModal(true)}>
-            <Plus className="h-4 w-4" /> Send Test Event
+            <Plus className="h-4 w-4" /> {t('events.sendTest')}
           </Button>
         )}
       </div>
@@ -106,13 +106,13 @@ export default function EventsPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <Radio className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No events yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('events.noEvents')}</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            Send your first webhook event to start processing deliveries
+            {t('events.noEventsDesc')}
           </p>
           {canSendEvents && (
             <Button onClick={() => setShowSendModal(true)}>
-              <Plus className="h-4 w-4" /> Send Test Event
+              <Plus className="h-4 w-4" /> {t('events.sendTest')}
             </Button>
           )}
         </div>
@@ -122,10 +122,10 @@ export default function EventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Created</TableHead>
-                  <TableHead className="text-xs">Event Type</TableHead>
-                  <TableHead className="text-xs">Event ID</TableHead>
-                  <TableHead className="text-xs">Deliveries</TableHead>
+                  <TableHead className="text-xs">{t('events.created')}</TableHead>
+                  <TableHead className="text-xs">{t('events.eventType')}</TableHead>
+                  <TableHead className="text-xs">{t('events.eventId')}</TableHead>
+                  <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -157,7 +157,7 @@ export default function EventsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title="View deliveries">
+                      <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title={t('common.viewAll')}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
@@ -170,11 +170,11 @@ export default function EventsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-xs text-muted-foreground">
-                Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalElements)} of {totalElements}
+                {t('common.showing', { from: page * pageSize + 1, to: Math.min((page + 1) * pageSize, totalElements), total: totalElements })}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
               </div>
             </div>
           )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Key } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useProjects, useCreateProject, useDeleteProject } from '../api/queries';
 import { usePermissions } from '../auth/usePermissions';
@@ -29,6 +30,7 @@ import {
 } from '../components/ui/alert-dialog';
 
 export default function ProjectsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: projects = [], isLoading: loading } = useProjects();
   const createProject = useCreateProject();
@@ -52,10 +54,10 @@ export default function ProjectsPage() {
           setShowCreateDialog(false);
           setName('');
           setDescription('');
-          toast.success('Project created successfully');
+          toast.success(t('projects.toast.created'));
         },
         onError: (err: any) => {
-          toast.error(err.response?.data?.message || 'Failed to create project');
+          toast.error(err.response?.data?.message || t('projects.toast.createFailed'));
         },
       }
     );
@@ -65,18 +67,18 @@ export default function ProjectsPage() {
     if (!deleteId) return;
     deleteProject.mutate(deleteId, {
       onSuccess: () => {
-        toast.success('Project deleted successfully');
+        toast.success(t('projects.toast.deleted'));
         setDeleteId(null);
       },
       onError: (err: any) => {
-        toast.error(err.response?.data?.message || 'Failed to delete project');
+        toast.error(err.response?.data?.message || t('projects.toast.deleteFailed'));
       },
     });
   };
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast.success('Project ID copied to clipboard');
+    toast.success(t('projects.toast.idCopied'));
   };
 
   const formatDate = (dateString: string) => {
@@ -111,15 +113,15 @@ export default function ProjectsPage() {
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Projects</h1>
+          <h1 className="text-title tracking-tight">{t('projects.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your webhook projects and integrations
+            {t('projects.subtitle')}
           </p>
         </div>
         {canCreateProject && (
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4" />
-            New Project
+            {t('projects.newProject')}
           </Button>
         )}
       </div>
@@ -129,16 +131,16 @@ export default function ProjectsPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <FolderKanban className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('projects.noProjects')}</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
             {canCreateProject
-              ? 'Get started by creating your first project to manage webhooks and integrations'
-              : 'No projects have been created yet. Ask a Developer or Owner to create one.'}
+              ? t('projects.noProjectsDesc')
+              : t('projects.noProjectsViewer')}
           </p>
           {canCreateProject && (
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-4 w-4" />
-              Create your first project
+              {t('projects.createFirst')}
             </Button>
           )}
         </div>
@@ -156,10 +158,10 @@ export default function ProjectsPage() {
                     <FolderKanban className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopyId(project.id)} title="Copy ID">
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopyId(project.id)} title={t('common.copyId')}>
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    {canDeleteProject && <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                    {canDeleteProject && <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>}
                   </div>
@@ -172,14 +174,14 @@ export default function ProjectsPage() {
               <CardContent>
                 <div className="flex items-center text-[11px] text-muted-foreground mb-4">
                   <Calendar className="mr-1.5 h-3 w-3" />
-                  Created {formatDate(project.createdAt)}
+                  {t('projects.created', { date: formatDate(project.createdAt) })}
                 </div>
                 <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
                   {[
-                    { label: 'Endpoints', path: `/admin/projects/${project.id}/endpoints`, icon: Settings },
-                    { label: 'Events', path: `/admin/projects/${project.id}/events`, icon: Radio },
-                    { label: 'Keys', path: `/admin/projects/${project.id}/api-keys`, icon: Key },
-                    { label: 'Deliveries', path: `/admin/projects/${project.id}/deliveries`, icon: Send },
+                    { label: t('projects.quickLinks.endpoints'), path: `/admin/projects/${project.id}/endpoints`, icon: Settings },
+                    { label: t('projects.quickLinks.events'), path: `/admin/projects/${project.id}/events`, icon: Radio },
+                    { label: t('projects.quickLinks.keys'), path: `/admin/projects/${project.id}/api-keys`, icon: Key },
+                    { label: t('projects.quickLinks.deliveries'), path: `/admin/projects/${project.id}/deliveries`, icon: Send },
                   ].map((action) => (
                     <button
                       key={action.label}
@@ -200,18 +202,18 @@ export default function ProjectsPage() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
+            <DialogTitle>{t('projects.createDialog.title')}</DialogTitle>
             <DialogDescription>
-              Add a new project to organize your webhooks and integrations
+              {t('projects.createDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Project Name</Label>
+                <Label htmlFor="name">{t('projects.createDialog.name')}</Label>
                 <Input
                   id="name"
-                  placeholder="My Awesome Project"
+                  placeholder={t('projects.createDialog.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -220,10 +222,10 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">Description (optional)</Label>
+                <Label htmlFor="description">{t('projects.createDialog.descriptionLabel')}</Label>
                 <Textarea
                   id="description"
-                  placeholder="What is this project for?"
+                  placeholder={t('projects.createDialog.descriptionPlaceholder')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   disabled={creating}
@@ -238,11 +240,11 @@ export default function ProjectsPage() {
                 onClick={() => setShowCreateDialog(false)}
                 disabled={creating}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={creating}>
                 {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {creating ? 'Creating...' : 'Create Project'}
+                {creating ? t('projects.createDialog.submitting') : t('projects.createDialog.submit')}
               </Button>
             </DialogFooter>
           </form>
@@ -252,21 +254,20 @@ export default function ProjectsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('projects.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the project
-              and all associated data.
+              {t('projects.deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleting ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

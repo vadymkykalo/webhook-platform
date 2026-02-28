@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { deliveriesApi } from '../api/deliveries.api';
 import { projectsApi } from '../api/projects.api';
@@ -39,6 +40,7 @@ const DATE_RANGE_OPTIONS = [
 ];
 
 export default function DeliveriesPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
@@ -81,7 +83,7 @@ export default function DeliveriesPage() {
       setProject(projectData);
       setEndpoints(endpointsData);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load project data');
+      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
     }
   };
 
@@ -125,7 +127,7 @@ export default function DeliveriesPage() {
       setTotalElements(response.totalElements);
       setTotalPages(response.totalPages);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load deliveries');
+      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -184,7 +186,7 @@ export default function DeliveriesPage() {
     const failedOrDlqSelected = statusFilter === 'FAILED' || statusFilter === 'DLQ';
     
     if (!hasFilters && !failedOrDlqSelected) {
-      toast.error('Please select a status filter (FAILED or DLQ) before bulk replay');
+      toast.error(t('deliveries.replayError'));
       return;
     }
     
@@ -199,7 +201,7 @@ export default function DeliveriesPage() {
       toast.success(response.message);
       loadDeliveries();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to bulk replay deliveries');
+      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
     } finally {
       setBulkReplaying(false);
     }
@@ -216,7 +218,7 @@ export default function DeliveriesPage() {
           <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Send className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Project not found</p>
+          <p className="text-muted-foreground">{t('deliveries.projectNotFound')}</p>
         </div>
       </div>
     );
@@ -225,44 +227,42 @@ export default function DeliveriesPage() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-title tracking-tight">Deliveries</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Track webhook delivery attempts for <span className="font-medium text-foreground">{project.name}</span>
-        </p>
+        <h1 className="text-title tracking-tight">{t('deliveries.title')}</h1>
+        <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('deliveries.subtitle', { project: project.name }) }} />
       </div>
 
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="status" className="text-xs">Status</Label>
+              <Label htmlFor="status" className="text-xs">{t('deliveries.filters.status')}</Label>
               <Select id="status" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
                 {STATUS_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="endpoint" className="text-xs">Endpoint</Label>
+              <Label htmlFor="endpoint" className="text-xs">{t('deliveries.filters.endpoint')}</Label>
               <Select id="endpoint" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
-                <option value="">All Endpoints</option>
+                <option value="">{t('deliveries.filters.allEndpoints')}</option>
                 {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dateRange" className="text-xs">Date Range</Label>
+              <Label htmlFor="dateRange" className="text-xs">{t('deliveries.filters.dateRange')}</Label>
               <Select id="dateRange" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
                 {DATE_RANGE_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="search" className="text-xs">Search by ID</Label>
-              <Input id="search" placeholder="Enter delivery ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Label htmlFor="search" className="text-xs">{t('deliveries.filters.searchById')}</Label>
+              <Input id="search" placeholder={t('deliveries.filters.searchPlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
           {canReplayDeliveries && (statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
             <div className="flex justify-end mt-3">
               <Button onClick={handleBulkReplay} disabled={bulkReplaying} variant="outline" size="sm">
                 {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                {bulkReplaying ? 'Replaying...' : `Replay All ${statusFilter}`}
+                {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: statusFilter })}
               </Button>
             </div>
           )}
@@ -280,9 +280,9 @@ export default function DeliveriesPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <Send className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No deliveries found</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('deliveries.noDeliveries')}</h3>
           <p className="text-sm text-muted-foreground text-center max-w-sm">
-            Deliveries will appear here once events are sent to your endpoints
+            {t('deliveries.noDeliveriesDesc')}
           </p>
         </div>
       ) : (
@@ -291,11 +291,11 @@ export default function DeliveriesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Created</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Endpoint</TableHead>
-                  <TableHead className="text-xs">Attempts</TableHead>
-                  <TableHead className="text-xs">Next Retry</TableHead>
+                  <TableHead className="text-xs">{t('deliveries.columns.created')}</TableHead>
+                  <TableHead className="text-xs">{t('deliveries.columns.status')}</TableHead>
+                  <TableHead className="text-xs">{t('deliveries.columns.endpoint')}</TableHead>
+                  <TableHead className="text-xs">{t('deliveries.columns.attempts')}</TableHead>
+                  <TableHead className="text-xs">{t('deliveries.columns.nextRetry')}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -319,7 +319,7 @@ export default function DeliveriesPage() {
                       <span className="text-[13px] text-muted-foreground">{delivery.nextRetryAt ? formatRelativeTime(delivery.nextRetryAt) : '—'}</span>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title="View details">
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title={t('common.viewAll')}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>
@@ -332,11 +332,11 @@ export default function DeliveriesPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-xs text-muted-foreground">
-                Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalElements)} of {totalElements}
+                {t('common.showing', { from: page * pageSize + 1, to: Math.min((page + 1) * pageSize, totalElements), total: totalElements })}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>Previous</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>Next</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
 import { type AuditLogEntry } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
@@ -43,6 +44,7 @@ function shortId(id: string | null) {
 }
 
 export default function AuditLogPage() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(0);
   const { data, isLoading } = useAuditLog(page);
 
@@ -54,9 +56,9 @@ export default function AuditLogPage() {
           <FileText className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t('auditLog.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            Track who did what in your organization
+            {t('auditLog.subtitle')}
           </p>
         </div>
       </div>
@@ -77,22 +79,22 @@ export default function AuditLogPage() {
         ) : !data || data.content.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <FileText className="h-10 w-10 mb-3 opacity-40" />
-            <p className="text-sm font-medium">No audit events yet</p>
-            <p className="text-xs mt-1">Actions like creating endpoints, rotating secrets will appear here</p>
+            <p className="text-sm font-medium">{t('auditLog.noLogs')}</p>
+            <p className="text-xs mt-1">{t('auditLog.noLogsDesc')}</p>
           </div>
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[160px]">Time</TableHead>
-                  <TableHead className="w-[120px]">Action</TableHead>
-                  <TableHead className="w-[120px]">Resource</TableHead>
-                  <TableHead className="w-[100px]">Resource ID</TableHead>
-                  <TableHead className="w-[100px]">User ID</TableHead>
-                  <TableHead className="w-[80px]">Status</TableHead>
-                  <TableHead className="w-[80px]">Duration</TableHead>
-                  <TableHead>Error</TableHead>
+                  <TableHead className="w-[160px]">{t('auditLog.columns.time')}</TableHead>
+                  <TableHead className="w-[120px]">{t('auditLog.columns.action')}</TableHead>
+                  <TableHead className="w-[120px]">{t('auditLog.columns.resource')}</TableHead>
+                  <TableHead className="w-[100px]">{t('auditLog.columns.resourceId')}</TableHead>
+                  <TableHead className="w-[100px]">{t('auditLog.columns.userId')}</TableHead>
+                  <TableHead className="w-[80px]">{t('auditLog.columns.status')}</TableHead>
+                  <TableHead className="w-[80px]">{t('auditLog.columns.duration')}</TableHead>
+                  <TableHead>{t('auditLog.columns.error')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -135,7 +137,7 @@ export default function AuditLogPage() {
 
             <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
               <p className="text-xs text-muted-foreground">
-                {data.totalElements} total events · Page {data.number + 1} of {data.totalPages}
+                {t('auditLog.pagination', { total: data.totalElements, page: data.number + 1, pages: data.totalPages })}
               </p>
               <div className="flex items-center gap-2">
                 <Button
