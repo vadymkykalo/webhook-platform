@@ -32,7 +32,7 @@ class OutboxPublisherServiceTest {
     private OutboxMessageRepository outboxMessageRepository;
 
     @Mock
-    private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
+    private KafkaTemplate<String, Object> kafkaTemplate;
 
     @Mock
     private ObjectMapper objectMapper;
@@ -77,8 +77,8 @@ class OutboxPublisherServiceTest {
                 .thenReturn(deliveryMessage);
         
         @SuppressWarnings("unchecked")
-        SendResult<String, DeliveryMessage> sendResult = mock(SendResult.class);
-        CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture.completedFuture(sendResult);
+        SendResult<String, Object> sendResult = mock(SendResult.class);
+        CompletableFuture<SendResult<String, Object>> future = CompletableFuture.completedFuture(sendResult);
         when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
 
         service.publishPendingMessages();
@@ -109,6 +109,7 @@ class OutboxPublisherServiceTest {
     private OutboxMessage createTestMessage() {
         OutboxMessage message = new OutboxMessage();
         message.setId(UUID.randomUUID());
+        message.setAggregateType("Delivery");
         message.setStatus(OutboxStatus.PENDING);
         message.setPayload("{\"deliveryId\":\"" + UUID.randomUUID() + "\"}");
         message.setKafkaTopic("test-topic");
