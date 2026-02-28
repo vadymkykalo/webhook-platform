@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Endpoint.VerificationStatus;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
@@ -65,8 +67,7 @@ public class EndpointVerificationService {
             Map<String, Object> challengePayload = Map.of(
                     "type", "webhook.verification",
                     "challenge", endpoint.getVerificationToken(),
-                    "timestamp", Instant.now().toString()
-            );
+                    "timestamp", Instant.now().toString());
 
             String response = webClient.post()
                     .uri(endpoint.getUrl())
@@ -77,7 +78,7 @@ public class EndpointVerificationService {
                     .timeout(Duration.ofSeconds(VERIFICATION_TIMEOUT_SECONDS))
                     .block();
 
-            boolean verified = response != null && response.contains(endpoint.getVerificationToken());
+            boolean verified = verifyChallengeResponse(response, endpoint.getVerificationToken());
 
             if (verified) {
                 endpoint.setVerificationStatus(VerificationStatus.VERIFIED);
@@ -108,11 +109,37 @@ public class EndpointVerificationService {
         endpoint.setVerificationStatus(VerificationStatus.SKIPPED);
         endpoint.setVerificationSkipReason(reason != null ? reason : "Skipped by administrator");
         endpoint.setVerificationCompletedAt(Instant.now());
-        
+
         endpoint = endpointRepository.save(endpoint);
         log.info("Endpoint {} verification skipped: {}", endpointId, reason);
         return endpoint;
     }
 
-    public record VerificationResult(boolean success, String message, Endpoint endpoint) {}
+    /**
+     * Strict challenge verification:
+     * 1. Try JSON parse — look for {"challenge": "..."} exact match
+     * 2. Fallback to exact trim().equals() for plain-text responses
+     */
+    private boolean verifyChallengeResponse(String response, String expectedToken) {
+        if (response == null || expectedToken == null) {
+            return false;
+        }
+
+        // Try JSON parse first
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode json = mapper.readTree(response);
+            if (json.has("challenge")) {
+                return expectedToken.equals(json.get("challenge").asText());
+            }
+        } catch (Exception e) {
+            // Not valid JSON, fall through to plain-text check
+        }
+
+        // Fallback: exact match on trimmed response
+        return expectedToken.equals(response.trim());
+    }
+
+    public record VerificationResult(boolean success, String message, Endpoint endpoint) {
+    }
 }

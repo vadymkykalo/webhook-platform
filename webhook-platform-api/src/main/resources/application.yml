@@ -5,6 +5,9 @@ spring:
     timeout-per-shutdown-phase: 30s
   
   data:
+    web:
+      pageable:
+        max-page-size: 100
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
@@ -122,6 +125,9 @@ spring.mail:
   properties:
     mail.smtp.auth: ${SMTP_AUTH:false}
     mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+
+swagger:
+  enabled: ${SWAGGER_ENABLED:true}
 
 springdoc:
   swagger-ui:

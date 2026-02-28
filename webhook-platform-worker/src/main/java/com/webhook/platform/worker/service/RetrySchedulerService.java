@@ -51,13 +51,12 @@ public class RetrySchedulerService {
     @Transactional
     public void scheduleRetries() {
         Instant now = Instant.now();
-        
+
         // Use efficient DB query with pagination and row-level locking
         List<Delivery> pendingRetries = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                PageRequest.of(0, batchSize)
-        );
+                PageRequest.of(0, batchSize));
 
         if (pendingRetries.isEmpty()) {
             return;
@@ -68,12 +67,12 @@ public class RetrySchedulerService {
         // Send all messages asynchronously (non-blocking, highload-friendly)
         Map<UUID, CompletableFuture<SendResult<String, DeliveryMessage>>> futures = new HashMap<>();
         Map<UUID, String> deliveryTopics = new HashMap<>();
-        
+
         for (Delivery delivery : pendingRetries) {
             try {
                 String topic = getRetryTopic(delivery.getAttemptCount());
                 deliveryTopics.put(delivery.getId(), topic);
-                
+
                 DeliveryMessage message = DeliveryMessage.builder()
                         .deliveryId(delivery.getId())
                         .eventId(delivery.getEventId())
@@ -83,8 +82,8 @@ public class RetrySchedulerService {
                         .attemptCount(delivery.getAttemptCount())
                         .build();
 
-                CompletableFuture<SendResult<String, DeliveryMessage>> future = 
-                        kafkaTemplate.send(topic, delivery.getEndpointId().toString(), message);
+                CompletableFuture<SendResult<String, DeliveryMessage>> future = kafkaTemplate.send(topic,
+                        delivery.getEndpointId().toString(), message);
                 futures.put(delivery.getId(), future);
             } catch (Exception e) {
                 log.error("Failed to initiate send for delivery {}: {}", delivery.getId(), e.getMessage(), e);
@@ -106,7 +105,7 @@ public class RetrySchedulerService {
         // Process results - update DB only after Kafka confirmation
         List<Delivery> successfulDeliveries = new ArrayList<>();
         List<Delivery> failedDeliveries = new ArrayList<>();
-        
+
         for (Delivery delivery : pendingRetries) {
             CompletableFuture<SendResult<String, DeliveryMessage>> future = futures.get(delivery.getId());
             if (future == null) {
@@ -117,28 +116,29 @@ public class RetrySchedulerService {
             }
 
             try {
-                SendResult<String, DeliveryMessage> result = future.getNow(null);
-                if (result != null) {
-                    // Successfully sent and confirmed
-                    RecordMetadata metadata = result.getRecordMetadata();
-                    delivery.setNextRetryAt(null);
-                    successfulDeliveries.add(delivery);
-                    
-                    log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
-                            delivery.getId(), 
-                            deliveryTopics.get(delivery.getId()),
-                            metadata.partition(), 
-                            metadata.offset());
-                } else {
-                    // Future not completed yet - treat as failure
+                if (!future.isDone()) {
+                    // Future genuinely not completed — timed out
                     rescheduleDelivery(delivery, "Send confirmation timeout");
                     failedDeliveries.add(delivery);
+                    continue;
                 }
+                // future.get() will throw if the future completed exceptionally
+                SendResult<String, DeliveryMessage> result = future.get();
+                // Successfully sent and confirmed
+                RecordMetadata metadata = result.getRecordMetadata();
+                delivery.setNextRetryAt(null);
+                successfulDeliveries.add(delivery);
+
+                log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
+                        delivery.getId(),
+                        deliveryTopics.get(delivery.getId()),
+                        metadata.partition(),
+                        metadata.offset());
             } catch (Exception e) {
                 // Send failed
                 rescheduleDelivery(delivery, e.getMessage());
                 failedDeliveries.add(delivery);
-                
+
                 log.error("Kafka send failed for delivery {} eventId={} endpointId={}: {}",
                         delivery.getId(),
                         delivery.getEventId(),
@@ -154,16 +154,16 @@ public class RetrySchedulerService {
         if (!failedDeliveries.isEmpty()) {
             deliveryRepository.saveAll(failedDeliveries);
         }
-        
-        log.info("Retry scheduling complete: {} successful, {} failed/rescheduled", 
+
+        log.info("Retry scheduling complete: {} successful, {} failed/rescheduled",
                 successfulDeliveries.size(), failedDeliveries.size());
     }
 
     private void rescheduleDelivery(Delivery delivery, String reason) {
         Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds);
         delivery.setNextRetryAt(rescheduleTime);
-        
-        log.warn("Rescheduling delivery {} to {} due to: {}", 
+
+        log.warn("Rescheduling delivery {} to {} due to: {}",
                 delivery.getId(), rescheduleTime, reason);
     }
 

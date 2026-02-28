@@ -1,5 +1,9 @@
 package com.webhook.platform.api.service;
 
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
@@ -9,6 +13,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Slf4j
@@ -22,14 +28,26 @@ public class AuthRateLimiterService {
     private final RedissonClient redissonClient;
     private final int loginRateLimit;
     private final int registerRateLimit;
+    private final Counter authRateLimitFallback;
+
+    /**
+     * Local in-memory fallback rate limiters (Bucket4j) used when Redis is
+     * unavailable.
+     * Keyed by the same key as Redis (IP/email) to maintain isolation.
+     */
+    private final ConcurrentMap<String, Bucket> localFallbackBuckets = new ConcurrentHashMap<>();
 
     public AuthRateLimiterService(
             RedissonClient redissonClient,
+            MeterRegistry meterRegistry,
             @Value("${auth.rate-limit.login-per-minute:10}") int loginRateLimit,
             @Value("${auth.rate-limit.register-per-minute:5}") int registerRateLimit) {
         this.redissonClient = redissonClient;
         this.loginRateLimit = loginRateLimit;
         this.registerRateLimit = registerRateLimit;
+        this.authRateLimitFallback = Counter.builder("auth_rate_limit_fallback_total")
+                .description("Number of auth requests rate-limited via local fallback (Redis unavailable)")
+                .register(meterRegistry);
     }
 
     public boolean allowLogin(String ip, String email) {
@@ -58,8 +76,29 @@ public class AuthRateLimiterService {
             }
             return acquired;
         } catch (Exception e) {
-            log.warn("Auth rate limiter unavailable, allowing request: {}", e.getMessage());
-            return true;
+            log.warn("Auth rate limiter unavailable, using local fallback for key {}: {}", key, e.getMessage());
+            authRateLimitFallback.increment();
+            return tryLocalFallback(key, ratePerMinute);
         }
+    }
+
+    /**
+     * Local in-memory rate limiter fallback using Bucket4j.
+     * Provides emergency throttling when Redis is unavailable.
+     */
+    private boolean tryLocalFallback(String key, int ratePerMinute) {
+        Bucket bucket = localFallbackBuckets.computeIfAbsent(key,
+                k -> Bucket.builder()
+                        .addLimit(Bandwidth.builder()
+                                .capacity(ratePerMinute)
+                                .refillGreedy(ratePerMinute, Duration.ofMinutes(1))
+                                .build())
+                        .build());
+
+        boolean acquired = bucket.tryConsume(1);
+        if (!acquired) {
+            log.warn("Local fallback auth rate limit exceeded for key: {}", key);
+        }
+        return acquired;
     }
 }

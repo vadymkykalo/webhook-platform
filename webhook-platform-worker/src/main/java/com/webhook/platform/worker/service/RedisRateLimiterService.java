@@ -23,6 +23,7 @@ public class RedisRateLimiterService {
     private final MeterRegistry meterRegistry;
     private final Counter rateLimitHits;
     private final Counter rateLimitMisses;
+    private final Counter rateLimitFallback;
 
     public RedisRateLimiterService(RedissonClient redissonClient, MeterRegistry meterRegistry) {
         this.redissonClient = redissonClient;
@@ -32,6 +33,9 @@ public class RedisRateLimiterService {
                 .register(meterRegistry);
         this.rateLimitMisses = Counter.builder("webhook_rate_limit_exceeded_total")
                 .description("Number of requests rejected by rate limiting")
+                .register(meterRegistry);
+        this.rateLimitFallback = Counter.builder("webhook_rate_limit_fallback_total")
+                .description("Number of delivery requests allowed via fail-open fallback (Redis unavailable)")
                 .register(meterRegistry);
     }
 
@@ -44,7 +48,7 @@ public class RedisRateLimiterService {
         try {
             String key = KEY_PREFIX + endpointId;
             RRateLimiter limiter = redissonClient.getRateLimiter(key);
-            
+
             limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
             limiter.expire(KEY_TTL);
 
@@ -57,7 +61,9 @@ public class RedisRateLimiterService {
             }
             return acquired;
         } catch (Exception e) {
-            log.warn("Redis rate limiter unavailable, allowing request: {}", e.getMessage());
+            log.warn("Redis rate limiter unavailable for endpoint {}, allowing request (fail-open): {}",
+                    endpointId, e.getMessage());
+            rateLimitFallback.increment();
             rateLimitHits.increment();
             return true;
         }
