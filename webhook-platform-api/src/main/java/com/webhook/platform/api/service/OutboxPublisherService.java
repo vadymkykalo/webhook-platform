@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.filter.CorrelationIdFilter;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.dto.IncomingForwardMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -27,13 +28,13 @@ import java.util.concurrent.TimeUnit;
 public class OutboxPublisherService {
 
     private final OutboxMessageRepository outboxMessageRepository;
-    private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final int batchSize;
 
     public OutboxPublisherService(
             OutboxMessageRepository outboxMessageRepository,
-            KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
+            KafkaTemplate<String, Object> kafkaTemplate,
             ObjectMapper objectMapper,
             @Value("${outbox.publisher.batch-size:100}") int batchSize) {
         this.outboxMessageRepository = outboxMessageRepository;
@@ -115,21 +116,18 @@ public class OutboxPublisherService {
     }
 
     private void publishMessageSynchronously(OutboxMessage message) throws Exception {
-        DeliveryMessage deliveryMessage = objectMapper.readValue(
-                message.getPayload(),
-                DeliveryMessage.class
-        );
+        Object payload = deserializePayload(message);
 
         String correlationId = CorrelationIdFilter.getCurrentCorrelationId();
         if (correlationId == null) {
             correlationId = UUID.randomUUID().toString();
         }
 
-        ProducerRecord<String, DeliveryMessage> record = new ProducerRecord<>(
+        ProducerRecord<String, Object> record = new ProducerRecord<>(
                 message.getKafkaTopic(),
                 null,
                 message.getKafkaKey(),
-                deliveryMessage
+                payload
         );
         record.headers().add(new RecordHeader("X-Correlation-ID", correlationId.getBytes(StandardCharsets.UTF_8)));
 
@@ -144,6 +142,14 @@ public class OutboxPublisherService {
         message.setPublishedAt(Instant.now());
         outboxMessageRepository.save(message);
         log.debug("Marked outbox message {} as published", message.getId());
+    }
+
+    private Object deserializePayload(OutboxMessage message) throws Exception {
+        String aggregateType = message.getAggregateType();
+        if ("IncomingForward".equals(aggregateType)) {
+            return objectMapper.readValue(message.getPayload(), IncomingForwardMessage.class);
+        }
+        return objectMapper.readValue(message.getPayload(), DeliveryMessage.class);
     }
 
     private void markAsFailed(OutboxMessage message, String errorMessage) {
