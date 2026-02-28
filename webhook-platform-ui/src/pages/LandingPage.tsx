@@ -206,16 +206,13 @@ function DashboardMockup() {
 function LogoCloud() {
   const { t } = useTranslation();
   const logos = [
-    { name: 'Stripe', src: '/logos/stripe.svg' },
-    { name: 'GitHub', src: '/logos/github.svg' },
-    { name: 'Slack', src: '/logos/slack.svg' },
-    { name: 'Twilio', src: '/logos/twilio.svg' },
-    { name: 'Salesforce', src: '/logos/salesforce.svg' },
-    { name: 'HubSpot', src: '/logos/hubspot.svg' },
-    { name: 'Jira', src: '/logos/jira.svg' },
-    { name: 'Grammarly', src: '/logos/grammarly.svg' },
+    { name: 'Spring Boot', src: '/logos/springboot.svg' },
+    { name: 'PostgreSQL', src: '/logos/postgresql.svg' },
     { name: 'Apache Kafka', src: '/logos/apachekafka.svg' },
+    { name: 'Redis', src: '/logos/redis.svg' },
+    { name: 'React', src: '/logos/react.svg' },
     { name: 'Docker', src: '/logos/docker.svg' },
+    { name: 'TypeScript', src: '/logos/typescript.svg' },
   ];
 
   const track = [...logos, ...logos];
@@ -249,7 +246,7 @@ function FlowDiagram() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'send' | 'receive'>('send');
 
-  const sendSources = [{ label: t('landing.flowDiagram.sendSource'), icon: Webhook, isBrand: false }];
+  const sendSources = [{ label: t('landing.flowDiagram.sendSource'), icon: Webhook }];
   const sendDestinations = [
     { label: 'Stripe', src: '/logos/stripe.svg' },
     { label: 'GitHub', src: '/logos/github.svg' },
@@ -261,16 +258,31 @@ function FlowDiagram() {
     { label: 'Twilio', src: '/logos/twilio.svg' },
     { label: 'HubSpot', src: '/logos/hubspot.svg' },
   ];
-  const receiveDestinations = [{ label: t('landing.flowDiagram.receiveDest'), icon: Webhook, isBrand: false }];
+  const receiveDestinations = [{ label: t('landing.flowDiagram.receiveDest'), icon: Webhook }];
 
   const sources = activeTab === 'send' ? sendSources : receiveSources;
   const destinations = activeTab === 'send' ? sendDestinations : receiveDestinations;
+  const maxRows = Math.max(sources.length, destinations.length);
 
   const badges = [
     { label: t('landing.flowDiagram.retries'), icon: RefreshCw },
     { label: t('landing.flowDiagram.signatures'), icon: Shield },
     { label: t('landing.flowDiagram.monitoring'), icon: Eye },
   ];
+
+  const renderPill = (item: any, idx: number) => (
+    <div
+      key={idx}
+      className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm"
+    >
+      {'src' in item ? (
+        <img src={item.src} alt={item.label} className="h-5 w-5 object-contain" />
+      ) : (
+        <item.icon className="h-5 w-5 text-primary" />
+      )}
+      <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{item.label}</span>
+    </div>
+  );
 
   return (
     <section className="py-24">
@@ -308,38 +320,38 @@ function FlowDiagram() {
           {/* Background dots pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
-          <div className="relative flex items-center justify-between gap-4 md:gap-8 min-h-[280px]">
-            {/* Left: Sources */}
-            <div className="flex flex-col items-center gap-4 flex-shrink-0">
-              {sources.map((s, i) => (
-                <div
-                  key={`src-${i}`}
-                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm animate-fade-in"
-                  style={{ animationDelay: `${i * 100}ms` }}
-                >
-                  {'src' in s ? (
-                    <img src={s.src} alt={s.label} className="h-5 w-5 object-contain" />
-                  ) : (
-                    <s.icon className="h-5 w-5 text-primary" />
-                  )}
-                  <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{s.label}</span>
+          {/* Desktop: Grid layout with proper line connections */}
+          <div
+            className="relative hidden md:grid items-center gap-y-4"
+            style={{ gridTemplateColumns: 'auto 1fr auto 1fr auto' }}
+          >
+            {/* Sources */}
+            {sources.length === 1 ? (
+              <div style={{ gridRow: `1 / ${maxRows + 1}`, gridColumn: 1 }} className="flex items-center justify-end">
+                {renderPill(sources[0], 0)}
+              </div>
+            ) : (
+              sources.map((s, i) => (
+                <div key={`s-${i}`} style={{ gridRow: i + 1, gridColumn: 1 }} className="flex items-center justify-end">
+                  {renderPill(s, i)}
                 </div>
-              ))}
-            </div>
+              ))
+            )}
 
-            {/* Animated line left */}
-            <div className="flex-1 relative hidden md:flex items-center justify-center min-w-[60px]">
-              <div className="w-full h-px border-t-2 border-dashed border-primary/30 flow-line-animate" />
-              <ArrowRight className="absolute right-0 h-4 w-4 text-primary/50" />
-            </div>
+            {/* Left connector lines — one per row */}
+            {Array.from({ length: maxRows }).map((_, i) => (
+              <div key={`lc-${i}`} style={{ gridRow: i + 1, gridColumn: 2 }} className="flex items-center px-3">
+                <div className="flex-1 flow-line-animate h-[2px]" />
+                <ArrowRight className="h-3.5 w-3.5 text-primary/40 flex-shrink-0 -ml-0.5" />
+              </div>
+            ))}
 
-            {/* Center: Hookflow Hub */}
-            <div className="flex flex-col items-center gap-3 flex-shrink-0 z-10">
+            {/* Center hub — spans all rows */}
+            <div style={{ gridRow: `1 / ${maxRows + 1}`, gridColumn: 3 }} className="flex flex-col items-center gap-3 px-2 z-10">
               <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-4 ring-primary/10">
                 <Webhook className="h-10 w-10 text-white" />
               </div>
               <span className="text-sm font-bold tracking-tight">Hookflow</span>
-              {/* Feature badges */}
               <div className="flex flex-wrap justify-center gap-1.5 mt-1">
                 {badges.map((b) => (
                   <span key={b.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
@@ -350,29 +362,40 @@ function FlowDiagram() {
               </div>
             </div>
 
-            {/* Animated line right */}
-            <div className="flex-1 relative hidden md:flex items-center justify-center min-w-[60px]">
-              <div className="w-full h-px border-t-2 border-dashed border-primary/30 flow-line-animate" />
-              <ArrowRight className="absolute right-0 h-4 w-4 text-primary/50" />
-            </div>
+            {/* Right connector lines — one per row */}
+            {Array.from({ length: maxRows }).map((_, i) => (
+              <div key={`rc-${i}`} style={{ gridRow: i + 1, gridColumn: 4 }} className="flex items-center px-3">
+                <div className="flex-1 flow-line-animate h-[2px]" />
+                <ArrowRight className="h-3.5 w-3.5 text-primary/40 flex-shrink-0 -ml-0.5" />
+              </div>
+            ))}
 
-            {/* Right: Destinations */}
-            <div className="flex flex-col items-center gap-4 flex-shrink-0">
-              {destinations.map((d, i) => (
-                <div
-                  key={`dest-${i}`}
-                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm animate-fade-in"
-                  style={{ animationDelay: `${(i + 1) * 150}ms` }}
-                >
-                  {'src' in d ? (
-                    <img src={d.src} alt={d.label} className="h-5 w-5 object-contain" />
-                  ) : (
-                    <d.icon className="h-5 w-5 text-primary" />
-                  )}
-                  <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{d.label}</span>
+            {/* Destinations */}
+            {destinations.length === 1 ? (
+              <div style={{ gridRow: `1 / ${maxRows + 1}`, gridColumn: 5 }} className="flex items-center justify-start">
+                {renderPill(destinations[0], 0)}
+              </div>
+            ) : (
+              destinations.map((d, i) => (
+                <div key={`d-${i}`} style={{ gridRow: i + 1, gridColumn: 5 }} className="flex items-center justify-start">
+                  {renderPill(d, i)}
                 </div>
-              ))}
+              ))
+            )}
+          </div>
+
+          {/* Mobile: simple vertical flow */}
+          <div className="md:hidden flex flex-col items-center gap-4 relative">
+            {sources.map((s, i) => renderPill(s, i))}
+            <ArrowRight className="h-5 w-5 text-primary/40 rotate-90" />
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg">
+                <Webhook className="h-8 w-8 text-white" />
+              </div>
+              <span className="text-sm font-bold">Hookflow</span>
             </div>
+            <ArrowRight className="h-5 w-5 text-primary/40 rotate-90" />
+            {destinations.map((d, i) => renderPill(d, i))}
           </div>
 
           {/* Description under diagram */}
