@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentMap;
 public class RedisRateLimiterService {
 
     private static final String KEY_PREFIX = "rate_limiter:project:";
+    private static final String SOURCE_KEY_PREFIX = "rate_limiter:source:";
     private static final Duration KEY_TTL = Duration.ofHours(24);
 
     private final RedissonClient redissonClient;
@@ -62,8 +63,15 @@ public class RedisRateLimiterService {
     }
 
     public boolean tryAcquire(UUID projectId, int ratePerSecond) {
+        return doTryAcquire(KEY_PREFIX + projectId, projectId, ratePerSecond);
+    }
+
+    public boolean tryAcquireForSource(UUID sourceId, int ratePerSecond) {
+        return doTryAcquire(SOURCE_KEY_PREFIX + sourceId, sourceId, ratePerSecond);
+    }
+
+    private boolean doTryAcquire(String key, UUID id, int ratePerSecond) {
         try {
-            String key = KEY_PREFIX + projectId;
             RRateLimiter limiter = redissonClient.getRateLimiter(key);
 
             limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
@@ -74,14 +82,14 @@ public class RedisRateLimiterService {
                 rateLimitHits.increment();
             } else {
                 rateLimitExceeded.increment();
-                log.warn("Rate limit exceeded for project: {} (limit: {}/sec)", projectId, ratePerSecond);
+                log.warn("Rate limit exceeded for id: {} (limit: {}/sec)", id, ratePerSecond);
             }
             return acquired;
         } catch (Exception e) {
-            log.warn("Redis rate limiter unavailable, using local fallback for project {}: {}",
-                    projectId, e.getMessage());
+            log.warn("Redis rate limiter unavailable, using local fallback for id {}: {}",
+                    id, e.getMessage());
             rateLimitFallback.increment();
-            return tryLocalFallback(projectId, ratePerSecond);
+            return tryLocalFallback(id, ratePerSecond);
         }
     }
 
