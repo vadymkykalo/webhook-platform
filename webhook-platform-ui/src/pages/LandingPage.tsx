@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
 import ThemeToggle from '../components/ThemeToggle';
@@ -23,6 +24,7 @@ export default function LandingPage() {
 }
 
 function Navigation() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [scrolled, setScrolled] = useState(false);
 
@@ -43,11 +45,11 @@ function Navigation() {
             <span className="text-lg font-bold tracking-tight">Hookflow</span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#architecture" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Architecture</a>
-            <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
-            <Link to="/quickstart" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Quickstart</Link>
-            <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">SDKs</Link>
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.features')}</a>
+            <a href="#architecture" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.architecture')}</a>
+            <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.docs')}</Link>
+            <Link to="/quickstart" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.quickstart')}</Link>
+            <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.sdks')}</Link>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -55,13 +57,13 @@ function Navigation() {
           <div className="w-px h-5 bg-border mx-1" />
           {isAuthenticated ? (
             <Link to="/admin/projects">
-              <Button size="sm">Go to Dashboard <ArrowRight className="h-3.5 w-3.5" /></Button>
+              <Button size="sm">{t('landing.nav.goToDashboard')} <ArrowRight className="h-3.5 w-3.5" /></Button>
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Sign in</Link>
+              <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">{t('landing.nav.signIn')}</Link>
               <Link to="/register">
-                <Button size="sm">Get started <ArrowRight className="h-3.5 w-3.5" /></Button>
+                <Button size="sm">{t('landing.nav.getStarted')} <ArrowRight className="h-3.5 w-3.5" /></Button>
               </Link>
             </>
           )}
@@ -72,6 +74,7 @@ function Navigation() {
 }
 
 function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
+  const { t } = useTranslation();
   return (
     <section className="relative overflow-hidden">
       {/* Background gradient orbs */}
@@ -83,33 +86,32 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
           <div className="animate-fade-in-up">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
               <Zap className="h-3 w-3" />
-              Production-ready webhook infrastructure
+              {t('landing.hero.badge')}
             </div>
             <h1 className="text-display text-foreground mb-6 leading-[1.1]">
-              Reliable webhook
-              <span className="gradient-text"> delivery </span>
-              at any scale
+              {t('landing.hero.title1')}
+              <span className="gradient-text">{t('landing.hero.titleHighlight')}</span>
+              {t('landing.hero.title2')}
             </h1>
             <p className="text-body-lg text-muted-foreground mb-8 max-w-lg">
-              Configure endpoints once. We handle delivery, retries, signatures, and monitoring.
-              You focus on building product.
+              {t('landing.hero.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <Link to={isAuthenticated ? '/admin/dashboard' : '/register'}>
                 <Button size="lg" className="shadow-glow">
-                  {isAuthenticated ? 'Go to Dashboard' : 'Start for free'} <ArrowRight className="h-4 w-4" />
+                  {isAuthenticated ? t('landing.nav.goToDashboard') : t('landing.hero.startFree')} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link to="/docs">
                 <Button variant="outline" size="lg">
-                  Read the docs
+                  {t('landing.hero.readDocs')}
                 </Button>
               </Link>
             </div>
             <div className="flex items-center gap-6 mt-8 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />No credit card</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />Free tier included</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />5-min setup</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.noCreditCard')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.freeTier')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.fiveMinSetup')}</span>
             </div>
           </div>
           <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
@@ -122,6 +124,7 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
 }
 
 function DashboardMockup() {
+  const { t } = useTranslation();
   const [activeRow, setActiveRow] = useState(0);
   const [retryCountdown, setRetryCountdown] = useState(28);
 
@@ -149,7 +152,7 @@ function DashboardMockup() {
             <div className="w-3 h-3 rounded-full bg-yellow-400" />
             <div className="w-3 h-3 rounded-full bg-green-400" />
           </div>
-          <div className="text-xs font-medium text-muted-foreground">Live Deliveries</div>
+          <div className="text-xs font-medium text-muted-foreground">{t('landing.mockup.liveDeliveries')}</div>
           <div className="w-16" />
         </div>
         <div className="p-3 space-y-1.5">
@@ -169,17 +172,17 @@ function DashboardMockup() {
                 <div className="flex items-center gap-2 ml-3">
                   {delivery.status === 'success' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-success/10 text-success">
-                      <CheckCircle2 className="w-3 h-3" /> Delivered
+                      <CheckCircle2 className="w-3 h-3" /> {t('landing.mockup.delivered')}
                     </span>
                   )}
                   {delivery.status === 'failed' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-destructive/10 text-destructive">
-                      <AlertCircle className="w-3 h-3" /> Failed
+                      <AlertCircle className="w-3 h-3" /> {t('landing.mockup.failed')}
                     </span>
                   )}
                   {delivery.status === 'retrying' && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-warning/10 text-warning animate-pulse">
-                      <Clock className="w-3 h-3" /> Retry {delivery.retry}s
+                      <Clock className="w-3 h-3" /> {t('landing.mockup.retry')} {delivery.retry}s
                     </span>
                   )}
                   <span className="text-[10px] text-muted-foreground">{delivery.time}</span>
@@ -194,6 +197,7 @@ function DashboardMockup() {
 }
 
 function LogoCloud() {
+  const { t } = useTranslation();
   const logos = [
     { name: 'Spring Boot', src: '/logos/springboot.svg' },
     { name: 'PostgreSQL', src: '/logos/postgresql.svg' },
@@ -210,7 +214,7 @@ function LogoCloud() {
     <section className="py-14 border-y border-border/50 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 mb-8">
         <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-          Built with battle-tested technology
+          {t('landing.logoCloud')}
         </p>
       </div>
       <div className="relative">
@@ -232,22 +236,23 @@ function LogoCloud() {
 }
 
 function Features() {
+  const { t } = useTranslation();
   const features = [
-    { icon: RefreshCw, title: 'Automatic retries', desc: 'Exponential backoff with configurable retry policies. Never miss a delivery.' },
-    { icon: Eye, title: 'Full visibility', desc: 'See every attempt, HTTP status, error message, and latency metric in real time.' },
-    { icon: Shield, title: 'HMAC signatures', desc: 'Every payload signed with HMAC-SHA256. Verify authenticity on your end.' },
-    { icon: Activity, title: 'One-click replay', desc: 'Replay any failed delivery from the dashboard. No code changes needed.' },
-    { icon: BarChart3, title: 'Analytics & metrics', desc: 'Time-series charts, success rates, latency percentiles, endpoint health scores.' },
-    { icon: Lock, title: 'mTLS support', desc: 'Configure mutual TLS for endpoints that require client certificate authentication.' },
+    { icon: RefreshCw, title: t('landing.features.retries'), desc: t('landing.features.retriesDesc') },
+    { icon: Eye, title: t('landing.features.visibility'), desc: t('landing.features.visibilityDesc') },
+    { icon: Shield, title: t('landing.features.hmac'), desc: t('landing.features.hmacDesc') },
+    { icon: Activity, title: t('landing.features.replay'), desc: t('landing.features.replayDesc') },
+    { icon: BarChart3, title: t('landing.features.analytics'), desc: t('landing.features.analyticsDesc') },
+    { icon: Lock, title: t('landing.features.mtls'), desc: t('landing.features.mtlsDesc') },
   ];
 
   return (
     <section id="features" className="py-24">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-16">
-          <h2 className="text-headline mb-4">Everything you need for<br /><span className="gradient-text">production webhooks</span></h2>
+          <h2 className="text-headline mb-4">{t('landing.features.title')}<br /><span className="gradient-text">{t('landing.features.titleHighlight')}</span></h2>
           <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
-            Enterprise-grade reliability with developer-friendly simplicity.
+            {t('landing.features.subtitle')}
           </p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -345,6 +350,7 @@ function AnimatedConnector({ isActive, isPast, color, delay }: { isActive: boole
 }
 
 function ArchitectureShowcase() {
+  const { t } = useTranslation();
   const [activeStep, setActiveStep] = useState(0);
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
@@ -396,11 +402,11 @@ function ArchitectureShowcase() {
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
             <Activity className="h-3 w-3" />
-            Transactional outbox pattern
+            {t('landing.architecture.badge')}
           </div>
-          <h2 className="text-headline mb-4">Battle-tested <span className="gradient-text">architecture</span></h2>
+          <h2 className="text-headline mb-4">{t('landing.architecture.title')} <span className="gradient-text">{t('landing.architecture.titleHighlight')}</span></h2>
           <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
-            Every event is persisted atomically, published reliably, and delivered with full observability
+            {t('landing.architecture.subtitle')}
           </p>
         </div>
 
@@ -418,7 +424,7 @@ function ArchitectureShowcase() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                 </span>
-                Architecture Flow
+                {t('landing.architecture.flowLabel')}
               </div>
               <div className="w-16" />
             </div>
@@ -482,9 +488,9 @@ function ArchitectureShowcase() {
 
               <div className="grid md:grid-cols-3 gap-4">
                 {[
-                  { title: 'Atomic writes', desc: 'Single transaction ensures consistency', icon: <Shield className="h-4 w-4" /> },
-                  { title: 'Zero data loss', desc: 'Events never lost during failures', icon: <CheckCircle2 className="h-4 w-4" /> },
-                  { title: 'At-least-once', desc: 'Automatic retry with exponential backoff', icon: <RefreshCw className="h-4 w-4" /> },
+                  { title: t('landing.architecture.atomicWrites'), desc: t('landing.architecture.atomicWritesDesc'), icon: <Shield className="h-4 w-4" /> },
+                  { title: t('landing.architecture.zeroDataLoss'), desc: t('landing.architecture.zeroDataLossDesc'), icon: <CheckCircle2 className="h-4 w-4" /> },
+                  { title: t('landing.architecture.atLeastOnce'), desc: t('landing.architecture.atLeastOnceDesc'), icon: <RefreshCw className="h-4 w-4" /> },
                 ].map((item) => (
                   <div key={item.title} className="group p-5 rounded-xl border bg-gradient-to-br from-muted/30 to-transparent hover:from-accent hover:to-accent/50 hover:border-primary/20 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
                     <div className="flex items-center gap-3 mb-2">
@@ -505,6 +511,7 @@ function ArchitectureShowcase() {
 
 
 function VisibilityAndControl() {
+  const { t } = useTranslation();
   const [selectedAttempt, setSelectedAttempt] = useState(2);
 
   const attempts = [
@@ -520,19 +527,19 @@ function VisibilityAndControl() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
               <Eye className="h-3 w-3" />
-              Complete observability
+              {t('landing.observability.badge')}
             </div>
             <h2 className="text-headline mb-6">
-              Full visibility into<br />every <span className="gradient-text">delivery</span>
+              {t('landing.observability.title')}<br /><span className="gradient-text">{t('landing.observability.titleHighlight')}</span>
             </h2>
             <p className="text-body-lg text-muted-foreground mb-8">
-              See every attempt with full HTTP context — status codes, error messages, latency, and timestamps.
+              {t('landing.observability.subtitle')}
             </p>
             <div className="space-y-4">
               {[
-                { title: 'Complete attempt timeline', desc: 'View all retry attempts with full HTTP context' },
-                { title: 'Error details and debugging', desc: 'See exact error messages and response bodies' },
-                { title: 'Performance metrics', desc: 'Track latency percentiles and identify slow endpoints' },
+                { title: t('landing.observability.timeline'), desc: t('landing.observability.timelineDesc') },
+                { title: t('landing.observability.errorDetails'), desc: t('landing.observability.errorDetailsDesc') },
+                { title: t('landing.observability.perfMetrics'), desc: t('landing.observability.perfMetricsDesc') },
               ].map((item) => (
                 <div key={item.title} className="flex items-start gap-3">
                   <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
@@ -553,7 +560,7 @@ function VisibilityAndControl() {
                   <div className="text-xs text-white/50 mt-0.5">Endpoint: https://api.customer.com/webhooks</div>
                 </div>
                 <div className="p-5">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Attempt History</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t('landing.observability.attemptHistory')}</div>
                   <div className="space-y-2">
                     {attempts.map((attempt) => (
                       <div
@@ -590,7 +597,7 @@ function VisibilityAndControl() {
                     ))}
                   </div>
                   <Button className="w-full mt-4" size="sm">
-                    <RefreshCw className="h-3.5 w-3.5" /> Replay delivery
+                    <RefreshCw className="h-3.5 w-3.5" /> {t('landing.observability.replayDelivery')}
                   </Button>
                 </div>
               </div>
@@ -603,6 +610,7 @@ function VisibilityAndControl() {
 }
 
 function DeveloperConfidence() {
+  const { t } = useTranslation();
   return (
     <section className="py-24 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
@@ -611,20 +619,20 @@ function DeveloperConfidence() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/80 text-xs font-semibold mb-6 border border-white/10">
               <Code2 className="h-3 w-3" />
-              Developer experience
+              {t('landing.devExperience.badge')}
             </div>
             <h2 className="text-headline text-white mb-6">
-              Developer-friendly API
+              {t('landing.devExperience.title')}
             </h2>
             <p className="text-lg text-white/60 mb-8">
-              Clean, predictable API. Send events in one request. We handle delivery, retries, and monitoring.
+              {t('landing.devExperience.subtitle')}
             </p>
             <div className="space-y-3">
               {[
-                'RESTful API design',
-                'Comprehensive error messages',
-                'HMAC signature verification',
-                'Idempotency built-in',
+                t('landing.devExperience.rest'),
+                t('landing.devExperience.errors'),
+                t('landing.devExperience.hmac'),
+                t('landing.devExperience.idempotency'),
               ].map((text) => (
                 <div key={text} className="flex items-center gap-3">
                   <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
@@ -659,7 +667,7 @@ function DeveloperConfidence() {
                 <div className="bg-slate-950 px-5 py-3 border-t border-white/10">
                   <div className="text-xs text-green-400 font-mono flex items-center gap-1.5">
                     <CheckCircle2 className="h-3 w-3" />
-                    Event accepted · ID: evt_abc123 · 3 deliveries queued
+                    {t('landing.devExperience.accepted')}
                   </div>
                 </div>
               </div>
@@ -672,6 +680,7 @@ function DeveloperConfidence() {
 }
 
 function HowItWorks() {
+  const { t } = useTranslation();
   const [activeStep, setActiveStep] = useState(0);
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
@@ -686,24 +695,24 @@ function HowItWorks() {
   const steps = [
     {
       num: '01',
-      title: 'Send an event',
-      desc: 'One API call. That\'s it. We persist atomically and queue for delivery.',
+      title: t('landing.howItWorks.step1Title'),
+      desc: t('landing.howItWorks.step1Desc'),
       color: '#8B5CF6',
-      details: ['API key auth', 'Idempotency built-in', 'Payload up to 256KB'],
+      details: [t('landing.howItWorks.step1Detail1'), t('landing.howItWorks.step1Detail2'), t('landing.howItWorks.step1Detail3')],
     },
     {
       num: '02',
-      title: 'We deliver reliably',
-      desc: 'HMAC-signed payloads, exponential backoff, automatic retries across multiple intervals.',
+      title: t('landing.howItWorks.step2Title'),
+      desc: t('landing.howItWorks.step2Desc'),
       color: '#10B981',
-      details: ['HMAC-SHA256 signatures', 'Up to 7 retry intervals', 'Configurable timeouts'],
+      details: [t('landing.howItWorks.step2Detail1'), t('landing.howItWorks.step2Detail2'), t('landing.howItWorks.step2Detail3')],
     },
     {
       num: '03',
-      title: 'You stay in control',
-      desc: 'Full observability dashboard. See every attempt, replay failures, track success rates.',
+      title: t('landing.howItWorks.step3Title'),
+      desc: t('landing.howItWorks.step3Desc'),
       color: '#F59E0B',
-      details: ['Real-time delivery feed', 'One-click replay', 'Analytics & metrics'],
+      details: [t('landing.howItWorks.step3Detail1'), t('landing.howItWorks.step3Detail2'), t('landing.howItWorks.step3Detail3')],
     },
   ];
 
@@ -716,11 +725,11 @@ function HowItWorks() {
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
             <Zap className="h-3 w-3" />
-            Three steps to production
+            {t('landing.howItWorks.badge')}
           </div>
-          <h2 className="text-headline mb-4">How it <span className="gradient-text">works</span></h2>
+          <h2 className="text-headline mb-4">{t('landing.howItWorks.title')} <span className="gradient-text">{t('landing.howItWorks.titleHighlight')}</span></h2>
           <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
-            From first API call to full observability in under 5 minutes
+            {t('landing.howItWorks.subtitle')}
           </p>
         </div>
 
@@ -799,7 +808,7 @@ function HowItWorks() {
                 {/* Step 1: Code */}
                 <div className={`absolute inset-0 p-6 transition-all duration-500 ${current === 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
                   }`}>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Send your first event</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">{t('landing.howItWorks.sendFirstEvent')}</div>
                   <div className="bg-slate-900 rounded-xl overflow-hidden">
                     <div className="px-4 py-2 border-b border-white/10 flex items-center gap-2">
                       <span className="text-[10px] font-mono text-white/40">POST</span>
@@ -823,7 +832,7 @@ function HowItWorks() {
                   <div className="mt-4 p-3 rounded-lg bg-green-500/5 border border-green-500/20">
                     <div className="flex items-center gap-2 text-xs text-green-700">
                       <CheckCircle2 className="h-3.5 w-3.5" />
-                      <span className="font-medium">Event accepted</span>
+                      <span className="font-medium">{t('landing.howItWorks.eventAccepted')}</span>
                       <span className="text-green-600/60 ml-auto font-mono">evt_8f3k2m · 3 deliveries queued</span>
                     </div>
                   </div>
@@ -832,7 +841,7 @@ function HowItWorks() {
                 {/* Step 2: Delivery */}
                 <div className={`absolute inset-0 p-6 transition-all duration-500 ${current === 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
                   }`}>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Live delivery pipeline</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">{t('landing.howItWorks.livePipeline')}</div>
                   <div className="space-y-3">
                     {[
                       { endpoint: 'api.acme.com/hooks', status: 'delivered', code: 200, latency: '89ms', sig: true },
@@ -858,7 +867,7 @@ function HowItWorks() {
                         </div>
                         <div className="flex items-center gap-4 text-[11px] text-muted-foreground pl-8">
                           <span>{d.latency}</span>
-                          {d.sig && <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> HMAC signed</span>}
+                          {d.sig && <span className="flex items-center gap-1"><Shield className="h-3 w-3" /> {t('landing.howItWorks.hmacSigned')}</span>}
                           {d.retryIn && <span className="text-amber-600 font-medium">Retry in {d.retryIn}</span>}
                         </div>
                       </div>
@@ -869,12 +878,12 @@ function HowItWorks() {
                 {/* Step 3: Monitor */}
                 <div className={`absolute inset-0 p-6 transition-all duration-500 ${current === 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
                   }`}>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Dashboard overview</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">{t('landing.howItWorks.dashboardOverview')}</div>
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[
-                      { label: 'Success rate', value: '99.7%', color: 'text-green-600', bg: 'bg-green-50' },
-                      { label: 'Avg latency', value: '124ms', color: 'text-blue-600', bg: 'bg-blue-50' },
-                      { label: 'Events today', value: '12,847', color: 'text-violet-600', bg: 'bg-violet-50' },
+                      { label: t('landing.howItWorks.successRate'), value: '99.7%', color: 'text-green-600', bg: 'bg-green-50' },
+                      { label: t('landing.howItWorks.avgLatency'), value: '124ms', color: 'text-blue-600', bg: 'bg-blue-50' },
+                      { label: t('landing.howItWorks.eventsToday'), value: '12,847', color: 'text-violet-600', bg: 'bg-violet-50' },
                     ].map((stat) => (
                       <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center`}>
                         <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
@@ -884,8 +893,8 @@ function HowItWorks() {
                   </div>
                   <div className="bg-muted/30 rounded-xl p-4 border">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-semibold">Delivery volume (24h)</span>
-                      <span className="text-[10px] text-muted-foreground">Updated live</span>
+                      <span className="text-xs font-semibold">{t('landing.howItWorks.deliveryVolume24h')}</span>
+                      <span className="text-[10px] text-muted-foreground">{t('landing.howItWorks.updatedLive')}</span>
                     </div>
                     <div className="flex items-end gap-[3px] h-20">
                       {[40, 55, 45, 70, 65, 80, 75, 90, 85, 95, 88, 92, 78, 85, 90, 70, 60, 75, 80, 85, 90, 95, 88, 92].map((h, i) => (
@@ -907,10 +916,10 @@ function HowItWorks() {
                   </div>
                   <div className="mt-3 flex items-center gap-2">
                     <Button size="sm" variant="outline" className="text-xs h-7">
-                      <RefreshCw className="h-3 w-3" /> Replay failed
+                      <RefreshCw className="h-3 w-3" /> {t('landing.howItWorks.replayFailed')}
                     </Button>
                     <Button size="sm" variant="outline" className="text-xs h-7">
-                      <Eye className="h-3 w-3" /> View all
+                      <Eye className="h-3 w-3" /> {t('landing.howItWorks.viewAll')}
                     </Button>
                   </div>
                 </div>
@@ -924,6 +933,7 @@ function HowItWorks() {
 }
 
 function QuickstartCTA() {
+  const { t } = useTranslation();
   return (
     <section className="py-24">
       <div className="max-w-7xl mx-auto px-6">
@@ -932,20 +942,20 @@ function QuickstartCTA() {
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="relative z-10">
             <h2 className="text-3xl lg:text-[2.75rem] font-bold text-white mb-4 leading-tight">
-              Start delivering webhooks reliably
+              {t('landing.cta.title')}
             </h2>
             <p className="text-lg text-white/70 mb-10 max-w-xl mx-auto">
-              Sign up, configure endpoints, and send your first event in under 5 minutes.
+              {t('landing.cta.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link to="/register">
                 <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-xl">
-                  Get started free <ArrowRight className="h-4 w-4" />
+                  {t('landing.cta.getStartedFree')} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link to="/quickstart">
                 <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent">
-                  View quickstart
+                  {t('landing.cta.viewQuickstart')}
                 </Button>
               </Link>
             </div>

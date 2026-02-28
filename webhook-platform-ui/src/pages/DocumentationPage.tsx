@@ -1,9 +1,11 @@
 import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, ExternalLink, Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ThemeToggle from '../components/ThemeToggle';
 
 export default function DocumentationPage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState(() => {
     const hash = window.location.hash.replace('#', '');
@@ -25,7 +27,7 @@ export default function DocumentationPage() {
         <main className="flex-1 lg:pl-64">
           <div className="sticky top-0 z-30 lg:hidden h-14 border-b border-border/50 bg-card/80 glass flex items-center px-4 gap-3">
             <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
-            <span className="text-sm font-semibold flex-1">Documentation</span>
+            <span className="text-sm font-semibold flex-1">{t('docsPage.mobileTitle')}</span>
             <ThemeToggle variant="icon" />
           </div>
           <div className="max-w-4xl mx-auto px-6 lg:px-8 py-10">
@@ -47,17 +49,18 @@ export default function DocumentationPage() {
 }
 
 function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }: { activeSection: string; setActiveSection: (section: string) => void; mobileOpen: boolean; onMobileClose: () => void }) {
+  const { t } = useTranslation();
   const sections = [
-    { id: 'overview', label: 'Overview', icon: Book },
-    { id: 'authentication', label: 'Authentication', icon: Key },
-    { id: 'getting-started', label: 'Getting Started', icon: Zap },
-    { id: 'events-api', label: 'Events API', icon: Code },
-    { id: 'endpoints-api', label: 'Endpoints API', icon: Shield },
-    { id: 'subscriptions-api', label: 'Subscriptions API', icon: RefreshCw },
-    { id: 'deliveries-api', label: 'Deliveries API', icon: CheckCircle2 },
-    { id: 'webhook-security', label: 'Webhook Security', icon: Shield },
-    { id: 'errors', label: 'Errors & Rate Limits', icon: Code },
-    { id: 'sdks', label: 'SDKs', icon: Package },
+    { id: 'overview', label: t('docsPage.sections.overview'), icon: Book },
+    { id: 'authentication', label: t('docsPage.sections.authentication'), icon: Key },
+    { id: 'getting-started', label: t('docsPage.sections.gettingStarted'), icon: Zap },
+    { id: 'events-api', label: t('docsPage.sections.eventsApi'), icon: Code },
+    { id: 'endpoints-api', label: t('docsPage.sections.endpointsApi'), icon: Shield },
+    { id: 'subscriptions-api', label: t('docsPage.sections.subscriptionsApi'), icon: RefreshCw },
+    { id: 'deliveries-api', label: t('docsPage.sections.deliveriesApi'), icon: CheckCircle2 },
+    { id: 'webhook-security', label: t('docsPage.sections.webhookSecurity'), icon: Shield },
+    { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
+    { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
 
   const navContent = (
@@ -68,7 +71,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
         </div>
         <span className="text-base font-bold tracking-tight">Hookflow</span>
       </Link>
-      <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">API Documentation</p>
+      <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{t('docsPage.sidebar.apiDocs')}</p>
       <nav className="space-y-0.5">
         {sections.map((section) => (
           <button
@@ -87,7 +90,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
       </nav>
       <div className="mt-8 pt-6 border-t border-border/50 space-y-1">
         <Link to="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
-          <ArrowRight className="h-4 w-4" /> Go to Dashboard
+          <ArrowRight className="h-4 w-4" /> {t('docsPage.sidebar.goToDashboard')}
         </Link>
         <ThemeToggle variant="full" />
       </div>
@@ -106,7 +109,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onMobileClose} />
           <aside className="fixed inset-y-0 left-0 w-72 bg-card border-r shadow-elevated animate-slide-in-left">
             <div className="flex items-center justify-between p-4 border-b border-border/50">
-              <span className="text-sm font-semibold">Navigation</span>
+              <span className="text-sm font-semibold">{t('docsPage.sidebar.navigation')}</span>
               <button onClick={onMobileClose} className="p-1.5 rounded-lg hover:bg-accent"><X className="h-4 w-4" /></button>
             </div>
             {navContent}
@@ -118,80 +121,81 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
 }
 
 function Overview() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">API Documentation</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.overview.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Complete reference for integrating webhook delivery into your application.
+          {t('docsPage.overview.subtitle')}
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">What is Webhook Platform?</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.overview.whatIs')}</h2>
         <p className="text-muted-foreground leading-relaxed mb-4">
-          Webhook Platform is a reliable webhook delivery service that handles event routing, retries, and monitoring for your application.
+          {t('docsPage.overview.whatIsDesc1')}
         </p>
         <p className="text-muted-foreground leading-relaxed">
-          Send events via our API, and we'll deliver them to your configured endpoints with automatic retries, signatures, and full visibility.
+          {t('docsPage.overview.whatIsDesc2')}
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Core Concepts</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{t('docsPage.overview.coreConcepts')}</h2>
         <div className="space-y-6">
           <ConceptCard
-            title="Event"
-            description="A data payload you send to our API that needs to be delivered to webhook endpoints."
+            title={t('docsPage.concepts.event')}
+            description={t('docsPage.concepts.eventDesc')}
           />
           <ConceptCard
-            title="Endpoint"
-            description="A URL where webhooks are delivered. Each endpoint has a unique secret for signature verification."
+            title={t('docsPage.concepts.endpoint')}
+            description={t('docsPage.concepts.endpointDesc')}
           />
           <ConceptCard
-            title="Subscription"
-            description="Links an endpoint to specific event types, controlling which events get delivered where."
+            title={t('docsPage.concepts.subscription')}
+            description={t('docsPage.concepts.subscriptionDesc')}
           />
           <ConceptCard
-            title="Delivery"
-            description="A single webhook delivery attempt to an endpoint, with full attempt history and status."
+            title={t('docsPage.concepts.delivery')}
+            description={t('docsPage.concepts.deliveryDesc')}
           />
           <ConceptCard
-            title="Attempt"
-            description="Each retry of a delivery, including HTTP status, error message, and latency."
+            title={t('docsPage.concepts.attempt')}
+            description={t('docsPage.concepts.attemptDesc')}
           />
         </div>
       </div>
 
       <div className="bg-muted/50 rounded-xl p-8 border border-border">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Event Flow</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">{t('docsPage.overview.eventFlow')}</h3>
         <div className="flex items-center justify-between text-sm">
           <div className="text-center">
             <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <Code className="h-8 w-8" />
             </div>
-            <div className="font-medium text-foreground">Your system</div>
+            <div className="font-medium text-foreground">{t('docsPage.overview.yourSystem')}</div>
           </div>
           <ArrowRight className="h-6 w-6 text-muted-foreground/60" />
           <div className="text-center">
             <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <Zap className="h-8 w-8" />
             </div>
-            <div className="font-medium text-foreground">Events API</div>
+            <div className="font-medium text-foreground">{t('docsPage.overview.eventsApi')}</div>
           </div>
           <ArrowRight className="h-6 w-6 text-muted-foreground/60" />
           <div className="text-center">
             <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <RefreshCw className="h-8 w-8" />
             </div>
-            <div className="font-medium text-foreground">Delivery engine</div>
+            <div className="font-medium text-foreground">{t('docsPage.overview.deliveryEngine')}</div>
           </div>
           <ArrowRight className="h-6 w-6 text-muted-foreground/60" />
           <div className="text-center">
             <div className="w-16 h-16 rounded-lg bg-primary text-white flex items-center justify-center mb-2 mx-auto">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <div className="font-medium text-foreground">Customer endpoint</div>
+            <div className="font-medium text-foreground">{t('docsPage.overview.customerEndpoint')}</div>
           </div>
         </div>
       </div>
@@ -209,22 +213,23 @@ function ConceptCard({ title, description }: { title: string; description: strin
 }
 
 function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Authentication</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.auth.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Two authentication methods: JWT for dashboard access and API keys for event ingestion.
+          {t('docsPage.auth.subtitle')}
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">JWT Authentication (Dashboard API)</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.auth.jwtTitle')}</h2>
         <p className="text-muted-foreground mb-6">
-          Use JWT tokens to access dashboard endpoints like projects, endpoints, and deliveries.
+          {t('docsPage.auth.jwtDesc')}
         </p>
         
-        <h3 className="text-lg font-semibold text-foreground mb-3">Register</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.auth.register')}</h3>
         <div className="mb-6">
           <HTTPMethod method="POST" path="/api/v1/auth/register" />
           <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
@@ -238,7 +243,7 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           </ResponseBlock>
         </div>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3">Login</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.auth.login')}</h3>
         <div className="mb-6">
           <HTTPMethod method="POST" path="/api/v1/auth/login" />
           <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
@@ -252,20 +257,20 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           </ResponseBlock>
         </div>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3">Using JWT Token</h3>
-        <p className="text-muted-foreground mb-4">Include the access token in the Authorization header for all authenticated requests:</p>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.auth.usingJwt')}</h3>
+        <p className="text-muted-foreground mb-4">{t('docsPage.auth.usingJwtDesc')}</p>
         <CodeBlock language="curl" setLanguage={() => {}}>
 {`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}
         </CodeBlock>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">API Key Authentication (Events API)</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.auth.apiKeyTitle')}</h2>
         <p className="text-muted-foreground mb-6">
-          Use API keys to send events to the platform. Each project has its own API keys.
+          {t('docsPage.auth.apiKeyDesc')}
         </p>
         
-        <h3 className="text-lg font-semibold text-foreground mb-3">Header Format</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.auth.headerFormat')}</h3>
         <CodeBlock language="curl" setLanguage={() => {}}>
 {`X-API-Key: wh_live_1234567890abcdef`}
         </CodeBlock>
@@ -274,9 +279,9 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           <div className="flex items-start space-x-3">
             <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">Security Note</div>
+              <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">{t('docsPage.auth.securityNote')}</div>
               <div className="text-amber-700 dark:text-amber-400 text-sm mt-1">
-                Never expose API keys in client-side code or public repositories. Store them securely in environment variables.
+                {t('docsPage.auth.securityNoteDesc')}
               </div>
             </div>
           </div>
@@ -287,25 +292,26 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
 }
 
 function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Getting Started</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.gettingStarted.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Complete workflow from registration to sending your first webhook.
+          {t('docsPage.gettingStarted.subtitle')}
         </p>
       </div>
 
-      <StepSection number="1" title="Register and Login">
-        <p className="text-muted-foreground mb-4">Create an account and get your JWT token.</p>
+      <StepSection number="1" title={t('docsPage.gettingStarted.step1')}>
+        <p className="text-muted-foreground mb-4">{t('docsPage.gettingStarted.step1Desc')}</p>
         <HTTPMethod method="POST" path="/api/v1/auth/register" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('register', activeLanguage)}
         </CodeBlock>
       </StepSection>
 
-      <StepSection number="2" title="Create a Project">
-        <p className="text-muted-foreground mb-4">Projects organize your webhooks, endpoints, and events.</p>
+      <StepSection number="2" title={t('docsPage.gettingStarted.step2')}>
+        <p className="text-muted-foreground mb-4">{t('docsPage.gettingStarted.step2Desc')}</p>
         <HTTPMethod method="POST" path="/api/v1/projects" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createProject', activeLanguage)}
@@ -320,8 +326,8 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
         </ResponseBlock>
       </StepSection>
 
-      <StepSection number="3" title="Create an API Key">
-        <p className="text-muted-foreground mb-4">Generate an API key to send events.</p>
+      <StepSection number="3" title={t('docsPage.gettingStarted.step3')}>
+        <p className="text-muted-foreground mb-4">{t('docsPage.gettingStarted.step3Desc')}</p>
         <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/api-keys" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createApiKey', activeLanguage)}
@@ -336,8 +342,8 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
         </ResponseBlock>
       </StepSection>
 
-      <StepSection number="4" title="Create an Endpoint">
-        <p className="text-muted-foreground mb-4">Add a URL where you want to receive webhooks.</p>
+      <StepSection number="4" title={t('docsPage.gettingStarted.step4')}>
+        <p className="text-muted-foreground mb-4">{t('docsPage.gettingStarted.step4Desc')}</p>
         <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/endpoints" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createEndpoint', activeLanguage)}
@@ -353,16 +359,16 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
         </ResponseBlock>
       </StepSection>
 
-      <StepSection number="5" title="Create a Subscription">
-        <p className="text-muted-foreground mb-4">Subscribe the endpoint to specific event types.</p>
+      <StepSection number="5" title={t('docsPage.gettingStarted.step5')}>
+        <p className="text-muted-foreground mb-4">{t('docsPage.gettingStarted.step5Desc')}</p>
         <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/subscriptions" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('createSubscription', activeLanguage)}
         </CodeBlock>
       </StepSection>
 
-      <StepSection number="6" title="Send an Event">
-        <p className="text-muted-foreground mb-4">Send your first event using the API key.</p>
+      <StepSection number="6" title={t('docsPage.gettingStarted.step6')}>
+        <p className="text-muted-foreground mb-4">{t('docsPage.gettingStarted.step6Desc')}</p>
         <HTTPMethod method="POST" path="/api/v1/events" />
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('sendEvent', activeLanguage)}
@@ -381,41 +387,42 @@ function GettingStarted({ activeLanguage, setActiveLanguage }: LanguageTabsProps
 }
 
 function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Events API</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.eventsApi.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Send events that will be delivered to subscribed webhook endpoints.
+          {t('docsPage.eventsApi.subtitle')}
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Send Event</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{t('docsPage.eventsApi.sendEvent')}</h2>
         <HTTPMethod method="POST" path="/api/v1/events" />
         <p className="text-muted-foreground mb-6">
-          Send an event to be delivered to all subscribed endpoints. Events are processed asynchronously and queued for delivery.
+          {t('docsPage.eventsApi.sendEventDesc')}
         </p>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3">Headers</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.eventsApi.headers')}</h3>
         <ParamTable params={[
           { name: 'X-API-Key', type: 'string', required: true, description: 'API key for authentication' },
           { name: 'Content-Type', type: 'string', required: true, description: 'application/json' },
           { name: 'Idempotency-Key', type: 'string', required: false, description: 'Unique key to prevent duplicate processing' },
         ]} />
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Request Body</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.eventsApi.requestBody')}</h3>
         <ParamTable params={[
           { name: 'type', type: 'string', required: true, description: 'Event type (e.g., "order.completed")' },
           { name: 'data', type: 'object', required: true, description: 'Event payload data' },
         ]} />
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Example</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.eventsApi.example')}</h3>
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('sendEvent', activeLanguage)}
         </CodeBlock>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Response</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.eventsApi.response')}</h3>
         <ResponseBlock>
 {`{
   "eventId": "123e4567-e89b-12d3-a456-426614174000",
@@ -425,7 +432,7 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
 }`}
         </ResponseBlock>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Response Fields</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.eventsApi.responseFields')}</h3>
         <ParamTable params={[
           { name: 'eventId', type: 'uuid', required: true, description: 'Unique event identifier' },
           { name: 'type', type: 'string', required: true, description: 'Event type echoed back' },
@@ -437,9 +444,9 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
           <div className="flex items-start space-x-3">
             <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Idempotency</div>
+              <div className="font-semibold text-blue-900 dark:text-blue-300 text-sm">{t('docsPage.eventsApi.idempotency')}</div>
               <div className="text-blue-700 dark:text-blue-400 text-sm mt-1">
-                Use the Idempotency-Key header to safely retry requests. If the same key is sent within 24 hours, the original response will be returned without creating duplicate events.
+                {t('docsPage.eventsApi.idempotencyDesc')}
               </div>
             </div>
           </div>
@@ -450,20 +457,21 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
 }
 
 function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Endpoints API</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.endpointsApi.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Manage webhook endpoints where events are delivered.
+          {t('docsPage.endpointsApi.subtitle')}
         </p>
       </div>
 
       <APIEndpoint
         method="POST"
         path="/api/v1/projects/{projectId}/endpoints"
-        title="Create Endpoint"
-        description="Add a new webhook endpoint to receive events."
+        title={t('docsPage.endpointsApi.create')}
+        description={t('docsPage.endpointsApi.createDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="createEndpoint"
@@ -481,8 +489,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       <APIEndpoint
         method="GET"
         path="/api/v1/projects/{projectId}/endpoints"
-        title="List Endpoints"
-        description="Get all endpoints for a project."
+        title={t('docsPage.endpointsApi.list')}
+        description={t('docsPage.endpointsApi.listDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="listEndpoints"
@@ -499,8 +507,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       <APIEndpoint
         method="GET"
         path="/api/v1/projects/{projectId}/endpoints/{id}"
-        title="Get Endpoint"
-        description="Returns endpoint details by ID."
+        title={t('docsPage.endpointsApi.get')}
+        description={t('docsPage.endpointsApi.getDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="getEndpoint"
@@ -517,8 +525,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       <APIEndpoint
         method="PUT"
         path="/api/v1/projects/{projectId}/endpoints/{id}"
-        title="Update Endpoint"
-        description="Updates endpoint configuration."
+        title={t('docsPage.endpointsApi.update')}
+        description={t('docsPage.endpointsApi.updateDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="updateEndpoint"
@@ -532,8 +540,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       <APIEndpoint
         method="DELETE"
         path="/api/v1/projects/{projectId}/endpoints/{id}"
-        title="Delete Endpoint"
-        description="Deletes an endpoint and all its subscriptions."
+        title={t('docsPage.endpointsApi.delete')}
+        description={t('docsPage.endpointsApi.deleteDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="deleteEndpoint"
@@ -543,8 +551,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       <APIEndpoint
         method="POST"
         path="/api/v1/projects/{projectId}/endpoints/{id}/rotate-secret"
-        title="Rotate Secret"
-        description="Generate a new webhook secret for an endpoint."
+        title={t('docsPage.endpointsApi.rotateSecret')}
+        description={t('docsPage.endpointsApi.rotateSecretDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="rotateSecret"
@@ -557,8 +565,8 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
       <APIEndpoint
         method="POST"
         path="/api/v1/projects/{projectId}/endpoints/{id}/test"
-        title="Test Endpoint"
-        description="Sends a test webhook to verify endpoint connectivity."
+        title={t('docsPage.endpointsApi.test')}
+        description={t('docsPage.endpointsApi.testDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="testEndpoint"
@@ -574,20 +582,21 @@ function EndpointsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) 
 }
 
 function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Subscriptions API</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.subscriptionsApi.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Route specific event types to endpoints.
+          {t('docsPage.subscriptionsApi.subtitle')}
         </p>
       </div>
 
       <APIEndpoint
         method="POST"
         path="/api/v1/projects/{projectId}/subscriptions"
-        title="Create Subscription"
-        description="Subscribe an endpoint to event types."
+        title={t('docsPage.subscriptionsApi.create')}
+        description={t('docsPage.subscriptionsApi.createDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="createSubscription"
@@ -605,8 +614,8 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
       <APIEndpoint
         method="GET"
         path="/api/v1/projects/{projectId}/subscriptions"
-        title="List Subscriptions"
-        description="Get all subscriptions for a project."
+        title={t('docsPage.subscriptionsApi.list')}
+        description={t('docsPage.subscriptionsApi.listDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="listSubscriptions"
@@ -623,8 +632,8 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
       <APIEndpoint
         method="GET"
         path="/api/v1/projects/{projectId}/subscriptions/{id}"
-        title="Get Subscription"
-        description="Returns subscription details."
+        title={t('docsPage.subscriptionsApi.get')}
+        description={t('docsPage.subscriptionsApi.getDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="getSubscription"
@@ -642,8 +651,8 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
       <APIEndpoint
         method="PUT"
         path="/api/v1/projects/{projectId}/subscriptions/{id}"
-        title="Update Subscription"
-        description="Updates subscription configuration."
+        title={t('docsPage.subscriptionsApi.update')}
+        description={t('docsPage.subscriptionsApi.updateDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="updateSubscription"
@@ -657,8 +666,8 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
       <APIEndpoint
         method="DELETE"
         path="/api/v1/projects/{projectId}/subscriptions/{id}"
-        title="Delete Subscription"
-        description="Removes a subscription."
+        title={t('docsPage.subscriptionsApi.delete')}
+        description={t('docsPage.subscriptionsApi.deleteDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="deleteSubscription"
@@ -669,20 +678,21 @@ function SubscriptionsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsPro
 }
 
 function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Deliveries API</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.deliveriesApi.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Monitor and manage webhook deliveries.
+          {t('docsPage.deliveriesApi.subtitle')}
         </p>
       </div>
 
       <APIEndpoint
         method="GET"
         path="/api/v1/deliveries/projects/{projectId}"
-        title="List Deliveries"
-        description="Get all deliveries for a project with filters."
+        title={t('docsPage.deliveriesApi.list')}
+        description={t('docsPage.deliveriesApi.listDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="listDeliveries"
@@ -705,7 +715,7 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       />
 
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-3">Query Parameters</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.deliveriesApi.queryParams')}</h3>
         <ParamTable params={[
           { name: 'status', type: 'string', required: false, description: 'Filter by status: PENDING, PROCESSING, SUCCESS, FAILED, DLQ' },
           { name: 'endpointId', type: 'uuid', required: false, description: 'Filter by endpoint' },
@@ -719,8 +729,8 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       <APIEndpoint
         method="GET"
         path="/api/v1/deliveries/{id}"
-        title="Get Delivery"
-        description="Returns delivery details by ID."
+        title={t('docsPage.deliveriesApi.get')}
+        description={t('docsPage.deliveriesApi.getDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="getDelivery"
@@ -740,8 +750,8 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       <APIEndpoint
         method="GET"
         path="/api/v1/deliveries/{id}/attempts"
-        title="Get Delivery Attempts"
-        description="View all retry attempts for a delivery."
+        title={t('docsPage.deliveriesApi.getAttempts')}
+        description={t('docsPage.deliveriesApi.getAttemptsDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="getAttempts"
@@ -761,8 +771,8 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       <APIEndpoint
         method="POST"
         path="/api/v1/deliveries/{id}/replay"
-        title="Replay Delivery"
-        description="Manually retry a failed delivery."
+        title={t('docsPage.deliveriesApi.replay')}
+        description={t('docsPage.deliveriesApi.replayDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="replayDelivery"
@@ -772,8 +782,8 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
       <APIEndpoint
         method="POST"
         path="/api/v1/deliveries/bulk-replay"
-        title="Bulk Replay"
-        description="Re-send multiple failed deliveries at once. Filter by status, endpoint, or provide specific delivery IDs."
+        title={t('docsPage.deliveriesApi.bulkReplay')}
+        description={t('docsPage.deliveriesApi.bulkReplayDesc')}
         activeLanguage={activeLanguage}
         setActiveLanguage={setActiveLanguage}
         example="bulkReplay"
@@ -789,22 +799,23 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
 }
 
 function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Webhook Security</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.security.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          Verify webhook authenticity using HMAC signatures.
+          {t('docsPage.security.subtitle')}
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Signature Verification</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.security.sigVerification')}</h2>
         <p className="text-muted-foreground mb-6">
-          Every webhook includes an X-Signature header with an HMAC-SHA256 signature.
+          {t('docsPage.security.sigVerificationDesc')}
         </p>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3">Headers</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.security.headers')}</h3>
         <ParamTable params={[
           { name: 'X-Signature', type: 'string', required: true, description: 'Format: t=timestamp,v1=signature' },
           { name: 'X-Event-Id', type: 'uuid', required: true, description: 'Event identifier' },
@@ -812,20 +823,20 @@ function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProp
           { name: 'X-Timestamp', type: 'integer', required: true, description: 'Unix timestamp in milliseconds' },
         ]} />
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Verification Examples</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.security.verificationExamples')}</h3>
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('verifySignature', activeLanguage)}
         </CodeBlock>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Endpoint Verification</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.security.endpointVerification')}</h2>
         <p className="text-muted-foreground mb-6">
-          When you register an endpoint, we send a verification challenge to confirm you own the URL.
+          {t('docsPage.security.endpointVerificationDesc')}
         </p>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3">Challenge Request</h3>
-        <p className="text-muted-foreground mb-4">We POST a JSON payload with type <code className="bg-muted px-2 py-1 rounded">webhook.verification</code>:</p>
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.security.challengeRequest')}</h3>
+        <p className="text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('docsPage.security.challengeRequestDesc') }} />
         <ResponseBlock>
 {`POST https://your-endpoint.com/webhooks
 Content-Type: application/json
@@ -837,8 +848,8 @@ Content-Type: application/json
 }`}
         </ResponseBlock>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Expected Response</h3>
-        <p className="text-muted-foreground mb-4">Return the <code className="bg-muted px-2 py-1 rounded">challenge</code> value in your response:</p>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.security.expectedResponse')}</h3>
+        <p className="text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('docsPage.security.expectedResponseDesc') }} />
         <ResponseBlock>
 {`HTTP/1.1 200 OK
 Content-Type: application/json
@@ -848,7 +859,7 @@ Content-Type: application/json
 }`}
         </ResponseBlock>
 
-        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">Implementation Examples</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.security.implementationExamples')}</h3>
         <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
           {getCodeExample('endpointVerification', activeLanguage)}
         </CodeBlock>
@@ -858,19 +869,20 @@ Content-Type: application/json
 }
 
 function Errors() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-12">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">Errors & Rate Limits</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.errors.title')}</h1>
         <p className="text-xl text-muted-foreground">
-          HTTP status codes, error responses, and rate limiting.
+          {t('docsPage.errors.subtitle')}
         </p>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Rate Limiting</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{t('docsPage.errors.rateLimiting')}</h2>
         <p className="text-muted-foreground mb-4">
-          The Events API is rate limited to protect the platform. Rate limit information is included in response headers.
+          {t('docsPage.errors.rateLimitingDesc')}
         </p>
         <ParamTable params={[
           { name: 'X-RateLimit-Limit', type: 'integer', required: true, description: 'Maximum requests per second' },
@@ -879,15 +891,15 @@ function Errors() {
           { name: 'Retry-After', type: 'integer', required: true, description: 'Seconds to wait before retrying (only on 429)' },
         ]} />
         <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-          <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">Rate Limit Exceeded (429)</div>
+          <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">{t('docsPage.errors.rateLimitExceeded')}</div>
           <div className="text-amber-700 dark:text-amber-400 text-sm mt-1">
-            When rate limited, wait until X-RateLimit-Reset timestamp before retrying.
+            {t('docsPage.errors.rateLimitExceededDesc')}
           </div>
         </div>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Error Response Format</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{t('docsPage.errors.errorFormat')}</h2>
         <ResponseBlock>
 {`{
   "error": "rate_limit_exceeded",
@@ -898,9 +910,9 @@ function Errors() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Validation Errors</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{t('docsPage.errors.validationErrors')}</h2>
         <p className="text-muted-foreground mb-4">
-          When request validation fails, you'll receive detailed field-level errors.
+          {t('docsPage.errors.validationErrorsDesc')}
         </p>
         <ResponseBlock>
 {`{
@@ -916,7 +928,7 @@ function Errors() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">HTTP Status Codes</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">{t('docsPage.errors.httpStatusCodes')}</h2>
         <div className="space-y-4">
           <ErrorCode code="200" title="OK" description="Request succeeded" />
           <ErrorCode code="201" title="Created" description="Resource created successfully" />
@@ -1681,6 +1693,7 @@ function SdkCodeBlock({ label, children, copyText }: { label: string; children: 
 }
 
 function SDKs() {
+  const { t } = useTranslation();
   const [activeLang, setActiveLang] = useState<'node' | 'python' | 'php' | 'curl'>('node');
   const [activeSection, setActiveSDKSection] = useState('quickstart');
 
@@ -1691,13 +1704,13 @@ function SDKs() {
   ];
 
   const sections = [
-    { id: 'quickstart', label: 'Quick Start' },
-    { id: 'events', label: 'Events' },
-    { id: 'endpoints', label: 'Endpoints' },
-    { id: 'subscriptions', label: 'Subscriptions' },
-    { id: 'deliveries', label: 'Deliveries' },
-    { id: 'verify', label: 'Signature Verification' },
-    { id: 'errors', label: 'Error Handling' },
+    { id: 'quickstart', label: t('docsPage.sdks.quickStart') },
+    { id: 'events', label: t('docsPage.sdks.events') },
+    { id: 'endpoints', label: t('docsPage.sdks.endpoints') },
+    { id: 'subscriptions', label: t('docsPage.sdks.subscriptions') },
+    { id: 'deliveries', label: t('docsPage.sdks.deliveries') },
+    { id: 'verify', label: t('docsPage.sdks.sigVerification') },
+    { id: 'errors', label: t('docsPage.sdks.errorHandling') },
   ];
 
   const code: Record<string, Record<string, { code: string; label: string }>> = {
@@ -2228,9 +2241,9 @@ fi` },
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-4xl font-bold text-foreground mb-4">SDKs</h1>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.sdks.title')}</h1>
         <p className="text-lg text-muted-foreground">
-          Official client libraries for Node.js, Python, and PHP — with full TypeScript / type-hint support.
+          {t('docsPage.sdks.subtitle')}
         </p>
       </div>
 
@@ -2254,7 +2267,7 @@ fi` },
 
       {/* Installation */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground mb-4">Installation</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.sdks.installation')}</h2>
         <div className="space-y-2">
           {sdkMeta.map(sdk => (
             <SdkCodeBlock key={sdk.id} label="terminal" copyText={sdk.install}>
