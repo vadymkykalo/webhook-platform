@@ -9,7 +9,6 @@ import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
-import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
@@ -20,7 +19,6 @@ import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.util.CryptoUtils;
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -94,7 +92,7 @@ public class IngressService {
 
         // Per-source rate limiting
         if (source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0) {
-            if (!rateLimiterService.tryAcquire(source.getId(), source.getRateLimitPerSecond())) {
+            if (!rateLimiterService.tryAcquireForSource(source.getId(), source.getRateLimitPerSecond())) {
                 throw new RateLimitExceededException("Rate limit exceeded for source " + source.getId());
             }
         }
