@@ -28,6 +28,7 @@ public class IncomingSourceResponse {
     private String hmacHeaderName;
     private String hmacSignaturePrefix;
     private boolean hmacSecretConfigured;
+    private Integer rateLimitPerSecond;
     private Instant createdAt;
     private Instant updatedAt;
 }

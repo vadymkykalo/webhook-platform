@@ -38,6 +38,8 @@ public class IngressController {
             @ApiResponse(responseCode = "410", description = "Source is disabled",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
             @ApiResponse(responseCode = "413", description = "Payload too large",
+                    content = @Content(schema = @Schema(implementation = IngressResponse.class))),
+            @ApiResponse(responseCode = "429", description = "Rate limit exceeded",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class)))
     })
     @PostMapping("/{token}")
@@ -69,6 +71,13 @@ public class IngressController {
                     .body(IngressResponse.builder()
                             .error("payload_too_large")
                             .message(e.getMessage())
+                            .build());
+        } catch (IngressService.RateLimitExceededException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("Retry-After", "1")
+                    .body(IngressResponse.builder()
+                            .error("rate_limit_exceeded")
+                            .message("Too many requests. Please retry later.")
                             .build());
         }
     }

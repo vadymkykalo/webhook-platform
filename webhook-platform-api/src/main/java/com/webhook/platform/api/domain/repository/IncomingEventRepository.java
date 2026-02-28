@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,4 +25,16 @@ public interface IncomingEventRepository extends JpaRepository<IncomingEvent, UU
 
     @Query("SELECT e FROM IncomingEvent e WHERE e.incomingSourceId IN :sourceIds ORDER BY e.receivedAt DESC")
     Page<IncomingEvent> findBySourceIds(@Param("sourceIds") List<UUID> sourceIds, Pageable pageable);
+
+    @Query("SELECT e FROM IncomingEvent e WHERE e.incomingSourceId = :sourceId " +
+            "AND (:from IS NULL OR e.receivedAt >= :from) " +
+            "AND (:to IS NULL OR e.receivedAt < :to) " +
+            "AND (:verified IS NULL OR e.verified = :verified) " +
+            "ORDER BY e.receivedAt ASC")
+    List<IncomingEvent> findForBulkReplay(
+            @Param("sourceId") UUID sourceId,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            @Param("verified") Boolean verified,
+            Pageable pageable);
 }

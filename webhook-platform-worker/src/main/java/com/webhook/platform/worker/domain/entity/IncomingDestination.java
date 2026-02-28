@@ -50,6 +50,9 @@ public class IncomingDestination {
     @Column(name = "retry_delays", nullable = false, columnDefinition = "TEXT")
     private String retryDelays;
 
+    @Column(name = "payload_transform", columnDefinition = "TEXT")
+    private String payloadTransform;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

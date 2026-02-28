@@ -1,6 +1,8 @@
 package com.webhook.platform.worker.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.PathNotFoundException;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
@@ -133,8 +135,8 @@ public class IncomingForwardService {
         log.info("Forwarding incoming event {} to destination {} (attempt {}/{})",
                 eventId, destinationId, attemptNumber, maxAttempts);
 
-        // Build request body — forward the original body as-is
-        String body = event.getBodyRaw();
+        // Build request body — apply payload transformation if configured
+        String body = transformPayload(event.getBodyRaw(), destination.getPayloadTransform());
         String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
 
         try {
@@ -361,6 +363,33 @@ public class IncomingForwardService {
             return objectMapper.writeValueAsString(headerMap);
         } catch (Exception e) {
             return "{}";
+        }
+    }
+
+    /**
+     * Applies JSONPath transformation to the payload if configured.
+     * Supports expressions like:
+     *   "$.data"          — extract a subtree
+     *   "$.events[0]"     — extract first element
+     *   "$.payload.body"  — nested extraction
+     * Returns original body if no transform is configured or on error.
+     */
+    private String transformPayload(String body, String payloadTransform) {
+        if (payloadTransform == null || payloadTransform.isBlank() || body == null || body.isBlank()) {
+            return body;
+        }
+        try {
+            Object result = JsonPath.read(body, payloadTransform);
+            if (result instanceof String) {
+                return (String) result;
+            }
+            return objectMapper.writeValueAsString(result);
+        } catch (PathNotFoundException e) {
+            log.warn("JSONPath '{}' not found in payload, forwarding as-is: {}", payloadTransform, e.getMessage());
+            return body;
+        } catch (Exception e) {
+            log.warn("Payload transform failed for expression '{}', forwarding as-is: {}", payloadTransform, e.getMessage());
+            return body;
         }
     }
 

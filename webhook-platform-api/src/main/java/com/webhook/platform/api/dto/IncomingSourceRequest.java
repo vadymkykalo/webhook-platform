@@ -48,4 +48,7 @@ public class IncomingSourceRequest {
     @Schema(description = "Prefix before the signature value", example = "sha256=")
     @Size(max = 50, message = "HMAC signature prefix must be at most 50 characters")
     private String hmacSignaturePrefix;
+
+    @Schema(description = "Rate limit per second for ingress endpoint (null = unlimited)", example = "100")
+    private Integer rateLimitPerSecond;
 }

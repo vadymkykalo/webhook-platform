@@ -24,6 +24,7 @@ public class IncomingDestinationResponse {
     private int maxAttempts;
     private int timeoutSeconds;
     private String retryDelays;
+    private String payloadTransform;
     private Instant createdAt;
     private Instant updatedAt;
 }

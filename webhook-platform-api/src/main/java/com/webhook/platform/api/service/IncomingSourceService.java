@@ -98,6 +98,7 @@ public class IncomingSourceService {
         if (request.getHmacSignaturePrefix() != null) {
             source.setHmacSignaturePrefix(request.getHmacSignaturePrefix());
         }
+        source.setRateLimitPerSecond(request.getRateLimitPerSecond());
 
         source = sourceRepository.saveAndFlush(source);
         log.info("Created incoming source: id={}, projectId={}, slug={}", source.getId(), projectId, slug);
@@ -156,6 +157,9 @@ public class IncomingSourceService {
         if (request.getHmacSignaturePrefix() != null) {
             source.setHmacSignaturePrefix(request.getHmacSignaturePrefix());
         }
+        if (request.getRateLimitPerSecond() != null) {
+            source.setRateLimitPerSecond(request.getRateLimitPerSecond());
+        }
 
         source = sourceRepository.saveAndFlush(source);
         log.info("Updated incoming source: id={}", id);
@@ -188,6 +192,7 @@ public class IncomingSourceService {
                 .hmacHeaderName(source.getHmacHeaderName())
                 .hmacSignaturePrefix(source.getHmacSignaturePrefix())
                 .hmacSecretConfigured(source.getHmacSecretEncrypted() != null)
+                .rateLimitPerSecond(source.getRateLimitPerSecond())
                 .createdAt(source.getCreatedAt())
                 .updatedAt(source.getUpdatedAt())
                 .build();

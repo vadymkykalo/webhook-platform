@@ -58,6 +58,9 @@ public class IncomingDestination {
     @Builder.Default
     private String retryDelays = "60,300,900,3600,21600";
 
+    @Column(name = "payload_transform", columnDefinition = "TEXT")
+    private String payloadTransform;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

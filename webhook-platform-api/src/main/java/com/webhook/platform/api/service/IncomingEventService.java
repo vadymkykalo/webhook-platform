@@ -15,6 +15,8 @@ import com.webhook.platform.api.domain.repository.IncomingForwardAttemptReposito
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.dto.IncomingBulkReplayRequest;
+import com.webhook.platform.api.dto.IncomingBulkReplayResponse;
 import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
@@ -23,6 +25,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -169,6 +172,102 @@ public class IncomingEventService {
 
         log.info("Replayed incoming event {} to {} destinations", eventId, replayed);
         return replayed;
+    }
+
+    @Transactional
+    public IncomingBulkReplayResponse bulkReplay(UUID projectId, IncomingBulkReplayRequest request, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
+
+        // Validate source belongs to project
+        IncomingSource source = sourceRepository.findById(request.getSourceId())
+                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
+        if (!source.getProjectId().equals(projectId)) {
+            throw new ForbiddenException("Source does not belong to this project");
+        }
+
+        List<IncomingDestination> destinations = destinationRepository
+                .findByIncomingSourceIdAndEnabledTrue(request.getSourceId());
+        if (destinations.isEmpty()) {
+            throw new IllegalStateException("No enabled destinations for this source");
+        }
+
+        int maxEvents = request.getMaxEvents() != null ? Math.min(request.getMaxEvents(), 5000) : 1000;
+
+        // Resolve events to replay
+        List<IncomingEvent> events;
+        if (request.getEventIds() != null && !request.getEventIds().isEmpty()) {
+            events = eventRepository.findAllById(request.getEventIds());
+            // Filter to only events belonging to this source
+            events = events.stream()
+                    .filter(e -> e.getIncomingSourceId().equals(request.getSourceId()))
+                    .limit(maxEvents)
+                    .toList();
+        } else {
+            events = eventRepository.findForBulkReplay(
+                    request.getSourceId(),
+                    request.getFrom(),
+                    request.getTo(),
+                    request.getVerified(),
+                    PageRequest.of(0, maxEvents));
+        }
+
+        if (events.isEmpty()) {
+            return IncomingBulkReplayResponse.builder()
+                    .status("bulk_replayed")
+                    .sourceId(request.getSourceId())
+                    .eventsReplayed(0)
+                    .totalForwardAttempts(0)
+                    .build();
+        }
+
+        int totalAttempts = 0;
+        for (IncomingEvent event : events) {
+            for (IncomingDestination destination : destinations) {
+                IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
+                        .incomingEventId(event.getId())
+                        .destinationId(destination.getId())
+                        .attemptNumber(1)
+                        .status(ForwardAttemptStatus.PENDING)
+                        .build();
+                forwardAttemptRepository.save(attempt);
+
+                try {
+                    IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
+                            .incomingEventId(event.getId())
+                            .destinationId(destination.getId())
+                            .incomingSourceId(source.getId())
+                            .attemptCount(0)
+                            .replay(true)
+                            .build();
+
+                    OutboxMessage outboxMessage = OutboxMessage.builder()
+                            .aggregateType("IncomingForward")
+                            .aggregateId(event.getId())
+                            .eventType("IncomingForwardBulkReplay")
+                            .payload(objectMapper.writeValueAsString(forwardMessage))
+                            .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
+                            .kafkaKey(destination.getId().toString())
+                            .status(OutboxStatus.PENDING)
+                            .retryCount(0)
+                            .build();
+                    outboxMessageRepository.save(outboxMessage);
+                    totalAttempts++;
+                } catch (Exception e) {
+                    log.error("Failed to create bulk replay outbox: eventId={}, destId={}",
+                            event.getId(), destination.getId(), e);
+                }
+            }
+        }
+
+        log.info("Bulk replayed {} events to {} destinations ({} total attempts) for source {}",
+                events.size(), destinations.size(), totalAttempts, request.getSourceId());
+
+        return IncomingBulkReplayResponse.builder()
+                .status("bulk_replayed")
+                .sourceId(request.getSourceId())
+                .eventsReplayed(events.size())
+                .totalForwardAttempts(totalAttempts)
+                .build();
     }
 
     private IncomingEventResponse mapToResponse(IncomingEvent event) {

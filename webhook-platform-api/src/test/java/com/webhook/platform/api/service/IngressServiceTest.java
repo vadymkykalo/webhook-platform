@@ -16,6 +16,7 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -49,8 +50,10 @@ class IngressServiceTest {
     @Mock private IncomingForwardAttemptRepository forwardAttemptRepository;
     @Mock private OutboxMessageRepository outboxMessageRepository;
     @Mock private HttpServletRequest httpRequest;
+    @Mock private RedisRateLimiterService rateLimiterService;
 
     private IngressService service;
+    private final WebhookVerifierFactory verifierFactory = new WebhookVerifierFactory();
     private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String encryptionKey = "test_encryption_key_32_chars_pad";
@@ -65,7 +68,8 @@ class IngressServiceTest {
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
                 forwardAttemptRepository, outboxMessageRepository,
-                objectMapper, meterRegistry, encryptionKey, encryptionSalt, 524288
+                objectMapper, meterRegistry, verifierFactory, rateLimiterService,
+                encryptionKey, encryptionSalt, 524288
         );
     }
 
