@@ -242,6 +242,47 @@ function LogoCloud() {
   );
 }
 
+function FlowConnector({ fromCount, toCount }: { fromCount: number; toCount: number }) {
+  const getY = (count: number): number[] => {
+    if (count === 1) return [50];
+    if (count === 2) return [28, 72];
+    return [18, 50, 82];
+  };
+
+  const fromY = getY(fromCount);
+  const toY = getY(toCount);
+  const paths: string[] = [];
+
+  if (fromCount === 1 && toCount === 1) {
+    paths.push('M 0,50 L 200,50');
+  } else if (fromCount === 1) {
+    toY.forEach(ty => {
+      paths.push(`M 0,50 C 80,50 120,${ty} 200,${ty}`);
+    });
+  } else {
+    fromY.forEach(fy => {
+      paths.push(`M 0,${fy} C 80,${fy} 120,50 200,50`);
+    });
+  }
+
+  return (
+    <svg viewBox="0 0 200 100" preserveAspectRatio="none" className="w-full h-full" fill="none">
+      {paths.map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          stroke="hsl(var(--primary))"
+          strokeOpacity="0.25"
+          strokeWidth="2"
+          strokeDasharray="8 5"
+          vectorEffect="non-scaling-stroke"
+          className="flow-svg-path"
+        />
+      ))}
+    </svg>
+  );
+}
+
 function FlowDiagram() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'send' | 'receive'>('send');
@@ -262,7 +303,6 @@ function FlowDiagram() {
 
   const sources = activeTab === 'send' ? sendSources : receiveSources;
   const destinations = activeTab === 'send' ? sendDestinations : receiveDestinations;
-  const maxRows = Math.max(sources.length, destinations.length);
 
   const badges = [
     { label: t('landing.flowDiagram.retries'), icon: RefreshCw },
@@ -320,36 +360,22 @@ function FlowDiagram() {
           {/* Background dots pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
-          {/* Desktop: Grid layout with proper line connections */}
-          <div
-            className="relative hidden md:grid items-center gap-y-4"
-            style={{ gridTemplateColumns: 'auto 1fr auto 1fr auto' }}
-          >
-            {/* Sources */}
-            {sources.length === 1 ? (
-              <div style={{ gridRow: `1 / ${maxRows + 1}`, gridColumn: 1 }} className="flex items-center justify-end">
-                {renderPill(sources[0], 0)}
-              </div>
-            ) : (
-              sources.map((s, i) => (
-                <div key={`s-${i}`} style={{ gridRow: i + 1, gridColumn: 1 }} className="flex items-center justify-end">
-                  {renderPill(s, i)}
-                </div>
-              ))
-            )}
+          {/* Desktop: SVG bezier curve connections */}
+          <div className="relative hidden md:flex items-stretch min-h-[240px]">
+            {/* Sources column */}
+            <div className="flex flex-col justify-around flex-shrink-0 z-10 py-4">
+              {sources.map((s, i) => renderPill(s, i))}
+            </div>
 
-            {/* Left connector lines — one per row */}
-            {Array.from({ length: maxRows }).map((_, i) => (
-              <div key={`lc-${i}`} style={{ gridRow: i + 1, gridColumn: 2 }} className="flex items-center px-3">
-                <div className="flex-1 flow-line-animate h-[2px]" />
-                <ArrowRight className="h-3.5 w-3.5 text-primary/40 flex-shrink-0 -ml-0.5" />
-              </div>
-            ))}
+            {/* Left SVG connector */}
+            <div className="flex-1 min-w-[90px] self-stretch">
+              <FlowConnector fromCount={sources.length} toCount={1} />
+            </div>
 
-            {/* Center hub — spans all rows */}
-            <div style={{ gridRow: `1 / ${maxRows + 1}`, gridColumn: 3 }} className="flex flex-col items-center gap-3 px-2 z-10">
-              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-4 ring-primary/10">
-                <Webhook className="h-10 w-10 text-white" />
+            {/* Center hub */}
+            <div className="flex flex-col items-center justify-center gap-3 flex-shrink-0 z-10 px-3">
+              <div className="h-[72px] w-[72px] rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-4 ring-primary/10 hub-pulse">
+                <Webhook className="h-9 w-9 text-white" />
               </div>
               <span className="text-sm font-bold tracking-tight">Hookflow</span>
               <div className="flex flex-wrap justify-center gap-1.5 mt-1">
@@ -362,39 +388,28 @@ function FlowDiagram() {
               </div>
             </div>
 
-            {/* Right connector lines — one per row */}
-            {Array.from({ length: maxRows }).map((_, i) => (
-              <div key={`rc-${i}`} style={{ gridRow: i + 1, gridColumn: 4 }} className="flex items-center px-3">
-                <div className="flex-1 flow-line-animate h-[2px]" />
-                <ArrowRight className="h-3.5 w-3.5 text-primary/40 flex-shrink-0 -ml-0.5" />
-              </div>
-            ))}
+            {/* Right SVG connector */}
+            <div className="flex-1 min-w-[90px] self-stretch">
+              <FlowConnector fromCount={1} toCount={destinations.length} />
+            </div>
 
-            {/* Destinations */}
-            {destinations.length === 1 ? (
-              <div style={{ gridRow: `1 / ${maxRows + 1}`, gridColumn: 5 }} className="flex items-center justify-start">
-                {renderPill(destinations[0], 0)}
-              </div>
-            ) : (
-              destinations.map((d, i) => (
-                <div key={`d-${i}`} style={{ gridRow: i + 1, gridColumn: 5 }} className="flex items-center justify-start">
-                  {renderPill(d, i)}
-                </div>
-              ))
-            )}
+            {/* Destinations column */}
+            <div className="flex flex-col justify-around flex-shrink-0 z-10 py-4">
+              {destinations.map((d, i) => renderPill(d, i))}
+            </div>
           </div>
 
           {/* Mobile: simple vertical flow */}
-          <div className="md:hidden flex flex-col items-center gap-4 relative">
+          <div className="md:hidden flex flex-col items-center gap-3 relative">
             {sources.map((s, i) => renderPill(s, i))}
-            <ArrowRight className="h-5 w-5 text-primary/40 rotate-90" />
+            <div className="h-8 w-px border-l-2 border-dashed border-primary/30" />
             <div className="flex flex-col items-center gap-2">
-              <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg">
-                <Webhook className="h-8 w-8 text-white" />
+              <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg">
+                <Webhook className="h-7 w-7 text-white" />
               </div>
-              <span className="text-sm font-bold">Hookflow</span>
+              <span className="text-xs font-bold">Hookflow</span>
             </div>
-            <ArrowRight className="h-5 w-5 text-primary/40 rotate-90" />
+            <div className="h-8 w-px border-l-2 border-dashed border-primary/30" />
             {destinations.map((d, i) => renderPill(d, i))}
           </div>
 
