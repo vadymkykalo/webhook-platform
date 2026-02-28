@@ -133,7 +133,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'members',
-        element: <S><MembersPage /></S>,
+        element: <ProtectedRoute requiredRole="OWNER"><S><MembersPage /></S></ProtectedRoute>,
       },
       {
         path: 'audit-log',
@@ -141,7 +141,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <S><SettingsPage /></S>,
+        element: <ProtectedRoute requiredRole="OWNER"><S><SettingsPage /></S></ProtectedRoute>,
       },
       {
         path: '*',

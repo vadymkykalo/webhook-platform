@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { UserPlus, Trash2, Loader2, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { formatDate } from '../lib/date';
+import PageSkeleton from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { type MembershipRole } from '../api/members.api';
 import { useMembers, useChangeMemberRole, useRemoveMember } from '../api/queries';
 import { useAuth } from '../auth/auth.store';
@@ -75,18 +78,9 @@ export default function MembersPage() {
   };
 
   if (loading) {
-    return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-28 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-32 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="h-[300px] bg-muted animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageSkeleton maxWidth="max-w-7xl">
+      <div className="h-[300px] bg-muted animate-pulse rounded-xl" />
+    </PageSkeleton>;
   }
 
   return (
@@ -106,20 +100,16 @@ export default function MembersPage() {
       </div>
 
       {members.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <Users className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('members.noMembers')}</h3>
-          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            {t('members.noMembersDesc')}
-          </p>
-          {canManageMembers && (
+        <EmptyState
+          icon={Users}
+          title={t('members.noMembers')}
+          description={t('members.noMembersDesc')}
+          action={canManageMembers ? (
             <Button onClick={() => setShowAddModal(true)}>
               <UserPlus className="h-4 w-4" /> {t('members.addMemberLower')}
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <Card className="overflow-hidden animate-fade-in">
           <Table>
@@ -167,7 +157,7 @@ export default function MembersPage() {
                     <Badge variant={getStatusBadgeVariant(member.status)}>{member.status}</Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-muted-foreground">{new Date(member.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[13px] text-muted-foreground">{formatDate(member.createdAt)}</span>
                   </TableCell>
                   {canManageMembers && (
                     <TableCell>

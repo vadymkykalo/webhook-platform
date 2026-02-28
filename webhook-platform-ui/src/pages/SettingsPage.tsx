@@ -4,6 +4,7 @@ import { authApi } from '../api/auth.api';
 import { User, Building2, Loader2, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { formatDate } from '../lib/date';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -225,7 +226,7 @@ export default function SettingsPage() {
                 <Input
                   value={
                     user?.organization?.createdAt
-                      ? new Date(user.organization.createdAt).toLocaleDateString()
+                      ? formatDate(user.organization.createdAt)
                       : ''
                   }
                   disabled

@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { formatRelativeTime, formatDateTime } from '../lib/date';
+import { SkeletonRows } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { deliveriesApi } from '../api/deliveries.api';
 import { projectsApi } from '../api/projects.api';
 import { endpointsApi } from '../api/endpoints.api';
@@ -153,26 +156,6 @@ export default function DeliveriesPage() {
     );
   };
 
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 60) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHour < 24) return `${diffHour}h ago`;
-    if (diffDay < 7) return `${diffDay}d ago`;
-    
-    return date.toLocaleDateString();
-  };
-
-  const formatExactTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
 
   const getEndpointName = (endpointId: string) => {
     const endpoint = endpoints.find(e => e.id === endpointId);
@@ -214,12 +197,7 @@ export default function DeliveriesPage() {
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <Send className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground">{t('deliveries.projectNotFound')}</p>
-        </div>
+        <EmptyState icon={Send} title={t('deliveries.projectNotFound')} />
       </div>
     );
   }
@@ -270,21 +248,9 @@ export default function DeliveriesPage() {
       </Card>
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />
-          ))}
-        </div>
+        <SkeletonRows count={5} />
       ) : filteredDeliveries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <Send className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('deliveries.noDeliveries')}</h3>
-          <p className="text-sm text-muted-foreground text-center max-w-sm">
-            {t('deliveries.noDeliveriesDesc')}
-          </p>
-        </div>
+        <EmptyState icon={Send} title={t('deliveries.noDeliveries')} description={t('deliveries.noDeliveriesDesc')} />
       ) : (
         <div className="animate-fade-in">
           <Card className="overflow-hidden">
@@ -305,7 +271,7 @@ export default function DeliveriesPage() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">{formatRelativeTime(delivery.createdAt)}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatExactTime(delivery.createdAt)}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDateTime(delivery.createdAt)}</span>
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(delivery.status)}</TableCell>

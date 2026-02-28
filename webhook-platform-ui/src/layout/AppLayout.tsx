@@ -7,9 +7,12 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
+import { useProject } from '../api/queries';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
+import { type Role, hasMinRole } from '../auth/ProtectedRoute';
+import { usePermissions } from '../auth/usePermissions';
 import { toast } from 'sonner';
 import { CommandPalette } from '../components/CommandPalette';
 import { getTheme, setTheme } from '../lib/theme';
@@ -20,6 +23,7 @@ interface NavItem {
   path: string;
   icon: React.ElementType;
   badge?: string;
+  requiredRole?: Role;
 }
 
 const mainNav: NavItem[] = [
@@ -28,9 +32,9 @@ const mainNav: NavItem[] = [
 ];
 
 const orgNav: NavItem[] = [
-  { nameKey: 'nav.members', path: '/admin/members', icon: Users },
+  { nameKey: 'nav.members', path: '/admin/members', icon: Users, requiredRole: 'OWNER' },
   { nameKey: 'nav.auditLog', path: '/admin/audit-log', icon: FileText },
-  { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings },
+  { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings, requiredRole: 'OWNER' },
 ];
 
 const getProjectNav = (projectId: string): NavItem[] => [
@@ -86,9 +90,89 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
   );
 }
 
+const BREADCRUMB_SEGMENT_KEYS: Record<string, string> = {
+  dashboard: 'breadcrumb.dashboard',
+  projects: 'breadcrumb.projects',
+  endpoints: 'breadcrumb.endpoints',
+  events: 'breadcrumb.events',
+  deliveries: 'breadcrumb.deliveries',
+  subscriptions: 'breadcrumb.subscriptions',
+  'api-keys': 'breadcrumb.api-keys',
+  analytics: 'breadcrumb.analytics',
+  dlq: 'breadcrumb.dlq',
+  'test-endpoints': 'breadcrumb.test-endpoints',
+  members: 'breadcrumb.members',
+  'audit-log': 'breadcrumb.audit-log',
+  settings: 'breadcrumb.settings',
+};
+
+function Breadcrumb({ projectId }: { projectId: string | undefined }) {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const { data: project } = useProject(projectId);
+
+  const crumbs: { label: string; to?: string }[] = [];
+
+  // Always start with Home
+  const path = location.pathname;
+  if (path === '/admin/dashboard' || path === '/admin') {
+    // On dashboard — no extra crumbs
+    return (
+      <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
+        <span className="text-foreground font-medium">{t('breadcrumb.dashboard')}</span>
+      </div>
+    );
+  }
+
+  // Parse: /admin/{section} or /admin/projects/{id}/{section}
+  const afterAdmin = path.replace(/^\/admin\/?/, '');
+  const parts = afterAdmin.split('/').filter(Boolean);
+
+  if (parts[0] === 'projects' && parts.length === 1) {
+    // /admin/projects
+    crumbs.push({ label: t('breadcrumb.projects') });
+  } else if (parts[0] === 'projects' && parts.length >= 2) {
+    // /admin/projects/:projectId/...
+    crumbs.push({ label: t('breadcrumb.projects'), to: '/admin/projects' });
+    crumbs.push({
+      label: project?.name || '…',
+      to: projectId ? `/admin/projects/${projectId}/endpoints` : undefined,
+    });
+    if (parts[2]) {
+      const segmentKey = BREADCRUMB_SEGMENT_KEYS[parts[2]];
+      crumbs.push({ label: segmentKey ? t(segmentKey) : parts[2] });
+    }
+  } else {
+    // /admin/members, /admin/settings, etc.
+    const segmentKey = BREADCRUMB_SEGMENT_KEYS[parts[0]];
+    crumbs.push({ label: segmentKey ? t(segmentKey) : parts[0] });
+  }
+
+  return (
+    <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground min-w-0">
+      <Link to="/admin/dashboard" className="hover:text-foreground transition-colors flex-shrink-0">
+        {t('nav.home')}
+      </Link>
+      {crumbs.map((crumb, i) => (
+        <span key={i} className="flex items-center gap-1.5 min-w-0">
+          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+          {crumb.to && i < crumbs.length - 1 ? (
+            <Link to={crumb.to} className="hover:text-foreground transition-colors truncate max-w-[140px]">
+              {crumb.label}
+            </Link>
+          ) : (
+            <span className="text-foreground font-medium truncate max-w-[160px]">{crumb.label}</span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function AppLayout() {
   const { t } = useTranslation();
   const { user, logout, updateUser } = useAuth();
+  const { role } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -182,7 +266,7 @@ export default function AppLayout() {
         )}
 
         <SidebarSection label={collapsed && !isMobile ? "" : t('nav.organization')}>
-          {orgNav.map((item) => (
+          {orgNav.filter((item) => !item.requiredRole || hasMinRole(role, item.requiredRole)).map((item) => (
             <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
           ))}
         </SidebarSection>
@@ -271,17 +355,7 @@ export default function AppLayout() {
             </Button>
 
             {/* Breadcrumb */}
-            <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Link to="/admin/dashboard" className="hover:text-foreground transition-colors">{t('nav.home')}</Link>
-              {location.pathname !== '/admin/dashboard' && (
-                <>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                  <span className="text-foreground font-medium capitalize">
-                    {location.pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ')}
-                  </span>
-                </>
-              )}
-            </div>
+            <Breadcrumb projectId={projectId} />
 
             <div className="flex-1" />
 

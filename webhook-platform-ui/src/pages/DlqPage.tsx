@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { formatDateTime } from '../lib/date';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { projectsApi } from '../api/projects.api';
 import { dlqApi, DlqItemResponse, DlqStatsResponse } from '../api/dlq.api';
 import { endpointsApi } from '../api/endpoints.api';
@@ -133,31 +136,17 @@ export default function DlqPage() {
 
   if (loading && !project) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-44 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-28 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
-        </div>
+      <PageSkeleton maxWidth="max-w-7xl">
+        <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
         <div className="h-[300px] bg-muted animate-pulse rounded-xl" />
-      </div>
+      </PageSkeleton>
     );
   }
 
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <AlertTriangle className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground">{t('dlq.projectNotFound')}</p>
-        </div>
+        <EmptyState icon={AlertTriangle} title={t('dlq.projectNotFound')} />
       </div>
     );
   }
@@ -225,15 +214,7 @@ export default function DlqPage() {
       </Card>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-success/10 flex items-center justify-center mb-6">
-            <CheckSquare className="h-8 w-8 text-success" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('dlq.noItems')}</h3>
-          <p className="text-sm text-muted-foreground text-center">
-            {t('dlq.noItemsDesc')}
-          </p>
-        </div>
+        <EmptyState icon={CheckSquare} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} />
       ) : (
         <div className="animate-fade-in">
           <Card className="overflow-hidden">
@@ -265,7 +246,7 @@ export default function DlqPage() {
                     <TableCell><span className="font-mono text-[13px] truncate max-w-[180px] block">{item.endpointUrl}</span></TableCell>
                     <TableCell><span className="text-sm font-medium">{item.attemptCount}<span className="text-muted-foreground">/{item.maxAttempts}</span></span></TableCell>
                     <TableCell><span className="text-[13px] text-destructive truncate max-w-[180px] block">{item.lastError || t('dlq.unknownError')}</span></TableCell>
-                    <TableCell><span className="text-[13px] text-muted-foreground">{new Date(item.failedAt).toLocaleString()}</span></TableCell>
+                    <TableCell><span className="text-[13px] text-muted-foreground">{formatDateTime(item.failedAt)}</span></TableCell>
                     {canManageDlq && (
                       <TableCell>
                         <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title={t('dlq.retry')}>

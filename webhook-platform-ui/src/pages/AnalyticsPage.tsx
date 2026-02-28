@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics, queryKeys } from '../api/queries';
+import { formatTime, formatNumber } from '../lib/date';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { useQueryClient } from '@tanstack/react-query';
 
 const CHART_COLORS = {
@@ -34,37 +37,17 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-32 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-40 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-28 bg-muted animate-pulse rounded-xl" />
-          ))}
-        </div>
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="h-80 bg-muted animate-pulse rounded-xl" />
-          <div className="h-80 bg-muted animate-pulse rounded-xl" />
-        </div>
-      </div>
+      <PageSkeleton maxWidth="max-w-7xl">
+        <SkeletonCards count={4} height="h-28" cols="grid-cols-2 lg:grid-cols-4" />
+        <SkeletonCards count={2} height="h-80" cols="lg:grid-cols-2" />
+      </PageSkeleton>
     );
   }
 
   if (!analytics) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-16 w-16 rounded-2xl bg-warning/10 flex items-center justify-center mb-6">
-            <AlertTriangle className="h-8 w-8 text-warning" />
-          </div>
-          <h2 className="text-lg font-semibold mb-2">{t('analytics.noData')}</h2>
-          <p className="text-sm text-muted-foreground">{t('analytics.noDataDesc')}</p>
-        </div>
+        <EmptyState icon={AlertTriangle} title={t('analytics.noData')} description={t('analytics.noDataDesc')} />
       </div>
     );
   }
@@ -109,7 +92,7 @@ export default function AnalyticsPage() {
               <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center"><CheckCircle2 className="h-4 w-4 text-success" /></div>
             </div>
             <div className="text-2xl font-bold">{overview.successRate}%</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">{overview.successfulDeliveries.toLocaleString()} {t('analytics.of')} {overview.totalDeliveries.toLocaleString()}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{formatNumber(overview.successfulDeliveries)} {t('analytics.of')} {formatNumber(overview.totalDeliveries)}</div>
           </div>
           <div className="rounded-xl border bg-card p-4">
             <div className="flex items-center justify-between mb-2">
@@ -125,14 +108,14 @@ export default function AnalyticsPage() {
               <div className="h-8 w-8 rounded-lg bg-warning/10 flex items-center justify-center"><Zap className="h-4 w-4 text-warning" /></div>
             </div>
             <div className="text-2xl font-bold">{overview.deliveriesPerSecond.toFixed(2)}</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">{t('analytics.deliveriesPerSec')} · {overview.totalEvents.toLocaleString()} {t('analytics.events')}</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{t('analytics.deliveriesPerSec')} · {formatNumber(overview.totalEvents)} {t('analytics.events')}</div>
           </div>
           <div className="rounded-xl border bg-card p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t('analytics.failed')}</span>
               <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center"><XCircle className="h-4 w-4 text-destructive" /></div>
             </div>
-            <div className="text-2xl font-bold">{overview.failedDeliveries.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatNumber(overview.failedDeliveries)}</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">{overview.totalDeliveries > 0 ? ((overview.failedDeliveries / overview.totalDeliveries) * 100).toFixed(1) : 0}% {t('analytics.failureRate')}</div>
           </div>
         </div>
@@ -162,7 +145,7 @@ export default function AnalyticsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="timestamp" tickFormatter={(t) => new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} stroke="#94a3b8" fontSize={12} />
+                  <XAxis dataKey="timestamp" tickFormatter={(v) => formatTime(v)} stroke="#94a3b8" fontSize={12} />
                   <YAxis stroke="#94a3b8" fontSize={12} />
                   <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }} />
                   <Area type="monotone" dataKey="success" stroke={CHART_COLORS.success} fill="url(#successGrad)" strokeWidth={2} name="Success" />
@@ -200,7 +183,7 @@ export default function AnalyticsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="timestamp" tickFormatter={(t) => new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})} stroke="#94a3b8" fontSize={12} />
+                  <XAxis dataKey="timestamp" tickFormatter={(v) => formatTime(v)} stroke="#94a3b8" fontSize={12} />
                   <YAxis stroke="#94a3b8" fontSize={12} unit="ms" />
                   <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }} formatter={(v) => [`${Math.round(v as number)}ms`, 'Latency']} />
                   <Area type="monotone" dataKey="avgLatencyMs" stroke={CHART_COLORS.latency} fill="url(#latencyGrad)" strokeWidth={2} name="Latency" />

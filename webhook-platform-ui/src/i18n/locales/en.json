@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "just now",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
   "common": {
     "cancel": "Cancel",
     "delete": "Delete",
@@ -1064,6 +1070,12 @@
     "backToDashboard": "Back to Dashboard",
     "backToHome": "Back to Home"
   },
+  "accessDenied": {
+    "title": "Access Denied",
+    "description": "You don't have permission to view this page. Contact your organization owner to request access.",
+    "backToDashboard": "Back to Dashboard",
+    "yourRole": "Your role: {{role}}"
+  },
   "verifyEmail": {
     "verifying": "Verifying your email...",
     "pleaseWait": "Please wait a moment.",
@@ -1120,5 +1132,88 @@
       "tip4": "Inspect the error messages in delivery attempts below",
       "tip5": "Consider replaying the delivery after fixing the issue"
     }
+  },
+  "breadcrumb": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "endpoints": "Endpoints",
+    "events": "Events",
+    "deliveries": "Deliveries",
+    "subscriptions": "Subscriptions",
+    "api-keys": "API Keys",
+    "analytics": "Analytics",
+    "dlq": "Dead Letter Queue",
+    "test-endpoints": "Test Endpoints",
+    "members": "Members",
+    "audit-log": "Audit Log",
+    "settings": "Settings"
+  },
+  "onboarding": {
+    "title": "Getting Started",
+    "subtitle": "Complete these steps to set up your webhook infrastructure",
+    "dismiss": "Dismiss",
+    "collapsed": "{{completed}} of {{total}} completed",
+    "steps": {
+      "createProject": "Create a project",
+      "createProjectDesc": "Projects organize your endpoints, events, and API keys",
+      "createEndpoint": "Add a webhook endpoint",
+      "createEndpointDesc": "Register the URL where you want to receive webhooks",
+      "createSubscription": "Subscribe to event types",
+      "createSubscriptionDesc": "Link your endpoint to specific event types",
+      "createApiKey": "Generate an API key",
+      "createApiKeyDesc": "You'll need an API key to send events programmatically",
+      "sendEvent": "Send your first event",
+      "sendEventDesc": "Send a test event and see it delivered to your endpoint",
+      "checkDelivery": "Verify delivery",
+      "checkDeliveryDesc": "Check the delivery log to confirm your webhook was received"
+    },
+    "go": "Go",
+    "done": "Done",
+    "allDone": "You're all set! Your webhook infrastructure is ready.",
+    "allDoneAction": "View quickstart guide"
+  },
+  "commandPalette": {
+    "placeholder": "Search pages, projects...",
+    "noResults": "No results found",
+    "navigate": "navigate",
+    "open": "open",
+    "close": "close",
+    "groupNavigation": "Navigation",
+    "groupProjects": "Projects",
+    "openProjectEndpoints": "Open project endpoints",
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "members": "Members",
+    "auditLog": "Audit Log",
+    "settings": "Settings",
+    "documentation": "Documentation",
+    "endpoints": "Endpoints",
+    "events": "Events",
+    "deliveries": "Deliveries",
+    "subscriptions": "Subscriptions",
+    "apiKeys": "API Keys",
+    "analytics": "Analytics",
+    "dlq": "Dead Letter Queue",
+    "testEndpoints": "Test Endpoints"
+  },
+  "footer": {
+    "tagline": "Production-ready webhook infrastructure. Reliable delivery at any scale.",
+    "product": "Product",
+    "features": "Features",
+    "quickstart": "Quickstart",
+    "documentation": "Documentation",
+    "access": "Access",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "dashboard": "Dashboard",
+    "sdks": "SDKs",
+    "copyright": "© {{year}} Hookflow. Built for production systems.",
+    "status": "Status",
+    "github": "GitHub"
+  },
+  "quickstartStatus": {
+    "delivered": "Delivered",
+    "retrying": "Retrying",
+    "failed": "Failed"
   }
 }

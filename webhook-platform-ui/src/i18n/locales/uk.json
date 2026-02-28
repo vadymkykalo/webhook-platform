@@ -1,4 +1,10 @@
 {
+  "relativeTime": {
+    "justNow": "щойно",
+    "minutesAgo": "{{count}}хв тому",
+    "hoursAgo": "{{count}}год тому",
+    "daysAgo": "{{count}}д тому"
+  },
   "common": {
     "cancel": "Скасувати",
     "delete": "Видалити",
@@ -1064,6 +1070,12 @@
     "backToDashboard": "Повернутися до панелі",
     "backToHome": "Повернутися на головну"
   },
+  "accessDenied": {
+    "title": "Доступ заборонено",
+    "description": "У вас немає дозволу для перегляду цієї сторінки. Зверніться до власника організації для отримання доступу.",
+    "backToDashboard": "Повернутися до панелі",
+    "yourRole": "Ваша роль: {{role}}"
+  },
   "verifyEmail": {
     "verifying": "Перевіряємо вашу електронну пошту...",
     "pleaseWait": "Будь ласка, зачекайте.",
@@ -1120,5 +1132,88 @@
       "tip4": "Перевірте повідомлення про помилки у спробах доставки нижче",
       "tip5": "Спробуйте повторити доставку після виправлення проблеми"
     }
+  },
+  "breadcrumb": {
+    "dashboard": "Дашборд",
+    "projects": "Проєкти",
+    "endpoints": "Ендпоінти",
+    "events": "Події",
+    "deliveries": "Доставки",
+    "subscriptions": "Підписки",
+    "api-keys": "API Ключі",
+    "analytics": "Аналітика",
+    "dlq": "Черга мертвих листів",
+    "test-endpoints": "Тестові ендпоінти",
+    "members": "Учасники",
+    "audit-log": "Журнал дій",
+    "settings": "Налаштування"
+  },
+  "onboarding": {
+    "title": "Початок роботи",
+    "subtitle": "Виконайте ці кроки, щоб налаштувати вашу webhook інфраструктуру",
+    "dismiss": "Приховати",
+    "collapsed": "{{completed}} з {{total}} виконано",
+    "steps": {
+      "createProject": "Створіть проєкт",
+      "createProjectDesc": "Проєкти організовують ваші ендпоінти, події та API ключі",
+      "createEndpoint": "Додайте webhook ендпоінт",
+      "createEndpointDesc": "Зареєструйте URL, на який ви хочете отримувати вебхуки",
+      "createSubscription": "Підпишіться на типи подій",
+      "createSubscriptionDesc": "Прив'яжіть ваш ендпоінт до конкретних типів подій",
+      "createApiKey": "Згенеруйте API ключ",
+      "createApiKeyDesc": "API ключ потрібен для надсилання подій програмно",
+      "sendEvent": "Надішліть першу подію",
+      "sendEventDesc": "Надішліть тестову подію та перевірте її доставку на ваш ендпоінт",
+      "checkDelivery": "Перевірте доставку",
+      "checkDeliveryDesc": "Перегляньте журнал доставок, щоб підтвердити отримання вебхука"
+    },
+    "go": "Перейти",
+    "done": "Готово",
+    "allDone": "Все готово! Ваша webhook інфраструктура налаштована.",
+    "allDoneAction": "Переглянути quickstart гайд"
+  },
+  "commandPalette": {
+    "placeholder": "Пошук сторінок, проєктів...",
+    "noResults": "Нічого не знайдено",
+    "navigate": "навігація",
+    "open": "відкрити",
+    "close": "закрити",
+    "groupNavigation": "Навігація",
+    "groupProjects": "Проєкти",
+    "openProjectEndpoints": "Відкрити ендпоінти проєкту",
+    "dashboard": "Дашборд",
+    "projects": "Проєкти",
+    "members": "Учасники",
+    "auditLog": "Журнал аудиту",
+    "settings": "Налаштування",
+    "documentation": "Документація",
+    "endpoints": "Ендпоінти",
+    "events": "Події",
+    "deliveries": "Доставки",
+    "subscriptions": "Підписки",
+    "apiKeys": "API ключі",
+    "analytics": "Аналітика",
+    "dlq": "Черга недоставлених",
+    "testEndpoints": "Тестові ендпоінти"
+  },
+  "footer": {
+    "tagline": "Готова до продакшну webhook інфраструктура. Надійна доставка будь-якого масштабу.",
+    "product": "Продукт",
+    "features": "Можливості",
+    "quickstart": "Швидкий старт",
+    "documentation": "Документація",
+    "access": "Доступ",
+    "signIn": "Увійти",
+    "createAccount": "Створити акаунт",
+    "dashboard": "Дашборд",
+    "sdks": "SDK",
+    "copyright": "© {{year}} Hookflow. Створено для продакшн систем.",
+    "status": "Статус",
+    "github": "GitHub"
+  },
+  "quickstartStatus": {
+    "delivered": "Доставлено",
+    "retrying": "Повторна спроба",
+    "failed": "Помилка"
   }
 }

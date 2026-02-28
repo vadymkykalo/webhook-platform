@@ -4,7 +4,10 @@ import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Ra
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useProjects, useCreateProject, useDeleteProject } from '../api/queries';
+import { formatDate } from '../lib/date';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import { usePermissions } from '../auth/usePermissions';
+import EmptyState from '../components/EmptyState';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -81,31 +84,12 @@ export default function ProjectsPage() {
     toast.success(t('projects.toast.idCopied'));
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    }).format(date);
-  };
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-32 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-64 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-32 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-muted animate-pulse rounded-xl" />
-          ))}
-        </div>
-      </div>
+      <PageSkeleton>
+        <SkeletonCards count={3} height="h-48" />
+      </PageSkeleton>
     );
   }
 
@@ -127,23 +111,17 @@ export default function ProjectsPage() {
       </div>
 
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <FolderKanban className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('projects.noProjects')}</h3>
-          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            {canCreateProject
-              ? t('projects.noProjectsDesc')
-              : t('projects.noProjectsViewer')}
-          </p>
-          {canCreateProject && (
+        <EmptyState
+          icon={FolderKanban}
+          title={t('projects.noProjects')}
+          description={canCreateProject ? t('projects.noProjectsDesc') : t('projects.noProjectsViewer')}
+          action={canCreateProject ? (
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-4 w-4" />
               {t('projects.createFirst')}
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
           {projects.map((project) => (

@@ -5,6 +5,7 @@ import {
   Webhook, Radio, Send, Bell, Key, BarChart3, AlertTriangle,
   TestTube, BookOpen, Search, Zap,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent } from './ui/dialog';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse } from '../types/api.types';
@@ -19,6 +20,7 @@ interface CommandItem {
 }
 
 export function CommandPalette() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -48,29 +50,32 @@ export function CommandPalette() {
   }, []);
 
   const items = useMemo<CommandItem[]>(() => {
+    const grpNav = t('commandPalette.groupNavigation');
+    const grpProj = t('commandPalette.groupProjects');
+
     const nav: CommandItem[] = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, action: () => go('/admin/dashboard'), group: 'Navigation' },
-      { id: 'projects', label: 'Projects', icon: FolderKanban, action: () => go('/admin/projects'), group: 'Navigation' },
-      { id: 'members', label: 'Members', icon: Users, action: () => go('/admin/members'), group: 'Navigation' },
-      { id: 'audit-log', label: 'Audit Log', icon: FileText, action: () => go('/admin/audit-log'), group: 'Navigation' },
-      { id: 'settings', label: 'Settings', icon: Settings, action: () => go('/admin/settings'), group: 'Navigation' },
-      { id: 'docs', label: 'Documentation', icon: BookOpen, action: () => go('/docs'), group: 'Navigation' },
+      { id: 'dashboard', label: t('commandPalette.dashboard'), icon: LayoutDashboard, action: () => go('/admin/dashboard'), group: grpNav },
+      { id: 'projects', label: t('commandPalette.projects'), icon: FolderKanban, action: () => go('/admin/projects'), group: grpNav },
+      { id: 'members', label: t('commandPalette.members'), icon: Users, action: () => go('/admin/members'), group: grpNav },
+      { id: 'audit-log', label: t('commandPalette.auditLog'), icon: FileText, action: () => go('/admin/audit-log'), group: grpNav },
+      { id: 'settings', label: t('commandPalette.settings'), icon: Settings, action: () => go('/admin/settings'), group: grpNav },
+      { id: 'docs', label: t('commandPalette.documentation'), icon: BookOpen, action: () => go('/docs'), group: grpNav },
     ];
 
     const projectItems: CommandItem[] = projects.flatMap(p => [
-      { id: `p-${p.id}`, label: p.name, description: 'Open project endpoints', icon: FolderKanban, action: () => go(`/admin/projects/${p.id}/endpoints`), group: 'Projects' },
-      { id: `p-${p.id}-ep`, label: `${p.name} → Endpoints`, icon: Webhook, action: () => go(`/admin/projects/${p.id}/endpoints`), group: 'Projects' },
-      { id: `p-${p.id}-ev`, label: `${p.name} → Events`, icon: Radio, action: () => go(`/admin/projects/${p.id}/events`), group: 'Projects' },
-      { id: `p-${p.id}-del`, label: `${p.name} → Deliveries`, icon: Send, action: () => go(`/admin/projects/${p.id}/deliveries`), group: 'Projects' },
-      { id: `p-${p.id}-sub`, label: `${p.name} → Subscriptions`, icon: Bell, action: () => go(`/admin/projects/${p.id}/subscriptions`), group: 'Projects' },
-      { id: `p-${p.id}-keys`, label: `${p.name} → API Keys`, icon: Key, action: () => go(`/admin/projects/${p.id}/api-keys`), group: 'Projects' },
-      { id: `p-${p.id}-an`, label: `${p.name} → Analytics`, icon: BarChart3, action: () => go(`/admin/projects/${p.id}/analytics`), group: 'Projects' },
-      { id: `p-${p.id}-dlq`, label: `${p.name} → Dead Letter Queue`, icon: AlertTriangle, action: () => go(`/admin/projects/${p.id}/dlq`), group: 'Projects' },
-      { id: `p-${p.id}-test`, label: `${p.name} → Test Endpoints`, icon: TestTube, action: () => go(`/admin/projects/${p.id}/test-endpoints`), group: 'Projects' },
+      { id: `p-${p.id}`, label: p.name, description: t('commandPalette.openProjectEndpoints'), icon: FolderKanban, action: () => go(`/admin/projects/${p.id}/endpoints`), group: grpProj },
+      { id: `p-${p.id}-ep`, label: `${p.name} → ${t('commandPalette.endpoints')}`, icon: Webhook, action: () => go(`/admin/projects/${p.id}/endpoints`), group: grpProj },
+      { id: `p-${p.id}-ev`, label: `${p.name} → ${t('commandPalette.events')}`, icon: Radio, action: () => go(`/admin/projects/${p.id}/events`), group: grpProj },
+      { id: `p-${p.id}-del`, label: `${p.name} → ${t('commandPalette.deliveries')}`, icon: Send, action: () => go(`/admin/projects/${p.id}/deliveries`), group: grpProj },
+      { id: `p-${p.id}-sub`, label: `${p.name} → ${t('commandPalette.subscriptions')}`, icon: Bell, action: () => go(`/admin/projects/${p.id}/subscriptions`), group: grpProj },
+      { id: `p-${p.id}-keys`, label: `${p.name} → ${t('commandPalette.apiKeys')}`, icon: Key, action: () => go(`/admin/projects/${p.id}/api-keys`), group: grpProj },
+      { id: `p-${p.id}-an`, label: `${p.name} → ${t('commandPalette.analytics')}`, icon: BarChart3, action: () => go(`/admin/projects/${p.id}/analytics`), group: grpProj },
+      { id: `p-${p.id}-dlq`, label: `${p.name} → ${t('commandPalette.dlq')}`, icon: AlertTriangle, action: () => go(`/admin/projects/${p.id}/dlq`), group: grpProj },
+      { id: `p-${p.id}-test`, label: `${p.name} → ${t('commandPalette.testEndpoints')}`, icon: TestTube, action: () => go(`/admin/projects/${p.id}/test-endpoints`), group: grpProj },
     ]);
 
     return [...nav, ...projectItems];
-  }, [projects, go]);
+  }, [projects, go, t]);
 
   const filtered = useMemo(() => {
     if (!query) return items;
@@ -128,7 +133,7 @@ export function CommandPalette() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search pages, projects..."
+            placeholder={t('commandPalette.placeholder')}
             className="flex-1 px-3 py-3 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
             autoFocus
           />
@@ -141,7 +146,7 @@ export function CommandPalette() {
           {filtered.length === 0 ? (
             <div className="py-8 text-center">
               <Zap className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No results found</p>
+              <p className="text-sm text-muted-foreground">{t('commandPalette.noResults')}</p>
             </div>
           ) : (
             Array.from(groups.entries()).map(([group, groupItems]) => (
@@ -181,9 +186,9 @@ export function CommandPalette() {
 
         <div className="border-t px-4 py-2 flex items-center justify-between text-[10px] text-muted-foreground">
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1"><kbd className="rounded border bg-muted px-1 py-0.5 font-mono">↑↓</kbd> navigate</span>
-            <span className="flex items-center gap-1"><kbd className="rounded border bg-muted px-1 py-0.5 font-mono">↵</kbd> open</span>
-            <span className="flex items-center gap-1"><kbd className="rounded border bg-muted px-1 py-0.5 font-mono">esc</kbd> close</span>
+            <span className="flex items-center gap-1"><kbd className="rounded border bg-muted px-1 py-0.5 font-mono">↑↓</kbd> {t('commandPalette.navigate')}</span>
+            <span className="flex items-center gap-1"><kbd className="rounded border bg-muted px-1 py-0.5 font-mono">↵</kbd> {t('commandPalette.open')}</span>
+            <span className="flex items-center gap-1"><kbd className="rounded border bg-muted px-1 py-0.5 font-mono">esc</kbd> {t('commandPalette.close')}</span>
           </div>
         </div>
       </DialogContent>

@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
+import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { apiKeysApi, ApiKeyResponse } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
@@ -118,64 +121,23 @@ export default function ApiKeysPage() {
     setShowKey(false);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-
-  const formatRelativeTime = (dateString: string | null) => {
+  const formatRelativeTimeOrNever = (dateString: string | null) => {
     if (!dateString) return t('apiKeys.never');
-    
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 60) return t('apiKeys.justNow');
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHour < 24) return `${diffHour}h ago`;
-    if (diffDay < 7) return `${diffDay}d ago`;
-    
-    return formatDate(dateString);
+    return formatRelativeTime(dateString);
   };
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-7 w-28 bg-muted animate-pulse rounded-lg" />
-            <div className="h-4 w-56 bg-muted animate-pulse rounded" />
-          </div>
-          <div className="h-10 w-36 bg-muted animate-pulse rounded-lg" />
-        </div>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
-          ))}
-        </div>
-      </div>
+      <PageSkeleton>
+        <SkeletonRows count={3} height="h-24" />
+      </PageSkeleton>
     );
   }
 
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <Key className="h-7 w-7 text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground">{t('apiKeys.projectNotFound')}</p>
-        </div>
+        <EmptyState icon={Key} title={t('apiKeys.projectNotFound')} />
       </div>
     );
   }
@@ -195,22 +157,16 @@ export default function ApiKeysPage() {
       </div>
 
       {apiKeys.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <Key className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('apiKeys.noKeys')}</h3>
-          <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            {canManageApiKeys
-              ? t('apiKeys.noKeysDesc')
-              : t('apiKeys.noKeysDescViewer')}
-          </p>
-          {canManageApiKeys && (
+        <EmptyState
+          icon={Key}
+          title={t('apiKeys.noKeys')}
+          description={canManageApiKeys ? t('apiKeys.noKeysDesc') : t('apiKeys.noKeysDescViewer')}
+          action={canManageApiKeys ? (
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-4 w-4" /> {t('apiKeys.createKey')}
             </Button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <div className="space-y-3 animate-fade-in">
           {apiKeys.map((apiKey) => (
@@ -225,8 +181,8 @@ export default function ApiKeysPage() {
                       <p className="text-sm font-semibold">{apiKey.name}</p>
                       <code className="text-[13px] font-mono text-muted-foreground">{apiKey.keyPrefix}...</code>
                       <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(apiKey.createdAt)}</span>
-                        <span>{t('apiKeys.lastUsed')}: {formatRelativeTime(apiKey.lastUsedAt)}</span>
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDateTimeShort(apiKey.createdAt)}</span>
+                        <span>{t('apiKeys.lastUsed')}: {formatRelativeTimeOrNever(apiKey.lastUsedAt)}</span>
                       </div>
                     </div>
                   </div>

@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
+import { formatDateTimeCompact } from '../lib/date';
+import { SkeletonTable } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { type AuditLogEntry } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
 import {
@@ -27,16 +30,6 @@ const ACTION_COLORS: Record<string, string> = {
   PASSWORD_CHANGED: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
 };
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
 
 function shortId(id: string | null) {
   if (!id) return '—';
@@ -65,23 +58,9 @@ export default function AuditLogPage() {
 
       <div className="border rounded-lg bg-card overflow-hidden">
         {isLoading ? (
-          <div className="p-4 space-y-3">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-                <div className="h-4 w-20 bg-muted animate-pulse rounded" />
-                <div className="h-4 flex-1 bg-muted animate-pulse rounded" />
-                <div className="h-4 w-16 bg-muted animate-pulse rounded" />
-                <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-              </div>
-            ))}
-          </div>
+          <SkeletonTable rows={8} />
         ) : !data || data.content.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <FileText className="h-10 w-10 mb-3 opacity-40" />
-            <p className="text-sm font-medium">{t('auditLog.noLogs')}</p>
-            <p className="text-xs mt-1">{t('auditLog.noLogsDesc')}</p>
-          </div>
+          <EmptyState icon={FileText} title={t('auditLog.noLogs')} description={t('auditLog.noLogsDesc')} className="flex flex-col items-center justify-center py-20" />
         ) : (
           <>
             <Table>
@@ -101,7 +80,7 @@ export default function AuditLogPage() {
                 {data.content.map((entry: AuditLogEntry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(entry.createdAt)}
+                      {formatDateTimeCompact(entry.createdAt)}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACTION_COLORS[entry.action] || 'bg-muted text-muted-foreground'}`}>

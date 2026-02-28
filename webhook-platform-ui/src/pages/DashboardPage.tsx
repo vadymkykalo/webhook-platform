@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useProjects, useDashboardStats } from '../api/queries';
+import { useProjects, useDashboardStats, useEndpoints, useSubscriptions, useApiKeysPaged } from '../api/queries';
+import { formatDateTime } from '../lib/date';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
+import OnboardingChecklist from '../components/OnboardingChecklist';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
@@ -30,25 +34,10 @@ function StatCard({ title, value, icon: Icon, iconColor, subtitle, loading }: {
 
 function SkeletonDashboard() {
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded-lg" />
-          <div className="h-4 w-72 bg-muted animate-pulse rounded" />
-        </div>
-        <div className="h-10 w-48 bg-muted animate-pulse rounded-lg" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-[120px] bg-muted animate-pulse rounded-xl" />
-        ))}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-[320px] bg-muted animate-pulse rounded-xl" />
-        ))}
-      </div>
-    </div>
+    <PageSkeleton maxWidth="max-w-7xl">
+      <SkeletonCards count={5} height="h-[120px]" cols="md:grid-cols-2 lg:grid-cols-5" />
+      <SkeletonCards count={2} height="h-[320px]" cols="md:grid-cols-2" />
+    </PageSkeleton>
   );
 }
 
@@ -68,6 +57,10 @@ export default function DashboardPage() {
   const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats(
     selectedProjectId || undefined
   );
+
+  const { data: endpoints = [] } = useEndpoints(selectedProjectId || undefined);
+  const { data: subscriptions = [] } = useSubscriptions(selectedProjectId || undefined);
+  const { data: apiKeysData } = useApiKeysPaged(selectedProjectId || undefined, 0, 1);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -110,19 +103,28 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Onboarding Checklist */}
+      <OnboardingChecklist
+        projectId={selectedProjectId || undefined}
+        hasProjects={projects.length > 0}
+        hasEndpoints={endpoints.length > 0}
+        hasSubscriptions={subscriptions.length > 0}
+        hasApiKeys={(apiKeysData?.content?.length ?? 0) > 0}
+        hasEvents={(dashboardStats?.recentEvents?.length ?? 0) > 0}
+        hasDeliveries={(dashboardStats?.deliveryStats?.totalDeliveries ?? 0) > 0}
+      />
+
       {!selectedProject ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-            <FolderKanban className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold mb-2">{t('dashboard.noProjects')}</h3>
-          <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
-            {t('dashboard.noProjectsDesc')}
-          </p>
-          <Button onClick={() => navigate('/admin/projects')}>
-            <Plus className="h-4 w-4" /> {t('dashboard.createProject')}
-          </Button>
-        </div>
+        <EmptyState
+          icon={FolderKanban}
+          title={t('dashboard.noProjects')}
+          description={t('dashboard.noProjectsDesc')}
+          action={
+            <Button onClick={() => navigate('/admin/projects')}>
+              <Plus className="h-4 w-4" /> {t('dashboard.createProject')}
+            </Button>
+          }
+        />
       ) : (
         <div className="space-y-6 animate-fade-in">
           {/* Stat Cards */}
@@ -190,19 +192,9 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {statsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-14 bg-muted animate-pulse rounded-lg" />
-                    ))}
-                  </div>
+                  <SkeletonCards count={3} height="h-14" cols="grid-cols-1" />
                 ) : !dashboardStats || dashboardStats.recentEvents.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mb-3">
-                      <Radio className="h-5 w-5 opacity-50" />
-                    </div>
-                    <p className="text-sm font-medium">{t('dashboard.recentEvents.empty')}</p>
-                    <p className="text-xs mt-1">{t('dashboard.recentEvents.emptyDesc')}</p>
-                  </div>
+                  <EmptyState icon={Radio} title={t('dashboard.recentEvents.empty')} description={t('dashboard.recentEvents.emptyDesc')} className="flex flex-col items-center justify-center py-10" />
                 ) : (
                   <div className="space-y-1">
                     {dashboardStats.recentEvents.map((event) => (
@@ -218,7 +210,7 @@ export default function DashboardPage() {
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate">{event.type}</p>
                             <p className="text-[11px] text-muted-foreground">
-                              {new Date(event.createdAt).toLocaleString()}
+                              {formatDateTime(event.createdAt)}
                             </p>
                           </div>
                         </div>
@@ -251,19 +243,9 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {statsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-14 bg-muted animate-pulse rounded-lg" />
-                    ))}
-                  </div>
+                  <SkeletonCards count={3} height="h-14" cols="grid-cols-1" />
                 ) : !dashboardStats || dashboardStats.endpointHealth.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mb-3">
-                      <Webhook className="h-5 w-5 opacity-50" />
-                    </div>
-                    <p className="text-sm font-medium">{t('dashboard.endpointHealth.empty')}</p>
-                    <p className="text-xs mt-1">{t('dashboard.endpointHealth.emptyDesc')}</p>
-                  </div>
+                  <EmptyState icon={Webhook} title={t('dashboard.endpointHealth.empty')} description={t('dashboard.endpointHealth.emptyDesc')} className="flex flex-col items-center justify-center py-10" />
                 ) : (
                   <div className="space-y-1">
                     {dashboardStats.endpointHealth.slice(0, 5).map((endpoint) => (
