@@ -5,6 +5,7 @@ import {
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
@@ -12,34 +13,35 @@ import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { CommandPalette } from '../components/CommandPalette';
 import { getTheme, setTheme } from '../lib/theme';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 interface NavItem {
-  name: string;
+  nameKey: string;
   path: string;
   icon: React.ElementType;
   badge?: string;
 }
 
 const mainNav: NavItem[] = [
-  { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-  { name: 'Projects', path: '/admin/projects', icon: FolderKanban },
+  { nameKey: 'nav.dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+  { nameKey: 'nav.projects', path: '/admin/projects', icon: FolderKanban },
 ];
 
 const orgNav: NavItem[] = [
-  { name: 'Members', path: '/admin/members', icon: Users },
-  { name: 'Audit Log', path: '/admin/audit-log', icon: FileText },
-  { name: 'Settings', path: '/admin/settings', icon: Settings },
+  { nameKey: 'nav.members', path: '/admin/members', icon: Users },
+  { nameKey: 'nav.auditLog', path: '/admin/audit-log', icon: FileText },
+  { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings },
 ];
 
 const getProjectNav = (projectId: string): NavItem[] => [
-  { name: 'Endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
-  { name: 'Events', path: `/admin/projects/${projectId}/events`, icon: Radio },
-  { name: 'Deliveries', path: `/admin/projects/${projectId}/deliveries`, icon: Send },
-  { name: 'Subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
-  { name: 'API Keys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
-  { name: 'Analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
-  { name: 'Dead Letter Queue', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
-  { name: 'Test Endpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
+  { nameKey: 'nav.endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
+  { nameKey: 'nav.events', path: `/admin/projects/${projectId}/events`, icon: Radio },
+  { nameKey: 'nav.deliveries', path: `/admin/projects/${projectId}/deliveries`, icon: Send },
+  { nameKey: 'nav.subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
+  { nameKey: 'nav.apiKeys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
+  { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
+  { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
+  { nameKey: 'nav.testEndpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -55,14 +57,16 @@ function SidebarSection({ label, children }: { label: string; children: React.Re
 
 function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: boolean; onClick?: () => void }) {
   const location = useLocation();
+  const { t } = useTranslation();
   const isActive = location.pathname === item.path;
   const Icon = item.icon;
+  const name = t(item.nameKey);
 
   return (
     <Link
       to={item.path}
       onClick={onClick}
-      title={collapsed ? item.name : undefined}
+      title={collapsed ? name : undefined}
       className={cn(
         "flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-150",
         collapsed && "justify-center px-2",
@@ -72,7 +76,7 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
       )}
     >
       <Icon className={cn("h-4 w-4 flex-shrink-0", isActive && "text-primary")} />
-      {!collapsed && <span className="truncate">{item.name}</span>}
+      {!collapsed && <span className="truncate">{name}</span>}
       {!collapsed && item.badge && (
         <span className="ml-auto text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
           {item.badge}
@@ -83,13 +87,14 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
 }
 
 export default function AppLayout() {
+  const { t } = useTranslation();
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [, setThemeIcon] = useState(false);
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
   const [resending, setResending] = useState(false);
@@ -100,7 +105,7 @@ export default function AppLayout() {
       if (freshUser.user?.status !== user?.user?.status) {
         updateUser(freshUser);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [location.pathname]);
 
   const handleResendVerification = async () => {
@@ -108,9 +113,9 @@ export default function AppLayout() {
     setResending(true);
     try {
       await authApi.resendVerification(user.user.email);
-      toast.success('Verification email sent!');
+      toast.success(t('auth.verification.sent'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to resend');
+      toast.error(err.response?.data?.message || t('auth.verification.failed'));
     } finally {
       setResending(false);
     }
@@ -118,7 +123,7 @@ export default function AppLayout() {
 
   const handleLogout = () => {
     logout();
-    toast.success('Logged out successfully');
+    toast.success(t('nav.loggedOut'));
     navigate('/login');
   };
 
@@ -153,7 +158,7 @@ export default function AppLayout() {
             size="icon-sm"
             onClick={() => setCollapsed(!collapsed)}
             className={cn("ml-auto text-muted-foreground hover:text-foreground", collapsed && "ml-0 mt-2")}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
           >
             <ChevronsLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
           </Button>
@@ -162,30 +167,30 @@ export default function AppLayout() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-        <SidebarSection label={collapsed && !isMobile ? "" : "Navigation"}>
+        <SidebarSection label={collapsed && !isMobile ? "" : t('nav.navigation')}>
           {mainNav.map((item) => (
             <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
           ))}
         </SidebarSection>
 
         {projectId && (
-          <SidebarSection label={collapsed && !isMobile ? "" : "Project"}>
+          <SidebarSection label={collapsed && !isMobile ? "" : t('nav.project')}>
             {getProjectNav(projectId).map((item) => (
               <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
             ))}
           </SidebarSection>
         )}
 
-        <SidebarSection label={collapsed && !isMobile ? "" : "Organization"}>
+        <SidebarSection label={collapsed && !isMobile ? "" : t('nav.organization')}>
           {orgNav.map((item) => (
             <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
           ))}
         </SidebarSection>
 
         {(!collapsed || isMobile) && (
-          <SidebarSection label="Resources">
+          <SidebarSection label={t('nav.resources')}>
             <NavLink
-              item={{ name: 'Documentation', path: '/docs', icon: BookOpen }}
+              item={{ nameKey: 'nav.documentation', path: '/docs', icon: BookOpen }}
               onClick={isMobile ? () => setSidebarOpen(false) : undefined}
             />
           </SidebarSection>
@@ -216,7 +221,7 @@ export default function AppLayout() {
               size="icon-sm"
               onClick={handleLogout}
               className="text-muted-foreground hover:text-destructive flex-shrink-0"
-              title="Logout"
+              title={t('nav.logout')}
             >
               <LogOut className="h-3.5 w-3.5" />
             </Button>
@@ -267,7 +272,7 @@ export default function AppLayout() {
 
             {/* Breadcrumb */}
             <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Link to="/admin/dashboard" className="hover:text-foreground transition-colors">Home</Link>
+              <Link to="/admin/dashboard" className="hover:text-foreground transition-colors">{t('nav.home')}</Link>
               {location.pathname !== '/admin/dashboard' && (
                 <>
                   <ChevronRight className="h-3.5 w-3.5" />
@@ -289,7 +294,7 @@ export default function AppLayout() {
                 onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
               >
                 <Search className="h-4 w-4" />
-                <span className="text-xs">Search</span>
+                <span className="text-xs">{t('nav.search')}</span>
                 <kbd className="ml-1 rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
               </Button>
               <Button
@@ -300,8 +305,9 @@ export default function AppLayout() {
               >
                 <Search className="h-4 w-4" />
               </Button>
+              <LanguageSwitcher />
               <Link to="/docs">
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title="Documentation">
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title={t('nav.documentation')}>
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
@@ -309,15 +315,15 @@ export default function AppLayout() {
                 variant="ghost"
                 size="icon-sm"
                 className="text-muted-foreground"
-                title="Toggle theme"
+                title={t('nav.toggleTheme')}
                 onClick={() => {
                   const current = getTheme();
                   const next = current === 'dark' ? 'light' : 'dark';
                   setTheme(next);
-                  setThemeIcon(prev => !prev);
+                  setIsDark(next === 'dark');
                 }}
               >
-                {document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
             </div>
           </header>
@@ -327,7 +333,7 @@ export default function AppLayout() {
             <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/40 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
                 <Mail className="h-4 w-4 flex-shrink-0" />
-                <span>Please verify your email <strong>{user?.user?.email}</strong> to unlock all features.</span>
+                <span dangerouslySetInnerHTML={{ __html: t('auth.verification.banner', { email: user?.user?.email }) }} />
               </div>
               <Button
                 variant="outline"
@@ -337,7 +343,7 @@ export default function AppLayout() {
                 className="flex-shrink-0 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40"
               >
                 {resending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                {resending ? 'Sending...' : 'Resend email'}
+                {resending ? t('auth.verification.resending') : t('auth.verification.resend')}
               </Button>
             </div>
           )}

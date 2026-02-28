@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Moon, Sun, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
-import { getTheme, setTheme } from '../lib/theme';
+import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function QuickstartPage() {
   return (
@@ -27,22 +29,8 @@ export default function QuickstartPage() {
   );
 }
 
-function ThemeToggle() {
-  const [, setToggle] = useState(false);
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTheme(getTheme() === 'dark' ? 'light' : 'dark'); setToggle(p => !p); }}
-      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-      title="Toggle theme"
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
-  );
-}
-
 function Navigation() {
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-lg">
@@ -54,19 +42,20 @@ function Navigation() {
             </div>
             <span className="text-lg font-bold">Hookflow</span>
           </Link>
-          <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</Link>
+          <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('quickstartPage.nav.docs')}</Link>
         </div>
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           <ThemeToggle />
           {isAuthenticated ? (
             <Link to="/admin/projects" className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-all">
-              Dashboard <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              {t('quickstartPage.nav.dashboard')} <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</Link>
+              <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('quickstartPage.nav.signIn')}</Link>
               <Link to="/register" className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-all">
-                Get started <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                {t('quickstartPage.nav.getStarted')} <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Link>
             </>
           )}
@@ -77,20 +66,21 @@ function Navigation() {
 }
 
 function Header() {
+  const { t } = useTranslation();
   return (
     <div className="mb-12">
       <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
-        <ArrowLeft className="h-4 w-4 mr-2" /> Back to home
+        <ArrowLeft className="h-4 w-4 mr-2" /> {t('quickstartPage.backToHome')}
       </Link>
       <div className="text-center max-w-3xl mx-auto">
         <div className="inline-flex items-center px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full mb-4">
-          <Zap className="h-3 w-3 mr-1.5" /> 5-minute quickstart
+          <Zap className="h-3 w-3 mr-1.5" /> {t('quickstartPage.badge')}
         </div>
         <h1 className="text-5xl font-bold text-foreground mb-4 tracking-tight">
-          From zero to first webhook
+          {t('quickstartPage.title')}
         </h1>
         <p className="text-xl text-muted-foreground leading-relaxed">
-          Complete walkthrough: create a project, install an SDK, configure endpoints, send events, verify signatures, and monitor deliveries.
+          {t('quickstartPage.subtitle')}
         </p>
       </div>
     </div>
@@ -98,14 +88,15 @@ function Header() {
 }
 
 function ProgressTimeline() {
+  const { t } = useTranslation();
   const steps = [
-    { num: 1, label: 'Project' },
-    { num: 2, label: 'SDK' },
-    { num: 3, label: 'Endpoint' },
-    { num: 4, label: 'Subscribe' },
-    { num: 5, label: 'Send' },
-    { num: 6, label: 'Verify' },
-    { num: 7, label: 'Monitor' },
+    { num: 1, label: t('quickstartPage.timeline.project') },
+    { num: 2, label: t('quickstartPage.timeline.sdk') },
+    { num: 3, label: t('quickstartPage.timeline.endpoint') },
+    { num: 4, label: t('quickstartPage.timeline.subscribe') },
+    { num: 5, label: t('quickstartPage.timeline.send') },
+    { num: 6, label: t('quickstartPage.timeline.verify') },
+    { num: 7, label: t('quickstartPage.timeline.monitor') },
   ];
   return (
     <div className="flex items-center justify-center gap-1 overflow-x-auto pb-2">
@@ -125,9 +116,10 @@ function ProgressTimeline() {
 /* ─── Shared components ─── */
 
 function StepBadge({ step, total = 7 }: { step: number; total?: number }) {
+  const { t } = useTranslation();
   return (
     <div className="inline-flex items-center px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full mb-4">
-      Step {step} of {total}
+      {t('quickstartPage.stepOf', { step, total })}
     </div>
   );
 }
@@ -187,12 +179,13 @@ function LanguageTabs({ active, onChange }: { active: string; onChange: (v: stri
 /* ─── Step 1 ─── */
 
 function Step1_CreateProject() {
+  const { t } = useTranslation();
   return (
     <section id="step-1">
       <StepBadge step={1} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Create a project</h2>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step1.title')}</h2>
       <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        A project organizes your webhooks, endpoints, API keys, and events. Sign up and create your first project from the dashboard, or use the API:
+        {t('quickstartPage.step1.desc')}
       </p>
       <CodeBlock title="terminal" lang="bash">{`# Register & login
 curl -X POST https://your-api.com/api/v1/auth/register \\
@@ -205,7 +198,7 @@ curl -X POST https://your-api.com/api/v1/projects \\
   -H "Content-Type: application/json" \\
   -d '{"name": "Production Webhooks"}'`}</CodeBlock>
       <div className="mt-6 bg-card rounded-xl border border-border p-5">
-        <div className="text-sm font-medium text-foreground mb-2">Response</div>
+        <div className="text-sm font-medium text-foreground mb-2">{t('quickstartPage.step1.response')}</div>
         <pre className="text-sm text-muted-foreground font-mono">{`{
   "id": "proj_a1b2c3d4-...",
   "name": "Production Webhooks",
@@ -214,9 +207,9 @@ curl -X POST https://your-api.com/api/v1/projects \\
 }`}</pre>
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-green-600" /> Retries enabled by default</div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-green-600" /> HMAC signatures configured</div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-green-600" /> Rate limiting built-in</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-green-600" /> {t('quickstartPage.step1.retriesEnabled')}</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-green-600" /> {t('quickstartPage.step1.hmacConfigured')}</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-green-600" /> {t('quickstartPage.step1.rateLimiting')}</div>
       </div>
     </section>
   );
@@ -225,6 +218,7 @@ curl -X POST https://your-api.com/api/v1/projects \\
 /* ─── Step 2 ─── */
 
 function Step2_InstallSDK() {
+  const { t } = useTranslation();
   const [lang, setLang] = useState('node');
   const installs: Record<string, string> = {
     node: 'npm install @webhook-platform/node',
@@ -263,9 +257,9 @@ export WEBHOOK_BASE_URL="https://your-api.com/api/v1"`,
   return (
     <section id="step-2">
       <StepBadge step={2} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Install an SDK</h2>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step2.title')}</h2>
       <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        Official SDKs for Node.js, Python, and PHP. Or use the REST API directly with cURL or any HTTP client.
+        {t('quickstartPage.step2.desc')}
       </p>
       <LanguageTabs active={lang} onChange={setLang} />
       <div className="space-y-4">
@@ -295,6 +289,7 @@ export WEBHOOK_BASE_URL="https://your-api.com/api/v1"`,
 /* ─── Step 3 ─── */
 
 function Step3_CreateEndpoint() {
+  const { t } = useTranslation();
   const [lang, setLang] = useState('node');
   const examples: Record<string, string> = {
     node: `const endpoint = await client.endpoints.create('proj_a1b2c3d4', {
@@ -330,9 +325,9 @@ echo $endpoint['secret'];  // "whsec_..." — save this for verification`,
   return (
     <section id="step-3">
       <StepBadge step={3} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Create a webhook endpoint</h2>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step3.title')}</h2>
       <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        Register the URL where you want to receive webhooks. Each endpoint gets a unique signing secret for HMAC verification.
+        {t('quickstartPage.step3.desc')}
       </p>
       <LanguageTabs active={lang} onChange={setLang} />
       <CodeBlock title="Create endpoint" lang={lang}>{examples[lang]}</CodeBlock>
@@ -340,8 +335,8 @@ echo $endpoint['secret'];  // "whsec_..." — save this for verification`,
         <div className="flex items-start gap-3">
           <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
-            <div className="font-semibold text-sm text-foreground">Save the endpoint secret</div>
-            <div className="text-sm text-muted-foreground mt-1">The <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">secret</code> is shown only once. Store it securely — you'll need it to verify webhook signatures in Step 6.</div>
+            <div className="font-semibold text-sm text-foreground">{t('quickstartPage.step3.saveSecret')}</div>
+            <div className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('quickstartPage.step3.saveSecretDesc') }} />
           </div>
         </div>
       </div>
@@ -352,6 +347,7 @@ echo $endpoint['secret'];  // "whsec_..." — save this for verification`,
 /* ─── Step 4 ─── */
 
 function Step4_Subscribe() {
+  const { t } = useTranslation();
   const [lang, setLang] = useState('node');
   const examples: Record<string, string> = {
     node: `// Subscribe endpoint to specific event types
@@ -387,9 +383,9 @@ echo $subscription['id'];  // "sub_..."`,
   return (
     <section id="step-4">
       <StepBadge step={4} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Subscribe to event types</h2>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step4.title')}</h2>
       <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        Link your endpoint to specific event types. Only matching events will be delivered — no noise, no filtering on your side.
+        {t('quickstartPage.step4.desc')}
       </p>
       <LanguageTabs active={lang} onChange={setLang} />
       <CodeBlock title="Create subscription" lang={lang}>{examples[lang]}</CodeBlock>
@@ -401,7 +397,7 @@ echo $subscription['id'];  // "sub_..."`,
           </div>
         ))}
       </div>
-      <p className="text-sm text-muted-foreground mt-3">You define the event types. Use dot notation for namespacing (e.g. <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">resource.action</code>).</p>
+      <p className="text-sm text-muted-foreground mt-3" dangerouslySetInnerHTML={{ __html: t('quickstartPage.step4.dotNotation') }} />
     </section>
   );
 }
@@ -409,6 +405,7 @@ echo $subscription['id'];  // "sub_..."`,
 /* ─── Step 5 ─── */
 
 function Step5_SendEvent() {
+  const { t } = useTranslation();
   const [lang, setLang] = useState('node');
   const examples: Record<string, string> = {
     node: `// Send an event — uses API key, not JWT
@@ -478,22 +475,20 @@ echo $event['deliveriesCreated']; // 1`,
   return (
     <section id="step-5">
       <StepBadge step={5} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Send your first event</h2>
-      <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        Events are sent using your <strong>API key</strong> (not JWT). The platform routes them to all subscribed endpoints automatically.
-      </p>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step5.title')}</h2>
+      <p className="text-lg text-muted-foreground mb-6 max-w-2xl" dangerouslySetInnerHTML={{ __html: t('quickstartPage.step5.desc') }} />
       <LanguageTabs active={lang} onChange={setLang} />
       <CodeBlock title="Send event" lang={lang}>{examples[lang]}</CodeBlock>
       <div className="mt-6 bg-card rounded-xl border border-border overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-muted/30">
-          <span className="text-sm font-medium text-foreground">What happens next</span>
+          <span className="text-sm font-medium text-foreground">{t('quickstartPage.step5.whatHappens')}</span>
         </div>
         <div className="p-5 grid grid-cols-1 sm:grid-cols-4 gap-4">
           {[
-            { icon: Zap, title: 'Event received', desc: 'Platform accepts the event' },
-            { icon: Code, title: 'Matched', desc: 'Finds subscribed endpoints' },
-            { icon: ArrowRight, title: 'Delivered', desc: 'POST to your endpoint URL' },
-            { icon: CheckCircle2, title: 'Confirmed', desc: 'HTTP 2xx = success' },
+            { icon: Zap, title: t('quickstartPage.step5.received'), desc: t('quickstartPage.step5.receivedDesc') },
+            { icon: Code, title: t('quickstartPage.step5.matched'), desc: t('quickstartPage.step5.matchedDesc') },
+            { icon: ArrowRight, title: t('quickstartPage.step5.delivered'), desc: t('quickstartPage.step5.deliveredDesc') },
+            { icon: CheckCircle2, title: t('quickstartPage.step5.confirmed'), desc: t('quickstartPage.step5.confirmedDesc') },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex flex-col items-center text-center p-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
@@ -512,6 +507,7 @@ echo $event['deliveriesCreated']; // 1`,
 /* ─── Step 6 ─── */
 
 function Step6_VerifySignature() {
+  const { t } = useTranslation();
   const [lang, setLang] = useState('node');
   const examples: Record<string, string> = {
     node: `import { verifySignature } from '@webhook-platform/node';
@@ -636,17 +632,15 @@ echo -n "1708358400.{\\"type\\":\\"order.completed\\",\\"data\\":{}}" \\
   return (
     <section id="step-6">
       <StepBadge step={6} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Verify webhook signatures</h2>
-      <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        Every webhook includes an <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">X-Signature</code> header. Always verify it to ensure the request came from Hookflow, not a third party.
-      </p>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step6.title')}</h2>
+      <p className="text-lg text-muted-foreground mb-6 max-w-2xl" dangerouslySetInnerHTML={{ __html: t('quickstartPage.step6.desc') }} />
       <LanguageTabs active={lang} onChange={setLang} />
       <CodeBlock title="Verify & handle webhook" lang={lang}>{examples[lang]}</CodeBlock>
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { icon: Lock, title: 'HMAC-SHA256', desc: 'Industry-standard signing' },
-          { icon: Clock, title: 'Timestamp check', desc: 'Prevents replay attacks' },
-          { icon: Shield, title: 'Per-endpoint secrets', desc: 'Unique secret per URL' },
+          { icon: Lock, title: t('quickstartPage.step6.hmacSha256'), desc: t('quickstartPage.step6.hmacDesc') },
+          { icon: Clock, title: t('quickstartPage.step6.timestamp'), desc: t('quickstartPage.step6.timestampDesc') },
+          { icon: Shield, title: t('quickstartPage.step6.perEndpoint'), desc: t('quickstartPage.step6.perEndpointDesc') },
         ].map(({ icon: Icon, title, desc }) => (
           <div key={title} className="flex items-start gap-3 p-4 bg-card rounded-xl border border-border">
             <Icon className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
@@ -664,18 +658,19 @@ echo -n "1708358400.{\\"type\\":\\"order.completed\\",\\"data\\":{}}" \\
 /* ─── Step 7 ─── */
 
 function Step7_MonitorAndReplay() {
+  const { t } = useTranslation();
   return (
     <section id="step-7">
       <StepBadge step={7} />
-      <h2 className="text-3xl font-bold text-foreground mb-3">Monitor deliveries & replay failures</h2>
+      <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.step7.title')}</h2>
       <p className="text-lg text-muted-foreground mb-6 max-w-2xl">
-        Every delivery is tracked with full attempt history. If something fails, replay it with one click — no code changes required.
+        {t('quickstartPage.step7.desc')}
       </p>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card rounded-xl border border-border overflow-hidden shadow-lg">
           <div className="px-5 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground">Recent Deliveries</span>
-            <span className="text-xs text-muted-foreground">Live</span>
+            <span className="text-sm font-semibold text-foreground">{t('quickstartPage.step7.recentDeliveries')}</span>
+            <span className="text-xs text-muted-foreground">{t('quickstartPage.step7.live')}</span>
           </div>
           <div className="divide-y divide-border">
             {[
@@ -707,8 +702,8 @@ function Step7_MonitorAndReplay() {
             <div className="flex items-start gap-3 mb-4">
               <Eye className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
               <div>
-                <div className="text-sm font-semibold text-foreground">Full visibility</div>
-                <div className="text-sm text-muted-foreground">See HTTP status, response body, headers, latency, and error messages for every attempt.</div>
+                <div className="text-sm font-semibold text-foreground">{t('quickstartPage.step7.fullVisibility')}</div>
+                <div className="text-sm text-muted-foreground">{t('quickstartPage.step7.fullVisibilityDesc')}</div>
               </div>
             </div>
           </div>
@@ -716,8 +711,8 @@ function Step7_MonitorAndReplay() {
             <div className="flex items-start gap-3 mb-4">
               <RotateCcw className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
               <div>
-                <div className="text-sm font-semibold text-foreground">One-click replay</div>
-                <div className="text-sm text-muted-foreground">Replay any failed delivery from the dashboard. Same payload, same endpoint — no code changes.</div>
+                <div className="text-sm font-semibold text-foreground">{t('quickstartPage.step7.oneClickReplay')}</div>
+                <div className="text-sm text-muted-foreground">{t('quickstartPage.step7.oneClickReplayDesc')}</div>
               </div>
             </div>
           </div>
@@ -725,8 +720,8 @@ function Step7_MonitorAndReplay() {
             <div className="flex items-start gap-3 mb-4">
               <RefreshCw className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
               <div>
-                <div className="text-sm font-semibold text-foreground">Automatic retries</div>
-                <div className="text-sm text-muted-foreground">Failed deliveries retry automatically with exponential backoff: 30s → 2m → 15m → 1h → 6h. Up to 5 attempts.</div>
+                <div className="text-sm font-semibold text-foreground">{t('quickstartPage.step7.autoRetries')}</div>
+                <div className="text-sm text-muted-foreground">{t('quickstartPage.step7.autoRetriesDesc')}</div>
               </div>
             </div>
           </div>
@@ -739,12 +734,13 @@ function Step7_MonitorAndReplay() {
 /* ─── SDK Section ─── */
 
 function SDKSection() {
+  const { t } = useTranslation();
   return (
     <section className="mt-20 mb-8">
       <div className="text-center mb-10">
-        <h2 className="text-3xl font-bold text-foreground mb-3">Official SDKs</h2>
+        <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.sdkSection.title')}</h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          First-class SDKs with type safety, automatic retries, and signature verification built-in.
+          {t('quickstartPage.sdkSection.subtitle')}
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -786,7 +782,7 @@ function SDKSection() {
               <span className="text-slate-500">$</span> {sdk.install}
             </div>
             <div className="flex items-center gap-1.5 text-xs text-primary mt-4 font-medium">
-              View on {sdk.badge} <ExternalLink className="h-3 w-3" />
+              {t('quickstartPage.sdkSection.viewOn')} {sdk.badge} <ExternalLink className="h-3 w-3" />
             </div>
           </a>
         ))}
@@ -798,21 +794,22 @@ function SDKSection() {
 /* ─── Final CTA ─── */
 
 function FinalCTA() {
+  const { t } = useTranslation();
   return (
     <section className="mt-16 text-center">
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-12 lg:p-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
         <div className="relative z-10">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">You're all set 🚀</h2>
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">{t('quickstartPage.finalCta.title')}</h2>
           <p className="text-lg text-slate-300 mb-10 max-w-2xl mx-auto">
-            Your webhook infrastructure is ready. Explore the dashboard, check delivery logs, and invite your team.
+            {t('quickstartPage.finalCta.subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/admin/dashboard" className="inline-flex items-center px-8 py-4 bg-white text-slate-900 text-base font-semibold rounded-lg hover:bg-slate-100 transition-all hover:scale-105 shadow-xl">
-              Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+              {t('quickstartPage.finalCta.goToDashboard')} <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
             <Link to="/docs" className="inline-flex items-center px-8 py-4 border-2 border-white/20 text-white text-base font-semibold rounded-lg hover:bg-white/10 transition-colors">
-              Read full docs
+              {t('quickstartPage.finalCta.readDocs')}
             </Link>
           </div>
         </div>

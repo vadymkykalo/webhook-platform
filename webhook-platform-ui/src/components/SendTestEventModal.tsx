@@ -133,8 +133,8 @@ export default function SendTestEventModal({
               </p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-              <p className="text-sm text-blue-900">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
                 <strong>Note:</strong> This event will create deliveries for all active subscriptions 
                 matching this event type. Check the Deliveries page to see processing results.
               </p>

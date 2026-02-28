@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
 import { User, Building2, Loader2, KeyRound, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Separator } from '../components/ui/separator';
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -24,12 +26,12 @@ export default function SettingsPage() {
     setPasswordSuccess(false);
 
     if (newPassword !== confirmPassword) {
-      setPasswordError('New passwords do not match');
+      setPasswordError(t('settings.passwordMismatch'));
       return;
     }
 
     if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
+      setPasswordError(t('settings.passwordTooShort'));
       return;
     }
 
@@ -40,9 +42,9 @@ export default function SettingsPage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      toast.success('Password changed successfully');
+      toast.success(t('settings.toast.passwordChanged'));
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Failed to change password';
+      const msg = err.response?.data?.message || t('settings.passwordChangeFailed');
       setPasswordError(msg);
       toast.error(msg);
     } finally {
@@ -53,9 +55,9 @@ export default function SettingsPage() {
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-title tracking-tight">Settings</h1>
+        <h1 className="text-title tracking-tight">{t('settings.title')}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage your account and organization settings
+          {t('settings.subtitle')}
         </p>
       </div>
 
@@ -64,16 +66,16 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
-              <CardTitle>Profile</CardTitle>
+              <CardTitle>{t('settings.profile')}</CardTitle>
             </div>
             <CardDescription>
-              Your account information
+              {t('settings.profileDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('settings.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -84,7 +86,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role">{t('settings.role')}</Label>
                 <Input
                   id="role"
                   value={user?.role || ''}
@@ -94,7 +96,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Account status</Label>
+                <Label htmlFor="status">{t('settings.accountStatus')}</Label>
                 <Input
                   id="status"
                   value={user?.user?.status || ''}
@@ -110,16 +112,16 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-primary" />
-              <CardTitle>Change Password</CardTitle>
+              <CardTitle>{t('settings.changePassword')}</CardTitle>
             </div>
             <CardDescription>
-              Update your account password
+              {t('settings.changePasswordDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current password</Label>
+                <Label htmlFor="currentPassword">{t('settings.currentPassword')}</Label>
                 <Input
                   id="currentPassword"
                   type="password"
@@ -135,7 +137,7 @@ export default function SettingsPage() {
               <Separator />
 
               <div className="space-y-2">
-                <Label htmlFor="newPassword">New password</Label>
+                <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
                 <Input
                   id="newPassword"
                   type="password"
@@ -147,12 +149,12 @@ export default function SettingsPage() {
                   className="max-w-md"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Min 8 characters, must include uppercase, lowercase, digit, and special character
+                  {t('settings.newPasswordHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm new password</Label>
+                <Label htmlFor="confirmPassword">{t('settings.confirmPassword')}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -174,14 +176,14 @@ export default function SettingsPage() {
               {passwordSuccess && (
                 <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 max-w-md">
                   <CheckCircle2 className="h-4 w-4" />
-                  Password changed successfully
+                  {t('settings.passwordChanged')}
                 </div>
               )}
 
               <div>
                 <Button type="submit" disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}>
                   {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {changingPassword ? 'Changing...' : 'Change password'}
+                  {changingPassword ? t('settings.changingPassword') : t('settings.changePasswordBtn')}
                 </Button>
               </div>
             </form>
@@ -192,16 +194,16 @@ export default function SettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Building2 className="h-5 w-5 text-primary" />
-              <CardTitle>Organization</CardTitle>
+              <CardTitle>{t('settings.organization')}</CardTitle>
             </div>
             <CardDescription>
-              Your organization details
+              {t('settings.organizationDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Organization Name</Label>
+                <Label>{t('settings.orgName')}</Label>
                 <Input
                   value={user?.organization?.name || ''}
                   disabled
@@ -210,7 +212,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Organization ID</Label>
+                <Label>{t('settings.orgId')}</Label>
                 <Input
                   value={user?.organization?.id || ''}
                   disabled
@@ -219,7 +221,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Created At</Label>
+                <Label>{t('settings.createdAt')}</Label>
                 <Input
                   value={
                     user?.organization?.createdAt
@@ -236,22 +238,22 @@ export default function SettingsPage() {
 
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardTitle className="text-destructive">{t('settings.dangerZone')}</CardTitle>
             <CardDescription>
-              Irreversible and destructive actions
+              {t('settings.dangerZoneDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Delete Account</p>
+                  <p className="text-sm font-medium">{t('settings.deleteAccount')}</p>
                   <p className="text-xs text-muted-foreground">
-                    Permanently delete your account and all associated data
+                    {t('settings.deleteAccountDesc')}
                   </p>
                 </div>
                 <Button variant="destructive" disabled>
-                  Delete Account
+                  {t('settings.deleteAccount')}
                 </Button>
               </div>
             </div>

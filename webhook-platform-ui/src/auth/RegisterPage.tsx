@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Webhook, Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -10,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -37,10 +39,10 @@ export default function RegisterPage() {
       http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
-      toast.success('Account created! Please verify your email.');
+      toast.success(t('auth.register.success'));
       setRegistered(true);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Registration failed. Please try again.';
+      const errorMessage = err.response?.data?.message || t('auth.register.failed');
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -52,9 +54,9 @@ export default function RegisterPage() {
     setResending(true);
     try {
       await authApi.resendVerification(email);
-      toast.success('Verification email sent!');
+      toast.success(t('auth.verification.sent'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to resend verification email');
+      toast.error(err.response?.data?.message || t('auth.verification.failed'));
     } finally {
       setResending(false);
     }
@@ -75,19 +77,17 @@ export default function RegisterPage() {
 
           <div className="space-y-8">
             <div>
-              <h2 className="text-4xl font-bold leading-tight mb-4">
-                Start delivering<br />webhooks in minutes
-              </h2>
+              <h2 className="text-4xl font-bold leading-tight mb-4" dangerouslySetInnerHTML={{ __html: t('auth.register.brandTitle').replace('\n', '<br />') }} />
               <p className="text-white/70 text-lg max-w-md">
-                Create your account and send your first webhook event in under 5 minutes.
+                {t('auth.register.brandSubtitle')}
               </p>
             </div>
             <div className="space-y-3">
               {[
-                'Free to start — no credit card required',
-                'Unlimited endpoints during trial',
-                'Full API access from day one',
-                'Automatic retries with exponential backoff',
+                t('auth.register.benefit1'),
+                t('auth.register.benefit2'),
+                t('auth.register.benefit3'),
+                t('auth.register.benefit4'),
               ].map((text) => (
                 <div key={text} className="flex items-center gap-3 text-white/80">
                   <CheckCircle2 className="h-4 w-4 text-green-300 flex-shrink-0" />
@@ -98,7 +98,7 @@ export default function RegisterPage() {
           </div>
 
           <p className="text-white/40 text-sm">
-            © {new Date().getFullYear()} Hookflow. Built for production systems.
+            {t('auth.login.copyright', { year: new Date().getFullYear() })}
           </p>
         </div>
       </div>
@@ -113,15 +113,12 @@ export default function RegisterPage() {
                 <Mail className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight mb-2">Check your email</h1>
-                <p className="text-muted-foreground">
-                  We've sent a verification link to <strong>{email}</strong>.
-                  Click it to activate your account.
-                </p>
+                <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.register.checkEmail')}</h1>
+                <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: t('auth.register.verificationSent', { email }) }} />
               </div>
               <div className="space-y-3">
                 <Button onClick={() => navigate('/admin/dashboard')} className="w-full">
-                  Continue to Dashboard
+                  {t('auth.register.continueToDashboard')}
                 </Button>
                 <Button
                   variant="outline"
@@ -130,11 +127,11 @@ export default function RegisterPage() {
                   className="w-full"
                 >
                   {resending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {resending ? 'Sending...' : 'Resend verification email'}
+                  {resending ? t('common.sending') : t('auth.register.resendVerification')}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Didn't receive it? Check your spam folder or click resend above.
+                {t('auth.register.resendHint')}
               </p>
             </div>
           ) : (
@@ -144,7 +141,7 @@ export default function RegisterPage() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to home
+            {t('common.backToHome')}
           </Link>
 
           <div className="mb-8">
@@ -154,20 +151,20 @@ export default function RegisterPage() {
               </div>
               <span className="text-lg font-bold">Hookflow</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight mb-2">Create your account</h1>
+            <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.register.title')}</h1>
             <p className="text-muted-foreground">
-              Get started with your webhook infrastructure
+              {t('auth.register.subtitle')}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-sm font-medium">Full name</Label>
+                <Label htmlFor="fullName" className="text-sm font-medium">{t('auth.register.fullName')}</Label>
                 <Input
                   id="fullName"
                   type="text"
-                  placeholder="John Doe"
+                  placeholder={t('auth.register.fullNamePlaceholder')}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
@@ -177,11 +174,11 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="organizationName" className="text-sm font-medium">Organization</Label>
+                <Label htmlFor="organizationName" className="text-sm font-medium">{t('auth.register.organization')}</Label>
                 <Input
                   id="organizationName"
                   type="text"
-                  placeholder="Acme Inc."
+                  placeholder={t('auth.register.organizationPlaceholder')}
                   value={organizationName}
                   onChange={(e) => setOrganizationName(e.target.value)}
                   required
@@ -192,7 +189,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
+              <Label htmlFor="email" className="text-sm font-medium">{t('auth.register.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -206,11 +203,11 @@ export default function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">{t('auth.register.password')}</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Min. 8 characters"
+                placeholder={t('auth.register.passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -218,7 +215,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 className="h-11"
               />
-              <p className="text-[11px] text-muted-foreground">Must include uppercase, lowercase, digit, and special character (@$!%*?&-_#)</p>
+              <p className="text-[11px] text-muted-foreground">{t('auth.register.passwordHint')}</p>
             </div>
 
             {error && (
@@ -233,18 +230,18 @@ export default function RegisterPage() {
               disabled={loading}
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? t('auth.register.submitting') : t('auth.register.submit')}
             </Button>
           </form>
 
           <p className="text-xs text-muted-foreground text-center mt-6">
-            By creating an account, you agree to our Terms of Service and Privacy Policy.
+            {t('auth.register.terms')}
           </p>
 
           <p className="text-sm text-muted-foreground text-center mt-4">
-            Already have an account?{' '}
+            {t('auth.register.hasAccount')}{' '}
             <Link to="/login" className="text-primary hover:underline font-semibold">
-              Sign in
+              {t('auth.register.signIn')}
             </Link>
           </p>
           </>

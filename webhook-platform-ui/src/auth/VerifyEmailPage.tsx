@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 
 export default function VerifyEmailPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
@@ -15,7 +17,7 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setErrorMessage('No verification token provided.');
+      setErrorMessage(t('verifyEmail.noToken'));
       return;
     }
 
@@ -23,7 +25,7 @@ export default function VerifyEmailPage() {
       .then(() => setStatus('success'))
       .catch((err: any) => {
         setStatus('error');
-        setErrorMessage(err.response?.data?.message || 'Verification failed. The token may be invalid or expired.');
+        setErrorMessage(err.response?.data?.message || t('verifyEmail.failed'));
       });
   }, [token]);
 
@@ -33,20 +35,20 @@ export default function VerifyEmailPage() {
         {status === 'loading' && (
           <>
             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <h2 className="text-xl font-semibold">Verifying your email...</h2>
-            <p className="text-sm text-muted-foreground">Please wait a moment.</p>
+            <h2 className="text-xl font-semibold">{t('verifyEmail.verifying')}</h2>
+            <p className="text-sm text-muted-foreground">{t('verifyEmail.pleaseWait')}</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-            <h2 className="text-xl font-semibold text-green-700">Email Verified!</h2>
+            <h2 className="text-xl font-semibold text-green-700">{t('verifyEmail.success')}</h2>
             <p className="text-sm text-muted-foreground">
-              Your email has been successfully verified. You can now use all features.
+              {t('verifyEmail.successDesc')}
             </p>
             <Button onClick={() => navigate('/admin/dashboard')} className="mt-4">
-              Go to Dashboard
+              {t('verifyEmail.goToDashboard')}
             </Button>
           </>
         )}
@@ -54,11 +56,11 @@ export default function VerifyEmailPage() {
         {status === 'error' && (
           <>
             <XCircle className="h-12 w-12 text-red-500 mx-auto" />
-            <h2 className="text-xl font-semibold text-red-600">Verification Failed</h2>
+            <h2 className="text-xl font-semibold text-red-600">{t('verifyEmail.errorTitle')}</h2>
             <p className="text-sm text-muted-foreground">{errorMessage}</p>
             <div className="flex gap-3 justify-center mt-4">
               <Link to="/login">
-                <Button variant="outline">Go to Login</Button>
+                <Button variant="outline">{t('verifyEmail.goToLogin')}</Button>
               </Link>
             </div>
           </>

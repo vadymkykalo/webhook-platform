@@ -3,10 +3,12 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.ChangePasswordRequest;
 import com.webhook.platform.api.dto.CurrentUserResponse;
+import com.webhook.platform.api.dto.ForgotPasswordRequest;
 import com.webhook.platform.api.dto.LoginRequest;
 import com.webhook.platform.api.dto.LogoutRequest;
 import com.webhook.platform.api.dto.RefreshTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
+import com.webhook.platform.api.dto.ResetPasswordRequest;
 import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.service.AuthRateLimiterService;
@@ -185,6 +187,38 @@ public class AuthController {
                 jwtAuth.getOrganizationId(),
                 jwtAuth.getRole());
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Forgot password", description = "Sends a password reset email to the user")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "If the email exists, a reset link has been sent"),
+            @ApiResponse(responseCode = "429", description = "Too many requests")
+    })
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest) {
+        if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), request.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many requests. Try again later.");
+        }
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Reset password", description = "Resets user password using the token from the reset email")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password reset successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token")
+    })
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest httpRequest) {
+        if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), null)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many requests. Try again later.");
+        }
+        authService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok().build();
     }
 
     private String getClientIp(HttpServletRequest request) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { deliveriesApi } from '../api/deliveries.api';
 import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
@@ -37,6 +38,7 @@ export default function DeliveryDetailsSheet({
   onClose,
   onRefresh,
 }: DeliveryDetailsSheetProps) {
+  const { t } = useTranslation();
   const [delivery, setDelivery] = useState<DeliveryResponse | null>(null);
   const [attempts, setAttempts] = useState<DeliveryAttemptResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +61,7 @@ export default function DeliveryDetailsSheet({
       const data = await deliveriesApi.get(deliveryId);
       setDelivery(data);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load delivery details');
+      toast.error(err.response?.data?.message || t('deliveryDetails.toast.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -86,13 +88,13 @@ export default function DeliveryDetailsSheet({
     setReplaying(true);
     try {
       await deliveriesApi.replay(deliveryId);
-      toast.success('Delivery replay initiated successfully');
+      toast.success(t('deliveryDetails.toast.replaySuccess'));
       setShowReplayDialog(false);
       onRefresh();
       loadDelivery();
       loadAttempts();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to replay delivery');
+      toast.error(err.response?.data?.message || t('deliveryDetails.toast.replayFailed'));
     } finally {
       setReplaying(false);
     }
@@ -101,7 +103,7 @@ export default function DeliveryDetailsSheet({
   const handleCopyId = () => {
     if (deliveryId) {
       navigator.clipboard.writeText(deliveryId);
-      toast.success('Delivery ID copied to clipboard');
+      toast.success(t('deliveryDetails.toast.idCopied'));
     }
   };
 
@@ -133,13 +135,13 @@ export default function DeliveryDetailsSheet({
     if (status === 'FAILED' || status === 'DLQ') {
       return (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-          <h4 className="text-sm font-semibold text-yellow-900 mb-2">Troubleshooting Tips</h4>
+          <h4 className="text-sm font-semibold text-yellow-900 mb-2">{t('deliveryDetails.troubleshooting.title')}</h4>
           <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
-            <li>Verify the endpoint URL is accessible and responding</li>
-            <li>Check webhook signature validation in your application</li>
-            <li>Review rate limits and ensure they're not exceeded</li>
-            <li>Inspect the error messages in delivery attempts below</li>
-            <li>Consider replaying the delivery after fixing the issue</li>
+            <li>{t('deliveryDetails.troubleshooting.tip1')}</li>
+            <li>{t('deliveryDetails.troubleshooting.tip2')}</li>
+            <li>{t('deliveryDetails.troubleshooting.tip3')}</li>
+            <li>{t('deliveryDetails.troubleshooting.tip4')}</li>
+            <li>{t('deliveryDetails.troubleshooting.tip5')}</li>
           </ul>
         </div>
       );
@@ -152,9 +154,9 @@ export default function DeliveryDetailsSheet({
       <Sheet open={open} onOpenChange={onClose}>
         <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
           <SheetHeader>
-            <SheetTitle>Delivery Details</SheetTitle>
+            <SheetTitle>{t('deliveryDetails.title')}</SheetTitle>
             <SheetDescription>
-              View delivery status, attempts, and responses
+              {t('deliveryDetails.description')}
             </SheetDescription>
           </SheetHeader>
 
@@ -166,11 +168,11 @@ export default function DeliveryDetailsSheet({
             <div className="space-y-6 mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Summary</CardTitle>
+                  <CardTitle className="text-lg">{t('deliveryDetails.summary')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Delivery ID</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.deliveryId')}</span>
                     <div className="flex items-center gap-2">
                       <code className="text-sm font-mono">{delivery.id.substring(0, 8)}...</code>
                       <Button variant="ghost" size="icon" onClick={handleCopyId}>
@@ -180,27 +182,27 @@ export default function DeliveryDetailsSheet({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Status</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.status')}</span>
                     {getStatusBadge(delivery.status)}
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Event ID</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.eventId')}</span>
                     <code className="text-sm font-mono">{delivery.eventId.substring(0, 8)}...</code>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Endpoint ID</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.endpointId')}</span>
                     <code className="text-sm font-mono">{delivery.endpointId.substring(0, 8)}...</code>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Created</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.created')}</span>
                     <span className="text-sm">{formatDateTime(delivery.createdAt)}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Attempts</span>
+                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.attempts')}</span>
                     <span className="text-sm font-medium">
                       {delivery.attemptCount} / {delivery.maxAttempts}
                     </span>
@@ -208,21 +210,21 @@ export default function DeliveryDetailsSheet({
 
                   {delivery.nextRetryAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Next Retry</span>
+                      <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.nextRetry')}</span>
                       <span className="text-sm">{formatDateTime(delivery.nextRetryAt)}</span>
                     </div>
                   )}
 
                   {delivery.succeededAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Succeeded At</span>
+                      <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.succeededAt')}</span>
                       <span className="text-sm">{formatDateTime(delivery.succeededAt)}</span>
                     </div>
                   )}
 
                   {delivery.failedAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Failed At</span>
+                      <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.failedAt')}</span>
                       <span className="text-sm">{formatDateTime(delivery.failedAt)}</span>
                     </div>
                   )}
@@ -233,7 +235,7 @@ export default function DeliveryDetailsSheet({
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Delivery Attempts</CardTitle>
+                  <CardTitle className="text-lg">{t('deliveryDetails.deliveryAttempts')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {attemptsLoading ? (
@@ -242,7 +244,7 @@ export default function DeliveryDetailsSheet({
                     </div>
                   ) : attempts.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No attempts recorded yet for this delivery.
+                      {t('deliveryDetails.noAttempts')}
                     </p>
                   ) : (
                     <div className="space-y-4">
@@ -253,7 +255,7 @@ export default function DeliveryDetailsSheet({
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-sm">
-                              Attempt #{attempt.attemptNumber}
+                              {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {formatDateTime(attempt.createdAt)}
@@ -263,7 +265,7 @@ export default function DeliveryDetailsSheet({
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             {attempt.httpStatusCode && (
                               <div>
-                                <span className="text-muted-foreground">Status:</span>
+                                <span className="text-muted-foreground">{t('deliveryDetails.statusLabel')}</span>
                                 <span className={`ml-2 font-medium ${
                                   attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300
                                     ? 'text-green-600'
@@ -275,7 +277,7 @@ export default function DeliveryDetailsSheet({
                             )}
                             {attempt.durationMs !== null && attempt.durationMs !== undefined && (
                               <div>
-                                <span className="text-muted-foreground">Duration:</span>
+                                <span className="text-muted-foreground">{t('deliveryDetails.duration')}</span>
                                 <span className="ml-2 font-medium">{attempt.durationMs}ms</span>
                               </div>
                             )}
@@ -284,7 +286,7 @@ export default function DeliveryDetailsSheet({
                           {attempt.requestHeaders && (
                             <details className="mt-2">
                               <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                Request Headers
+                                {t('deliveryDetails.requestHeaders')}
                               </summary>
                               <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
                                 {JSON.stringify(JSON.parse(attempt.requestHeaders), null, 2)}
@@ -295,7 +297,7 @@ export default function DeliveryDetailsSheet({
                           {attempt.requestBody && (
                             <details className="mt-2">
                               <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                Request Body
+                                {t('deliveryDetails.requestBody')}
                               </summary>
                               <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
                                 {(() => {
@@ -312,7 +314,7 @@ export default function DeliveryDetailsSheet({
                           {attempt.responseHeaders && (
                             <details className="mt-2">
                               <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                Response Headers
+                                {t('deliveryDetails.responseHeaders')}
                               </summary>
                               <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
                                 {JSON.stringify(JSON.parse(attempt.responseHeaders), null, 2)}
@@ -322,7 +324,7 @@ export default function DeliveryDetailsSheet({
 
                           {attempt.errorMessage && (
                             <div className="mt-2">
-                              <span className="text-sm text-muted-foreground">Error:</span>
+                              <span className="text-sm text-muted-foreground">{t('deliveryDetails.error')}</span>
                               <p className="text-sm text-red-600 mt-1 font-mono bg-red-50 p-2 rounded">
                                 {attempt.errorMessage}
                               </p>
@@ -332,7 +334,7 @@ export default function DeliveryDetailsSheet({
                           {attempt.responseBody && (
                             <details className="mt-2">
                               <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                Response Body
+                                {t('deliveryDetails.responseBody')}
                               </summary>
                               <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
                                 {(() => {
@@ -359,13 +361,13 @@ export default function DeliveryDetailsSheet({
                   className="flex-1"
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Replay Delivery
+                  {t('deliveryDetails.replayDelivery')}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-center py-16">
-              <p className="text-muted-foreground">No delivery data available</p>
+              <p className="text-muted-foreground">{t('deliveryDetails.noData')}</p>
             </div>
           )}
         </SheetContent>
@@ -374,17 +376,16 @@ export default function DeliveryDetailsSheet({
       <AlertDialog open={showReplayDialog} onOpenChange={setShowReplayDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Replay Delivery?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deliveryDetails.replayDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will re-attempt delivery of the webhook to the endpoint. The delivery will be
-              queued for immediate processing.
+              {t('deliveryDetails.replayDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={replaying}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={replaying}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleReplay} disabled={replaying}>
               {replaying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {replaying ? 'Replaying...' : 'Replay'}
+              {replaying ? t('deliveryDetails.replaying') : t('deliveryDetails.replay')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

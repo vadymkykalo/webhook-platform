@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { testEndpointsApi, TestEndpointResponse, CapturedRequestResponse } from '../api/testEndpoints.api';
 import { Button } from '../components/ui/button';
@@ -15,9 +16,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function TestEndpointsPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const { canManageTestEndpoints } = usePermissions();
   const [endpoints, setEndpoints] = useState<TestEndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -47,7 +51,7 @@ export default function TestEndpointsPage() {
       const data = await testEndpointsApi.list(projectId);
       setEndpoints(data);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load test endpoints');
+      toast.error(err.response?.data?.message || t('testEndpoints.toast.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -60,7 +64,7 @@ export default function TestEndpointsPage() {
       const data = await testEndpointsApi.getRequests(projectId, endpointId);
       setRequests(data.content);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load requests');
+      toast.error(err.response?.data?.message || t('testEndpoints.toast.loadRequestsFailed'));
     } finally {
       setLoadingRequests(false);
     }
@@ -72,10 +76,10 @@ export default function TestEndpointsPage() {
       setCreating(true);
       const endpoint = await testEndpointsApi.create(projectId);
       setEndpoints([endpoint, ...endpoints]);
-      toast.success('Test endpoint created');
+      toast.success(t('testEndpoints.toast.created'));
       copyToClipboard(endpoint.url);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create test endpoint');
+      toast.error(err.response?.data?.message || t('testEndpoints.toast.createFailed'));
     } finally {
       setCreating(false);
     }
@@ -91,9 +95,9 @@ export default function TestEndpointsPage() {
         setSelectedEndpoint(null);
         setRequests([]);
       }
-      toast.success('Test endpoint deleted');
+      toast.success(t('testEndpoints.toast.deleted'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
+      toast.error(err.response?.data?.message || t('testEndpoints.toast.deleteFailed'));
     } finally {
       setDeleting(false);
       setDeleteId(null);
@@ -102,7 +106,7 @@ export default function TestEndpointsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('URL copied to clipboard');
+    toast.success(t('testEndpoints.toast.urlCopied'));
   };
 
   const formatDate = (dateString: string) => {
@@ -113,11 +117,11 @@ export default function TestEndpointsPage() {
     const now = new Date();
     const expires = new Date(expiresAt);
     const diff = expires.getTime() - now.getTime();
-    if (diff <= 0) return 'Expired';
+    if (diff <= 0) return t('testEndpoints.expired');
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    if (hours > 0) return `${hours}h ${minutes}m remaining`;
-    return `${minutes}m remaining`;
+    if (hours > 0) return `${hours}h ${minutes}m ${t('testEndpoints.remaining')}`;
+    return `${minutes}m ${t('testEndpoints.remaining')}`;
   };
 
   const getMethodColor = (method: string) => {
@@ -162,23 +166,25 @@ export default function TestEndpointsPage() {
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Test Endpoints</h1>
+          <h1 className="text-title tracking-tight">{t('testEndpoints.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Temporary endpoints to capture and inspect webhook requests
+            {t('testEndpoints.subtitle')}
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={creating}>
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Create Test Endpoint
-        </Button>
+        {canManageTestEndpoints && (
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {t('testEndpoints.create')}
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Endpoints</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('testEndpoints.endpoints')}</p>
           {endpoints.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-xl">
-              <p className="text-sm text-muted-foreground">No test endpoints yet</p>
+              <p className="text-sm text-muted-foreground">{t('testEndpoints.noEndpoints')}</p>
             </div>
           ) : (
             endpoints.map((endpoint) => (
@@ -199,9 +205,11 @@ export default function TestEndpointsPage() {
                       <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyToClipboard(endpoint.url); }}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {canManageTestEndpoints && (
+                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
@@ -218,17 +226,17 @@ export default function TestEndpointsPage() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Captured Requests</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('testEndpoints.capturedRequests')}</p>
             {selectedEndpoint && (
               <Button variant="outline" size="sm" onClick={() => loadRequests(selectedEndpoint)} disabled={loadingRequests}>
-                <RefreshCw className={`h-3.5 w-3.5 ${loadingRequests ? 'animate-spin' : ''}`} /> Refresh
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingRequests ? 'animate-spin' : ''}`} /> {t('testEndpoints.refresh')}
               </Button>
             )}
           </div>
 
           {!selectedEndpoint ? (
             <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-xl">
-              <p className="text-sm text-muted-foreground">Select an endpoint to view requests</p>
+              <p className="text-sm text-muted-foreground">{t('testEndpoints.selectEndpoint')}</p>
             </div>
           ) : loadingRequests ? (
             <div className="flex items-center justify-center h-32">
@@ -236,7 +244,7 @@ export default function TestEndpointsPage() {
             </div>
           ) : requests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 border border-dashed rounded-xl">
-              <p className="text-sm text-muted-foreground">No requests captured yet</p>
+              <p className="text-sm text-muted-foreground">{t('testEndpoints.noRequests')}</p>
             </div>
           ) : (
             <div className="space-y-2 animate-fade-in">
@@ -255,13 +263,13 @@ export default function TestEndpointsPage() {
                     <CardContent className="pt-0 pb-4 space-y-3">
                       {req.headers && (
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Headers</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{t('testEndpoints.headers')}</p>
                           <pre className="bg-muted/50 border p-3 rounded-lg text-[11px] font-mono overflow-x-auto max-h-40">{JSON.stringify(parseHeaders(req.headers), null, 2)}</pre>
                         </div>
                       )}
                       {req.body && (
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Body</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{t('testEndpoints.body')}</p>
                           <pre className="bg-muted/50 border p-3 rounded-lg text-[11px] font-mono overflow-x-auto max-h-60">
                             {(() => { try { return JSON.stringify(JSON.parse(req.body), null, 2); } catch { return req.body; } })()}
                           </pre>
@@ -269,7 +277,7 @@ export default function TestEndpointsPage() {
                       )}
                       {req.queryString && (
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Query String</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">{t('testEndpoints.queryString')}</p>
                           <code className="bg-muted/50 border px-2 py-1 rounded text-[11px] font-mono">?{req.queryString}</code>
                         </div>
                       )}
@@ -285,20 +293,20 @@ export default function TestEndpointsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete test endpoint?</AlertDialogTitle>
+            <AlertDialogTitle>{t('testEndpoints.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the endpoint and all captured requests.
+              {t('testEndpoints.deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

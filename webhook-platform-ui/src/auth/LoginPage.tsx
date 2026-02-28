@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Webhook, Loader2, ArrowLeft, Shield, Zap, Eye } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -10,12 +11,15 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const redirectTo = (location.state as any)?.from || '/admin/projects';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +32,10 @@ export default function LoginPage() {
       http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
-      toast.success('Welcome back!');
-      navigate('/admin/projects');
+      toast.success(t('auth.login.welcomeBack'));
+      navigate(redirectTo);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Login failed. Please try again.';
+      const errorMessage = err.response?.data?.message || t('auth.login.failed');
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -54,18 +58,16 @@ export default function LoginPage() {
 
           <div className="space-y-8">
             <div>
-              <h2 className="text-4xl font-bold leading-tight mb-4">
-                Webhook infrastructure<br />you can trust
-              </h2>
+              <h2 className="text-4xl font-bold leading-tight mb-4" dangerouslySetInnerHTML={{ __html: t('auth.login.brandTitle').replace('\n', '<br />') }} />
               <p className="text-white/70 text-lg max-w-md">
-                Reliable delivery, automatic retries, and complete visibility for every webhook.
+                {t('auth.login.brandSubtitle')}
               </p>
             </div>
             <div className="space-y-4">
               {[
-                { icon: Zap, text: 'Sub-second delivery latency' },
-                { icon: Shield, text: 'HMAC signature verification' },
-                { icon: Eye, text: 'Full delivery transparency' },
+                { icon: Zap, text: t('auth.login.feature1') },
+                { icon: Shield, text: t('auth.login.feature2') },
+                { icon: Eye, text: t('auth.login.feature3') },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} className="flex items-center gap-3 text-white/80">
                   <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center">
@@ -78,7 +80,7 @@ export default function LoginPage() {
           </div>
 
           <p className="text-white/40 text-sm">
-            © {new Date().getFullYear()} Hookflow. Built for production systems.
+            {t('auth.login.copyright', { year: new Date().getFullYear() })}
           </p>
         </div>
       </div>
@@ -91,7 +93,7 @@ export default function LoginPage() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to home
+            {t('common.backToHome')}
           </Link>
 
           <div className="mb-8">
@@ -101,15 +103,15 @@ export default function LoginPage() {
               </div>
               <span className="text-lg font-bold">Hookflow</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight mb-2">Welcome back</h1>
+            <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.login.title')}</h1>
             <p className="text-muted-foreground">
-              Sign in to your account to continue
+              {t('auth.login.subtitle')}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
+              <Label htmlFor="email" className="text-sm font-medium">{t('auth.login.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -123,7 +125,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-sm font-medium">{t('auth.login.password')}</Label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  {t('auth.login.forgotPassword')}
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -149,14 +159,14 @@ export default function LoginPage() {
               disabled={loading}
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? t('auth.login.submitting') : t('auth.login.submit')}
             </Button>
           </form>
 
           <p className="text-sm text-muted-foreground text-center mt-8">
-            Don't have an account?{' '}
+            {t('auth.login.noAccount')}{' '}
             <Link to="/register" className="text-primary hover:underline font-semibold">
-              Create account
+              {t('auth.login.createAccount')}
             </Link>
           </p>
         </div>

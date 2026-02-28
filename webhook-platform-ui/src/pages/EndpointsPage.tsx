@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { endpointsApi } from '../api/endpoints.api';
 import { projectsApi } from '../api/projects.api';
@@ -29,9 +30,12 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import MtlsConfigModal from '../components/MtlsConfigModal';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function EndpointsPage() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const { canManageEndpoints } = usePermissions();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +81,7 @@ export default function EndpointsPage() {
       setEndpoints(endpointsData.content);
       setPageInfo(endpointsData);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load data');
+      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -104,10 +108,10 @@ export default function EndpointsPage() {
       setRateLimitPerSecond(undefined);
       setAllowedSourceIps('');
       setNewSecret(secret);
-      toast.success('Endpoint created successfully');
+      toast.success(t('endpoints.toast.created'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create endpoint');
+      toast.error(err.response?.data?.message || t('endpoints.toast.createFailed'));
     } finally {
       setCreating(false);
     }
@@ -119,11 +123,11 @@ export default function EndpointsPage() {
     setDeleting(true);
     try {
       await endpointsApi.delete(projectId, deleteId);
-      toast.success('Endpoint deleted successfully');
+      toast.success(t('endpoints.toast.deleted'));
       setDeleteId(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete endpoint');
+      toast.error(err.response?.data?.message || t('endpoints.toast.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -143,11 +147,11 @@ export default function EndpointsPage() {
         enabled: !endpoint.enabled,
         rateLimitPerSecond: endpoint.rateLimitPerSecond,
       });
-      toast.success(`Endpoint ${!endpoint.enabled ? 'enabled' : 'disabled'} successfully`);
+      toast.success(!endpoint.enabled ? t('endpoints.toast.enabled') : t('endpoints.toast.disabled'));
       setToggleId(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to toggle endpoint');
+      toast.error(err.response?.data?.message || t('endpoints.toast.toggleFailed'));
     } finally {
       setToggling(false);
     }
@@ -160,10 +164,10 @@ export default function EndpointsPage() {
     try {
       const response = await endpointsApi.rotateSecret(projectId, rotateId);
       setNewSecret(response.secret || null);
-      toast.success('Secret rotated successfully');
+      toast.success(t('endpoints.toast.secretRotated'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to rotate secret');
+      toast.error(err.response?.data?.message || t('endpoints.toast.rotateFailed'));
       setRotateId(null);
     } finally {
       setRotating(false);
@@ -173,7 +177,7 @@ export default function EndpointsPage() {
   const handleCopySecret = () => {
     if (newSecret) {
       navigator.clipboard.writeText(newSecret);
-      toast.success('Secret copied to clipboard');
+      toast.success(t('endpoints.toast.secretCopied'));
     }
   };
 
@@ -193,12 +197,12 @@ export default function EndpointsPage() {
       const result = await endpointsApi.test(projectId, endpointId);
       setTestResult(result);
       if (result.success) {
-        toast.success(`Test successful: ${result.httpStatusCode} (${result.latencyMs}ms)`);
+        toast.success(t('endpoints.toast.testSuccess', { status: result.httpStatusCode, latency: result.latencyMs }));
       } else {
-        toast.error(`Test failed: ${result.message}`);
+        toast.error(t('endpoints.toast.testFailed', { message: result.message }));
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to test endpoint');
+      toast.error(err.response?.data?.message || t('endpoints.toast.testError'));
       setTestId(null);
     } finally {
       setTesting(false);
@@ -217,14 +221,14 @@ export default function EndpointsPage() {
     try {
       const result = await endpointsApi.verify(projectId, endpointId);
       if (result.success) {
-        toast.success('Endpoint verified successfully!');
+        toast.success(t('endpoints.toast.verified'));
         loadData();
       } else {
-        toast.error(`Verification failed: ${result.message}`);
+        toast.error(t('endpoints.toast.verifyFailed', { message: result.message }));
         loadData();
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to verify endpoint');
+      toast.error(err.response?.data?.message || t('endpoints.toast.verifyError'));
     } finally {
       setVerifyingId(null);
     }
@@ -236,10 +240,10 @@ export default function EndpointsPage() {
     setSkippingId(endpointId);
     try {
       await endpointsApi.skipVerification(projectId, endpointId, 'Manually skipped by user');
-      toast.success('Verification skipped');
+      toast.success(t('endpoints.toast.skipped'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to skip verification');
+      toast.error(err.response?.data?.message || t('endpoints.toast.skipFailed'));
     } finally {
       setSkippingId(null);
     }
@@ -250,26 +254,26 @@ export default function EndpointsPage() {
       case 'VERIFIED':
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-            <CheckCircle className="h-3 w-3" /> Verified
+            <CheckCircle className="h-3 w-3" /> {t('endpoints.verified')}
           </span>
         );
       case 'FAILED':
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
-            <AlertCircle className="h-3 w-3" /> Failed
+            <AlertCircle className="h-3 w-3" /> {t('endpoints.failed')}
           </span>
         );
       case 'SKIPPED':
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-            <ShieldOff className="h-3 w-3" /> Skipped
+            <ShieldOff className="h-3 w-3" /> {t('endpoints.skipped')}
           </span>
         );
       case 'PENDING':
       default:
         return (
           <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-            <Clock className="h-3 w-3" /> Pending
+            <Clock className="h-3 w-3" /> {t('endpoints.pending')}
           </span>
         );
     }
@@ -313,7 +317,7 @@ export default function EndpointsPage() {
           <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
             <Webhook className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Project not found</p>
+          <p className="text-muted-foreground">{t('endpoints.projectNotFound')}</p>
         </div>
       </div>
     );
@@ -323,14 +327,14 @@ export default function EndpointsPage() {
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
-          <h1 className="text-title tracking-tight">Endpoints</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage webhook endpoints for <span className="font-medium text-foreground">{project.name}</span>
-          </p>
+          <h1 className="text-title tracking-tight">{t('endpoints.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('endpoints.subtitle', { project: project.name }) }} />
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4" /> New Endpoint
-        </Button>
+        {canManageEndpoints && (
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" /> {t('endpoints.newEndpoint')}
+          </Button>
+        )}
       </div>
 
       {endpoints.length === 0 ? (
@@ -338,13 +342,15 @@ export default function EndpointsPage() {
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
             <Webhook className="h-8 w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No endpoints yet</h3>
+          <h3 className="text-lg font-semibold mb-2">{t('endpoints.noEndpoints')}</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            Create your first endpoint to start receiving webhooks
+            {t('endpoints.noEndpointsDesc')}
           </p>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" /> Create endpoint
-          </Button>
+          {canManageEndpoints && (
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" /> {t('endpoints.createFirst')}
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3 animate-fade-in">
@@ -363,11 +369,11 @@ export default function EndpointsPage() {
                         <p className="text-sm font-semibold truncate">{endpoint.url}</p>
                         {endpoint.enabled ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                            <Power className="h-3 w-3" /> Active
+                            <Power className="h-3 w-3" /> {t('endpoints.active')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                            <PowerOff className="h-3 w-3" /> Disabled
+                            <PowerOff className="h-3 w-3" /> {t('endpoints.disabled')}
                           </span>
                         )}
                         {endpoint.mtlsEnabled && (
@@ -389,35 +395,39 @@ export default function EndpointsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title="Test" disabled={testing && testId === endpoint.id}>
-                      {testing && testId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? 'Disable' : 'Enable'}>
-                      {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title="Rotate Secret">
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}>
-                      <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
-                    </Button>
-                    {endpoint.verificationStatus !== 'VERIFIED' && (
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title="Verify endpoint" disabled={verifyingId === endpoint.id}>
-                        {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
-                      </Button>
+                    {canManageEndpoints && (
+                      <>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title={t('endpoints.test')} disabled={testing && testId === endpoint.id}>
+                          {testing && testId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? t('common.disable') : t('common.enable')}>
+                          {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title={t('endpoints.rotateSecret')}>
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? t('endpoints.configureMtls') : t('endpoints.enableMtls')}>
+                          <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
+                        </Button>
+                        {endpoint.verificationStatus !== 'VERIFIED' && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title={t('endpoints.verifyEndpoint')} disabled={verifyingId === endpoint.id}>
+                            {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
                     )}
-                    <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </div>
 
-                {(endpoint.verificationStatus === 'PENDING' || endpoint.verificationStatus === 'FAILED') && (
+                {canManageEndpoints && (endpoint.verificationStatus === 'PENDING' || endpoint.verificationStatus === 'FAILED') && (
                   <div className="mt-4 p-3 bg-accent/50 rounded-lg border border-primary/10">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex-1">
                         <p className="text-xs font-semibold">
-                          {endpoint.verificationStatus === 'PENDING' ? 'Endpoint verification required' : 'Verification failed — retry?'}
+                          {endpoint.verificationStatus === 'PENDING' ? t('endpoints.verificationRequired') : t('endpoints.verificationRetry')}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           Respond to <code className="bg-muted px-1 py-0.5 rounded text-[10px] font-mono">POST</code> with the challenge value.
@@ -425,11 +435,11 @@ export default function EndpointsPage() {
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <Button size="sm" variant="outline" onClick={() => handleSkipVerification(endpoint.id)} disabled={skippingId === endpoint.id}>
-                          {skippingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Skip'}
+                          {skippingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('endpoints.skip')}
                         </Button>
                         <Button size="sm" onClick={() => handleVerify(endpoint.id)} disabled={verifyingId === endpoint.id}>
                           {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
-                          Verify
+                          {t('endpoints.verify')}
                         </Button>
                       </div>
                     </div>
@@ -442,7 +452,7 @@ export default function EndpointsPage() {
           {pageInfo && pageInfo.totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
               <p className="text-sm text-muted-foreground">
-                Showing {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements)} of {pageInfo.totalElements}
+                {t('common.showing', { from: currentPage * PAGE_SIZE + 1, to: Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements), total: pageInfo.totalElements })}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -451,7 +461,7 @@ export default function EndpointsPage() {
                   onClick={() => setCurrentPage(p => p - 1)}
                   disabled={pageInfo.first}
                 >
-                  <ChevronLeft className="h-4 w-4" /> Previous
+                  <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
                 </Button>
                 <span className="text-sm text-muted-foreground px-2">
                   {currentPage + 1} / {pageInfo.totalPages}
@@ -462,7 +472,7 @@ export default function EndpointsPage() {
                   onClick={() => setCurrentPage(p => p + 1)}
                   disabled={pageInfo.last}
                 >
-                  Next <ChevronRight className="h-4 w-4" />
+                  {t('common.next')} <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -473,19 +483,19 @@ export default function EndpointsPage() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Endpoint</DialogTitle>
+            <DialogTitle>{t('endpoints.createDialog.title')}</DialogTitle>
             <DialogDescription>
-              Add a new webhook endpoint to receive events
+              {t('endpoints.createDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="url">Endpoint URL</Label>
+                <Label htmlFor="url">{t('endpoints.createDialog.url')}</Label>
                 <Input
                   id="url"
                   type="url"
-                  placeholder="https://example.com/webhooks"
+                  placeholder={t('endpoints.createDialog.urlPlaceholder')}
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   required
@@ -493,14 +503,14 @@ export default function EndpointsPage() {
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
-                  The URL where webhook events will be sent
+                  {t('endpoints.createDialog.urlHint')}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">Description (optional)</Label>
+                <Label htmlFor="description">{t('endpoints.createDialog.description')}</Label>
                 <Textarea
                   id="description"
-                  placeholder="Production webhook endpoint"
+                  placeholder={t('endpoints.createDialog.descPlaceholder')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   disabled={creating}
@@ -508,33 +518,32 @@ export default function EndpointsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rateLimit">Rate Limit (optional)</Label>
+                <Label htmlFor="rateLimit">{t('endpoints.createDialog.rateLimit')}</Label>
                 <Input
                   id="rateLimit"
                   type="number"
                   min="1"
                   max="1000"
-                  placeholder="Requests per second"
+                  placeholder={t('endpoints.createDialog.rateLimitPlaceholder')}
                   value={rateLimitPerSecond || ''}
                   onChange={(e) => setRateLimitPerSecond(e.target.value ? parseInt(e.target.value) : undefined)}
                   disabled={creating}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Maximum requests per second (leave empty for no limit)
+                  {t('endpoints.createDialog.rateLimitHint')}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="allowedSourceIps">Allowed Source IPs (optional)</Label>
+                <Label htmlFor="allowedSourceIps">{t('endpoints.createDialog.allowedIps')}</Label>
                 <Input
                   id="allowedSourceIps"
-                  placeholder="192.168.1.1, 10.0.0.0/8"
+                  placeholder={t('endpoints.createDialog.allowedIpsPlaceholder')}
                   value={allowedSourceIps}
                   onChange={(e) => setAllowedSourceIps(e.target.value)}
                   disabled={creating}
                 />
                 <p className="text-xs text-muted-foreground">
-                  For documentation only. Record which IPs your endpoint expects webhooks from.
-                  This helps with compliance audits and firewall configuration.
+                  {t('endpoints.createDialog.allowedIpsHint')}
                 </p>
               </div>
             </div>
@@ -545,11 +554,11 @@ export default function EndpointsPage() {
                 onClick={() => setShowCreateDialog(false)}
                 disabled={creating}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={creating}>
                 {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {creating ? 'Creating...' : 'Create Endpoint'}
+                {creating ? t('endpoints.createDialog.submitting') : t('endpoints.createDialog.submit')}
               </Button>
             </DialogFooter>
           </form>
@@ -559,20 +568,20 @@ export default function EndpointsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete endpoint?</AlertDialogTitle>
+            <AlertDialogTitle>{t('endpoints.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This endpoint will stop receiving webhooks immediately.
+              {t('endpoints.deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleting ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -582,19 +591,19 @@ export default function EndpointsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {getToggleEndpoint()?.enabled ? 'Disable' : 'Enable'} endpoint?
+              {getToggleEndpoint()?.enabled ? t('endpoints.toggleDialog.disableTitle') : t('endpoints.toggleDialog.enableTitle')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {getToggleEndpoint()?.enabled
-                ? 'This endpoint will stop receiving webhooks until re-enabled.'
-                : 'This endpoint will start receiving webhooks again.'}
+                ? t('endpoints.toggleDialog.disableDesc')
+                : t('endpoints.toggleDialog.enableDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={toggling}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={toggling}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleToggle} disabled={toggling}>
               {toggling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {toggling ? 'Processing...' : 'Confirm'}
+              {toggling ? t('endpoints.toggleDialog.processing') : t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -603,17 +612,16 @@ export default function EndpointsPage() {
       <AlertDialog open={!!rotateId && !newSecret} onOpenChange={(open) => !open && setRotateId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Rotate webhook secret?</AlertDialogTitle>
+            <AlertDialogTitle>{t('endpoints.rotateDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              A new secret will be generated. You'll need to update your webhook signature verification with the new secret.
-              The old secret will stop working immediately.
+              {t('endpoints.rotateDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={rotating}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={rotating}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRotateSecret} disabled={rotating}>
               {rotating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {rotating ? 'Rotating...' : 'Rotate Secret'}
+              {rotating ? t('endpoints.rotateDialog.rotating') : t('endpoints.rotateDialog.submit')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -622,9 +630,9 @@ export default function EndpointsPage() {
       <Dialog open={!!newSecret} onOpenChange={closeSecretDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Webhook Secret</DialogTitle>
+            <DialogTitle>{t('endpoints.secretDialog.title')}</DialogTitle>
             <DialogDescription>
-              Save this secret securely. It won't be shown again.
+              {t('endpoints.secretDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -638,17 +646,17 @@ export default function EndpointsPage() {
                 variant="outline"
                 size="icon"
                 onClick={handleCopySecret}
-                title="Copy secret"
+                title={t('endpoints.secretDialog.copy')}
               >
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              Use this secret to verify webhook signatures in your application.
+              {t('endpoints.secretDialog.hint')}
             </p>
           </div>
           <DialogFooter>
-            <Button onClick={closeSecretDialog}>Done</Button>
+            <Button onClick={closeSecretDialog}>{t('endpoints.secretDialog.done')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -656,9 +664,9 @@ export default function EndpointsPage() {
       <Dialog open={!!testResult} onOpenChange={closeTestDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Endpoint Test Result</DialogTitle>
+            <DialogTitle>{t('endpoints.testDialog.title')}</DialogTitle>
             <DialogDescription>
-              Test webhook was sent to the endpoint
+              {t('endpoints.testDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -670,7 +678,7 @@ export default function EndpointsPage() {
                       <Power className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
-                      <div className="font-semibold text-green-700">Test Successful</div>
+                      <div className="font-semibold text-green-700">{t('endpoints.testDialog.success')}</div>
                       <div className="text-sm text-muted-foreground">
                         HTTP {testResult.httpStatusCode} • {testResult.latencyMs}ms
                       </div>
@@ -682,9 +690,9 @@ export default function EndpointsPage() {
                       <PowerOff className="h-5 w-5 text-red-600" />
                     </div>
                     <div>
-                      <div className="font-semibold text-red-700">Test Failed</div>
+                      <div className="font-semibold text-red-700">{t('endpoints.testDialog.failed')}</div>
                       <div className="text-sm text-muted-foreground">
-                        {testResult?.latencyMs ? `${testResult.latencyMs}ms` : 'No response'}
+                        {testResult?.latencyMs ? `${testResult.latencyMs}ms` : t('endpoints.testDialog.noResponse')}
                       </div>
                     </div>
                   </>
@@ -694,7 +702,7 @@ export default function EndpointsPage() {
 
             {testResult?.httpStatusCode && (
               <div>
-                <Label>HTTP Status Code</Label>
+                <Label>{t('endpoints.testDialog.httpStatus')}</Label>
                 <div className="mt-1 p-3 bg-muted rounded-md font-mono text-sm">
                   {testResult.httpStatusCode}
                 </div>
@@ -703,7 +711,7 @@ export default function EndpointsPage() {
 
             {testResult?.responseBody && (
               <div>
-                <Label>Response Body</Label>
+                <Label>{t('endpoints.testDialog.responseBody')}</Label>
                 <div className="mt-1 p-3 bg-muted rounded-md font-mono text-xs max-h-48 overflow-auto">
                   {testResult.responseBody}
                 </div>
@@ -712,7 +720,7 @@ export default function EndpointsPage() {
 
             {testResult?.errorMessage && (
               <div>
-                <Label>Error Message</Label>
+                <Label>{t('endpoints.testDialog.errorMessage')}</Label>
                 <div className="mt-1 p-3 bg-red-50 text-red-700 rounded-md text-sm">
                   {testResult.errorMessage}
                 </div>
@@ -720,14 +728,14 @@ export default function EndpointsPage() {
             )}
 
             <div>
-              <Label>Message</Label>
+              <Label>{t('endpoints.testDialog.message')}</Label>
               <div className="mt-1 p-3 bg-muted rounded-md text-sm">
                 {testResult?.message}
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={closeTestDialog}>Close</Button>
+            <Button onClick={closeTestDialog}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

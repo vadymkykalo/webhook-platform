@@ -52,6 +52,53 @@ public class EmailService {
         }
     }
 
+    public void sendPasswordResetEmail(String to, String token) {
+        String resetUrl = baseUrl + "/reset-password?token=" + token;
+
+        if (!emailEnabled) {
+            log.info("========== PASSWORD RESET ==========");
+            log.info("To: {}", to);
+            log.info("Reset URL: {}", resetUrl);
+            log.info("====================================");
+            return;
+        }
+
+        try {
+            var message = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject("Reset your password — Hookflow");
+            helper.setText(buildPasswordResetHtml(resetUrl), true);
+            mailSender.send(message);
+            log.info("Password reset email sent to {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
+            log.info("Fallback — Reset URL: {}", resetUrl);
+        }
+    }
+
+    private String buildPasswordResetHtml(String resetUrl) {
+        return """
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+                <h2 style="color: #111;">Reset your password</h2>
+                <p style="color: #555; line-height: 1.5;">
+                    We received a request to reset the password for your Hookflow account.
+                    Click the button below to set a new password.
+                </p>
+                <a href="%s"
+                   style="display: inline-block; padding: 12px 24px; background: #111; color: #fff;
+                          text-decoration: none; border-radius: 6px; margin: 16px 0;">
+                    Reset Password
+                </a>
+                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+                    If you didn't request a password reset, you can safely ignore this email.
+                    This link expires in 1 hour.
+                </p>
+            </div>
+            """.formatted(resetUrl);
+    }
+
     private String buildVerificationHtml(String verifyUrl) {
         return """
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">

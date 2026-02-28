@@ -41,6 +41,12 @@ public class User {
     @Column(name = "verification_token_expires_at")
     private Instant verificationTokenExpiresAt;
 
+    @Column(name = "password_reset_token", length = 64)
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_token_expires_at")
+    private Instant passwordResetTokenExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
