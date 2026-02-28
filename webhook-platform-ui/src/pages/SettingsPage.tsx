@@ -3,7 +3,7 @@ import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
 import { User, Building2, Loader2, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -43,11 +43,11 @@ export default function SettingsPage() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      toast.success(t('settings.toast.passwordChanged'));
+      showSuccess(t('settings.toast.passwordChanged'));
     } catch (err: any) {
       const msg = err.response?.data?.message || t('settings.passwordChangeFailed');
       setPasswordError(msg);
-      toast.error(msg);
+      showApiError(err, 'settings.passwordChangeFailed');
     } finally {
       setChangingPassword(false);
     }

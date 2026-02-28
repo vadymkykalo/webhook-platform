@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import { testEndpointsApi, TestEndpointResponse, CapturedRequestResponse } from '../api/testEndpoints.api';
@@ -53,7 +53,7 @@ export default function TestEndpointsPage() {
       const data = await testEndpointsApi.list(projectId);
       setEndpoints(data);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.loadFailed'));
+      showApiError(err, 'testEndpoints.toast.loadFailed', { retry: loadEndpoints });
     } finally {
       setLoading(false);
     }
@@ -66,7 +66,7 @@ export default function TestEndpointsPage() {
       const data = await testEndpointsApi.getRequests(projectId, endpointId);
       setRequests(data.content);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.loadRequestsFailed'));
+      showApiError(err, 'testEndpoints.toast.loadRequestsFailed');
     } finally {
       setLoadingRequests(false);
     }
@@ -78,10 +78,10 @@ export default function TestEndpointsPage() {
       setCreating(true);
       const endpoint = await testEndpointsApi.create(projectId);
       setEndpoints([endpoint, ...endpoints]);
-      toast.success(t('testEndpoints.toast.created'));
+      showSuccess(t('testEndpoints.toast.created'));
       copyToClipboard(endpoint.url);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.createFailed'));
+      showApiError(err, 'testEndpoints.toast.createFailed');
     } finally {
       setCreating(false);
     }
@@ -97,9 +97,9 @@ export default function TestEndpointsPage() {
         setSelectedEndpoint(null);
         setRequests([]);
       }
-      toast.success(t('testEndpoints.toast.deleted'));
+      showSuccess(t('testEndpoints.toast.deleted'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('testEndpoints.toast.deleteFailed'));
+      showApiError(err, 'testEndpoints.toast.deleteFailed');
     } finally {
       setDeleting(false);
       setDeleteId(null);
@@ -108,7 +108,7 @@ export default function TestEndpointsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(t('testEndpoints.toast.urlCopied'));
+    showSuccess(t('testEndpoints.toast.urlCopied'));
   };
 
 

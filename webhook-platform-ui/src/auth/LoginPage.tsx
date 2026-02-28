@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Webhook, Loader2, ArrowLeft, Shield, Zap, Eye } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
 import { useAuth } from './auth.store';
@@ -32,12 +32,12 @@ export default function LoginPage() {
       http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
-      toast.success(t('auth.login.welcomeBack'));
+      showSuccess(t('auth.login.welcomeBack'));
       navigate(redirectTo);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || t('auth.login.failed');
       setError(errorMessage);
-      toast.error(errorMessage);
+      showApiError(err, 'auth.login.failed');
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -68,7 +68,7 @@ export default function DlqPage() {
       setEndpoints(endpointsData);
       setSelectedIds(new Set());
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('dlq.toast.loadFailed'));
+      showApiError(err, 'dlq.toast.loadFailed', { retry: loadData });
     } finally {
       setLoading(false);
     }
@@ -78,10 +78,10 @@ export default function DlqPage() {
     try {
       setRetrying(true);
       await dlqApi.retrySingle(projectId!, deliveryId);
-      toast.success(t('dlq.toast.retried'));
+      showSuccess(t('dlq.toast.retried'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('dlq.toast.retryFailed'));
+      showApiError(err, 'dlq.toast.retryFailed');
     } finally {
       setRetrying(false);
     }
@@ -93,10 +93,10 @@ export default function DlqPage() {
     try {
       setRetrying(true);
       const result = await dlqApi.retryBulk(projectId!, Array.from(selectedIds));
-      toast.success(t('dlq.toast.bulkRetried', { count: result.retried }));
+      showSuccess(t('dlq.toast.bulkRetried', { count: result.retried }));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('dlq.toast.bulkRetryFailed'));
+      showApiError(err, 'dlq.toast.bulkRetryFailed');
     } finally {
       setRetrying(false);
     }
@@ -106,11 +106,11 @@ export default function DlqPage() {
     try {
       setPurging(true);
       const result = await dlqApi.purgeAll(projectId!);
-      toast.success(t('dlq.toast.purged', { count: result.purged }));
+      showCriticalSuccess(t('dlq.toast.purged', { count: result.purged }));
       setShowPurgeDialog(false);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('dlq.toast.purgeFailed'));
+      showApiError(err, 'dlq.toast.purgeFailed');
     } finally {
       setPurging(false);
     }

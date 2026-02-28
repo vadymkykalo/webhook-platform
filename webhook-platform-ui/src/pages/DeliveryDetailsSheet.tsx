@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import { useTranslation } from 'react-i18next';
 import { deliveriesApi } from '../api/deliveries.api';
@@ -62,7 +62,7 @@ export default function DeliveryDetailsSheet({
       const data = await deliveriesApi.get(deliveryId);
       setDelivery(data);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('deliveryDetails.toast.loadFailed'));
+      showApiError(err, 'deliveryDetails.toast.loadFailed', { retry: loadDelivery });
     } finally {
       setLoading(false);
     }
@@ -89,13 +89,13 @@ export default function DeliveryDetailsSheet({
     setReplaying(true);
     try {
       await deliveriesApi.replay(deliveryId);
-      toast.success(t('deliveryDetails.toast.replaySuccess'));
+      showSuccess(t('deliveryDetails.toast.replaySuccess'));
       setShowReplayDialog(false);
       onRefresh();
       loadDelivery();
       loadAttempts();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('deliveryDetails.toast.replayFailed'));
+      showApiError(err, 'deliveryDetails.toast.replayFailed');
     } finally {
       setReplaying(false);
     }
@@ -104,7 +104,7 @@ export default function DeliveryDetailsSheet({
   const handleCopyId = () => {
     if (deliveryId) {
       navigator.clipboard.writeText(deliveryId);
-      toast.success(t('deliveryDetails.toast.idCopied'));
+      showSuccess(t('deliveryDetails.toast.idCopied'));
     }
   };
 

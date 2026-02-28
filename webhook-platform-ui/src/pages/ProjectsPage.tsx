@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Key } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { useProjects, useCreateProject, useDeleteProject } from '../api/queries';
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
@@ -57,10 +57,10 @@ export default function ProjectsPage() {
           setShowCreateDialog(false);
           setName('');
           setDescription('');
-          toast.success(t('projects.toast.created'));
+          showSuccess(t('projects.toast.created'));
         },
         onError: (err: any) => {
-          toast.error(err.response?.data?.message || t('projects.toast.createFailed'));
+          showApiError(err, 'projects.toast.createFailed');
         },
       }
     );
@@ -70,18 +70,18 @@ export default function ProjectsPage() {
     if (!deleteId) return;
     deleteProject.mutate(deleteId, {
       onSuccess: () => {
-        toast.success(t('projects.toast.deleted'));
+        showCriticalSuccess(t('projects.toast.deleted'));
         setDeleteId(null);
       },
       onError: (err: any) => {
-        toast.error(err.response?.data?.message || t('projects.toast.deleteFailed'));
+        showApiError(err, 'projects.toast.deleteFailed');
       },
     });
   };
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast.success(t('projects.toast.idCopied'));
+    showSuccess(t('projects.toast.idCopied'));
   };
 
 

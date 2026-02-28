@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -84,7 +84,7 @@ export default function EndpointsPage() {
       setEndpoints(endpointsData.content);
       setPageInfo(endpointsData);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
+      showApiError(err, 'endpoints.toast.loadFailed', { retry: loadData });
     } finally {
       setLoading(false);
     }
@@ -111,10 +111,10 @@ export default function EndpointsPage() {
       setRateLimitPerSecond(undefined);
       setAllowedSourceIps('');
       setNewSecret(secret);
-      toast.success(t('endpoints.toast.created'));
+      showSuccess(t('endpoints.toast.created'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.createFailed'));
+      showApiError(err, 'endpoints.toast.createFailed');
     } finally {
       setCreating(false);
     }
@@ -126,11 +126,11 @@ export default function EndpointsPage() {
     setDeleting(true);
     try {
       await endpointsApi.delete(projectId, deleteId);
-      toast.success(t('endpoints.toast.deleted'));
+      showCriticalSuccess(t('endpoints.toast.deleted'));
       setDeleteId(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.deleteFailed'));
+      showApiError(err, 'endpoints.toast.deleteFailed');
     } finally {
       setDeleting(false);
     }
@@ -150,11 +150,11 @@ export default function EndpointsPage() {
         enabled: !endpoint.enabled,
         rateLimitPerSecond: endpoint.rateLimitPerSecond,
       });
-      toast.success(!endpoint.enabled ? t('endpoints.toast.enabled') : t('endpoints.toast.disabled'));
+      showSuccess(!endpoint.enabled ? t('endpoints.toast.enabled') : t('endpoints.toast.disabled'));
       setToggleId(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.toggleFailed'));
+      showApiError(err, 'endpoints.toast.toggleFailed');
     } finally {
       setToggling(false);
     }
@@ -167,10 +167,10 @@ export default function EndpointsPage() {
     try {
       const response = await endpointsApi.rotateSecret(projectId, rotateId);
       setNewSecret(response.secret || null);
-      toast.success(t('endpoints.toast.secretRotated'));
+      showSuccess(t('endpoints.toast.secretRotated'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.rotateFailed'));
+      showApiError(err, 'endpoints.toast.rotateFailed');
       setRotateId(null);
     } finally {
       setRotating(false);
@@ -180,7 +180,7 @@ export default function EndpointsPage() {
   const handleCopySecret = () => {
     if (newSecret) {
       navigator.clipboard.writeText(newSecret);
-      toast.success(t('endpoints.toast.secretCopied'));
+      showSuccess(t('endpoints.toast.secretCopied'));
     }
   };
 
@@ -200,12 +200,12 @@ export default function EndpointsPage() {
       const result = await endpointsApi.test(projectId, endpointId);
       setTestResult(result);
       if (result.success) {
-        toast.success(t('endpoints.toast.testSuccess', { status: result.httpStatusCode, latency: result.latencyMs }));
+        showSuccess(t('endpoints.toast.testSuccess', { status: result.httpStatusCode, latency: result.latencyMs }));
       } else {
-        toast.error(t('endpoints.toast.testFailed', { message: result.message }));
+        showApiError(new Error(result.message), 'endpoints.toast.testFailed');
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.testError'));
+      showApiError(err, 'endpoints.toast.testError');
       setTestId(null);
     } finally {
       setTesting(false);
@@ -224,14 +224,14 @@ export default function EndpointsPage() {
     try {
       const result = await endpointsApi.verify(projectId, endpointId);
       if (result.success) {
-        toast.success(t('endpoints.toast.verified'));
+        showSuccess(t('endpoints.toast.verified'));
         loadData();
       } else {
-        toast.error(t('endpoints.toast.verifyFailed', { message: result.message }));
+        showApiError(new Error(result.message), 'endpoints.toast.verifyFailed');
         loadData();
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.verifyError'));
+      showApiError(err, 'endpoints.toast.verifyError');
     } finally {
       setVerifyingId(null);
     }
@@ -243,10 +243,10 @@ export default function EndpointsPage() {
     setSkippingId(endpointId);
     try {
       await endpointsApi.skipVerification(projectId, endpointId, 'Manually skipped by user');
-      toast.success(t('endpoints.toast.skipped'));
+      showSuccess(t('endpoints.toast.skipped'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.skipFailed'));
+      showApiError(err, 'endpoints.toast.skipFailed');
     } finally {
       setSkippingId(null);
     }

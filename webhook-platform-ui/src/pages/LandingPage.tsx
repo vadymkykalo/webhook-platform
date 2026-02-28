@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,12 +14,17 @@ export default function LandingPage() {
       <Navigation />
       <Hero isAuthenticated={isAuthenticated} />
       <LogoCloud />
+      <FlowDiagram />
+      <SocialProof />
+      <ProblemSolution />
       <Features />
       <ArchitectureShowcase />
+      <Integrations />
       <VisibilityAndControl />
       <DeveloperConfidence />
       <HowItWorks />
-      <QuickstartCTA />
+      <FAQ />
+      <FinalCTA />
     </div>
   );
 }
@@ -201,13 +206,16 @@ function DashboardMockup() {
 function LogoCloud() {
   const { t } = useTranslation();
   const logos = [
-    { name: 'Spring Boot', src: '/logos/springboot.svg' },
-    { name: 'PostgreSQL', src: '/logos/postgresql.svg' },
+    { name: 'Stripe', src: '/logos/stripe.svg' },
+    { name: 'GitHub', src: '/logos/github.svg' },
+    { name: 'Slack', src: '/logos/slack.svg' },
+    { name: 'Twilio', src: '/logos/twilio.svg' },
+    { name: 'Salesforce', src: '/logos/salesforce.svg' },
+    { name: 'HubSpot', src: '/logos/hubspot.svg' },
+    { name: 'Jira', src: '/logos/jira.svg' },
+    { name: 'Grammarly', src: '/logos/grammarly.svg' },
     { name: 'Apache Kafka', src: '/logos/apachekafka.svg' },
-    { name: 'Redis', src: '/logos/redis.svg' },
-    { name: 'React', src: '/logos/react.svg' },
     { name: 'Docker', src: '/logos/docker.svg' },
-    { name: 'TypeScript', src: '/logos/typescript.svg' },
   ];
 
   const track = [...logos, ...logos];
@@ -231,6 +239,146 @@ function LogoCloud() {
               <span className="text-xs font-medium text-muted-foreground/60 transition-colors duration-300 group-hover:text-foreground whitespace-nowrap">{logo.name}</span>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FlowDiagram() {
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'send' | 'receive'>('send');
+
+  const sendSources = [{ label: t('landing.flowDiagram.sendSource'), icon: Webhook, isBrand: false }];
+  const sendDestinations = [
+    { label: 'Stripe', src: '/logos/stripe.svg' },
+    { label: 'GitHub', src: '/logos/github.svg' },
+    { label: 'Slack', src: '/logos/slack.svg' },
+  ];
+
+  const receiveSources = [
+    { label: 'Stripe', src: '/logos/stripe.svg' },
+    { label: 'Twilio', src: '/logos/twilio.svg' },
+    { label: 'HubSpot', src: '/logos/hubspot.svg' },
+  ];
+  const receiveDestinations = [{ label: t('landing.flowDiagram.receiveDest'), icon: Webhook, isBrand: false }];
+
+  const sources = activeTab === 'send' ? sendSources : receiveSources;
+  const destinations = activeTab === 'send' ? sendDestinations : receiveDestinations;
+
+  const badges = [
+    { label: t('landing.flowDiagram.retries'), icon: RefreshCw },
+    { label: t('landing.flowDiagram.signatures'), icon: Shield },
+    { label: t('landing.flowDiagram.monitoring'), icon: Eye },
+  ];
+
+  return (
+    <section className="py-24">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-12">
+          <h2 className="text-headline mb-4">
+            {t('landing.flowDiagram.title')}
+            <span className="gradient-text">{t('landing.flowDiagram.titleHighlight')}</span>
+          </h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.flowDiagram.subtitle')}
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex justify-center mb-10">
+          <div className="inline-flex rounded-xl border bg-muted/50 p-1 gap-1">
+            <button
+              onClick={() => setActiveTab('send')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'send' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {t('landing.flowDiagram.tabSend')}
+            </button>
+            <button
+              onClick={() => setActiveTab('receive')}
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'receive' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {t('landing.flowDiagram.tabReceive')}
+            </button>
+          </div>
+        </div>
+
+        {/* Flow Diagram Card */}
+        <div className="relative max-w-4xl mx-auto rounded-2xl border bg-card p-8 md:p-12 shadow-sm overflow-hidden">
+          {/* Background dots pattern */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+
+          <div className="relative flex items-center justify-between gap-4 md:gap-8 min-h-[280px]">
+            {/* Left: Sources */}
+            <div className="flex flex-col items-center gap-4 flex-shrink-0">
+              {sources.map((s, i) => (
+                <div
+                  key={`src-${i}`}
+                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm animate-fade-in"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  {'src' in s ? (
+                    <img src={s.src} alt={s.label} className="h-5 w-5 object-contain" />
+                  ) : (
+                    <s.icon className="h-5 w-5 text-primary" />
+                  )}
+                  <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{s.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Animated line left */}
+            <div className="flex-1 relative hidden md:flex items-center justify-center min-w-[60px]">
+              <div className="w-full h-px border-t-2 border-dashed border-primary/30 flow-line-animate" />
+              <ArrowRight className="absolute right-0 h-4 w-4 text-primary/50" />
+            </div>
+
+            {/* Center: Hookflow Hub */}
+            <div className="flex flex-col items-center gap-3 flex-shrink-0 z-10">
+              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-4 ring-primary/10">
+                <Webhook className="h-10 w-10 text-white" />
+              </div>
+              <span className="text-sm font-bold tracking-tight">Hookflow</span>
+              {/* Feature badges */}
+              <div className="flex flex-wrap justify-center gap-1.5 mt-1">
+                {badges.map((b) => (
+                  <span key={b.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                    <b.icon className="h-2.5 w-2.5" />
+                    {b.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Animated line right */}
+            <div className="flex-1 relative hidden md:flex items-center justify-center min-w-[60px]">
+              <div className="w-full h-px border-t-2 border-dashed border-primary/30 flow-line-animate" />
+              <ArrowRight className="absolute right-0 h-4 w-4 text-primary/50" />
+            </div>
+
+            {/* Right: Destinations */}
+            <div className="flex flex-col items-center gap-4 flex-shrink-0">
+              {destinations.map((d, i) => (
+                <div
+                  key={`dest-${i}`}
+                  className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm animate-fade-in"
+                  style={{ animationDelay: `${(i + 1) * 150}ms` }}
+                >
+                  {'src' in d ? (
+                    <img src={d.src} alt={d.label} className="h-5 w-5 object-contain" />
+                  ) : (
+                    <d.icon className="h-5 w-5 text-primary" />
+                  )}
+                  <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{d.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Description under diagram */}
+          <p className="text-center text-sm text-muted-foreground mt-8 max-w-lg mx-auto">
+            {activeTab === 'send' ? t('landing.flowDiagram.sendDesc') : t('landing.flowDiagram.receiveDesc')}
+          </p>
         </div>
       </div>
     </section>
@@ -934,7 +1082,258 @@ function HowItWorks() {
   );
 }
 
-function QuickstartCTA() {
+function SocialProof() {
+  const { t } = useTranslation();
+
+  const stats = [
+    { value: t('landing.socialProof.stat1Value'), label: t('landing.socialProof.stat1Label'), desc: t('landing.socialProof.stat1Desc'), color: 'text-green-500' },
+    { value: t('landing.socialProof.stat2Value'), label: t('landing.socialProof.stat2Label'), desc: t('landing.socialProof.stat2Desc'), color: 'text-blue-500' },
+    { value: t('landing.socialProof.stat3Value'), label: t('landing.socialProof.stat3Label'), desc: t('landing.socialProof.stat3Desc'), color: 'text-violet-500' },
+    { value: t('landing.socialProof.stat4Value'), label: t('landing.socialProof.stat4Label'), desc: t('landing.socialProof.stat4Desc'), color: 'text-amber-500' },
+  ];
+
+  const quotes = [
+    { text: t('landing.socialProof.quote1'), author: t('landing.socialProof.quote1Author'), role: t('landing.socialProof.quote1Role') },
+    { text: t('landing.socialProof.quote2'), author: t('landing.socialProof.quote2Author'), role: t('landing.socialProof.quote2Role') },
+    { text: t('landing.socialProof.quote3'), author: t('landing.socialProof.quote3Author'), role: t('landing.socialProof.quote3Role') },
+  ];
+
+  return (
+    <section className="py-24">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-headline mb-4">{t('landing.socialProof.title')}<span className="gradient-text">{t('landing.socialProof.titleHighlight')}</span></h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">{t('landing.socialProof.subtitle')}</p>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          {stats.map((stat) => (
+            <div key={stat.label} className="text-center p-6 rounded-2xl border bg-card hover:shadow-card-hover transition-all duration-300">
+              <div className={`text-4xl lg:text-5xl font-bold ${stat.color} mb-2`}>{stat.value}</div>
+              <div className="text-sm font-semibold mb-1">{stat.label}</div>
+              <div className="text-xs text-muted-foreground">{stat.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {quotes.map((quote) => (
+            <div key={quote.author} className="relative p-6 rounded-2xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
+              <Quote className="h-8 w-8 text-primary/20 mb-4" />
+              <p className="text-sm text-muted-foreground leading-relaxed mb-6">{quote.text}</p>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary">{quote.author.charAt(0)}</span>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{quote.author}</div>
+                  <div className="text-xs text-muted-foreground">{quote.role}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProblemSolution() {
+  const { t } = useTranslation();
+
+  const items = [
+    { before: t('landing.problem.item1Before'), after: t('landing.problem.item1After') },
+    { before: t('landing.problem.item2Before'), after: t('landing.problem.item2After') },
+    { before: t('landing.problem.item3Before'), after: t('landing.problem.item3After') },
+    { before: t('landing.problem.item4Before'), after: t('landing.problem.item4After') },
+    { before: t('landing.problem.item5Before'), after: t('landing.problem.item5After') },
+    { before: t('landing.problem.item6Before'), after: t('landing.problem.item6After') },
+  ];
+
+  return (
+    <section className="py-24 bg-muted/30 relative overflow-hidden">
+      <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-destructive/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold mb-6 border border-destructive/20">
+            <AlertCircle className="h-3 w-3" />
+            {t('landing.problem.badge')}
+          </div>
+          <h2 className="text-headline mb-4">{t('landing.problem.title')}<span className="gradient-text">{t('landing.problem.titleHighlight')}</span></h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">{t('landing.problem.subtitle')}</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8 mb-12">
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <X className="h-4 w-4 text-destructive" />
+              </div>
+              <span className="text-sm font-bold text-destructive uppercase tracking-wider">{t('landing.problem.before')}</span>
+            </div>
+            <div className="space-y-3">
+              {items.map((item) => (
+                <div key={item.before} className="flex items-start gap-3 p-4 rounded-xl border border-destructive/10 bg-destructive/[0.02]">
+                  <X className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-muted-foreground">{item.before}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+              </div>
+              <span className="text-sm font-bold text-success uppercase tracking-wider">{t('landing.problem.after')}</span>
+            </div>
+            <div className="space-y-3">
+              {items.map((item) => (
+                <div key={item.after} className="flex items-start gap-3 p-4 rounded-xl border border-success/10 bg-success/[0.02]">
+                  <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />
+                  <span className="text-sm text-foreground">{item.after}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-primary/10 border border-primary/20">
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-primary">{t('landing.problem.saveBadge')}</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-3">{t('landing.problem.saveDesc')}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Integrations() {
+  const { t } = useTranslation();
+
+  const sdks = [
+    { name: 'Node.js', desc: t('landing.integrations.nodeDesc'), logoSrc: '/logos/typescript.svg' },
+    { name: 'Python', desc: t('landing.integrations.pythonDesc'), logoSrc: '/logos/python.svg' },
+    { name: 'PHP', desc: t('landing.integrations.phpDesc'), logoSrc: '/logos/php.svg' },
+  ];
+
+  const services = [
+    { name: 'Stripe', desc: t('landing.integrations.service1Desc'), src: '/logos/stripe.svg' },
+    { name: 'GitHub', desc: t('landing.integrations.service2Desc'), src: '/logos/github.svg' },
+    { name: 'Slack', desc: t('landing.integrations.service3Desc'), src: '/logos/slack.svg' },
+    { name: 'Twilio', desc: t('landing.integrations.service4Desc'), src: '/logos/twilio.svg' },
+    { name: 'Salesforce', desc: t('landing.integrations.service5Desc'), src: '/logos/salesforce.svg' },
+    { name: t('landing.integrations.service6'), desc: t('landing.integrations.service6Desc'), icon: Webhook },
+  ];
+
+  return (
+    <section className="py-24">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+            <Code2 className="h-3 w-3" />
+            {t('landing.integrations.badge')}
+          </div>
+          <h2 className="text-headline mb-4">{t('landing.integrations.title')}<span className="gradient-text">{t('landing.integrations.titleHighlight')}</span></h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">{t('landing.integrations.subtitle')}</p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-8 mb-12">
+          <div className="lg:col-span-2">
+            <h3 className="text-lg font-semibold mb-2">{t('landing.integrations.sdksTitle')}</h3>
+            <p className="text-sm text-muted-foreground mb-6">{t('landing.integrations.sdksDesc')}</p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {sdks.map((sdk) => (
+                <div key={sdk.name} className="group p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-3">
+                    <img src={sdk.logoSrc} alt={sdk.name} className="h-8 w-8 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-sm font-semibold">{sdk.name}</span>
+                  </div>
+                  <code className="text-[11px] text-muted-foreground font-mono bg-muted px-2 py-1 rounded">{sdk.desc}</code>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-4 rounded-xl border bg-muted/30">
+              <div className="flex items-center gap-2 mb-1">
+                <Code2 className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">{t('landing.integrations.restTitle')}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('landing.integrations.restDesc')}</p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold mb-2">{t('landing.integrations.deliverTo')}</h3>
+            <p className="text-sm text-muted-foreground mb-6">{t('landing.integrations.deliverToDesc')}</p>
+            <div className="space-y-3">
+              {services.map((service) => (
+                <div key={service.name} className="flex items-center gap-3 p-3 rounded-xl border hover:border-primary/20 hover:bg-accent transition-all duration-200">
+                  <div className="h-9 w-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
+                    {'src' in service ? (
+                      <img src={service.src} alt={service.name} className="h-5 w-5 object-contain" />
+                    ) : (
+                      <service.icon className="h-4 w-4 text-primary" />
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium block">{service.name}</span>
+                    <span className="text-[11px] text-muted-foreground">{service.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FAQ() {
+  const { t } = useTranslation();
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const questions = [
+    { q: t('landing.faq.q1'), a: t('landing.faq.a1') },
+    { q: t('landing.faq.q2'), a: t('landing.faq.a2') },
+    { q: t('landing.faq.q3'), a: t('landing.faq.a3') },
+    { q: t('landing.faq.q4'), a: t('landing.faq.a4') },
+    { q: t('landing.faq.q5'), a: t('landing.faq.a5') },
+    { q: t('landing.faq.q6'), a: t('landing.faq.a6') },
+  ];
+
+  return (
+    <section className="py-24 bg-muted/30">
+      <div className="max-w-3xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <h2 className="text-headline mb-4">{t('landing.faq.title')}<span className="gradient-text">{t('landing.faq.titleHighlight')}</span></h2>
+        </div>
+
+        <div className="space-y-3">
+          {questions.map((item, index) => (
+            <div key={index} className="rounded-xl border bg-card overflow-hidden transition-all duration-300 hover:border-primary/20">
+              <button
+                className="w-full flex items-center justify-between p-5 text-left"
+                onClick={() => setOpenIndex(openIndex === index ? null : index)}
+              >
+                <span className="text-sm font-semibold pr-4">{item.q}</span>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-300 ${openIndex === index ? 'rotate-180' : ''}`} />
+              </button>
+              <div className={`overflow-hidden transition-all duration-300 ${openIndex === index ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'}`}>
+                <p className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed">{item.a}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCTA() {
   const { t } = useTranslation();
   return (
     <section className="py-24">
@@ -946,20 +1345,25 @@ function QuickstartCTA() {
             <h2 className="text-3xl lg:text-[2.75rem] font-bold text-white mb-4 leading-tight">
               {t('landing.cta.title')}
             </h2>
-            <p className="text-lg text-white/70 mb-10 max-w-xl mx-auto">
+            <p className="text-lg text-white/70 mb-6 max-w-xl mx-auto">
               {t('landing.cta.subtitle')}
             </p>
+            <div className="flex items-center justify-center gap-4 mb-8 text-sm text-white/60">
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.noCreditCard')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.freeTier')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.fiveMinSetup')}</span>
+            </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link to="/register">
                 <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-xl">
                   {t('landing.cta.getStartedFree')} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link to="/quickstart">
+              <a href="mailto:sales@hookflow.dev">
                 <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent">
-                  {t('landing.cta.viewQuickstart')}
+                  <Mail className="h-4 w-4" /> {t('landing.cta.contactSales')}
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>

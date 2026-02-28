@@ -13,7 +13,7 @@ import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { type Role, hasMinRole } from '../auth/ProtectedRoute';
 import { usePermissions } from '../auth/usePermissions';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { CommandPalette } from '../components/CommandPalette';
 import { getTheme, setTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -90,20 +90,20 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
   );
 }
 
-const BREADCRUMB_SEGMENT_KEYS: Record<string, string> = {
-  dashboard: 'breadcrumb.dashboard',
-  projects: 'breadcrumb.projects',
-  endpoints: 'breadcrumb.endpoints',
-  events: 'breadcrumb.events',
-  deliveries: 'breadcrumb.deliveries',
-  subscriptions: 'breadcrumb.subscriptions',
-  'api-keys': 'breadcrumb.api-keys',
-  analytics: 'breadcrumb.analytics',
-  dlq: 'breadcrumb.dlq',
-  'test-endpoints': 'breadcrumb.test-endpoints',
-  members: 'breadcrumb.members',
-  'audit-log': 'breadcrumb.audit-log',
-  settings: 'breadcrumb.settings',
+const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType }> = {
+  dashboard: { key: 'breadcrumb.dashboard', icon: LayoutDashboard },
+  projects: { key: 'breadcrumb.projects', icon: FolderKanban },
+  endpoints: { key: 'breadcrumb.endpoints', icon: Webhook },
+  events: { key: 'breadcrumb.events', icon: Radio },
+  deliveries: { key: 'breadcrumb.deliveries', icon: Send },
+  subscriptions: { key: 'breadcrumb.subscriptions', icon: Bell },
+  'api-keys': { key: 'breadcrumb.api-keys', icon: Key },
+  analytics: { key: 'breadcrumb.analytics', icon: BarChart3 },
+  dlq: { key: 'breadcrumb.dlq', icon: AlertTriangle },
+  'test-endpoints': { key: 'breadcrumb.test-endpoints', icon: TestTube },
+  members: { key: 'breadcrumb.members', icon: Users },
+  'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
+  settings: { key: 'breadcrumb.settings', icon: Settings },
 };
 
 function Breadcrumb({ projectId }: { projectId: string | undefined }) {
@@ -111,7 +111,7 @@ function Breadcrumb({ projectId }: { projectId: string | undefined }) {
   const location = useLocation();
   const { data: project } = useProject(projectId);
 
-  const crumbs: { label: string; to?: string }[] = [];
+  const crumbs: { label: string; to?: string; icon?: React.ElementType }[] = [];
 
   // Always start with Home
   const path = location.pathname;
@@ -119,6 +119,7 @@ function Breadcrumb({ projectId }: { projectId: string | undefined }) {
     // On dashboard — no extra crumbs
     return (
       <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
+        <LayoutDashboard className="h-3.5 w-3.5" />
         <span className="text-foreground font-medium">{t('breadcrumb.dashboard')}</span>
       </div>
     );
@@ -130,22 +131,31 @@ function Breadcrumb({ projectId }: { projectId: string | undefined }) {
 
   if (parts[0] === 'projects' && parts.length === 1) {
     // /admin/projects
-    crumbs.push({ label: t('breadcrumb.projects') });
+    const seg = BREADCRUMB_SEGMENTS.projects;
+    crumbs.push({ label: t(seg.key), icon: seg.icon });
   } else if (parts[0] === 'projects' && parts.length >= 2) {
     // /admin/projects/:projectId/...
-    crumbs.push({ label: t('breadcrumb.projects'), to: '/admin/projects' });
+    const seg = BREADCRUMB_SEGMENTS.projects;
+    crumbs.push({ label: t(seg.key), to: '/admin/projects', icon: seg.icon });
     crumbs.push({
       label: project?.name || '…',
       to: projectId ? `/admin/projects/${projectId}/endpoints` : undefined,
+      icon: FolderKanban,
     });
     if (parts[2]) {
-      const segmentKey = BREADCRUMB_SEGMENT_KEYS[parts[2]];
-      crumbs.push({ label: segmentKey ? t(segmentKey) : parts[2] });
+      const segment = BREADCRUMB_SEGMENTS[parts[2]];
+      crumbs.push({
+        label: segment ? t(segment.key) : parts[2],
+        icon: segment?.icon,
+      });
     }
   } else {
     // /admin/members, /admin/settings, etc.
-    const segmentKey = BREADCRUMB_SEGMENT_KEYS[parts[0]];
-    crumbs.push({ label: segmentKey ? t(segmentKey) : parts[0] });
+    const segment = BREADCRUMB_SEGMENTS[parts[0]];
+    crumbs.push({
+      label: segment ? t(segment.key) : parts[0],
+      icon: segment?.icon,
+    });
   }
 
   return (
@@ -153,18 +163,26 @@ function Breadcrumb({ projectId }: { projectId: string | undefined }) {
       <Link to="/admin/dashboard" className="hover:text-foreground transition-colors flex-shrink-0">
         {t('nav.home')}
       </Link>
-      {crumbs.map((crumb, i) => (
-        <span key={i} className="flex items-center gap-1.5 min-w-0">
-          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
-          {crumb.to && i < crumbs.length - 1 ? (
-            <Link to={crumb.to} className="hover:text-foreground transition-colors truncate max-w-[140px]">
-              {crumb.label}
-            </Link>
-          ) : (
-            <span className="text-foreground font-medium truncate max-w-[160px]">{crumb.label}</span>
-          )}
-        </span>
-      ))}
+      {crumbs.map((crumb, i) => {
+        const Icon = crumb.icon;
+        const isLast = i === crumbs.length - 1;
+        return (
+          <span key={i} className="flex items-center gap-1.5 min-w-0">
+            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+            {crumb.to && !isLast ? (
+              <Link to={crumb.to} className="flex items-center gap-1 hover:text-foreground transition-colors truncate max-w-[160px]">
+                {Icon && <Icon className="h-3.5 w-3.5 flex-shrink-0" />}
+                {crumb.label}
+              </Link>
+            ) : (
+              <span className="flex items-center gap-1 text-foreground font-medium truncate max-w-[180px]">
+                {Icon && isLast && <Icon className="h-3.5 w-3.5 flex-shrink-0" />}
+                {crumb.label}
+              </span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -197,9 +215,9 @@ export default function AppLayout() {
     setResending(true);
     try {
       await authApi.resendVerification(user.user.email);
-      toast.success(t('auth.verification.sent'));
+      showSuccess(t('auth.verification.sent'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('auth.verification.failed'));
+      showApiError(err, 'auth.verification.failed');
     } finally {
       setResending(false);
     }
@@ -207,7 +225,7 @@ export default function AppLayout() {
 
   const handleLogout = () => {
     logout();
-    toast.success(t('nav.loggedOut'));
+    showSuccess(t('nav.loggedOut'));
     navigate('/login');
   };
 

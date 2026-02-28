@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Trash2, Loader2, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -34,6 +35,7 @@ export default function MembersPage() {
   const [removeUserId, setRemoveUserId] = useState<string | null>(null);
 
   const orgId = user?.organization?.id;
+  const queryClient = useQueryClient();
 
   const { data: members = [], isLoading: loading } = useMembers(orgId);
   const changeRole = useChangeMemberRole(orgId!);
@@ -43,8 +45,8 @@ export default function MembersPage() {
     changeRole.mutate(
       { userId, role: newRole },
       {
-        onSuccess: () => toast.success(t('members.toast.roleChanged')),
-        onError: (err: any) => toast.error(err.response?.data?.message || t('members.toast.roleChangeFailed')),
+        onSuccess: () => showSuccess(t('members.toast.roleChanged')),
+        onError: (err: any) => showApiError(err, 'members.toast.roleChangeFailed'),
       }
     );
   };
@@ -53,10 +55,10 @@ export default function MembersPage() {
     if (!removeUserId) return;
     removeMember.mutate(removeUserId, {
       onSuccess: () => {
-        toast.success(t('members.toast.removed'));
+        showSuccess(t('members.toast.removed'));
         setRemoveUserId(null);
       },
-      onError: (err: any) => toast.error(err.response?.data?.message || t('members.toast.removeFailed')),
+      onError: (err: any) => showApiError(err, 'members.toast.removeFailed'),
     });
   };
 
@@ -180,7 +182,7 @@ export default function MembersPage() {
           orgId={orgId!}
           open={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSuccess={() => { }}
+          onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['members'] }); }}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { membersApi, MembershipRole } from '../api/members.api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -68,18 +68,18 @@ export default function AddMemberModal({
       });
       
       if (response.temporaryPassword) {
-        toast.success(
+        showSuccess(
           `Member added! Temporary password: ${response.temporaryPassword}`,
           { duration: 10000 }
         );
       } else {
-        toast.success('Member added successfully');
+        showSuccess('Member added successfully');
       }
       
       handleClose();
       onSuccess();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to add member');
+      showApiError(err, 'members.toast.addFailed');
     } finally {
       setAdding(false);
     }

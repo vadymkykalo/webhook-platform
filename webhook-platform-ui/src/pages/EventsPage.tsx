@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Eye, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showSuccess } from '../lib/toast';
 import { useEvents } from '../api/queries';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
@@ -38,7 +38,7 @@ export default function EventsPage() {
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast.success(t('events.toast.idCopied'));
+    showSuccess(t('events.toast.idCopied'));
   };
 
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
 import type { EndpointResponse } from '../types/api.types';
 import { Button } from './ui/button';
@@ -118,16 +118,16 @@ export default function CreateSubscriptionModal({
 
       if (subscription) {
         await subscriptionsApi.update(projectId, subscription.id, payload);
-        toast.success('Subscription updated successfully');
+        showSuccess('Subscription updated successfully');
       } else {
         await subscriptionsApi.create(projectId, payload);
-        toast.success('Subscription created successfully');
+        showSuccess('Subscription created successfully');
       }
 
       onClose();
       onSuccess();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save subscription');
+      showApiError(err, 'toast.errors.server');
     } finally {
       setSaving(false);
     }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -54,21 +54,21 @@ export default function SubscriptionsPage() {
   const handleToggleEnabled = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
       { id: subscription.id, data: { enabled: !subscription.enabled } },
-      { onSuccess: () => toast.success(!subscription.enabled ? t('subscriptions.toast.enabled') : t('subscriptions.toast.disabled')) }
+      { onSuccess: () => showSuccess(!subscription.enabled ? t('subscriptions.toast.enabled') : t('subscriptions.toast.disabled')) }
     );
   };
 
   const handleToggleOrdering = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
       { id: subscription.id, data: { orderingEnabled: !subscription.orderingEnabled } },
-      { onSuccess: () => toast.success(!subscription.orderingEnabled ? t('subscriptions.toast.fifoEnabled') : t('subscriptions.toast.fifoDisabled')) }
+      { onSuccess: () => showSuccess(!subscription.orderingEnabled ? t('subscriptions.toast.fifoEnabled') : t('subscriptions.toast.fifoDisabled')) }
     );
   };
 
   const handleDelete = () => {
     if (!deleteId || !projectId) return;
     deleteMutation.mutate(deleteId, {
-      onSuccess: () => { toast.success(t('subscriptions.toast.deleted')); setDeleteId(null); },
+      onSuccess: () => { showSuccess(t('subscriptions.toast.deleted')); setDeleteId(null); },
     });
   };
 

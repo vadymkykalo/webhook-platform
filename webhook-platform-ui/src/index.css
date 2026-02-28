@@ -181,6 +181,19 @@
   animation-play-state: paused;
 }
 
+/* Flow diagram animated dashed line */
+@keyframes flow-dash {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 0; }
+}
+.flow-line-animate {
+  border: none !important;
+  height: 2px;
+  background-image: linear-gradient(to right, hsl(var(--primary) / 0.4) 50%, transparent 50%);
+  background-size: 12px 2px;
+  animation: flow-dash 1s linear infinite;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

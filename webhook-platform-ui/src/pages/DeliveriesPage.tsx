@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
 import { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -86,7 +86,7 @@ export default function DeliveriesPage() {
       setProject(projectData);
       setEndpoints(endpointsData);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
+      showApiError(err, 'endpoints.toast.loadFailed', { retry: loadInitialData });
     }
   };
 
@@ -130,7 +130,7 @@ export default function DeliveriesPage() {
       setTotalElements(response.totalElements);
       setTotalPages(response.totalPages);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
+      showApiError(err, 'endpoints.toast.loadFailed', { retry: loadDeliveries });
     } finally {
       setLoading(false);
     }
@@ -169,7 +169,7 @@ export default function DeliveriesPage() {
     const failedOrDlqSelected = statusFilter === 'FAILED' || statusFilter === 'DLQ';
     
     if (!hasFilters && !failedOrDlqSelected) {
-      toast.error(t('deliveries.replayError'));
+      showApiError(new Error('Filter required'), 'deliveries.replayError');
       return;
     }
     
@@ -181,10 +181,10 @@ export default function DeliveriesPage() {
         endpointId: endpointFilter || undefined,
       });
       
-      toast.success(response.message);
+      showSuccess(response.message);
       loadDeliveries();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('endpoints.toast.loadFailed'));
+      showApiError(err, 'deliveries.toast.replayFailed');
     } finally {
       setBulkReplaying(false);
     }

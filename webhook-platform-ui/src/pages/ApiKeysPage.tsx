@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
+import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -70,7 +70,7 @@ export default function ApiKeysPage() {
       setApiKeys(apiKeysData.content);
       setPageInfo(apiKeysData);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('apiKeys.toast.loadFailed'));
+      showApiError(err, 'apiKeys.toast.loadFailed', { retry: loadData });
     } finally {
       setLoading(false);
     }
@@ -86,10 +86,10 @@ export default function ApiKeysPage() {
       setShowCreateDialog(false);
       setName('');
       setNewApiKey(response);
-      toast.success(t('apiKeys.toast.created'));
+      showSuccess(t('apiKeys.toast.created'));
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('apiKeys.toast.createFailed'));
+      showApiError(err, 'apiKeys.toast.createFailed');
     } finally {
       setCreating(false);
     }
@@ -101,11 +101,11 @@ export default function ApiKeysPage() {
     setRevoking(true);
     try {
       await apiKeysApi.revoke(projectId, revokeId);
-      toast.success(t('apiKeys.toast.revoked'));
+      showSuccess(t('apiKeys.toast.revoked'));
       setRevokeId(null);
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || t('apiKeys.toast.revokeFailed'));
+      showApiError(err, 'apiKeys.toast.revokeFailed');
     } finally {
       setRevoking(false);
     }
@@ -113,7 +113,7 @@ export default function ApiKeysPage() {
 
   const handleCopyKey = (key: string) => {
     navigator.clipboard.writeText(key);
-    toast.success(t('apiKeys.toast.copied'));
+    showSuccess(t('apiKeys.toast.copied'));
   };
 
   const closeKeyDialog = () => {
