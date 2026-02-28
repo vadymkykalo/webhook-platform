@@ -1057,5 +1057,68 @@
       "description": "Description"
     },
     "response": "Response"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist or has been moved.",
+    "backToDashboard": "Back to Dashboard",
+    "backToHome": "Back to Home"
+  },
+  "verifyEmail": {
+    "verifying": "Verifying your email...",
+    "pleaseWait": "Please wait a moment.",
+    "success": "Email Verified!",
+    "successDesc": "Your email has been successfully verified. You can now use all features.",
+    "goToDashboard": "Go to Dashboard",
+    "errorTitle": "Verification Failed",
+    "goToLogin": "Go to Login",
+    "noToken": "No verification token provided.",
+    "failed": "Verification failed. The token may be invalid or expired."
+  },
+  "deliveryDetails": {
+    "title": "Delivery Details",
+    "description": "View delivery status, attempts, and responses",
+    "summary": "Summary",
+    "deliveryId": "Delivery ID",
+    "status": "Status",
+    "eventId": "Event ID",
+    "endpointId": "Endpoint ID",
+    "created": "Created",
+    "attempts": "Attempts",
+    "nextRetry": "Next Retry",
+    "succeededAt": "Succeeded At",
+    "failedAt": "Failed At",
+    "deliveryAttempts": "Delivery Attempts",
+    "noAttempts": "No attempts recorded yet for this delivery.",
+    "attemptNumber": "Attempt #{{number}}",
+    "statusLabel": "Status:",
+    "duration": "Duration:",
+    "requestHeaders": "Request Headers",
+    "requestBody": "Request Body",
+    "responseHeaders": "Response Headers",
+    "responseBody": "Response Body",
+    "error": "Error:",
+    "replayDelivery": "Replay Delivery",
+    "noData": "No delivery data available",
+    "replay": "Replay",
+    "replaying": "Replaying...",
+    "replayDialog": {
+      "title": "Replay Delivery?",
+      "description": "This will re-attempt delivery of the webhook to the endpoint. The delivery will be queued for immediate processing."
+    },
+    "toast": {
+      "loadFailed": "Failed to load delivery details",
+      "replaySuccess": "Delivery replay initiated successfully",
+      "replayFailed": "Failed to replay delivery",
+      "idCopied": "Delivery ID copied to clipboard"
+    },
+    "troubleshooting": {
+      "title": "Troubleshooting Tips",
+      "tip1": "Verify the endpoint URL is accessible and responding",
+      "tip2": "Check webhook signature validation in your application",
+      "tip3": "Review rate limits and ensure they're not exceeded",
+      "tip4": "Inspect the error messages in delivery attempts below",
+      "tip5": "Consider replaying the delivery after fixing the issue"
+    }
   }
 }
