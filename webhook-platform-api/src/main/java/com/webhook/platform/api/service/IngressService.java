@@ -17,8 +17,9 @@ import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
+import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
+import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.util.CryptoUtils;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,6 +50,8 @@ public class IngressService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final WebhookVerifierFactory verifierFactory;
+    private final RedisRateLimiterService rateLimiterService;
     private final String encryptionKey;
     private final String encryptionSalt;
     private final long maxPayloadSizeBytes;
@@ -61,6 +64,8 @@ public class IngressService {
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
+            WebhookVerifierFactory verifierFactory,
+            RedisRateLimiterService rateLimiterService,
             @Value("${webhook.encryption-key}") String encryptionKey,
             @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes) {
@@ -71,6 +76,8 @@ public class IngressService {
         this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.verifierFactory = verifierFactory;
+        this.rateLimiterService = rateLimiterService;
         this.encryptionKey = encryptionKey;
         this.encryptionSalt = encryptionSalt;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
@@ -83,6 +90,13 @@ public class IngressService {
 
         if (source.getStatus() != IncomingSourceStatus.ACTIVE) {
             throw new SourceDisabledException("Source is disabled");
+        }
+
+        // Per-source rate limiting
+        if (source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0) {
+            if (!rateLimiterService.tryAcquire(source.getId(), source.getRateLimitPerSecond())) {
+                throw new RateLimitExceededException("Rate limit exceeded for source " + source.getId());
+            }
         }
 
         // Enforce size limit
@@ -101,19 +115,22 @@ public class IngressService {
         String headersJson = extractHeadersJson(request);
         String bodySha256 = computeSha256(body);
 
-        // Verify signature if enabled
+        // Verify signature via strategy pattern
         Boolean verified = null;
         String verificationError = null;
-        if (source.getVerificationMode() == VerificationMode.HMAC_GENERIC) {
+        WebhookVerificationStrategy verifier = verifierFactory.getVerifier(source);
+        if (verifier != null) {
             try {
-                verified = verifyHmacSignature(source, body, request);
-                if (!verified) {
-                    verificationError = "Signature mismatch";
+                String secret = decryptHmacSecret(source);
+                WebhookVerificationStrategy.VerificationResult result = verifier.verify(secret, body, request);
+                verified = result.verified();
+                if (!result.verified()) {
+                    verificationError = result.error();
                 }
             } catch (Exception e) {
                 verified = false;
                 verificationError = "Verification error: " + e.getMessage();
-                log.warn("HMAC verification failed for source {}: {}", source.getId(), e.getMessage());
+                log.warn("Webhook verification failed for source {}: {}", source.getId(), e.getMessage());
             }
         }
 
@@ -192,54 +209,16 @@ public class IngressService {
         return event;
     }
 
-    private boolean verifyHmacSignature(IncomingSource source, String body, HttpServletRequest request) {
+    private String decryptHmacSecret(IncomingSource source) {
         if (source.getHmacSecretEncrypted() == null || source.getHmacSecretIv() == null) {
             throw new IllegalStateException("HMAC secret not configured for source " + source.getId());
         }
-
-        String secret = CryptoUtils.decryptSecret(
+        return CryptoUtils.decryptSecret(
                 source.getHmacSecretEncrypted(),
                 source.getHmacSecretIv(),
                 encryptionKey,
                 encryptionSalt
         );
-
-        String headerName = source.getHmacHeaderName() != null ? source.getHmacHeaderName() : "X-Signature";
-        String signatureHeader = request.getHeader(headerName);
-        if (signatureHeader == null || signatureHeader.isBlank()) {
-            return false;
-        }
-
-        // Strip prefix if configured (e.g., "sha256=")
-        String prefix = source.getHmacSignaturePrefix();
-        if (prefix != null && !prefix.isEmpty() && signatureHeader.startsWith(prefix)) {
-            signatureHeader = signatureHeader.substring(prefix.length());
-        }
-
-        // Try platform's standard signature format (t=timestamp,v1=signature)
-        if (signatureHeader.contains("t=") && signatureHeader.contains("v1=")) {
-            return WebhookSignatureUtils.verifySignature(secret, signatureHeader, body);
-        }
-
-        // Generic HMAC: compare raw HMAC-SHA256 hex of body
-        String computedHmac = computeHmacSha256(secret, body);
-        return MessageDigest.isEqual(
-                computedHmac.getBytes(StandardCharsets.UTF_8),
-                signatureHeader.getBytes(StandardCharsets.UTF_8)
-        );
-    }
-
-    private String computeHmacSha256(String secret, String body) {
-        try {
-            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
-            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(
-                    secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(keySpec);
-            byte[] hash = mac.doFinal(body != null ? body.getBytes(StandardCharsets.UTF_8) : new byte[0]);
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to compute HMAC-SHA256", e);
-        }
     }
 
     private String extractClientIp(HttpServletRequest request) {
@@ -301,5 +280,9 @@ public class IngressService {
 
     public static class PayloadTooLargeException extends RuntimeException {
         public PayloadTooLargeException(String message) { super(message); }
+    }
+
+    public static class RateLimitExceededException extends RuntimeException {
+        public RateLimitExceededException(String message) { super(message); }
     }
 }

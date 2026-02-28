@@ -79,6 +79,7 @@ public class IncomingDestinationService {
                 .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts() : 5)
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600")
+                .payloadTransform(request.getPayloadTransform())
                 .build();
 
         // Encrypt auth config if provided
@@ -142,6 +143,9 @@ public class IncomingDestinationService {
         if (request.getRetryDelays() != null) {
             destination.setRetryDelays(request.getRetryDelays());
         }
+        if (request.getPayloadTransform() != null) {
+            destination.setPayloadTransform(request.getPayloadTransform().isBlank() ? null : request.getPayloadTransform());
+        }
 
         destination = destinationRepository.saveAndFlush(destination);
         log.info("Updated incoming destination: id={}", id);
@@ -170,6 +174,7 @@ public class IncomingDestinationService {
                 .maxAttempts(destination.getMaxAttempts())
                 .timeoutSeconds(destination.getTimeoutSeconds())
                 .retryDelays(destination.getRetryDelays())
+                .payloadTransform(destination.getPayloadTransform())
                 .createdAt(destination.getCreatedAt())
                 .updatedAt(destination.getUpdatedAt())
                 .build();

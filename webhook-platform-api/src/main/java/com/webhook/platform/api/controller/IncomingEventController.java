@@ -1,8 +1,11 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.dto.IncomingBulkReplayRequest;
+import com.webhook.platform.api.dto.IncomingBulkReplayResponse;
 import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.dto.ReplayEventResponse;
+import jakarta.validation.Valid;
 import com.webhook.platform.api.exception.UnauthorizedException;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.RbacUtil;
@@ -97,6 +100,25 @@ public class IncomingEventController {
                 .eventId(id)
                 .destinationsCount(replayed)
                 .build());
+    }
+
+    @Operation(summary = "Bulk replay incoming events",
+            description = "Re-sends multiple incoming events to all enabled destinations. " +
+                    "Filter by source, time range, or explicit event IDs.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Bulk replay completed"),
+            @ApiResponse(responseCode = "404", description = "Source not found")
+    })
+    @PostMapping("/bulk-replay")
+    public ResponseEntity<IncomingBulkReplayResponse> bulkReplay(
+            @PathVariable("projectId") UUID projectId,
+            @Valid @RequestBody IncomingBulkReplayRequest request,
+            Authentication authentication) {
+        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+        IncomingBulkReplayResponse response = eventService.bulkReplay(
+                projectId, request, jwtAuth.getOrganizationId());
+        return ResponseEntity.ok(response);
     }
 
     private JwtAuthenticationToken requireJwt(Authentication authentication) {

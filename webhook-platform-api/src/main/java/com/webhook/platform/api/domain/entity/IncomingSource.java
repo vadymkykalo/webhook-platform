@@ -65,6 +65,9 @@ public class IncomingSource {
     @Builder.Default
     private String hmacSignaturePrefix = "";
 
+    @Column(name = "rate_limit_per_second")
+    private Integer rateLimitPerSecond;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
