@@ -33,4 +33,12 @@ export const authApi = {
   logout: (refreshToken: string): Promise<void> => {
     return http.post<void>('/api/v1/auth/logout', { refreshToken });
   },
+
+  forgotPassword: (email: string): Promise<void> => {
+    return http.post<void>('/api/v1/auth/forgot-password', { email });
+  },
+
+  resetPassword: (token: string, newPassword: string): Promise<void> => {
+    return http.post<void>('/api/v1/auth/reset-password', { token, newPassword });
+  },
 };

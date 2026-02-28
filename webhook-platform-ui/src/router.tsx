@@ -1,27 +1,45 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import AppLayout from './layout/AppLayout';
 import PublicLayout from './layout/PublicLayout';
-import LoginPage from './auth/LoginPage';
-import RegisterPage from './auth/RegisterPage';
 import ProtectedRoute from './auth/ProtectedRoute';
-import DashboardPage from './pages/DashboardPage';
-import ProjectsPage from './pages/ProjectsPage';
-import EndpointsPage from './pages/EndpointsPage';
-import DeliveriesPage from './pages/DeliveriesPage';
-import EventsPage from './pages/EventsPage';
-import SubscriptionsPage from './pages/SubscriptionsPage';
-import MembersPage from './pages/MembersPage';
-import ApiKeysPage from './pages/ApiKeysPage';
-import SettingsPage from './pages/SettingsPage';
-import DocumentationPage from './pages/DocumentationPage';
-import LandingPage from './pages/LandingPage';
-import QuickstartPage from './pages/QuickstartPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import DlqPage from './pages/DlqPage';
-import TestEndpointsPage from './pages/TestEndpointsPage';
-import AuditLogPage from './pages/AuditLogPage';
-import VerifyEmailPage from './auth/VerifyEmailPage';
-import NotFoundPage from './pages/NotFoundPage';
+
+// Lazy-loaded pages — each becomes its own chunk
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const QuickstartPage = lazy(() => import('./pages/QuickstartPage'));
+const LoginPage = lazy(() => import('./auth/LoginPage'));
+const RegisterPage = lazy(() => import('./auth/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('./auth/VerifyEmailPage'));
+const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
+const DocumentationPage = lazy(() => import('./pages/DocumentationPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
+const DeliveriesPage = lazy(() => import('./pages/DeliveriesPage'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const SubscriptionsPage = lazy(() => import('./pages/SubscriptionsPage'));
+const MembersPage = lazy(() => import('./pages/MembersPage'));
+const ApiKeysPage = lazy(() => import('./pages/ApiKeysPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const DlqPage = lazy(() => import('./pages/DlqPage'));
+const TestEndpointsPage = lazy(() => import('./pages/TestEndpointsPage'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    </div>
+  );
+}
+
+function S({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
 
 export const router = createBrowserRouter([
   {
@@ -29,29 +47,37 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <LandingPage />,
+        element: <S><LandingPage /></S>,
       },
       {
         path: '/quickstart',
-        element: <QuickstartPage />,
+        element: <S><QuickstartPage /></S>,
       },
     ],
   },
   {
     path: '/login',
-    element: <LoginPage />,
+    element: <S><LoginPage /></S>,
   },
   {
     path: '/register',
-    element: <RegisterPage />,
+    element: <S><RegisterPage /></S>,
   },
   {
     path: '/verify-email',
-    element: <VerifyEmailPage />,
+    element: <S><VerifyEmailPage /></S>,
+  },
+  {
+    path: '/forgot-password',
+    element: <S><ForgotPasswordPage /></S>,
+  },
+  {
+    path: '/reset-password',
+    element: <S><ResetPasswordPage /></S>,
   },
   {
     path: '/docs',
-    element: <DocumentationPage />,
+    element: <S><DocumentationPage /></S>,
   },
   {
     path: '/admin',
@@ -62,65 +88,69 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
+        index: true,
+        element: <Navigate to="dashboard" replace />,
+      },
+      {
         path: 'dashboard',
-        element: <DashboardPage />,
+        element: <S><DashboardPage /></S>,
       },
       {
         path: 'projects',
-        element: <ProjectsPage />,
+        element: <S><ProjectsPage /></S>,
       },
       {
         path: 'projects/:projectId/endpoints',
-        element: <EndpointsPage />,
+        element: <S><EndpointsPage /></S>,
       },
       {
         path: 'projects/:projectId/deliveries',
-        element: <DeliveriesPage />,
+        element: <S><DeliveriesPage /></S>,
       },
       {
         path: 'projects/:projectId/events',
-        element: <EventsPage />,
+        element: <S><EventsPage /></S>,
       },
       {
         path: 'projects/:projectId/subscriptions',
-        element: <SubscriptionsPage />,
+        element: <S><SubscriptionsPage /></S>,
       },
       {
         path: 'projects/:projectId/api-keys',
-        element: <ApiKeysPage />,
+        element: <S><ApiKeysPage /></S>,
       },
       {
         path: 'projects/:projectId/analytics',
-        element: <AnalyticsPage />,
+        element: <S><AnalyticsPage /></S>,
       },
       {
         path: 'projects/:projectId/dlq',
-        element: <DlqPage />,
+        element: <S><DlqPage /></S>,
       },
       {
         path: 'projects/:projectId/test-endpoints',
-        element: <TestEndpointsPage />,
+        element: <S><TestEndpointsPage /></S>,
       },
       {
         path: 'members',
-        element: <MembersPage />,
+        element: <S><MembersPage /></S>,
       },
       {
         path: 'audit-log',
-        element: <AuditLogPage />,
+        element: <S><AuditLogPage /></S>,
       },
       {
         path: 'settings',
-        element: <SettingsPage />,
+        element: <S><SettingsPage /></S>,
       },
       {
         path: '*',
-        element: <NotFoundPage />,
+        element: <S><NotFoundPage /></S>,
       },
     ],
   },
   {
     path: '*',
-    element: <NotFoundPage />,
+    element: <S><NotFoundPage /></S>,
   },
 ]);

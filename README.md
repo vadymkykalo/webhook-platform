@@ -398,6 +398,7 @@ make restore-db FILE=...  # Restore from backup
 make shell-db             # Open psql shell
 make dev-api              # Quick rebuild API + tail logs
 make verify-link          # Show email verification link from logs
+make reset-link           # Show password reset link from logs
 make nuke CONFIRM=YES     # Destroy everything
 ```
 
@@ -415,6 +416,18 @@ make verify-link
 ```
 
 Open the printed URL in a browser to confirm the account.
+</details>
+
+<details>
+<summary>Forgot password in local development</summary>
+
+Password reset emails also go to the API logs when `EMAIL_ENABLED=false`. After requesting a reset on the `/forgot-password` page:
+
+```bash
+make reset-link
+```
+
+Open the printed URL in a browser to set a new password. The link expires in 1 hour.
 </details>
 
 <details>

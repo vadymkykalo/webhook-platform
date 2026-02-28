@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link scale-worker
+.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link scale-worker
 
 # Default target
 .DEFAULT_GOAL := help
@@ -210,6 +210,9 @@ logs-ui: ## Follow logs for UI service
 
 verify-link: ## Show last email verification link from API logs
 	@$(DOCKER_COMPOSE) logs api 2>&1 | grep "Verify URL:" | tail -1 | sed 's/.*Verify URL: //'
+
+reset-link: ## Show last password reset link from API logs
+	@$(DOCKER_COMPOSE) logs api 2>&1 | grep "Reset URL:" | tail -1 | sed 's/.*Reset URL: //'
 
 WAIT_TIMEOUT ?= 120
 wait-healthy: ## Wait until API and Worker are healthy (max WAIT_TIMEOUT seconds)

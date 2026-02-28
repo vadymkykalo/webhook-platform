@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
 import { toast } from 'sonner';
-import { projectsApi } from '../api/projects.api';
-import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
-import { endpointsApi } from '../api/endpoints.api';
-import type { ProjectResponse, EndpointResponse } from '../types/api.types';
+import { SubscriptionResponse } from '../api/subscriptions.api';
+import { useProject, useSubscriptions, useEndpoints, usePatchSubscription, useDeleteSubscription, queryKeys } from '../api/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -25,86 +24,47 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function SubscriptionsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [subscriptions, setSubscriptions] = useState<SubscriptionResponse[]>([]);
-  const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { canManageSubscriptions } = usePermissions();
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: subscriptions = [], isLoading: subsLoading } = useSubscriptions(projectId);
+  const { data: endpoints = [], isLoading: endpointsLoading } = useEndpoints(projectId);
+  const patchMutation = usePatchSubscription(projectId!);
+  const deleteMutation = useDeleteSubscription(projectId!);
+  const qc = useQueryClient();
+
+  const loading = projectLoading || subsLoading || endpointsLoading;
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<SubscriptionResponse | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   
   const [eventTypeFilter, setEventTypeFilter] = useState('');
   const [endpointFilter, setEndpointFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => {
-    if (projectId) {
-      loadData();
-    }
-  }, [projectId]);
-
-  const loadData = async () => {
-    if (!projectId) return;
-    
-    try {
-      setLoading(true);
-      const [projectData, subscriptionsData, endpointsData] = await Promise.all([
-        projectsApi.get(projectId),
-        subscriptionsApi.list(projectId),
-        endpointsApi.list(projectId),
-      ]);
-      setProject(projectData);
-      setSubscriptions(subscriptionsData);
-      setEndpoints(endpointsData);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
+  const handleToggleEnabled = (subscription: SubscriptionResponse) => {
+    patchMutation.mutate(
+      { id: subscription.id, data: { enabled: !subscription.enabled } },
+      { onSuccess: () => toast.success(`Subscription ${!subscription.enabled ? 'enabled' : 'disabled'}`) }
+    );
   };
 
-  const handleToggleEnabled = async (subscription: SubscriptionResponse) => {
-    try {
-      await subscriptionsApi.patch(projectId!, subscription.id, {
-        enabled: !subscription.enabled,
-      });
-      toast.success(`Subscription ${!subscription.enabled ? 'enabled' : 'disabled'}`);
-      loadData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update subscription');
-    }
+  const handleToggleOrdering = (subscription: SubscriptionResponse) => {
+    patchMutation.mutate(
+      { id: subscription.id, data: { orderingEnabled: !subscription.orderingEnabled } },
+      { onSuccess: () => toast.success(`FIFO ordering ${!subscription.orderingEnabled ? 'enabled' : 'disabled'}`) }
+    );
   };
 
-  const handleToggleOrdering = async (subscription: SubscriptionResponse) => {
-    try {
-      await subscriptionsApi.patch(projectId!, subscription.id, {
-        orderingEnabled: !subscription.orderingEnabled,
-      });
-      toast.success(`FIFO ordering ${!subscription.orderingEnabled ? 'enabled' : 'disabled'}`);
-      loadData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update subscription');
-    }
-  };
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deleteId || !projectId) return;
-
-    setDeletingId(deleteId);
-    try {
-      await subscriptionsApi.delete(projectId, deleteId);
-      toast.success('Subscription deleted successfully');
-      setDeleteId(null);
-      loadData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete subscription');
-    } finally {
-      setDeletingId(null);
-    }
+    deleteMutation.mutate(deleteId, {
+      onSuccess: () => { toast.success('Subscription deleted successfully'); setDeleteId(null); },
+    });
   };
 
   const handleEdit = (subscription: SubscriptionResponse) => {
@@ -175,9 +135,11 @@ export default function SubscriptionsPage() {
             Route event types to endpoints for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4" /> Create Subscription
-        </Button>
+        {canManageSubscriptions && (
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4" /> Create Subscription
+          </Button>
+        )}
       </div>
 
       <Card className="mb-6">
@@ -219,7 +181,7 @@ export default function SubscriptionsPage() {
               ? 'Create a subscription to route events to your endpoints'
               : 'Try adjusting your filters'}
           </p>
-          {subscriptions.length === 0 && (
+          {subscriptions.length === 0 && canManageSubscriptions && (
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4" /> Create Subscription
             </Button>
@@ -235,7 +197,7 @@ export default function SubscriptionsPage() {
                 <TableHead className="text-xs">Status</TableHead>
                 <TableHead className="text-xs">Ordering</TableHead>
                 <TableHead className="text-xs">Created</TableHead>
-                <TableHead className="w-[80px]"></TableHead>
+                {canManageSubscriptions && <TableHead className="w-[80px]"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -249,13 +211,13 @@ export default function SubscriptionsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Switch checked={subscription.enabled} onCheckedChange={() => handleToggleEnabled(subscription)} />
+                      <Switch checked={subscription.enabled} onCheckedChange={() => handleToggleEnabled(subscription)} disabled={!canManageSubscriptions} />
                       <Badge variant={subscription.enabled ? 'success' : 'secondary'}>{subscription.enabled ? 'On' : 'Off'}</Badge>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Switch checked={subscription.orderingEnabled} onCheckedChange={() => handleToggleOrdering(subscription)} />
+                      <Switch checked={subscription.orderingEnabled} onCheckedChange={() => handleToggleOrdering(subscription)} disabled={!canManageSubscriptions} />
                       {subscription.orderingEnabled && (
                         <Badge variant="outline" className="gap-1 text-[10px]"><ListOrdered className="h-3 w-3" />FIFO</Badge>
                       )}
@@ -264,16 +226,18 @@ export default function SubscriptionsPage() {
                   <TableCell>
                     <span className="text-[13px] text-muted-foreground">{new Date(subscription.createdAt).toLocaleDateString()}</span>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title="Edit">
-                        <Settings className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManageSubscriptions && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title="Edit">
+                          <Settings className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -287,7 +251,7 @@ export default function SubscriptionsPage() {
         subscription={editingSubscription}
         open={showCreateModal}
         onClose={handleCloseModal}
-        onSuccess={loadData}
+        onSuccess={() => qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId!) })}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
@@ -300,10 +264,10 @@ export default function SubscriptionsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!deletingId}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={!!deletingId} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deletingId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deletingId ? 'Deleting...' : 'Delete'}
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleteMutation.isPending} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

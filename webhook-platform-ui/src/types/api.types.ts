@@ -116,14 +116,6 @@ export interface DeliveryAttemptResponse {
   createdAt: string;
 }
 
-export interface PageResponse<T> {
-  content: T[];
-  totalElements: number;
-  totalPages: number;
-  size: number;
-  number: number;
-}
-
 export interface EventResponse {
   id: string;
   projectId: string;

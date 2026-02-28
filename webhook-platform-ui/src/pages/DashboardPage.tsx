@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
-import { projectsApi } from '../api/projects.api';
-import { dashboardApi, type DashboardStats } from '../api/dashboard.api';
-import type { ProjectResponse } from '../types/api.types';
+import { useProjects, useDashboardStats } from '../api/queries';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
@@ -56,50 +53,19 @@ function SkeletonDashboard() {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const { data: projects = [], isLoading: loading } = useProjects();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(false);
 
+  // Auto-select first project when loaded
   useEffect(() => {
-    loadProjects();
-  }, []);
-
-  useEffect(() => {
-    if (selectedProjectId) {
-      loadDashboardStats();
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
     }
-  }, [selectedProjectId]);
+  }, [projects, selectedProjectId]);
 
-  const loadProjects = async () => {
-    try {
-      setLoading(true);
-      const data = await projectsApi.list();
-      setProjects(data);
-      if (data.length > 0) {
-        setSelectedProjectId(data[0].id);
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadDashboardStats = async () => {
-    if (!selectedProjectId) return;
-    
-    try {
-      setStatsLoading(true);
-      const stats = await dashboardApi.getProjectStats(selectedProjectId);
-      setDashboardStats(stats);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load dashboard stats');
-    } finally {
-      setStatsLoading(false);
-    }
-  };
+  const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats(
+    selectedProjectId || undefined
+  );
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -328,10 +294,10 @@ export default function DashboardPage() {
           {/* Quick Actions */}
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'Endpoints', path: `/projects/${selectedProjectId}/endpoints`, icon: Webhook },
-              { label: 'Events', path: `/projects/${selectedProjectId}/events`, icon: Radio },
-              { label: 'Deliveries', path: `/projects/${selectedProjectId}/deliveries`, icon: Send },
-              { label: 'Dead Letter Queue', path: `/projects/${selectedProjectId}/dlq`, icon: AlertTriangle },
+              { label: 'Endpoints', path: `/admin/projects/${selectedProjectId}/endpoints`, icon: Webhook },
+              { label: 'Events', path: `/admin/projects/${selectedProjectId}/events`, icon: Radio },
+              { label: 'Deliveries', path: `/admin/projects/${selectedProjectId}/deliveries`, icon: Send },
+              { label: 'Dead Letter Queue', path: `/admin/projects/${selectedProjectId}/dlq`, icon: AlertTriangle },
             ].map((action) => (
               <button
                 key={action.label}

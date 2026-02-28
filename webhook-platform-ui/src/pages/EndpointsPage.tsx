@@ -29,9 +29,11 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import MtlsConfigModal from '../components/MtlsConfigModal';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function EndpointsPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const { canManageEndpoints } = usePermissions();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -328,9 +330,11 @@ export default function EndpointsPage() {
             Manage webhook endpoints for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4" /> New Endpoint
-        </Button>
+        {canManageEndpoints && (
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" /> New Endpoint
+          </Button>
+        )}
       </div>
 
       {endpoints.length === 0 ? (
@@ -342,9 +346,11 @@ export default function EndpointsPage() {
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
             Create your first endpoint to start receiving webhooks
           </p>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" /> Create endpoint
-          </Button>
+          {canManageEndpoints && (
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" /> Create endpoint
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3 animate-fade-in">
@@ -389,30 +395,34 @@ export default function EndpointsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title="Test" disabled={testing && testId === endpoint.id}>
-                      {testing && testId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? 'Disable' : 'Enable'}>
-                      {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title="Rotate Secret">
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}>
-                      <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
-                    </Button>
-                    {endpoint.verificationStatus !== 'VERIFIED' && (
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title="Verify endpoint" disabled={verifyingId === endpoint.id}>
-                        {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
-                      </Button>
+                    {canManageEndpoints && (
+                      <>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title="Test" disabled={testing && testId === endpoint.id}>
+                          {testing && testId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? 'Disable' : 'Enable'}>
+                          {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title="Rotate Secret">
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? 'Configure mTLS' : 'Enable mTLS'}>
+                          <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
+                        </Button>
+                        {endpoint.verificationStatus !== 'VERIFIED' && (
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title="Verify endpoint" disabled={verifyingId === endpoint.id}>
+                            {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
                     )}
-                    <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </div>
 
-                {(endpoint.verificationStatus === 'PENDING' || endpoint.verificationStatus === 'FAILED') && (
+                {canManageEndpoints && (endpoint.verificationStatus === 'PENDING' || endpoint.verificationStatus === 'FAILED') && (
                   <div className="mt-4 p-3 bg-accent/50 rounded-lg border border-primary/10">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex-1">

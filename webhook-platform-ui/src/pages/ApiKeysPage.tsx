@@ -27,9 +27,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function ApiKeysPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const { canManageApiKeys } = usePermissions();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,9 +187,11 @@ export default function ApiKeysPage() {
             Manage API keys for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4" /> Create API Key
-        </Button>
+        {canManageApiKeys && (
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" /> Create API Key
+          </Button>
+        )}
       </div>
 
       {apiKeys.length === 0 ? (
@@ -197,11 +201,15 @@ export default function ApiKeysPage() {
           </div>
           <h3 className="text-lg font-semibold mb-2">No API keys yet</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            Create your first API key to start sending events
+            {canManageApiKeys
+              ? 'Create your first API key to start sending events'
+              : 'No API keys have been created yet. Ask a Developer or Owner to create one.'}
           </p>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" /> Create API Key
-          </Button>
+          {canManageApiKeys && (
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" /> Create API Key
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3 animate-fade-in">
@@ -222,9 +230,11 @@ export default function ApiKeysPage() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title="Revoke" className="text-muted-foreground hover:text-destructive flex-shrink-0">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {canManageApiKeys && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title="Revoke" className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

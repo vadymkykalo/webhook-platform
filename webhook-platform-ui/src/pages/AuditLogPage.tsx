@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
-import { auditLogApi, AuditLogEntry, AuditLogPage as AuditLogPageData } from '../api/auditLog.api';
+import { useAuditLog } from '../api/queries';
+import { type AuditLogEntry } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
 import {
   Table,
@@ -12,14 +13,17 @@ import {
 } from '../components/ui/table';
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE: 'bg-green-100 text-green-800',
-  UPDATE: 'bg-blue-100 text-blue-800',
-  DELETE: 'bg-red-100 text-red-800',
-  ROTATE_SECRET: 'bg-orange-100 text-orange-800',
-  REVOKE: 'bg-red-100 text-red-800',
-  REGISTER: 'bg-purple-100 text-purple-800',
-  LOGIN: 'bg-cyan-100 text-cyan-800',
-  LOGOUT: 'bg-gray-100 text-gray-800',
+  CREATE: 'bg-green-500/10 text-green-700 dark:text-green-400',
+  UPDATE: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  DELETE: 'bg-red-500/10 text-red-700 dark:text-red-400',
+  ROTATE_SECRET: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
+  REVOKE: 'bg-red-500/10 text-red-700 dark:text-red-400',
+  REGISTER: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
+  LOGIN: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
+  LOGOUT: 'bg-muted text-muted-foreground',
+  PASSWORD_RESET_REQUESTED: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+  PASSWORD_RESET: 'bg-green-500/10 text-green-700 dark:text-green-400',
+  PASSWORD_CHANGED: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
 };
 
 function formatDate(dateStr: string) {
@@ -39,25 +43,9 @@ function shortId(id: string | null) {
 }
 
 export default function AuditLogPage() {
-  const [data, setData] = useState<AuditLogPageData | null>(null);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useAuditLog(page);
 
-  const fetchData = async (p: number) => {
-    setLoading(true);
-    try {
-      const result = await auditLogApi.list(p, 20);
-      setData(result);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData(page);
-  }, [page]);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -74,7 +62,7 @@ export default function AuditLogPage() {
       </div>
 
       <div className="border rounded-lg bg-card overflow-hidden">
-        {loading && !data ? (
+        {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
               <div key={i} className="flex items-center gap-4">
@@ -114,7 +102,7 @@ export default function AuditLogPage() {
                       {formatDate(entry.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACTION_COLORS[entry.action] || 'bg-gray-100 text-gray-800'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACTION_COLORS[entry.action] || 'bg-muted text-muted-foreground'}`}>
                         {entry.action}
                       </span>
                     </TableCell>

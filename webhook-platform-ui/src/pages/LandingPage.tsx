@@ -1,9 +1,9 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, Moon, Sun } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
-import { getTheme, setTheme } from '../lib/theme';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
@@ -25,7 +25,6 @@ export default function LandingPage() {
 function Navigation() {
   const { isAuthenticated } = useAuth();
   const [scrolled, setScrolled] = useState(false);
-  const [, setThemeToggle] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -52,16 +51,7 @@ function Navigation() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); const next = getTheme() === 'dark' ? 'light' : 'dark'; setTheme(next); setThemeToggle(p => !p); }}
-            className="relative z-10 text-muted-foreground hover:text-foreground"
-            title="Toggle theme"
-          >
-            {typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <ThemeToggle className="relative z-10 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" />
           <div className="w-px h-5 bg-border mx-1" />
           {isAuthenticated ? (
             <Link to="/admin/projects">
@@ -166,11 +156,10 @@ function DashboardMockup() {
           {deliveries.map((delivery, index) => (
             <div
               key={delivery.id}
-              className={`p-3 rounded-lg border transition-all duration-500 ${
-                activeRow === index
+              className={`p-3 rounded-lg border transition-all duration-500 ${activeRow === index
                   ? 'border-primary/30 bg-accent shadow-sm scale-[1.02]'
                   : 'border-transparent bg-transparent hover:bg-muted/50'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
@@ -287,11 +276,10 @@ function ArchNode({ name, sub, logoSrc, icon, color, isActive, onClick }: {
   return (
     <div className="flex flex-col items-center cursor-pointer group" onClick={onClick}>
       <div
-        className={`relative w-[5.5rem] h-[5.5rem] lg:w-[6.5rem] lg:h-[6.5rem] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-700 ${
-          isActive
+        className={`relative w-[5.5rem] h-[5.5rem] lg:w-[6.5rem] lg:h-[6.5rem] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-700 ${isActive
             ? 'border-transparent scale-110 shadow-xl'
             : 'border-border bg-card hover:border-primary/20 hover:shadow-md hover:-translate-y-0.5'
-        }`}
+          }`}
         style={isActive ? {
           borderColor: `${color}40`,
           background: `linear-gradient(135deg, ${color}08, ${color}15)`,
@@ -307,28 +295,24 @@ function ArchNode({ name, sub, logoSrc, icon, color, isActive, onClick }: {
           <img
             src={logoSrc}
             alt={name}
-            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 object-contain transition-all duration-500 ${
-              isActive ? 'opacity-100 grayscale-0' : 'opacity-50 grayscale group-hover:opacity-80 group-hover:grayscale-0'
-            }`}
+            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 object-contain transition-all duration-500 ${isActive ? 'opacity-100 grayscale-0' : 'opacity-50 grayscale group-hover:opacity-80 group-hover:grayscale-0'
+              }`}
           />
         ) : (
           <div
-            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 transition-all duration-500 [&>svg]:w-full [&>svg]:h-full ${
-              isActive ? '' : 'text-muted-foreground/60 group-hover:text-foreground/80'
-            }`}
+            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 transition-all duration-500 [&>svg]:w-full [&>svg]:h-full ${isActive ? '' : 'text-muted-foreground/60 group-hover:text-foreground/80'
+              }`}
             style={isActive ? { color } : {}}
           >
             {icon}
           </div>
         )}
-        <div className={`text-[11px] lg:text-xs font-bold tracking-wide transition-colors duration-500 ${
-          isActive ? 'text-foreground' : 'text-foreground/80'
-        }`}>
+        <div className={`text-[11px] lg:text-xs font-bold tracking-wide transition-colors duration-500 ${isActive ? 'text-foreground' : 'text-foreground/80'
+          }`}>
           {name}
         </div>
-        <div className={`text-[9px] lg:text-[10px] transition-colors duration-500 ${
-          isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'
-        }`}>
+        <div className={`text-[9px] lg:text-[10px] transition-colors duration-500 ${isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'
+          }`}>
           {sub}
         </div>
       </div>
@@ -339,9 +323,8 @@ function ArchNode({ name, sub, logoSrc, icon, color, isActive, onClick }: {
 function AnimatedConnector({ isActive, isPast, color, delay }: { isActive: boolean; isPast: boolean; color: string; delay: number }) {
   return (
     <div className="relative w-8 lg:w-14 h-8 mx-0.5 lg:mx-1 flex items-center">
-      <div className={`w-full h-[2px] rounded-full transition-all duration-700 ${
-        isPast ? 'bg-primary/40' : 'bg-border'
-      }`} />
+      <div className={`w-full h-[2px] rounded-full transition-all duration-700 ${isPast ? 'bg-primary/40' : 'bg-border'
+        }`} />
       {(isActive || isPast) && (
         <div
           className="absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full"
@@ -372,20 +355,34 @@ function ArchitectureShowcase() {
   }, [hoveredStep]);
 
   const components = [
-    { name: 'Client', sub: 'POST /events', color: '#8B5CF6',
-      icon: <Code2 className="w-full h-full" /> },
-    { name: 'API', sub: 'Spring Boot', color: '#6DB33F',
-      logoSrc: '/logos/springboot.svg' },
-    { name: 'DB', sub: 'Event + Outbox', color: '#4169E1',
-      logoSrc: '/logos/postgresql.svg' },
-    { name: 'Publisher', sub: 'Scheduled', color: '#F59E0B',
-      icon: <Clock className="w-full h-full" /> },
-    { name: 'Kafka', sub: 'Queue', color: '#231F20',
-      logoSrc: '/logos/apachekafka.svg' },
-    { name: 'Worker', sub: 'Consumer', color: '#10B981',
-      icon: <RefreshCw className="w-full h-full" /> },
-    { name: 'Endpoint', sub: 'HMAC', color: '#EF4444',
-      icon: <Lock className="w-full h-full" /> },
+    {
+      name: 'Client', sub: 'POST /events', color: '#8B5CF6',
+      icon: <Code2 className="w-full h-full" />
+    },
+    {
+      name: 'API', sub: 'Spring Boot', color: '#6DB33F',
+      logoSrc: '/logos/springboot.svg'
+    },
+    {
+      name: 'DB', sub: 'Event + Outbox', color: '#4169E1',
+      logoSrc: '/logos/postgresql.svg'
+    },
+    {
+      name: 'Publisher', sub: 'Scheduled', color: '#F59E0B',
+      icon: <Clock className="w-full h-full" />
+    },
+    {
+      name: 'Kafka', sub: 'Queue', color: '#231F20',
+      logoSrc: '/logos/apachekafka.svg'
+    },
+    {
+      name: 'Worker', sub: 'Consumer', color: '#10B981',
+      icon: <RefreshCw className="w-full h-full" />
+    },
+    {
+      name: 'Endpoint', sub: 'HMAC', color: '#EF4444',
+      icon: <Lock className="w-full h-full" />
+    },
   ];
 
   const current = hoveredStep ?? activeStep;
@@ -462,9 +459,8 @@ function ArchitectureShowcase() {
                 {components.map((component, index) => (
                   <div
                     key={index}
-                    className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 ${
-                      current === index ? 'border-primary/30 bg-accent shadow-sm' : 'border-transparent'
-                    }`}
+                    className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 ${current === index ? 'border-primary/30 bg-accent shadow-sm' : 'border-transparent'
+                      }`}
                     onClick={() => setActiveStep(index)}
                   >
                     <div className="h-10 w-10 rounded-lg flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5"
@@ -563,11 +559,10 @@ function VisibilityAndControl() {
                       <div
                         key={attempt.id}
                         onClick={() => setSelectedAttempt(attempt.id)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                          selectedAttempt === attempt.id
+                        className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selectedAttempt === attempt.id
                             ? 'border-primary/40 bg-accent ring-1 ring-primary/20'
                             : 'border-border hover:border-primary/20 hover:bg-muted/50'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
@@ -649,7 +644,7 @@ function DeveloperConfidence() {
                   <span className="ml-3 text-xs text-white/40 font-mono">send-event.sh</span>
                 </div>
                 <pre className="p-5 text-[13px] text-white/90 overflow-x-auto font-mono leading-relaxed">
-{`curl -X POST /api/v1/events \\
+                  {`curl -X POST /api/v1/events \\
   -H "X-API-Key: wh_live_abc123..." \\
   -H "Content-Type: application/json" \\
   -H "Idempotency-Key: unique-id" \\
@@ -735,11 +730,10 @@ function HowItWorks() {
             {steps.map((step, index) => (
               <div
                 key={index}
-                className={`group relative p-5 rounded-2xl border cursor-pointer transition-all duration-500 ${
-                  current === index
+                className={`group relative p-5 rounded-2xl border cursor-pointer transition-all duration-500 ${current === index
                     ? 'bg-card border-primary/30 shadow-lg'
                     : 'bg-card/50 border-transparent hover:bg-card hover:border-border'
-                }`}
+                  }`}
                 onClick={() => { setActiveStep(index); setHoveredStep(null); }}
                 onMouseEnter={() => setHoveredStep(index)}
                 onMouseLeave={() => setHoveredStep(null)}
@@ -749,9 +743,8 @@ function HowItWorks() {
                 )}
                 <div className="flex items-start gap-4">
                   <div
-                    className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold tracking-wider transition-all duration-500 ${
-                      current === index ? 'text-white scale-110' : 'bg-muted text-muted-foreground'
-                    }`}
+                    className={`flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-sm font-bold tracking-wider transition-all duration-500 ${current === index ? 'text-white scale-110' : 'bg-muted text-muted-foreground'
+                      }`}
                     style={current === index ? { background: step.color, boxShadow: `0 4px 20px ${step.color}40` } : {}}
                   >
                     {step.num}
@@ -759,9 +752,8 @@ function HowItWorks() {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-semibold mb-1">{step.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-                    <div className={`mt-3 space-y-1.5 overflow-hidden transition-all duration-500 ${
-                      current === index ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
-                    }`}>
+                    <div className={`mt-3 space-y-1.5 overflow-hidden transition-all duration-500 ${current === index ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                      }`}>
                       {step.details.map((detail) => (
                         <div key={detail} className="flex items-center gap-2 text-xs">
                           <div className="h-1 w-1 rounded-full flex-shrink-0" style={{ background: step.color }} />
@@ -794,9 +786,8 @@ function HowItWorks() {
                   {steps.map((s, i) => (
                     <div
                       key={i}
-                      className={`h-1.5 rounded-full transition-all duration-500 ${
-                        current === i ? 'w-6' : 'w-1.5'
-                      }`}
+                      className={`h-1.5 rounded-full transition-all duration-500 ${current === i ? 'w-6' : 'w-1.5'
+                        }`}
                       style={{ background: current === i ? s.color : '#d1d5db' }}
                     />
                   ))}
@@ -806,9 +797,8 @@ function HowItWorks() {
 
               <div className="relative min-h-[380px]">
                 {/* Step 1: Code */}
-                <div className={`absolute inset-0 p-6 transition-all duration-500 ${
-                  current === 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-                }`}>
+                <div className={`absolute inset-0 p-6 transition-all duration-500 ${current === 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}>
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Send your first event</div>
                   <div className="bg-slate-900 rounded-xl overflow-hidden">
                     <div className="px-4 py-2 border-b border-white/10 flex items-center gap-2">
@@ -840,9 +830,8 @@ function HowItWorks() {
                 </div>
 
                 {/* Step 2: Delivery */}
-                <div className={`absolute inset-0 p-6 transition-all duration-500 ${
-                  current === 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-                }`}>
+                <div className={`absolute inset-0 p-6 transition-all duration-500 ${current === 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}>
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Live delivery pipeline</div>
                   <div className="space-y-3">
                     {[
@@ -850,9 +839,8 @@ function HowItWorks() {
                       { endpoint: 'hooks.partner.io/v2', status: 'retrying', code: 503, latency: '5002ms', sig: true, retryIn: '60s' },
                       { endpoint: 'notify.internal.dev', status: 'delivered', code: 200, latency: '45ms', sig: true },
                     ].map((d, i) => (
-                      <div key={i} className={`p-4 rounded-xl border transition-all duration-300 ${
-                        d.status === 'retrying' ? 'border-amber-200 bg-amber-50/50' : 'border-border bg-card'
-                      }`}>
+                      <div key={i} className={`p-4 rounded-xl border transition-all duration-300 ${d.status === 'retrying' ? 'border-amber-200 bg-amber-50/50' : 'border-border bg-card'
+                        }`}>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             {d.status === 'delivered' ? (
@@ -879,9 +867,8 @@ function HowItWorks() {
                 </div>
 
                 {/* Step 3: Monitor */}
-                <div className={`absolute inset-0 p-6 transition-all duration-500 ${
-                  current === 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-                }`}>
+                <div className={`absolute inset-0 p-6 transition-all duration-500 ${current === 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                  }`}>
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Dashboard overview</div>
                   <div className="grid grid-cols-3 gap-3 mb-4">
                     {[

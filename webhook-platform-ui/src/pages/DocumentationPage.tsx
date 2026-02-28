@@ -1,7 +1,7 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, Moon, Sun, ExternalLink, Package } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, ExternalLink, Package } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { getTheme, setTheme } from '../lib/theme';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function DocumentationPage() {
   const location = useLocation();
@@ -26,7 +26,7 @@ export default function DocumentationPage() {
           <div className="sticky top-0 z-30 lg:hidden h-14 border-b border-border/50 bg-card/80 glass flex items-center px-4 gap-3">
             <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
             <span className="text-sm font-semibold flex-1">Documentation</span>
-            <ThemeToggle />
+            <ThemeToggle variant="icon" />
           </div>
           <div className="max-w-4xl mx-auto px-6 lg:px-8 py-10">
             {activeSection === 'overview' && <Overview />}
@@ -43,21 +43,6 @@ export default function DocumentationPage() {
         </main>
       </div>
     </div>
-  );
-}
-
-function ThemeToggle() {
-  const [, setToggle] = useState(false);
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  return (
-    <button
-      onClick={() => { setTheme(getTheme() === 'dark' ? 'light' : 'dark'); setToggle(p => !p); }}
-      className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent w-full"
-      title="Toggle theme"
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
-    </button>
   );
 }
 
@@ -104,7 +89,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
         <Link to="/admin/dashboard" className="flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
           <ArrowRight className="h-4 w-4" /> Go to Dashboard
         </Link>
-        <ThemeToggle />
+        <ThemeToggle variant="full" />
       </div>
     </div>
   );
@@ -285,12 +270,12 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
 {`X-API-Key: wh_live_1234567890abcdef`}
         </CodeBlock>
         
-        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="mt-6 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
           <div className="flex items-start space-x-3">
-            <Shield className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-semibold text-amber-900 text-sm">Security Note</div>
-              <div className="text-amber-700 text-sm mt-1">
+              <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">Security Note</div>
+              <div className="text-amber-700 dark:text-amber-400 text-sm mt-1">
                 Never expose API keys in client-side code or public repositories. Store them securely in environment variables.
               </div>
             </div>
@@ -448,12 +433,12 @@ function EventsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
           { name: 'deliveriesCreated', type: 'integer', required: true, description: 'Number of deliveries created for this event' },
         ]} />
 
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="mt-6 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
           <div className="flex items-start space-x-3">
-            <Zap className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
-              <div className="font-semibold text-blue-900 text-sm">Idempotency</div>
-              <div className="text-blue-700 text-sm mt-1">
+              <div className="font-semibold text-blue-900 dark:text-blue-300 text-sm">Idempotency</div>
+              <div className="text-blue-700 dark:text-blue-400 text-sm mt-1">
                 Use the Idempotency-Key header to safely retry requests. If the same key is sent within 24 hours, the original response will be returned without creating duplicate events.
               </div>
             </div>
@@ -893,9 +878,9 @@ function Errors() {
           { name: 'X-RateLimit-Reset', type: 'timestamp', required: true, description: 'Unix timestamp when limit resets' },
           { name: 'Retry-After', type: 'integer', required: true, description: 'Seconds to wait before retrying (only on 429)' },
         ]} />
-        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="font-semibold text-amber-900 text-sm">Rate Limit Exceeded (429)</div>
-          <div className="text-amber-700 text-sm mt-1">
+        <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+          <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">Rate Limit Exceeded (429)</div>
+          <div className="text-amber-700 dark:text-amber-400 text-sm mt-1">
             When rate limited, wait until X-RateLimit-Reset timestamp before retrying.
           </div>
         </div>

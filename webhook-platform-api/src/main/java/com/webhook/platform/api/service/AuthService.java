@@ -229,6 +229,42 @@ public class AuthService {
         log.info("Password changed for user {}", userId);
     }
 
+    @Transactional
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        // Always return success to prevent email enumeration
+        if (user == null) {
+            log.info("Password reset requested for non-existent email: {}", email);
+            return;
+        }
+
+        String resetToken = generateVerificationToken();
+        user.setPasswordResetToken(resetToken);
+        user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
+        userRepository.save(user);
+
+        emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
+        log.info("Password reset token generated for user {}", user.getEmail());
+    }
+
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        User user = userRepository.findByPasswordResetToken(token)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset token"));
+
+        if (user.getPasswordResetTokenExpiresAt() != null
+                && user.getPasswordResetTokenExpiresAt().isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reset token has expired. Please request a new one.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiresAt(null);
+        userRepository.save(user);
+        log.info("Password reset completed for user {}", user.getEmail());
+    }
+
     public CurrentUserResponse getCurrentUser(UUID userId, UUID organizationId, MembershipRole role) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

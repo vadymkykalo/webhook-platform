@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AuthContext, AuthState } from './auth/auth.store';
 import { router } from './router';
@@ -7,6 +8,24 @@ import { http } from './api/http';
 import { authApi } from './api/auth.api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import type { CurrentUserResponse } from './types/api.types';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
+      refetchOnWindowFocus: true,
+    },
+    mutations: {
+      onError: (error: unknown) => {
+        const err = error as { response?: { data?: { message?: string } } };
+        const message = err?.response?.data?.message || 'An unexpected error occurred';
+        import('sonner').then(({ toast }) => toast.error(message));
+      },
+    },
+  },
+});
 
 export default function App() {
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
@@ -18,7 +37,7 @@ export default function App() {
   useEffect(() => {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
-    
+
     const storedRefreshToken = localStorage.getItem('refresh_token');
     if (storedToken && storedUser) {
       try {
@@ -73,7 +92,7 @@ export default function App() {
       localStorage.setItem('auth_user', JSON.stringify(newUser));
     },
     logout: () => {
-      authApi.logout(refreshToken || '').catch(() => {});
+      authApi.logout(refreshToken || '').catch(() => { });
       setToken(null);
       setRefreshToken(null);
       setUser(null);
@@ -102,10 +121,12 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={authState}>
-        <RouterProvider router={router} />
-        <Toaster position="top-right" richColors />
-      </AuthContext.Provider>
+      <QueryClientProvider client={queryClient}>
+        <AuthContext.Provider value={authState}>
+          <RouterProvider router={router} />
+          <Toaster position="top-right" richColors />
+        </AuthContext.Provider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

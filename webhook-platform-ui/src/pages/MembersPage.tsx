@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { UserPlus, Trash2, Loader2, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { membersApi, MemberResponse, MembershipRole } from '../api/members.api';
+import { type MembershipRole } from '../api/members.api';
+import { useMembers, useChangeMemberRole, useRemoveMember } from '../api/queries';
 import { useAuth } from '../auth/auth.store';
+import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -22,68 +24,35 @@ import AddMemberModal from '../components/AddMemberModal';
 
 export default function MembersPage() {
   const { user } = useAuth();
-  const [members, setMembers] = useState<MemberResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { canManageMembers } = usePermissions();
   const [showAddModal, setShowAddModal] = useState(false);
   const [removeUserId, setRemoveUserId] = useState<string | null>(null);
-  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
-  const [changingRoleUserId, setChangingRoleUserId] = useState<string | null>(null);
 
   const orgId = user?.organization?.id;
-  const currentUserRole = (user?.role || 'VIEWER') as MembershipRole;
-  const isOwner = currentUserRole === 'OWNER';
 
-  useEffect(() => {
-    if (orgId) {
-      loadMembers();
-    }
-  }, [orgId]);
+  const { data: members = [], isLoading: loading } = useMembers(orgId);
+  const changeRole = useChangeMemberRole(orgId!);
+  const removeMember = useRemoveMember(orgId!);
 
-  const loadMembers = async () => {
-    if (!orgId) return;
-
-    try {
-      setLoading(true);
-      const data = await membersApi.list(orgId);
-      setMembers(data);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load members');
-    } finally {
-      setLoading(false);
-    }
+  const handleChangeRole = (userId: string, newRole: MembershipRole) => {
+    changeRole.mutate(
+      { userId, role: newRole },
+      {
+        onSuccess: () => toast.success('Member role updated successfully'),
+        onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to update member role'),
+      }
+    );
   };
 
-  const handleChangeRole = async (userId: string, newRole: MembershipRole) => {
-    if (!orgId) return;
-
-    setChangingRoleUserId(userId);
-    try {
-      await membersApi.changeRole(orgId, userId, { role: newRole });
-      toast.success('Member role updated successfully');
-      loadMembers();
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to update member role';
-      toast.error(errorMessage);
-    } finally {
-      setChangingRoleUserId(null);
-    }
-  };
-
-  const handleRemove = async () => {
-    if (!removeUserId || !orgId) return;
-
-    setRemovingUserId(removeUserId);
-    try {
-      await membersApi.remove(orgId, removeUserId);
-      toast.success('Member removed successfully');
-      setRemoveUserId(null);
-      loadMembers();
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to remove member';
-      toast.error(errorMessage);
-    } finally {
-      setRemovingUserId(null);
-    }
+  const handleRemove = () => {
+    if (!removeUserId) return;
+    removeMember.mutate(removeUserId, {
+      onSuccess: () => {
+        toast.success('Member removed successfully');
+        setRemoveUserId(null);
+      },
+      onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to remove member'),
+    });
   };
 
   const getRoleBadgeVariant = (role: MembershipRole) => {
@@ -127,7 +96,7 @@ export default function MembersPage() {
             Manage access to this organization
           </p>
         </div>
-        {isOwner && (
+        {canManageMembers && (
           <Button onClick={() => setShowAddModal(true)}>
             <UserPlus className="h-4 w-4" /> Add Member
           </Button>
@@ -143,7 +112,7 @@ export default function MembersPage() {
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
             You are the only member of this organization
           </p>
-          {isOwner && (
+          {canManageMembers && (
             <Button onClick={() => setShowAddModal(true)}>
               <UserPlus className="h-4 w-4" /> Add member
             </Button>
@@ -158,7 +127,7 @@ export default function MembersPage() {
                 <TableHead className="text-xs">Role</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
                 <TableHead className="text-xs">Joined</TableHead>
-                {isOwner && <TableHead className="w-[80px]"></TableHead>}
+                {canManageMembers && <TableHead className="w-[80px]"></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -178,11 +147,11 @@ export default function MembersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {isOwner && member.role !== 'OWNER' ? (
+                    {canManageMembers && member.role !== 'OWNER' ? (
                       <Select
                         value={member.role}
                         onChange={(e) => handleChangeRole(member.userId, e.target.value as MembershipRole)}
-                        disabled={changingRoleUserId === member.userId}
+                        disabled={changeRole.isPending}
                         className="w-32"
                       >
                         <option value="DEVELOPER">Developer</option>
@@ -198,7 +167,7 @@ export default function MembersPage() {
                   <TableCell>
                     <span className="text-[13px] text-muted-foreground">{new Date(member.createdAt).toLocaleDateString()}</span>
                   </TableCell>
-                  {isOwner && (
+                  {canManageMembers && (
                     <TableCell>
                       {member.userId !== user?.user?.id && (
                         <Button variant="ghost" size="icon-sm" onClick={() => setRemoveUserId(member.userId)} title="Remove" className="text-muted-foreground hover:text-destructive">
@@ -214,12 +183,12 @@ export default function MembersPage() {
         </Card>
       )}
 
-      {isOwner && (
+      {canManageMembers && (
         <AddMemberModal
           orgId={orgId!}
           open={showAddModal}
           onClose={() => setShowAddModal(false)}
-          onSuccess={loadMembers}
+          onSuccess={() => { }}
         />
       )}
 
@@ -233,14 +202,14 @@ export default function MembersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!removingUserId}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={removeMember.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemove}
-              disabled={!!removingUserId}
+              disabled={removeMember.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {removingUserId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {removingUserId ? 'Removing...' : 'Remove'}
+              {removeMember.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {removeMember.isPending ? 'Removing...' : 'Remove'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

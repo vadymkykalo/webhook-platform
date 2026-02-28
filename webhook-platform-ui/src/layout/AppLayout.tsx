@@ -89,7 +89,7 @@ export default function AppLayout() {
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [, setThemeIcon] = useState(false);
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
   const [resending, setResending] = useState(false);
@@ -100,7 +100,7 @@ export default function AppLayout() {
       if (freshUser.user?.status !== user?.user?.status) {
         updateUser(freshUser);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [location.pathname]);
 
   const handleResendVerification = async () => {
@@ -314,10 +314,10 @@ export default function AppLayout() {
                   const current = getTheme();
                   const next = current === 'dark' ? 'light' : 'dark';
                   setTheme(next);
-                  setThemeIcon(prev => !prev);
+                  setIsDark(next === 'dark');
                 }}
               >
-                {document.documentElement.classList.contains('dark') ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
             </div>
           </header>

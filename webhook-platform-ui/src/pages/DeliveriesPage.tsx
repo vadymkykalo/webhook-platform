@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
+import { usePermissions } from '../auth/usePermissions';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -55,6 +56,7 @@ export default function DeliveriesPage() {
   
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
   const [bulkReplaying, setBulkReplaying] = useState(false);
+  const { canReplayDeliveries } = usePermissions();
 
   useEffect(() => {
     if (projectId) {
@@ -256,7 +258,7 @@ export default function DeliveriesPage() {
               <Input id="search" placeholder="Enter delivery ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
-          {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
+          {canReplayDeliveries && (statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
             <div className="flex justify-end mt-3">
               <Button onClick={handleBulkReplay} disabled={bulkReplaying} variant="outline" size="sm">
                 {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}

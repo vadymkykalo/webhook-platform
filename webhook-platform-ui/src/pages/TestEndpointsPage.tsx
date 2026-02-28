@@ -15,9 +15,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function TestEndpointsPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const { canManageTestEndpoints } = usePermissions();
   const [endpoints, setEndpoints] = useState<TestEndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -167,10 +169,12 @@ export default function TestEndpointsPage() {
             Temporary endpoints to capture and inspect webhook requests
           </p>
         </div>
-        <Button onClick={handleCreate} disabled={creating}>
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          Create Test Endpoint
-        </Button>
+        {canManageTestEndpoints && (
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Create Test Endpoint
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -199,9 +203,11 @@ export default function TestEndpointsPage() {
                       <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyToClipboard(endpoint.url); }}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {canManageTestEndpoints && (
+                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2">

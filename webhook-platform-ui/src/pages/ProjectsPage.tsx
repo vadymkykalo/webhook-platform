@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Key } from 'lucide-react';
 import { toast } from 'sonner';
-import { projectsApi } from '../api/projects.api';
-import type { ProjectResponse } from '../types/api.types';
+import { useProjects, useCreateProject, useDeleteProject } from '../api/queries';
+import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -30,62 +30,48 @@ import {
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<ProjectResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: projects = [], isLoading: loading } = useProjects();
+  const createProject = useCreateProject();
+  const deleteProject = useDeleteProject();
+  const { canCreateProject, canDeleteProject } = usePermissions();
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  const loadProjects = async () => {
-    try {
-      setLoading(true);
-      const data = await projectsApi.list();
-      setProjects(data);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const creating = createProject.isPending;
+  const deleting = deleteProject.isPending;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreating(true);
-    try {
-      await projectsApi.create({ name, description });
-      setShowCreateDialog(false);
-      setName('');
-      setDescription('');
-      toast.success('Project created successfully');
-      loadProjects();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create project');
-    } finally {
-      setCreating(false);
-    }
+    createProject.mutate(
+      { name, description },
+      {
+        onSuccess: () => {
+          setShowCreateDialog(false);
+          setName('');
+          setDescription('');
+          toast.success('Project created successfully');
+        },
+        onError: (err: any) => {
+          toast.error(err.response?.data?.message || 'Failed to create project');
+        },
+      }
+    );
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deleteId) return;
-    
-    setDeleting(true);
-    try {
-      await projectsApi.delete(deleteId);
-      toast.success('Project deleted successfully');
-      setDeleteId(null);
-      loadProjects();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete project');
-    } finally {
-      setDeleting(false);
-    }
+    deleteProject.mutate(deleteId, {
+      onSuccess: () => {
+        toast.success('Project deleted successfully');
+        setDeleteId(null);
+      },
+      onError: (err: any) => {
+        toast.error(err.response?.data?.message || 'Failed to delete project');
+      },
+    });
   };
 
   const handleCopyId = (id: string) => {
@@ -130,10 +116,12 @@ export default function ProjectsPage() {
             Manage your webhook projects and integrations
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-4 w-4" />
-          New Project
-        </Button>
+        {canCreateProject && (
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4" />
+            New Project
+          </Button>
+        )}
       </div>
 
       {projects.length === 0 ? (
@@ -143,12 +131,16 @@ export default function ProjectsPage() {
           </div>
           <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
-            Get started by creating your first project to manage webhooks and integrations
+            {canCreateProject
+              ? 'Get started by creating your first project to manage webhooks and integrations'
+              : 'No projects have been created yet. Ask a Developer or Owner to create one.'}
           </p>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" />
-            Create your first project
-          </Button>
+          {canCreateProject && (
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" />
+              Create your first project
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
@@ -167,9 +159,9 @@ export default function ProjectsPage() {
                     <Button variant="ghost" size="icon-sm" onClick={() => handleCopyId(project.id)} title="Copy ID">
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
+                    {canDeleteProject && <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title="Delete" className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </Button>}
                   </div>
                 </div>
                 <CardTitle className="text-base">{project.name}</CardTitle>

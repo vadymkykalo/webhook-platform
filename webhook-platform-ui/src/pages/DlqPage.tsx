@@ -21,9 +21,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function DlqPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const { canManageDlq } = usePermissions();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [items, setItems] = useState<DlqItemResponse[]>([]);
   const [stats, setStats] = useState<DlqStatsResponse | null>(null);
@@ -167,17 +169,19 @@ export default function DlqPage() {
             Failed deliveries for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <div className="flex gap-2">
-          {selectedIds.size > 0 && (
-            <Button onClick={handleRetrySelected} disabled={retrying} size="sm">
-              {retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Retry ({selectedIds.size})
+        {canManageDlq && (
+          <div className="flex gap-2">
+            {selectedIds.size > 0 && (
+              <Button onClick={handleRetrySelected} disabled={retrying} size="sm">
+                {retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Retry ({selectedIds.size})
+              </Button>
+            )}
+            <Button variant="destructive" size="sm" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
+              <Trash2 className="h-3.5 w-3.5" /> Purge All
             </Button>
-          )}
-          <Button variant="destructive" size="sm" onClick={() => setShowPurgeDialog(true)} disabled={!stats?.totalItems}>
-            <Trash2 className="h-3.5 w-3.5" /> Purge All
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
       {stats && (
@@ -246,7 +250,7 @@ export default function DlqPage() {
                   <TableHead className="text-xs">Attempts</TableHead>
                   <TableHead className="text-xs">Last Error</TableHead>
                   <TableHead className="text-xs">Failed At</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  {canManageDlq && <TableHead className="w-[60px]"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -262,11 +266,13 @@ export default function DlqPage() {
                     <TableCell><span className="text-sm font-medium">{item.attemptCount}<span className="text-muted-foreground">/{item.maxAttempts}</span></span></TableCell>
                     <TableCell><span className="text-[13px] text-destructive truncate max-w-[180px] block">{item.lastError || 'Unknown error'}</span></TableCell>
                     <TableCell><span className="text-[13px] text-muted-foreground">{new Date(item.failedAt).toLocaleString()}</span></TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title="Retry">
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
+                    {canManageDlq && (
+                      <TableCell>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title="Retry">
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

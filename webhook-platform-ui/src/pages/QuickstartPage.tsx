@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Moon, Sun, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/auth.store';
-import { getTheme, setTheme } from '../lib/theme';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function QuickstartPage() {
   return (
@@ -24,21 +24,6 @@ export default function QuickstartPage() {
         <FinalCTA />
       </div>
     </div>
-  );
-}
-
-function ThemeToggle() {
-  const [, setToggle] = useState(false);
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTheme(getTheme() === 'dark' ? 'light' : 'dark'); setToggle(p => !p); }}
-      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-      title="Toggle theme"
-    >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </button>
   );
 }
 

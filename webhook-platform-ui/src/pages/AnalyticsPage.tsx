@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -8,8 +8,8 @@ import {
   RefreshCw, TrendingUp, Activity,
   Clock, CheckCircle2, XCircle, AlertTriangle, Zap, Server
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { dashboardApi, type AnalyticsData } from '../api/dashboard.api';
+import { useAnalytics, queryKeys } from '../api/queries';
+import { useQueryClient } from '@tanstack/react-query';
 
 const CHART_COLORS = {
   success: '#22c55e',
@@ -22,25 +22,12 @@ const PIE_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4
 
 export default function AnalyticsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('24h');
+  const { data: analytics, isLoading: loading } = useAnalytics(projectId, period);
+  const qc = useQueryClient();
 
-  useEffect(() => {
-    if (projectId) loadAnalytics();
-  }, [projectId, period]);
-
-  const loadAnalytics = async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      const data = await dashboardApi.getAnalytics(projectId, period);
-      setAnalytics(data);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load analytics');
-    } finally {
-      setLoading(false);
-    }
+  const refreshAnalytics = () => {
+    if (projectId) qc.invalidateQueries({ queryKey: queryKeys.dashboard.analytics(projectId, period) });
   };
 
   if (loading) {
@@ -107,7 +94,7 @@ export default function AnalyticsPage() {
                 </button>
               ))}
             </div>
-            <button onClick={loadAnalytics} className="p-2 rounded-lg bg-card border hover:bg-accent transition-colors">
+            <button onClick={refreshAnalytics} className="p-2 rounded-lg bg-card border hover:bg-accent transition-colors">
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>

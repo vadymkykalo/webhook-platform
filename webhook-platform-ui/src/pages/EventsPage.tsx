@@ -1,52 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Eye, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { useEvents } from '../api/queries';
 import { projectsApi } from '../api/projects.api';
-import { eventsApi, EventResponse } from '../api/events.api';
-import type { ProjectResponse } from '../types/api.types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import SendTestEventModal from '../components/SendTestEventModal';
+import { usePermissions } from '../auth/usePermissions';
 
 export default function EventsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const [pageSize] = useState(20);
+  const pageSize = 20;
   const [showSendModal, setShowSendModal] = useState(false);
+  const { canSendEvents } = usePermissions();
 
-  useEffect(() => {
-    if (projectId) {
-      loadData();
-    }
-  }, [projectId, page]);
+  const { data: project } = useQuery({
+    queryKey: ['projects', projectId],
+    queryFn: () => projectsApi.get(projectId!),
+    enabled: !!projectId,
+  });
 
-  const loadData = async () => {
-    if (!projectId) return;
-    
-    try {
-      setLoading(true);
-      const [projectData, eventsData] = await Promise.all([
-        projectsApi.get(projectId),
-        eventsApi.listByProject(projectId, { page, size: pageSize }),
-      ]);
-      setProject(projectData);
-      setEvents(eventsData.content);
-      setTotalElements(eventsData.totalElements);
-      setTotalPages(eventsData.totalPages);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to load data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize);
+  const events = eventsData?.content ?? [];
+  const totalElements = eventsData?.totalElements ?? 0;
+  const totalPages = eventsData?.totalPages ?? 0;
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -66,7 +49,7 @@ export default function EventsPage() {
     if (diffMin < 60) return `${diffMin}m ago`;
     if (diffHour < 24) return `${diffHour}h ago`;
     if (diffDay < 7) return `${diffDay}d ago`;
-    
+
     return date.toLocaleDateString();
   };
 
@@ -111,9 +94,11 @@ export default function EventsPage() {
             Webhook events for <span className="font-medium text-foreground">{project.name}</span>
           </p>
         </div>
-        <Button onClick={() => setShowSendModal(true)}>
-          <Plus className="h-4 w-4" /> Send Test Event
-        </Button>
+        {canSendEvents && (
+          <Button onClick={() => setShowSendModal(true)}>
+            <Plus className="h-4 w-4" /> Send Test Event
+          </Button>
+        )}
       </div>
 
       {events.length === 0 ? (
@@ -125,9 +110,11 @@ export default function EventsPage() {
           <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">
             Send your first webhook event to start processing deliveries
           </p>
-          <Button onClick={() => setShowSendModal(true)}>
-            <Plus className="h-4 w-4" /> Send Test Event
-          </Button>
+          {canSendEvents && (
+            <Button onClick={() => setShowSendModal(true)}>
+              <Plus className="h-4 w-4" /> Send Test Event
+            </Button>
+          )}
         </div>
       ) : (
         <div className="animate-fade-in">
@@ -198,7 +185,7 @@ export default function EventsPage() {
         projectId={projectId!}
         open={showSendModal}
         onClose={() => setShowSendModal(false)}
-        onSuccess={loadData}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['events', projectId] })}
       />
     </div>
   );

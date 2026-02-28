@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Webhook, Loader2, ArrowLeft, Shield, Zap, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '../api/auth.api';
@@ -15,7 +15,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const redirectTo = (location.state as any)?.from || '/admin/projects';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +31,7 @@ export default function LoginPage() {
       const user = await authApi.getCurrentUser();
       login(authResponse.accessToken, authResponse.refreshToken, user);
       toast.success('Welcome back!');
-      navigate('/admin/projects');
+      navigate(redirectTo);
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || 'Login failed. Please try again.';
       setError(errorMessage);
@@ -123,7 +125,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
