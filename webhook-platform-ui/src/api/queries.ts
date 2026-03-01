@@ -10,7 +10,10 @@ import { dashboardApi } from './dashboard.api';
 import { dlqApi } from './dlq.api';
 import { testEndpointsApi } from './testEndpoints.api';
 import { auditLogApi } from './auditLog.api';
-import type { EndpointRequest } from '../types/api.types';
+import { incomingSourcesApi } from './incomingSources.api';
+import { incomingDestinationsApi } from './incomingDestinations.api';
+import { incomingEventsApi, type IncomingEventFilters } from './incomingEvents.api';
+import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
 
@@ -51,6 +54,20 @@ export const queryKeys = {
     },
     auditLog: {
         list: (page: number, size: number) => ['audit-log', page, size] as const,
+    },
+    incomingSources: {
+        list: (projectId: string, page: number, size: number) => ['incoming-sources', projectId, page, size] as const,
+        all: (projectId: string) => ['incoming-sources', projectId] as const,
+        detail: (projectId: string, id: string) => ['incoming-sources', projectId, id] as const,
+    },
+    incomingDestinations: {
+        list: (projectId: string, sourceId: string, page: number, size: number) => ['incoming-destinations', projectId, sourceId, page, size] as const,
+        all: (projectId: string, sourceId: string) => ['incoming-destinations', projectId, sourceId] as const,
+    },
+    incomingEvents: {
+        list: (projectId: string, filters: IncomingEventFilters) => ['incoming-events', projectId, filters] as const,
+        detail: (projectId: string, id: string) => ['incoming-events', projectId, id] as const,
+        attempts: (projectId: string, eventId: string) => ['incoming-events', projectId, eventId, 'attempts'] as const,
     },
 } as const;
 
@@ -399,5 +416,123 @@ export function useAuditLog(page: number, size = 20) {
     return useQuery({
         queryKey: queryKeys.auditLog.list(page, size),
         queryFn: () => auditLogApi.list(page, size),
+    });
+}
+
+// ─── Incoming Sources ─────────────────────────────────────────────
+
+export function useIncomingSources(projectId: string | undefined, page: number, size = 20) {
+    return useQuery({
+        queryKey: queryKeys.incomingSources.list(projectId!, page, size),
+        queryFn: () => incomingSourcesApi.list(projectId!, page, size),
+        enabled: !!projectId,
+    });
+}
+
+export function useIncomingSource(projectId: string | undefined, id: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.incomingSources.detail(projectId!, id!),
+        queryFn: () => incomingSourcesApi.get(projectId!, id!),
+        enabled: !!projectId && !!id,
+    });
+}
+
+export function useCreateIncomingSource(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: IncomingSourceRequest) => incomingSourcesApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-sources', projectId] }); },
+    });
+}
+
+export function useUpdateIncomingSource(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: IncomingSourceRequest }) => incomingSourcesApi.update(projectId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-sources', projectId] }); },
+    });
+}
+
+export function useDeleteIncomingSource(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => incomingSourcesApi.delete(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-sources', projectId] }); },
+    });
+}
+
+// ─── Incoming Destinations ────────────────────────────────────────
+
+export function useIncomingDestinations(projectId: string | undefined, sourceId: string | undefined, page: number, size = 20) {
+    return useQuery({
+        queryKey: queryKeys.incomingDestinations.list(projectId!, sourceId!, page, size),
+        queryFn: () => incomingDestinationsApi.list(projectId!, sourceId!, page, size),
+        enabled: !!projectId && !!sourceId,
+    });
+}
+
+export function useCreateIncomingDestination(projectId: string, sourceId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: IncomingDestinationRequest) => incomingDestinationsApi.create(projectId, sourceId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-destinations', projectId, sourceId] }); },
+    });
+}
+
+export function useUpdateIncomingDestination(projectId: string, sourceId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: IncomingDestinationRequest }) => incomingDestinationsApi.update(projectId, sourceId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-destinations', projectId, sourceId] }); },
+    });
+}
+
+export function useDeleteIncomingDestination(projectId: string, sourceId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => incomingDestinationsApi.delete(projectId, sourceId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-destinations', projectId, sourceId] }); },
+    });
+}
+
+// ─── Incoming Events ──────────────────────────────────────────────
+
+export function useIncomingEvents(projectId: string | undefined, filters: IncomingEventFilters) {
+    return useQuery({
+        queryKey: queryKeys.incomingEvents.list(projectId!, filters),
+        queryFn: () => incomingEventsApi.list(projectId!, filters),
+        enabled: !!projectId,
+    });
+}
+
+export function useIncomingEvent(projectId: string | undefined, id: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.incomingEvents.detail(projectId!, id!),
+        queryFn: () => incomingEventsApi.get(projectId!, id!),
+        enabled: !!projectId && !!id,
+    });
+}
+
+export function useIncomingEventAttempts(projectId: string | undefined, eventId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.incomingEvents.attempts(projectId!, eventId!),
+        queryFn: () => incomingEventsApi.getAttempts(projectId!, eventId!),
+        enabled: !!projectId && !!eventId,
+    });
+}
+
+export function useReplayIncomingEvent(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (eventId: string) => incomingEventsApi.replay(projectId, eventId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-events', projectId] }); },
+    });
+}
+
+export function useBulkReplayIncomingEvents(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (request: IncomingBulkReplayRequest) => incomingEventsApi.bulkReplay(projectId, request),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-events', projectId] }); },
     });
 }

@@ -68,9 +68,14 @@
     "analytics": "Analytics",
     "dlq": "Dead Letter Queue",
     "testEndpoints": "Test Endpoints",
+    "incomingSources": "Incoming Sources",
+    "incomingEvents": "Incoming Events",
     "members": "Members",
     "auditLog": "Audit Log",
     "settings": "Settings",
+    "outgoing": "Outgoing",
+    "incoming": "Incoming",
+    "tools": "Tools",
     "documentation": "Documentation",
     "home": "Home",
     "search": "Search",
@@ -1184,6 +1189,175 @@
     },
     "response": "Response"
   },
+  "incomingSources": {
+    "title": "Incoming Sources",
+    "subtitle": "Manage incoming webhook sources for <strong>{{project}}</strong>",
+    "create": "Create Source",
+    "noSources": "No incoming sources yet",
+    "noSourcesDesc": "Create your first incoming source to start receiving webhooks from external providers",
+    "name": "Name",
+    "slug": "Slug",
+    "provider": "Provider",
+    "status": "Status",
+    "verification": "Verification",
+    "created": "Created",
+    "active": "Active",
+    "disabled": "Disabled",
+    "ingressUrl": "Ingress URL",
+    "hmacConfigured": "HMAC configured",
+    "hmacNotConfigured": "No HMAC",
+    "rateLimit": "Rate Limit",
+    "rateLimitHint": "Requests per second (leave empty for unlimited)",
+    "destinations": "Destinations",
+    "viewDetails": "View details",
+    "createDialog": {
+      "title": "Create Incoming Source",
+      "description": "Configure a new incoming webhook source to receive events from external providers",
+      "name": "Source Name",
+      "namePlaceholder": "GitHub Webhooks",
+      "slug": "Slug (optional)",
+      "slugPlaceholder": "github-webhooks",
+      "slugHint": "URL-friendly identifier. Auto-generated from name if empty.",
+      "provider": "Provider Type",
+      "verificationMode": "Verification Mode",
+      "hmacSecret": "HMAC Secret",
+      "hmacSecretPlaceholder": "Your webhook signing secret",
+      "hmacSecretHint": "The secret used by the provider to sign webhook payloads. Stored encrypted.",
+      "hmacHeaderName": "Signature Header",
+      "hmacHeaderPlaceholder": "X-Hub-Signature-256",
+      "hmacSignaturePrefix": "Signature Prefix",
+      "hmacPrefixPlaceholder": "sha256=",
+      "rateLimit": "Rate Limit (req/s)",
+      "rateLimitPlaceholder": "100"
+    },
+    "editDialog": {
+      "title": "Edit Incoming Source",
+      "description": "Update the incoming webhook source configuration"
+    },
+    "deleteDialog": {
+      "title": "Disable incoming source?",
+      "description": "This source will be disabled and stop accepting incoming webhooks. Existing events are preserved."
+    },
+    "howToSend": {
+      "title": "How to send webhooks",
+      "description": "Configure your provider to send webhooks to the ingress URL below:",
+      "curlExample": "Example cURL request:",
+      "copy": "Copy URL"
+    },
+    "toast": {
+      "created": "Incoming source created",
+      "createFailed": "Failed to create incoming source",
+      "updated": "Incoming source updated",
+      "updateFailed": "Failed to update incoming source",
+      "deleted": "Incoming source disabled",
+      "deleteFailed": "Failed to disable incoming source",
+      "urlCopied": "Ingress URL copied to clipboard",
+      "loadFailed": "Failed to load incoming sources"
+    }
+  },
+  "incomingDestinations": {
+    "title": "Forwarding Destinations",
+    "subtitle": "Where incoming webhooks are forwarded to",
+    "create": "Add Destination",
+    "noDestinations": "No destinations configured",
+    "noDestinationsDesc": "Add a forwarding destination to route incoming webhooks to your application",
+    "url": "URL",
+    "authType": "Auth Type",
+    "status": "Status",
+    "maxAttempts": "Max Attempts",
+    "timeout": "Timeout",
+    "retryDelays": "Retry Delays",
+    "payloadTransform": "Payload Transform",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "createDialog": {
+      "title": "Add Forwarding Destination",
+      "description": "Configure where incoming webhooks should be forwarded",
+      "url": "Destination URL",
+      "urlPlaceholder": "https://api.example.com/webhooks",
+      "authType": "Authentication Type",
+      "authConfig": "Auth Configuration (JSON)",
+      "authConfigPlaceholder": "{\"token\": \"your-bearer-token\"}",
+      "authConfigHint": "BEARER: {token}, BASIC: {username, password}, CUSTOM_HEADER: {headerName, headerValue}",
+      "customHeaders": "Custom Headers (JSON)",
+      "customHeadersPlaceholder": "{\"X-Custom\": \"value\"}",
+      "maxAttempts": "Max Attempts",
+      "maxAttemptsPlaceholder": "5",
+      "timeout": "Timeout (seconds)",
+      "timeoutPlaceholder": "30",
+      "retryDelays": "Retry Delays (seconds, comma-separated)",
+      "retryDelaysPlaceholder": "60,300,900,3600,21600",
+      "payloadTransform": "Payload Transform (JSONPath)",
+      "payloadTransformPlaceholder": "$.data",
+      "payloadTransformHint": "Optional JSONPath expression to transform payload before forwarding"
+    },
+    "editDialog": {
+      "title": "Edit Destination",
+      "description": "Update the forwarding destination configuration"
+    },
+    "deleteDialog": {
+      "title": "Delete destination?",
+      "description": "This destination will be permanently deleted. Incoming webhooks will no longer be forwarded to this URL."
+    },
+    "toast": {
+      "created": "Destination created",
+      "createFailed": "Failed to create destination",
+      "updated": "Destination updated",
+      "updateFailed": "Failed to update destination",
+      "deleted": "Destination deleted",
+      "deleteFailed": "Failed to delete destination"
+    }
+  },
+  "incomingEvents": {
+    "title": "Incoming Events",
+    "subtitle": "Incoming webhook events for <strong>{{project}}</strong>",
+    "noEvents": "No incoming events yet",
+    "noEventsDesc": "Events will appear here when external providers send webhooks to your sources",
+    "columns": {
+      "received": "Received",
+      "source": "Source",
+      "method": "Method",
+      "status": "Verification",
+      "requestId": "Request ID",
+      "clientIp": "Client IP",
+      "contentType": "Content Type"
+    },
+    "filters": {
+      "allSources": "All Sources",
+      "source": "Source",
+      "searchById": "Search by request ID..."
+    },
+    "verified": "Verified",
+    "failed": "Failed",
+    "noVerification": "No verification",
+    "detail": {
+      "title": "Event Details",
+      "requestMeta": "Request Metadata",
+      "headers": "Request Headers",
+      "body": "Request Body",
+      "bodyTruncated": "Body truncated ({{size}})",
+      "signatureResult": "Signature Verification",
+      "forwardingResults": "Forwarding Results",
+      "noAttempts": "No forwarding attempts yet",
+      "attempt": "Attempt #{{number}}",
+      "responseCode": "HTTP {{code}}",
+      "nextRetry": "Next retry: {{time}}",
+      "error": "Error"
+    },
+    "replay": {
+      "title": "Replay Event?",
+      "description": "This will re-send the event to all enabled destinations. Note: this may cause duplicate processing if the destination is not idempotent.",
+      "idempotencyWarning": "Ensure your destinations handle duplicate events (idempotency).",
+      "submit": "Replay Event",
+      "replaying": "Replaying..."
+    },
+    "toast": {
+      "replayed": "Event replayed to {{count}} destinations",
+      "replayFailed": "Failed to replay event",
+      "loadFailed": "Failed to load incoming events",
+      "idCopied": "Request ID copied to clipboard"
+    }
+  },
   "notFound": {
     "title": "Page not found",
     "description": "The page you're looking for doesn't exist or has been moved.",
@@ -1264,6 +1438,8 @@
     "analytics": "Analytics",
     "dlq": "Dead Letter Queue",
     "test-endpoints": "Test Endpoints",
+    "incoming-sources": "Incoming Sources",
+    "incoming-events": "Incoming Events",
     "members": "Members",
     "audit-log": "Audit Log",
     "settings": "Settings"

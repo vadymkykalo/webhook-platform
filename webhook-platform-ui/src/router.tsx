@@ -28,6 +28,9 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const DlqPage = lazy(() => import('./pages/DlqPage'));
 const TestEndpointsPage = lazy(() => import('./pages/TestEndpointsPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
+const IncomingSourceDetailPage = lazy(() => import('./pages/IncomingSourceDetailPage'));
+const IncomingEventsPage = lazy(() => import('./pages/IncomingEventsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoader() {
@@ -135,6 +138,18 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/test-endpoints',
         element: <S><TestEndpointsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/incoming-sources',
+        element: <S><IncomingSourcesPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/incoming-sources/:sourceId',
+        element: <S><IncomingSourceDetailPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/incoming-events',
+        element: <S><IncomingEventsPage /></S>,
       },
       {
         path: 'members',
