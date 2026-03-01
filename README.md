@@ -399,6 +399,7 @@ make shell-db             # Open psql shell
 make dev-api              # Quick rebuild API + tail logs
 make verify-link          # Show email verification link from logs
 make reset-link           # Show password reset link from logs
+make invite-link          # Show member invite link from logs
 make nuke CONFIRM=YES     # Destroy everything
 ```
 
@@ -428,6 +429,24 @@ make reset-link
 ```
 
 Open the printed URL in a browser to set a new password. The link expires in 1 hour.
+</details>
+
+<details>
+<summary>Member invite in local development</summary>
+
+When an OWNER adds a new member via the Members page, an invite link is printed to the API logs (when `EMAIL_ENABLED=false`).
+
+```bash
+make invite-link
+```
+
+The invite flow:
+1. OWNER adds member by email on the Members page → membership created with `INVITED` status
+2. New user account is auto-created with a temporary password (logged server-side)
+3. Invite link is logged to API console — grab it with `make invite-link`
+4. Open the link in a browser while logged in as the invited user → status changes to `ACTIVE`
+
+The invite token expires in 48 hours. If it expires, the OWNER must remove and re-add the member.
 </details>
 
 <details>

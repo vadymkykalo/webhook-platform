@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -73,7 +72,7 @@ class DeliveryRepositoryTest {
         List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                PageRequest.of(0, 10)
+                10
         );
 
         // Assert
@@ -97,7 +96,7 @@ class DeliveryRepositoryTest {
         List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                PageRequest.of(0, 10)
+                10
         );
 
         // Assert
@@ -121,7 +120,7 @@ class DeliveryRepositoryTest {
         List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                PageRequest.of(0, 10)
+                10
         );
 
         // Assert
@@ -146,7 +145,7 @@ class DeliveryRepositoryTest {
         List<Delivery> page1 = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                PageRequest.of(0, 5)
+                5
         );
 
         // Assert

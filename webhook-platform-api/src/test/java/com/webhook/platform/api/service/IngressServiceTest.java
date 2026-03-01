@@ -224,7 +224,7 @@ class IngressServiceTest {
     }
 
     @Test
-    void receiveWebhook_hmacVerification_mismatch() {
+    void receiveWebhook_hmacVerification_mismatch_throwsAndBlocksForwarding() {
         String secret = "my-hmac-secret";
         CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
 
@@ -241,14 +241,63 @@ class IngressServiceTest {
             e.setId(eventId);
             return e;
         });
-        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
         when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
 
-        IncomingEvent event = service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest);
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest))
+                .isInstanceOf(IngressService.SignatureVerificationFailedException.class)
+                .satisfies(ex -> {
+                    IngressService.SignatureVerificationFailedException sve =
+                            (IngressService.SignatureVerificationFailedException) ex;
+                    assertThat(sve.getEvent().getVerified()).isFalse();
+                    assertThat(sve.getEvent().getVerificationError()).isEqualTo("Signature mismatch");
+                });
 
-        assertThat(event.getVerified()).isFalse();
-        assertThat(event.getVerificationError()).isEqualTo("Signature mismatch");
+        // Event is saved for audit trail
+        verify(eventRepository).save(any(IncomingEvent.class));
+        // But no forward attempts or outbox messages are created
+        verify(forwardAttemptRepository, never()).saveAll(any());
+        verify(outboxMessageRepository, never()).saveAll(any());
+        // Destinations are never queried since we short-circuit before that
+        verify(destinationRepository, never()).findByIncomingSourceIdAndEnabledTrue(any());
+    }
+
+    @Test
+    void receiveWebhook_hmacVerification_mismatch_withDestinations_blocksForwarding() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        IncomingDestination dest = IncomingDestination.builder()
+                .id(destId).incomingSourceId(sourceId)
+                .url("https://example.com/hook")
+                .authType(IncomingAuthType.NONE)
+                .enabled(true).maxAttempts(5).timeoutSeconds(30)
+                .retryDelays("60,300")
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn("bad-sig");
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
+                .isInstanceOf(IngressService.SignatureVerificationFailedException.class);
+
+        // Event saved for audit, but forwarding completely blocked
+        verify(eventRepository).save(any(IncomingEvent.class));
+        verify(forwardAttemptRepository, never()).saveAll(any());
+        verify(outboxMessageRepository, never()).saveAll(any());
     }
 
     @Test

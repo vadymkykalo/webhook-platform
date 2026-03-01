@@ -39,6 +39,8 @@ public class IngressController {
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
             @ApiResponse(responseCode = "413", description = "Payload too large",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Signature verification failed",
+                    content = @Content(schema = @Schema(implementation = IngressResponse.class))),
             @ApiResponse(responseCode = "429", description = "Rate limit exceeded",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class)))
     })
@@ -78,6 +80,13 @@ public class IngressController {
                     .body(IngressResponse.builder()
                             .error("rate_limit_exceeded")
                             .message("Too many requests. Please retry later.")
+                            .build());
+        } catch (IngressService.SignatureVerificationFailedException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(IngressResponse.builder()
+                            .error("signature_verification_failed")
+                            .message("Webhook signature verification failed")
+                            .requestId(e.getEvent().getRequestId())
                             .build());
         }
     }

@@ -105,4 +105,19 @@ public class MemberController {
         membershipService.removeMember(orgId, userId, jwtAuth.getRole());
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(summary = "Accept invite", description = "Accepts an organization membership invite using the invite token")
+    @ApiResponse(responseCode = "200", description = "Invite accepted")
+    @PostMapping("/accept-invite")
+    public ResponseEntity<MemberResponse> acceptInvite(
+            @PathVariable("orgId") UUID orgId,
+            @RequestParam("token") String token,
+            Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken)) {
+            throw new UnauthorizedException("Authentication required");
+        }
+
+        MemberResponse response = membershipService.acceptInvite(token);
+        return ResponseEntity.ok(response);
+    }
 }

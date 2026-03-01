@@ -1,10 +1,7 @@
 package com.webhook.platform.worker.domain.repository;
 
 import com.webhook.platform.worker.domain.entity.Delivery;
-import jakarta.persistence.LockModeType;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -25,12 +22,12 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
            "WHERE d.status = 'PROCESSING' AND d.lastAttemptAt < :threshold")
     int resetStuckDeliveries(@Param("threshold") Instant threshold);
     
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query(value = "SELECT d FROM Delivery d WHERE d.status = :status AND d.nextRetryAt IS NOT NULL AND d.nextRetryAt <= :now ORDER BY d.nextRetryAt ASC")
+    @Query(value = "SELECT * FROM deliveries WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now ORDER BY next_retry_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED",
+            nativeQuery = true)
     List<Delivery> findPendingRetriesForUpdate(
             @Param("status") Delivery.DeliveryStatus status,
             @Param("now") Instant now,
-            Pageable pageable
+            @Param("limit") int limit
     );
 
     @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.status IN ('PENDING', 'PROCESSING')")

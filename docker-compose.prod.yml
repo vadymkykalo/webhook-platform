@@ -29,6 +29,7 @@ services:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     environment:
       APP_ENV: production
+      SPRING_PROFILES_ACTIVE: production
       SWAGGER_ENABLED: "false"
       WEBHOOK_ALLOW_PRIVATE_IPS: "false"
       DB_SSL_MODE: ${DB_SSL_MODE:-require}
@@ -39,6 +40,7 @@ services:
     image: ${DOCKER_REGISTRY:-webhook-platform}-worker:${WORKER_IMAGE_TAG:-latest}
     environment:
       APP_ENV: production
+      SPRING_PROFILES_ACTIVE: production
       WEBHOOK_ALLOW_PRIVATE_IPS: "false"
       DB_SSL_MODE: ${DB_SSL_MODE:-require}
       LOG_LEVEL: ${LOG_LEVEL:-WARN}

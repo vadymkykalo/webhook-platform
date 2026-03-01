@@ -6,7 +6,6 @@ import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -56,7 +55,7 @@ public class RetrySchedulerService {
         List<Delivery> pendingRetries = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                PageRequest.of(0, batchSize));
+                batchSize);
 
         if (pendingRetries.isEmpty()) {
             return;

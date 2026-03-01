@@ -24,10 +24,12 @@ public class RedisConcurrencyControlService {
 
     private final RedissonClient redissonClient;
     private final ConcurrentHashMap<String, String> acquiredPermits = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, AtomicInteger> localPermits = new ConcurrentHashMap<>();
     private final int maxConcurrentPerEndpoint;
     private final Counter concurrencyAcquired;
     private final Counter concurrencyRejected;
     private final Counter concurrencyReleased;
+    private final Counter concurrencyFallback;
     private final AtomicInteger activePermits = new AtomicInteger(0);
 
     public RedisConcurrencyControlService(
@@ -45,6 +47,9 @@ public class RedisConcurrencyControlService {
                 .register(meterRegistry);
         this.concurrencyReleased = Counter.builder("webhook_concurrency_released_total")
                 .description("Number of concurrency permits released")
+                .register(meterRegistry);
+        this.concurrencyFallback = Counter.builder("webhook_concurrency_fallback_total")
+                .description("Number of concurrency checks via local fallback (Redis unavailable)")
                 .register(meterRegistry);
         
         Gauge.builder("webhook_concurrency_active_permits", activePermits, AtomicInteger::get)
@@ -77,9 +82,31 @@ public class RedisConcurrencyControlService {
             log.warn("Interrupted while acquiring permit for endpoint: {}", endpointId);
             return false;
         } catch (Exception e) {
-            log.warn("Redis concurrency control unavailable, allowing request: {}", e.getMessage());
+            log.warn("Redis concurrency control unavailable for endpoint {}, using local fallback: {}",
+                    endpointId, e.getMessage());
+            concurrencyFallback.increment();
+            return tryAcquireLocal(endpointId);
+        }
+    }
+
+    private boolean tryAcquireLocal(UUID endpointId) {
+        AtomicInteger permits = localPermits.computeIfAbsent(endpointId, k -> new AtomicInteger(0));
+        int current = permits.incrementAndGet();
+        if (current <= maxConcurrentPerEndpoint) {
+            activePermits.incrementAndGet();
             concurrencyAcquired.increment();
             return true;
+        }
+        permits.decrementAndGet();
+        concurrencyRejected.increment();
+        log.debug("Local concurrency limit reached for endpoint: {} (max: {})", endpointId, maxConcurrentPerEndpoint);
+        return false;
+    }
+
+    private void releaseLocal(UUID endpointId) {
+        AtomicInteger permits = localPermits.get(endpointId);
+        if (permits != null) {
+            permits.decrementAndGet();
         }
     }
 
@@ -98,6 +125,10 @@ public class RedisConcurrencyControlService {
                 log.warn("Failed to release permit for endpoint {}: {}", endpointId, e.getMessage());
                 activePermits.decrementAndGet();
             }
+        } else {
+            releaseLocal(endpointId);
+            activePermits.decrementAndGet();
+            concurrencyReleased.increment();
         }
     }
 

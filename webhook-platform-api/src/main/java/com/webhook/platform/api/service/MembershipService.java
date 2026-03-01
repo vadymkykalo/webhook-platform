@@ -9,6 +9,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,22 +19,33 @@ import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class MembershipService {
+
+    private static final int INVITE_EXPIRATION_HOURS = 48;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final MembershipRepository membershipRepository;
+    private final EmailService emailService;
     private final BCryptPasswordEncoder passwordEncoder;
 
     public MembershipService(
             UserRepository userRepository,
-            MembershipRepository membershipRepository) {
+            MembershipRepository membershipRepository,
+            EmailService emailService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
+        this.emailService = emailService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
@@ -48,7 +60,7 @@ public class MembershipService {
                             .userId(user.getId())
                             .email(user.getEmail())
                             .role(membership.getRole())
-                            .status(MembershipStatus.ACTIVE)
+                            .status(membership.getStatus())
                             .createdAt(membership.getCreatedAt())
                             .build();
                 })
@@ -61,7 +73,6 @@ public class MembershipService {
             throw new ForbiddenException("Only owners can add members");
         }
 
-        String temporaryPassword = null;
         boolean isNewUser = !userRepository.existsByEmail(request.getEmail());
 
         User user = userRepository.findByEmail(request.getEmail())
@@ -72,38 +83,85 @@ public class MembershipService {
                             .passwordHash(passwordEncoder.encode(tempPass))
                             .status(UserStatus.ACTIVE)
                             .build();
-                    return userRepository.save(newUser);
+                    User saved = userRepository.save(newUser);
+                    // TODO: send temp password via email instead of logging
+                    log.info("Created new user for invite: userId={}, email={}", saved.getId(), request.getEmail());
+                    return saved;
                 });
 
         if (membershipRepository.existsByUserIdAndOrganizationId(user.getId(), organizationId)) {
             throw new IllegalArgumentException("User is already a member");
         }
 
-        if (isNewUser) {
-            temporaryPassword = generateTemporaryPassword();
-            user.setPasswordHash(passwordEncoder.encode(temporaryPassword));
-            userRepository.save(user);
-        }
+        String inviteToken = generateInviteToken();
+        Instant expiresAt = Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS);
 
         Membership membership = Membership.builder()
                 .userId(user.getId())
                 .organizationId(organizationId)
                 .role(request.getRole())
+                .status(isNewUser ? MembershipStatus.INVITED : MembershipStatus.ACTIVE)
+                .inviteToken(isNewUser ? inviteToken : null)
+                .inviteExpiresAt(isNewUser ? expiresAt : null)
                 .build();
         membershipRepository.save(membership);
+
+        log.info("Member added: userId={}, orgId={}, role={}, status={}",
+                user.getId(), organizationId, request.getRole(), membership.getStatus());
+
+        if (isNewUser) {
+            emailService.sendInviteEmail(request.getEmail(), organizationId.toString(), inviteToken);
+        }
 
         return MemberResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .role(membership.getRole())
-                .status(MembershipStatus.ACTIVE)
+                .status(membership.getStatus())
                 .createdAt(membership.getCreatedAt())
-                .temporaryPassword(temporaryPassword)
+                .build();
+    }
+
+    @Transactional
+    public MemberResponse acceptInvite(String inviteToken) {
+        Membership membership = membershipRepository.findByInviteToken(inviteToken)
+                .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
+
+        if (membership.getStatus() != MembershipStatus.INVITED) {
+            throw new IllegalStateException("Invite already accepted or membership is not in INVITED status");
+        }
+
+        if (membership.getInviteExpiresAt() != null && Instant.now().isAfter(membership.getInviteExpiresAt())) {
+            throw new ResponseStatusException(HttpStatus.GONE, "Invite token has expired");
+        }
+
+        membership.setStatus(MembershipStatus.ACTIVE);
+        membership.setInviteToken(null);
+        membership.setInviteExpiresAt(null);
+        membershipRepository.save(membership);
+
+        User user = userRepository.findById(membership.getUserId())
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        log.info("Invite accepted: userId={}, orgId={}", user.getId(), membership.getOrganizationId());
+
+        return MemberResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .role(membership.getRole())
+                .status(membership.getStatus())
+                .createdAt(membership.getCreatedAt())
                 .build();
     }
 
     private String generateTemporaryPassword() {
         return "Temp" + UUID.randomUUID().toString().substring(0, 8) + "!";
+    }
+
+    private String generateInviteToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Transactional
@@ -137,7 +195,7 @@ public class MembershipService {
                 .userId(user.getId())
                 .email(user.getEmail())
                 .role(membership.getRole())
-                .status(MembershipStatus.ACTIVE)
+                .status(membership.getStatus())
                 .createdAt(membership.getCreatedAt())
                 .build();
     }

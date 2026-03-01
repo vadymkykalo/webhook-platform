@@ -10,6 +10,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.UUID;
 
 @Component
@@ -46,9 +47,9 @@ public class IncomingForwardConsumer {
             log.info("Incoming forward processed: eventId={}, destId={}",
                     message.getIncomingEventId(), message.getDestinationId());
         } catch (Exception e) {
-            log.error("Failed to process incoming forward: eventId={}, destId={}: {}",
+            log.error("Failed to process incoming forward: eventId={}, destId={}, error={}. Will nack for redelivery.",
                     message.getIncomingEventId(), message.getDestinationId(), e.getMessage(), e);
-            ack.acknowledge();
+            ack.nack(Duration.ofSeconds(10));
         } finally {
             MDC.remove("correlationId");
             MDC.remove("incomingEventId");

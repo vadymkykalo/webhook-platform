@@ -78,6 +78,52 @@ public class EmailService {
         }
     }
 
+    public void sendInviteEmail(String to, String orgId, String inviteToken) {
+        String inviteUrl = baseUrl + "/accept-invite?token=" + inviteToken + "&orgId=" + orgId;
+
+        if (!emailEnabled) {
+            log.info("========== MEMBER INVITE ==========");
+            log.info("To: {}", to);
+            log.info("Invite URL: {}", inviteUrl);
+            log.info("====================================");
+            return;
+        }
+
+        try {
+            var message = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject("You've been invited to join an organization — Hookflow");
+            helper.setText(buildInviteHtml(inviteUrl), true);
+            mailSender.send(message);
+            log.info("Invite email sent to {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send invite email to {}: {}", to, e.getMessage());
+            log.info("Fallback — Invite URL: {}", inviteUrl);
+        }
+    }
+
+    private String buildInviteHtml(String inviteUrl) {
+        return """
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+                <h2 style="color: #111;">You're invited!</h2>
+                <p style="color: #555; line-height: 1.5;">
+                    You've been invited to join an organization on Hookflow.
+                    Click the button below to accept the invitation.
+                </p>
+                <a href="%s"
+                   style="display: inline-block; padding: 12px 24px; background: #111; color: #fff;
+                          text-decoration: none; border-radius: 6px; margin: 16px 0;">
+                    Accept Invitation
+                </a>
+                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+                    This invitation expires in 48 hours. If you didn't expect this, you can safely ignore it.
+                </p>
+            </div>
+            """.formatted(inviteUrl);
+    }
+
     private String buildPasswordResetHtml(String resetUrl) {
         return """
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">

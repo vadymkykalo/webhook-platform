@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
+import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
@@ -18,6 +19,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
+import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -81,7 +83,7 @@ public class IngressService {
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = SignatureVerificationFailedException.class)
     public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
         IncomingSource source = sourceRepository.findByIngressPathToken(token)
                 .orElseThrow(() -> new SourceNotFoundException("Invalid ingress token"));
@@ -97,8 +99,8 @@ public class IngressService {
             }
         }
 
-        // Enforce size limit
-        if (body != null && body.length() > maxPayloadSizeBytes) {
+        // Enforce size limit (measure in bytes, not characters — multi-byte UTF-8 matters)
+        if (body != null && body.getBytes(StandardCharsets.UTF_8).length > maxPayloadSizeBytes) {
             throw new PayloadTooLargeException("Payload exceeds maximum allowed size of " + maxPayloadSizeBytes + " bytes");
         }
 
@@ -158,6 +160,18 @@ public class IngressService {
 
         log.info("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
                 event.getId(), source.getId(), requestId, verified);
+
+        // Block forwarding when signature verification is configured and not verified
+        if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verified)) {
+            meterRegistry.counter("incoming_events_rejected_total",
+                    "source_id", source.getId().toString(),
+                    "reason", "signature_verification_failed").increment();
+            String reason = verificationError != null ? verificationError : "Verification not completed";
+            log.warn("Blocking incoming webhook due to failed signature verification: eventId={}, sourceId={}, error={}",
+                    event.getId(), source.getId(), reason);
+            throw new SignatureVerificationFailedException(
+                    "Signature verification failed: " + reason, event);
+        }
 
         // Create forward attempts + outbox messages in batch
         List<IncomingDestination> destinations = destinationRepository
@@ -282,5 +296,18 @@ public class IngressService {
 
     public static class RateLimitExceededException extends RuntimeException {
         public RateLimitExceededException(String message) { super(message); }
+    }
+
+    public static class SignatureVerificationFailedException extends RuntimeException {
+        private final IncomingEvent event;
+
+        public SignatureVerificationFailedException(String message, IncomingEvent event) {
+            super(message);
+            this.event = event;
+        }
+
+        public IncomingEvent getEvent() {
+            return event;
+        }
     }
 }

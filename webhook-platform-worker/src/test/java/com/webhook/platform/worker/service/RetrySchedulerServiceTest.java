@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -61,7 +60,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
-                                any(PageRequest.class))).thenReturn(Collections.singletonList(dueDelivery));
+                                anyInt())).thenReturn(Collections.singletonList(dueDelivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
@@ -72,13 +71,13 @@ class RetrySchedulerServiceTest {
                 retrySchedulerService.scheduleRetries();
 
                 // Assert
-                ArgumentCaptor<PageRequest> pageRequestCaptor = ArgumentCaptor.forClass(PageRequest.class);
+                ArgumentCaptor<Integer> limitCaptor = ArgumentCaptor.forClass(Integer.class);
                 verify(deliveryRepository).findPendingRetriesForUpdate(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
-                                pageRequestCaptor.capture());
+                                limitCaptor.capture());
 
-                assertEquals(batchSize, pageRequestCaptor.getValue().getPageSize());
+                assertEquals(batchSize, limitCaptor.getValue());
                 verify(kafkaTemplate, times(1)).send(anyString(), anyString(), any(DeliveryMessage.class));
         }
 
@@ -94,7 +93,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
-                                any(PageRequest.class))).thenReturn(deliveries);
+                                anyInt())).thenReturn(deliveries);
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
@@ -118,7 +117,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
-                                any(PageRequest.class))).thenReturn(Collections.singletonList(delivery));
+                                anyInt())).thenReturn(Collections.singletonList(delivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
@@ -141,7 +140,7 @@ class RetrySchedulerServiceTest {
         when(deliveryRepository.findPendingRetriesForUpdate(
                 any(Delivery.DeliveryStatus.class),
                 any(Instant.class),
-                any(PageRequest.class)
+                anyInt()
         )).thenReturn(Collections.emptyList());
 
         // Act
@@ -161,7 +160,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
-                                any(PageRequest.class))).thenReturn(Collections.singletonList(delivery));
+                                anyInt())).thenReturn(Collections.singletonList(delivery));
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> failedFuture = new CompletableFuture<>();
                 failedFuture.completeExceptionally(new RuntimeException("Kafka error"));
@@ -195,7 +194,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
-                                any(PageRequest.class)))
+                                anyInt()))
                                 .thenReturn(Collections.singletonList(delivery1))
                                 .thenReturn(Collections.singletonList(delivery2))
                                 .thenReturn(Collections.singletonList(delivery6));
@@ -225,7 +224,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
-                                any(PageRequest.class)))
+                                anyInt()))
                                 .thenReturn(Arrays.asList(completedDelivery, incompleteDelivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
@@ -259,7 +258,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
-                                any(PageRequest.class))).thenReturn(Collections.singletonList(delivery));
+                                anyInt())).thenReturn(Collections.singletonList(delivery));
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> exceptionalFuture = new CompletableFuture<>();
                 exceptionalFuture.completeExceptionally(new RuntimeException("Broker unavailable"));
