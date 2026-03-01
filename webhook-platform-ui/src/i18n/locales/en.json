@@ -257,7 +257,9 @@
       "endpoints": "Endpoints",
       "events": "Events",
       "deliveries": "Deliveries",
-      "dlq": "Dead Letter Queue"
+      "dlq": "Dead Letter Queue",
+      "incomingSources": "Incoming Sources",
+      "incomingEvents": "Incoming Events"
     }
   },
   "endpoints": {
@@ -553,6 +555,21 @@
     "orgName": "Organization Name",
     "orgId": "Organization ID",
     "createdAt": "Created At",
+    "security": {
+      "title": "Security",
+      "subtitle": "Security best practices and guidelines for your organization",
+      "secretRotation": "Secret Rotation",
+      "secretRotationDesc": "Rotate your endpoint signing secrets and HMAC secrets every 90 days. Use the rotate button on each endpoint or update the HMAC secret on incoming sources.",
+      "hmacVerification": "HMAC Signature Verification",
+      "hmacVerificationDesc": "Enable HMAC verification on all incoming sources to ensure only authenticated providers can send events. Sources without verification are marked with a warning badge.",
+      "auditLogging": "Audit Logging",
+      "auditLoggingDesc": "All configuration changes are logged in the Audit Log. Review it regularly for unexpected changes to endpoints, API keys, or member permissions.",
+      "bestPracticeTitle": "Security Checklist",
+      "tip1": "Enable HMAC verification on all incoming sources",
+      "tip2": "Rotate signing secrets and API keys every 90 days",
+      "tip3": "Use RBAC — grant DEVELOPER role instead of OWNER where possible",
+      "tip4": "Review the Audit Log weekly for suspicious activity"
+    },
     "dangerZone": "Danger Zone",
     "dangerZoneDesc": "Irreversible and destructive actions",
     "deleteAccount": "Delete Account",
@@ -1238,6 +1255,13 @@
       "title": "Disable incoming source?",
       "description": "This source will be disabled and stop accepting incoming webhooks. Existing events are preserved."
     },
+    "security": {
+      "noVerificationTitle": "No signature verification",
+      "noVerificationDesc": "Without HMAC verification, anyone with the ingress URL can send events. Consider enabling HMAC_GENERIC or PROVIDER verification for production use.",
+      "rotateHmacHint": "Rotate your HMAC secret periodically to maintain security. Update the secret here and in your provider's webhook settings simultaneously.",
+      "postureSafe": "Verified",
+      "postureWarning": "Unverified"
+    },
     "howToSend": {
       "title": "How to send webhooks",
       "description": "Configure your provider to send webhooks to the ingress URL below:",
@@ -1461,12 +1485,26 @@
       "sendEvent": "Send your first event",
       "sendEventDesc": "Send a test event and see it delivered to your endpoint",
       "checkDelivery": "Verify delivery",
-      "checkDeliveryDesc": "Check the delivery log to confirm your webhook was received"
+      "checkDeliveryDesc": "Check the delivery log to confirm your webhook was received",
+      "createIncomingSource": "Create an incoming source",
+      "createIncomingSourceDesc": "Set up an ingress endpoint to receive webhooks from GitHub, Stripe, or any provider",
+      "enableHmac": "Enable HMAC verification",
+      "enableHmacDesc": "Secure your ingress by enabling signature verification — prevents unauthorized event injection",
+      "createIncomingDestination": "Add a forwarding destination",
+      "createIncomingDestinationDesc": "Configure the URL where incoming events should be forwarded to",
+      "testIncomingCurl": "Send a test webhook",
+      "testIncomingCurlDesc": "Use the ingress URL to send a cURL request and verify the source accepts events",
+      "verifyForwarding": "Verify event forwarding",
+      "verifyForwardingDesc": "Check the incoming events page to confirm events are received and forwarded"
     },
     "go": "Go",
     "done": "Done",
     "allDone": "You're all set! Your webhook infrastructure is ready.",
-    "allDoneAction": "View quickstart guide"
+    "allDoneAction": "View quickstart guide",
+    "tabOutgoing": "Outgoing Webhooks",
+    "tabIncoming": "Incoming Webhooks",
+    "trackOutgoing": "Send webhooks to your consumers",
+    "trackIncoming": "Receive & forward external webhooks"
   },
   "commandPalette": {
     "placeholder": "Search pages, projects...",

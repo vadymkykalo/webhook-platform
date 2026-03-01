@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Plus, ArrowDownToLine, Calendar, Loader2, Trash2, Pencil, Copy, ChevronLeft, ChevronRight,
-  Power, PowerOff, ShieldCheck, ShieldOff, ExternalLink
+  Power, PowerOff, ShieldCheck, ShieldOff, ExternalLink, AlertTriangle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
@@ -328,6 +328,15 @@ export default function IncomingSourcesPage() {
                   </Select>
                 </div>
               </div>
+              {formVerification === 'NONE' && (
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{t('incomingSources.security.noVerificationTitle')}</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{t('incomingSources.security.noVerificationDesc')}</p>
+                  </div>
+                </div>
+              )}
               {showHmacFields && (
                 <>
                   <div className="space-y-2">
