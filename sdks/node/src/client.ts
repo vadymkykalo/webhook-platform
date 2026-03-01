@@ -2,7 +2,7 @@ import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
 import {
-  WebhookPlatformConfig,
+  HookflowConfig,
   Event,
   EventResponse,
   Endpoint,
@@ -28,7 +28,7 @@ import {
   ReplayEventResponse,
 } from './types';
 import {
-  WebhookPlatformError,
+  HookflowError,
   AuthenticationError,
   RateLimitError,
   ValidationError,
@@ -37,9 +37,9 @@ import {
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '1.1.0';
+const SDK_VERSION = '2.0.0';
 
-export class WebhookPlatform {
+export class Hookflow {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly timeout: number;
@@ -51,7 +51,7 @@ export class WebhookPlatform {
   public readonly incomingSources: IncomingSources;
   public readonly incomingEvents: IncomingEvents;
 
-  constructor(config: WebhookPlatformConfig) {
+  constructor(config: HookflowConfig) {
     if (!config.apiKey) {
       throw new Error('API key is required');
     }
@@ -81,7 +81,7 @@ export class WebhookPlatform {
     const headers: Record<string, string> = {
       'X-API-Key': this.apiKey,
       'Content-Type': 'application/json',
-      'User-Agent': `webhook-platform-node/${SDK_VERSION}`,
+      'User-Agent': `hookflow-node/${SDK_VERSION}`,
     };
 
     if (idempotencyKey) {
@@ -119,18 +119,18 @@ export class WebhookPlatform {
 
             resolve(parsed as T);
           } catch (err) {
-            reject(new WebhookPlatformError('Failed to parse response', 500));
+            reject(new HookflowError('Failed to parse response', 500));
           }
         });
       });
 
       req.on('error', (err) => {
-        reject(new WebhookPlatformError(err.message, 0, 'network_error'));
+        reject(new HookflowError(err.message, 0, 'network_error'));
       });
 
       req.on('timeout', () => {
         req.destroy();
-        reject(new WebhookPlatformError('Request timeout', 0, 'timeout'));
+        reject(new HookflowError('Request timeout', 0, 'timeout'));
       });
 
       if (body) {
@@ -160,7 +160,7 @@ export class WebhookPlatform {
     status: number,
     body: Record<string, unknown>,
     rateLimitInfo?: RateLimitInfo
-  ): WebhookPlatformError {
+  ): HookflowError {
     const message = (body.message as string) || 'Unknown error';
 
     switch (status) {
@@ -179,13 +179,13 @@ export class WebhookPlatform {
           (body.fieldErrors as Record<string, string>) || {}
         );
       default:
-        return new WebhookPlatformError(message, status, body.error as string);
+        return new HookflowError(message, status, body.error as string);
     }
   }
 }
 
 class Events {
-  constructor(private client: WebhookPlatform) {}
+  constructor(private client: Hookflow) {}
 
   async send(event: Event, idempotencyKey?: string): Promise<EventResponse> {
     return this.client.request<EventResponse>(
@@ -198,7 +198,7 @@ class Events {
 }
 
 class Endpoints {
-  constructor(private client: WebhookPlatform) {}
+  constructor(private client: Hookflow) {}
 
   async create(projectId: string, params: EndpointCreateParams): Promise<Endpoint> {
     return this.client.request<Endpoint>(
@@ -257,7 +257,7 @@ class Endpoints {
 }
 
 class Subscriptions {
-  constructor(private client: WebhookPlatform) {}
+  constructor(private client: Hookflow) {}
 
   async create(projectId: string, params: SubscriptionCreateParams): Promise<Subscription> {
     return this.client.request<Subscription>(
@@ -302,7 +302,7 @@ class Subscriptions {
 }
 
 class Deliveries {
-  constructor(private client: WebhookPlatform) {}
+  constructor(private client: Hookflow) {}
 
   async get(deliveryId: string): Promise<Delivery> {
     return this.client.request<Delivery>('GET', `/api/v1/deliveries/${deliveryId}`);
@@ -339,7 +339,7 @@ class Deliveries {
 }
 
 class IncomingSources {
-  constructor(private client: WebhookPlatform) {}
+  constructor(private client: Hookflow) {}
 
   async create(projectId: string, params: IncomingSourceCreateParams): Promise<IncomingSource> {
     return this.client.request<IncomingSource>(
@@ -439,7 +439,7 @@ class IncomingSources {
 }
 
 class IncomingEvents {
-  constructor(private client: WebhookPlatform) {}
+  constructor(private client: Hookflow) {}
 
   async list(
     projectId: string,

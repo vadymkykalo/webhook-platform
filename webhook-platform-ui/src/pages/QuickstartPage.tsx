@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw, ArrowDownToLine, Globe, Send, Activity } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Code, ExternalLink, Lock, Eye, RotateCcw, ArrowDownToLine, Globe, Send, Activity } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
@@ -39,7 +40,7 @@ function Navigation() {
         <div className="flex items-center space-x-8">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <Webhook className="h-4 w-4 text-primary-foreground" />
+              <HookflowIcon className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold">Hookflow</span>
           </Link>
@@ -228,28 +229,28 @@ function Step2_InstallSDK() {
     curl: '# No installation needed — use cURL directly',
   };
   const inits: Record<string, string> = {
-    node: `import { WebhookPlatform } from '@webhook-platform/node';
+    node: `import { Hookflow } from '@webhook-platform/node';
 
-const client = new WebhookPlatform({
+const client = new Hookflow({
   apiKey: 'wh_live_your_api_key',
   // Optional: custom base URL
   // baseUrl: 'https://your-api.com/api/v1'
 });`,
-    python: `from webhook_platform import WebhookPlatform
+    python: `from hookflow import Hookflow
 
-client = WebhookPlatform(
+client = Hookflow(
     api_key="wh_live_your_api_key",
     # Optional: custom base URL
     # base_url="https://your-api.com/api/v1"
 )`,
     php: `<?php
-use WebhookPlatform\\WebhookPlatform;
+use Hookflow\\Hookflow;
 
-$client = new WebhookPlatform([
-    'apiKey' => 'wh_live_your_api_key',
+$client = new Hookflow(
+    apiKey: 'wh_live_your_api_key',
     // Optional: custom base URL
-    // 'baseUrl' => 'https://your-api.com/api/v1'
-]);`,
+    // baseUrl: 'https://your-api.com/api/v1'
+);`,
     curl: `# Set your API key as an environment variable
 export WEBHOOK_API_KEY="wh_live_your_api_key"
 export WEBHOOK_BASE_URL="https://your-api.com/api/v1"`,
@@ -548,7 +549,7 @@ app.post('/webhooks', (req, res) => {
 
   res.status(200).json({ received: true });
 });`,
-    python: `from webhook_platform import verify_signature
+    python: `from hookflow import verify_signature
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -582,7 +583,7 @@ def handle_webhook():
 
     return jsonify({"received": True}), 200`,
     php: `<?php
-use WebhookPlatform\\Webhook;
+use Hookflow\\Webhook;
 
 // Get the raw payload
 $payload = file_get_contents('php://input');

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Webhook, Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
 import { showApiError } from '../lib/toast';
 import { authApi } from '../api/auth.api';
@@ -49,7 +50,7 @@ export default function ForgotPasswordPage() {
         <div className="mb-8">
           <div className="flex items-center gap-2.5 mb-6">
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Webhook className="h-4 w-4 text-primary-foreground" />
+              <HookflowIcon className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold">Hookflow</span>
           </div>

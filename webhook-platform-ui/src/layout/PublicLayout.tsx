@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Webhook } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
 
 export default function PublicLayout() {
@@ -23,7 +23,7 @@ export function Footer() {
           <div>
             <Link to="/" className="flex items-center gap-2.5 mb-4">
               <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-                <Webhook className="h-3.5 w-3.5 text-primary-foreground" />
+                <HookflowIcon className="h-3.5 w-3.5 text-primary-foreground" />
               </div>
               <span className="text-sm font-bold">Hookflow</span>
             </Link>

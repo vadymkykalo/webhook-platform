@@ -1,4 +1,4 @@
-"""Webhook Platform API client."""
+"""Hookflow API client."""
 
 from typing import Any, Dict, List, Optional
 import requests
@@ -28,7 +28,7 @@ from .types import (
     ReplayEventResponse,
 )
 from .errors import (
-    WebhookPlatformError,
+    HookflowError,
     AuthenticationError,
     RateLimitError,
     ValidationError,
@@ -37,11 +37,11 @@ from .errors import (
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 30
-SDK_VERSION = "1.1.0"
+SDK_VERSION = "2.0.0"
 
 
-class WebhookPlatform:
-    """Webhook Platform API client."""
+class Hookflow:
+    """Hookflow API client."""
 
     def __init__(
         self,
@@ -76,7 +76,7 @@ class WebhookPlatform:
         headers = {
             "X-API-Key": self.api_key,
             "Content-Type": "application/json",
-            "User-Agent": f"webhook-platform-python/{SDK_VERSION}",
+            "User-Agent": f"hookflow-python/{SDK_VERSION}",
         }
 
         if idempotency_key:
@@ -92,9 +92,9 @@ class WebhookPlatform:
                 timeout=self.timeout,
             )
         except requests.Timeout:
-            raise WebhookPlatformError("Request timeout", 0, "timeout")
+            raise HookflowError("Request timeout", 0, "timeout")
         except requests.RequestException as e:
-            raise WebhookPlatformError(str(e), 0, "network_error")
+            raise HookflowError(str(e), 0, "network_error")
 
         rate_limit_info = self._extract_rate_limit_info(response.headers)
 
@@ -131,7 +131,7 @@ class WebhookPlatform:
         status: int,
         body: Dict[str, Any],
         rate_limit_info: Optional[RateLimitInfo],
-    ) -> WebhookPlatformError:
+    ) -> HookflowError:
         message = body.get("message", "Unknown error")
 
         if status == 401:
@@ -147,13 +147,13 @@ class WebhookPlatform:
         elif status == 400:
             return ValidationError(message, body.get("fieldErrors", {}))
         else:
-            return WebhookPlatformError(message, status, body.get("error"))
+            return HookflowError(message, status, body.get("error"))
 
 
 class Events:
     """Events API."""
 
-    def __init__(self, client: WebhookPlatform) -> None:
+    def __init__(self, client: Hookflow) -> None:
         self._client = client
 
     def send(
@@ -172,7 +172,7 @@ class Events:
 class Endpoints:
     """Endpoints API."""
 
-    def __init__(self, client: WebhookPlatform) -> None:
+    def __init__(self, client: Hookflow) -> None:
         self._client = client
 
     def create(self, project_id: str, params: EndpointCreateParams) -> Endpoint:
@@ -238,7 +238,7 @@ class Endpoints:
 class Subscriptions:
     """Subscriptions API."""
 
-    def __init__(self, client: WebhookPlatform) -> None:
+    def __init__(self, client: Hookflow) -> None:
         self._client = client
 
     def create(
@@ -318,7 +318,7 @@ class Subscriptions:
 class Deliveries:
     """Deliveries API."""
 
-    def __init__(self, client: WebhookPlatform) -> None:
+    def __init__(self, client: Hookflow) -> None:
         self._client = client
 
     def get(self, delivery_id: str) -> Delivery:
@@ -354,7 +354,7 @@ class Deliveries:
 class IncomingSources:
     """Incoming Sources API."""
 
-    def __init__(self, client: WebhookPlatform) -> None:
+    def __init__(self, client: Hookflow) -> None:
         self._client = client
 
     def create(
@@ -466,7 +466,7 @@ class IncomingSources:
 class IncomingEventsApi:
     """Incoming Events API."""
 
-    def __init__(self, client: WebhookPlatform) -> None:
+    def __init__(self, client: Hookflow) -> None:
         self._client = client
 
     def list(

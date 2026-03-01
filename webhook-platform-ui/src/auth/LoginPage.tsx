@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Webhook, Loader2, ArrowLeft, Shield, Zap, Eye } from 'lucide-react';
+import { Loader2, ArrowLeft, Shield, Zap, Eye } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
@@ -51,7 +52,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <Link to="/" className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Webhook className="h-5 w-5 text-white" />
+              <HookflowIcon className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold">Hookflow</span>
           </Link>
@@ -99,7 +100,7 @@ export default function LoginPage() {
           <div className="mb-8">
             <div className="lg:hidden flex items-center gap-2.5 mb-6">
               <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-                <Webhook className="h-4 w-4 text-primary-foreground" />
+                <HookflowIcon className="h-4 w-4 text-primary-foreground" />
               </div>
               <span className="text-lg font-bold">Hookflow</span>
             </div>

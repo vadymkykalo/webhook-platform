@@ -1,9 +1,9 @@
 {
     "name": "webhook-platform/php",
-    "description": "Official PHP SDK for Webhook Platform",
+    "description": "Official PHP SDK for Hookflow — reliable webhook infrastructure",
     "type": "library",
     "license": "MIT",
-    "version": "1.1.0",
+    "version": "2.0.0",
     "keywords": ["webhook", "webhooks", "api", "events", "delivery"],
     "authors": [
         {
@@ -22,12 +22,12 @@
     },
     "autoload": {
         "psr-4": {
-            "WebhookPlatform\\": "src/"
+            "Hookflow\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "WebhookPlatform\\Tests\\": "tests/"
+            "Hookflow\\Tests\\": "tests/"
         }
     },
     "scripts": {

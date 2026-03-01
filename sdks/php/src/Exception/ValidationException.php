@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform\Exception;
+namespace Hookflow\Exception;
 
-class ValidationException extends WebhookPlatformException
+class ValidationException extends HookflowException
 {
     private array $fieldErrors;
 

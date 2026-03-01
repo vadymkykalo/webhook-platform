@@ -1,10 +1,10 @@
-"""Tests for WebhookPlatform client."""
+"""Tests for Hookflow client."""
 
 import pytest
 
-from webhook_platform import (
-    WebhookPlatform,
-    WebhookPlatformError,
+from hookflow import (
+    Hookflow,
+    HookflowError,
     AuthenticationError,
     RateLimitError,
     ValidationError,
@@ -24,29 +24,29 @@ from webhook_platform import (
 )
 
 
-class TestWebhookPlatformClient:
-    """Tests for WebhookPlatform client initialization."""
+class TestHookflowClient:
+    """Tests for Hookflow client initialization."""
 
     def test_creates_with_api_key(self):
         """Should create client with API key."""
-        client = WebhookPlatform(api_key="test_api_key")
+        client = Hookflow(api_key="test_api_key")
         assert client is not None
         assert client.api_key == "test_api_key"
 
     def test_raises_without_api_key(self):
         """Should raise error without API key."""
         with pytest.raises(ValueError) as exc:
-            WebhookPlatform(api_key="")
+            Hookflow(api_key="")
         assert "API key is required" in str(exc.value)
 
     def test_uses_default_base_url(self):
         """Should use default base URL."""
-        client = WebhookPlatform(api_key="test_api_key")
+        client = Hookflow(api_key="test_api_key")
         assert client.base_url == "http://localhost:8080"
 
     def test_accepts_custom_base_url(self):
         """Should accept custom base URL."""
-        client = WebhookPlatform(
+        client = Hookflow(
             api_key="test_api_key",
             base_url="https://api.example.com/",
         )
@@ -54,7 +54,7 @@ class TestWebhookPlatformClient:
 
     def test_strips_trailing_slash(self):
         """Should strip trailing slash from base URL."""
-        client = WebhookPlatform(
+        client = Hookflow(
             api_key="test_api_key",
             base_url="https://api.example.com/",
         )
@@ -62,12 +62,12 @@ class TestWebhookPlatformClient:
 
     def test_accepts_custom_timeout(self):
         """Should accept custom timeout."""
-        client = WebhookPlatform(api_key="test_api_key", timeout=60)
+        client = Hookflow(api_key="test_api_key", timeout=60)
         assert client.timeout == 60
 
     def test_initializes_api_modules(self):
         """Should initialize all API modules."""
-        client = WebhookPlatform(api_key="test_api_key")
+        client = Hookflow(api_key="test_api_key")
         assert client.events is not None
         assert client.endpoints is not None
         assert client.subscriptions is not None
@@ -77,9 +77,9 @@ class TestWebhookPlatformClient:
 class TestErrorClasses:
     """Tests for error classes."""
 
-    def test_webhook_platform_error(self):
-        """WebhookPlatformError should have correct properties."""
-        error = WebhookPlatformError("Test error", 500, "test_code")
+    def test_hookflow_error(self):
+        """HookflowError should have correct properties."""
+        error = HookflowError("Test error", 500, "test_code")
         assert error.message == "Test error"
         assert error.status == 500
         assert error.code == "test_code"
@@ -249,7 +249,7 @@ class TestTypeClasses:
 
     def test_delivery_list_params_to_params(self):
         """DeliveryListParams should convert to query params correctly."""
-        from webhook_platform.types import DeliveryStatus
+        from hookflow.types import DeliveryStatus
         
         params = DeliveryListParams(
             status=DeliveryStatus.FAILED,

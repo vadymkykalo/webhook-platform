@@ -1,6 +1,6 @@
 # @webhook-platform/node
 
-Official Node.js SDK for [Webhook Platform](https://github.com/vadymkykalo/webhook-platform).
+Official Node.js SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
 
 ## Installation
 
@@ -11,9 +11,9 @@ npm install @webhook-platform/node
 ## Quick Start
 
 ```typescript
-import { WebhookPlatform } from '@webhook-platform/node';
+import { Hookflow } from '@webhook-platform/node';
 
-const client = new WebhookPlatform({
+const client = new Hookflow({
   apiKey: 'wh_live_your_api_key',
   baseUrl: 'http://localhost:8080', // optional, defaults to localhost
 });
@@ -256,7 +256,7 @@ app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
 
 ```typescript
 import { 
-  WebhookPlatformError, 
+  HookflowError, 
   RateLimitError, 
   AuthenticationError,
   ValidationError 
@@ -273,7 +273,7 @@ try {
     console.error('Invalid API key');
   } else if (err instanceof ValidationError) {
     console.error('Validation failed:', err.fieldErrors);
-  } else if (err instanceof WebhookPlatformError) {
+  } else if (err instanceof HookflowError) {
     console.error(`Error ${err.status}: ${err.message}`);
   }
 }
@@ -282,7 +282,7 @@ try {
 ## Configuration
 
 ```typescript
-const client = new WebhookPlatform({
+const client = new Hookflow({
   apiKey: 'wh_live_xxx',      // Required: Your API key
   baseUrl: 'https://api.example.com', // Optional: API base URL
   timeout: 30000,              // Optional: Request timeout in ms (default: 30000)

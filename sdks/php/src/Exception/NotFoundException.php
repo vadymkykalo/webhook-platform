@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform\Exception;
+namespace Hookflow\Exception;
 
-class NotFoundException extends WebhookPlatformException
+class NotFoundException extends HookflowException
 {
     public function __construct(string $message = 'Resource not found')
     {

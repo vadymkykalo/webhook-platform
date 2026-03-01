@@ -1,4 +1,5 @@
 import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +47,7 @@ function Navigation() {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <Webhook className="h-4 w-4 text-primary-foreground" />
+              <HookflowIcon className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold tracking-tight">Hookflow</span>
           </Link>
@@ -375,7 +376,7 @@ function FlowDiagram() {
             {/* Center hub */}
             <div className="flex flex-col items-center justify-center gap-3 flex-shrink-0 z-10 px-3">
               <div className="h-[72px] w-[72px] rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-4 ring-primary/10 hub-pulse">
-                <Webhook className="h-9 w-9 text-white" />
+                <HookflowIcon className="h-9 w-9 text-white" />
               </div>
               <span className="text-sm font-bold tracking-tight">Hookflow</span>
               <div className="flex flex-wrap justify-center gap-1.5 mt-1">
@@ -405,7 +406,7 @@ function FlowDiagram() {
             <div className="h-8 w-px border-l-2 border-dashed border-primary/30" />
             <div className="flex flex-col items-center gap-2">
               <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg">
-                <Webhook className="h-7 w-7 text-white" />
+                <HookflowIcon className="h-7 w-7 text-white" />
               </div>
               <span className="text-xs font-bold">Hookflow</span>
             </div>
