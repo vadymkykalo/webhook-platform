@@ -25,6 +25,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations")
 @Tag(name = "Incoming Destinations", description = "Incoming webhook forwarding destinations")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class IncomingDestinationController {
 
     private final IncomingDestinationService destinationService;

@@ -28,6 +28,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/incoming-events")
 @Tag(name = "Incoming Events", description = "Incoming webhook events monitoring")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class IncomingEventController {
 
     private final IncomingEventService eventService;

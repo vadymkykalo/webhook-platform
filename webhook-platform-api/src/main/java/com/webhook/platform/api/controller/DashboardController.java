@@ -20,6 +20,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/dashboard")
 @Tag(name = "Dashboard", description = "Project dashboard, statistics and analytics")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class DashboardController {
     
     private final DashboardService dashboardService;

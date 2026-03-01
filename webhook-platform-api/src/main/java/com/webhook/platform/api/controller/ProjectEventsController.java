@@ -23,6 +23,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/events")
 @Tag(name = "Events", description = "Event history and test events")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class ProjectEventsController {
 
     private final EventService eventService;

@@ -39,8 +39,8 @@ public class OpenApiConfig {
                                 - **Rate Limiting**: Distributed rate limiting via Redis
                                 
                                 ## Authentication
-                                - **JWT Bearer Token**: For management operations (projects, endpoints, subscriptions)
-                                - **API Key**: For event ingestion (`X-API-Key` header)
+                                - **JWT Bearer Token**: For all operations (UI / user context)
+                                - **API Key**: For all project-scoped operations (`X-API-Key` header, SDK usage)
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()

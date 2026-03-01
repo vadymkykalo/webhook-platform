@@ -24,6 +24,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/orgs/{orgId}/members")
 @Tag(name = "Organizations", description = "Organization member management")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class MemberController {
 
     private final MembershipService membershipService;
@@ -92,7 +93,7 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             @RequestParam("token") String token,
             AuthContext auth) {
-        MemberResponse response = membershipService.acceptInvite(token, orgId, auth.userId());
+        MemberResponse response = membershipService.acceptInvite(token, orgId, auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 }

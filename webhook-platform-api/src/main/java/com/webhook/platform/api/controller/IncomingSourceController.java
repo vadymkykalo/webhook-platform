@@ -25,6 +25,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/incoming-sources")
 @Tag(name = "Incoming Sources", description = "Incoming webhook source configuration")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class IncomingSourceController {
 
     private final IncomingSourceService sourceService;

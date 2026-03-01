@@ -44,4 +44,15 @@ public record AuthContext(
     public boolean isApiKey() {
         return role == MembershipRole.API_KEY;
     }
+
+    /**
+     * Returns userId or throws if this is an API Key context (userId is null).
+     * Use in endpoints that require a real user identity (e.g. org membership, profile).
+     */
+    public UUID requireUserId() {
+        if (userId == null) {
+            throw new ForbiddenException("This operation requires user authentication (JWT). API keys are not supported.");
+        }
+        return userId;
+    }
 }

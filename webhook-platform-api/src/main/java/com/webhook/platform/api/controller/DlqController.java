@@ -25,6 +25,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/dlq")
 @Tag(name = "Dead Letter Queue", description = "DLQ management operations")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 @RequiredArgsConstructor
 public class DlqController {
 

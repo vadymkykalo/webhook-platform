@@ -24,6 +24,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/api-keys")
 @Tag(name = "API Keys", description = "API key management for event ingestion")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;

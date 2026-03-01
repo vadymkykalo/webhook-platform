@@ -159,7 +159,7 @@ public class AuthController {
     public ResponseEntity<Void> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
             AuthContext auth) {
-        authService.changePassword(auth.userId(), request.getCurrentPassword(), request.getNewPassword());
+        authService.changePassword(auth.requireUserId(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok().build();
     }
 
@@ -172,7 +172,7 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<CurrentUserResponse> getCurrentUser(AuthContext auth) {
         CurrentUserResponse response = authService.getCurrentUser(
-                auth.userId(),
+                auth.requireUserId(),
                 auth.organizationId(),
                 auth.role());
         return ResponseEntity.ok(response);

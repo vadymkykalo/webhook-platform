@@ -20,6 +20,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/subscriptions")
 @Tag(name = "Subscriptions", description = "Event type subscriptions")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;

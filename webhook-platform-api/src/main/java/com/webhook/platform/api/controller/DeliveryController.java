@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/deliveries")
 @Tag(name = "Deliveries", description = "Delivery status and replay operations")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class DeliveryController {
 
     private final DeliveryService deliveryService;

@@ -18,6 +18,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/orgs")
 @Tag(name = "Organizations", description = "Organization management")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class OrganizationController {
 
     private final OrganizationService organizationService;
@@ -29,7 +30,7 @@ public class OrganizationController {
     @Operation(summary = "List user organizations", description = "Returns all organizations the user belongs to")
     @GetMapping
     public ResponseEntity<List<OrganizationResponse>> getUserOrganizations(AuthContext auth) {
-        List<OrganizationResponse> response = organizationService.getUserOrganizations(auth.userId());
+        List<OrganizationResponse> response = organizationService.getUserOrganizations(auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -38,7 +39,7 @@ public class OrganizationController {
     public ResponseEntity<OrganizationResponse> getOrganization(
             @PathVariable("orgId") UUID orgId,
             AuthContext auth) {
-        OrganizationResponse response = organizationService.getOrganization(orgId, auth.userId());
+        OrganizationResponse response = organizationService.getOrganization(orgId, auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 }

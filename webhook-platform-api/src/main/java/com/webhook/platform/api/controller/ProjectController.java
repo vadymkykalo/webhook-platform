@@ -20,6 +20,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects")
 @Tag(name = "Projects", description = "Project management")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class ProjectController {
 
     private final ProjectService projectService;

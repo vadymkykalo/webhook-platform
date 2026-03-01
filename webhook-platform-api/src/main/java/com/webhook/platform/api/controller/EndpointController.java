@@ -26,6 +26,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/endpoints")
 @Tag(name = "Endpoints", description = "Webhook endpoint configuration")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class EndpointController {
 
     private final EndpointService endpointService;
