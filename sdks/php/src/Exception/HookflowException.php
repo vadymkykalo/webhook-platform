@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform\Exception;
+namespace Hookflow\Exception;
 
-class WebhookPlatformException extends \Exception
+class HookflowException extends \Exception
 {
     protected int $statusCode;
     protected ?string $errorCode;

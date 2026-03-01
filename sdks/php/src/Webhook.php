@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform;
+namespace Hookflow;
 
-use WebhookPlatform\Exception\WebhookPlatformException;
+use Hookflow\Exception\HookflowException;
 
 class Webhook
 {
@@ -18,7 +18,7 @@ class Webhook
      * @param string $secret Endpoint webhook secret
      * @param int $toleranceMs Maximum age of signature in milliseconds
      * @return bool True if signature is valid
-     * @throws WebhookPlatformException If signature is invalid or expired
+     * @throws HookflowException If signature is invalid or expired
      */
     public static function verifySignature(
         string $payload,
@@ -27,7 +27,7 @@ class Webhook
         int $toleranceMs = self::DEFAULT_TOLERANCE_MS
     ): bool {
         if (empty($signature)) {
-            throw new WebhookPlatformException('Missing signature header', 400, 'invalid_signature');
+            throw new HookflowException('Missing signature header', 400, 'invalid_signature');
         }
 
         $timestamp = null;
@@ -42,7 +42,7 @@ class Webhook
         }
 
         if ($timestamp === null || $sig === null) {
-            throw new WebhookPlatformException(
+            throw new HookflowException(
                 'Invalid signature format. Expected: t=timestamp,v1=signature',
                 400,
                 'invalid_signature'
@@ -53,7 +53,7 @@ class Webhook
         $nowMs = (int) (microtime(true) * 1000);
 
         if (abs($nowMs - $timestampMs) > $toleranceMs) {
-            throw new WebhookPlatformException(
+            throw new HookflowException(
                 'Webhook timestamp is outside tolerance window',
                 400,
                 'timestamp_expired'
@@ -64,7 +64,7 @@ class Webhook
         $expectedSignature = hash_hmac('sha256', $signedPayload, $secret);
 
         if (!hash_equals($expectedSignature, $sig)) {
-            throw new WebhookPlatformException('Invalid signature', 400, 'invalid_signature');
+            throw new HookflowException('Invalid signature', 400, 'invalid_signature');
         }
 
         return true;
@@ -78,7 +78,7 @@ class Webhook
      * @param string $secret Endpoint webhook secret
      * @param int $toleranceMs Maximum age of signature in milliseconds
      * @return array Parsed webhook event with eventId, deliveryId, timestamp, type, data
-     * @throws WebhookPlatformException If signature is invalid or payload is malformed
+     * @throws HookflowException If signature is invalid or payload is malformed
      */
     public static function constructEvent(
         string $payload,
@@ -98,14 +98,14 @@ class Webhook
         $deliveryId = $normalizedHeaders['x-delivery-id'] ?? '';
 
         if (empty($signature)) {
-            throw new WebhookPlatformException('Missing X-Signature header', 400, 'missing_header');
+            throw new HookflowException('Missing X-Signature header', 400, 'missing_header');
         }
 
         self::verifySignature($payload, $signature, $secret, $toleranceMs);
 
         $data = json_decode($payload, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new WebhookPlatformException('Invalid JSON payload', 400, 'invalid_payload');
+            throw new HookflowException('Invalid JSON payload', 400, 'invalid_payload');
         }
 
         return [

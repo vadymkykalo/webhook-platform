@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, Optional
 
 from .types import WebhookEvent
-from .errors import WebhookPlatformError
+from .errors import HookflowError
 
 DEFAULT_TOLERANCE_MS = 300000  # 5 minutes
 
@@ -30,10 +30,10 @@ def verify_signature(
         True if signature is valid
 
     Raises:
-        WebhookPlatformError: If signature is invalid or expired
+        HookflowError: If signature is invalid or expired
     """
     if not signature:
-        raise WebhookPlatformError(
+        raise HookflowError(
             "Missing signature header", 400, "invalid_signature"
         )
 
@@ -50,7 +50,7 @@ def verify_signature(
                 sig = value
 
     if not timestamp or not sig:
-        raise WebhookPlatformError(
+        raise HookflowError(
             "Invalid signature format. Expected: t=timestamp,v1=signature",
             400,
             "invalid_signature",
@@ -61,7 +61,7 @@ def verify_signature(
     now_ms = int(time.time() * 1000)
 
     if abs(now_ms - timestamp_ms) > tolerance_ms:
-        raise WebhookPlatformError(
+        raise HookflowError(
             "Webhook timestamp is outside tolerance window",
             400,
             "timestamp_expired",
@@ -76,7 +76,7 @@ def verify_signature(
     ).hexdigest()
 
     if not hmac.compare_digest(sig, expected_signature):
-        raise WebhookPlatformError("Invalid signature", 400, "invalid_signature")
+        raise HookflowError("Invalid signature", 400, "invalid_signature")
 
     return True
 
@@ -100,7 +100,7 @@ def construct_event(
         Parsed and verified WebhookEvent
 
     Raises:
-        WebhookPlatformError: If signature is invalid or payload is malformed
+        HookflowError: If signature is invalid or payload is malformed
     """
     # Get headers (case-insensitive)
     headers_lower = {k.lower(): v for k, v in headers.items()}
@@ -111,7 +111,7 @@ def construct_event(
     delivery_id = headers_lower.get("x-delivery-id", "")
 
     if not signature:
-        raise WebhookPlatformError(
+        raise HookflowError(
             "Missing X-Signature header", 400, "missing_header"
         )
 
@@ -123,7 +123,7 @@ def construct_event(
     try:
         data = json.loads(payload)
     except json.JSONDecodeError:
-        raise WebhookPlatformError("Invalid JSON payload", 400, "invalid_payload")
+        raise HookflowError("Invalid JSON payload", 400, "invalid_payload")
 
     return WebhookEvent(
         event_id=event_id,

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform\Exception;
+namespace Hookflow\Exception;
 
-class RateLimitException extends WebhookPlatformException
+class RateLimitException extends HookflowException
 {
     private array $rateLimitInfo;
 

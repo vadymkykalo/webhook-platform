@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { WebhookEvent } from './types';
-import { WebhookPlatformError } from './errors';
+import { HookflowError } from './errors';
 
 const SIGNATURE_HEADER = 'x-signature';
 const TIMESTAMP_HEADER = 'x-timestamp';
@@ -28,7 +28,7 @@ export interface VerifyOptions {
  * @param secret - Endpoint webhook secret
  * @param options - Verification options
  * @returns true if signature is valid
- * @throws WebhookPlatformError if signature is invalid
+ * @throws HookflowError if signature is invalid
  */
 export function verifySignature(
   payload: string,
@@ -39,7 +39,7 @@ export function verifySignature(
   const tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
 
   if (!signature) {
-    throw new WebhookPlatformError('Missing signature header', 400, 'invalid_signature');
+    throw new HookflowError('Missing signature header', 400, 'invalid_signature');
   }
 
   const parts = signature.split(',');
@@ -53,7 +53,7 @@ export function verifySignature(
   }
 
   if (!timestamp || !sig) {
-    throw new WebhookPlatformError(
+    throw new HookflowError(
       'Invalid signature format. Expected: t=timestamp,v1=signature',
       400,
       'invalid_signature'
@@ -64,7 +64,7 @@ export function verifySignature(
   const now = Date.now();
 
   if (Math.abs(now - timestampMs) > tolerance) {
-    throw new WebhookPlatformError(
+    throw new HookflowError(
       'Webhook timestamp is outside tolerance window',
       400,
       'timestamp_expired'
@@ -81,7 +81,7 @@ export function verifySignature(
   const expectedBuffer = Buffer.from(expectedSignature);
 
   if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-    throw new WebhookPlatformError('Invalid signature', 400, 'invalid_signature');
+    throw new HookflowError('Invalid signature', 400, 'invalid_signature');
   }
 
   return true;
@@ -107,7 +107,7 @@ export function constructEvent(
   const deliveryId = headers[DELIVERY_ID_HEADER] || headers['X-Delivery-Id'];
 
   if (!signature) {
-    throw new WebhookPlatformError('Missing X-Signature header', 400, 'missing_header');
+    throw new HookflowError('Missing X-Signature header', 400, 'missing_header');
   }
 
   verifySignature(payload, signature, secret, options);
@@ -116,7 +116,7 @@ export function constructEvent(
   try {
     data = JSON.parse(payload);
   } catch {
-    throw new WebhookPlatformError('Invalid JSON payload', 400, 'invalid_payload');
+    throw new HookflowError('Invalid JSON payload', 400, 'invalid_payload');
   }
 
   return {

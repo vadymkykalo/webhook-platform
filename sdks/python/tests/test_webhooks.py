@@ -4,11 +4,11 @@ import json
 import time
 import pytest
 
-from webhook_platform import (
+from hookflow import (
     verify_signature,
     construct_event,
     generate_signature,
-    WebhookPlatformError,
+    HookflowError,
 )
 
 
@@ -83,7 +83,7 @@ class TestVerifySignature:
 
     def test_raises_on_missing_signature(self):
         """Should raise on missing signature."""
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature("payload", "", "secret")
         
         assert "Missing signature header" in str(exc.value)
@@ -91,21 +91,21 @@ class TestVerifySignature:
 
     def test_raises_on_invalid_format(self):
         """Should raise on invalid signature format."""
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature("payload", "invalid_format", "secret")
         
         assert "Invalid signature format" in str(exc.value)
 
     def test_raises_on_missing_timestamp(self):
         """Should raise when timestamp is missing."""
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature("payload", "v1=abc123", "secret")
         
         assert "Invalid signature format" in str(exc.value)
 
     def test_raises_on_missing_v1(self):
         """Should raise when v1 signature is missing."""
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature("payload", "t=1700000000000", "secret")
         
         assert "Invalid signature format" in str(exc.value)
@@ -117,7 +117,7 @@ class TestVerifySignature:
         old_timestamp = int(time.time() * 1000) - 600000  # 10 min ago
         signature = generate_signature(payload, secret, old_timestamp)
         
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature(payload, signature, secret)
         
         assert "outside tolerance window" in str(exc.value)
@@ -130,7 +130,7 @@ class TestVerifySignature:
         future_timestamp = int(time.time() * 1000) + 600000  # 10 min in future
         signature = generate_signature(payload, secret, future_timestamp)
         
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature(payload, signature, secret)
         
         assert "outside tolerance window" in str(exc.value)
@@ -150,7 +150,7 @@ class TestVerifySignature:
         secret = "whsec_test_secret"
         timestamp = int(time.time() * 1000)
         
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature(payload, f"t={timestamp},v1=invalid", secret)
         
         assert "Invalid signature" in str(exc.value)
@@ -164,7 +164,7 @@ class TestVerifySignature:
         
         tampered = '{"type": "hacked"}'
         
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             verify_signature(tampered, signature, secret)
         
         assert "Invalid signature" in str(exc.value)
@@ -177,7 +177,7 @@ class TestVerifySignature:
         signature = generate_signature(payload, secret, old_timestamp)
         
         # Should fail with 30s tolerance
-        with pytest.raises(WebhookPlatformError):
+        with pytest.raises(HookflowError):
             verify_signature(payload, signature, secret, tolerance_ms=30000)
         
         # Should pass with 2min tolerance
@@ -230,7 +230,7 @@ class TestConstructEvent:
         """Should raise on missing signature header."""
         headers = {"x-timestamp": "1700000000000"}
         
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             construct_event('{"type": "test"}', headers, "secret")
         
         assert "Missing X-Signature header" in str(exc.value)
@@ -244,7 +244,7 @@ class TestConstructEvent:
         
         headers = {"x-signature": signature}
         
-        with pytest.raises(WebhookPlatformError) as exc:
+        with pytest.raises(HookflowError) as exc:
             construct_event(invalid_payload, headers, secret)
         
         assert "Invalid JSON payload" in str(exc.value)

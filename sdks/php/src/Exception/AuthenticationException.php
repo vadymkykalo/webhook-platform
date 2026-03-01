@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform\Exception;
+namespace Hookflow\Exception;
 
-class AuthenticationException extends WebhookPlatformException
+class AuthenticationException extends HookflowException
 {
     public function __construct(string $message = 'Invalid API key')
     {

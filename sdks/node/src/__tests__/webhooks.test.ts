@@ -1,5 +1,5 @@
 import { verifySignature, constructEvent, generateSignature } from '../webhooks';
-import { WebhookPlatformError } from '../errors';
+import { HookflowError } from '../errors';
 
 describe('Webhook Signature Verification', () => {
   const secret = 'whsec_test_secret_key_123';
@@ -47,7 +47,7 @@ describe('Webhook Signature Verification', () => {
     });
 
     it('should throw on missing signature', () => {
-      expect(() => verifySignature(payload, '', secret)).toThrow(WebhookPlatformError);
+      expect(() => verifySignature(payload, '', secret)).toThrow(HookflowError);
       expect(() => verifySignature(payload, '', secret)).toThrow('Missing signature header');
     });
 

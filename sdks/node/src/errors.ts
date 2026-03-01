@@ -1,25 +1,25 @@
 import { RateLimitInfo } from './types';
 
-export class WebhookPlatformError extends Error {
+export class HookflowError extends Error {
   public readonly status: number;
   public readonly code?: string;
 
   constructor(message: string, status: number, code?: string) {
     super(message);
-    this.name = 'WebhookPlatformError';
+    this.name = 'HookflowError';
     this.status = status;
     this.code = code;
   }
 }
 
-export class AuthenticationError extends WebhookPlatformError {
+export class AuthenticationError extends HookflowError {
   constructor(message: string = 'Invalid API key') {
     super(message, 401, 'authentication_error');
     this.name = 'AuthenticationError';
   }
 }
 
-export class RateLimitError extends WebhookPlatformError {
+export class RateLimitError extends HookflowError {
   public readonly rateLimitInfo: RateLimitInfo;
 
   constructor(message: string, rateLimitInfo: RateLimitInfo) {
@@ -33,7 +33,7 @@ export class RateLimitError extends WebhookPlatformError {
   }
 }
 
-export class ValidationError extends WebhookPlatformError {
+export class ValidationError extends HookflowError {
   public readonly fieldErrors: Record<string, string>;
 
   constructor(message: string, fieldErrors: Record<string, string> = {}) {
@@ -43,7 +43,7 @@ export class ValidationError extends WebhookPlatformError {
   }
 }
 
-export class NotFoundError extends WebhookPlatformError {
+export class NotFoundError extends HookflowError {
   constructor(message: string = 'Resource not found') {
     super(message, 404, 'not_found');
     this.name = 'NotFoundError';

@@ -27,7 +27,7 @@ public class OpenApiConfig {
     public OpenAPI webhookPlatformOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Webhook Platform API")
+                        .title("Hookflow API")
                         .description("""
                                 Enterprise-grade distributed webhook delivery system with at-least-once guarantees.
                                 
@@ -44,7 +44,7 @@ public class OpenApiConfig {
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()
-                                .name("Webhook Platform")
+                                .name("Hookflow")
                                 .url("https://github.com/vadymkykalo/webhook-platform"))
                         .license(new License()
                                 .name("MIT")

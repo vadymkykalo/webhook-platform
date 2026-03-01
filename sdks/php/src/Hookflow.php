@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform;
+namespace Hookflow;
 
-use WebhookPlatform\Api\Events;
-use WebhookPlatform\Api\Endpoints;
-use WebhookPlatform\Api\Subscriptions;
-use WebhookPlatform\Api\Deliveries;
-use WebhookPlatform\Api\IncomingSources;
-use WebhookPlatform\Api\IncomingEvents;
+use Hookflow\Api\Events;
+use Hookflow\Api\Endpoints;
+use Hookflow\Api\Subscriptions;
+use Hookflow\Api\Deliveries;
+use Hookflow\Api\IncomingSources;
+use Hookflow\Api\IncomingEvents;
 
-class WebhookPlatform
+class Hookflow
 {
-    private const SDK_VERSION = '1.1.0';
+    private const SDK_VERSION = '2.0.0';
 
     private string $apiKey;
     private string $baseUrl;
@@ -63,7 +63,7 @@ class WebhookPlatform
         $headers = [
             'X-API-Key: ' . $this->apiKey,
             'Content-Type: application/json',
-            'User-Agent: webhook-platform-php/' . self::SDK_VERSION,
+            'User-Agent: hookflow-php/' . self::SDK_VERSION,
         ];
 
         if ($idempotencyKey) {
@@ -104,7 +104,7 @@ class WebhookPlatform
         curl_close($ch);
 
         if ($error) {
-            throw new Exception\WebhookPlatformException("cURL error: $error", 0);
+            throw new Exception\HookflowException("cURL error: $error", 0);
         }
 
         $headerStr = substr($response, 0, $headerSize);
@@ -148,7 +148,7 @@ class WebhookPlatform
         return null;
     }
 
-    private function handleError(int $status, array $body, ?array $rateLimitInfo): Exception\WebhookPlatformException
+    private function handleError(int $status, array $body, ?array $rateLimitInfo): Exception\HookflowException
     {
         $message = $body['message'] ?? 'Unknown error';
 
@@ -161,7 +161,7 @@ class WebhookPlatform
                 'reset' => time() * 1000 + 60000,
             ]),
             400 => new Exception\ValidationException($message, $body['fieldErrors'] ?? []),
-            default => new Exception\WebhookPlatformException($message, $status),
+            default => new Exception\HookflowException($message, $status),
         };
     }
 }

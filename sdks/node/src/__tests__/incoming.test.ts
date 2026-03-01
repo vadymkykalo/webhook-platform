@@ -1,4 +1,4 @@
-import { WebhookPlatform } from '../client';
+import { Hookflow } from '../client';
 import * as http from 'http';
 
 // Minimal mock HTTP server to verify request paths & methods
@@ -34,8 +34,8 @@ function setMockResponse(status: number, body: unknown) {
   mockResponse = { status, body };
 }
 
-function createClient(): WebhookPlatform {
-  return new WebhookPlatform({
+function createClient(): Hookflow {
+  return new Hookflow({
     apiKey: 'test_key',
     baseUrl: `http://localhost:${PORT}`,
   });
@@ -344,7 +344,7 @@ describe('IncomingEvents', () => {
 
 describe('Client initialization includes incoming modules', () => {
   it('should have incomingSources and incomingEvents', () => {
-    const client = new WebhookPlatform({ apiKey: 'test_key' });
+    const client = new Hookflow({ apiKey: 'test_key' });
     expect(client.incomingSources).toBeDefined();
     expect(client.incomingEvents).toBeDefined();
   });

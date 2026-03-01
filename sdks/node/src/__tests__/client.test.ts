@@ -1,24 +1,24 @@
-import { WebhookPlatform } from '../client';
-import { WebhookPlatformError, AuthenticationError, ValidationError } from '../errors';
+import { Hookflow } from '../client';
+import { HookflowError, AuthenticationError, ValidationError } from '../errors';
 
-describe('WebhookPlatform Client', () => {
+describe('Hookflow Client', () => {
   describe('constructor', () => {
     it('should create client with API key', () => {
-      const client = new WebhookPlatform({ apiKey: 'test_api_key' });
-      expect(client).toBeInstanceOf(WebhookPlatform);
+      const client = new Hookflow({ apiKey: 'test_api_key' });
+      expect(client).toBeInstanceOf(Hookflow);
     });
 
     it('should throw error without API key', () => {
-      expect(() => new WebhookPlatform({ apiKey: '' })).toThrow('API key is required');
+      expect(() => new Hookflow({ apiKey: '' })).toThrow('API key is required');
     });
 
     it('should use default base URL', () => {
-      const client = new WebhookPlatform({ apiKey: 'test_api_key' });
+      const client = new Hookflow({ apiKey: 'test_api_key' });
       expect(client).toBeDefined();
     });
 
     it('should accept custom base URL', () => {
-      const client = new WebhookPlatform({
+      const client = new Hookflow({
         apiKey: 'test_api_key',
         baseUrl: 'https://api.example.com',
       });
@@ -26,7 +26,7 @@ describe('WebhookPlatform Client', () => {
     });
 
     it('should accept custom timeout', () => {
-      const client = new WebhookPlatform({
+      const client = new Hookflow({
         apiKey: 'test_api_key',
         timeout: 60000,
       });
@@ -34,7 +34,7 @@ describe('WebhookPlatform Client', () => {
     });
 
     it('should initialize all API modules', () => {
-      const client = new WebhookPlatform({ apiKey: 'test_api_key' });
+      const client = new Hookflow({ apiKey: 'test_api_key' });
       expect(client.events).toBeDefined();
       expect(client.endpoints).toBeDefined();
       expect(client.subscriptions).toBeDefined();
@@ -44,13 +44,13 @@ describe('WebhookPlatform Client', () => {
 });
 
 describe('Error Classes', () => {
-  describe('WebhookPlatformError', () => {
+  describe('HookflowError', () => {
     it('should have correct properties', () => {
-      const error = new WebhookPlatformError('Test error', 500, 'test_code');
+      const error = new HookflowError('Test error', 500, 'test_code');
       expect(error.message).toBe('Test error');
       expect(error.status).toBe(500);
       expect(error.code).toBe('test_code');
-      expect(error.name).toBe('WebhookPlatformError');
+      expect(error.name).toBe('HookflowError');
     });
   });
 

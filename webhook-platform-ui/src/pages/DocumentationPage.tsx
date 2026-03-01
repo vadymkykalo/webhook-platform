@@ -1,4 +1,5 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, ExternalLink, Package, ArrowDownToLine } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -71,7 +72,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     <div className="p-5">
       <Link to="/" className="flex items-center gap-2.5 mb-8">
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-          <Webhook className="h-4 w-4 text-primary-foreground" />
+          <HookflowIcon className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="text-base font-bold tracking-tight">Hookflow</span>
       </Link>
@@ -1720,7 +1721,7 @@ function IncomingWebhooks({ activeLanguage, setActiveLanguage }: { activeLanguag
   hmacSecret: 'whsec_...',
   hmacHeaderName: 'Stripe-Signature'
 });`,
-    python: `from webhook_platform.types import IncomingSourceCreateParams
+    python: `from hookflow.types import IncomingSourceCreateParams
 
 source = client.incoming_sources.create(
     project_id,
@@ -1751,7 +1752,7 @@ source = client.incoming_sources.create(
   maxAttempts: 5,
   timeoutSeconds: 30
 });`,
-    python: `from webhook_platform.types import IncomingDestinationCreateParams
+    python: `from hookflow.types import IncomingDestinationCreateParams
 
 dest = client.incoming_sources.create_destination(
     project_id,
@@ -1895,9 +1896,9 @@ function SDKs() {
 
   const code: Record<string, Record<string, { code: string; label: string }>> = {
     quickstart: {
-      node: { label: 'typescript', code: `import { WebhookPlatform } from '@webhook-platform/node';
+      node: { label: 'typescript', code: `import { Hookflow } from '@webhook-platform/node';
 
-const client = new WebhookPlatform({
+const client = new Hookflow({
   apiKey: 'wh_live_your_api_key',
   baseUrl: 'http://localhost:8080', // optional
 });
@@ -1914,9 +1915,9 @@ const event = await client.events.send({
 
 console.log(\`Event created: \${event.eventId}\`);
 console.log(\`Deliveries created: \${event.deliveriesCreated}\`);` },
-      python: { label: 'python', code: `from webhook_platform import WebhookPlatform, Event
+      python: { label: 'python', code: `from hookflow import Hookflow, Event
 
-client = WebhookPlatform(
+client = Hookflow(
     api_key="wh_live_your_api_key",
     base_url="http://localhost:8080",  # optional
 )
@@ -1936,9 +1937,9 @@ event = client.events.send(
 print(f"Event created: {event.event_id}")
 print(f"Deliveries created: {event.deliveries_created}")` },
       php: { label: 'php', code: `<?php
-use WebhookPlatform\\WebhookPlatform;
+use Hookflow\\Hookflow;
 
-$client = new WebhookPlatform(
+$client = new Hookflow(
     apiKey: 'wh_live_your_api_key',
     baseUrl: 'http://localhost:8080' // optional
 );
@@ -1974,7 +1975,7 @@ const event = await client.events.send(
   { type: 'order.completed', data: { orderId: '123' } },
   'unique-idempotency-key'
 );` },
-      python: { label: 'python', code: `from webhook_platform import Event
+      python: { label: 'python', code: `from hookflow import Event
 
 # Send event with idempotency key
 event = client.events.send(
@@ -2020,7 +2021,7 @@ console.log(\`New secret: \${updated.secret}\`);
 // Test endpoint connectivity
 const result = await client.endpoints.test(projectId, endpointId);
 console.log(\`Test \${result.success ? 'passed' : 'failed'}: \${result.latencyMs}ms\`);` },
-      python: { label: 'python', code: `from webhook_platform import EndpointCreateParams, EndpointUpdateParams
+      python: { label: 'python', code: `from hookflow import EndpointCreateParams, EndpointUpdateParams
 
 # Create endpoint
 endpoint = client.endpoints.create(
@@ -2110,7 +2111,7 @@ await client.subscriptions.update(projectId, subscriptionId, {
 
 // Delete subscription
 await client.subscriptions.delete(projectId, subscriptionId);` },
-      python: { label: 'python', code: `from webhook_platform import SubscriptionCreateParams
+      python: { label: 'python', code: `from hookflow import SubscriptionCreateParams
 
 # Subscribe endpoint to event type
 subscription = client.subscriptions.create(
@@ -2179,7 +2180,7 @@ for (const attempt of attempts) {
 
 // Replay failed delivery
 await client.deliveries.replay(deliveryId);` },
-      python: { label: 'python', code: `from webhook_platform import DeliveryListParams, DeliveryStatus
+      python: { label: 'python', code: `from hookflow import DeliveryListParams, DeliveryStatus
 
 # List deliveries with filters
 deliveries = client.deliveries.list(
@@ -2254,7 +2255,7 @@ app.post('/webhooks', (req, res) => {
     res.status(400).send('Invalid signature');
   }
 });` },
-      python: { label: 'python', code: `from webhook_platform import verify_signature, construct_event, WebhookPlatformError
+      python: { label: 'python', code: `from hookflow import verify_signature, construct_event, HookflowError
 from flask import Flask, request
 
 app = Flask(__name__)
@@ -2279,12 +2280,12 @@ def handle_webhook():
 
         return "OK", 200
 
-    except WebhookPlatformError as e:
+    except HookflowError as e:
         print(f"Webhook verification failed: {e.message}")
         return "Invalid signature", 400` },
       php: { label: 'php', code: `<?php
-use WebhookPlatform\\Webhook;
-use WebhookPlatform\\Exception\\WebhookPlatformException;
+use Hookflow\\Webhook;
+use Hookflow\\Exception\\HookflowException;
 
 $payload = file_get_contents('php://input');
 $headers = getallheaders();
@@ -2308,7 +2309,7 @@ try {
     http_response_code(200);
     echo 'OK';
 
-} catch (WebhookPlatformException $e) {
+} catch (HookflowException $e) {
     error_log("Webhook verification failed: {$e->getMessage()}");
     http_response_code(400);
     echo 'Invalid signature';
@@ -2330,7 +2331,7 @@ curl -X POST http://localhost:3000/webhooks \\
     },
     errors: {
       node: { label: 'typescript', code: `import {
-  WebhookPlatformError,
+  HookflowError,
   RateLimitError,
   AuthenticationError,
   ValidationError
@@ -2346,12 +2347,12 @@ try {
     console.error('Invalid API key');
   } else if (err instanceof ValidationError) {
     console.error('Validation failed:', err.fieldErrors);
-  } else if (err instanceof WebhookPlatformError) {
+  } else if (err instanceof HookflowError) {
     console.error(\`Error \${err.status}: \${err.message}\`);
   }
 }` },
-      python: { label: 'python', code: `from webhook_platform import (
-    WebhookPlatformError,
+      python: { label: 'python', code: `from hookflow import (
+    HookflowError,
     RateLimitError,
     AuthenticationError,
     ValidationError,
@@ -2366,13 +2367,13 @@ except AuthenticationError:
     print("Invalid API key")
 except ValidationError as e:
     print(f"Validation failed: {e.field_errors}")
-except WebhookPlatformError as e:
+except HookflowError as e:
     print(f"Error {e.status}: {e.message}")` },
       php: { label: 'php', code: `<?php
-use WebhookPlatform\\Exception\\WebhookPlatformException;
-use WebhookPlatform\\Exception\\RateLimitException;
-use WebhookPlatform\\Exception\\AuthenticationException;
-use WebhookPlatform\\Exception\\ValidationException;
+use Hookflow\\Exception\\HookflowException;
+use Hookflow\\Exception\\RateLimitException;
+use Hookflow\\Exception\\AuthenticationException;
+use Hookflow\\Exception\\ValidationException;
 
 try {
     $client->events->send(type: 'test', data: []);
@@ -2383,7 +2384,7 @@ try {
     echo "Invalid API key\\n";
 } catch (ValidationException $e) {
     echo "Validation failed: " . json_encode($e->getFieldErrors()) . "\\n";
-} catch (WebhookPlatformException $e) {
+} catch (HookflowException $e) {
     echo "Error {$e->getStatusCode()}: {$e->getMessage()}\\n";
 }` },
       curl: { label: 'bash', code: `# HTTP status codes:

@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace WebhookPlatform\Api;
+namespace Hookflow\Api;
 
-use WebhookPlatform\WebhookPlatform;
+use Hookflow\Hookflow;
 
 class Subscriptions
 {
-    private WebhookPlatform $client;
+    private Hookflow $client;
 
-    public function __construct(WebhookPlatform $client)
+    public function __construct(Hookflow $client)
     {
         $this->client = $client;
     }

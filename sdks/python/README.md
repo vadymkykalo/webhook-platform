@@ -1,6 +1,6 @@
 # webhook-platform
 
-Official Python SDK for [Webhook Platform](https://github.com/vadymkykalo/webhook-platform).
+Official Python SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
 
 ## Installation
 
@@ -11,9 +11,9 @@ pip install webhook-platform
 ## Quick Start
 
 ```python
-from webhook_platform import WebhookPlatform, Event
+from hookflow import Hookflow, Event
 
-client = WebhookPlatform(
+client = Hookflow(
     api_key="wh_live_your_api_key",
     base_url="http://localhost:8080",  # optional
 )
@@ -39,7 +39,7 @@ print(f"Deliveries created: {event.deliveries_created}")
 ### Events
 
 ```python
-from webhook_platform import Event
+from hookflow import Event
 
 # Send event with idempotency key
 event = client.events.send(
@@ -51,7 +51,7 @@ event = client.events.send(
 ### Endpoints
 
 ```python
-from webhook_platform import EndpointCreateParams, EndpointUpdateParams
+from hookflow import EndpointCreateParams, EndpointUpdateParams
 
 # Create endpoint
 endpoint = client.endpoints.create(
@@ -88,7 +88,7 @@ print(f"Test {'passed' if result.success else 'failed'}: {result.latency_ms}ms")
 ### Subscriptions
 
 ```python
-from webhook_platform import SubscriptionCreateParams
+from hookflow import SubscriptionCreateParams
 
 # Subscribe endpoint to an event type
 subscription = client.subscriptions.create(
@@ -117,7 +117,7 @@ client.subscriptions.delete(project_id, subscription_id)
 ### Deliveries
 
 ```python
-from webhook_platform import DeliveryListParams, DeliveryStatus
+from hookflow import DeliveryListParams, DeliveryStatus
 
 # List deliveries with filters
 deliveries = client.deliveries.list(
@@ -143,7 +143,7 @@ Receive, validate, and forward webhooks from third-party providers (Stripe, GitH
 ### Incoming Sources
 
 ```python
-from webhook_platform import IncomingSourceCreateParams, IncomingSourceUpdateParams
+from hookflow import IncomingSourceCreateParams, IncomingSourceUpdateParams
 
 # Create an incoming source with HMAC verification
 source = client.incoming_sources.create(
@@ -177,7 +177,7 @@ client.incoming_sources.delete(project_id, source_id)
 ### Incoming Destinations
 
 ```python
-from webhook_platform import IncomingDestinationCreateParams
+from hookflow import IncomingDestinationCreateParams
 
 # Add a forwarding destination
 dest = client.incoming_sources.create_destination(
@@ -201,7 +201,7 @@ client.incoming_sources.delete_destination(project_id, source_id, dest_id)
 ### Incoming Events
 
 ```python
-from webhook_platform import IncomingEventListParams
+from hookflow import IncomingEventListParams
 
 # List incoming events (with optional source filter)
 events = client.incoming_events.list(
@@ -225,7 +225,7 @@ print(f"Replayed to {result.destinations_count} destinations")
 Verify incoming webhooks in your endpoint:
 
 ```python
-from webhook_platform import verify_signature, construct_event, WebhookPlatformError
+from hookflow import verify_signature, construct_event, HookflowError
 
 # Flask example
 from flask import Flask, request
@@ -253,7 +253,7 @@ def handle_webhook():
 
         return "OK", 200
 
-    except WebhookPlatformError as e:
+    except HookflowError as e:
         print(f"Webhook verification failed: {e.message}")
         return "Invalid signature", 400
 ```
@@ -262,7 +262,7 @@ def handle_webhook():
 
 ```python
 from fastapi import FastAPI, Request, HTTPException
-from webhook_platform import construct_event, WebhookPlatformError
+from hookflow import construct_event, HookflowError
 
 app = FastAPI()
 
@@ -281,15 +281,15 @@ async def handle_webhook(request: Request):
         # Process event...
         return {"status": "ok"}
 
-    except WebhookPlatformError as e:
+    except HookflowError as e:
         raise HTTPException(status_code=400, detail=e.message)
 ```
 
 ## Error Handling
 
 ```python
-from webhook_platform import (
-    WebhookPlatformError,
+from hookflow import (
+    HookflowError,
     RateLimitError,
     AuthenticationError,
     ValidationError,
@@ -305,14 +305,14 @@ except AuthenticationError:
     print("Invalid API key")
 except ValidationError as e:
     print(f"Validation failed: {e.field_errors}")
-except WebhookPlatformError as e:
+except HookflowError as e:
     print(f"Error {e.status}: {e.message}")
 ```
 
 ## Configuration
 
 ```python
-client = WebhookPlatform(
+client = Hookflow(
     api_key="wh_live_xxx",          # Required: Your API key
     base_url="https://api.example.com",  # Optional: API base URL
     timeout=30,                     # Optional: Request timeout in seconds (default: 30)
@@ -324,7 +324,7 @@ client = WebhookPlatform(
 This SDK includes full type hints for better IDE support:
 
 ```python
-from webhook_platform import (
+from hookflow import (
     Event,
     EventResponse,
     Endpoint,

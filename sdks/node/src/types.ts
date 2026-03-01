@@ -1,4 +1,4 @@
-export interface WebhookPlatformConfig {
+export interface HookflowConfig {
   apiKey: string;
   baseUrl?: string;
   timeout?: number;

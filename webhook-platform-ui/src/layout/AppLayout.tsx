@@ -6,6 +6,7 @@ import {
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
   ArrowDownToLine, Activity
 } from 'lucide-react';
+import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import { useProject } from '../api/queries';
@@ -254,7 +255,7 @@ export default function AppLayout() {
       <div className={cn("flex items-center h-16 border-b border-border/50 px-4", collapsed && !isMobile && "justify-center px-2")}>
         <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-            <Webhook className="h-4 w-4 text-primary-foreground" />
+            <HookflowIcon className="h-4 w-4 text-primary-foreground" />
           </div>
           {(!collapsed || isMobile) && (
             <span className="text-base font-bold tracking-tight">Hookflow</span>

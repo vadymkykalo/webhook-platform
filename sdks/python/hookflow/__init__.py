@@ -1,8 +1,8 @@
-"""Official Python SDK for Webhook Platform."""
+"""Official Python SDK for Hookflow."""
 
-from .client import WebhookPlatform
+from .client import Hookflow
 from .errors import (
-    WebhookPlatformError,
+    HookflowError,
     AuthenticationError,
     RateLimitError,
     ValidationError,
@@ -36,8 +36,15 @@ from .types import (
     ReplayEventResponse,
 )
 
-__version__ = "1.1.0"
+__version__ = "2.0.0"
+
+# Backward-compatible aliases
+WebhookPlatform = Hookflow
+WebhookPlatformError = HookflowError
+
 __all__ = [
+    "Hookflow",
+    "HookflowError",
     "WebhookPlatform",
     "WebhookPlatformError",
     "AuthenticationError",
