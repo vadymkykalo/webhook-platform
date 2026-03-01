@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker
+.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker test-ui
 
 # Default target
 .DEFAULT_GOAL := help
@@ -170,6 +170,11 @@ dev-ui: ## Quick dev: rebuild UI with cache + restart
 	@$(DOCKER_COMPOSE) up -d ui
 	@echo "$(GREEN) UI ready$(NC)"
 	@$(MAKE) logs-ui
+
+test-ui: ## Run frontend unit tests (Vitest)
+	@echo "$(GREEN)Running frontend tests...$(NC)"
+	@cd webhook-platform-ui && npm run test:ci
+	@echo "$(GREEN)Frontend tests passed$(NC)"
 
 ##@ Scaling
 scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
