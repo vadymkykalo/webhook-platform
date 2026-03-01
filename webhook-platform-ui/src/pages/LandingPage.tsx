@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -430,6 +430,8 @@ function Features() {
     { icon: Eye, title: t('landing.features.visibility'), desc: t('landing.features.visibilityDesc') },
     { icon: Shield, title: t('landing.features.hmac'), desc: t('landing.features.hmacDesc') },
     { icon: Activity, title: t('landing.features.replay'), desc: t('landing.features.replayDesc') },
+    { icon: ArrowDownToLine, title: t('landing.features.incomingIngress'), desc: t('landing.features.incomingIngressDesc') },
+    { icon: Globe, title: t('landing.features.incomingRouting'), desc: t('landing.features.incomingRoutingDesc') },
     { icon: BarChart3, title: t('landing.features.analytics'), desc: t('landing.features.analyticsDesc') },
     { icon: Lock, title: t('landing.features.mtls'), desc: t('landing.features.mtlsDesc') },
   ];
@@ -443,7 +445,7 @@ function Features() {
             {t('landing.features.subtitle')}
           </p>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((f, i) => (
             <div
               key={i}
@@ -1338,6 +1340,8 @@ function FAQ() {
     { q: t('landing.faq.q1'), a: t('landing.faq.a1') },
     { q: t('landing.faq.q2'), a: t('landing.faq.a2') },
     { q: t('landing.faq.q3'), a: t('landing.faq.a3') },
+    { q: t('landing.faq.q7'), a: t('landing.faq.a7') },
+    { q: t('landing.faq.q8'), a: t('landing.faq.a8') },
     { q: t('landing.faq.q4'), a: t('landing.faq.a4') },
     { q: t('landing.faq.q5'), a: t('landing.faq.a5') },
     { q: t('landing.faq.q6'), a: t('landing.faq.a6') },

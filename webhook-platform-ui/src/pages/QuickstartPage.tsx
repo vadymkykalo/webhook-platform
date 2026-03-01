@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, ArrowRight, RefreshCw, Shield, Clock, Zap, Webhook, Code, ExternalLink, Lock, Eye, RotateCcw, ArrowDownToLine, Globe, Send, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
@@ -21,6 +21,7 @@ export default function QuickstartPage() {
           <Step5_SendEvent />
           <Step6_VerifySignature />
           <Step7_MonitorAndReplay />
+          <IncomingWebhooksSection />
         </div>
         <SDKSection />
         <FinalCTA />
@@ -725,6 +726,74 @@ function Step7_MonitorAndReplay() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Incoming Webhooks Section ─── */
+
+function IncomingWebhooksSection() {
+  const { t } = useTranslation();
+  return (
+    <section id="incoming" className="relative">
+      <div className="absolute -inset-x-6 -inset-y-4 bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 rounded-3xl pointer-events-none" />
+      <div className="relative">
+        <div className="inline-flex items-center px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full mb-4">
+          <ArrowDownToLine className="h-3 w-3 mr-1.5" /> {t('quickstartPage.incomingSection.badge')}
+        </div>
+        <h2 className="text-3xl font-bold text-foreground mb-3">{t('quickstartPage.incomingSection.title')}</h2>
+        <p className="text-lg text-muted-foreground mb-8 max-w-2xl">
+          {t('quickstartPage.incomingSection.desc')}
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {[
+            { icon: ArrowDownToLine, title: t('quickstartPage.incomingSection.step1Title'), desc: t('quickstartPage.incomingSection.step1Desc'), color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/30' },
+            { icon: Globe, title: t('quickstartPage.incomingSection.step2Title'), desc: t('quickstartPage.incomingSection.step2Desc'), color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+            { icon: Send, title: t('quickstartPage.incomingSection.step3Title'), desc: t('quickstartPage.incomingSection.step3Desc'), color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/30' },
+            { icon: Activity, title: t('quickstartPage.incomingSection.step4Title'), desc: t('quickstartPage.incomingSection.step4Desc'), color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
+          ].map(({ icon: Icon, title, desc, color, bg }) => (
+            <div key={title} className={`${bg} rounded-xl border p-5`}>
+              <div className="flex items-start gap-3">
+                <div className={`h-8 w-8 rounded-lg bg-white dark:bg-card flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                  <Icon className={`h-4 w-4 ${color}`} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground mb-1">{title}</div>
+                  <div className="text-sm text-muted-foreground leading-relaxed">{desc}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <CodeBlock title="terminal — Create source & send test webhook" lang="bash">{`# Create an incoming source
+curl -X POST https://your-api.com/api/v1/projects/proj_a1b2c3d4/incoming-sources \\
+  -H "Authorization: Bearer <accessToken>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name": "Stripe Webhooks", "slug": "stripe", "providerType": "STRIPE", "verificationMode": "HMAC_GENERIC"}'
+
+# Response includes the ingress URL:
+# { "ingressUrl": "https://your-api.com/ingress/proj_a1b2c3d4/stripe", ... }
+
+# Test it with a cURL (simulates Stripe sending a webhook):
+curl -X POST https://your-api.com/ingress/proj_a1b2c3d4/stripe \\
+  -H "Content-Type: application/json" \\
+  -d '{"type": "payment_intent.succeeded", "data": {"amount": 2000}}'`}</CodeBlock>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          {[
+            t('quickstartPage.incomingSection.features.uniqueUrl'),
+            t('quickstartPage.incomingSection.features.hmacValidation'),
+            t('quickstartPage.incomingSection.features.autoForwarding'),
+            t('quickstartPage.incomingSection.features.fullLogging'),
+          ].map(feature => (
+            <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-green-600" /> {feature}
+            </div>
+          ))}
         </div>
       </div>
     </section>

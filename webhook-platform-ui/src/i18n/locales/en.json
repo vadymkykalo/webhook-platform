@@ -719,11 +719,11 @@
       "getStarted": "Get started"
     },
     "hero": {
-      "badge": "Production-ready webhook infrastructure",
+      "badge": "Bidirectional webhook infrastructure",
       "title1": "Reliable webhook",
       "titleHighlight": " delivery ",
       "title2": "at any scale",
-      "subtitle": "Configure endpoints once. We handle delivery, retries, signatures, and monitoring. You focus on building product.",
+      "subtitle": "Send and receive webhooks through one platform. Outgoing delivery with retries and signatures. Incoming ingestion with validation and routing. You focus on building product.",
       "startFree": "Start for free",
       "readDocs": "Read the docs",
       "noCreditCard": "No credit card",
@@ -740,7 +740,7 @@
     "flowDiagram": {
       "title": "See how",
       "titleHighlight": " Hookflow works",
-      "subtitle": "Hookflow sits between your application and your customers' endpoints — handling delivery, retries, and observability.",
+      "subtitle": "Hookflow sits between your application and external services — handling delivery, ingestion, retries, and observability in both directions.",
       "tabSend": "Send webhooks",
       "tabReceive": "Receive webhooks",
       "sendSource": "YOUR APP",
@@ -766,7 +766,11 @@
       "analytics": "Analytics & metrics",
       "analyticsDesc": "Time-series charts, success rates, latency percentiles, endpoint health scores.",
       "mtls": "mTLS support",
-      "mtlsDesc": "Configure mutual TLS for endpoints that require client certificate authentication."
+      "mtlsDesc": "Configure mutual TLS for endpoints that require client certificate authentication.",
+      "incomingIngress": "Incoming webhook ingestion",
+      "incomingIngressDesc": "Receive webhooks from Stripe, GitHub, Twilio and any provider. Each source gets a unique ingress URL with rate limiting.",
+      "incomingRouting": "Smart routing & forwarding",
+      "incomingRoutingDesc": "Validate incoming payloads, then forward to one or more internal destinations with full retry and observability."
     },
     "architecture": {
       "badge": "Transactional outbox pattern",
@@ -839,8 +843,8 @@
       "viewAll": "View all"
     },
     "cta": {
-      "title": "Start delivering webhooks reliably",
-      "subtitle": "Sign up, configure endpoints, and send your first event in under 5 minutes.",
+      "title": "Start sending and receiving webhooks reliably",
+      "subtitle": "Sign up, configure endpoints, and send or receive your first webhook in under 5 minutes.",
       "getStartedFree": "Get started free",
       "viewQuickstart": "View quickstart",
       "talkToSales": "Talk to sales",
@@ -887,10 +891,10 @@
       "item3After": "HMAC-SHA256 on every delivery, automatic",
       "item4Before": "No replay capability when things break",
       "item4After": "One-click replay from dashboard",
-      "item5Before": "Weeks of engineering time per quarter",
-      "item5After": "5-minute setup, zero maintenance",
-      "item6Before": "No dead letter queue or alerting",
-      "item6After": "DLQ + real-time monitoring built in",
+      "item5Before": "Custom code to receive third-party webhooks",
+      "item5After": "Managed ingress URLs with HMAC validation per provider",
+      "item6Before": "No unified view of incoming and outgoing events",
+      "item6After": "Single dashboard for both directions, DLQ + monitoring built in",
       "saveBadge": "Save 200+ engineering hours per year",
       "saveDesc": "Stop reinventing webhook infrastructure. Ship features instead."
     },
@@ -898,7 +902,7 @@
       "badge": "Integrations & SDKs",
       "title": "Works with your",
       "titleHighlight": " existing stack",
-      "subtitle": "Official SDKs, OpenAPI spec, and webhook delivery to any HTTP endpoint. Integrate in minutes, not days.",
+      "subtitle": "Official SDKs, OpenAPI spec, bidirectional webhook support, and delivery to any HTTP endpoint. Integrate in minutes, not days.",
       "sdksTitle": "Official SDKs",
       "sdksDesc": "Type-safe clients with built-in signature verification",
       "nodeDesc": "npm install @hookflow/node",
@@ -906,8 +910,8 @@
       "phpDesc": "composer require hookflow/php",
       "restTitle": "REST API + OpenAPI",
       "restDesc": "Full OpenAPI 3.0 spec. Generate clients in any language.",
-      "deliverTo": "Deliver webhooks to",
-      "deliverToDesc": "Any service with an HTTP endpoint. No vendor lock-in.",
+      "deliverTo": "Send & receive webhooks",
+      "deliverToDesc": "Deliver to any endpoint. Receive from any provider. No vendor lock-in.",
       "service1": "Stripe",
       "service1Desc": "Payment webhooks",
       "service2": "GitHub",
@@ -935,7 +939,11 @@
       "q5": "What's included in the free tier?",
       "a5": "The free tier includes unlimited projects, endpoints, and events. You get full access to all features: retries, HMAC signatures, analytics, DLQ, audit logs, and team management. No credit card required.",
       "q6": "How long does it take to integrate?",
-      "a6": "Most teams are up and running in under 5 minutes. Create a project, register an endpoint, and send your first event with a single API call. Our quickstart guide walks you through every step."
+      "a6": "Most teams are up and running in under 5 minutes. Create a project, register an endpoint, and send your first event with a single API call. Our quickstart guide walks you through every step.",
+      "q7": "Can Hookflow receive incoming webhooks from third-party services?",
+      "a7": "Yes. Create an incoming source for any provider (Stripe, GitHub, Twilio, etc.), and Hookflow generates a unique ingress URL. Incoming payloads are validated with HMAC, stored, and forwarded to your internal destinations — with retries and full observability.",
+      "q8": "What's the difference between outgoing and incoming webhooks?",
+      "a8": "Outgoing: your app sends events → Hookflow delivers to your customers' endpoints. Incoming: third-party services send webhooks → Hookflow ingests, validates, and routes them to your internal APIs. Both directions share the same retry, signature, and observability features."
     }
   },
   "quickstartPage": {
@@ -948,7 +956,7 @@
     "backToHome": "Back to home",
     "badge": "5-minute quickstart",
     "title": "From zero to first webhook",
-    "subtitle": "Complete walkthrough: create a project, install an SDK, configure endpoints, send events, verify signatures, and monitor deliveries.",
+    "subtitle": "Complete walkthrough: send outgoing webhooks with retries and signatures, or receive incoming webhooks from third-party providers.",
     "stepOf": "Step {{step}} of {{total}}",
     "timeline": {
       "project": "Project",
@@ -1017,6 +1025,25 @@
       "autoRetries": "Automatic retries",
       "autoRetriesDesc": "Failed deliveries retry automatically with exponential backoff: 30s → 2m → 15m → 1h → 6h. Up to 5 attempts."
     },
+    "incomingSection": {
+      "badge": "Bonus: Incoming Webhooks",
+      "title": "Receive webhooks from third-party providers",
+      "desc": "Hookflow can also receive webhooks from services like Stripe, GitHub, or Twilio — validate them, store them, and forward to your internal APIs.",
+      "step1Title": "1. Create an incoming source",
+      "step1Desc": "Each source gets a unique ingress URL. Configure the provider type and optional HMAC verification.",
+      "step2Title": "2. Add a forwarding destination",
+      "step2Desc": "Specify where validated webhooks should be forwarded. Hookflow retries failed forwards automatically.",
+      "step3Title": "3. Point your provider to the ingress URL",
+      "step3Desc": "Copy the ingress URL and paste it into your provider's webhook settings (e.g., Stripe Dashboard → Webhooks).",
+      "step4Title": "4. Monitor incoming events",
+      "step4Desc": "Every incoming webhook is logged with full request details, verification status, and forwarding results.",
+      "features": {
+        "uniqueUrl": "Unique ingress URL per source",
+        "hmacValidation": "HMAC signature validation",
+        "autoForwarding": "Automatic forwarding with retries",
+        "fullLogging": "Full request logging & replay"
+      }
+    },
     "sdkSection": {
       "title": "Official SDKs",
       "subtitle": "First-class SDKs with type safety, automatic retries, and signature verification built-in.",
@@ -1024,7 +1051,7 @@
     },
     "finalCta": {
       "title": "You're all set 🚀",
-      "subtitle": "Your webhook infrastructure is ready. Explore the dashboard, check delivery logs, and invite your team.",
+      "subtitle": "Your webhook infrastructure is ready. Send outgoing events and receive incoming webhooks — all from one dashboard.",
       "goToDashboard": "Go to Dashboard",
       "readDocs": "Read full docs"
     }
@@ -1045,15 +1072,16 @@
       "subscriptionsApi": "Subscriptions API",
       "deliveriesApi": "Deliveries API",
       "webhookSecurity": "Webhook Security",
+      "incomingWebhooks": "Incoming Webhooks",
       "errors": "Errors & Rate Limits",
       "sdks": "SDKs"
     },
     "overview": {
       "title": "API Documentation",
-      "subtitle": "Complete reference for integrating webhook delivery into your application.",
+      "subtitle": "Complete reference for integrating bidirectional webhook infrastructure into your application.",
       "whatIs": "What is Webhook Platform?",
-      "whatIsDesc1": "Webhook Platform is a reliable webhook delivery service that handles event routing, retries, and monitoring for your application.",
-      "whatIsDesc2": "Send events via our API, and we'll deliver them to your configured endpoints with automatic retries, signatures, and full visibility.",
+      "whatIsDesc1": "Webhook Platform is a bidirectional webhook infrastructure that handles outgoing delivery and incoming ingestion with retries, signatures, and monitoring.",
+      "whatIsDesc2": "Send events to your customers' endpoints (outgoing), or receive webhooks from third-party providers like Stripe and GitHub (incoming). Both directions share the same reliability and observability features.",
       "coreConcepts": "Core Concepts",
       "eventFlow": "Event Flow",
       "yourSystem": "Your system",
@@ -1210,7 +1238,44 @@
       "optional": "Optional",
       "description": "Description"
     },
-    "response": "Response"
+    "response": "Response",
+    "incomingWebhooks": {
+      "title": "Incoming Webhooks",
+      "subtitle": "Receive, validate, and forward webhooks from third-party providers to your internal APIs.",
+      "overview": "Overview",
+      "overviewDesc1": "Incoming webhooks let you receive events from external services (Stripe, GitHub, Twilio, etc.) through managed ingress URLs. Each incoming source gets a unique URL, optional HMAC verification, and automatic forwarding to your internal destinations.",
+      "overviewDesc2": "The incoming flow: Provider sends POST → Hookflow ingress URL → HMAC validation → stored as incoming event → forwarded to configured destinations with retries.",
+      "sourcesApi": "Incoming Sources API",
+      "createSource": "Create Incoming Source",
+      "createSourceDesc": "Create a new incoming source with a unique ingress URL. Configure the provider type and optional HMAC verification.",
+      "listSources": "List Sources",
+      "listSourcesDesc": "Get all incoming sources for a project.",
+      "getSource": "Get Source",
+      "getSourceDesc": "Returns source details including the ingress URL.",
+      "deleteSource": "Delete Source",
+      "deleteSourceDesc": "Deletes a source and all its destinations.",
+      "destinationsApi": "Destinations API",
+      "createDest": "Create Destination",
+      "createDestDesc": "Add a forwarding destination to an incoming source. Validated webhooks will be forwarded to this URL.",
+      "listDests": "List Destinations",
+      "listDestsDesc": "Get all destinations for a source.",
+      "deleteDest": "Delete Destination",
+      "deleteDestDesc": "Removes a forwarding destination.",
+      "eventsApi": "Incoming Events API",
+      "listEvents": "List Incoming Events",
+      "listEventsDesc": "Get all incoming events for a project, with optional source filtering.",
+      "getEvent": "Get Incoming Event",
+      "getEventDesc": "Returns full event details including request headers, body, verification status, and forwarding results.",
+      "replayEvent": "Replay Incoming Event",
+      "replayEventDesc": "Re-forward an incoming event to all configured destinations.",
+      "ingressUrl": "Ingress URL Format",
+      "ingressUrlDesc": "Each source gets a unique URL in the format:",
+      "ingressUrlExample": "POST https://your-api.com/ingress/{projectId}/{sourceSlug}",
+      "verificationModes": "Verification Modes",
+      "verificationNone": "NONE — No verification (not recommended for production)",
+      "verificationHmac": "HMAC_GENERIC — Verify using provider's HMAC signature",
+      "providerTypes": "Supported provider types: GENERIC, STRIPE, GITHUB, TWILIO, SHOPIFY, HUBSPOT, SLACK, CUSTOM"
+    }
   },
   "incomingSources": {
     "title": "Incoming Sources",
