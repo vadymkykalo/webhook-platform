@@ -8,6 +8,8 @@ use WebhookPlatform\Api\Events;
 use WebhookPlatform\Api\Endpoints;
 use WebhookPlatform\Api\Subscriptions;
 use WebhookPlatform\Api\Deliveries;
+use WebhookPlatform\Api\IncomingSources;
+use WebhookPlatform\Api\IncomingEvents;
 
 class WebhookPlatform
 {
@@ -21,6 +23,8 @@ class WebhookPlatform
     public readonly Endpoints $endpoints;
     public readonly Subscriptions $subscriptions;
     public readonly Deliveries $deliveries;
+    public readonly IncomingSources $incomingSources;
+    public readonly IncomingEvents $incomingEvents;
 
     public function __construct(
         string $apiKey,
@@ -39,6 +43,8 @@ class WebhookPlatform
         $this->endpoints = new Endpoints($this);
         $this->subscriptions = new Subscriptions($this);
         $this->deliveries = new Deliveries($this);
+        $this->incomingSources = new IncomingSources($this);
+        $this->incomingEvents = new IncomingEvents($this);
     }
 
     public function request(

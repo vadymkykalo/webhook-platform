@@ -2,9 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.ApiKeyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,7 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -41,15 +38,10 @@ public class ApiKeyController {
     public ResponseEntity<ApiKeyResponse> createApiKey(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody ApiKeyRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-
-        ApiKeyResponse response = apiKeyService.createApiKey(projectId, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        ApiKeyResponse response = apiKeyService.createApiKey(projectId, request, auth.organizationId());
         log.info("Created API key {} for project {}", response.getId(), projectId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -59,13 +51,9 @@ public class ApiKeyController {
     public ResponseEntity<Page<ApiKeyResponse>> listApiKeys(
             @PathVariable("projectId") UUID projectId,
             @PageableDefault(size = 20) Pageable pageable,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, jwtAuth.getOrganizationId(), pageable);
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -75,15 +63,10 @@ public class ApiKeyController {
     public ResponseEntity<Void> revokeApiKey(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("apiKeyId") UUID apiKeyId,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-
-        apiKeyService.revokeApiKey(projectId, apiKeyId, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        apiKeyService.revokeApiKey(projectId, apiKeyId, auth.organizationId());
         log.info("Revoked API key {} for project {}", apiKeyId, projectId);
         return ResponseEntity.noContent().build();
     }

@@ -16,6 +16,16 @@ import {
   PaginatedResponse,
   EndpointTestResult,
   RateLimitInfo,
+  IncomingSource,
+  IncomingSourceCreateParams,
+  IncomingSourceUpdateParams,
+  IncomingDestination,
+  IncomingDestinationCreateParams,
+  IncomingDestinationUpdateParams,
+  IncomingEvent,
+  IncomingEventListParams,
+  IncomingForwardAttempt,
+  ReplayEventResponse,
 } from './types';
 import {
   WebhookPlatformError,
@@ -38,6 +48,8 @@ export class WebhookPlatform {
   public readonly endpoints: Endpoints;
   public readonly subscriptions: Subscriptions;
   public readonly deliveries: Deliveries;
+  public readonly incomingSources: IncomingSources;
+  public readonly incomingEvents: IncomingEvents;
 
   constructor(config: WebhookPlatformConfig) {
     if (!config.apiKey) {
@@ -52,6 +64,8 @@ export class WebhookPlatform {
     this.endpoints = new Endpoints(this);
     this.subscriptions = new Subscriptions(this);
     this.deliveries = new Deliveries(this);
+    this.incomingSources = new IncomingSources(this);
+    this.incomingEvents = new IncomingEvents(this);
   }
 
   async request<T>(
@@ -321,5 +335,148 @@ class Deliveries {
 
   async replay(deliveryId: string): Promise<void> {
     return this.client.request<void>('POST', `/api/v1/deliveries/${deliveryId}/replay`);
+  }
+}
+
+class IncomingSources {
+  constructor(private client: WebhookPlatform) {}
+
+  async create(projectId: string, params: IncomingSourceCreateParams): Promise<IncomingSource> {
+    return this.client.request<IncomingSource>(
+      'POST',
+      `/api/v1/projects/${projectId}/incoming-sources`,
+      params
+    );
+  }
+
+  async get(projectId: string, sourceId: string): Promise<IncomingSource> {
+    return this.client.request<IncomingSource>(
+      'GET',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}`
+    );
+  }
+
+  async list(projectId: string): Promise<PaginatedResponse<IncomingSource>> {
+    return this.client.request<PaginatedResponse<IncomingSource>>(
+      'GET',
+      `/api/v1/projects/${projectId}/incoming-sources`
+    );
+  }
+
+  async update(projectId: string, sourceId: string, params: IncomingSourceUpdateParams): Promise<IncomingSource> {
+    return this.client.request<IncomingSource>(
+      'PUT',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}`,
+      params
+    );
+  }
+
+  async delete(projectId: string, sourceId: string): Promise<void> {
+    return this.client.request<void>(
+      'DELETE',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}`
+    );
+  }
+
+  // ── Destinations ──
+
+  async createDestination(
+    projectId: string,
+    sourceId: string,
+    params: IncomingDestinationCreateParams
+  ): Promise<IncomingDestination> {
+    return this.client.request<IncomingDestination>(
+      'POST',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}/destinations`,
+      params
+    );
+  }
+
+  async getDestination(
+    projectId: string,
+    sourceId: string,
+    destinationId: string
+  ): Promise<IncomingDestination> {
+    return this.client.request<IncomingDestination>(
+      'GET',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}/destinations/${destinationId}`
+    );
+  }
+
+  async listDestinations(
+    projectId: string,
+    sourceId: string
+  ): Promise<PaginatedResponse<IncomingDestination>> {
+    return this.client.request<PaginatedResponse<IncomingDestination>>(
+      'GET',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}/destinations`
+    );
+  }
+
+  async updateDestination(
+    projectId: string,
+    sourceId: string,
+    destinationId: string,
+    params: IncomingDestinationUpdateParams
+  ): Promise<IncomingDestination> {
+    return this.client.request<IncomingDestination>(
+      'PUT',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}/destinations/${destinationId}`,
+      params
+    );
+  }
+
+  async deleteDestination(
+    projectId: string,
+    sourceId: string,
+    destinationId: string
+  ): Promise<void> {
+    return this.client.request<void>(
+      'DELETE',
+      `/api/v1/projects/${projectId}/incoming-sources/${sourceId}/destinations/${destinationId}`
+    );
+  }
+}
+
+class IncomingEvents {
+  constructor(private client: WebhookPlatform) {}
+
+  async list(
+    projectId: string,
+    params: IncomingEventListParams = {}
+  ): Promise<PaginatedResponse<IncomingEvent>> {
+    const query = new URLSearchParams();
+    if (params.sourceId) query.set('sourceId', params.sourceId);
+    if (params.page !== undefined) query.set('page', params.page.toString());
+    if (params.size !== undefined) query.set('size', params.size.toString());
+
+    const queryString = query.toString();
+    const path = `/api/v1/projects/${projectId}/incoming-events${queryString ? `?${queryString}` : ''}`;
+
+    return this.client.request<PaginatedResponse<IncomingEvent>>('GET', path);
+  }
+
+  async get(projectId: string, eventId: string): Promise<IncomingEvent> {
+    return this.client.request<IncomingEvent>(
+      'GET',
+      `/api/v1/projects/${projectId}/incoming-events/${eventId}`
+    );
+  }
+
+  async getAttempts(
+    projectId: string,
+    eventId: string
+  ): Promise<PaginatedResponse<IncomingForwardAttempt>> {
+    return this.client.request<PaginatedResponse<IncomingForwardAttempt>>(
+      'GET',
+      `/api/v1/projects/${projectId}/incoming-events/${eventId}/attempts`
+    );
+  }
+
+  async replay(projectId: string, eventId: string): Promise<ReplayEventResponse> {
+    return this.client.request<ReplayEventResponse>(
+      'POST',
+      `/api/v1/projects/${projectId}/incoming-events/${eventId}/replay`
+    );
   }
 }

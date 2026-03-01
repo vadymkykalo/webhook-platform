@@ -66,12 +66,14 @@ sdks/php/.phpunit.cache/
 sdks/php/composer.lock
 
 # === Python SDK ===
-sdks/python/__pycache__/
-sdks/python/**/__pycache__/
-sdks/python/*.egg-info/
-sdks/python/**/*.egg-info/
-sdks/python/.pytest_cache/
-sdks/python/**/.mypy_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+sdks/python/dist/
+sdks/python/build/
 
 # === Node SDK (dist already covered above) ===
 sdks/node/dist/

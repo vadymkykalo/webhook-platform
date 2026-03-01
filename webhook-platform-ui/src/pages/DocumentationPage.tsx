@@ -1720,14 +1720,18 @@ function IncomingWebhooks({ activeLanguage, setActiveLanguage }: { activeLanguag
   hmacSecret: 'whsec_...',
   hmacHeaderName: 'Stripe-Signature'
 });`,
-    python: `source = client.incoming_sources.create(
-    project_id=project_id,
-    name="Stripe Webhooks",
-    slug="stripe",
-    provider_type="STRIPE",
-    verification_mode="HMAC_GENERIC",
-    hmac_secret="whsec_...",
-    hmac_header_name="Stripe-Signature"
+    python: `from webhook_platform.types import IncomingSourceCreateParams
+
+source = client.incoming_sources.create(
+    project_id,
+    IncomingSourceCreateParams(
+        name="Stripe Webhooks",
+        slug="stripe",
+        provider_type="STRIPE",
+        verification_mode="HMAC_GENERIC",
+        hmac_secret="whsec_...",
+        hmac_header_name="Stripe-Signature"
+    )
 )`
   };
 
@@ -1737,17 +1741,27 @@ function IncomingWebhooks({ activeLanguage, setActiveLanguage }: { activeLanguag
   -H "Content-Type: application/json" \\
   -d '{
     "url": "https://your-api.com/webhooks/stripe",
-    "description": "Internal webhook handler"
+    "enabled": true,
+    "maxAttempts": 5,
+    "timeoutSeconds": 30
   }'`,
     node: `const dest = await client.incomingSources.createDestination(projectId, sourceId, {
   url: 'https://your-api.com/webhooks/stripe',
-  description: 'Internal webhook handler'
+  enabled: true,
+  maxAttempts: 5,
+  timeoutSeconds: 30
 });`,
-    python: `dest = client.incoming_sources.create_destination(
-    project_id=project_id,
-    source_id=source_id,
-    url="https://your-api.com/webhooks/stripe",
-    description="Internal webhook handler"
+    python: `from webhook_platform.types import IncomingDestinationCreateParams
+
+dest = client.incoming_sources.create_destination(
+    project_id,
+    source_id,
+    IncomingDestinationCreateParams(
+        url="https://your-api.com/webhooks/stripe",
+        enabled=True,
+        max_attempts=5,
+        timeout_seconds=30
+    )
 )`
   };
 

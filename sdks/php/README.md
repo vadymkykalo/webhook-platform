@@ -129,6 +129,82 @@ foreach ($attempts as $attempt) {
 $client->deliveries->replay($deliveryId);
 ```
 
+## Incoming Webhooks
+
+Receive, validate, and forward webhooks from third-party providers (Stripe, GitHub, Twilio, etc.).
+
+### Incoming Sources
+
+```php
+// Create an incoming source with HMAC verification
+$source = $client->incomingSources->create($projectId, [
+    'name' => 'Stripe Webhooks',
+    'slug' => 'stripe',
+    'providerType' => 'STRIPE',
+    'verificationMode' => 'HMAC_GENERIC',
+    'hmacSecret' => 'whsec_...',
+    'hmacHeaderName' => 'Stripe-Signature',
+]);
+
+echo "Ingress URL: {$source['ingressUrl']}\n";
+
+// List sources
+$sources = $client->incomingSources->list($projectId);
+
+// Update source
+$client->incomingSources->update($projectId, $sourceId, [
+    'name' => 'Stripe Production',
+    'rateLimitPerSecond' => 100,
+]);
+
+// Delete source
+$client->incomingSources->delete($projectId, $sourceId);
+```
+
+### Incoming Destinations
+
+```php
+// Add a forwarding destination
+$dest = $client->incomingSources->createDestination($projectId, $sourceId, [
+    'url' => 'https://your-api.com/webhooks/stripe',
+    'enabled' => true,
+    'maxAttempts' => 5,
+    'timeoutSeconds' => 30,
+]);
+
+// List destinations
+$dests = $client->incomingSources->listDestinations($projectId, $sourceId);
+
+// Update destination
+$client->incomingSources->updateDestination($projectId, $sourceId, $destId, [
+    'enabled' => false,
+]);
+
+// Delete destination
+$client->incomingSources->deleteDestination($projectId, $sourceId, $destId);
+```
+
+### Incoming Events
+
+```php
+// List incoming events (with optional source filter)
+$events = $client->incomingEvents->list($projectId, [
+    'sourceId' => $sourceId,
+    'page' => 0,
+    'size' => 20,
+]);
+
+// Get event details
+$event = $client->incomingEvents->get($projectId, $eventId);
+
+// Get forward attempts
+$attempts = $client->incomingEvents->getAttempts($projectId, $eventId);
+
+// Replay event to all destinations
+$result = $client->incomingEvents->replay($projectId, $eventId);
+echo "Replayed to {$result['destinationsCount']} destinations\n";
+```
+
 ## Webhook Signature Verification
 
 Verify incoming webhooks in your endpoint:

@@ -9,8 +9,7 @@ import com.webhook.platform.api.dto.LogoutRequest;
 import com.webhook.platform.api.dto.RefreshTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.dto.ResetPasswordRequest;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +22,6 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -160,12 +158,8 @@ public class AuthController {
     @PostMapping("/change-password")
     public ResponseEntity<Void> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        authService.changePassword(jwtAuth.getUserId(), request.getCurrentPassword(), request.getNewPassword());
+            AuthContext auth) {
+        authService.changePassword(auth.userId(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok().build();
     }
 
@@ -176,16 +170,11 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
     @GetMapping("/me")
-    public ResponseEntity<CurrentUserResponse> getCurrentUser(Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+    public ResponseEntity<CurrentUserResponse> getCurrentUser(AuthContext auth) {
         CurrentUserResponse response = authService.getCurrentUser(
-                jwtAuth.getUserId(),
-                jwtAuth.getOrganizationId(),
-                jwtAuth.getRole());
+                auth.userId(),
+                auth.organizationId(),
+                auth.role());
         return ResponseEntity.ok(response);
     }
 

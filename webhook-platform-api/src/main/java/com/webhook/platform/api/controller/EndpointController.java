@@ -3,9 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.api.dto.EndpointTestResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.EndpointService;
 import com.webhook.platform.api.service.EndpointVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,7 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -45,14 +42,11 @@ public class EndpointController {
     public ResponseEntity<EndpointResponse> createEndpoint(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody EndpointRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         try {
-            JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-            RbacUtil.requireWriteAccess(jwtAuth.getRole());
-            EndpointResponse response = endpointService.createEndpoint(projectId, request, jwtAuth.getOrganizationId());
+            EndpointResponse response = endpointService.createEndpoint(projectId, request, auth.organizationId());
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
             log.error("Failed to create endpoint for project {}: {}", projectId, e.getMessage(), e);
@@ -64,12 +58,8 @@ public class EndpointController {
     @GetMapping("/{id}")
     public ResponseEntity<EndpointResponse> getEndpoint(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        EndpointResponse response = endpointService.getEndpoint(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        EndpointResponse response = endpointService.getEndpoint(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -78,12 +68,9 @@ public class EndpointController {
     public ResponseEntity<Page<EndpointResponse>> listEndpoints(
             @PathVariable("projectId") UUID projectId,
             @PageableDefault(size = 20) Pageable pageable,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        Page<EndpointResponse> response = endpointService.listEndpoints(projectId, jwtAuth.getOrganizationId(), pageable);
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        Page<EndpointResponse> response = endpointService.listEndpoints(projectId, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -92,13 +79,9 @@ public class EndpointController {
     public ResponseEntity<EndpointResponse> updateEndpoint(
             @PathVariable("id") UUID id,
             @Valid @RequestBody EndpointRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        EndpointResponse response = endpointService.updateEndpoint(id, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        EndpointResponse response = endpointService.updateEndpoint(id, request, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -107,13 +90,9 @@ public class EndpointController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEndpoint(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        endpointService.deleteEndpoint(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        endpointService.deleteEndpoint(id, auth.organizationId());
         return ResponseEntity.noContent().build();
     }
 
@@ -121,13 +100,9 @@ public class EndpointController {
     @PostMapping("/{id}/rotate-secret")
     public ResponseEntity<EndpointResponse> rotateSecret(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        EndpointResponse response = endpointService.rotateSecret(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        EndpointResponse response = endpointService.rotateSecret(id, auth.organizationId());
         log.info("Rotated secret for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
@@ -136,12 +111,8 @@ public class EndpointController {
     @PostMapping("/{id}/test")
     public ResponseEntity<EndpointTestResponse> testEndpoint(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        EndpointTestResponse response = endpointService.testEndpoint(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        EndpointTestResponse response = endpointService.testEndpoint(id, auth.organizationId());
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }
@@ -152,13 +123,10 @@ public class EndpointController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             @Valid @RequestBody com.webhook.platform.api.dto.MtlsConfigRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        EndpointResponse response = endpointService.configureMtls(projectId, id, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        EndpointResponse response = endpointService.configureMtls(projectId, id, request, auth.organizationId());
         log.info("Configured mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
@@ -168,13 +136,10 @@ public class EndpointController {
     public ResponseEntity<EndpointResponse> disableMtls(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        EndpointResponse response = endpointService.disableMtls(projectId, id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        EndpointResponse response = endpointService.disableMtls(projectId, id, auth.organizationId());
         log.info("Disabled mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
@@ -184,12 +149,8 @@ public class EndpointController {
     public ResponseEntity<VerificationResponse> verifyEndpoint(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
         var result = verificationService.verify(id);
         log.info("Verification attempt for endpoint {}: success={}", id, result.success());
         
@@ -206,18 +167,15 @@ public class EndpointController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             @RequestBody(required = false) SkipVerificationRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         
         String reason = request != null ? request.reason() : "Skipped by administrator";
         var endpoint = verificationService.skipVerification(id, reason);
         log.info("Skipped verification for endpoint {}: {}", id, reason);
         
-        return ResponseEntity.ok(endpointService.getEndpoint(id, jwtAuth.getOrganizationId()));
+        return ResponseEntity.ok(endpointService.getEndpoint(id, auth.organizationId()));
     }
 
     public record VerificationResponse(boolean success, String message, String status) {}

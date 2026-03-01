@@ -2,9 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.EventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,7 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -39,12 +36,9 @@ public class ProjectEventsController {
     public ResponseEntity<Page<EventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
             Pageable pageable,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        Page<EventResponse> response = eventService.listEvents(projectId, jwtAuth.getOrganizationId(), pageable);
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        Page<EventResponse> response = eventService.listEvents(projectId, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -53,12 +47,9 @@ public class ProjectEventsController {
     public ResponseEntity<EventResponse> getEvent(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        EventResponse response = eventService.getEvent(projectId, id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        EventResponse response = eventService.getEvent(projectId, id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -68,15 +59,12 @@ public class ProjectEventsController {
     public ResponseEntity<EventResponse> sendTestEvent(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody EventIngestRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         
         log.info("Sending test event type: {} for project: {}", request.getType(), projectId);
-        EventResponse response = eventService.sendTestEvent(projectId, request, jwtAuth.getOrganizationId());
+        EventResponse response = eventService.sendTestEvent(projectId, request, auth.organizationId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

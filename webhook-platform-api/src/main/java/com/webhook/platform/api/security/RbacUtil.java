@@ -9,6 +9,7 @@ public class RbacUtil {
         if (role == MembershipRole.VIEWER) {
             throw new ForbiddenException("Viewers have read-only access");
         }
+        // API_KEY, DEVELOPER, OWNER all have write access
     }
 
     public static void requireOwnerAccess(MembershipRole role) {

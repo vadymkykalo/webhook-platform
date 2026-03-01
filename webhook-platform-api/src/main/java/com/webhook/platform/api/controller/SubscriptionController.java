@@ -2,9 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,13 +34,10 @@ public class SubscriptionController {
     public ResponseEntity<SubscriptionResponse> createSubscription(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody SubscriptionRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        SubscriptionResponse response = subscriptionService.createSubscription(projectId, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        SubscriptionResponse response = subscriptionService.createSubscription(projectId, request, auth.organizationId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -51,12 +45,8 @@ public class SubscriptionController {
     @GetMapping("/{id}")
     public ResponseEntity<SubscriptionResponse> getSubscription(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        SubscriptionResponse response = subscriptionService.getSubscription(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        SubscriptionResponse response = subscriptionService.getSubscription(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -64,12 +54,9 @@ public class SubscriptionController {
     @GetMapping
     public ResponseEntity<List<SubscriptionResponse>> listSubscriptions(
             @PathVariable("projectId") UUID projectId,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        List<SubscriptionResponse> response = subscriptionService.listSubscriptions(projectId, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        List<SubscriptionResponse> response = subscriptionService.listSubscriptions(projectId, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -78,13 +65,9 @@ public class SubscriptionController {
     public ResponseEntity<SubscriptionResponse> updateSubscription(
             @PathVariable("id") UUID id,
             @Valid @RequestBody SubscriptionRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -93,13 +76,9 @@ public class SubscriptionController {
     public ResponseEntity<SubscriptionResponse> patchSubscription(
             @PathVariable("id") UUID id,
             @RequestBody SubscriptionRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -108,13 +87,9 @@ public class SubscriptionController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSubscription(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        subscriptionService.deleteSubscription(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        subscriptionService.deleteSubscription(id, auth.organizationId());
         return ResponseEntity.noContent().build();
     }
 }
