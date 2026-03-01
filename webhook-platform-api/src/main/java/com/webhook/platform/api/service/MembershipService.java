@@ -123,9 +123,22 @@ public class MembershipService {
     }
 
     @Transactional
-    public MemberResponse acceptInvite(String inviteToken) {
+    public MemberResponse acceptInvite(String inviteToken, UUID organizationId, UUID authenticatedUserId) {
         Membership membership = membershipRepository.findByInviteToken(inviteToken)
                 .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
+
+        // Security: validate the invite belongs to the specified organization AND the authenticated user.
+        // Use a single generic error message to prevent information leakage about which check failed.
+        boolean orgMatch = membership.getOrganizationId().equals(organizationId);
+        boolean userMatch = membership.getUserId().equals(authenticatedUserId);
+        if (!orgMatch || !userMatch) {
+            log.warn("Invite token validation failed: orgMatch={}, userMatch={}, " +
+                            "tokenOrgId={}, requestOrgId={}, tokenUserId={}, authUserId={}",
+                    orgMatch, userMatch,
+                    membership.getOrganizationId(), organizationId,
+                    membership.getUserId(), authenticatedUserId);
+            throw new ForbiddenException("Invalid invite token");
+        }
 
         if (membership.getStatus() != MembershipStatus.INVITED) {
             throw new IllegalStateException("Invite already accepted or membership is not in INVITED status");

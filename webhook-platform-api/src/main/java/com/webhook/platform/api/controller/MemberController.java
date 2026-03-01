@@ -117,7 +117,8 @@ public class MemberController {
             throw new UnauthorizedException("Authentication required");
         }
 
-        MemberResponse response = membershipService.acceptInvite(token);
+        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+        MemberResponse response = membershipService.acceptInvite(token, orgId, jwtAuth.getUserId());
         return ResponseEntity.ok(response);
     }
 }
