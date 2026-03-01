@@ -30,6 +30,7 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     private String jwtToken;
     private String apiKey;
     private UUID projectId;
+    private UUID organizationId;
 
     @BeforeEach
     void setup() throws Exception {
@@ -48,6 +49,13 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
 
         JsonNode authJson = objectMapper.readTree(registerResult.getResponse().getContentAsString());
         jwtToken = authJson.get("accessToken").asText();
+
+        MvcResult meResult = mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode meJson = objectMapper.readTree(meResult.getResponse().getContentAsString());
+        organizationId = UUID.fromString(meJson.get("organization").get("id").asText());
 
         ProjectRequest projectRequest = ProjectRequest.builder()
                 .name("AuthCtx Test Project")
@@ -230,6 +238,40 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     public void apiKey_crossProject_forbidden() throws Exception {
         UUID otherProjectId = UUID.randomUUID();
         mockMvc.perform(get("/api/v1/projects/" + otherProjectId + "/endpoints")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── JWT auth: org-scoped MemberController with @RequireOrgAccess ──
+
+    @Test
+    public void jwt_listMembers() throws Exception {
+        mockMvc.perform(get("/api/v1/orgs/" + organizationId + "/members")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    public void jwt_listMembers_wrongOrg_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/orgs/" + UUID.randomUUID() + "/members")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── API Key auth: org-scoped MemberController with @RequireOrgAccess ──
+
+    @Test
+    public void apiKey_listMembers() throws Exception {
+        mockMvc.perform(get("/api/v1/orgs/" + organizationId + "/members")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    public void apiKey_listMembers_wrongOrg_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/orgs/" + UUID.randomUUID() + "/members")
                         .header("X-API-Key", apiKey))
                 .andExpect(status().isForbidden());
     }
