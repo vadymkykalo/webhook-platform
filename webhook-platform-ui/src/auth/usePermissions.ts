@@ -65,6 +65,10 @@ export function usePermissions() {
         // Test Endpoints
         canManageTestEndpoints: hasMinRole(role, 'DEVELOPER'),
 
+        // Incoming Webhooks
+        canManageIncomingSources: hasMinRole(role, 'DEVELOPER'),
+        canReplayIncomingEvents: hasMinRole(role, 'DEVELOPER'),
+
         // Members
         canManageMembers: role === 'OWNER',
 

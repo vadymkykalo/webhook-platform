@@ -3,7 +3,8 @@ import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-
 import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
-  Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun
+  Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
+  ArrowDownToLine, Activity
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
@@ -37,11 +38,19 @@ const orgNav: NavItem[] = [
   { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings, requiredRole: 'OWNER' },
 ];
 
-const getProjectNav = (projectId: string): NavItem[] => [
+const getProjectOutgoingNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
   { nameKey: 'nav.events', path: `/admin/projects/${projectId}/events`, icon: Radio },
   { nameKey: 'nav.deliveries', path: `/admin/projects/${projectId}/deliveries`, icon: Send },
   { nameKey: 'nav.subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
+];
+
+const getProjectIncomingNav = (projectId: string): NavItem[] => [
+  { nameKey: 'nav.incomingSources', path: `/admin/projects/${projectId}/incoming-sources`, icon: ArrowDownToLine },
+  { nameKey: 'nav.incomingEvents', path: `/admin/projects/${projectId}/incoming-events`, icon: Activity },
+];
+
+const getProjectToolsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.apiKeys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
   { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
@@ -101,6 +110,8 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   analytics: { key: 'breadcrumb.analytics', icon: BarChart3 },
   dlq: { key: 'breadcrumb.dlq', icon: AlertTriangle },
   'test-endpoints': { key: 'breadcrumb.test-endpoints', icon: TestTube },
+  'incoming-sources': { key: 'breadcrumb.incoming-sources', icon: ArrowDownToLine },
+  'incoming-events': { key: 'breadcrumb.incoming-events', icon: Activity },
   members: { key: 'breadcrumb.members', icon: Users },
   'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
   settings: { key: 'breadcrumb.settings', icon: Settings },
@@ -276,11 +287,25 @@ export default function AppLayout() {
         </SidebarSection>
 
         {projectId && (
-          <SidebarSection label={collapsed && !isMobile ? "" : t('nav.project')}>
-            {getProjectNav(projectId).map((item) => (
-              <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
-            ))}
-          </SidebarSection>
+          <>
+            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.outgoing')}>
+              {getProjectOutgoingNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
+            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.incoming')}>
+              {getProjectIncomingNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
+            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.tools')}>
+              {getProjectToolsNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+          </>
         )}
 
         <SidebarSection label={collapsed && !isMobile ? "" : t('nav.organization')}>

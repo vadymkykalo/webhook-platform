@@ -68,9 +68,14 @@
     "analytics": "Аналітика",
     "dlq": "Черга мертвих листів",
     "testEndpoints": "Тестові ендпоінти",
+    "incomingSources": "Вхідні джерела",
+    "incomingEvents": "Вхідні події",
     "members": "Учасники",
     "auditLog": "Журнал дій",
     "settings": "Налаштування",
+    "outgoing": "Вихідні",
+    "incoming": "Вхідні",
+    "tools": "Інструменти",
     "documentation": "Документація",
     "home": "Головна",
     "search": "Пошук",
@@ -1184,6 +1189,175 @@
     },
     "response": "Відповідь"
   },
+  "incomingSources": {
+    "title": "Вхідні джерела",
+    "subtitle": "Керуйте вхідними webhook джерелами для <strong>{{project}}</strong>",
+    "create": "Створити джерело",
+    "noSources": "Вхідних джерел поки немає",
+    "noSourcesDesc": "Створіть перше вхідне джерело, щоб почати отримувати вебхуки від зовнішніх провайдерів",
+    "name": "Назва",
+    "slug": "Слаг",
+    "provider": "Провайдер",
+    "status": "Статус",
+    "verification": "Верифікація",
+    "created": "Створено",
+    "active": "Активний",
+    "disabled": "Вимкнений",
+    "ingressUrl": "URL для вебхуків",
+    "hmacConfigured": "HMAC налаштовано",
+    "hmacNotConfigured": "Без HMAC",
+    "rateLimit": "Ліміт запитів",
+    "rateLimitHint": "Запитів на секунду (залиште порожнім для необмеженого)",
+    "destinations": "Призначення",
+    "viewDetails": "Детальніше",
+    "createDialog": {
+      "title": "Створити вхідне джерело",
+      "description": "Налаштуйте нове вхідне webhook джерело для отримання подій від зовнішніх провайдерів",
+      "name": "Назва джерела",
+      "namePlaceholder": "GitHub Webhooks",
+      "slug": "Слаг (необов'язково)",
+      "slugPlaceholder": "github-webhooks",
+      "slugHint": "URL-сумісний ідентифікатор. Генерується автоматично з назви, якщо порожній.",
+      "provider": "Тип провайдера",
+      "verificationMode": "Режим верифікації",
+      "hmacSecret": "HMAC Секрет",
+      "hmacSecretPlaceholder": "Ваш секрет підпису вебхука",
+      "hmacSecretHint": "Секрет, який провайдер використовує для підпису вебхуків. Зберігається зашифрованим.",
+      "hmacHeaderName": "Заголовок підпису",
+      "hmacHeaderPlaceholder": "X-Hub-Signature-256",
+      "hmacSignaturePrefix": "Префікс підпису",
+      "hmacPrefixPlaceholder": "sha256=",
+      "rateLimit": "Ліміт запитів (зап/с)",
+      "rateLimitPlaceholder": "100"
+    },
+    "editDialog": {
+      "title": "Редагувати вхідне джерело",
+      "description": "Оновіть конфігурацію вхідного webhook джерела"
+    },
+    "deleteDialog": {
+      "title": "Вимкнути вхідне джерело?",
+      "description": "Це джерело буде вимкнено і перестане приймати вхідні вебхуки. Існуючі події збережені."
+    },
+    "howToSend": {
+      "title": "Як надсилати вебхуки",
+      "description": "Налаштуйте вашого провайдера для надсилання вебхуків на URL нижче:",
+      "curlExample": "Приклад cURL запиту:",
+      "copy": "Копіювати URL"
+    },
+    "toast": {
+      "created": "Вхідне джерело створено",
+      "createFailed": "Не вдалося створити вхідне джерело",
+      "updated": "Вхідне джерело оновлено",
+      "updateFailed": "Не вдалося оновити вхідне джерело",
+      "deleted": "Вхідне джерело вимкнено",
+      "deleteFailed": "Не вдалося вимкнути вхідне джерело",
+      "urlCopied": "URL скопійовано в буфер обміну",
+      "loadFailed": "Не вдалося завантажити вхідні джерела"
+    }
+  },
+  "incomingDestinations": {
+    "title": "Призначення для пересилання",
+    "subtitle": "Куди пересилаються вхідні вебхуки",
+    "create": "Додати призначення",
+    "noDestinations": "Призначень не налаштовано",
+    "noDestinationsDesc": "Додайте призначення для пересилання, щоб маршрутизувати вхідні вебхуки у ваш додаток",
+    "url": "URL",
+    "authType": "Тип авторизації",
+    "status": "Статус",
+    "maxAttempts": "Макс. спроб",
+    "timeout": "Таймаут",
+    "retryDelays": "Затримки повторів",
+    "payloadTransform": "Трансформація даних",
+    "enabled": "Увімкнено",
+    "disabled": "Вимкнено",
+    "createDialog": {
+      "title": "Додати призначення для пересилання",
+      "description": "Налаштуйте, куди пересилати вхідні вебхуки",
+      "url": "URL призначення",
+      "urlPlaceholder": "https://api.example.com/webhooks",
+      "authType": "Тип авторизації",
+      "authConfig": "Конфігурація авторизації (JSON)",
+      "authConfigPlaceholder": "{\"token\": \"your-bearer-token\"}",
+      "authConfigHint": "BEARER: {token}, BASIC: {username, password}, CUSTOM_HEADER: {headerName, headerValue}",
+      "customHeaders": "Додаткові заголовки (JSON)",
+      "customHeadersPlaceholder": "{\"X-Custom\": \"value\"}",
+      "maxAttempts": "Макс. спроб",
+      "maxAttemptsPlaceholder": "5",
+      "timeout": "Таймаут (секунди)",
+      "timeoutPlaceholder": "30",
+      "retryDelays": "Затримки повторів (секунди, через кому)",
+      "retryDelaysPlaceholder": "60,300,900,3600,21600",
+      "payloadTransform": "Трансформація даних (JSONPath)",
+      "payloadTransformPlaceholder": "$.data",
+      "payloadTransformHint": "Необов'язковий JSONPath вираз для трансформації даних перед пересиланням"
+    },
+    "editDialog": {
+      "title": "Редагувати призначення",
+      "description": "Оновіть конфігурацію призначення для пересилання"
+    },
+    "deleteDialog": {
+      "title": "Видалити призначення?",
+      "description": "Це призначення буде видалено назавжди. Вхідні вебхуки більше не будуть пересилатися на цю URL."
+    },
+    "toast": {
+      "created": "Призначення створено",
+      "createFailed": "Не вдалося створити призначення",
+      "updated": "Призначення оновлено",
+      "updateFailed": "Не вдалося оновити призначення",
+      "deleted": "Призначення видалено",
+      "deleteFailed": "Не вдалося видалити призначення"
+    }
+  },
+  "incomingEvents": {
+    "title": "Вхідні події",
+    "subtitle": "Вхідні webhook події для <strong>{{project}}</strong>",
+    "noEvents": "Вхідних подій поки немає",
+    "noEventsDesc": "Події з'являться тут, коли зовнішні провайдери надсилатимуть вебхуки на ваші джерела",
+    "columns": {
+      "received": "Отримано",
+      "source": "Джерело",
+      "method": "Метод",
+      "status": "Верифікація",
+      "requestId": "ID запиту",
+      "clientIp": "IP клієнта",
+      "contentType": "Тип контенту"
+    },
+    "filters": {
+      "allSources": "Усі джерела",
+      "source": "Джерело",
+      "searchById": "Пошук за ID запиту..."
+    },
+    "verified": "Верифіковано",
+    "failed": "Помилка",
+    "noVerification": "Без верифікації",
+    "detail": {
+      "title": "Деталі події",
+      "requestMeta": "Метадані запиту",
+      "headers": "Заголовки запиту",
+      "body": "Тіло запиту",
+      "bodyTruncated": "Тіло обрізано ({{size}})",
+      "signatureResult": "Верифікація підпису",
+      "forwardingResults": "Результати пересилання",
+      "noAttempts": "Спроб пересилання поки немає",
+      "attempt": "Спроба #{{number}}",
+      "responseCode": "HTTP {{code}}",
+      "nextRetry": "Наступна спроба: {{time}}",
+      "error": "Помилка"
+    },
+    "replay": {
+      "title": "Повторити подію?",
+      "description": "Це повторно надішле подію на всі активні призначення. Увага: це може спричинити дублювання обробки, якщо призначення не ідемпотентне.",
+      "idempotencyWarning": "Переконайтесь, що ваші призначення обробляють дублікати подій (ідемпотентність).",
+      "submit": "Повторити подію",
+      "replaying": "Повторення..."
+    },
+    "toast": {
+      "replayed": "Подію повторено на {{count}} призначень",
+      "replayFailed": "Не вдалося повторити подію",
+      "loadFailed": "Не вдалося завантажити вхідні події",
+      "idCopied": "ID запиту скопійовано в буфер обміну"
+    }
+  },
   "notFound": {
     "title": "Сторінку не знайдено",
     "description": "Сторінка, яку ви шукаєте, не існує або була переміщена.",
@@ -1264,6 +1438,8 @@
     "analytics": "Аналітика",
     "dlq": "Черга мертвих листів",
     "test-endpoints": "Тестові ендпоінти",
+    "incoming-sources": "Вхідні джерела",
+    "incoming-events": "Вхідні події",
     "members": "Учасники",
     "audit-log": "Журнал дій",
     "settings": "Налаштування"
