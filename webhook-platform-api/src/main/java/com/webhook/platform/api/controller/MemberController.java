@@ -3,8 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.ChangeMemberRoleRequest;
 import com.webhook.platform.api.dto.MemberResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.RequireOrgAccess;
 import com.webhook.platform.api.service.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +14,6 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +24,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/orgs/{orgId}/members")
 @Tag(name = "Organizations", description = "Organization member management")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class MemberController {
 
     private final MembershipService membershipService;
@@ -39,11 +38,7 @@ public class MemberController {
     @GetMapping
     public ResponseEntity<List<MemberResponse>> getMembers(
             @PathVariable("orgId") UUID orgId,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
+            AuthContext auth) {
         List<MemberResponse> response = membershipService.getOrganizationMembers(orgId);
         return ResponseEntity.ok(response);
     }
@@ -55,16 +50,11 @@ public class MemberController {
     public ResponseEntity<MemberResponse> addMember(
             @PathVariable("orgId") UUID orgId,
             @Valid @RequestBody AddMemberRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+            AuthContext auth) {
         MemberResponse response = membershipService.addMember(
                 orgId,
                 request,
-                jwtAuth.getRole());
+                auth.role());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -75,17 +65,12 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             @PathVariable("userId") UUID userId,
             @Valid @RequestBody ChangeMemberRoleRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+            AuthContext auth) {
         MemberResponse response = membershipService.changeMemberRole(
                 orgId,
                 userId,
                 request.getRole(),
-                jwtAuth.getRole());
+                auth.role());
         return ResponseEntity.ok(response);
     }
 
@@ -96,13 +81,8 @@ public class MemberController {
     public ResponseEntity<Void> removeMember(
             @PathVariable("orgId") UUID orgId,
             @PathVariable("userId") UUID userId,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        membershipService.removeMember(orgId, userId, jwtAuth.getRole());
+            AuthContext auth) {
+        membershipService.removeMember(orgId, userId, auth.role());
         return ResponseEntity.noContent().build();
     }
 
@@ -112,13 +92,8 @@ public class MemberController {
     public ResponseEntity<MemberResponse> acceptInvite(
             @PathVariable("orgId") UUID orgId,
             @RequestParam("token") String token,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        MemberResponse response = membershipService.acceptInvite(token, orgId, jwtAuth.getUserId());
+            AuthContext auth) {
+        MemberResponse response = membershipService.acceptInvite(token, orgId, auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 }

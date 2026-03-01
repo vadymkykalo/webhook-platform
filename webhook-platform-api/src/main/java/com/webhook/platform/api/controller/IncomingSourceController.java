@@ -2,9 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.IncomingSourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,7 +16,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -28,6 +25,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/incoming-sources")
 @Tag(name = "Incoming Sources", description = "Incoming webhook source configuration")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class IncomingSourceController {
 
     private final IncomingSourceService sourceService;
@@ -42,10 +40,10 @@ public class IncomingSourceController {
     public ResponseEntity<IncomingSourceResponse> createSource(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody IncomingSourceRequest request,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        IncomingSourceResponse response = sourceService.createSource(projectId, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        IncomingSourceResponse response = sourceService.createSource(projectId, request, auth.organizationId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -57,9 +55,8 @@ public class IncomingSourceController {
     @GetMapping("/{id}")
     public ResponseEntity<IncomingSourceResponse> getSource(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        IncomingSourceResponse response = sourceService.getSource(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        IncomingSourceResponse response = sourceService.getSource(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -68,9 +65,9 @@ public class IncomingSourceController {
     public ResponseEntity<Page<IncomingSourceResponse>> listSources(
             @PathVariable("projectId") UUID projectId,
             @PageableDefault(size = 20) Pageable pageable,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        Page<IncomingSourceResponse> response = sourceService.listSources(projectId, jwtAuth.getOrganizationId(), pageable);
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        Page<IncomingSourceResponse> response = sourceService.listSources(projectId, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -83,10 +80,9 @@ public class IncomingSourceController {
     public ResponseEntity<IncomingSourceResponse> updateSource(
             @PathVariable("id") UUID id,
             @Valid @RequestBody IncomingSourceRequest request,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        IncomingSourceResponse response = sourceService.updateSource(id, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        IncomingSourceResponse response = sourceService.updateSource(id, request, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -95,17 +91,9 @@ public class IncomingSourceController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSource(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        sourceService.deleteSource(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        sourceService.deleteSource(id, auth.organizationId());
         return ResponseEntity.noContent().build();
-    }
-
-    private JwtAuthenticationToken requireJwt(Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        return (JwtAuthenticationToken) authentication;
     }
 }

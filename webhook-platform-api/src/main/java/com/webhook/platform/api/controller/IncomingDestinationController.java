@@ -2,9 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.IncomingDestinationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -18,7 +16,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -28,6 +25,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations")
 @Tag(name = "Incoming Destinations", description = "Incoming webhook forwarding destinations")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class IncomingDestinationController {
 
     private final IncomingDestinationService destinationService;
@@ -42,10 +40,9 @@ public class IncomingDestinationController {
     public ResponseEntity<IncomingDestinationResponse> createDestination(
             @PathVariable("sourceId") UUID sourceId,
             @Valid @RequestBody IncomingDestinationRequest request,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        IncomingDestinationResponse response = destinationService.createDestination(sourceId, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        IncomingDestinationResponse response = destinationService.createDestination(sourceId, request, auth.organizationId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -57,9 +54,8 @@ public class IncomingDestinationController {
     @GetMapping("/{id}")
     public ResponseEntity<IncomingDestinationResponse> getDestination(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        IncomingDestinationResponse response = destinationService.getDestination(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        IncomingDestinationResponse response = destinationService.getDestination(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -68,9 +64,8 @@ public class IncomingDestinationController {
     public ResponseEntity<Page<IncomingDestinationResponse>> listDestinations(
             @PathVariable("sourceId") UUID sourceId,
             @PageableDefault(size = 20) Pageable pageable,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        Page<IncomingDestinationResponse> response = destinationService.listDestinations(sourceId, jwtAuth.getOrganizationId(), pageable);
+            AuthContext auth) {
+        Page<IncomingDestinationResponse> response = destinationService.listDestinations(sourceId, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -83,10 +78,9 @@ public class IncomingDestinationController {
     public ResponseEntity<IncomingDestinationResponse> updateDestination(
             @PathVariable("id") UUID id,
             @Valid @RequestBody IncomingDestinationRequest request,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        IncomingDestinationResponse response = destinationService.updateDestination(id, request, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        IncomingDestinationResponse response = destinationService.updateDestination(id, request, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -95,17 +89,9 @@ public class IncomingDestinationController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDestination(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        destinationService.deleteDestination(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        destinationService.deleteDestination(id, auth.organizationId());
         return ResponseEntity.noContent().build();
-    }
-
-    private JwtAuthenticationToken requireJwt(Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        return (JwtAuthenticationToken) authentication;
     }
 }

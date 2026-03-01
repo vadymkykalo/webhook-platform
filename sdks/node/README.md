@@ -119,6 +119,82 @@ for (const attempt of attempts) {
 await client.deliveries.replay(deliveryId);
 ```
 
+## Incoming Webhooks
+
+Receive, validate, and forward webhooks from third-party providers (Stripe, GitHub, Twilio, etc.).
+
+### Incoming Sources
+
+```typescript
+// Create an incoming source with HMAC verification
+const source = await client.incomingSources.create(projectId, {
+  name: 'Stripe Webhooks',
+  slug: 'stripe',
+  providerType: 'STRIPE',
+  verificationMode: 'HMAC_GENERIC',
+  hmacSecret: 'whsec_...',
+  hmacHeaderName: 'Stripe-Signature',
+});
+
+console.log(`Ingress URL: ${source.ingressUrl}`);
+
+// List sources
+const sources = await client.incomingSources.list(projectId);
+
+// Update source
+await client.incomingSources.update(projectId, sourceId, {
+  name: 'Stripe Production',
+  rateLimitPerSecond: 100,
+});
+
+// Delete source
+await client.incomingSources.delete(projectId, sourceId);
+```
+
+### Incoming Destinations
+
+```typescript
+// Add a forwarding destination
+const dest = await client.incomingSources.createDestination(projectId, sourceId, {
+  url: 'https://your-api.com/webhooks/stripe',
+  enabled: true,
+  maxAttempts: 5,
+  timeoutSeconds: 30,
+});
+
+// List destinations
+const dests = await client.incomingSources.listDestinations(projectId, sourceId);
+
+// Update destination
+await client.incomingSources.updateDestination(projectId, sourceId, destId, {
+  enabled: false,
+});
+
+// Delete destination
+await client.incomingSources.deleteDestination(projectId, sourceId, destId);
+```
+
+### Incoming Events
+
+```typescript
+// List incoming events (with optional source filter)
+const events = await client.incomingEvents.list(projectId, {
+  sourceId: source.id,
+  page: 0,
+  size: 20,
+});
+
+// Get event details
+const event = await client.incomingEvents.get(projectId, eventId);
+
+// Get forward attempts for an event
+const attempts = await client.incomingEvents.getAttempts(projectId, eventId);
+
+// Replay event to all destinations
+const result = await client.incomingEvents.replay(projectId, eventId);
+console.log(`Replayed to ${result.destinationsCount} destinations`);
+```
+
 ## Webhook Signature Verification
 
 Verify incoming webhooks in your endpoint:

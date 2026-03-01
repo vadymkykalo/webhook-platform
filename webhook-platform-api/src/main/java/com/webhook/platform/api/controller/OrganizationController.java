@@ -1,15 +1,13 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.OrganizationResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.OrganizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +18,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/orgs")
 @Tag(name = "Organizations", description = "Organization management")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class OrganizationController {
 
     private final OrganizationService organizationService;
@@ -30,13 +29,8 @@ public class OrganizationController {
 
     @Operation(summary = "List user organizations", description = "Returns all organizations the user belongs to")
     @GetMapping
-    public ResponseEntity<List<OrganizationResponse>> getUserOrganizations(Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        List<OrganizationResponse> response = organizationService.getUserOrganizations(jwtAuth.getUserId());
+    public ResponseEntity<List<OrganizationResponse>> getUserOrganizations(AuthContext auth) {
+        List<OrganizationResponse> response = organizationService.getUserOrganizations(auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -44,13 +38,8 @@ public class OrganizationController {
     @GetMapping("/{orgId}")
     public ResponseEntity<OrganizationResponse> getOrganization(
             @PathVariable("orgId") UUID orgId,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        OrganizationResponse response = organizationService.getOrganization(orgId, jwtAuth.getUserId());
+            AuthContext auth) {
+        OrganizationResponse response = organizationService.getOrganization(orgId, auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 }

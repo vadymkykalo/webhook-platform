@@ -136,6 +136,90 @@ for attempt in attempts:
 client.deliveries.replay(delivery_id)
 ```
 
+## Incoming Webhooks
+
+Receive, validate, and forward webhooks from third-party providers (Stripe, GitHub, Twilio, etc.).
+
+### Incoming Sources
+
+```python
+from webhook_platform import IncomingSourceCreateParams, IncomingSourceUpdateParams
+
+# Create an incoming source with HMAC verification
+source = client.incoming_sources.create(
+    project_id,
+    IncomingSourceCreateParams(
+        name="Stripe Webhooks",
+        slug="stripe",
+        provider_type="STRIPE",
+        verification_mode="HMAC_GENERIC",
+        hmac_secret="whsec_...",
+        hmac_header_name="Stripe-Signature",
+    ),
+)
+
+print(f"Ingress URL: {source.ingress_url}")
+
+# List sources
+sources = client.incoming_sources.list(project_id)
+
+# Update source
+client.incoming_sources.update(
+    project_id,
+    source_id,
+    IncomingSourceUpdateParams(name="Stripe Production", rate_limit_per_second=100),
+)
+
+# Delete source
+client.incoming_sources.delete(project_id, source_id)
+```
+
+### Incoming Destinations
+
+```python
+from webhook_platform import IncomingDestinationCreateParams
+
+# Add a forwarding destination
+dest = client.incoming_sources.create_destination(
+    project_id,
+    source_id,
+    IncomingDestinationCreateParams(
+        url="https://your-api.com/webhooks/stripe",
+        enabled=True,
+        max_attempts=5,
+        timeout_seconds=30,
+    ),
+)
+
+# List destinations
+dests = client.incoming_sources.list_destinations(project_id, source_id)
+
+# Delete destination
+client.incoming_sources.delete_destination(project_id, source_id, dest_id)
+```
+
+### Incoming Events
+
+```python
+from webhook_platform import IncomingEventListParams
+
+# List incoming events (with optional source filter)
+events = client.incoming_events.list(
+    project_id,
+    IncomingEventListParams(source_id=source.id, page=0, size=20),
+)
+
+# Get event details
+event = client.incoming_events.get(project_id, event_id)
+
+# Get forward attempts
+attempts = client.incoming_events.get_attempts(project_id, event_id)
+
+# Replay event to all destinations
+result = client.incoming_events.replay(project_id, event_id)
+print(f"Replayed to {result.destinations_count} destinations")
+```
+
 ## Webhook Signature Verification
 
 Verify incoming webhooks in your endpoint:

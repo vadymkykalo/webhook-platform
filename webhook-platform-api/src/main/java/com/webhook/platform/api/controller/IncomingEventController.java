@@ -6,9 +6,7 @@ import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.dto.ReplayEventResponse;
 import jakarta.validation.Valid;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.IncomingEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,7 +19,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -31,6 +28,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects/{projectId}/incoming-events")
 @Tag(name = "Incoming Events", description = "Incoming webhook events monitoring")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class IncomingEventController {
 
     private final IncomingEventService eventService;
@@ -46,10 +44,10 @@ public class IncomingEventController {
             @PathVariable("projectId") UUID projectId,
             @Parameter(description = "Filter by incoming source ID") @RequestParam(value = "sourceId", required = false) UUID sourceId,
             @PageableDefault(size = 20, sort = "receivedAt") Pageable pageable,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
         Page<IncomingEventResponse> response = eventService.listEvents(
-                projectId, jwtAuth.getOrganizationId(), sourceId, pageable);
+                projectId, auth.organizationId(), sourceId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -61,9 +59,8 @@ public class IncomingEventController {
     @GetMapping("/{id}")
     public ResponseEntity<IncomingEventResponse> getEvent(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        IncomingEventResponse response = eventService.getEvent(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        IncomingEventResponse response = eventService.getEvent(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -76,10 +73,9 @@ public class IncomingEventController {
     public ResponseEntity<Page<IncomingForwardAttemptResponse>> getEventAttempts(
             @PathVariable("id") UUID id,
             @PageableDefault(size = 20) Pageable pageable,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
+            AuthContext auth) {
         Page<IncomingForwardAttemptResponse> response = eventService.getEventAttempts(
-                id, jwtAuth.getOrganizationId(), pageable);
+                id, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -91,10 +87,9 @@ public class IncomingEventController {
     @PostMapping("/{id}/replay")
     public ResponseEntity<ReplayEventResponse> replayEvent(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        int replayed = eventService.replayEvent(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        int replayed = eventService.replayEvent(id, auth.organizationId());
         return ResponseEntity.ok(ReplayEventResponse.builder()
                 .status("replayed")
                 .eventId(id)
@@ -113,18 +108,11 @@ public class IncomingEventController {
     public ResponseEntity<IncomingBulkReplayResponse> bulkReplay(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody IncomingBulkReplayRequest request,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = requireJwt(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         IncomingBulkReplayResponse response = eventService.bulkReplay(
-                projectId, request, jwtAuth.getOrganizationId());
+                projectId, request, auth.organizationId());
         return ResponseEntity.ok(response);
-    }
-
-    private JwtAuthenticationToken requireJwt(Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        return (JwtAuthenticationToken) authentication;
     }
 }

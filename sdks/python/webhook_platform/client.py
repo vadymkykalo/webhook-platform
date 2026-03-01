@@ -17,6 +17,15 @@ from .types import (
     PaginatedResponse,
     EndpointTestResult,
     RateLimitInfo,
+    IncomingSource,
+    IncomingSourceCreateParams,
+    IncomingSourceUpdateParams,
+    IncomingDestination,
+    IncomingDestinationCreateParams,
+    IncomingEvent,
+    IncomingEventListParams,
+    IncomingForwardAttempt,
+    ReplayEventResponse,
 )
 from .errors import (
     WebhookPlatformError,
@@ -51,6 +60,8 @@ class WebhookPlatform:
         self.endpoints = Endpoints(self)
         self.subscriptions = Subscriptions(self)
         self.deliveries = Deliveries(self)
+        self.incoming_sources = IncomingSources(self)
+        self.incoming_events = IncomingEventsApi(self)
 
     def _request(
         self,
@@ -338,3 +349,162 @@ class Deliveries:
     def replay(self, delivery_id: str) -> None:
         """Replay a failed delivery."""
         self._client._request("POST", f"/api/v1/deliveries/{delivery_id}/replay")
+
+
+class IncomingSources:
+    """Incoming Sources API."""
+
+    def __init__(self, client: WebhookPlatform) -> None:
+        self._client = client
+
+    def create(
+        self, project_id: str, params: IncomingSourceCreateParams
+    ) -> IncomingSource:
+        """Create a new incoming webhook source."""
+        data = self._client._request(
+            "POST",
+            f"/api/v1/projects/{project_id}/incoming-sources",
+            body=params.to_dict(),
+        )
+        return IncomingSource.from_dict(data)
+
+    def get(self, project_id: str, source_id: str) -> IncomingSource:
+        """Get incoming source by ID."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}",
+        )
+        return IncomingSource.from_dict(data)
+
+    def list(self, project_id: str) -> PaginatedResponse:
+        """List incoming sources for a project."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-sources",
+        )
+        return PaginatedResponse.from_dict(data, IncomingSource)
+
+    def update(
+        self, project_id: str, source_id: str, params: IncomingSourceUpdateParams
+    ) -> IncomingSource:
+        """Update incoming source."""
+        data = self._client._request(
+            "PUT",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}",
+            body=params.to_dict(),
+        )
+        return IncomingSource.from_dict(data)
+
+    def delete(self, project_id: str, source_id: str) -> None:
+        """Delete (disable) incoming source."""
+        self._client._request(
+            "DELETE",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}",
+        )
+
+    # ── Destinations ──
+
+    def create_destination(
+        self,
+        project_id: str,
+        source_id: str,
+        params: IncomingDestinationCreateParams,
+    ) -> IncomingDestination:
+        """Create a forwarding destination for an incoming source."""
+        data = self._client._request(
+            "POST",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}/destinations",
+            body=params.to_dict(),
+        )
+        return IncomingDestination.from_dict(data)
+
+    def get_destination(
+        self, project_id: str, source_id: str, destination_id: str
+    ) -> IncomingDestination:
+        """Get destination by ID."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}/destinations/{destination_id}",
+        )
+        return IncomingDestination.from_dict(data)
+
+    def list_destinations(
+        self, project_id: str, source_id: str
+    ) -> PaginatedResponse:
+        """List destinations for an incoming source."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}/destinations",
+        )
+        return PaginatedResponse.from_dict(data, IncomingDestination)
+
+    def update_destination(
+        self,
+        project_id: str,
+        source_id: str,
+        destination_id: str,
+        params: IncomingDestinationCreateParams,
+    ) -> IncomingDestination:
+        """Update a forwarding destination."""
+        data = self._client._request(
+            "PUT",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}/destinations/{destination_id}",
+            body=params.to_dict(),
+        )
+        return IncomingDestination.from_dict(data)
+
+    def delete_destination(
+        self, project_id: str, source_id: str, destination_id: str
+    ) -> None:
+        """Delete a forwarding destination."""
+        self._client._request(
+            "DELETE",
+            f"/api/v1/projects/{project_id}/incoming-sources/{source_id}/destinations/{destination_id}",
+        )
+
+
+class IncomingEventsApi:
+    """Incoming Events API."""
+
+    def __init__(self, client: WebhookPlatform) -> None:
+        self._client = client
+
+    def list(
+        self, project_id: str, params: Optional[IncomingEventListParams] = None
+    ) -> PaginatedResponse:
+        """List incoming events for a project."""
+        query_params = (params or IncomingEventListParams()).to_params()
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-events",
+            params=query_params,
+        )
+        return PaginatedResponse.from_dict(data, IncomingEvent)
+
+    def get(self, project_id: str, event_id: str) -> IncomingEvent:
+        """Get incoming event by ID."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-events/{event_id}",
+        )
+        return IncomingEvent.from_dict(data)
+
+    def get_attempts(
+        self, project_id: str, event_id: str
+    ) -> List[IncomingForwardAttempt]:
+        """Get forward attempts for an incoming event."""
+        data = self._client._request(
+            "GET",
+            f"/api/v1/projects/{project_id}/incoming-events/{event_id}/attempts",
+        )
+        if isinstance(data, dict) and "content" in data:
+            return [IncomingForwardAttempt.from_dict(a) for a in data["content"]]
+        return [IncomingForwardAttempt.from_dict(a) for a in data]
+
+    def replay(self, project_id: str, event_id: str) -> ReplayEventResponse:
+        """Replay an incoming event to all enabled destinations."""
+        data = self._client._request(
+            "POST",
+            f"/api/v1/projects/{project_id}/incoming-events/{event_id}/replay",
+        )
+        return ReplayEventResponse.from_dict(data)

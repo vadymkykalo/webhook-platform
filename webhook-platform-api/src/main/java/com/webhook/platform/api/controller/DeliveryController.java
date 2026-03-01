@@ -3,9 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.DeliveryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -31,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/deliveries")
 @Tag(name = "Deliveries", description = "Delivery status and replay operations")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 public class DeliveryController {
 
     private final DeliveryService deliveryService;
@@ -43,12 +41,8 @@ public class DeliveryController {
     @GetMapping("/{id}")
     public ResponseEntity<DeliveryResponse> getDelivery(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        DeliveryResponse response = deliveryService.getDelivery(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        DeliveryResponse response = deliveryService.getDelivery(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -57,12 +51,8 @@ public class DeliveryController {
     public ResponseEntity<Page<DeliveryResponse>> listDeliveries(
             @RequestParam(value = "eventId", required = false) UUID eventId,
             Pageable pageable,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        Page<DeliveryResponse> response = deliveryService.listDeliveries(eventId, jwtAuth.getOrganizationId(), pageable);
+            AuthContext auth) {
+        Page<DeliveryResponse> response = deliveryService.listDeliveries(eventId, auth.organizationId(), pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -75,17 +65,13 @@ public class DeliveryController {
             @RequestParam(value = "fromDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromDate,
             @RequestParam(value = "toDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toDate,
             Pageable pageable,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
         log.info("Deliveries request - projectId: {}, status: {}, endpointId: {}, fromDate: {}, toDate: {}", 
                  projectId, status, endpointId, fromDate, toDate);
         
         Page<DeliveryResponse> response = deliveryService.listDeliveriesByProject(
-                projectId, jwtAuth.getOrganizationId(), status, endpointId, fromDate, toDate, pageable);
+                projectId, auth.organizationId(), status, endpointId, fromDate, toDate, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -94,13 +80,9 @@ public class DeliveryController {
     @PostMapping("/{id}/replay")
     public ResponseEntity<Void> replayDelivery(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
-        deliveryService.replayDelivery(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        deliveryService.replayDelivery(id, auth.organizationId());
         return ResponseEntity.accepted().build();
     }
 
@@ -108,12 +90,8 @@ public class DeliveryController {
     @GetMapping("/{id}/attempts")
     public ResponseEntity<List<DeliveryAttemptResponse>> getDeliveryAttempts(
             @PathVariable("id") UUID id,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 
@@ -122,19 +100,15 @@ public class DeliveryController {
     @PostMapping("/bulk-replay")
     public ResponseEntity<com.webhook.platform.api.dto.BulkReplayResponse> bulkReplayDeliveries(
             @Valid @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,
-            Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
         
         int replayedCount = deliveryService.bulkReplayDeliveries(
                 request.getDeliveryIds(),
                 request.getStatus(),
                 request.getEndpointId(),
                 request.getProjectId(),
-                jwtAuth.getOrganizationId()
+                auth.organizationId()
         );
         
         int totalRequested = request.getDeliveryIds() != null ? request.getDeliveryIds().size() : 0;

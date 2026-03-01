@@ -1,11 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.dto.DlqActionResponse;
 import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.dto.DlqRetryRequest;
 import com.webhook.platform.api.dto.DlqStatsResponse;
-import com.webhook.platform.api.exception.UnauthorizedException;
-import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.security.RbacUtil;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.DlqService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,17 +16,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/dlq")
 @Tag(name = "Dead Letter Queue", description = "DLQ management operations")
 @SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "apiKey")
 @RequiredArgsConstructor
 public class DlqController {
 
@@ -40,9 +38,9 @@ public class DlqController {
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "20") int size,
             @RequestParam(name = "endpointId", required = false) UUID endpointId,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = validateAuth(authentication);
-        dlqService.validateProjectOwnership(projectId, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        dlqService.validateProjectOwnership(projectId, auth.organizationId());
         
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
         Page<DlqItemResponse> items = dlqService.listDlqItems(projectId, endpointId, pageable);
@@ -53,9 +51,9 @@ public class DlqController {
     @GetMapping("/stats")
     public ResponseEntity<DlqStatsResponse> getDlqStats(
             @PathVariable("projectId") UUID projectId,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = validateAuth(authentication);
-        dlqService.validateProjectOwnership(projectId, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        dlqService.validateProjectOwnership(projectId, auth.organizationId());
         
         DlqStatsResponse stats = dlqService.getDlqStats(projectId);
         return ResponseEntity.ok(stats);
@@ -66,57 +64,53 @@ public class DlqController {
     public ResponseEntity<DlqItemResponse> getDlqItem(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("deliveryId") UUID deliveryId,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = validateAuth(authentication);
-        DlqItemResponse item = dlqService.getDlqItem(projectId, deliveryId, jwtAuth.getOrganizationId());
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        DlqItemResponse item = dlqService.getDlqItem(projectId, deliveryId, auth.organizationId());
         return ResponseEntity.ok(item);
     }
 
     @Operation(summary = "Retry single DLQ item", description = "Retries a single failed delivery")
     @ApiResponse(responseCode = "200", description = "Delivery queued for retry")
     @PostMapping("/{deliveryId}/retry")
-    public ResponseEntity<Map<String, Object>> retrySingle(
+    public ResponseEntity<DlqActionResponse> retrySingle(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("deliveryId") UUID deliveryId,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = validateAuth(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         
-        int retried = dlqService.retryDeliveries(projectId, Collections.singletonList(deliveryId), jwtAuth.getOrganizationId());
-        return ResponseEntity.ok(Map.of("retried", retried));
+        int retried = dlqService.retryDeliveries(projectId, Collections.singletonList(deliveryId), auth.organizationId());
+        return ResponseEntity.ok(DlqActionResponse.builder().retried(retried).build());
     }
 
     @Operation(summary = "Bulk retry DLQ items", description = "Retries multiple failed deliveries")
     @ApiResponse(responseCode = "200", description = "Deliveries queued for retry")
     @PostMapping("/retry")
-    public ResponseEntity<Map<String, Object>> retryBulk(
+    public ResponseEntity<DlqActionResponse> retryBulk(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody DlqRetryRequest request,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = validateAuth(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         
-        int retried = dlqService.retryDeliveries(projectId, request.getDeliveryIds(), jwtAuth.getOrganizationId());
-        return ResponseEntity.ok(Map.of("retried", retried, "requested", request.getDeliveryIds().size()));
+        int retried = dlqService.retryDeliveries(projectId, request.getDeliveryIds(), auth.organizationId());
+        return ResponseEntity.ok(DlqActionResponse.builder()
+                .retried(retried)
+                .requested(request.getDeliveryIds().size())
+                .build());
     }
 
     @Operation(summary = "Purge all DLQ items", description = "Permanently deletes all items in DLQ for the project")
     @ApiResponse(responseCode = "200", description = "DLQ purged")
     @DeleteMapping
-    public ResponseEntity<Map<String, Object>> purgeAll(
+    public ResponseEntity<DlqActionResponse> purgeAll(
             @PathVariable("projectId") UUID projectId,
-            Authentication authentication) {
-        JwtAuthenticationToken jwtAuth = validateAuth(authentication);
-        RbacUtil.requireWriteAccess(jwtAuth.getRole());
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         
-        int purged = dlqService.purgeAllDlq(projectId, jwtAuth.getOrganizationId());
-        return ResponseEntity.ok(Map.of("purged", purged));
-    }
-
-    private JwtAuthenticationToken validateAuth(Authentication authentication) {
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new UnauthorizedException("Authentication required");
-        }
-        return (JwtAuthenticationToken) authentication;
+        int purged = dlqService.purgeAllDlq(projectId, auth.organizationId());
+        return ResponseEntity.ok(DlqActionResponse.builder().purged(purged).build());
     }
 }

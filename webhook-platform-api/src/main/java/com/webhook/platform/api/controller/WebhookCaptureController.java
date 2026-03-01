@@ -1,6 +1,7 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.CapturedRequestResponse;
+import com.webhook.platform.api.dto.WebhookCaptureResponse;
 import com.webhook.platform.api.service.TestEndpointService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -42,7 +42,7 @@ public class WebhookCaptureController {
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
             RequestMethod.PATCH, RequestMethod.DELETE })
     @Operation(summary = "Capture webhook request", description = "Captures any HTTP request sent to this test endpoint")
-    public ResponseEntity<Map<String, Object>> captureRequest(
+    public ResponseEntity<WebhookCaptureResponse> captureRequest(
             @PathVariable("slug") String slug,
             @RequestBody(required = false) String body,
             HttpServletRequest request) {
@@ -58,10 +58,11 @@ public class WebhookCaptureController {
         if (!bucket.tryConsume(1)) {
             log.warn("Rate limit exceeded for test endpoint slug: {}", slug);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of(
-                            "success", false,
-                            "error", "rate_limit_exceeded",
-                            "message", "Too many requests to this test endpoint"));
+                    .body(WebhookCaptureResponse.builder()
+                            .success(false)
+                            .error("rate_limit_exceeded")
+                            .message("Too many requests to this test endpoint")
+                            .build());
         }
 
         CapturedRequestResponse captured = testEndpointService.captureRequest(slug, request);
@@ -74,11 +75,12 @@ public class WebhookCaptureController {
                     String challenge = json.has("challenge") ? json.get("challenge").asText() : null;
                     if (challenge != null) {
                         log.info("Test endpoint {} responding to verification challenge", slug);
-                        return ResponseEntity.ok(Map.of(
-                                "success", true,
-                                "message", "Verification challenge accepted",
-                                "challenge", challenge,
-                                "requestId", captured.getId()));
+                        return ResponseEntity.ok(WebhookCaptureResponse.builder()
+                                .success(true)
+                                .message("Verification challenge accepted")
+                                .challenge(challenge)
+                                .requestId(captured.getId())
+                                .build());
                     }
                 }
             } catch (Exception e) {
@@ -86,11 +88,11 @@ public class WebhookCaptureController {
             }
         }
 
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Request captured",
-                "requestId", captured.getId(),
-                "receivedAt",
-                captured.getReceivedAt() != null ? captured.getReceivedAt().toString() : Instant.now().toString()));
+        return ResponseEntity.ok(WebhookCaptureResponse.builder()
+                .success(true)
+                .message("Request captured")
+                .requestId(captured.getId())
+                .receivedAt(captured.getReceivedAt() != null ? captured.getReceivedAt().toString() : Instant.now().toString())
+                .build());
     }
 }

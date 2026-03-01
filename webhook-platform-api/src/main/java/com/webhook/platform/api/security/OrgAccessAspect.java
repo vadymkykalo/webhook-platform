@@ -45,18 +45,40 @@ public class OrgAccessAspect {
             throw new ForbiddenException("Access denied: organization ID not found in request");
         }
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof JwtAuthenticationToken)) {
-            throw new ForbiddenException("Access denied: authentication required");
+        AuthContext authContext = extractAuthContext(joinPoint);
+        if (authContext != null) {
+            UUID tokenOrgId = authContext.organizationId();
+            if (!pathOrgId.equals(tokenOrgId)) {
+                log.warn("Tenant isolation violation: org {} attempted to access org {}",
+                        tokenOrgId, pathOrgId);
+                throw new ForbiddenException("Access denied to organization");
+            }
+            return;
         }
 
-        JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
-        UUID tokenOrgId = jwtAuth.getOrganizationId();
-        if (!pathOrgId.equals(tokenOrgId)) {
-            log.warn("Tenant isolation violation: user {} (org {}) attempted to access org {}",
-                    jwtAuth.getUserId(), tokenOrgId, pathOrgId);
-            throw new ForbiddenException("Access denied to organization");
+        // Fallback for methods without AuthContext parameter
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof JwtAuthenticationToken jwtAuth) {
+            if (!pathOrgId.equals(jwtAuth.getOrganizationId())) {
+                log.warn("Tenant isolation violation: user {} (org {}) attempted to access org {}",
+                        jwtAuth.getUserId(), jwtAuth.getOrganizationId(), pathOrgId);
+                throw new ForbiddenException("Access denied to organization");
+            }
+        } else if (authentication instanceof ApiKeyAuthenticationToken) {
+            // API key org is resolved via AuthContext; if no AuthContext param, deny
+            throw new ForbiddenException("Access denied: authentication required");
+        } else {
+            throw new ForbiddenException("Access denied: authentication required");
         }
+    }
+
+    private AuthContext extractAuthContext(JoinPoint joinPoint) {
+        for (Object arg : joinPoint.getArgs()) {
+            if (arg instanceof AuthContext) {
+                return (AuthContext) arg;
+            }
+        }
+        return null;
     }
 
     /**
