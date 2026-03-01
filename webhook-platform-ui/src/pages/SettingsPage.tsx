@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
-import { User, Building2, Loader2, KeyRound, CheckCircle2 } from 'lucide-react';
+import { User, Building2, Loader2, KeyRound, CheckCircle2, ShieldCheck, AlertTriangle, RotateCcw, Lock, Eye } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -232,6 +232,56 @@ export default function SettingsPage() {
                   disabled
                   className="bg-muted"
                 />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <CardTitle>{t('settings.security.title')}</CardTitle>
+            </div>
+            <CardDescription>
+              {t('settings.security.subtitle')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <RotateCcw className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">{t('settings.security.secretRotation')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('settings.security.secretRotationDesc')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <Lock className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">{t('settings.security.hmacVerification')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('settings.security.hmacVerificationDesc')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                <Eye className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">{t('settings.security.auditLogging')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('settings.security.auditLoggingDesc')}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{t('settings.security.bestPracticeTitle')}</p>
+                  <ul className="text-xs text-amber-700 dark:text-amber-300 mt-1 space-y-1 list-disc list-inside">
+                    <li>{t('settings.security.tip1')}</li>
+                    <li>{t('settings.security.tip2')}</li>
+                    <li>{t('settings.security.tip3')}</li>
+                    <li>{t('settings.security.tip4')}</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </CardContent>

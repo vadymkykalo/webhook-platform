@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle } from 'lucide-react';
+import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle, ArrowDownToLine, Activity } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useProjects, useDashboardStats, useEndpoints, useSubscriptions, useApiKeysPaged } from '../api/queries';
+import { useProjects, useDashboardStats, useEndpoints, useSubscriptions, useApiKeysPaged, useIncomingSources } from '../api/queries';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -61,6 +61,9 @@ export default function DashboardPage() {
   const { data: endpoints = [] } = useEndpoints(selectedProjectId || undefined);
   const { data: subscriptions = [] } = useSubscriptions(selectedProjectId || undefined);
   const { data: apiKeysData } = useApiKeysPaged(selectedProjectId || undefined, 0, 1);
+  const { data: incomingSourcesData } = useIncomingSources(selectedProjectId || undefined, 0, 1);
+
+  const hasIncomingSources = (incomingSourcesData?.totalElements ?? 0) > 0;
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -112,6 +115,8 @@ export default function DashboardPage() {
         hasApiKeys={(apiKeysData?.content?.length ?? 0) > 0}
         hasEvents={(dashboardStats?.recentEvents?.length ?? 0) > 0}
         hasDeliveries={(dashboardStats?.deliveryStats?.totalDeliveries ?? 0) > 0}
+        hasIncomingSources={hasIncomingSources}
+        hasIncomingDestinations={hasIncomingSources}
       />
 
       {!selectedProject ? (
@@ -282,6 +287,8 @@ export default function DashboardPage() {
               { label: t('dashboard.quickActions.events'), path: `/admin/projects/${selectedProjectId}/events`, icon: Radio },
               { label: t('dashboard.quickActions.deliveries'), path: `/admin/projects/${selectedProjectId}/deliveries`, icon: Send },
               { label: t('dashboard.quickActions.dlq'), path: `/admin/projects/${selectedProjectId}/dlq`, icon: AlertTriangle },
+              { label: t('dashboard.quickActions.incomingSources'), path: `/admin/projects/${selectedProjectId}/incoming-sources`, icon: ArrowDownToLine },
+              { label: t('dashboard.quickActions.incomingEvents'), path: `/admin/projects/${selectedProjectId}/incoming-events`, icon: Activity },
             ].map((action) => (
               <button
                 key={action.label}

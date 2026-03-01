@@ -55,9 +55,15 @@ export default function AcceptInvitePage() {
             <p className="text-sm text-muted-foreground">
               {t('invite.loginRequiredDesc')}
             </p>
-            <Link to={`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
-              <Button className="mt-4">{t('invite.goToLogin')}</Button>
-            </Link>
+            <div className="flex flex-col gap-2 mt-4">
+              <Link to={`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
+                <Button className="w-full">{t('invite.goToLogin')}</Button>
+              </Link>
+              <Link to={`/register?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
+                <Button variant="outline" className="w-full">{t('invite.goToRegister')}</Button>
+              </Link>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">{t('invite.newUserHint')}</p>
           </>
         )}
 

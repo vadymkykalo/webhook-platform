@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, ExternalLink, Package } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Webhook, Menu, X, ExternalLink, Package, ArrowDownToLine } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +41,7 @@ export default function DocumentationPage() {
             {activeSection === 'subscriptions-api' && <SubscriptionsAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'deliveries-api' && <DeliveriesAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'webhook-security' && <WebhookSecurity activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'incoming-webhooks' && <IncomingWebhooks activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'errors' && <Errors />}
             {activeSection === 'sdks' && <SDKs />}
           </div>
@@ -61,6 +62,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'subscriptions-api', label: t('docsPage.sections.subscriptionsApi'), icon: RefreshCw },
     { id: 'deliveries-api', label: t('docsPage.sections.deliveriesApi'), icon: CheckCircle2 },
     { id: 'webhook-security', label: t('docsPage.sections.webhookSecurity'), icon: Shield },
+    { id: 'incoming-webhooks', label: t('docsPage.sections.incomingWebhooks'), icon: ArrowDownToLine },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
     { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
@@ -1691,6 +1693,167 @@ function SdkCodeBlock({ label, children, copyText }: { label: string; children: 
         )}
       </div>
       <pre className="p-4 text-[13px] font-mono overflow-x-auto leading-relaxed">{children}</pre>
+    </div>
+  );
+}
+
+function IncomingWebhooks({ activeLanguage, setActiveLanguage }: { activeLanguage: 'curl' | 'node' | 'python'; setActiveLanguage: (l: 'curl' | 'node' | 'python') => void }) {
+  const { t } = useTranslation();
+
+  const createSourceCode = {
+    curl: `curl -X POST https://your-api.com/api/v1/projects/{projectId}/incoming-sources \\
+  -H "Authorization: Bearer <token>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Stripe Webhooks",
+    "slug": "stripe",
+    "providerType": "STRIPE",
+    "verificationMode": "HMAC_GENERIC",
+    "hmacSecret": "whsec_...",
+    "hmacHeaderName": "Stripe-Signature"
+  }'`,
+    node: `const source = await client.incomingSources.create(projectId, {
+  name: 'Stripe Webhooks',
+  slug: 'stripe',
+  providerType: 'STRIPE',
+  verificationMode: 'HMAC_GENERIC',
+  hmacSecret: 'whsec_...',
+  hmacHeaderName: 'Stripe-Signature'
+});`,
+    python: `source = client.incoming_sources.create(
+    project_id=project_id,
+    name="Stripe Webhooks",
+    slug="stripe",
+    provider_type="STRIPE",
+    verification_mode="HMAC_GENERIC",
+    hmac_secret="whsec_...",
+    hmac_header_name="Stripe-Signature"
+)`
+  };
+
+  const createDestCode = {
+    curl: `curl -X POST https://your-api.com/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations \\
+  -H "Authorization: Bearer <token>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "url": "https://your-api.com/webhooks/stripe",
+    "description": "Internal webhook handler"
+  }'`,
+    node: `const dest = await client.incomingSources.createDestination(projectId, sourceId, {
+  url: 'https://your-api.com/webhooks/stripe',
+  description: 'Internal webhook handler'
+});`,
+    python: `dest = client.incoming_sources.create_destination(
+    project_id=project_id,
+    source_id=source_id,
+    url="https://your-api.com/webhooks/stripe",
+    description="Internal webhook handler"
+)`
+  };
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">{t('docsPage.incomingWebhooks.title')}</h1>
+        <p className="text-lg text-muted-foreground">{t('docsPage.incomingWebhooks.subtitle')}</p>
+      </div>
+
+      {/* Overview */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2"><ArrowDownToLine className="h-5 w-5 text-primary" /> {t('docsPage.incomingWebhooks.overview')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.incomingWebhooks.overviewDesc1')}</p>
+        <div className="bg-muted/50 rounded-xl border p-4">
+          <p className="text-sm text-muted-foreground font-mono">{t('docsPage.incomingWebhooks.overviewDesc2')}</p>
+        </div>
+      </section>
+
+      {/* Ingress URL */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.incomingWebhooks.ingressUrl')}</h2>
+        <p className="text-muted-foreground">{t('docsPage.incomingWebhooks.ingressUrlDesc')}</p>
+        <ResponseBlock>{t('docsPage.incomingWebhooks.ingressUrlExample')}</ResponseBlock>
+      </section>
+
+      {/* Verification Modes */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.incomingWebhooks.verificationModes')}</h2>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" /> {t('docsPage.incomingWebhooks.verificationNone')}</li>
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" /> {t('docsPage.incomingWebhooks.verificationHmac')}</li>
+        </ul>
+        <p className="text-sm text-muted-foreground">{t('docsPage.incomingWebhooks.providerTypes')}</p>
+      </section>
+
+      {/* Sources API */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.incomingWebhooks.sourcesApi')}</h2>
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.createSource')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/incoming-sources" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.createSourceDesc')}</p>
+            <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{createSourceCode[activeLanguage]}</CodeBlock>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.listSources')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/incoming-sources" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.listSourcesDesc')}</p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.deleteSource')}</h3>
+            <HTTPMethod method="DELETE" path="/api/v1/projects/{projectId}/incoming-sources/{sourceId}" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.deleteSourceDesc')}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Destinations API */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.incomingWebhooks.destinationsApi')}</h2>
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.createDest')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.createDestDesc')}</p>
+            <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{createDestCode[activeLanguage]}</CodeBlock>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.listDests')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.listDestsDesc')}</p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.deleteDest')}</h3>
+            <HTTPMethod method="DELETE" path="/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations/{destId}" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.deleteDestDesc')}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Incoming Events API */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.incomingWebhooks.eventsApi')}</h2>
+
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.listEvents')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/incoming-events?sourceId={sourceId}" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.listEventsDesc')}</p>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.incomingWebhooks.replayEvent')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/incoming-events/{eventId}/replay" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.replayEventDesc')}</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

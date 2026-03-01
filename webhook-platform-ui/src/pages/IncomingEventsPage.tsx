@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Activity, Loader2, Copy, ChevronLeft, ChevronRight, CheckCircle, XCircle, MinusCircle,
-  RotateCcw, Clock, AlertTriangle, Calendar
+  RotateCcw, Clock, AlertTriangle, Calendar, ArrowDownToLine
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
@@ -33,6 +33,7 @@ const PAGE_SIZE = 20;
 export default function IncomingEventsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const { canReplayIncomingEvents } = usePermissions();
 
   const [project, setProject] = useState<ProjectResponse | null>(null);
@@ -186,7 +187,12 @@ export default function IncomingEventsPage() {
         <EmptyState
           icon={Activity}
           title={t('incomingEvents.noEvents')}
-          description={t('incomingEvents.noEventsDesc')}
+          description={sources.length === 0 ? t('incomingEvents.noEventsNoSourcesDesc') : t('incomingEvents.noEventsDesc')}
+          action={sources.length === 0 ? (
+            <Button onClick={() => navigate(`/admin/projects/${projectId}/incoming-sources`)}>
+              <ArrowDownToLine className="h-4 w-4" /> {t('incomingEvents.createSourceFirst')}
+            </Button>
+          ) : undefined}
         />
       ) : (
         <div className="space-y-2 animate-fade-in">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
@@ -24,6 +24,10 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 
@@ -61,6 +65,7 @@ export default function DeliveriesPage() {
   
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
   const [bulkReplaying, setBulkReplaying] = useState(false);
+  const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
   const { canReplayDeliveries } = usePermissions();
 
   useEffect(() => {
@@ -238,7 +243,7 @@ export default function DeliveriesPage() {
           </div>
           {canReplayDeliveries && (statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
             <div className="flex justify-end mt-3">
-              <Button onClick={handleBulkReplay} disabled={bulkReplaying} variant="outline" size="sm">
+              <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline" size="sm">
                 {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
                 {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: statusFilter })}
               </Button>
@@ -315,6 +320,29 @@ export default function DeliveriesPage() {
         onClose={() => setSelectedDeliveryId(null)}
         onRefresh={loadDeliveries}
       />
+
+      {/* Bulk Replay Confirmation */}
+      <AlertDialog open={showBulkReplayDialog} onOpenChange={setShowBulkReplayDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deliveries.bulkReplayDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deliveries.bulkReplayDialog.description', { status: statusFilter, count: totalElements })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg mx-1">
+            <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-warning">{t('deliveries.bulkReplayDialog.warning')}</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkReplaying}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { handleBulkReplay(); setShowBulkReplayDialog(false); }} disabled={bulkReplaying}>
+              {bulkReplaying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplayDialog.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
