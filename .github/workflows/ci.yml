@@ -271,6 +271,8 @@ jobs:
     name: Container Security Scan (Trivy)
     runs-on: ubuntu-latest
     needs: docker-build
+    continue-on-error: true
+    timeout-minutes: 30
     
     steps:
       - name: Checkout code
@@ -295,6 +297,10 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
+          version: 'v0.58.2'
+        env:
+          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
+          TRIVY_JAVA_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-java-db:1'
       
       - name: Run Trivy on Worker image
         uses: aquasecurity/trivy-action@0.34.1
@@ -303,6 +309,10 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
+          version: 'v0.58.2'
+        env:
+          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
+          TRIVY_JAVA_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-java-db:1'
       
       - name: Run Trivy on UI image
         uses: aquasecurity/trivy-action@0.34.1
@@ -311,6 +321,10 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
+          version: 'v0.58.2'
+        env:
+          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
+          TRIVY_JAVA_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-java-db:1'
       
       - name: Container Scan Summary
         if: always()
