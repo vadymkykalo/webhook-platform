@@ -76,7 +76,14 @@ export default function MembersPage() {
   };
 
   const getStatusBadgeVariant = (status: string) => {
-    return status === 'ACTIVE' ? 'success' : 'secondary';
+    switch (status) {
+      case 'ACTIVE':
+        return 'success';
+      case 'INVITED':
+        return 'outline';
+      default:
+        return 'secondary';
+    }
   };
 
   if (loading) {

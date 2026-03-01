@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.entity;
 
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -31,6 +32,17 @@ public class Membership {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MembershipRole role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private MembershipStatus status = MembershipStatus.ACTIVE;
+
+    @Column(name = "invite_token", length = 64)
+    private String inviteToken;
+
+    @Column(name = "invite_expires_at")
+    private Instant inviteExpiresAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

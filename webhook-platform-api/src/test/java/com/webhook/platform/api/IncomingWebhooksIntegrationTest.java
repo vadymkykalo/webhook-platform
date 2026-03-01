@@ -311,6 +311,17 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(enableReq)))
                 .andExpect(status().isOk());
 
+        // Reset verification mode to NONE for basic ingress acceptance test
+        IncomingSourceRequest resetVerification = IncomingSourceRequest.builder()
+                .name("GitHub Webhooks Updated")
+                .verificationMode(VerificationMode.NONE)
+                .build();
+        mockMvc.perform(put("/api/v1/projects/" + projectId + "/incoming-sources/" + sourceId)
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(resetVerification)))
+                .andExpect(status().isOk());
+
         // Send webhook to ingress endpoint (no auth required — public endpoint)
         mockMvc.perform(post("/ingress/" + ingressPathToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -333,6 +344,56 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
     @Test
     @Order(32)
     void ingress_emptyBody_accepted() throws Exception {
+        Assumptions.assumeTrue(ingressPathToken != null, "Source must be created first");
+        mockMvc.perform(post("/ingress/" + ingressPathToken)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("accepted"));
+    }
+
+    @Test
+    @Order(33)
+    void ingress_signatureVerificationFailed_returns401() throws Exception {
+        Assumptions.assumeTrue(ingressPathToken != null, "Source must be created first");
+
+        // Enable HMAC verification on the source
+        IncomingSourceRequest enableHmac = IncomingSourceRequest.builder()
+                .name("GitHub Webhooks Updated")
+                .verificationMode(VerificationMode.HMAC_GENERIC)
+                .hmacSecret("test-hmac-secret")
+                .hmacHeaderName("X-Signature")
+                .hmacSignaturePrefix("")
+                .build();
+        mockMvc.perform(put("/api/v1/projects/" + projectId + "/incoming-sources/" + sourceId)
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(enableHmac)))
+                .andExpect(status().isOk());
+
+        // Send webhook with wrong signature — should be rejected
+        mockMvc.perform(post("/ingress/" + ingressPathToken)
+                        .header("X-Signature", "invalid-signature")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"push\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("signature_verification_failed"))
+                .andExpect(jsonPath("$.requestId").isNotEmpty());
+
+        // Reset back to NONE for subsequent tests
+        IncomingSourceRequest resetMode = IncomingSourceRequest.builder()
+                .name("GitHub Webhooks Updated")
+                .verificationMode(VerificationMode.NONE)
+                .build();
+        mockMvc.perform(put("/api/v1/projects/" + projectId + "/incoming-sources/" + sourceId)
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(resetMode)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @Order(34)
+    void ingress_emptyBody_withNoVerification_accepted() throws Exception {
         Assumptions.assumeTrue(ingressPathToken != null, "Source must be created first");
         mockMvc.perform(post("/ingress/" + ingressPathToken)
                         .contentType(MediaType.APPLICATION_JSON))

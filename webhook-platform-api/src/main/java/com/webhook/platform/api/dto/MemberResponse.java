@@ -20,5 +20,4 @@ public class MemberResponse {
     private MembershipRole role;
     private MembershipStatus status;
     private Instant createdAt;
-    private String temporaryPassword;
 }

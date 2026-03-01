@@ -11,7 +11,6 @@ import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
-import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
@@ -32,8 +31,10 @@ import com.webhook.platform.api.exception.NotFoundException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -42,7 +43,6 @@ public class DlqService {
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
-    private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
     private final OutboxMessageRepository outboxMessageRepository;
@@ -56,6 +56,7 @@ public class DlqService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Page<DlqItemResponse> listDlqItems(UUID projectId, UUID endpointId, Pageable pageable) {
         Page<Delivery> deliveries;
         if (endpointId != null) {
@@ -63,9 +64,22 @@ public class DlqService {
         } else {
             deliveries = deliveryRepository.findDlqByProjectId(projectId, pageable);
         }
-        return deliveries.map(this::mapToResponse);
+
+        // Batch-load last delivery attempts in 1 query instead of N
+        List<UUID> deliveryIds = deliveries.getContent().stream()
+                .map(Delivery::getId).collect(Collectors.toList());
+        Map<UUID, DeliveryAttempt> lastAttempts = Map.of();
+        if (!deliveryIds.isEmpty()) {
+            lastAttempts = deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(deliveryIds)
+                    .stream()
+                    .collect(Collectors.toMap(DeliveryAttempt::getDeliveryId, a -> a));
+        }
+
+        Map<UUID, DeliveryAttempt> finalLastAttempts = lastAttempts;
+        return deliveries.map(d -> mapToResponse(d, finalLastAttempts.get(d.getId())));
     }
 
+    @Transactional(readOnly = true)
     public DlqItemResponse getDlqItem(UUID projectId, UUID deliveryId, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
         Delivery delivery = deliveryRepository.findById(deliveryId)
@@ -75,7 +89,9 @@ public class DlqService {
             throw new IllegalArgumentException("Delivery is not in DLQ");
         }
         
-        return mapToResponse(delivery);
+        Optional<DeliveryAttempt> lastAttempt = deliveryAttemptRepository
+                .findTopByDeliveryIdOrderByAttemptNumberDesc(delivery.getId());
+        return mapToResponse(delivery, lastAttempt.orElse(null));
     }
 
     public DlqStatsResponse getDlqStats(UUID projectId) {
@@ -132,18 +148,16 @@ public class DlqService {
         return (int) count;
     }
 
-    private DlqItemResponse mapToResponse(Delivery delivery) {
-        Event event = eventRepository.findById(delivery.getEventId()).orElse(null);
-        Endpoint endpoint = endpointRepository.findById(delivery.getEndpointId()).orElse(null);
-        
-        // Get last error from most recent attempt
+    private DlqItemResponse mapToResponse(Delivery delivery, DeliveryAttempt lastAttempt) {
+        // Use already-fetched relations from JOIN FETCH (no extra queries)
+        Event event = delivery.getEvent();
+        Endpoint endpoint = delivery.getEndpoint();
+
         String lastError = null;
-        Optional<DeliveryAttempt> lastAttempt = deliveryAttemptRepository
-                .findTopByDeliveryIdOrderByAttemptNumberDesc(delivery.getId());
-        if (lastAttempt.isPresent()) {
-            lastError = lastAttempt.get().getErrorMessage();
-            if (lastError == null && lastAttempt.get().getHttpStatusCode() != null) {
-                lastError = "HTTP " + lastAttempt.get().getHttpStatusCode();
+        if (lastAttempt != null) {
+            lastError = lastAttempt.getErrorMessage();
+            if (lastError == null && lastAttempt.getHttpStatusCode() != null) {
+                lastError = "HTTP " + lastAttempt.getHttpStatusCode();
             }
         }
         

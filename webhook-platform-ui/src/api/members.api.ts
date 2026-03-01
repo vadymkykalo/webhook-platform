@@ -1,7 +1,7 @@
 import { http } from './http';
 
 export type MembershipRole = 'OWNER' | 'DEVELOPER' | 'VIEWER';
-export type MembershipStatus = 'ACTIVE' | 'DISABLED';
+export type MembershipStatus = 'INVITED' | 'ACTIVE' | 'DISABLED';
 
 export interface MemberResponse {
   userId: string;
@@ -9,7 +9,6 @@ export interface MemberResponse {
   role: MembershipRole;
   status: MembershipStatus;
   createdAt: string;
-  temporaryPassword?: string;
 }
 
 export interface AddMemberRequest {
@@ -36,5 +35,9 @@ export const membersApi = {
 
   remove: (orgId: string, userId: string): Promise<void> => {
     return http.delete<void>(`/api/v1/orgs/${orgId}/members/${userId}`);
+  },
+
+  acceptInvite: (orgId: string, token: string): Promise<MemberResponse> => {
+    return http.post<MemberResponse>(`/api/v1/orgs/${orgId}/members/accept-invite?token=${encodeURIComponent(token)}`);
   },
 };

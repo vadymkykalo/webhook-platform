@@ -80,7 +80,8 @@ public class OutboxPublisherService {
 
         for (OutboxMessage message : failedMessages) {
             long backoffSeconds = calculateBackoff(message.getRetryCount());
-            Instant nextRetryTime = message.getCreatedAt().plusSeconds(backoffSeconds);
+            Instant baseTime = message.getLastAttemptAt() != null ? message.getLastAttemptAt() : message.getCreatedAt();
+            Instant nextRetryTime = baseTime.plusSeconds(backoffSeconds);
             
             if (Instant.now().isBefore(nextRetryTime)) {
                 log.debug("Skipping message {} - backoff not expired (retry at {})", 
@@ -107,6 +108,7 @@ public class OutboxPublisherService {
     private void incrementRetryCount(OutboxMessage message, String errorMessage) {
         message.setRetryCount(message.getRetryCount() + 1);
         message.setErrorMessage(errorMessage);
+        message.setLastAttemptAt(Instant.now());
         
         if (message.getRetryCount() >= 5) {
             log.error("Outbox message {} exceeded max retries, giving up", message.getId());
@@ -156,6 +158,7 @@ public class OutboxPublisherService {
         message.setStatus(OutboxStatus.FAILED);
         message.setRetryCount(message.getRetryCount() + 1);
         message.setErrorMessage(errorMessage);
+        message.setLastAttemptAt(Instant.now());
         outboxMessageRepository.save(message);
         log.warn("Marked outbox message {} as failed: {}", message.getId(), errorMessage);
     }

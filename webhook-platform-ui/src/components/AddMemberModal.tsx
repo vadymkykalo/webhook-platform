@@ -67,11 +67,8 @@ export default function AddMemberModal({
         role,
       });
       
-      if (response.temporaryPassword) {
-        showSuccess(
-          `Member added! Temporary password: ${response.temporaryPassword}`,
-          { duration: 10000 }
-        );
+      if (response.status === 'INVITED') {
+        showSuccess('Invitation sent! The member will need to accept the invite.');
       } else {
         showSuccess('Member added successfully');
       }

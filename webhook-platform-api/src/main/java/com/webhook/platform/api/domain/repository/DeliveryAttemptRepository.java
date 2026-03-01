@@ -17,7 +17,18 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
     List<DeliveryAttempt> findByDeliveryIdOrderByAttemptNumberAsc(UUID deliveryId);
     
     Optional<DeliveryAttempt> findTopByDeliveryIdOrderByAttemptNumberDesc(UUID deliveryId);
-    
+
+    @Query(value = """
+        SELECT da.* FROM delivery_attempts da
+        INNER JOIN (
+            SELECT delivery_id, MAX(attempt_number) as max_attempt
+            FROM delivery_attempts
+            WHERE delivery_id IN :deliveryIds
+            GROUP BY delivery_id
+        ) latest ON da.delivery_id = latest.delivery_id AND da.attempt_number = latest.max_attempt
+        """, nativeQuery = true)
+    List<DeliveryAttempt> findLatestAttemptsByDeliveryIds(@Param("deliveryIds") List<UUID> deliveryIds);
+
     @Modifying(clearAutomatically = true)
     @Query(value = """
         WITH rows_to_delete AS (

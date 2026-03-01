@@ -60,4 +60,7 @@ public class OutboxMessage {
 
     @Column(name = "published_at")
     private Instant publishedAt;
+
+    @Column(name = "last_attempt_at")
+    private Instant lastAttemptAt;
 }

@@ -13,9 +13,12 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,6 +33,7 @@ public class EventIngestService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
+    private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
 
     public EventIngestService(
@@ -40,6 +44,7 @@ public class EventIngestService {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
+            PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
@@ -48,11 +53,27 @@ public class EventIngestService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
     }
 
-    @Transactional
     public EventIngestResponse ingestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
+        try {
+            return transactionTemplate.execute(status -> doIngestEvent(projectId, request, idempotencyKey));
+        } catch (DataIntegrityViolationException e) {
+            if (idempotencyKey != null) {
+                var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
+                if (existingEvent.isPresent()) {
+                    log.info("Idempotency race resolved, returning existing event: {}", existingEvent.get().getId());
+                    Counter.builder("events_duplicate_total").tag("event_type", request.getType()).register(meterRegistry).increment();
+                    return buildResponse(existingEvent.get(), 0);
+                }
+            }
+            throw e;
+        }
+    }
+
+    private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
         if (idempotencyKey != null) {
             var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
             if (existingEvent.isPresent()) {
@@ -100,9 +121,10 @@ public class EventIngestService {
         try {
             String payload = objectMapper.writeValueAsString(request.getData());
 
-            if (payload.length() > maxPayloadSizeBytes) {
+            long payloadBytes = payload.getBytes(StandardCharsets.UTF_8).length;
+            if (payloadBytes > maxPayloadSizeBytes) {
                 throw new IllegalArgumentException(
-                        "Event payload size (" + payload.length() + " bytes) exceeds maximum allowed size ("
+                        "Event payload size (" + payloadBytes + " bytes) exceeds maximum allowed size ("
                                 + maxPayloadSizeBytes + " bytes)");
             }
 

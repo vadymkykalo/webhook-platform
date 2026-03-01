@@ -26,10 +26,18 @@ public class WebhookVerifierFactory {
 
         // PROVIDER mode — pick strategy based on providerType
         if (source.getVerificationMode() == VerificationMode.PROVIDER) {
-            return getProviderVerifier(source.getProviderType());
+            WebhookVerificationStrategy verifier = getProviderVerifier(source.getProviderType());
+            if (verifier == null) {
+                throw new IllegalStateException(
+                        "No verifier available for provider type: " + source.getProviderType()
+                                + " on source " + source.getId());
+            }
+            return verifier;
         }
 
-        return null;
+        throw new IllegalStateException(
+                "Unknown verification mode: " + source.getVerificationMode()
+                        + " on source " + source.getId());
     }
 
     private WebhookVerificationStrategy getProviderVerifier(ProviderType providerType) {

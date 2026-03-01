@@ -2,9 +2,9 @@
 
 # Webhook Platform
 
-**Production-grade webhook delivery infrastructure you can self-host in 60 seconds.**
+**Production-grade webhook infrastructure you can self-host in 60 seconds.**
 
-At-least-once delivery · FIFO ordering · Automatic retries · HMAC signatures · mTLS · Multi-tenant
+Outgoing delivery · Incoming ingress · Signature verification · FIFO ordering · Automatic retries · mTLS · Multi-tenant
 
 [![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -34,25 +34,25 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 
 ## Why Webhook Platform?
 
-Building reliable webhook delivery is harder than it looks. Retries, ordering, signatures, rate limiting, dead letter queues, monitoring, multi-tenancy — that's a lot of infrastructure before you write a single line of business logic.
+Building reliable webhook infrastructure is harder than it looks — both **sending** and **receiving**. Retries, ordering, signatures, rate limiting, dead letter queues, provider-specific verification, forwarding to multiple destinations — that's a lot of plumbing before you write a single line of business logic.
 
-There are great commercial solutions like [Svix](https://www.svix.com/) and [Hookdeck](https://hookdeck.com/) that solve this well. Webhook Platform is a fully open-source, MIT-licensed alternative you can self-host and own entirely. It includes FIFO ordering, mTLS, a built-in request bin, and a multi-tenant admin dashboard out of the box.
+There are great commercial solutions like [Svix](https://www.svix.com/) and [Hookdeck](https://hookdeck.com/) that solve parts of this well. Webhook Platform is a fully open-source, MIT-licensed alternative you can self-host and own entirely. It handles both directions: **outgoing delivery** (fan-out to customer endpoints) and **incoming ingress** (receive from third-party providers, verify, and forward). It includes FIFO ordering, mTLS, provider-specific signature verification, payload transformation, a built-in request bin, and a multi-tenant admin dashboard out of the box.
 
 ---
 
 ## Use Cases
 
+### Outgoing — Deliver webhooks to your customers
+
 <details>
-<summary><b>E-commerce — Stripe / Shopify webhooks</b></summary>
+<summary><b>E-commerce — Fan-out order events</b></summary>
 
 ```
-Customer places order on Shopify
-     |
-Shopify sends webhook to your app
+Customer places order in your app
      |
 Your app calls Webhook Platform API
      |
-Platform delivers to:
+Platform delivers to customer endpoints:
   -> Inventory service (update stock)
   -> Email service (send confirmation)
   -> Analytics (record sale)
@@ -72,21 +72,6 @@ curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
     }
   }'
 ```
-</details>
-
-<details>
-<summary><b>Payments — Fan-out to multiple services</b></summary>
-
-```
-Stripe payment.succeeded
-     |
-Webhook Platform
-     |
-  -> Fulfillment service (ship product)
-  -> Accounting service (record revenue)
-  -> CRM (update customer status)
-  -> Slack #payments channel
-```
 
 One event, multiple reliable deliveries. Each endpoint gets independent retries, rate limiting, and delivery tracking.
 </details>
@@ -95,9 +80,7 @@ One event, multiple reliable deliveries. Each endpoint gets independent retries,
 <summary><b>CI/CD — GitHub / GitLab automation</b></summary>
 
 ```
-GitHub push event
-     |
-Webhook Platform
+GitHub push event → Your app → Webhook Platform
      |
   -> Build server (trigger CI)
   -> Deploy service (staging deploy)
@@ -105,37 +88,78 @@ Webhook Platform
 ```
 </details>
 
+### Incoming — Receive webhooks from third-party providers
+
 <details>
-<summary><b>Real-time data sync</b></summary>
+<summary><b>Stripe / Shopify / GitHub → Your services</b></summary>
 
 ```
-CRM contact.updated
+Stripe sends payment.succeeded
      |
-Webhook Platform
+POST /ingress/{token}   ← public URL, no auth needed
      |
-  -> Marketing platform (sync segments)
-  -> Support tool (update ticket context)
-  -> Data warehouse (ETL pipeline)
+Webhook Platform:
+  1. Verify Stripe signature (provider-specific)
+  2. Persist raw event for audit
+  3. Forward to your destinations:
+     -> Payment service (fulfill order)
+     -> Accounting API (record revenue)
+     -> Slack #payments (notify team)
 ```
+
+Each destination gets independent retries, auth headers (Bearer/Basic/custom), payload transformation, and SSRF protection.
+</details>
+
+<details>
+<summary><b>Multi-provider aggregation</b></summary>
+
+```
+GitHub    ──┐
+Stripe    ──┤ Each provider gets its own
+Shopify   ──┤ /ingress/{token} URL with
+Slack     ──┘ provider-specific signature verification
+     |
+Webhook Platform verifies + normalizes
+     |
+  -> Your unified event processing pipeline
+  -> Data warehouse (raw event archive)
+  -> Alerting service
+```
+
+One platform to receive from all providers. Each incoming source has its own ingress URL, verification mode, rate limits, and forwarding destinations.
 </details>
 
 ---
 
 ## Features
 
-### Core Delivery Engine
+### Outgoing — Core Delivery Engine
 - **Transactional outbox** — Kafka — at-least-once delivery (zero event loss)
 - **FIFO ordering** per endpoint via Redis ordering buffer + sequence numbers
 - **6-tier retry** with exponential backoff: 1m, 5m, 15m, 1h, 6h, 24h
 - **Dead Letter Queue** with one-click reprocessing from dashboard
 - **Circuit breaker** per endpoint — automatically pauses failing endpoints
 
+### Incoming — Webhook Ingress Engine
+- **Public ingress URLs** — unique `/ingress/{token}` per source, no auth required for providers
+- **Provider-specific signature verification** — built-in support for Stripe, GitHub, GitLab, Shopify, Slack
+- **Generic HMAC verification** — configurable header name, prefix, and algorithm for any provider
+- **Multi-destination forwarding** — fan-out each incoming event to multiple internal services
+- **Forwarding auth** — Bearer, Basic, or custom header authentication per destination
+- **Payload transformation** — JSONPath expressions to extract/reshape payloads before forwarding
+- **Per-source rate limiting** — protect your pipeline from provider bursts
+- **Full audit trail** — every incoming request persisted with headers, body, IP, verification status
+- **Retry with backoff** — configurable per-destination retry delays and max attempts
+
 ### Security
-- **HMAC-SHA256** signatures on every delivery
-- **AES-256-GCM** encryption for endpoint secrets at rest
+- **HMAC-SHA256** signatures on every outgoing delivery
+- **Incoming signature verification** — strategy pattern supporting 5+ providers
+- **AES-256-GCM** encryption for all secrets at rest (endpoint secrets, HMAC keys, auth configs)
 - **mTLS** — mutual TLS with per-endpoint client certificates
 - **Endpoint verification** — challenge-response before first delivery
+- **SSRF protection** — URL validation on both outgoing deliveries and incoming forwarding
 - **API key** authentication with project-level scoping and expiration
+- **Production safety validator** — startup guardrails prevent dev defaults in production
 
 ### Multi-tenancy & Access Control
 - **Organizations** — **Projects** — **Endpoints** — **Subscriptions**
@@ -203,36 +227,54 @@ Open the **Deliveries** tab in the dashboard to see real-time delivery status, r
 
 ```mermaid
 graph TB
+    subgraph "Third-Party Providers"
+        Stripe[Stripe]
+        GitHub[GitHub]
+        Shopify[Shopify]
+    end
+
     subgraph "Your Infrastructure"
         App[Your Application]
+        Svc1[Internal Service A]
+        Svc2[Internal Service B]
     end
     
     subgraph "Webhook Platform"
         UI[Dashboard<br/>React + Vite]
         API[API Service<br/>Spring Boot]
-        DB[(PostgreSQL<br/>Events · Deliveries · Outbox)]
+        DB[(PostgreSQL<br/>Events · Deliveries · Outbox<br/>Incoming Events · Forward Attempts)]
         Redis[(Redis<br/>Rate Limits · Ordering Buffer)]
-        Kafka[Kafka<br/>Delivery Dispatch · Retry Topics · DLQ]
+        Kafka[Kafka<br/>Delivery Topics · Forward Topics · Retry · DLQ]
         Worker[Worker Service<br/>Spring Boot]
     end
     
     subgraph "Customer Endpoints"
         EP1[Endpoint A]
         EP2[Endpoint B]
-        EP3[Endpoint C]
     end
     
+    %% Outgoing flow
     App -->|POST /api/v1/events| API
     UI  -->|REST API| API
-    API -->|Rate Limit Check| Redis
     API -->|Transactional Write| DB
     API -->|Outbox Publish| Kafka
-    Kafka -->|Consume| Worker
+    Kafka -->|Consume Deliveries| Worker
+    Worker -->|POST + HMAC| EP1
+    Worker -->|POST + HMAC| EP2
+    
+    %% Incoming flow
+    Stripe -->|POST /ingress/tok_stripe| API
+    GitHub -->|POST /ingress/tok_github| API
+    Shopify -->|POST /ingress/tok_shopify| API
+    API -->|Verify Signature + Persist| DB
+    Kafka -->|Consume Forwards| Worker
+    Worker -->|Forward + Auth| Svc1
+    Worker -->|Forward + Auth| Svc2
+    
+    %% Shared infra
+    API -->|Rate Limit| Redis
     Worker -->|Read/Update| DB
     Worker -->|Ordering Buffer| Redis
-    Worker -->|POST + HMAC-SHA256| EP1
-    Worker -->|POST + HMAC-SHA256| EP2
-    Worker -->|POST + HMAC-SHA256| EP3
     
     style API fill:#4CAF50
     style Worker fill:#2196F3
@@ -244,14 +286,14 @@ graph TB
 
 | Service | Port | Role |
 |---------|------|------|
-| **API** | `8080` | Event ingestion, REST API, outbox publisher |
-| **Worker** | `8081` | Kafka consumer, HTTP delivery, retry scheduling |
+| **API** | `8080` | Outgoing event ingestion, incoming webhook ingress, REST API, outbox publisher |
+| **Worker** | `8081` | Kafka consumer, outgoing HTTP delivery, incoming forwarding, retry scheduling |
 | **UI** | `5173` | Admin dashboard (React / Vite / shadcn/ui) |
-| **PostgreSQL** | `5432` | Persistent storage |
-| **Kafka** | `9092` | Message broker (dispatch + 6 retry topics + DLQ) |
-| **Redis** | `6379` | Rate limiting, FIFO ordering buffer |
+| **PostgreSQL** | `5432` | Events, deliveries, incoming events, forward attempts, outbox |
+| **Kafka** | `9092` | Delivery dispatch + 6 retry topics + incoming forward dispatch/retry |
+| **Redis** | `6379` | Rate limiting, FIFO ordering buffer, circuit breaker state |
 
-### How Delivery Works
+### How Outgoing Delivery Works
 
 ```mermaid
 sequenceDiagram
@@ -286,6 +328,66 @@ sequenceDiagram
         Worker->>DB: Status = DLQ
     end
 ```
+
+### How Incoming Ingress Works
+
+```mermaid
+sequenceDiagram
+    participant Provider as Third-Party Provider
+    participant API as API Service
+    participant DB as PostgreSQL
+    participant Kafka as Kafka
+    participant Worker as Worker
+    participant Dest as Your Internal Service
+
+    Provider->>API: POST /ingress/{token}
+    
+    API->>DB: Load IncomingSource by token
+    
+    alt Signature verification enabled
+        API->>API: Verify signature (Stripe/GitHub/Shopify/Slack/HMAC)
+    end
+    
+    API->>DB: INSERT IncomingEvent (headers, body, IP, verified status)
+
+    alt Signature invalid
+        API-->>Provider: 401 Unauthorized
+        Note over DB: Event persisted for audit trail
+    else Signature valid or verification disabled
+        API-->>Provider: 202 Accepted
+        API->>DB: INSERT ForwardAttempts + OutboxMessages (single TX)
+        
+        Note over API: Outbox publisher polls
+        API->>Kafka: Publish to incoming.forward.dispatch
+        
+        Kafka->>Worker: Consume forward message
+        Worker->>DB: Load event + destination
+        Worker->>Worker: Apply payload transform (JSONPath)
+        Worker->>Dest: POST body + auth headers (Bearer/Basic/custom)
+        
+        alt 2xx Response
+            Dest-->>Worker: 200 OK
+            Worker->>DB: Status = SUCCESS
+        else 5xx / Timeout
+            Dest-->>Worker: 503 / timeout
+            Worker->>DB: Schedule retry (configurable delays)
+            Note over Worker: Retry scheduler re-dispatches via Kafka
+        else All retries exhausted
+            Worker->>DB: Status = DLQ
+        end
+    end
+```
+
+### Supported Signature Verification
+
+| Provider | Header | Algorithm | Mode |
+|----------|--------|-----------|------|
+| **GitHub / GitLab** | `X-Hub-Signature-256` | HMAC-SHA256 | `PROVIDER` |
+| **Stripe** | `Stripe-Signature` | HMAC-SHA256 (timestamp + payload) | `PROVIDER` |
+| **Shopify** | `X-Shopify-Hmac-SHA256` | HMAC-SHA256 (Base64) | `PROVIDER` |
+| **Slack** | `X-Slack-Signature` | HMAC-SHA256 (v0:timestamp:body) | `PROVIDER` |
+| **Any provider** | _Configurable_ | HMAC with configurable prefix | `HMAC_GENERIC` |
+| **No verification** | — | — | `NONE` |
 
 ---
 
@@ -364,6 +466,99 @@ All SDKs include signature verification, error handling, and typescript/type hin
 
 ---
 
+## Incoming Webhooks — API Usage
+
+Set up incoming webhook ingress in 3 steps via the REST API (or through the dashboard).
+
+### Step 1: Create an Incoming Source
+
+```bash
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Stripe Payments",
+    "providerType": "STRIPE",
+    "verificationMode": "PROVIDER",
+    "hmacSecret": "whsec_your_stripe_webhook_secret",
+    "rateLimitPerSecond": 100
+  }'
+```
+
+Response includes the **ingress URL** — give this to the provider:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Stripe Payments",
+  "providerType": "STRIPE",
+  "verificationMode": "PROVIDER",
+  "ingressUrl": "http://localhost:8080/ingress/tok_a1b2c3d4e5f6",
+  "ingressPathToken": "tok_a1b2c3d4e5f6",
+  "hmacSecretConfigured": true,
+  "status": "ACTIVE"
+}
+```
+
+### Step 2: Add Forwarding Destinations
+
+```bash
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Payment Processing Service",
+    "url": "https://internal-api.example.com/webhooks/stripe",
+    "authType": "BEARER",
+    "authConfig": { "token": "internal_service_token" },
+    "payloadTransform": "$.data.object",
+    "maxAttempts": 5,
+    "retryDelays": "60,300,900,3600,21600"
+  }'
+```
+
+**Auth types:** `NONE`, `BEARER`, `BASIC`, `CUSTOM_HEADER`
+**Payload transform:** JSONPath expression to extract/reshape the body before forwarding
+
+### Step 3: Configure Provider Webhook URL
+
+Point your provider (Stripe, GitHub, etc.) to the ingress URL:
+
+```
+https://your-domain.com/ingress/tok_a1b2c3d4e5f6
+```
+
+That's it. Every webhook received at this URL will be:
+1. **Verified** against the provider's signature
+2. **Persisted** with full request metadata for audit
+3. **Forwarded** to all enabled destinations with retries
+
+### Verification Modes
+
+| Mode | Use when |
+|------|----------|
+| `PROVIDER` | Using a supported provider (Stripe, GitHub, GitLab, Shopify, Slack) — signature format auto-detected |
+| `HMAC_GENERIC` | Any provider that sends HMAC signatures — configure `hmacHeaderName` and `hmacSignaturePrefix` |
+| `NONE` | No signature verification (testing or trusted internal sources only) |
+
+**Generic HMAC example** (custom provider):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Custom Provider",
+    "providerType": "CUSTOM",
+    "verificationMode": "HMAC_GENERIC",
+    "hmacSecret": "my_webhook_secret",
+    "hmacHeaderName": "X-Webhook-Signature",
+    "hmacSignaturePrefix": "sha256="
+  }'
+```
+
+---
+
 ## Deployment
 
 ### Development
@@ -399,6 +594,7 @@ make shell-db             # Open psql shell
 make dev-api              # Quick rebuild API + tail logs
 make verify-link          # Show email verification link from logs
 make reset-link           # Show password reset link from logs
+make invite-link          # Show member invite link from logs
 make nuke CONFIRM=YES     # Destroy everything
 ```
 
@@ -428,6 +624,24 @@ make reset-link
 ```
 
 Open the printed URL in a browser to set a new password. The link expires in 1 hour.
+</details>
+
+<details>
+<summary>Member invite in local development</summary>
+
+When an OWNER adds a new member via the Members page, an invite link is printed to the API logs (when `EMAIL_ENABLED=false`).
+
+```bash
+make invite-link
+```
+
+The invite flow:
+1. OWNER adds member by email on the Members page → membership created with `INVITED` status
+2. New user account is auto-created with a temporary password (logged server-side)
+3. Invite link is logged to API console — grab it with `make invite-link`
+4. Open the link in a browser while logged in as the invited user → status changes to `ACTIVE`
+
+The invite token expires in 48 hours. If it expires, the OWNER must remove and re-add the member.
 </details>
 
 <details>

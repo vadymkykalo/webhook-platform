@@ -1335,5 +1335,18 @@
     "delivered": "Delivered",
     "retrying": "Retrying",
     "failed": "Failed"
+  },
+  "invite": {
+    "accepting": "Accepting invitation...",
+    "pleaseWait": "Please wait a moment.",
+    "success": "Invitation Accepted!",
+    "successDesc": "You are now a member of the organization. Welcome aboard!",
+    "goToDashboard": "Go to Dashboard",
+    "errorTitle": "Invitation Failed",
+    "noToken": "Invalid invite link. Token or organization ID is missing.",
+    "failed": "Failed to accept invitation. The token may be invalid or expired.",
+    "loginRequired": "Login Required",
+    "loginRequiredDesc": "Please log in or register to accept this invitation.",
+    "goToLogin": "Log in to continue"
   }
 }

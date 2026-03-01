@@ -10,10 +10,10 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,10 +40,11 @@ public class IncomingForwardRetryScheduler {
     }
 
     @Scheduled(fixedDelayString = "${incoming-forward.retry.poll-interval-ms:10000}")
+    @Transactional
     public void pollPendingRetries() {
         try {
             List<IncomingForwardAttempt> pendingRetries = attemptRepository
-                    .findPendingRetries(ForwardAttemptStatus.PENDING, Instant.now(), PageRequest.of(0, batchSize));
+                    .findPendingRetriesForUpdate(ForwardAttemptStatus.PENDING, Instant.now(), batchSize);
 
             if (pendingRetries.isEmpty()) {
                 return;

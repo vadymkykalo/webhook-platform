@@ -86,10 +86,12 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             @Param("from") Instant from,
             @Param("to") Instant to);
 
-    @Query("SELECT d FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId ORDER BY d.failedAt DESC")
+    @Query(value = "SELECT d FROM Delivery d JOIN FETCH d.event JOIN FETCH d.endpoint WHERE d.status = 'DLQ' AND d.event.projectId = :projectId ORDER BY d.failedAt DESC",
+            countQuery = "SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")
     Page<Delivery> findDlqByProjectId(@Param("projectId") UUID projectId, Pageable pageable);
 
-    @Query("SELECT d FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId AND d.endpointId = :endpointId ORDER BY d.failedAt DESC")
+    @Query(value = "SELECT d FROM Delivery d JOIN FETCH d.event JOIN FETCH d.endpoint WHERE d.status = 'DLQ' AND d.event.projectId = :projectId AND d.endpointId = :endpointId ORDER BY d.failedAt DESC",
+            countQuery = "SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId AND d.endpointId = :endpointId")
     Page<Delivery> findDlqByProjectIdAndEndpointId(@Param("projectId") UUID projectId, @Param("endpointId") UUID endpointId, Pageable pageable);
 
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")

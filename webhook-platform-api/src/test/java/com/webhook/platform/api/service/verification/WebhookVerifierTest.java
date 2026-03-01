@@ -17,6 +17,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -325,11 +326,13 @@ class WebhookVerifierTest {
     }
 
     @Test
-    void factory_returnsNullForGenericProvider() {
+    void factory_throwsForGenericProviderInProviderMode() {
         var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GENERIC);
 
-        assertThat(factory.getVerifier(source)).isNull();
+        assertThatThrownBy(() -> factory.getVerifier(source))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No verifier available for provider type");
     }
 
     // ======================== helpers ========================
