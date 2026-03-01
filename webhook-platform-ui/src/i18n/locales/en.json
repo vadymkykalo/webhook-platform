@@ -448,7 +448,13 @@
     "bulkReplay": "Replay All {{status}}",
     "replaying": "Replaying...",
     "replayError": "Please select a status filter (FAILED or DLQ) before bulk replay",
-    "justNow": "just now"
+    "justNow": "just now",
+    "bulkReplayDialog": {
+      "title": "Replay all {{status}} deliveries?",
+      "description": "This will re-send {{count}} deliveries with status {{status}}. Each delivery will be attempted again from scratch.",
+      "warning": "Bulk replay may cause duplicate deliveries if the destination is not idempotent. Make sure your consumers can handle repeated events.",
+      "confirm": "Replay All"
+    }
   },
   "apiKeys": {
     "title": "API Keys",
@@ -1337,6 +1343,8 @@
     "subtitle": "Incoming webhook events for <strong>{{project}}</strong>",
     "noEvents": "No incoming events yet",
     "noEventsDesc": "Events will appear here when external providers send webhooks to your sources",
+    "noEventsNoSourcesDesc": "You need to create an incoming source first. Set up an ingress endpoint, then send webhooks to it.",
+    "createSourceFirst": "Create Incoming Source",
     "columns": {
       "received": "Received",
       "source": "Source",
@@ -1560,7 +1568,9 @@
     "noToken": "Invalid invite link. Token or organization ID is missing.",
     "failed": "Failed to accept invitation. The token may be invalid or expired.",
     "loginRequired": "Login Required",
-    "loginRequiredDesc": "Please log in or register to accept this invitation.",
-    "goToLogin": "Log in to continue"
+    "loginRequiredDesc": "You need to sign in to accept this invitation.",
+    "goToLogin": "Log in to continue",
+    "goToRegister": "Create an account",
+    "newUserHint": "Don't have an account yet? Register first, then you'll be redirected back to accept the invite."
   }
 }
