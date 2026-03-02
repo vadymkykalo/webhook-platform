@@ -58,7 +58,7 @@ class DeliveryRepositoryTest {
     private TestEntityManager entityManager;
 
     @Test
-    void findPendingRetriesForUpdate_shouldOnlySelectPendingStatus() {
+    void findPendingRetryIds_shouldOnlySelectPendingStatus() {
         // Arrange
         Instant now = Instant.now();
         Delivery pending = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(60));
@@ -69,12 +69,9 @@ class DeliveryRepositoryTest {
         entityManager.clear();
 
         // Act
-        List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
-                Delivery.DeliveryStatus.PENDING,
-                now,
-                10,
-                100
-        );
+        List<UUID> ids = deliveryRepository.findPendingRetryIds(
+                Delivery.DeliveryStatus.PENDING, now, 10, 100);
+        List<Delivery> result = deliveryRepository.lockByIds(ids);
 
         // Assert
         assertEquals(1, result.size());
@@ -82,7 +79,7 @@ class DeliveryRepositoryTest {
     }
 
     @Test
-    void findPendingRetriesForUpdate_shouldOnlySelectDueRetries() {
+    void findPendingRetryIds_shouldOnlySelectDueRetries() {
         // Arrange
         Instant now = Instant.now();
         Delivery overdue = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(120));
@@ -94,12 +91,9 @@ class DeliveryRepositoryTest {
         entityManager.clear();
 
         // Act
-        List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
-                Delivery.DeliveryStatus.PENDING,
-                now,
-                10,
-                100
-        );
+        List<UUID> ids = deliveryRepository.findPendingRetryIds(
+                Delivery.DeliveryStatus.PENDING, now, 10, 100);
+        List<Delivery> result = deliveryRepository.lockByIds(ids);
 
         // Assert
         assertEquals(2, result.size());
@@ -108,7 +102,7 @@ class DeliveryRepositoryTest {
     }
 
     @Test
-    void findPendingRetriesForUpdate_shouldOrderByNextRetryAtAsc() {
+    void lockByIds_shouldOrderByNextRetryAtAsc() {
         // Arrange
         Instant now = Instant.now();
         Delivery third = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(10));
@@ -119,12 +113,9 @@ class DeliveryRepositoryTest {
         entityManager.clear();
 
         // Act
-        List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
-                Delivery.DeliveryStatus.PENDING,
-                now,
-                10,
-                100
-        );
+        List<UUID> ids = deliveryRepository.findPendingRetryIds(
+                Delivery.DeliveryStatus.PENDING, now, 10, 100);
+        List<Delivery> result = deliveryRepository.lockByIds(ids);
 
         // Assert
         assertEquals(3, result.size());
@@ -134,7 +125,7 @@ class DeliveryRepositoryTest {
     }
 
     @Test
-    void findPendingRetriesForUpdate_shouldRespectPageSize() {
+    void findPendingRetryIds_shouldRespectPageSize() {
         // Arrange
         Instant now = Instant.now();
         for (int i = 0; i < 15; i++) {
@@ -145,15 +136,11 @@ class DeliveryRepositoryTest {
         entityManager.clear();
 
         // Act
-        List<Delivery> page1 = deliveryRepository.findPendingRetriesForUpdate(
-                Delivery.DeliveryStatus.PENDING,
-                now,
-                5,
-                100
-        );
+        List<UUID> ids = deliveryRepository.findPendingRetryIds(
+                Delivery.DeliveryStatus.PENDING, now, 5, 100);
 
         // Assert
-        assertEquals(5, page1.size());
+        assertEquals(5, ids.size());
     }
 
     private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt) {

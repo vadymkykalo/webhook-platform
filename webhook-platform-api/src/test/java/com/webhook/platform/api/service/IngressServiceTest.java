@@ -44,13 +44,20 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IngressServiceTest {
 
-    @Mock private IncomingSourceRepository sourceRepository;
-    @Mock private IncomingEventRepository eventRepository;
-    @Mock private IncomingDestinationRepository destinationRepository;
-    @Mock private IncomingForwardAttemptRepository forwardAttemptRepository;
-    @Mock private OutboxMessageRepository outboxMessageRepository;
-    @Mock private HttpServletRequest httpRequest;
-    @Mock private RedisRateLimiterService rateLimiterService;
+    @Mock
+    private IncomingSourceRepository sourceRepository;
+    @Mock
+    private IncomingEventRepository eventRepository;
+    @Mock
+    private IncomingDestinationRepository destinationRepository;
+    @Mock
+    private IncomingForwardAttemptRepository forwardAttemptRepository;
+    @Mock
+    private OutboxMessageRepository outboxMessageRepository;
+    @Mock
+    private HttpServletRequest httpRequest;
+    @Mock
+    private RedisRateLimiterService rateLimiterService;
 
     private IngressService service;
     private final WebhookVerifierFactory verifierFactory = new WebhookVerifierFactory();

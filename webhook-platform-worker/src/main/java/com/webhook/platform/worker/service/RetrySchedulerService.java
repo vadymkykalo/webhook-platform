@@ -51,12 +51,19 @@ public class RetrySchedulerService {
     public void scheduleRetries() {
         Instant now = Instant.now();
 
-        // Use efficient DB query with pagination and row-level locking
-        List<Delivery> pendingRetries = deliveryRepository.findPendingRetriesForUpdate(
+        // Step 1: find candidate IDs (window function, no locking)
+        List<UUID> candidateIds = deliveryRepository.findPendingRetryIds(
                 Delivery.DeliveryStatus.PENDING,
                 now,
                 batchSize,
                 10);
+
+        if (candidateIds.isEmpty()) {
+            return;
+        }
+
+        // Step 2: lock rows for update (no window function)
+        List<Delivery> pendingRetries = deliveryRepository.lockByIds(candidateIds);
 
         if (pendingRetries.isEmpty()) {
             return;
