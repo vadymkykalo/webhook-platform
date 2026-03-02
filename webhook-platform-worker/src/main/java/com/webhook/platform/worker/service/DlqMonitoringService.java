@@ -10,6 +10,7 @@ import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
+import jakarta.annotation.PreDestroy;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,16 @@ public class DlqMonitoringService {
                 .register(meterRegistry);
 
         log.info("DLQ monitoring initialized");
+    }
+
+    @PreDestroy
+    public void close() {
+        try {
+            adminClient.close();
+            log.info("DLQ monitoring AdminClient closed");
+        } catch (Exception e) {
+            log.warn("Failed to close DLQ AdminClient: {}", e.getMessage());
+        }
     }
 
     @Scheduled(fixedDelayString = "${dlq.monitoring.interval-ms:60000}")

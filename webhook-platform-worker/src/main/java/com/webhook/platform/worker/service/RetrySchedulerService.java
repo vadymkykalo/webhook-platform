@@ -55,7 +55,8 @@ public class RetrySchedulerService {
         List<Delivery> pendingRetries = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                batchSize);
+                batchSize,
+                10);
 
         if (pendingRetries.isEmpty()) {
             return;

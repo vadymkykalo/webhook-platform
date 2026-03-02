@@ -72,7 +72,8 @@ class DeliveryRepositoryTest {
         List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                10
+                10,
+                100
         );
 
         // Assert
@@ -96,7 +97,8 @@ class DeliveryRepositoryTest {
         List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                10
+                10,
+                100
         );
 
         // Assert
@@ -120,7 +122,8 @@ class DeliveryRepositoryTest {
         List<Delivery> result = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                10
+                10,
+                100
         );
 
         // Assert
@@ -145,7 +148,8 @@ class DeliveryRepositoryTest {
         List<Delivery> page1 = deliveryRepository.findPendingRetriesForUpdate(
                 Delivery.DeliveryStatus.PENDING,
                 now,
-                5
+                5,
+                100
         );
 
         // Assert

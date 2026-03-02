@@ -336,6 +336,50 @@ class IngressServiceTest {
         assertThat(event.getClientIp()).isEqualTo("203.0.113.50");
     }
 
+    @Test
+    void receiveWebhook_duplicateProviderEventId_returnsExisting() {
+        IncomingSource source = buildActiveSource();
+        IncomingEvent existing = IncomingEvent.builder()
+                .id(eventId).incomingSourceId(sourceId)
+                .requestId("old-req").method("POST")
+                .providerEventId("evt_123")
+                .receivedAt(Instant.now())
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_123");
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_123"))
+                .thenReturn(Optional.of(existing));
+
+        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        // No new event saved, no forwarding
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+        verify(forwardAttemptRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void receiveWebhook_newProviderEventId_setsFieldOnEvent() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(eq(sourceId), anyString()))
+                .thenReturn(Optional.empty());
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("Stripe-Webhook-Id")).thenReturn("evt_stripe_456");
+
+        IncomingEvent result = service.receiveWebhook("validtoken", "{}", httpRequest);
+
+        assertThat(result.getProviderEventId()).isEqualTo("evt_stripe_456");
+    }
+
     private String computeHmac(String secret, String body) {
         try {
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");

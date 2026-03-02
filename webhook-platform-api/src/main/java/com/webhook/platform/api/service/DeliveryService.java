@@ -105,6 +105,7 @@ public class DeliveryService {
             UUID organizationId,
             DeliveryStatus status,
             UUID endpointId,
+            UUID eventId,
             Instant fromDate,
             Instant toDate,
             Pageable pageable
@@ -116,10 +117,15 @@ public class DeliveryService {
             throw new ForbiddenException("Access denied");
         }
 
-        List<UUID> eventIds = eventRepository.findByProjectId(projectId)
-                .stream()
-                .map(Event::getId)
-                .toList();
+        List<UUID> eventIds;
+        if (eventId != null) {
+            eventIds = List.of(eventId);
+        } else {
+            eventIds = eventRepository.findByProjectId(projectId)
+                    .stream()
+                    .map(Event::getId)
+                    .toList();
+        }
 
         if (eventIds.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);

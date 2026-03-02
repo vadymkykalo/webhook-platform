@@ -104,26 +104,33 @@ public class EventIngestService {
             }
         }
 
-        Event event = createEvent(projectId, request, idempotencyKey);
-        event = eventRepository.saveAndFlush(event);
-        Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
-        log.info("Created event: {} for project: {}", event.getId(), projectId);
-
-        // Schema validation (optional, per-project setting)
+        // Schema validation BEFORE saving event
         if (project != null && Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
-            schemaRegistryService.autoDiscover(projectId, request.getType(), event.getPayload());
+            String payloadJson;
+            try {
+                payloadJson = objectMapper.writeValueAsString(request.getData());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to serialize event payload", e);
+            }
+
+            schemaRegistryService.autoDiscover(projectId, request.getType(), payloadJson);
 
             List<String> validationErrors = schemaRegistryService.validatePayload(
-                    projectId, request.getType(), event.getPayload());
+                    projectId, request.getType(), payloadJson);
             if (!validationErrors.isEmpty()) {
-                log.warn("Schema validation failed for event {} (type '{}'): {}",
-                        event.getId(), request.getType(), validationErrors);
+                log.warn("Schema validation failed for event type '{}': {}",
+                        request.getType(), validationErrors);
                 if (project.getSchemaValidationPolicy() == SchemaValidationPolicy.BLOCK) {
                     throw new IllegalArgumentException(
                             "Schema validation failed: " + String.join("; ", validationErrors));
                 }
             }
         }
+
+        Event event = createEvent(projectId, request, idempotencyKey);
+        event = eventRepository.saveAndFlush(event);
+        Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
+        log.info("Created event: {} for project: {}", event.getId(), projectId);
 
         List<Subscription> subscriptions = subscriptionRepository
                 .findByProjectIdAndEnabledTrue(projectId).stream()

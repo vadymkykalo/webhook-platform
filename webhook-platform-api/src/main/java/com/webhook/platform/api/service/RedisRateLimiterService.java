@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.dto.RateLimitInfo;
+import com.webhook.platform.api.dto.RateLimitResult;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.Counter;
@@ -64,6 +65,58 @@ public class RedisRateLimiterService {
 
     public boolean tryAcquire(UUID projectId, int ratePerSecond) {
         return doTryAcquire(KEY_PREFIX + projectId, projectId, ratePerSecond);
+    }
+
+    public RateLimitResult tryAcquireWithInfo(UUID projectId) {
+        return tryAcquireWithInfo(projectId, defaultRateLimit);
+    }
+
+    public RateLimitResult tryAcquireWithInfo(UUID projectId, int ratePerSecond) {
+        try {
+            String key = KEY_PREFIX + projectId;
+            RRateLimiter limiter = redissonClient.getRateLimiter(key);
+            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
+            limiter.expire(KEY_TTL);
+
+            boolean acquired = limiter.tryAcquire(1);
+            long available = limiter.availablePermits();
+            int remaining = (int) Math.max(0, Math.min(available, ratePerSecond));
+            long resetTimestamp = Instant.now().plusSeconds(1).getEpochSecond();
+
+            if (acquired) {
+                rateLimitHits.increment();
+            } else {
+                rateLimitExceeded.increment();
+                log.warn("Rate limit exceeded for project: {} (limit: {}/sec)", projectId, ratePerSecond);
+            }
+
+            RateLimitInfo info = RateLimitInfo.builder()
+                    .limit(ratePerSecond)
+                    .remaining(acquired ? remaining : 0)
+                    .resetTimestamp(resetTimestamp)
+                    .build();
+
+            return RateLimitResult.builder()
+                    .acquired(acquired)
+                    .info(info)
+                    .retryAfterSeconds(acquired ? 0 : 1)
+                    .build();
+        } catch (Exception e) {
+            log.warn("Redis rate limiter unavailable, using local fallback for project {}: {}",
+                    projectId, e.getMessage());
+            rateLimitFallback.increment();
+            boolean acquired = tryLocalFallback(projectId, ratePerSecond);
+            RateLimitInfo info = RateLimitInfo.builder()
+                    .limit(ratePerSecond)
+                    .remaining(acquired ? ratePerSecond - 1 : 0)
+                    .resetTimestamp(Instant.now().plusSeconds(1).getEpochSecond())
+                    .build();
+            return RateLimitResult.builder()
+                    .acquired(acquired)
+                    .info(info)
+                    .retryAfterSeconds(acquired ? 0 : 1)
+                    .build();
+        }
     }
 
     public boolean tryAcquireForSource(UUID sourceId, int ratePerSecond) {

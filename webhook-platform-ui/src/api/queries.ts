@@ -35,7 +35,7 @@ export const queryKeys = {
         list: (projectId: string, filters: DeliveryFilters) => ['deliveries', projectId, filters] as const,
     },
     events: {
-        list: (projectId: string, page: number, size: number) => ['events', projectId, page, size] as const,
+        list: (projectId: string, page: number, size: number, sort?: string) => ['events', projectId, page, size, sort] as const,
     },
     subscriptions: {
         list: (projectId: string) => ['subscriptions', projectId] as const,
@@ -84,6 +84,7 @@ export function useProjects() {
     return useQuery({
         queryKey: queryKeys.projects.all,
         queryFn: () => projectsApi.list(),
+        staleTime: 0,
     });
 }
 
@@ -118,6 +119,7 @@ export function useDashboardStats(projectId: string | undefined) {
         queryKey: queryKeys.dashboard.stats(projectId!),
         queryFn: () => dashboardApi.getProjectStats(projectId!),
         enabled: !!projectId,
+        staleTime: 0,
     });
 }
 
@@ -136,6 +138,7 @@ export function useEndpoints(projectId: string | undefined) {
         queryKey: queryKeys.endpoints.list(projectId!),
         queryFn: () => endpointsApi.list(projectId!),
         enabled: !!projectId,
+        staleTime: 0,
     });
 }
 
@@ -229,10 +232,10 @@ export function useBulkReplayDeliveries() {
 
 // ─── Events ────────────────────────────────────────────────────────
 
-export function useEvents(projectId: string | undefined, page: number, size = 20) {
+export function useEvents(projectId: string | undefined, page: number, size = 20, sort = 'createdAt,desc') {
     return useQuery({
-        queryKey: queryKeys.events.list(projectId!, page, size),
-        queryFn: () => eventsApi.listByProject(projectId!, { page, size }),
+        queryKey: queryKeys.events.list(projectId!, page, size, sort),
+        queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort }),
         enabled: !!projectId,
     });
 }
@@ -244,6 +247,7 @@ export function useSubscriptions(projectId: string | undefined) {
         queryKey: queryKeys.subscriptions.list(projectId!),
         queryFn: () => subscriptionsApi.list(projectId!),
         enabled: !!projectId,
+        staleTime: 0,
     });
 }
 
@@ -321,6 +325,7 @@ export function useApiKeysPaged(projectId: string | undefined, page: number, siz
         queryKey: queryKeys.apiKeys.paged(projectId!, page, size),
         queryFn: () => apiKeysApi.listPaged(projectId!, page, size),
         enabled: !!projectId,
+        staleTime: 0,
     });
 }
 
@@ -433,6 +438,7 @@ export function useIncomingSources(projectId: string | undefined, page: number, 
         queryKey: queryKeys.incomingSources.list(projectId!, page, size),
         queryFn: () => incomingSourcesApi.list(projectId!, page, size),
         enabled: !!projectId,
+        staleTime: 0,
     });
 }
 

@@ -4,8 +4,10 @@ import type { DeliveryResponse, DeliveryAttemptResponse, PageResponse } from '..
 export interface DeliveryFilters {
   page?: number;
   size?: number;
+  sort?: string;
   status?: string;
   endpointId?: string;
+  eventId?: string;
   fromDate?: string;
   toDate?: string;
 }
@@ -48,6 +50,8 @@ export const deliveriesApi = {
     if (filters?.size !== undefined) params.append('size', filters.size.toString());
     if (filters?.status) params.append('status', filters.status);
     if (filters?.endpointId) params.append('endpointId', filters.endpointId);
+    if (filters?.eventId) params.append('eventId', filters.eventId);
+    if (filters?.sort) params.append('sort', filters.sort);
     if (filters?.fromDate) params.append('fromDate', filters.fromDate);
     if (filters?.toDate) params.append('toDate', filters.toDate);
     

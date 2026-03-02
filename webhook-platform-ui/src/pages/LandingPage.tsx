@@ -321,6 +321,29 @@ function FlowConnector({ fromCount, toCount }: { fromCount: number; toCount: num
 function FlowDiagram() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'send' | 'receive'>('send');
+  const [eventCount, setEventCount] = useState(12_847);
+  const [deliveredFlags, setDeliveredFlags] = useState<boolean[]>([]);
+
+  // Live event counter
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setEventCount(prev => prev + Math.floor(Math.random() * 3) + 1);
+    }, 2200);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Staggered destination delivery animation
+  useEffect(() => {
+    setDeliveredFlags([]);
+    const count = activeTab === 'send' ? 3 : 1;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 0; i < count; i++) {
+      timers.push(setTimeout(() => {
+        setDeliveredFlags(prev => [...prev, true]);
+      }, 800 + i * 600));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [activeTab]);
 
   const sendSources = [{ label: t('landing.flowDiagram.sendSource'), icon: Webhook }];
   const sendDestinations = [
@@ -345,24 +368,45 @@ function FlowDiagram() {
     { label: t('landing.flowDiagram.monitoring'), icon: Eye },
   ];
 
-  const renderPill = (item: any, idx: number) => (
-    <div
-      key={idx}
-      className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm"
-    >
-      {'src' in item ? (
-        <img src={item.src} alt={item.label} className="h-5 w-5 object-contain" />
-      ) : (
-        <item.icon className="h-5 w-5 text-primary" />
-      )}
-      <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{item.label}</span>
-    </div>
-  );
+  const renderPill = (item: any, idx: number, side: 'source' | 'dest') => {
+    const isDelivered = side === 'dest' && deliveredFlags[idx];
+    return (
+      <div
+        key={idx}
+        className={`relative flex items-center gap-2.5 px-4 py-2.5 rounded-xl border bg-background shadow-sm transition-all duration-500 ${side === 'source' ? 'animate-[slideInLeft_0.5s_ease-out_both]' : 'animate-[slideInRight_0.5s_ease-out_both]'}`}
+        style={{ animationDelay: `${idx * 150}ms` }}
+      >
+        {'src' in item ? (
+          <img src={item.src} alt={item.label} className="h-5 w-5 object-contain" />
+        ) : (
+          <item.icon className="h-5 w-5 text-primary" />
+        )}
+        <span className="text-xs font-semibold tracking-wide whitespace-nowrap">{item.label}</span>
+        {isDelivered && (
+          <div className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-green-500 flex items-center justify-center animate-[scaleIn_0.3s_ease-out_both] shadow-sm shadow-green-500/30">
+            <CheckCircle2 className="h-3 w-3 text-white" />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <section className="py-24">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-24 relative overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/[0.02] rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
         <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+            <Activity className="h-3 w-3" />
+            <span className="relative flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              Live architecture
+            </span>
+          </div>
           <h2 className="text-headline mb-4">
             {t('landing.flowDiagram.title')}
             <span className="gradient-text">{t('landing.flowDiagram.titleHighlight')}</span>
@@ -379,27 +423,35 @@ function FlowDiagram() {
               onClick={() => setActiveTab('send')}
               className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'send' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              {t('landing.flowDiagram.tabSend')}
+              <span className="flex items-center gap-2">
+                <ArrowRight className="h-3.5 w-3.5" />
+                {t('landing.flowDiagram.tabSend')}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('receive')}
               className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'receive' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              {t('landing.flowDiagram.tabReceive')}
+              <span className="flex items-center gap-2">
+                <ArrowDownToLine className="h-3.5 w-3.5" />
+                {t('landing.flowDiagram.tabReceive')}
+              </span>
             </button>
           </div>
         </div>
 
         {/* Flow Diagram Card */}
-        <div className="relative max-w-4xl mx-auto rounded-2xl border bg-card p-8 md:p-12 shadow-sm overflow-hidden">
+        <div className="relative max-w-4xl mx-auto rounded-2xl border bg-card p-8 md:p-12 shadow-elevated overflow-hidden">
           {/* Background dots pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+          {/* Gradient glow behind hub */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-primary/[0.06] rounded-full blur-[80px] pointer-events-none" />
 
           {/* Desktop: SVG bezier curve connections */}
-          <div className="relative hidden md:flex items-stretch min-h-[240px]">
+          <div key={activeTab} className="relative hidden md:flex items-stretch min-h-[260px]">
             {/* Sources column */}
             <div className="flex flex-col justify-around flex-shrink-0 z-10 py-4">
-              {sources.map((s, i) => renderPill(s, i))}
+              {sources.map((s, i) => renderPill(s, i, 'source'))}
             </div>
 
             {/* Left SVG connector */}
@@ -408,18 +460,34 @@ function FlowDiagram() {
             </div>
 
             {/* Center hub */}
-            <div className="flex flex-col items-center justify-center gap-3 flex-shrink-0 z-10 px-3">
-              <div className="h-[72px] w-[72px] rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20 ring-4 ring-primary/10 hub-pulse">
-                <HookflowIcon className="h-9 w-9 text-white" />
+            <div className="flex flex-col items-center justify-center gap-2 flex-shrink-0 z-10 px-3">
+              <div className="relative">
+                <div className="absolute -inset-3 rounded-3xl bg-primary/10 animate-pulse" />
+                <div className="relative h-[76px] w-[76px] rounded-2xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/25 ring-4 ring-primary/10 hub-pulse">
+                  <HookflowIcon className="h-10 w-10 text-white" />
+                </div>
               </div>
               <span className="text-sm font-bold tracking-tight">Hookflow</span>
               <div className="flex flex-wrap justify-center gap-1.5 mt-1">
-                {badges.map((b) => (
-                  <span key={b.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                {badges.map((b, i) => (
+                  <span
+                    key={b.label}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold animate-[fadeInUp_0.4s_ease-out_both]"
+                    style={{ animationDelay: `${400 + i * 150}ms` }}
+                  >
                     <b.icon className="h-2.5 w-2.5" />
                     {b.label}
                   </span>
                 ))}
+              </div>
+              {/* Live counter */}
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground animate-[fadeIn_1s_ease-out_both]" style={{ animationDelay: '1s' }}>
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+                </span>
+                <span className="font-mono font-semibold tabular-nums">{eventCount.toLocaleString()}</span>
+                <span>events processed</span>
               </div>
             </div>
 
@@ -430,28 +498,48 @@ function FlowDiagram() {
 
             {/* Destinations column */}
             <div className="flex flex-col justify-around flex-shrink-0 z-10 py-4">
-              {destinations.map((d, i) => renderPill(d, i))}
+              {destinations.map((d, i) => renderPill(d, i, 'dest'))}
             </div>
           </div>
 
           {/* Mobile: simple vertical flow */}
           <div className="md:hidden flex flex-col items-center gap-3 relative">
-            {sources.map((s, i) => renderPill(s, i))}
+            {sources.map((s, i) => renderPill(s, i, 'source'))}
             <div className="h-8 w-px border-l-2 border-dashed border-primary/30" />
             <div className="flex flex-col items-center gap-2">
-              <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg">
+              <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg hub-pulse">
                 <HookflowIcon className="h-7 w-7 text-white" />
               </div>
               <span className="text-xs font-bold">Hookflow</span>
             </div>
             <div className="h-8 w-px border-l-2 border-dashed border-primary/30" />
-            {destinations.map((d, i) => renderPill(d, i))}
+            {destinations.map((d, i) => renderPill(d, i, 'dest'))}
           </div>
 
-          {/* Description under diagram */}
-          <p className="text-center text-sm text-muted-foreground mt-8 max-w-lg mx-auto">
-            {activeTab === 'send' ? t('landing.flowDiagram.sendDesc') : t('landing.flowDiagram.receiveDesc')}
-          </p>
+          {/* Description + stats under diagram */}
+          <div className="mt-8 space-y-5">
+            <p className="text-center text-sm text-muted-foreground max-w-lg mx-auto">
+              {activeTab === 'send' ? t('landing.flowDiagram.sendDesc') : t('landing.flowDiagram.receiveDesc')}
+            </p>
+
+            {/* Live stats bar */}
+            <div className="flex items-center justify-center gap-6 md:gap-10 pt-5 border-t border-border/50">
+              {[
+                { value: '< 100ms', label: 'p99 latency', icon: Zap, color: 'text-amber-500' },
+                { value: '99.99%', label: 'delivery rate', icon: CheckCircle2, color: 'text-green-500' },
+                { value: '7 tiers', label: 'auto-retry', icon: RefreshCw, color: 'text-blue-500' },
+                { value: 'SHA-256', label: 'every payload', icon: Shield, color: 'text-violet-500' },
+              ].map((stat, i) => (
+                <div key={stat.label} className="flex items-center gap-2 animate-[fadeInUp_0.4s_ease-out_both]" style={{ animationDelay: `${1200 + i * 100}ms` }}>
+                  <stat.icon className={`h-3.5 w-3.5 ${stat.color}`} />
+                  <div>
+                    <div className="text-xs font-bold">{stat.value}</div>
+                    <div className="text-[10px] text-muted-foreground">{stat.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1039,11 +1127,49 @@ function HowItWorks() {
 
 function Integrations() {
   const { t } = useTranslation();
+  const [activeSdk, setActiveSdk] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   const sdks = [
-    { name: 'Node.js', desc: t('landing.integrations.nodeDesc'), logoSrc: '/logos/typescript.svg' },
-    { name: 'Python', desc: t('landing.integrations.pythonDesc'), logoSrc: '/logos/python.svg' },
-    { name: 'PHP', desc: t('landing.integrations.phpDesc'), logoSrc: '/logos/php.svg' },
+    {
+      name: 'Node.js',
+      install: 'npm install @webhook-platform/node',
+      logoSrc: '/logos/typescript.svg',
+      code: `import { Hookflow } from '@webhook-platform/node';
+
+const hf = new Hookflow({ apiKey: 'wh_live_...' });
+
+await hf.events.send({
+  type: 'order.completed',
+  data: { orderId: 'ord_123', amount: 99.99 }
+});`,
+    },
+    {
+      name: 'Python',
+      install: 'pip install webhook-platform',
+      logoSrc: '/logos/python.svg',
+      code: `from hookflow import Hookflow
+
+hf = Hookflow(api_key="wh_live_...")
+
+hf.events.send(
+    event_type="order.completed",
+    data={"order_id": "ord_123", "amount": 99.99}
+)`,
+    },
+    {
+      name: 'PHP',
+      install: 'composer require webhook-platform/php',
+      logoSrc: '/logos/php.svg',
+      code: `use Hookflow\\Hookflow;
+
+$hf = new Hookflow(['apiKey' => 'wh_live_...']);
+
+$hf->events->send([
+    'type' => 'order.completed',
+    'data' => ['order_id' => 'ord_123', 'amount' => 99.99]
+]);`,
+    },
   ];
 
   const services = [
@@ -1055,9 +1181,19 @@ function Integrations() {
     { name: t('landing.integrations.service6'), desc: t('landing.integrations.service6Desc'), icon: Webhook },
   ];
 
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const sdk = sdks[activeSdk];
+
   return (
-    <section className="py-24">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-24 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/[0.03] rounded-full blur-[100px] translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
             <Code2 className="h-3 w-3" />
@@ -1067,51 +1203,117 @@ function Integrations() {
           <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">{t('landing.integrations.subtitle')}</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 mb-12">
-          <div className="lg:col-span-2">
-            <h3 className="text-lg font-semibold mb-2">{t('landing.integrations.sdksTitle')}</h3>
-            <p className="text-sm text-muted-foreground mb-6">{t('landing.integrations.sdksDesc')}</p>
-            <div className="grid sm:grid-cols-3 gap-4">
-              {sdks.map((sdk) => (
-                <div key={sdk.name} className="group p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
-                  <div className="flex items-center gap-3 mb-3">
-                    <img src={sdk.logoSrc} alt={sdk.name} className="h-8 w-8 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
-                    <span className="text-sm font-semibold">{sdk.name}</span>
+        {/* SDK Showcase — tabs + live code */}
+        <div className="grid lg:grid-cols-[1fr_1.2fr] gap-6 mb-16">
+          {/* Left: SDK selector + install */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">{t('landing.integrations.sdksTitle')}</h3>
+            <p className="text-sm text-muted-foreground">{t('landing.integrations.sdksDesc')}</p>
+
+            <div className="space-y-2 mt-4">
+              {sdks.map((s, i) => (
+                <button
+                  key={s.name}
+                  onClick={() => { setActiveSdk(i); setCopied(false); }}
+                  className={`w-full flex items-center gap-3 p-4 rounded-xl border text-left transition-all duration-300 ${activeSdk === i
+                    ? 'bg-card border-primary/30 shadow-lg ring-1 ring-primary/10'
+                    : 'bg-card/50 border-transparent hover:bg-card hover:border-border'
+                  }`}
+                >
+                  <img src={s.logoSrc} alt={s.name} className={`h-8 w-8 object-contain transition-opacity ${activeSdk === i ? 'opacity-100' : 'opacity-50'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{s.name}</div>
+                    <code className="text-[11px] text-muted-foreground font-mono truncate block">{s.install}</code>
                   </div>
-                  <code className="text-[11px] text-muted-foreground font-mono bg-muted px-2 py-1 rounded">{sdk.desc}</code>
-                </div>
+                  {activeSdk === i && (
+                    <div className="flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleCopy(s.install); }}
+                        className="px-2.5 py-1 rounded-md text-[10px] font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        {copied ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  )}
+                </button>
               ))}
             </div>
-            <div className="mt-4 p-4 rounded-xl border bg-muted/30">
-              <div className="flex items-center gap-2 mb-1">
+
+            {/* REST API + OpenAPI */}
+            <div className="p-4 rounded-xl border bg-muted/30 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Code2 className="h-4 w-4 text-primary" />
-                <span className="text-sm font-semibold">{t('landing.integrations.restTitle')}</span>
               </div>
-              <p className="text-xs text-muted-foreground">{t('landing.integrations.restDesc')}</p>
+              <div>
+                <div className="text-sm font-semibold">{t('landing.integrations.restTitle')}</div>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('landing.integrations.restDesc')}</p>
+              </div>
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-2">{t('landing.integrations.deliverTo')}</h3>
-            <p className="text-sm text-muted-foreground mb-6">{t('landing.integrations.deliverToDesc')}</p>
-            <div className="space-y-3">
-              {services.map((service) => (
-                <div key={service.name} className="flex items-center gap-3 p-3 rounded-xl border hover:border-primary/20 hover:bg-accent transition-all duration-200">
-                  <div className="h-9 w-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
-                    {'src' in service ? (
-                      <img src={service.src} alt={service.name} className="h-5 w-5 object-contain" />
-                    ) : (
-                      <service.icon className="h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium block">{service.name}</span>
-                    <span className="text-[11px] text-muted-foreground">{service.desc}</span>
-                  </div>
+          {/* Right: Live code preview */}
+          <div className="relative">
+            <div className="absolute -inset-3 bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent rounded-2xl blur-xl pointer-events-none" />
+            <div className="relative bg-slate-900 rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+              {/* Terminal header */}
+              <div className="bg-slate-950 px-4 py-2.5 flex items-center gap-2 border-b border-white/10">
+                <div className="w-3 h-3 rounded-full bg-red-400/80" />
+                <div className="w-3 h-3 rounded-full bg-yellow-400/80" />
+                <div className="w-3 h-3 rounded-full bg-green-400/80" />
+                <span className="ml-3 text-xs text-white/40 font-mono">
+                  {sdk.name === 'Node.js' ? 'app.ts' : sdk.name === 'Python' ? 'app.py' : 'app.php'}
+                </span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                  </span>
+                  <span className="text-[10px] text-green-400/80 font-mono">ready</span>
                 </div>
-              ))}
+              </div>
+
+              {/* Code */}
+              <pre className="p-5 text-[12.5px] text-white/85 font-mono leading-relaxed overflow-x-auto min-h-[260px]">
+                <code>{sdk.code}</code>
+              </pre>
+
+              {/* Response footer */}
+              <div className="bg-slate-950 px-5 py-3 border-t border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-green-400 font-mono">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Event sent · 3 deliveries queued</span>
+                </div>
+                <span className="text-[10px] text-white/30 font-mono">47ms</span>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Services Grid */}
+        <div className="text-center mb-8">
+          <h3 className="text-lg font-semibold mb-2">{t('landing.integrations.deliverTo')}</h3>
+          <p className="text-sm text-muted-foreground">{t('landing.integrations.deliverToDesc')}</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {services.map((service, i) => (
+            <div
+              key={service.name}
+              className="group flex flex-col items-center gap-2.5 p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 hover:-translate-y-1 transition-all duration-300 animate-[fadeInUp_0.4s_ease-out_both]"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <div className="h-11 w-11 rounded-xl bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                {'src' in service ? (
+                  <img src={service.src} alt={service.name} className="h-6 w-6 object-contain opacity-70 group-hover:opacity-100 transition-opacity" />
+                ) : (
+                  <service.icon className="h-5 w-5 text-primary" />
+                )}
+              </div>
+              <div className="text-center">
+                <span className="text-xs font-semibold block">{service.name}</span>
+                <span className="text-[10px] text-muted-foreground">{service.desc}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

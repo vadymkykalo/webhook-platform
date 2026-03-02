@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
-import { formatRelativeTime, formatDateTime } from '../lib/date';
+import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
 import { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
 import { deliveriesApi } from '../api/deliveries.api';
@@ -14,6 +14,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
+import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
+import { TablePagination } from '../components/ui/table-pagination';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
 import {
@@ -50,6 +52,8 @@ const DATE_RANGE_OPTIONS = [
 export default function DeliveriesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const eventIdFilter = searchParams.get('eventId') || '';
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryResponse[]>([]);
@@ -62,8 +66,9 @@ export default function DeliveriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [page, setPage] = useState(0);
-  const [pageSize] = useState(20);
-  
+  const [pageSize, setPageSize] = useState(20);
+  const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
+
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
   const [bulkReplaying, setBulkReplaying] = useState(false);
   const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
@@ -79,7 +84,15 @@ export default function DeliveriesPage() {
     if (projectId) {
       loadDeliveries();
     }
-  }, [projectId, statusFilter, endpointFilter, dateRange, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, statusFilter, endpointFilter, eventIdFilter, dateRange, page, pageSize, sortParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refresh when there are active deliveries
+  useEffect(() => {
+    const hasActive = deliveries.some(d => d.status === 'PENDING' || d.status === 'PROCESSING');
+    if (!hasActive) return;
+    const interval = setInterval(loadDeliveries, 5000);
+    return () => clearInterval(interval);
+  }, [deliveries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadInitialData = async () => {
     if (!projectId) return;
@@ -126,10 +139,12 @@ export default function DeliveriesPage() {
       const response = await deliveriesApi.listByProject(projectId, {
         page,
         size: pageSize,
+        sort: sortParam,
         status: statusFilter || undefined,
         endpointId: endpointFilter || undefined,
-        fromDate,
-        toDate,
+        eventId: eventIdFilter || undefined,
+        fromDate: eventIdFilter ? undefined : fromDate,
+        toDate: eventIdFilter ? undefined : toDate,
       });
       
       setDeliveries(response.content);
@@ -215,6 +230,18 @@ export default function DeliveriesPage() {
         <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('deliveries.subtitle', { project: project.name }) }} />
       </div>
 
+      {eventIdFilter && (
+        <div className="flex items-center gap-3 p-3 mb-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+          <Send className="h-4 w-4 text-blue-600 shrink-0" />
+          <span className="text-sm text-blue-700 dark:text-blue-300">
+            {t('deliveries.filteringByEvent')} <code className="font-mono text-xs bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">{eventIdFilter.substring(0, 8)}...</code>
+          </span>
+          <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => setSearchParams({})}>
+            {t('deliveries.clearEventFilter')}
+          </Button>
+        </div>
+      )}
+
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -265,11 +292,12 @@ export default function DeliveriesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">{t('deliveries.columns.created')}</TableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.status')}</TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.created')}</SortableTableHead>
+                  <SortableTableHead field="status" sort={sort} onSort={toggleSort}>{t('deliveries.columns.status')}</SortableTableHead>
                   <TableHead className="text-xs">{t('deliveries.columns.endpoint')}</TableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.attempts')}</TableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.nextRetry')}</TableHead>
+                  <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort}>{t('deliveries.columns.attempts')}</SortableTableHead>
+                  <SortableTableHead field="nextRetryAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.nextRetry')}</SortableTableHead>
+                  <TableHead className="text-xs hidden lg:table-cell">{t('deliveries.columns.lastError')}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -282,7 +310,22 @@ export default function DeliveriesPage() {
                         <span className="text-[11px] text-muted-foreground">{formatDateTime(delivery.createdAt)}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(delivery.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        {getStatusBadge(delivery.status)}
+                        <span className="text-[11px] text-muted-foreground">
+                          {delivery.status === 'PENDING' && delivery.attemptCount > 0 && delivery.nextRetryAt
+                            ? t('deliveries.statusExplain.PENDING_RETRY', { time: formatRelativeFuture(delivery.nextRetryAt) })
+                            : delivery.status === 'PENDING' && delivery.attemptCount === 0
+                              ? t('deliveries.statusExplain.PENDING_NEW')
+                              : delivery.status === 'PROCESSING'
+                                ? t('deliveries.statusExplain.PROCESSING')
+                                : delivery.status === 'DLQ'
+                                  ? t('deliveries.statusExplain.DLQ', { count: delivery.attemptCount })
+                                  : null}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className="font-mono text-[13px] truncate max-w-[200px] block">{getEndpointName(delivery.endpointId)}</span>
                     </TableCell>
@@ -290,7 +333,21 @@ export default function DeliveriesPage() {
                       <span className="text-sm font-medium">{delivery.attemptCount}<span className="text-muted-foreground">/{delivery.maxAttempts}</span></span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-[13px] text-muted-foreground">{delivery.nextRetryAt ? formatRelativeTime(delivery.nextRetryAt) : '—'}</span>
+                      {delivery.status === 'PENDING' && delivery.nextRetryAt ? (
+                        <div className="flex flex-col">
+                          <span className="text-[13px] font-medium">{formatRelativeFuture(delivery.nextRetryAt)}</span>
+                          <span className="text-[11px] text-muted-foreground">{formatDateTime(delivery.nextRetryAt)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[13px] text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {delivery.status === 'FAILED' || delivery.status === 'DLQ' ? (
+                        <span className="text-[12px] text-red-600 dark:text-red-400 truncate max-w-[180px] block" title={delivery.lastAttemptAt ? '' : ''}>
+                          {delivery.status === 'FAILED' ? 'Non-retryable error' : `Exhausted ${delivery.attemptCount}/${delivery.maxAttempts} attempts`}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title={t('common.viewAll')}>
@@ -303,17 +360,14 @@ export default function DeliveriesPage() {
             </Table>
           </Card>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-muted-foreground">
-                {t('common.showing', { from: page * pageSize + 1, to: Math.min((page + 1) * pageSize, totalElements), total: totalElements })}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

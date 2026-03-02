@@ -95,6 +95,29 @@ export function formatRelativeTime(dateString: string): string {
 }
 
 /**
+ * Relative future time: "in 30s", "in 5m", "in 2h"
+ * For past dates, falls back to formatRelativeTime.
+ */
+export function formatRelativeFuture(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+
+  if (diffMs <= 0) return formatRelativeTime(dateString);
+
+  const t = i18n.t.bind(i18n);
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+
+  if (diffSec < 60) return t('relativeTime.inSeconds', { count: diffSec });
+  if (diffMin < 60) return t('relativeTime.inMinutes', { count: diffMin });
+  if (diffHour < 24) return t('relativeTime.inHours', { count: diffHour });
+
+  return formatDateTime(dateString);
+}
+
+/**
  * Locale-aware number formatting: 1234567 → "1,234,567" / "1 234 567"
  */
 export function formatNumber(value: number): string {

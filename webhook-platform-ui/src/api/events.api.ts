@@ -18,6 +18,7 @@ export interface EventResponse {
 export interface EventFilters {
   page?: number;
   size?: number;
+  sort?: string;
 }
 
 export const eventsApi = {
@@ -26,6 +27,7 @@ export const eventsApi = {
     
     if (filters?.page !== undefined) params.append('page', filters.page.toString());
     if (filters?.size !== undefined) params.append('size', filters.size.toString());
+    if (filters?.sort) params.append('sort', filters.sort);
     
     const queryString = params.toString();
     return http.get<PageResponse<EventResponse>>(

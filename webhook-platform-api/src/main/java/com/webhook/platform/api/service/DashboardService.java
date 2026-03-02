@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,20 +46,22 @@ public class DashboardService {
             throw new ForbiddenException("Access denied");
         }
         
-        // Calculate delivery stats using DB-level counts
-        DashboardStatsResponse.DeliveryStats deliveryStats = calculateDeliveryStats(projectId);
+        Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
+        
+        // Calculate delivery stats using DB-level counts (last 30 days)
+        DashboardStatsResponse.DeliveryStats deliveryStats = calculateDeliveryStats(projectId, since);
         
         // Get recent events (last 10) with delivery counts
         List<DashboardStatsResponse.RecentEventSummary> recentEvents = getRecentEvents(projectId);
         
-        // Get endpoint health
-        List<DashboardStatsResponse.EndpointHealthSummary> endpointHealth = getEndpointHealth(projectId);
+        // Get endpoint health (last 30 days)
+        List<DashboardStatsResponse.EndpointHealthSummary> endpointHealth = getEndpointHealth(projectId, since);
         
         return new DashboardStatsResponse(deliveryStats, recentEvents, endpointHealth);
     }
     
-    private DashboardStatsResponse.DeliveryStats calculateDeliveryStats(UUID projectId) {
-        List<Object[]> statusCounts = deliveryRepository.countByProjectIdGroupByStatus(projectId);
+    private DashboardStatsResponse.DeliveryStats calculateDeliveryStats(UUID projectId, Instant since) {
+        List<Object[]> statusCounts = deliveryRepository.countByProjectIdGroupByStatus(projectId, since);
         
         long total = 0, successful = 0, failed = 0, dlq = 0, pending = 0;
         for (Object[] row : statusCounts) {
@@ -97,7 +101,7 @@ public class DashboardService {
                 .collect(Collectors.toList());
     }
     
-    private List<DashboardStatsResponse.EndpointHealthSummary> getEndpointHealth(UUID projectId) {
+    private List<DashboardStatsResponse.EndpointHealthSummary> getEndpointHealth(UUID projectId, Instant since) {
         List<Endpoint> endpoints = endpointRepository.findByProjectId(projectId);
         
         if (endpoints.isEmpty()) {
@@ -105,7 +109,7 @@ public class DashboardService {
         }
         
         List<UUID> endpointIds = endpoints.stream().map(Endpoint::getId).collect(Collectors.toList());
-        List<Object[]> stats = deliveryRepository.countByEndpointIdsGroupByEndpointAndStatus(endpointIds);
+        List<Object[]> stats = deliveryRepository.countByEndpointIdsGroupByEndpointAndStatus(endpointIds, since);
         
         // Build lookup: endpointId -> {status -> count}
         Map<UUID, Map<String, Long>> statsMap = new HashMap<>();

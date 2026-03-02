@@ -11,6 +11,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import org.slf4j.MDC;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
@@ -60,6 +62,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     Collections.emptyList()
                             );
                             SecurityContextHolder.getContext().setAuthentication(authentication);
+                            MDC.put("organizationId", organizationId.toString());
+                            MDC.put("userId", userId.toString());
                         }
                     }
                 }
@@ -68,6 +72,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.remove("organizationId");
+            MDC.remove("userId");
+            MDC.remove("projectId");
+        }
     }
 }

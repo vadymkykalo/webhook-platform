@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Plus, Eye, Copy, Share2, Loader2 } from 'lucide-react';
+import { Radio, Plus, Copy, Share2, Loader2, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { useEvents } from '../api/queries';
@@ -12,6 +12,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
+import { TablePagination } from '../components/ui/table-pagination';
 import SendTestEventModal from '../components/SendTestEventModal';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
@@ -23,7 +25,8 @@ export default function EventsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
+  const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
   const [showSendModal, setShowSendModal] = useState(false);
   const { canSendEvents, canCreateDebugLinks } = usePermissions();
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export default function EventsPage() {
     enabled: !!projectId,
   });
 
-  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize);
+  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize, sortParam);
   const events = eventsData?.content ?? [];
   const totalElements = eventsData?.totalElements ?? 0;
   const totalPages = eventsData?.totalPages ?? 0;
@@ -105,39 +108,31 @@ export default function EventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">{t('events.created')}</TableHead>
-                  <TableHead className="text-xs">{t('events.eventType')}</TableHead>
+                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort}>{t('events.eventType')}</SortableTableHead>
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
-                  <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('events.created')}</SortableTableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {events.map((event) => (
                   <TableRow key={event.id} className="hover:bg-muted/30">
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{formatRelativeTime(event.createdAt)}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
-                      </div>
+                      <span className="font-mono text-sm font-semibold">{event.eventType}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-[13px] font-medium">{event.eventType}</span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 group">
                         <code className="text-[13px] font-mono text-muted-foreground">{event.id.substring(0, 8)}...</code>
-                        <Button variant="ghost" size="icon-sm" className="h-6 w-6" onClick={() => handleCopyId(event.id)}>
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }}>
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {event.deliveriesCreated !== undefined && (
-                        <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full bg-muted text-xs font-medium">
-                          {event.deliveriesCreated}
-                        </span>
-                      )}
+                      <div className="flex flex-col">
+                        <span className="text-sm">{formatRelativeTime(event.createdAt)}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -145,7 +140,7 @@ export default function EventsPage() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => handleShareDebugLink(event.id)}
+                            onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
                             disabled={sharingEventId === event.id}
                             title={t('debugLinks.share')}
                           >
@@ -156,8 +151,13 @@ export default function EventsPage() {
                             )}
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title={t('common.viewAll')}>
-                          <Eye className="h-3.5 w-3.5" />
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => navigate(`/admin/projects/${projectId}/deliveries?eventId=${event.id}`)}
+                          title={t('events.viewDeliveries')}
+                        >
+                          <Send className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -167,17 +167,14 @@ export default function EventsPage() {
             </Table>
           </Card>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-muted-foreground">
-                {t('common.showing', { from: page * pageSize + 1, to: Math.min((page + 1) * pageSize, totalElements), total: totalElements })}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
