@@ -4,7 +4,7 @@ import {
   FileJson2, Plus, Trash2, Loader2, ChevronRight, AlertTriangle,
   CheckCircle2, Clock, ArrowUpCircle, ArrowDownCircle, Search, Info,
   GitCompareArrows, Shield, ShieldAlert, ShieldCheck, Copy, Check,
-  History
+  History, Fingerprint
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
@@ -38,6 +38,7 @@ export default function SchemasPage() {
       </div>
 
       <ValidationSettingsCard projectId={projectId} />
+      <IdempotencyPolicyCard projectId={projectId} />
 
       <RecentChangesBoard projectId={projectId} />
 
@@ -830,6 +831,77 @@ function ValidationSettingsCard({ projectId }: { projectId: string }) {
                 project.schemaValidationEnabled ? "translate-x-6" : "translate-x-1"
               )} />
             </button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Idempotency Policy Card ──
+
+function IdempotencyPolicyCard({ projectId }: { projectId: string }) {
+  const { t } = useTranslation();
+  const { data: project } = useProject(projectId);
+  const updateMutation = useUpdateProject(projectId);
+
+  if (!project) return null;
+
+  const policy = project.idempotencyPolicy || 'NONE';
+
+  const handlePolicyChange = async (newPolicy: string) => {
+    try {
+      await updateMutation.mutateAsync({
+        name: project.name,
+        description: project.description,
+        idempotencyPolicy: newPolicy,
+      });
+      showSuccess(t('schemas.idempotency.saved'));
+    } catch (err: any) {
+      showApiError(err, 'schemas.idempotency.saved');
+    }
+  };
+
+  return (
+    <Card className="mb-6">
+      <CardContent className="py-4 px-5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={cn(
+              "h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0",
+              policy !== 'NONE'
+                ? "bg-blue-100 dark:bg-blue-900/30"
+                : "bg-muted"
+            )}>
+              <Fingerprint className={cn(
+                "h-4.5 w-4.5",
+                policy !== 'NONE'
+                  ? "text-blue-700 dark:text-blue-400"
+                  : "text-muted-foreground"
+              )} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{t('schemas.idempotency.title')}</p>
+              <p className="text-xs text-muted-foreground truncate">{t('schemas.idempotency.hint')}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0 rounded-lg border p-0.5">
+            {(['NONE', 'AUTO', 'REQUIRED'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => handlePolicyChange(p)}
+                disabled={updateMutation.isPending}
+                className={cn(
+                  "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                  policy === p
+                    ? (p === 'NONE' ? 'bg-muted text-foreground' : p === 'AUTO' ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300' : 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300')
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t(`schemas.idempotency.${p.toLowerCase()}`)}
+              </button>
+            ))}
           </div>
         </div>
       </CardContent>

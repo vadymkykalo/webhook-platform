@@ -775,7 +775,9 @@
       "schemaRegistry": "Schema Registry",
       "schemaRegistryDesc": "Define JSON Schema contracts per event type. Version, diff, promote, and deprecate schemas. Block breaking changes before they reach production.",
       "wildcardRouting": "Wildcard event routing",
-      "wildcardRoutingDesc": "Subscribe to order.*, payment.**, or ** to catch all. Flexible glob-style pattern matching for precise event routing."
+      "wildcardRoutingDesc": "Subscribe to order.*, payment.**, or ** to catch all. Flexible glob-style pattern matching for precise event routing.",
+      "deterministicReplay": "Deterministic replay",
+      "deterministicReplayDesc": "Dry-run preview before replay, replay from any attempt step, and Idempotency-Key headers on every outgoing webhook for safe deduplication."
     },
     "architecture": {
       "badge": "Transactional outbox pattern",
@@ -1085,6 +1087,7 @@
       "webhookSecurity": "Webhook Security",
       "incomingWebhooks": "Incoming Webhooks",
       "schemaRegistry": "Schema Registry",
+      "deterministicReplay": "Deterministic Replay",
       "errors": "Errors & Rate Limits",
       "sdks": "SDKs"
     },
@@ -1334,6 +1337,24 @@
       "compatBackward": "BACKWARD — New schema can read data written by the old schema",
       "compatForward": "FORWARD — Old schema can read data written by the new schema",
       "compatFull": "FULL — Both backward and forward compatible"
+    },
+    "deterministicReplay": {
+      "title": "Deterministic Replay",
+      "subtitle": "Preview replays before sending, replay from any attempt step, and leverage Idempotency-Key headers for safe deduplication.",
+      "overview": "Overview",
+      "overviewDesc": "Deterministic Replay gives you full control over webhook re-delivery. Preview what will happen before replaying, choose exactly which attempt to resume from, and ensure every outgoing request carries an Idempotency-Key header so your consumers can safely deduplicate.",
+      "idempotencyKeyHeader": "Idempotency-Key Header",
+      "idempotencyKeyHeaderDesc": "Every outgoing webhook includes an Idempotency-Key header derived from the event's idempotency key and the target endpoint ID. If the event was ingested with an explicit key, it is reused; under AUTO policy a key is generated from the event ID. Consumers can use this header to detect and discard duplicate deliveries.",
+      "dryRunTitle": "Dry-Run Replay",
+      "dryRunDesc": "Call the replay endpoint with ?dryRun=true to get a full preview without actually sending. The response includes the target URL, idempotency key, event type, payload summary, previous attempts, and a human-readable plan string.",
+      "replayFromAttemptTitle": "Replay from Specific Attempt",
+      "replayFromAttemptDesc": "Pass ?fromAttempt=N to resume delivery from attempt N instead of restarting from scratch. The delivery's attempt counter is set to N and it is re-queued for immediate dispatch.",
+      "replayFromAttemptNote": "Useful when an early attempt partially succeeded and you want to skip retrying from the beginning.",
+      "idempotencyPoliciesTitle": "Idempotency Policies",
+      "idempotencyPoliciesDesc": "Configure per-project idempotency behaviour in Settings → Schemas & Policies:",
+      "policyNone": "No idempotency key handling. Keys are optional and not auto-generated.",
+      "policyAuto": "Auto-generate an idempotency key from the event ID if the client does not provide one.",
+      "policyRequired": "Reject events that do not include an Idempotency-Key header with 400 Bad Request."
     }
   },
   "incomingSources": {
@@ -1568,10 +1589,24 @@
       "title": "Replay Delivery?",
       "description": "This will re-attempt delivery of the webhook to the endpoint. The delivery will be queued for immediate processing."
     },
+    "dryRun": {
+      "title": "Dry Run Preview",
+      "button": "Dry Run",
+      "plan": "Plan:",
+      "endpoint": "Endpoint:",
+      "idempotencyKey": "Idempotency Key:",
+      "eventType": "Event Type:",
+      "dismiss": "Dismiss preview"
+    },
+    "replayFromStep": {
+      "label": "Replay from specific attempt:",
+      "step": "From #{{number}}"
+    },
     "toast": {
       "loadFailed": "Failed to load delivery details",
       "replaySuccess": "Delivery replay initiated successfully",
       "replayFailed": "Failed to replay delivery",
+      "dryRunFailed": "Failed to run dry-run preview",
       "idCopied": "Delivery ID copied to clipboard"
     },
     "troubleshooting": {
@@ -1664,6 +1699,14 @@
       "policyWarn": "Warn — log validation errors but accept the event",
       "policyBlock": "Block — reject events that fail schema validation",
       "saved": "Schema validation settings saved"
+    },
+    "idempotency": {
+      "title": "Idempotency Policy",
+      "hint": "Control how idempotency keys are handled for event ingestion and outgoing webhooks",
+      "none": "None",
+      "auto": "Auto",
+      "required": "Required",
+      "saved": "Idempotency policy saved"
     }
   },
   "onboarding": {

@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
+import com.webhook.platform.api.dto.DryRunReplayResponse;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.DeliveryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -75,14 +76,26 @@ public class DeliveryController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Replay delivery", description = "Re-sends a failed delivery")
+    @Operation(summary = "Replay delivery", description = "Re-sends a failed delivery. Use dryRun=true to preview without sending. Use fromAttempt=N to continue from a specific attempt.")
     @ApiResponse(responseCode = "202", description = "Replay initiated")
     @PostMapping("/{id}/replay")
-    public ResponseEntity<Void> replayDelivery(
+    public ResponseEntity<?> replayDelivery(
             @PathVariable("id") UUID id,
+            @RequestParam(value = "dryRun", required = false, defaultValue = "false") boolean dryRun,
+            @RequestParam(value = "fromAttempt", required = false) Integer fromAttempt,
             AuthContext auth) {
         auth.requireWriteAccess();
-        deliveryService.replayDelivery(id, auth.organizationId());
+
+        if (dryRun) {
+            DryRunReplayResponse response = deliveryService.dryRunReplay(id, auth.organizationId());
+            return ResponseEntity.ok(response);
+        }
+
+        if (fromAttempt != null) {
+            deliveryService.replayFromAttempt(id, fromAttempt, auth.organizationId());
+        } else {
+            deliveryService.replayDelivery(id, auth.organizationId());
+        }
         return ResponseEntity.accepted().build();
     }
 

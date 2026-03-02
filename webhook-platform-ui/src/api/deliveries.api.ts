@@ -24,6 +24,22 @@ export interface BulkReplayResponse {
   message: string;
 }
 
+export interface DryRunReplayResponse {
+  deliveryId: string;
+  eventId: string;
+  endpointId: string;
+  endpointUrl: string;
+  eventType: string;
+  idempotencyKey: string;
+  payload: string;
+  previousAttemptCount: number;
+  maxAttempts: number;
+  currentStatus: string;
+  lastAttemptAt?: string;
+  previousAttempts: { attemptNumber: number; httpStatusCode?: number; errorMessage?: string; durationMs?: number; createdAt: string }[];
+  plan: string;
+}
+
 export const deliveriesApi = {
   listByProject: (projectId: string, filters?: DeliveryFilters): Promise<PageResponse<DeliveryResponse>> => {
     const params = new URLSearchParams();
@@ -47,6 +63,14 @@ export const deliveriesApi = {
 
   replay: (id: string): Promise<void> => {
     return http.post<void>(`/api/v1/deliveries/${id}/replay`);
+  },
+
+  dryRunReplay: (id: string): Promise<DryRunReplayResponse> => {
+    return http.post<DryRunReplayResponse>(`/api/v1/deliveries/${id}/replay?dryRun=true`);
+  },
+
+  replayFromAttempt: (id: string, fromAttempt: number): Promise<void> => {
+    return http.post<void>(`/api/v1/deliveries/${id}/replay?fromAttempt=${fromAttempt}`);
   },
 
   bulkReplay: (request: BulkReplayRequest): Promise<BulkReplayResponse> => {

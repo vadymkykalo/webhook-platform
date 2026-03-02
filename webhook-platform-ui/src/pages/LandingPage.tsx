@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -435,6 +435,7 @@ function Features() {
     { icon: Globe, title: t('landing.features.incomingRouting'), desc: t('landing.features.incomingRoutingDesc') },
     { icon: FileCheck, title: t('landing.features.schemaRegistry'), desc: t('landing.features.schemaRegistryDesc') },
     { icon: GitBranch, title: t('landing.features.wildcardRouting'), desc: t('landing.features.wildcardRoutingDesc') },
+    { icon: Fingerprint, title: t('landing.features.deterministicReplay'), desc: t('landing.features.deterministicReplayDesc') },
     { icon: BarChart3, title: t('landing.features.analytics'), desc: t('landing.features.analyticsDesc') },
     { icon: Lock, title: t('landing.features.mtls'), desc: t('landing.features.mtlsDesc') },
   ];

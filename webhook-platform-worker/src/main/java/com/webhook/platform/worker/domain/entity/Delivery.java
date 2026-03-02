@@ -55,6 +55,9 @@ public class Delivery {
     @Column(name = "custom_headers", columnDefinition = "TEXT")
     private String customHeaders;
 
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 

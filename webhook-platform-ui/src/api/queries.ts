@@ -631,7 +631,7 @@ export function useProjectSchemaChanges(projectId: string | undefined) {
 export function useUpdateProject(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (data: { name: string; description?: string; schemaValidationEnabled?: boolean; schemaValidationPolicy?: string }) =>
+        mutationFn: (data: { name: string; description?: string; schemaValidationEnabled?: boolean; schemaValidationPolicy?: string; idempotencyPolicy?: string }) =>
             projectsApi.update(projectId, data),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) }); },
     });

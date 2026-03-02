@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
+import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
@@ -10,12 +11,14 @@ import com.webhook.platform.api.domain.enums.OutboxStatus;
 import java.time.Instant;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
+import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.specification.DeliverySpecification;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
+import com.webhook.platform.api.dto.DryRunReplayResponse;
 import org.springframework.data.jpa.domain.Specification;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
@@ -40,6 +43,7 @@ public class DeliveryService {
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
+    private final EndpointRepository endpointRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
@@ -48,12 +52,14 @@ public class DeliveryService {
     public DeliveryService(
             DeliveryRepository deliveryRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
+            EndpointRepository endpointRepository,
             OutboxMessageRepository outboxMessageRepository,
             EventRepository eventRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
+        this.endpointRepository = endpointRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.eventRepository = eventRepository;
         this.projectRepository = projectRepository;
@@ -305,6 +311,107 @@ public class DeliveryService {
             return str;
         }
         return str.substring(0, maxLength) + "... (truncated at " + maxLength + " characters)";
+    }
+
+    public DryRunReplayResponse dryRunReplay(UUID deliveryId, UUID organizationId) {
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
+        validateDeliveryAccess(delivery, organizationId);
+
+        Event event = eventRepository.findById(delivery.getEventId())
+                .orElseThrow(() -> new NotFoundException("Event not found"));
+
+        Endpoint endpoint = endpointRepository.findById(delivery.getEndpointId())
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
+
+        List<DeliveryAttempt> attempts = deliveryAttemptRepository
+                .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
+
+        String idempotencyKey = delivery.getIdempotencyKey() != null
+                ? delivery.getIdempotencyKey()
+                : event.getId().toString() + "-" + delivery.getEndpointId().toString();
+
+        String plan;
+        if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
+            plan = "SKIP: Delivery already succeeded. Safe replay will not re-send.";
+        } else if (!endpoint.getEnabled()) {
+            plan = "BLOCKED: Endpoint is disabled. Enable it before replaying.";
+        } else {
+            plan = "WILL_SEND: POST " + endpoint.getUrl() + " with Idempotency-Key: " + idempotencyKey
+                    + " (attempt " + (delivery.getAttemptCount() + 1) + "/" + delivery.getMaxAttempts() + ")";
+        }
+
+        return DryRunReplayResponse.builder()
+                .deliveryId(delivery.getId())
+                .eventId(event.getId())
+                .endpointId(endpoint.getId())
+                .endpointUrl(endpoint.getUrl())
+                .eventType(event.getEventType())
+                .idempotencyKey(idempotencyKey)
+                .payload(event.getPayload())
+                .previousAttemptCount(delivery.getAttemptCount())
+                .maxAttempts(delivery.getMaxAttempts())
+                .currentStatus(delivery.getStatus().name())
+                .lastAttemptAt(delivery.getLastAttemptAt())
+                .previousAttempts(attempts.stream().map(a -> DryRunReplayResponse.AttemptSummary.builder()
+                        .attemptNumber(a.getAttemptNumber())
+                        .httpStatusCode(a.getHttpStatusCode())
+                        .errorMessage(a.getErrorMessage())
+                        .durationMs(a.getDurationMs())
+                        .createdAt(a.getCreatedAt())
+                        .build()).toList())
+                .plan(plan)
+                .build();
+    }
+
+    @Transactional
+    public void replayFromAttempt(UUID deliveryId, int fromAttempt, UUID organizationId) {
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
+        validateDeliveryAccess(delivery, organizationId);
+
+        if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
+            throw new IllegalArgumentException("Cannot replay successful delivery");
+        }
+
+        if (fromAttempt < 1 || fromAttempt > delivery.getAttemptCount()) {
+            throw new IllegalArgumentException("fromAttempt must be between 1 and " + delivery.getAttemptCount());
+        }
+
+        delivery.setStatus(DeliveryStatus.PENDING);
+        delivery.setAttemptCount(fromAttempt - 1);
+        delivery.setNextRetryAt(null);
+        delivery.setLastAttemptAt(null);
+        delivery.setFailedAt(null);
+        deliveryRepository.save(delivery);
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(delivery.getId())
+                .eventId(delivery.getEventId())
+                .endpointId(delivery.getEndpointId())
+                .subscriptionId(delivery.getSubscriptionId())
+                .status(delivery.getStatus().name())
+                .attemptCount(delivery.getAttemptCount())
+                .build();
+
+        try {
+            String payload = objectMapper.writeValueAsString(message);
+            OutboxMessage outboxMessage = OutboxMessage.builder()
+                    .aggregateType("Delivery")
+                    .aggregateId(delivery.getId())
+                    .eventType("DeliveryReplayedFromStep")
+                    .payload(payload)
+                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
+                    .kafkaKey(delivery.getEndpointId().toString())
+                    .status(OutboxStatus.PENDING)
+                    .retryCount(0)
+                    .build();
+
+            outboxMessageRepository.save(outboxMessage);
+            log.info("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create replay outbox message", e);
+        }
     }
 
     private DeliveryResponse mapToResponse(Delivery delivery) {

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import jakarta.persistence.*;
 import lombok.*;
@@ -50,4 +51,9 @@ public class Project {
     @Column(name = "schema_validation_policy", nullable = false, length = 10)
     @Builder.Default
     private SchemaValidationPolicy schemaValidationPolicy = SchemaValidationPolicy.WARN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "idempotency_policy", nullable = false, length = 10)
+    @Builder.Default
+    private IdempotencyPolicy idempotencyPolicy = IdempotencyPolicy.NONE;
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
+import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
@@ -82,6 +83,17 @@ public class EventIngestService {
     }
 
     private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
+        // Enforce idempotency policy
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.REQUIRED && idempotencyKey == null) {
+            throw new IllegalArgumentException(
+                    "Idempotency-Key header is required for this project (policy: REQUIRED)");
+        }
+        if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.AUTO && idempotencyKey == null) {
+            idempotencyKey = UUID.randomUUID().toString();
+            log.debug("Auto-generated idempotency key: {} for project: {}", idempotencyKey, projectId);
+        }
+
         if (idempotencyKey != null) {
             var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
             if (existingEvent.isPresent()) {
@@ -98,7 +110,6 @@ public class EventIngestService {
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
         // Schema validation (optional, per-project setting)
-        Project project = projectRepository.findById(projectId).orElse(null);
         if (project != null && Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
             schemaRegistryService.autoDiscover(projectId, request.getType(), event.getPayload());
 
@@ -169,6 +180,10 @@ public class EventIngestService {
     }
 
     private Delivery createDelivery(Event event, Subscription subscription, Long sequenceNumber, boolean orderingEnabled) {
+        String deliveryIdempotencyKey = event.getIdempotencyKey() != null
+                ? event.getIdempotencyKey() + "-" + subscription.getEndpointId()
+                : null;
+
         return Delivery.builder()
                 .eventId(event.getId())
                 .endpointId(subscription.getEndpointId())
@@ -182,6 +197,7 @@ public class EventIngestService {
                 .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
+                .idempotencyKey(deliveryIdempotencyKey)
                 .build();
     }
 

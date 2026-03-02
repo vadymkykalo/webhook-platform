@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -44,6 +44,7 @@ export default function DocumentationPage() {
             {activeSection === 'webhook-security' && <WebhookSecurity activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'incoming-webhooks' && <IncomingWebhooks activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'deterministic-replay' && <DeterministicReplayDocs />}
             {activeSection === 'errors' && <Errors />}
             {activeSection === 'sdks' && <SDKs />}
           </div>
@@ -66,6 +67,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'webhook-security', label: t('docsPage.sections.webhookSecurity'), icon: Shield },
     { id: 'incoming-webhooks', label: t('docsPage.sections.incomingWebhooks'), icon: ArrowDownToLine },
     { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
+    { id: 'deterministic-replay', label: t('docsPage.sections.deterministicReplay'), icon: Fingerprint },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
     { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
@@ -872,6 +874,68 @@ Content-Type: application/json
           {getCodeExample('endpointVerification', activeLanguage)}
         </CodeBlock>
       </div>
+    </div>
+  );
+}
+
+function DeterministicReplayDocs() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">{t('docsPage.deterministicReplay.title')}</h1>
+        <p className="text-lg text-muted-foreground">{t('docsPage.deterministicReplay.subtitle')}</p>
+      </div>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2"><Fingerprint className="h-5 w-5 text-primary" /> {t('docsPage.deterministicReplay.overview')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.deterministicReplay.overviewDesc')}</p>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.deterministicReplay.idempotencyKeyHeader')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.deterministicReplay.idempotencyKeyHeaderDesc')}</p>
+        <ResponseBlock>{`Idempotency-Key: <event-idempotency-key>-<endpoint-id>
+# or auto-generated:
+Idempotency-Key: <event-id>-<endpoint-id>`}</ResponseBlock>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.deterministicReplay.dryRunTitle')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.deterministicReplay.dryRunDesc')}</p>
+        <div className="space-y-3">
+          <HTTPMethod method="POST" path="/api/v1/deliveries/{id}/replay?dryRun=true" />
+          <ResponseBlock>{`{
+  "deliveryId": "...",
+  "endpointUrl": "https://your-app.com/webhook",
+  "eventType": "order.created",
+  "idempotencyKey": "idem-key-123-endpoint-456",
+  "plan": "WILL_SEND: POST https://your-app.com/webhook with Idempotency-Key: idem-key-123-endpoint-456 (attempt 4/7)",
+  "previousAttemptCount": 3,
+  "maxAttempts": 7,
+  "currentStatus": "FAILED",
+  "previousAttempts": [...]
+}`}</ResponseBlock>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.deterministicReplay.replayFromAttemptTitle')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.deterministicReplay.replayFromAttemptDesc')}</p>
+        <HTTPMethod method="POST" path="/api/v1/deliveries/{id}/replay?fromAttempt=2" />
+        <p className="text-sm text-muted-foreground">{t('docsPage.deterministicReplay.replayFromAttemptNote')}</p>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.deterministicReplay.idempotencyPoliciesTitle')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.deterministicReplay.idempotencyPoliciesDesc')}</p>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" /> <strong>NONE</strong> — {t('docsPage.deterministicReplay.policyNone')}</li>
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" /> <strong>AUTO</strong> — {t('docsPage.deterministicReplay.policyAuto')}</li>
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" /> <strong>REQUIRED</strong> — {t('docsPage.deterministicReplay.policyRequired')}</li>
+        </ul>
+      </section>
     </div>
   );
 }
