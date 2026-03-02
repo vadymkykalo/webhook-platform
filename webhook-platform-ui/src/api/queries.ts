@@ -35,7 +35,7 @@ export const queryKeys = {
         list: (projectId: string, filters: DeliveryFilters) => ['deliveries', projectId, filters] as const,
     },
     events: {
-        list: (projectId: string, page: number, size: number) => ['events', projectId, page, size] as const,
+        list: (projectId: string, page: number, size: number, sort?: string) => ['events', projectId, page, size, sort] as const,
     },
     subscriptions: {
         list: (projectId: string) => ['subscriptions', projectId] as const,
@@ -234,7 +234,7 @@ export function useBulkReplayDeliveries() {
 
 export function useEvents(projectId: string | undefined, page: number, size = 20, sort = 'createdAt,desc') {
     return useQuery({
-        queryKey: queryKeys.events.list(projectId!, page, size),
+        queryKey: queryKeys.events.list(projectId!, page, size, sort),
         queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort }),
         enabled: !!projectId,
     });
