@@ -30,6 +30,7 @@ import {
 } from '../components/ui/alert-dialog';
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -241,12 +242,14 @@ export default function DeliveriesPage() {
               <Input id="search" placeholder={t('deliveries.filters.searchPlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
-          {canReplayDeliveries && (statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
+          {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
             <div className="flex justify-end mt-3">
-              <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline" size="sm">
-                {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: statusFilter })}
-              </Button>
+              <PermissionGate allowed={canReplayDeliveries}>
+                <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline" size="sm">
+                  {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                  {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: statusFilter })}
+                </Button>
+              </PermissionGate>
             </div>
           )}
         </CardContent>
@@ -255,7 +258,7 @@ export default function DeliveriesPage() {
       {loading ? (
         <SkeletonRows count={5} />
       ) : filteredDeliveries.length === 0 ? (
-        <EmptyState icon={Send} title={t('deliveries.noDeliveries')} description={t('deliveries.noDeliveriesDesc')} />
+        <EmptyState icon={Send} title={t('deliveries.noDeliveries')} description={t('deliveries.noDeliveriesDesc')} docsLink="/docs#deliveries-api" />
       ) : (
         <div className="animate-fade-in">
           <Card className="overflow-hidden">

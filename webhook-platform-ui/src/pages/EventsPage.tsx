@@ -14,6 +14,7 @@ import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import SendTestEventModal from '../components/SendTestEventModal';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 import { debugLinksApi } from '../api/debugLinks.api';
 
 export default function EventsPage() {
@@ -77,11 +78,11 @@ export default function EventsPage() {
           <h1 className="text-title tracking-tight">{t('events.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('events.subtitle', { project: project.name }) }} />
         </div>
-        {canSendEvents && (
+        <PermissionGate allowed={canSendEvents}>
           <Button onClick={() => setShowSendModal(true)}>
             <Plus className="h-4 w-4" /> {t('events.sendTest')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       {events.length === 0 ? (
@@ -89,11 +90,14 @@ export default function EventsPage() {
           icon={Radio}
           title={t('events.noEvents')}
           description={t('events.noEventsDesc')}
-          action={canSendEvents ? (
-            <Button onClick={() => setShowSendModal(true)}>
-              <Plus className="h-4 w-4" /> {t('events.sendTest')}
-            </Button>
-          ) : undefined}
+          action={
+            <PermissionGate allowed={canSendEvents}>
+              <Button onClick={() => setShowSendModal(true)}>
+                <Plus className="h-4 w-4" /> {t('events.sendTest')}
+              </Button>
+            </PermissionGate>
+          }
+          docsLink="/docs#events-api"
         />
       ) : (
         <div className="animate-fade-in">

@@ -35,6 +35,7 @@ import {
 } from '../components/ui/alert-dialog';
 import MtlsConfigModal from '../components/MtlsConfigModal';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 export default function EndpointsPage() {
   const { t } = useTranslation();
@@ -312,11 +313,11 @@ export default function EndpointsPage() {
           <h1 className="text-title tracking-tight">{t('endpoints.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('endpoints.subtitle', { project: project.name }) }} />
         </div>
-        {canManageEndpoints && (
+        <PermissionGate allowed={canManageEndpoints}>
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4" /> {t('endpoints.newEndpoint')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       {endpoints.length === 0 ? (
@@ -324,11 +325,14 @@ export default function EndpointsPage() {
           icon={Webhook}
           title={t('endpoints.noEndpoints')}
           description={t('endpoints.noEndpointsDesc')}
-          action={canManageEndpoints ? (
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" /> {t('endpoints.createFirst')}
-            </Button>
-          ) : undefined}
+          action={
+            <PermissionGate allowed={canManageEndpoints}>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4" /> {t('endpoints.createFirst')}
+              </Button>
+            </PermissionGate>
+          }
+          docsLink="/docs#endpoints-api"
         />
       ) : (
         <div className="space-y-3 animate-fade-in">

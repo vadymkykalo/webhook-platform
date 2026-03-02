@@ -54,6 +54,17 @@
     "backToHome": "Back to home",
     "learnMore": "Learn more"
   },
+  "dangerConfirm": {
+    "impact": "This action will affect:",
+    "typeToConfirm": "Type \"{{name}}\" to confirm"
+  },
+  "permissions": {
+    "requiredRole": "Requires {{role}} role",
+    "ownerRole": "Owner",
+    "developerRole": "Developer",
+    "viewerRole": "Viewer",
+    "contactOwner": "Contact your organization owner to request access"
+  },
   "nav": {
     "navigation": "Navigation",
     "project": "Project",
@@ -70,6 +81,7 @@
     "replay": "Time Machine",
     "dlq": "Dead Letter Queue",
     "testEndpoints": "Test Endpoints",
+    "devWorkspace": "DX Workspace",
     "incomingSources": "Incoming Sources",
     "incomingEvents": "Incoming Events",
     "members": "Members",
@@ -78,6 +90,10 @@
     "outgoing": "Outgoing",
     "incoming": "Incoming",
     "tools": "Tools",
+    "operations": "Operations",
+    "security": "Security",
+    "devTools": "Developer Tools",
+    "selectProject": "Select project",
     "documentation": "Documentation",
     "home": "Home",
     "search": "Search",
@@ -208,7 +224,10 @@
     },
     "deleteDialog": {
       "title": "Are you sure?",
-      "description": "This action cannot be undone. This will permanently delete the project and all associated data."
+      "description": "This action cannot be undone. This will permanently delete the project and all associated data.",
+      "impactEndpoints": "All endpoints and their secrets will be deleted",
+      "impactEvents": "All events, deliveries, and delivery attempts will be lost",
+      "impactKeys": "All API keys will be revoked immediately"
     },
     "toast": {
       "created": "Project created successfully",
@@ -746,7 +765,9 @@
     "unknownError": "Unknown error",
     "purgeDialog": {
       "title": "Purge All DLQ Items?",
-      "description": "This will permanently delete all {{count}} items from the Dead Letter Queue. This action cannot be undone."
+      "description": "This will permanently delete all {{count}} items from the Dead Letter Queue. This action cannot be undone.",
+      "impactItems": "{{count}} failed deliveries will be permanently deleted",
+      "impactIrreversible": "These items cannot be recovered or retried after purging"
     },
     "toast": {
       "retried": "Delivery queued for retry",
@@ -790,10 +811,59 @@
     "refresh": "Refresh",
     "clearRequests": "Clear"
   },
+  "devWorkspace": {
+    "title": "DX Workspace",
+    "subtitle": "Developer tools for <strong>{{project}}</strong>",
+    "projectNotFound": "Project not found",
+    "tabs": {
+      "send": "Send Event",
+      "verify": "Verify Signature",
+      "replay": "Quick Replay"
+    },
+    "send": {
+      "eventType": "Event Type",
+      "eventTypeHint": "Use dot notation (e.g., user.created, order.updated)",
+      "payload": "Event Payload (JSON)",
+      "invalidJson": "Invalid JSON format",
+      "fixJson": "Please fix JSON errors before submitting",
+      "submit": "Send Event",
+      "sending": "Sending...",
+      "success": "Event sent — {{count}} deliveries created",
+      "failed": "Failed to send event",
+      "resultTitle": "Event Sent Successfully",
+      "eventId": "Event ID",
+      "deliveries": "Deliveries Created"
+    },
+    "verify": {
+      "secret": "Endpoint Secret",
+      "secretHint": "The HMAC signing secret from your endpoint configuration",
+      "signatureHeader": "Signature Header",
+      "signatureHint": "The webhook-signature header value (v1,timestamp.signature)",
+      "body": "Request Body",
+      "submit": "Verify Signature",
+      "valid": "Signature Valid",
+      "validDesc": "The HMAC signature matches — this webhook is authentic.",
+      "invalid": "Signature Invalid",
+      "invalidDesc": "The signature does not match. Check the secret, header format, and body content."
+    },
+    "replay": {
+      "deliveryId": "Delivery ID",
+      "deliveryIdHint": "Paste the UUID of the delivery you want to replay",
+      "submit": "Replay Delivery",
+      "replaying": "Replaying...",
+      "success": "Delivery replay initiated",
+      "failed": "Failed to replay delivery",
+      "successTitle": "Replay Initiated",
+      "successDesc": "The delivery has been queued for re-processing. Check the Deliveries page for status.",
+      "errorTitle": "Replay Failed"
+    }
+  },
   "landing": {
     "nav": {
       "features": "Features",
       "architecture": "Architecture",
+      "capabilities": "Capabilities",
+      "howItWorks": "How it Works",
       "docs": "Docs",
       "quickstart": "Quickstart",
       "sdks": "SDKs",
@@ -809,8 +879,9 @@
       "subtitle": "Send and receive webhooks through one platform. Outgoing delivery with retries and signatures. Incoming ingestion with validation and routing. You focus on building product.",
       "startFree": "Start for free",
       "readDocs": "Read the docs",
-      "noCreditCard": "No credit card",
-      "freeTier": "Free tier included",
+      "openSource": "Open Source",
+      "openSourceFree": "100% open source",
+      "selfHosted": "Self-hosted",
       "fiveMinSetup": "5-min setup"
     },
     "mockup": {
@@ -818,6 +889,40 @@
       "delivered": "Delivered",
       "failed": "Failed",
       "retry": "Retry"
+    },
+    "quickWins": {
+      "queueing": "Built-in event queueing",
+      "queueingDesc": "Buffer and control event flow with a resilient queue that handles spikes, retries, and destination failures.",
+      "replay": "Issue management & replay",
+      "replayDesc": "Automatically surface failed events, inspect metadata, and replay them with confidence.",
+      "devTools": "Developer workspace",
+      "devToolsDesc": "Send test events, verify signatures, and replay deliveries — all from one unified interface.",
+      "routing": "Flexible routing",
+      "routingDesc": "Filter and route events to one or many destinations with wildcard subscriptions and pattern matching."
+    },
+    "trust": {
+      "badge": "Secure & reliable",
+      "title": "Scalable, secure,",
+      "titleHighlight": "and production-ready",
+      "subtitle": "Enterprise-grade security and reliability built into every layer of the platform.",
+      "encryption": "Data encryption",
+      "encryptionDesc": "AES-GCM encryption at rest. TLS in transit. Secrets never stored in plaintext.",
+      "hmac": "HMAC-SHA256 signatures",
+      "hmacDesc": "Every outgoing payload cryptographically signed. Incoming webhooks verified before forwarding.",
+      "ssrf": "SSRF protection",
+      "ssrfDesc": "Built-in URL validation blocks internal network access and private IP ranges.",
+      "rbac": "Role-based access",
+      "rbacDesc": "Owner, Developer, Viewer roles with granular permissions per organization.",
+      "apiKeys": "API key authentication",
+      "apiKeysDesc": "Scoped API keys with project-level isolation. Rotate without downtime.",
+      "audit": "Audit logging",
+      "auditDesc": "Every action tracked — who did what, when, and from where.",
+      "atLeastOnce": "At-least-once delivery",
+      "atLeastOnceDesc": "Transactional outbox pattern ensures zero event loss even during failures.",
+      "selfHosted": "Self-hosted",
+      "selfHostedDesc": "Deploy on your own infrastructure. Full control over data and configuration.",
+      "openSource": "100% open source",
+      "openSourceDesc": "MIT licensed. Audit the code, contribute, and customize to your needs."
     },
     "logoCloud": "Built with battle-tested technology",
     "flowDiagram": {
@@ -834,32 +939,73 @@
       "signatures": "HMAC signed",
       "monitoring": "Full observability"
     },
+    "capabilities": {
+      "badge": "Core capabilities",
+      "title": "Built for teams that",
+      "titleHighlight": "ship reliable integrations",
+      "subtitle": "Three pillars that make Hookflow the infrastructure layer your webhooks deserve.",
+      "retries": {
+        "badge": "Delivery guarantee",
+        "title": "Smart retries with dead letter queue",
+        "desc": "Exponential backoff across 6 retry tiers (1m → 24h). Failed after all attempts? Automatically routed to DLQ for manual inspection and one-click replay.",
+        "exponential": "6-tier exponential backoff",
+        "exponentialDesc": "1m, 5m, 15m, 1h, 6h, 24h — configurable per endpoint",
+        "dlq": "Dead letter queue",
+        "dlqDesc": "Failed deliveries preserved for inspection, replay or bulk purge",
+        "replay": "One-click replay",
+        "replayDesc": "Re-deliver any event from any attempt — with dry-run preview"
+      },
+      "diagnostics": {
+        "badge": "Observability",
+        "title": "Error diagnostics & classification",
+        "desc": "Every failed delivery is automatically classified into 11 error categories with severity levels, suggested fixes, and a visual retry timeline.",
+        "classify": "Auto-classification",
+        "classifyDesc": "Timeout, DNS, SSL, auth, rate-limit, 5xx — identified instantly",
+        "suggest": "Suggested fixes",
+        "suggestDesc": "Actionable guidance for each error type — no guesswork",
+        "timeline": "Retry timeline",
+        "timelineDesc": "Visual dot-by-dot history of every delivery attempt"
+      },
+      "incoming": {
+        "badge": "Incoming webhooks",
+        "title": "Receive, verify & forward — zero code",
+        "desc": "Create ingress URLs for Stripe, GitHub, or any provider. Hookflow verifies HMAC signatures and forwards to your internal services with full retry support.",
+        "ingest": "Unique ingress URLs",
+        "ingestDesc": "Each source gets a dedicated URL with rate limiting",
+        "verify": "HMAC verification",
+        "verifyDesc": "Validate signatures from any provider before forwarding",
+        "forward": "Multi-destination forwarding",
+        "forwardDesc": "Route to one or more internal endpoints with retries"
+      }
+    },
     "features": {
       "title": "Everything you need for",
       "titleHighlight": "production webhooks",
-      "subtitle": "Enterprise-grade reliability with developer-friendly simplicity.",
-      "retries": "Automatic retries",
-      "retriesDesc": "Exponential backoff with configurable retry policies. Never miss a delivery.",
-      "visibility": "Full visibility",
-      "visibilityDesc": "See every attempt, HTTP status, error message, and latency metric in real time.",
-      "hmac": "HMAC signatures",
-      "hmacDesc": "Every payload signed with HMAC-SHA256. Verify authenticity on your end.",
-      "replay": "One-click replay",
-      "replayDesc": "Replay any failed delivery from the dashboard. No code changes needed.",
-      "analytics": "Analytics & metrics",
-      "analyticsDesc": "Time-series charts, success rates, latency percentiles, endpoint health scores.",
-      "mtls": "mTLS support",
-      "mtlsDesc": "Configure mutual TLS for endpoints that require client certificate authentication.",
-      "incomingIngress": "Incoming webhook ingestion",
-      "incomingIngressDesc": "Receive webhooks from Stripe, GitHub, Twilio and any provider. Each source gets a unique ingress URL with rate limiting.",
-      "incomingRouting": "Smart routing & forwarding",
-      "incomingRoutingDesc": "Validate incoming payloads, then forward to one or more internal destinations with full retry and observability.",
-      "schemaRegistry": "Schema Registry",
-      "schemaRegistryDesc": "Define JSON Schema contracts per event type. Version, diff, promote, and deprecate schemas. Block breaking changes before they reach production.",
-      "wildcardRouting": "Wildcard event routing",
-      "wildcardRoutingDesc": "Subscribe to order.*, payment.**, or ** to catch all. Flexible glob-style pattern matching for precise event routing.",
+      "subtitle": "12 battle-tested features. Zero compromises on reliability, security, or developer experience.",
+      "retries": "Exponential retries",
+      "retriesDesc": "6-tier backoff (1m → 24h). Never miss a delivery.",
+      "hmac": "HMAC-SHA256 signatures",
+      "hmacDesc": "Every payload cryptographically signed. Verify on your end.",
+      "dlq": "Dead letter queue",
+      "dlqDesc": "Failed deliveries preserved for inspection and one-click replay.",
+      "diagnostics": "Error diagnostics",
+      "diagnosticsDesc": "Auto-classify failures into 11 categories with suggested fixes.",
+      "incomingIngress": "Incoming webhooks",
+      "incomingIngressDesc": "Receive from Stripe, GitHub, Twilio — unique ingress URLs per source.",
+      "schemaRegistry": "Schema registry",
+      "schemaRegistryDesc": "JSON Schema contracts per event type. Version, diff, and promote.",
+      "wildcardRouting": "Wildcard subscriptions",
+      "wildcardRoutingDesc": "Subscribe to order.* or ** for flexible event routing.",
       "deterministicReplay": "Deterministic replay",
-      "deterministicReplayDesc": "Dry-run preview before replay, replay from any attempt step, and Idempotency-Key headers on every outgoing webhook for safe deduplication."
+      "deterministicReplayDesc": "Dry-run preview, idempotency keys, replay from any attempt.",
+      "analytics": "Analytics dashboard",
+      "analyticsDesc": "Success rates, latency percentiles, endpoint health scores.",
+      "piiMasking": "PII masking",
+      "piiMaskingDesc": "Redact sensitive fields in payloads and headers automatically.",
+      "auditLog": "Audit log",
+      "auditLogDesc": "Track every action — who did what, when, and from where.",
+      "rbac": "Role-based access",
+      "rbacDesc": "Owner, Developer, Viewer roles with granular permissions."
     },
     "architecture": {
       "badge": "Transactional outbox pattern",
@@ -1698,6 +1844,60 @@
       "tip3": "Review rate limits and ensure they're not exceeded",
       "tip4": "Inspect the error messages in delivery attempts below",
       "tip5": "Consider replaying the delivery after fixing the issue"
+    },
+    "diagnosis": {
+      "title": "Error Diagnosis",
+      "category": "Error Type",
+      "suggestedFix": "Suggested Fix",
+      "retryTimeline": "Retry Timeline",
+      "attemptLabel": "#{{number}}",
+      "noMoreRetries": "No more retries — moved to DLQ"
+    }
+  },
+  "errorClass": {
+    "timeout": {
+      "label": "Connection Timeout",
+      "fix": "Your endpoint took too long to respond. Increase the timeout on your server or optimize the webhook handler to respond within 30 seconds."
+    },
+    "connRefused": {
+      "label": "Connection Refused",
+      "fix": "The endpoint server is not accepting connections. Verify the server is running, the port is correct, and firewall rules allow inbound traffic."
+    },
+    "dns": {
+      "label": "DNS Resolution Failed",
+      "fix": "The endpoint hostname could not be resolved. Check the URL for typos and verify DNS records are configured correctly."
+    },
+    "ssl": {
+      "label": "SSL/TLS Error",
+      "fix": "The SSL handshake failed. Ensure the SSL certificate is valid, not expired, and the certificate chain is complete."
+    },
+    "auth": {
+      "label": "Authentication Rejected",
+      "fix": "The endpoint returned 401/403. Verify the webhook signature validation logic on your server and check that secrets match."
+    },
+    "notFound": {
+      "label": "Endpoint Not Found",
+      "fix": "The endpoint returned 404. Verify the webhook URL path is correct and the route is registered on your server."
+    },
+    "payloadTooLarge": {
+      "label": "Payload Too Large",
+      "fix": "The endpoint returned 413. Increase the request body size limit on your server or reduce the event payload size."
+    },
+    "rateLimited": {
+      "label": "Rate Limited",
+      "fix": "The endpoint returned 429. Your server is rejecting requests due to rate limiting. The delivery will be retried automatically with backoff."
+    },
+    "clientError": {
+      "label": "Client Error (4xx)",
+      "fix": "The endpoint rejected the request. Check the response body for details and verify your webhook handler accepts the expected content type and format."
+    },
+    "serverError": {
+      "label": "Server Error (5xx)",
+      "fix": "The endpoint server encountered an internal error. Check your server logs for exceptions. The delivery will be retried automatically."
+    },
+    "unknown": {
+      "label": "Unknown Error",
+      "fix": "An unexpected error occurred. Check the error message and response body for details."
     }
   },
   "breadcrumb": {
@@ -1908,6 +2108,46 @@
     "tabIncoming": "Incoming Webhooks",
     "trackOutgoing": "Send webhooks to your consumers",
     "trackIncoming": "Receive & forward external webhooks"
+  },
+  "wizard": {
+    "back": "Back",
+    "next": "Next",
+    "letsGo": "Let's go",
+    "getStarted": "Get started",
+    "goThere": "Go there",
+    "welcome": {
+      "title": "Welcome to Hookflow! 🎉",
+      "description": "We'll walk you through the key steps to set up your webhook infrastructure in just a few minutes."
+    },
+    "project": {
+      "title": "Create a Project",
+      "description": "Projects are the top-level containers that organize your endpoints, events, subscriptions, and API keys.",
+      "tip": "Think of projects as separate environments — e.g. \"Production\", \"Staging\", or per-customer."
+    },
+    "endpoint": {
+      "title": "Register an Endpoint",
+      "description": "Endpoints are the URLs where your webhooks will be delivered. Add the URL of your server that will receive webhook events.",
+      "tip": "Each endpoint gets a unique signing secret for HMAC signature verification."
+    },
+    "subscription": {
+      "title": "Subscribe to Events",
+      "description": "Subscriptions link your endpoints to specific event types. Only events matching the subscription will be delivered.",
+      "tip": "Use wildcards like \"order.*\" to subscribe to all order-related events."
+    },
+    "apiKey": {
+      "title": "Generate an API Key",
+      "description": "API keys are used to authenticate when sending events programmatically from your backend services.",
+      "tip": "Store your API key securely — it's shown only once at creation time."
+    },
+    "send": {
+      "title": "Send Your First Event",
+      "description": "Use the API or the UI to send a test event. It will be matched against subscriptions and delivered to the right endpoints.",
+      "tip": "Check the Deliveries page to see real-time status, attempts, and response details."
+    },
+    "done": {
+      "title": "You're All Set!",
+      "description": "Your webhook infrastructure is ready. Head to your project to start sending events and monitoring deliveries."
+    }
   },
   "commandPalette": {
     "placeholder": "Search pages, projects...",

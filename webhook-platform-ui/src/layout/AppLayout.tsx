@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Terminal
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,7 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { CommandPalette } from '../components/CommandPalette';
 import { getTheme, setTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ProjectSwitcher from '../components/ProjectSwitcher';
 
 interface NavItem {
   nameKey: string;
@@ -51,14 +52,21 @@ const getProjectIncomingNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.incomingEvents', path: `/admin/projects/${projectId}/incoming-events`, icon: Activity },
 ];
 
-const getProjectToolsNav = (projectId: string): NavItem[] => [
-  { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
-  { nameKey: 'nav.piiRules', path: `/admin/projects/${projectId}/pii-rules`, icon: Shield },
-  { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
-  { nameKey: 'nav.apiKeys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
+const getProjectOperationsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
   { nameKey: 'nav.replay', path: `/admin/projects/${projectId}/replay`, icon: History },
   { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
+];
+
+const getProjectSecurityNav = (projectId: string): NavItem[] => [
+  { nameKey: 'nav.apiKeys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
+  { nameKey: 'nav.piiRules', path: `/admin/projects/${projectId}/pii-rules`, icon: Shield },
+];
+
+const getProjectDevToolsNav = (projectId: string): NavItem[] => [
+  { nameKey: 'nav.devWorkspace', path: `/admin/projects/${projectId}/dev-workspace`, icon: Terminal },
+  { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
+  { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
   { nameKey: 'nav.testEndpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
 
@@ -295,6 +303,8 @@ export default function AppLayout() {
           ))}
         </SidebarSection>
 
+        <ProjectSwitcher currentProjectId={projectId} collapsed={collapsed && !isMobile} />
+
         {projectId && (
           <>
             <SidebarSection label={collapsed && !isMobile ? "" : t('nav.outgoing')}>
@@ -309,8 +319,20 @@ export default function AppLayout() {
               ))}
             </SidebarSection>
 
-            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.tools')}>
-              {getProjectToolsNav(projectId).map((item) => (
+            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.operations')}>
+              {getProjectOperationsNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
+            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.security')}>
+              {getProjectSecurityNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
+            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.devTools')}>
+              {getProjectDevToolsNav(projectId).map((item) => (
                 <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
               ))}
             </SidebarSection>

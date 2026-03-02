@@ -25,6 +25,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 const STATUS_VARIANTS: Record<string, { variant: any; icon: any }> = {
   PENDING: { variant: 'secondary', icon: Clock },
@@ -254,12 +255,12 @@ export default function ReplayPage() {
           <h1 className="text-title tracking-tight">{t('replay.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('replay.subtitle', { project: project.name }) }} />
         </div>
-        {canReplayDeliveries && (
+        <PermissionGate allowed={canReplayDeliveries}>
           <Button onClick={() => setShowForm(!showForm)} size="sm">
             {showForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {t('replay.newReplay')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       {/* New Replay Form */}
@@ -390,7 +391,7 @@ export default function ReplayPage() {
       </div>
 
       {sessions.length === 0 ? (
-        <EmptyState icon={History} title={t('replay.noSessions')} description={t('replay.noSessionsDesc')} />
+        <EmptyState icon={History} title={t('replay.noSessions')} description={t('replay.noSessionsDesc')} docsLink="/docs#deterministic-replay" />
       ) : (
         <div className="space-y-3 animate-fade-in">
           {sessions.map((session) => (

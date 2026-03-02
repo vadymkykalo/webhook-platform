@@ -29,6 +29,7 @@ import {
 } from '../components/ui/alert-dialog';
 import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
@@ -122,11 +123,11 @@ export default function SubscriptionsPage() {
           <h1 className="text-title tracking-tight">{t('subscriptions.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('subscriptions.subtitle', { project: project.name }) }} />
         </div>
-        {canManageSubscriptions && (
+        <PermissionGate allowed={canManageSubscriptions}>
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4" /> {t('subscriptions.newSubscription')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       <Card className="mb-6">
@@ -160,11 +161,14 @@ export default function SubscriptionsPage() {
           icon={LinkIcon}
           title={subscriptions.length === 0 ? t('subscriptions.noSubscriptions') : t('subscriptions.noMatching')}
           description={subscriptions.length === 0 ? t('subscriptions.noSubscriptionsDesc') : t('subscriptions.noMatchingDesc')}
-          action={subscriptions.length === 0 && canManageSubscriptions ? (
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
-            </Button>
+          action={subscriptions.length === 0 ? (
+            <PermissionGate allowed={canManageSubscriptions}>
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
+              </Button>
+            </PermissionGate>
           ) : undefined}
+          docsLink="/docs#subscriptions-api"
         />
       ) : (
         <Card className="overflow-hidden animate-fade-in">

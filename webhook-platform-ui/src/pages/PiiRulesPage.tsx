@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 const MASK_STYLE_OPTIONS: { value: MaskStyle; label: string }[] = [
   { value: 'PARTIAL', label: 'Partial' },
@@ -181,7 +182,7 @@ export default function PiiRulesPage() {
             {t('piiRules.subtitle')}
           </p>
         </div>
-        {canManagePiiRules && (
+        <PermissionGate allowed={canManagePiiRules}>
           <div className="flex gap-2">
             {rules.length === 0 && (
               <Button variant="outline" onClick={handleSeedDefaults} disabled={seeding}>
@@ -193,7 +194,7 @@ export default function PiiRulesPage() {
               <Plus className="h-4 w-4" /> {t('piiRules.addRule')}
             </Button>
           </div>
-        )}
+        </PermissionGate>
       </div>
 
       {showAddForm && (

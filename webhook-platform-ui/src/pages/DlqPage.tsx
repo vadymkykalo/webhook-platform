@@ -15,17 +15,9 @@ import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Select } from '../components/ui/select';
 import { Label } from '../components/ui/label';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
+import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 export default function DlqPage() {
   const { t } = useTranslation();
@@ -158,7 +150,7 @@ export default function DlqPage() {
           <h1 className="text-title tracking-tight">{t('dlq.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('dlq.subtitle', { project: project.name }) }} />
         </div>
-        {canManageDlq && (
+        <PermissionGate allowed={canManageDlq}>
           <div className="flex gap-2">
             {selectedIds.size > 0 && (
               <Button onClick={handleRetrySelected} disabled={retrying} size="sm">
@@ -170,7 +162,7 @@ export default function DlqPage() {
               <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
             </Button>
           </div>
-        )}
+        </PermissionGate>
       </div>
 
       {stats && (
@@ -214,7 +206,7 @@ export default function DlqPage() {
       </Card>
 
       {items.length === 0 ? (
-        <EmptyState icon={CheckSquare} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} />
+        <EmptyState icon={CheckSquare} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} docsLink="/docs#deliveries-api" />
       ) : (
         <div className="animate-fade-in">
           <Card className="overflow-hidden">
@@ -272,27 +264,20 @@ export default function DlqPage() {
         </div>
       )}
 
-      <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('dlq.purgeDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('dlq.purgeDialog.description', { count: stats?.totalItems })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={purging}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handlePurgeAll}
-              disabled={purging}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {purging && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {purging ? t('dlq.purging') : t('dlq.purgeAll')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DangerConfirmDialog
+        open={showPurgeDialog}
+        onOpenChange={setShowPurgeDialog}
+        title={t('dlq.purgeDialog.title')}
+        description={t('dlq.purgeDialog.description', { count: stats?.totalItems })}
+        confirmName={project?.name || ''}
+        impact={[
+          t('dlq.purgeDialog.impactItems', { count: stats?.totalItems || 0 }),
+          t('dlq.purgeDialog.impactIrreversible'),
+        ]}
+        onConfirm={handlePurgeAll}
+        loading={purging}
+        confirmLabel={t('dlq.purgeAll')}
+      />
     </div>
   );
 }

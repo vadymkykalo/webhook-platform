@@ -47,7 +47,7 @@ export default function AnalyticsPage() {
   if (!analytics) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <EmptyState icon={AlertTriangle} title={t('analytics.noData')} description={t('analytics.noDataDesc')} />
+        <EmptyState icon={AlertTriangle} title={t('analytics.noData')} description={t('analytics.noDataDesc')} docsLink="/docs#getting-started" />
       </div>
     );
   }
