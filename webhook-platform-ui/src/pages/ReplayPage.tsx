@@ -103,25 +103,15 @@ export default function ReplayPage() {
     if (projectId) loadData();
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll running sessions
-  useEffect(() => {
-    const hasRunning = sessions.some(s =>
-      s.status === 'RUNNING' || s.status === 'PENDING' || s.status === 'ESTIMATING' || s.status === 'CANCELLING'
-    );
-    setPollingActive(hasRunning);
-
-    if (hasRunning) {
-      const interval = setInterval(() => loadSessions(), 2000);
-      return () => clearInterval(interval);
+  const loadSessions = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const data = await replayApi.list(projectId, 0, 50);
+      setSessions(data.content);
+    } catch {
+      // Silent — polling
     }
-  }, [sessions, loadSessions]);
-
-  // Set default date range
-  useEffect(() => {
-    const range = quickRange('24h');
-    setFromDate(toLocalDatetime(range.from));
-    setToDate(toLocalDatetime(range.to));
-  }, []);
+  }, [projectId]);
 
   const loadData = async () => {
     if (!projectId) return;
@@ -142,15 +132,25 @@ export default function ReplayPage() {
     }
   };
 
-  const loadSessions = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      const data = await replayApi.list(projectId, 0, 50);
-      setSessions(data.content);
-    } catch {
-      // Silent — polling
+  // Poll running sessions
+  useEffect(() => {
+    const hasRunning = sessions.some(s =>
+      s.status === 'RUNNING' || s.status === 'PENDING' || s.status === 'ESTIMATING' || s.status === 'CANCELLING'
+    );
+    setPollingActive(hasRunning);
+
+    if (hasRunning) {
+      const interval = setInterval(() => loadSessions(), 2000);
+      return () => clearInterval(interval);
     }
-  }, [projectId]);
+  }, [sessions, loadSessions]);
+
+  // Set default date range
+  useEffect(() => {
+    const range = quickRange('24h');
+    setFromDate(toLocalDatetime(range.from));
+    setToDate(toLocalDatetime(range.to));
+  }, []);
 
   const handleQuickRange = (key: string) => {
     setSelectedRange(key);
