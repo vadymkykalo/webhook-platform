@@ -42,12 +42,18 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class IncomingEventServiceTest {
 
-    @Mock private IncomingEventRepository eventRepository;
-    @Mock private IncomingSourceRepository sourceRepository;
-    @Mock private IncomingForwardAttemptRepository forwardAttemptRepository;
-    @Mock private IncomingDestinationRepository destinationRepository;
-    @Mock private OutboxMessageRepository outboxMessageRepository;
-    @Mock private ProjectRepository projectRepository;
+    @Mock
+    private IncomingEventRepository eventRepository;
+    @Mock
+    private IncomingSourceRepository sourceRepository;
+    @Mock
+    private IncomingForwardAttemptRepository forwardAttemptRepository;
+    @Mock
+    private IncomingDestinationRepository destinationRepository;
+    @Mock
+    private OutboxMessageRepository outboxMessageRepository;
+    @Mock
+    private ProjectRepository projectRepository;
 
     private IncomingEventService service;
     private final ObjectMapper objectMapper = new ObjectMapper();

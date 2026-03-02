@@ -35,14 +35,22 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class EventIngestServiceTest {
 
-    @Mock private EventRepository eventRepository;
-    @Mock private SubscriptionRepository subscriptionRepository;
-    @Mock private DeliveryRepository deliveryRepository;
-    @Mock private OutboxMessageRepository outboxMessageRepository;
-    @Mock private SequenceGeneratorService sequenceGeneratorService;
-    @Mock private SchemaRegistryService schemaRegistryService;
-    @Mock private ProjectRepository projectRepository;
-    @Mock private PlatformTransactionManager transactionManager;
+    @Mock
+    private EventRepository eventRepository;
+    @Mock
+    private SubscriptionRepository subscriptionRepository;
+    @Mock
+    private DeliveryRepository deliveryRepository;
+    @Mock
+    private OutboxMessageRepository outboxMessageRepository;
+    @Mock
+    private SequenceGeneratorService sequenceGeneratorService;
+    @Mock
+    private SchemaRegistryService schemaRegistryService;
+    @Mock
+    private ProjectRepository projectRepository;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();

@@ -1209,107 +1209,139 @@
       "signIn": "Sign in",
       "getStarted": "Get started"
     },
-    "backToHome": "Back to home",
-    "badge": "5-minute quickstart",
-    "title": "From zero to first webhook",
-    "subtitle": "Complete walkthrough: send outgoing webhooks with retries and signatures, or receive incoming webhooks from third-party providers.",
-    "stepOf": "Step {{step}} of {{total}}",
-    "timeline": {
-      "project": "Project",
-      "sdk": "SDK",
-      "endpoint": "Endpoint",
-      "subscribe": "Subscribe",
-      "send": "Send",
-      "verify": "Verify",
-      "monitor": "Monitor"
+    "badge": "Interactive playground",
+    "title": "See how Hookflow works",
+    "subtitle": "No setup needed. Click the buttons below to watch real webhook flows in action — delivery, signatures, retries, and incoming webhooks.",
+    "liveLog": "Live Event Log",
+    "resetBtn": "Reset",
+    "processing": "Processing…",
+    "hero": {
+      "outgoing": "Outgoing delivery",
+      "signatures": "HMAC signatures",
+      "retries": "Auto-retries",
+      "incoming": "Incoming webhooks"
     },
-    "step1": {
-      "title": "Create a project",
-      "desc": "A project organizes your webhooks, endpoints, API keys, and events. Sign up and create your first project from the dashboard, or use the API:",
-      "response": "Response",
-      "retriesEnabled": "Retries enabled by default",
-      "hmacConfigured": "HMAC signatures configured",
-      "rateLimiting": "Rate limiting built-in"
-    },
-    "step2": {
-      "title": "Install an SDK",
-      "desc": "Official SDKs for Node.js, Python, and PHP. Or use the REST API directly with cURL or any HTTP client."
-    },
-    "step3": {
-      "title": "Create a webhook endpoint",
-      "desc": "Register the URL where you want to receive webhooks. Each endpoint gets a unique signing secret for HMAC verification.",
-      "saveSecret": "Save the endpoint secret",
-      "saveSecretDesc": "The <code>secret</code> is shown only once. Store it securely — you'll need it to verify webhook signatures in Step 6."
-    },
-    "step4": {
-      "title": "Subscribe to event types",
-      "desc": "Link your endpoint to specific event types. Only matching events will be delivered — no noise, no filtering on your side.",
-      "dotNotation": "You define the event types. Use dot notation for namespacing (e.g. <code>resource.action</code>)."
-    },
-    "step5": {
-      "title": "Send your first event",
-      "desc": "Events are sent using your <strong>API key</strong> (not JWT). The platform routes them to all subscribed endpoints automatically.",
-      "whatHappens": "What happens next",
-      "received": "Event received",
-      "receivedDesc": "Platform accepts the event",
-      "matched": "Matched",
-      "matchedDesc": "Finds subscribed endpoints",
-      "delivered": "Delivered",
-      "deliveredDesc": "POST to your endpoint URL",
-      "confirmed": "Confirmed",
-      "confirmedDesc": "HTTP 2xx = success"
-    },
-    "step6": {
-      "title": "Verify webhook signatures",
-      "desc": "Every webhook includes an <code>X-Signature</code> header. Always verify it to ensure the request came from Hookflow, not a third party.",
-      "hmacSha256": "HMAC-SHA256",
-      "hmacDesc": "Industry-standard signing",
-      "timestamp": "Timestamp check",
-      "timestampDesc": "Prevents replay attacks",
-      "perEndpoint": "Per-endpoint secrets",
-      "perEndpointDesc": "Unique secret per URL"
-    },
-    "step7": {
-      "title": "Monitor deliveries & replay failures",
-      "desc": "Every delivery is tracked with full attempt history. If something fails, replay it with one click — no code changes required.",
-      "recentDeliveries": "Recent Deliveries",
-      "live": "Live",
-      "fullVisibility": "Full visibility",
-      "fullVisibilityDesc": "See HTTP status, response body, headers, latency, and error messages for every attempt.",
-      "oneClickReplay": "One-click replay",
-      "oneClickReplayDesc": "Replay any failed delivery from the dashboard. Same payload, same endpoint — no code changes.",
-      "autoRetries": "Automatic retries",
-      "autoRetriesDesc": "Failed deliveries retry automatically with exponential backoff: 30s → 2m → 15m → 1h → 6h. Up to 5 attempts."
-    },
-    "incomingSection": {
-      "badge": "Bonus: Incoming Webhooks",
-      "title": "Receive webhooks from third-party providers",
-      "desc": "Hookflow can also receive webhooks from services like Stripe, GitHub, or Twilio — validate them, store them, and forward to your internal APIs.",
-      "step1Title": "1. Create an incoming source",
-      "step1Desc": "Each source gets a unique ingress URL. Configure the provider type and optional HMAC verification.",
-      "step2Title": "2. Add a forwarding destination",
-      "step2Desc": "Specify where validated webhooks should be forwarded. Hookflow retries failed forwards automatically.",
-      "step3Title": "3. Point your provider to the ingress URL",
-      "step3Desc": "Copy the ingress URL and paste it into your provider's webhook settings (e.g., Stripe Dashboard → Webhooks).",
-      "step4Title": "4. Monitor incoming events",
-      "step4Desc": "Every incoming webhook is logged with full request details, verification status, and forwarding results.",
-      "features": {
-        "uniqueUrl": "Unique ingress URL per source",
-        "hmacValidation": "HMAC signature validation",
-        "autoForwarding": "Automatic forwarding with retries",
-        "fullLogging": "Full request logging & replay"
+    "outgoing": {
+      "badge": "Demo 1 — Outgoing Webhooks",
+      "title": "Send a webhook in real time",
+      "desc": "Watch an event get accepted, signed with HMAC-SHA256, delivered to an endpoint, and confirmed — all in a few seconds.",
+      "sendBtn": "Send webhook",
+      "waiting": "Waiting for event…",
+      "incomingRequest": "Incoming webhook request",
+      "preparing": "Preparing delivery…",
+      "phases": {
+        "accepted": "Event accepted",
+        "signed": "Signature computed",
+        "delivering": "Delivering",
+        "confirmed": "Confirmed"
+      },
+      "log": {
+        "accepted": "Event accepted",
+        "signed": "Signature computed",
+        "delivering": "Delivering…",
+        "confirmed": "Delivery confirmed"
       }
     },
-    "sdkSection": {
-      "title": "Official SDKs",
-      "subtitle": "First-class SDKs with type safety, automatic retries, and signature verification built-in.",
-      "viewOn": "View on"
+    "signature": {
+      "badge": "Demo 2 — Signature Verification",
+      "title": "Tamper with a payload",
+      "desc": "Every webhook is signed with HMAC-SHA256. Try modifying the payload and see how the signature check catches it instantly.",
+      "payloadTitle": "Webhook payload",
+      "toggleHint": "Click \"Tamper\" to modify the amount",
+      "tamperedWarning": "amount changed: 149.99 → 0.01",
+      "tamperBtn": "Tamper payload",
+      "restoreBtn": "Restore original",
+      "verifyBtn": "Verify signature",
+      "secret": "Endpoint Secret",
+      "headerLabel": "X-Signature Header",
+      "resultValid": "Signature valid ✓",
+      "resultInvalid": "Signature mismatch ✗",
+      "resultValidDesc": "HMAC matches — payload is authentic and untampered.",
+      "resultInvalidDesc": "Computed HMAC doesn't match — payload was modified in transit.",
+      "step1": "Timestamp included",
+      "step1Desc": "Prevents replay attacks with a time-bound signature.",
+      "step2": "HMAC-SHA256",
+      "step2Desc": "Industry-standard signing with per-endpoint secrets.",
+      "step3": "Automatic verification",
+      "step3Desc": "SDKs verify signatures in one line of code."
     },
-    "finalCta": {
-      "title": "You're all set 🚀",
-      "subtitle": "Your webhook infrastructure is ready. Send outgoing events and receive incoming webhooks — all from one dashboard.",
+    "retry": {
+      "badge": "Demo 3 — Automatic Retries",
+      "title": "What happens when delivery fails?",
+      "desc": "Endpoints go down. Hookflow retries automatically with exponential backoff — no manual intervention needed.",
+      "simulateBtn": "Simulate failure",
+      "attemptHistory": "Delivery Attempts",
+      "noAttempts": "Click \"Simulate failure\" to see retry in action",
+      "waitingRetry": "Waiting for next retry window…",
+      "delivering": "Delivering…",
+      "schedule": "Retry Schedule",
+      "retryAfter": "Retry after {{interval}}",
+      "smartRetries": "Smart exponential backoff",
+      "smartRetriesDesc": "30s → 2m → 15m → 1h → 6h → 24h. Up to 5 attempts before moving to the dead letter queue."
+    },
+    "incoming": {
+      "badge": "Demo 4 — Incoming Webhooks",
+      "title": "Receive webhooks from Stripe & others",
+      "desc": "Hookflow validates incoming webhooks from third-party providers, stores them, and forwards to your internal APIs with retries.",
+      "provider": "Sends webhook",
+      "validates": "Validates & forwards",
+      "yourApi": "Your API",
+      "receives": "Receives clean data",
+      "simulateBtn": "Simulate Stripe webhook",
+      "waiting": "Waiting for incoming webhook…",
+      "forwardedPayload": "Forwarded by Hookflow",
+      "verifying": "Verifying signature…",
+      "features": {
+        "uniqueUrl": "Unique ingress URL",
+        "hmac": "HMAC verification",
+        "autoForward": "Auto-forwarding",
+        "logging": "Full event logging"
+      },
+      "log": {
+        "received": "Webhook received",
+        "verified": "Signature verified",
+        "forwarding": "Forwarding → api.internal.com",
+        "delivering": "Delivering…",
+        "complete": "Forwarding complete"
+      }
+    },
+    "dashboard": {
+      "badge": "Dashboard Preview",
+      "title": "Full visibility into every delivery",
+      "desc": "Monitor all webhook activity from a real-time dashboard — status, latency, attempts, and one-click replay for failures.",
+      "healthy": "Healthy",
+      "endpoints": "endpoints",
+      "eventTypes": "event types",
+      "successRate": "success rate",
+      "stats": {
+        "total": "Total deliveries",
+        "delivered": "Delivered",
+        "retrying": "Retrying",
+        "failed": "Failed"
+      },
+      "col": {
+        "event": "Event",
+        "endpoint": "Endpoint",
+        "status": "Status",
+        "response": "Response",
+        "latency": "Latency",
+        "attempts": "Attempts"
+      },
+      "feat": {
+        "realtime": "Real-time monitoring",
+        "realtimeDesc": "See every delivery as it happens with live status updates.",
+        "replay": "One-click replay",
+        "replayDesc": "Replay any failed delivery instantly — same payload, same endpoint.",
+        "dlq": "Dead letter queue",
+        "dlqDesc": "Failed deliveries are safely stored for manual review and replay."
+      }
+    },
+    "cta": {
+      "title": "Ready to try it for real?",
+      "subtitle": "Create a free account and send your first webhook in under 5 minutes. No credit card required.",
+      "createAccount": "Create free account",
       "goToDashboard": "Go to Dashboard",
-      "readDocs": "Read full docs"
+      "readDocs": "Read the docs"
     }
   },
   "docsPage": {
