@@ -49,6 +49,8 @@ export interface OrganizationResponse {
 export interface ProjectRequest {
   name: string;
   description?: string;
+  schemaValidationEnabled?: boolean;
+  schemaValidationPolicy?: string;
 }
 
 export interface ProjectResponse {
@@ -56,6 +58,8 @@ export interface ProjectResponse {
   name: string;
   description?: string;
   organizationId: string;
+  schemaValidationEnabled: boolean;
+  schemaValidationPolicy: string;
   createdAt: string;
   updatedAt: string;
 }

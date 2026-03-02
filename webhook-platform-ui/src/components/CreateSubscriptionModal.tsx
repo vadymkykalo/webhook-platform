@@ -81,8 +81,8 @@ export default function CreateSubscriptionModal({
     }
     if (!eventType.trim()) {
       newErrors.eventType = 'Event type is required';
-    } else if (!/^[a-z][a-z0-9_.]*$/.test(eventType)) {
-      newErrors.eventType = 'Must start with lowercase letter, only lowercase, digits, dots, underscores';
+    } else if (!/^(\*{1,2}|[a-z][a-z0-9_]*)(\.(\*{1,2}|[a-z][a-z0-9_]*))*$/.test(eventType)) {
+      newErrors.eventType = 'Lowercase with dots/underscores, wildcards * and ** allowed (e.g. order.*, **)';
     }
     if (maxAttempts < 1 || maxAttempts > 20) {
       newErrors.maxAttempts = 'Must be between 1 and 20';
@@ -181,7 +181,7 @@ export default function CreateSubscriptionModal({
               </Label>
               <Input
                 id="eventType"
-                placeholder="e.g., user.created"
+                placeholder="e.g., user.created, order.*, **"
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
                 disabled={saving}
@@ -191,7 +191,7 @@ export default function CreateSubscriptionModal({
                 <p className="text-sm text-destructive">{errors.eventType}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Use dot notation (e.g., user.created, order.updated). One event type per subscription.
+                Dot notation: <code className="bg-muted px-1 rounded">order.created</code> exact, <code className="bg-muted px-1 rounded">order.*</code> one level, <code className="bg-muted px-1 rounded">order.**</code> all nested, <code className="bg-muted px-1 rounded">**</code> catch-all.
               </p>
             </div>
 

@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -43,6 +43,7 @@ export default function DocumentationPage() {
             {activeSection === 'deliveries-api' && <DeliveriesAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'webhook-security' && <WebhookSecurity activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'incoming-webhooks' && <IncomingWebhooks activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'errors' && <Errors />}
             {activeSection === 'sdks' && <SDKs />}
           </div>
@@ -64,6 +65,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'deliveries-api', label: t('docsPage.sections.deliveriesApi'), icon: CheckCircle2 },
     { id: 'webhook-security', label: t('docsPage.sections.webhookSecurity'), icon: Shield },
     { id: 'incoming-webhooks', label: t('docsPage.sections.incomingWebhooks'), icon: ArrowDownToLine },
+    { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
     { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
@@ -1868,6 +1870,157 @@ dest = client.incoming_sources.create_destination(
             <p className="text-sm text-muted-foreground mb-3">{t('docsPage.incomingWebhooks.replayEventDesc')}</p>
           </div>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function SchemaRegistryDocs({ activeLanguage, setActiveLanguage }: { activeLanguage: 'curl' | 'node' | 'python'; setActiveLanguage: (l: 'curl' | 'node' | 'python') => void }) {
+  const { t } = useTranslation();
+
+  const createEventTypeCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/schemas \\
+  -H "X-API-Key: wh_live_abc123..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "order.created",
+    "description": "Fired when a new order is placed"
+  }'`;
+
+  const createVersionCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/schemas/{eventTypeId}/versions \\
+  -H "X-API-Key: wh_live_abc123..." \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "schemaJson": "{\\"type\\":\\"object\\",\\"required\\":[\\"order_id\\",\\"amount\\"],\\"properties\\":{\\"order_id\\":{\\"type\\":\\"string\\"},\\"amount\\":{\\"type\\":\\"number\\"},\\"currency\\":{\\"type\\":\\"string\\",\\"enum\\":[\\"USD\\",\\"EUR\\",\\"UAH\\"]}},\\"additionalProperties\\":false}",
+    "description": "Initial schema with required fields",
+    "compatibilityMode": "BACKWARD"
+  }'`;
+
+  const promoteCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/schemas/{eventTypeId}/versions/{versionId}/promote \\
+  -H "X-API-Key: wh_live_abc123..."`;
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">{t('docsPage.schemaRegistry.title')}</h1>
+        <p className="text-lg text-muted-foreground">{t('docsPage.schemaRegistry.subtitle')}</p>
+      </div>
+
+      {/* Overview */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2"><FileCheck className="h-5 w-5 text-primary" /> {t('docsPage.schemaRegistry.overview')}</h2>
+        <p className="text-muted-foreground leading-relaxed">{t('docsPage.schemaRegistry.overviewDesc1')}</p>
+        <div className="bg-muted/50 rounded-xl border p-4">
+          <p className="text-sm text-muted-foreground font-mono">{t('docsPage.schemaRegistry.overviewDesc2')}</p>
+        </div>
+      </section>
+
+      {/* Event Types API */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.schemaRegistry.eventTypesApi')}</h2>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.createEventType')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/schemas" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.createEventTypeDesc')}</p>
+            <ResponseBlock>{createEventTypeCode}</ResponseBlock>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.listEventTypes')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/schemas" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.listEventTypesDesc')}</p>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.updateEventType')}</h3>
+            <HTTPMethod method="PUT" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.updateEventTypeDesc')}</p>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.deleteEventType')}</h3>
+            <HTTPMethod method="DELETE" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.deleteEventTypeDesc')}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Schema Versions API */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.schemaRegistry.versionsApi')}</h2>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.createVersion')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}/versions" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.createVersionDesc')}</p>
+            <ResponseBlock>{createVersionCode}</ResponseBlock>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.listVersions')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}/versions" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.listVersionsDesc')}</p>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.promoteVersion')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}/versions/{versionId}/promote" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.promoteVersionDesc')}</p>
+            <ResponseBlock>{promoteCode}</ResponseBlock>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.deprecateVersion')}</h3>
+            <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}/versions/{versionId}/deprecate" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.deprecateVersionDesc')}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Schema Changes API */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.schemaRegistry.changesApi')}</h2>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.listChanges')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/schemas/{eventTypeId}/changes" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.listChangesDesc')}</p>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold mb-2">{t('docsPage.schemaRegistry.listProjectChanges')}</h3>
+            <HTTPMethod method="GET" path="/api/v1/projects/{projectId}/schemas/changes" />
+            <p className="text-sm text-muted-foreground mb-3">{t('docsPage.schemaRegistry.listProjectChangesDesc')}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Validation Policies */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2"><Shield className="h-5 w-5 text-primary" /> {t('docsPage.schemaRegistry.validationPolicies')}</h2>
+        <p className="text-muted-foreground">{t('docsPage.schemaRegistry.validationPoliciesDesc')}</p>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" /> {t('docsPage.schemaRegistry.policyWarn')}</li>
+          <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" /> {t('docsPage.schemaRegistry.policyBlock')}</li>
+        </ul>
+      </section>
+
+      {/* Wildcard Routing */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold flex items-center gap-2"><GitBranch className="h-5 w-5 text-primary" /> {t('docsPage.schemaRegistry.wildcardRouting')}</h2>
+        <p className="text-muted-foreground">{t('docsPage.schemaRegistry.wildcardRoutingDesc')}</p>
+        <div className="bg-muted/50 rounded-xl border p-4 space-y-1.5">
+          <p className="text-sm font-mono text-muted-foreground">{t('docsPage.schemaRegistry.wildcardExact')}</p>
+          <p className="text-sm font-mono text-muted-foreground">{t('docsPage.schemaRegistry.wildcardSingle')}</p>
+          <p className="text-sm font-mono text-muted-foreground">{t('docsPage.schemaRegistry.wildcardMulti')}</p>
+          <p className="text-sm font-mono text-muted-foreground">{t('docsPage.schemaRegistry.wildcardAll')}</p>
+          <p className="text-sm font-mono text-muted-foreground">{t('docsPage.schemaRegistry.wildcardMiddle')}</p>
+        </div>
+      </section>
+
+      {/* Compatibility Modes */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold">{t('docsPage.schemaRegistry.compatibilityModes')}</h2>
+        <p className="text-muted-foreground">{t('docsPage.schemaRegistry.compatibilityModesDesc')}</p>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-muted-foreground/50 mt-0.5 flex-shrink-0" /> {t('docsPage.schemaRegistry.compatNone')}</li>
+          <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" /> {t('docsPage.schemaRegistry.compatBackward')}</li>
+          <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" /> {t('docsPage.schemaRegistry.compatForward')}</li>
+          <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" /> {t('docsPage.schemaRegistry.compatFull')}</li>
+        </ul>
       </section>
     </div>
   );

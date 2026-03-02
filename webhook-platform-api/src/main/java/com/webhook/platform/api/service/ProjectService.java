@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
@@ -68,6 +69,16 @@ public class ProjectService {
 
         project.setName(request.getName());
         project.setDescription(request.getDescription());
+        if (request.getSchemaValidationEnabled() != null) {
+            project.setSchemaValidationEnabled(request.getSchemaValidationEnabled());
+        }
+        if (request.getSchemaValidationPolicy() != null) {
+            try {
+                project.setSchemaValidationPolicy(
+                        SchemaValidationPolicy.valueOf(request.getSchemaValidationPolicy().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         project = projectRepository.save(project);
 
         return mapToResponse(project);
@@ -92,6 +103,8 @@ public class ProjectService {
                 .id(project.getId())
                 .name(project.getName())
                 .description(project.getDescription())
+                .schemaValidationEnabled(project.getSchemaValidationEnabled())
+                .schemaValidationPolicy(project.getSchemaValidationPolicy().name())
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
                 .build();

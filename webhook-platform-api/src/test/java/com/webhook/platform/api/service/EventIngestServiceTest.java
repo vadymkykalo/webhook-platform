@@ -40,6 +40,8 @@ class EventIngestServiceTest {
     @Mock private DeliveryRepository deliveryRepository;
     @Mock private OutboxMessageRepository outboxMessageRepository;
     @Mock private SequenceGeneratorService sequenceGeneratorService;
+    @Mock private SchemaRegistryService schemaRegistryService;
+    @Mock private ProjectRepository projectRepository;
     @Mock private PlatformTransactionManager transactionManager;
 
     private EventIngestService service;
@@ -54,7 +56,8 @@ class EventIngestServiceTest {
         service = new EventIngestService(
                 eventRepository, subscriptionRepository, deliveryRepository,
                 outboxMessageRepository, objectMapper, meterRegistry,
-                sequenceGeneratorService, transactionManager, 262144
+                sequenceGeneratorService, schemaRegistryService, projectRepository,
+                transactionManager, 262144
         );
     }
 

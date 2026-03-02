@@ -215,8 +215,48 @@
   background: hsl(var(--muted-foreground));
 }
 
-/* Focus visible ring */
+/* ── Universal form control styling (low specificity via :where) ── */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]),
+textarea) {
+  height: 2.5rem;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--input));
+  background-color: hsl(var(--background));
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: hsl(var(--foreground));
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+:where(textarea) {
+  height: auto;
+  min-height: 5rem;
+}
+:where(input::placeholder, textarea::placeholder) {
+  color: hsl(var(--muted-foreground));
+}
+:where(input:disabled, textarea:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Focus ring — subtle, consistent */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):focus,
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):focus-visible,
+textarea:focus, textarea:focus-visible) {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.1);
+}
+
+/* Kill default browser focus outline globally, components handle their own */
 *:focus-visible {
+  outline: none;
+}
+
+/* Buttons & interactive elements — subtle ring on keyboard focus only */
+:where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]):focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
   border-radius: var(--radius);

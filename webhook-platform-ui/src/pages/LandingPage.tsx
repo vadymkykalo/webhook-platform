@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -433,6 +433,8 @@ function Features() {
     { icon: Activity, title: t('landing.features.replay'), desc: t('landing.features.replayDesc') },
     { icon: ArrowDownToLine, title: t('landing.features.incomingIngress'), desc: t('landing.features.incomingIngressDesc') },
     { icon: Globe, title: t('landing.features.incomingRouting'), desc: t('landing.features.incomingRoutingDesc') },
+    { icon: FileCheck, title: t('landing.features.schemaRegistry'), desc: t('landing.features.schemaRegistryDesc') },
+    { icon: GitBranch, title: t('landing.features.wildcardRouting'), desc: t('landing.features.wildcardRoutingDesc') },
     { icon: BarChart3, title: t('landing.features.analytics'), desc: t('landing.features.analyticsDesc') },
     { icon: Lock, title: t('landing.features.mtls'), desc: t('landing.features.mtlsDesc') },
   ];
@@ -1189,6 +1191,7 @@ function ProblemSolution() {
     { before: t('landing.problem.item4Before'), after: t('landing.problem.item4After') },
     { before: t('landing.problem.item5Before'), after: t('landing.problem.item5After') },
     { before: t('landing.problem.item6Before'), after: t('landing.problem.item6After') },
+    { before: t('landing.problem.item7Before'), after: t('landing.problem.item7After') },
   ];
 
   return (
@@ -1343,6 +1346,8 @@ function FAQ() {
     { q: t('landing.faq.q3'), a: t('landing.faq.a3') },
     { q: t('landing.faq.q7'), a: t('landing.faq.a7') },
     { q: t('landing.faq.q8'), a: t('landing.faq.a8') },
+    { q: t('landing.faq.q9'), a: t('landing.faq.a9') },
+    { q: t('landing.faq.q10'), a: t('landing.faq.a10') },
     { q: t('landing.faq.q4'), a: t('landing.faq.a4') },
     { q: t('landing.faq.q5'), a: t('landing.faq.a5') },
     { q: t('landing.faq.q6'), a: t('landing.faq.a6') },

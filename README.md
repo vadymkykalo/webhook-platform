@@ -151,6 +151,13 @@ One platform to receive from all providers. Each incoming source has its own ing
 - **Full audit trail** — every incoming request persisted with headers, body, IP, verification status
 - **Retry with backoff** — configurable per-destination retry delays and max attempts
 
+### Schema Registry & Event Routing
+- **Schema Registry** — define JSON Schema contracts per event type, version, diff, promote, deprecate
+- **Breaking change detection** — automatic diff between schema versions, flags added/removed fields and type changes
+- **Validation policies** — WARN (log mismatches) or BLOCK (reject invalid payloads) per project
+- **Wildcard subscriptions** — `order.*` (single segment), `order.**` (multi-segment), `**` (catch-all)
+- **Compatibility modes** — NONE, BACKWARD, FORWARD, FULL per schema version
+
 ### Security
 - **HMAC-SHA256** signatures on every outgoing delivery
 - **Incoming signature verification** — strategy pattern supporting 5+ providers

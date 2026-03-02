@@ -83,7 +83,8 @@
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
     "logout": "Logout",
-    "loggedOut": "Logged out successfully"
+    "loggedOut": "Logged out successfully",
+    "schemas": "Schemas"
   },
   "auth": {
     "login": {
@@ -770,7 +771,11 @@
       "incomingIngress": "Incoming webhook ingestion",
       "incomingIngressDesc": "Receive webhooks from Stripe, GitHub, Twilio and any provider. Each source gets a unique ingress URL with rate limiting.",
       "incomingRouting": "Smart routing & forwarding",
-      "incomingRoutingDesc": "Validate incoming payloads, then forward to one or more internal destinations with full retry and observability."
+      "incomingRoutingDesc": "Validate incoming payloads, then forward to one or more internal destinations with full retry and observability.",
+      "schemaRegistry": "Schema Registry",
+      "schemaRegistryDesc": "Define JSON Schema contracts per event type. Version, diff, promote, and deprecate schemas. Block breaking changes before they reach production.",
+      "wildcardRouting": "Wildcard event routing",
+      "wildcardRoutingDesc": "Subscribe to order.*, payment.**, or ** to catch all. Flexible glob-style pattern matching for precise event routing."
     },
     "architecture": {
       "badge": "Transactional outbox pattern",
@@ -895,6 +900,8 @@
       "item5After": "Managed ingress URLs with HMAC validation per provider",
       "item6Before": "No unified view of incoming and outgoing events",
       "item6After": "Single dashboard for both directions, DLQ + monitoring built in",
+      "item7Before": "Provider changes payload schema silently, your integration breaks",
+      "item7After": "Schema registry detects breaking changes and blocks invalid payloads automatically",
       "saveBadge": "Save 200+ engineering hours per year",
       "saveDesc": "Stop reinventing webhook infrastructure. Ship features instead."
     },
@@ -943,7 +950,11 @@
       "q7": "Can Hookflow receive incoming webhooks from third-party services?",
       "a7": "Yes. Create an incoming source for any provider (Stripe, GitHub, Twilio, etc.), and Hookflow generates a unique ingress URL. Incoming payloads are validated with HMAC, stored, and forwarded to your internal destinations — with retries and full observability.",
       "q8": "What's the difference between outgoing and incoming webhooks?",
-      "a8": "Outgoing: your app sends events → Hookflow delivers to your customers' endpoints. Incoming: third-party services send webhooks → Hookflow ingests, validates, and routes them to your internal APIs. Both directions share the same retry, signature, and observability features."
+      "a8": "Outgoing: your app sends events → Hookflow delivers to your customers' endpoints. Incoming: third-party services send webhooks → Hookflow ingests, validates, and routes them to your internal APIs. Both directions share the same retry, signature, and observability features.",
+      "q9": "What is the Schema Registry and how does it work?",
+      "a9": "The Schema Registry lets you define JSON Schema contracts for each event type. Every new version is automatically diffed against the previous one, breaking changes are flagged, and you can enforce WARN or BLOCK policies. Think Kafka Schema Registry, but for HTTP webhooks.",
+      "q10": "How does wildcard event routing work?",
+      "a10": "Subscriptions support glob-style patterns: order.* matches single-segment (order.created, order.updated), order.** matches multi-segment (order.line.added), and ** catches everything. Pattern validation is enforced at creation time."
     }
   },
   "quickstartPage": {
@@ -1073,6 +1084,7 @@
       "deliveriesApi": "Deliveries API",
       "webhookSecurity": "Webhook Security",
       "incomingWebhooks": "Incoming Webhooks",
+      "schemaRegistry": "Schema Registry",
       "errors": "Errors & Rate Limits",
       "sdks": "SDKs"
     },
@@ -1275,6 +1287,53 @@
       "verificationNone": "NONE — No verification (not recommended for production)",
       "verificationHmac": "HMAC_GENERIC — Verify using provider's HMAC signature",
       "providerTypes": "Supported provider types: GENERIC, STRIPE, GITHUB, TWILIO, SHOPIFY, HUBSPOT, SLACK, CUSTOM"
+    },
+    "schemaRegistry": {
+      "title": "Schema Registry",
+      "subtitle": "Define JSON Schema contracts, version schemas, detect breaking changes, and enforce validation policies per project.",
+      "overview": "Overview",
+      "overviewDesc1": "The Schema Registry brings contract testing to HTTP webhooks. Define a JSON Schema for each event type, upload new versions, and Hookflow automatically diffs them — flagging added fields, removed fields, type changes, and breaking changes.",
+      "overviewDesc2": "Enable schema validation per project with WARN (log mismatches) or BLOCK (reject invalid payloads) policies. Think Kafka Schema Registry, but for webhooks.",
+      "eventTypesApi": "Event Types API",
+      "createEventType": "Create Event Type",
+      "createEventTypeDesc": "Register a new event type in the project catalog. Names must be lowercase with dots/underscores (e.g. order.created).",
+      "listEventTypes": "List Event Types",
+      "listEventTypesDesc": "Returns all event types for the project, including latest version number, active status, and breaking change flag.",
+      "updateEventType": "Update Event Type",
+      "updateEventTypeDesc": "Update the description of an existing event type.",
+      "deleteEventType": "Delete Event Type",
+      "deleteEventTypeDesc": "Delete an event type and all its schema versions.",
+      "versionsApi": "Schema Versions API",
+      "createVersion": "Create Schema Version",
+      "createVersionDesc": "Upload a new JSON Schema version for an event type. Created as DRAFT. Duplicate schemas are deduplicated by fingerprint.",
+      "listVersions": "List Versions",
+      "listVersionsDesc": "Returns all schema versions for an event type, ordered by version number descending.",
+      "promoteVersion": "Promote Version",
+      "promoteVersionDesc": "Promotes a DRAFT schema to ACTIVE. The previous ACTIVE version is automatically deprecated.",
+      "deprecateVersion": "Deprecate Version",
+      "deprecateVersionDesc": "Sets a schema version status to DEPRECATED.",
+      "changesApi": "Schema Changes API",
+      "listChanges": "List Changes for Event Type",
+      "listChangesDesc": "Returns the diff history for a specific event type — added/removed fields, type changes, and breaking change flags.",
+      "listProjectChanges": "List All Project Changes",
+      "listProjectChangesDesc": "Returns the global diff feed across all event types in the project, with event type names.",
+      "validationPolicies": "Validation Policies",
+      "validationPoliciesDesc": "Enable schema validation on a project to automatically validate every incoming event payload against the active schema:",
+      "policyWarn": "WARN — Log validation errors but accept the event",
+      "policyBlock": "BLOCK — Reject the event with 400 if payload doesn't match the active schema",
+      "wildcardRouting": "Wildcard Event Routing",
+      "wildcardRoutingDesc": "Subscriptions support glob-style patterns for event type matching:",
+      "wildcardExact": "order.created — Exact match",
+      "wildcardSingle": "order.* — Matches one segment (order.created, order.updated)",
+      "wildcardMulti": "order.** — Matches multiple segments (order.line.added, order.a.b.c)",
+      "wildcardAll": "** — Catch-all, matches every event type",
+      "wildcardMiddle": "order.**.completed — Deep match with suffix",
+      "compatibilityModes": "Compatibility Modes",
+      "compatibilityModesDesc": "Each schema version has a compatibility mode that controls how changes are evaluated:",
+      "compatNone": "NONE — No compatibility checks",
+      "compatBackward": "BACKWARD — New schema can read data written by the old schema",
+      "compatForward": "FORWARD — Old schema can read data written by the new schema",
+      "compatFull": "FULL — Both backward and forward compatible"
     }
   },
   "incomingSources": {
@@ -1539,7 +1598,73 @@
     "incoming-events": "Incoming Events",
     "members": "Members",
     "audit-log": "Audit Log",
-    "settings": "Settings"
+    "settings": "Settings",
+    "schemas": "Schemas"
+  },
+  "schemas": {
+    "title": "Schema Registry",
+    "subtitle": "Manage event type contracts, versioned schemas, and track breaking changes",
+    "eventTypes": "Event Types",
+    "addType": "Add Type",
+    "eventTypeName": "Event type name",
+    "eventTypeNameHint": "Use dot notation, e.g. order.created, user.updated",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description of this event type",
+    "searchTypes": "Filter event types…",
+    "noSearchResults": "No event types match your search",
+    "noEventTypes": "No event types registered",
+    "noEventTypesHint": "Create one manually or send an event — schemas are auto-discovered",
+    "eventTypeCreated": "Event type created",
+    "eventTypeDeleted": "Event type deleted",
+    "createFailed": "Failed to create event type",
+    "deleteFailed": "Failed to delete event type",
+    "confirmDelete": "Delete event type \"{{name}}\" and all its schema versions?",
+    "created": "Created",
+    "latestVersion": "Latest",
+    "versions": "Versions",
+    "changeHistory": "Change History",
+    "uploadSchema": "Upload Schema",
+    "jsonSchema": "JSON Schema",
+    "versionNote": "Version note",
+    "versionNotePlaceholder": "What changed in this version?",
+    "uploadVersion": "Upload",
+    "uploadHint": "Schema will be fingerprinted and diffed automatically",
+    "invalidJson": "Invalid JSON — please check your schema",
+    "versionCreated": "Schema version created",
+    "createVersionFailed": "Failed to create schema version",
+    "noVersions": "No schema versions yet",
+    "noVersionsHint": "Upload a JSON schema or send an event to auto-discover one",
+    "promote": "Activate",
+    "deprecate": "Deprecate",
+    "versionPromoted": "Schema version activated",
+    "versionDeprecated": "Schema version deprecated",
+    "promoteFailed": "Failed to activate schema",
+    "deprecateFailed": "Failed to deprecate schema",
+    "copySchema": "Copy",
+    "noChanges": "No schema changes recorded",
+    "noChangesHint": "Changes appear when new schema versions are uploaded",
+    "breakingChange": "Breaking",
+    "selectEventType": "Select an event type",
+    "selectEventTypeHint": "Choose an event type from the left panel to view its schemas and history",
+    "board": {
+      "title": "Recent Changes",
+      "breakingCount": "breaking",
+      "added": "added",
+      "removed": "removed",
+      "changed": "changed",
+      "showAll": "Show all {{count}} changes",
+      "showLess": "Show less"
+    },
+    "validation": {
+      "title": "Schema Validation",
+      "description": "Validate incoming events against active schemas",
+      "enabled": "Schema validation enabled",
+      "enabledHint": "When enabled, incoming events are validated against the active schema for their event type",
+      "policy": "Validation policy",
+      "policyWarn": "Warn — log validation errors but accept the event",
+      "policyBlock": "Block — reject events that fail schema validation",
+      "saved": "Schema validation settings saved"
+    }
   },
   "onboarding": {
     "title": "Getting Started",
@@ -1639,3 +1764,4 @@
     "newUserHint": "Don't have an account yet? Register first, then you'll be redirected back to accept the invite."
   }
 }
+

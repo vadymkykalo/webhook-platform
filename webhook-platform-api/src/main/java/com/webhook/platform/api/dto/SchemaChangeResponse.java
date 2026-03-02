@@ -12,12 +12,15 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProjectResponse {
+public class SchemaChangeResponse {
     private UUID id;
-    private String name;
-    private String description;
-    private Boolean schemaValidationEnabled;
-    private String schemaValidationPolicy;
+    private UUID eventTypeId;
+    private String eventTypeName;
+    private UUID fromVersionId;
+    private Integer fromVersion;
+    private UUID toVersionId;
+    private Integer toVersion;
+    private String changeSummary;
+    private Boolean breaking;
     private Instant createdAt;
-    private Instant updatedAt;
 }
