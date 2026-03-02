@@ -190,7 +190,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-webhook_redis_pass}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@hookflow.dev}
-      EMAIL_BASE_URL: ${EMAIL_BASE_URL:-http://localhost:5173}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5173}
       SMTP_HOST: ${SMTP_HOST:-localhost}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USERNAME: ${SMTP_USERNAME:-}

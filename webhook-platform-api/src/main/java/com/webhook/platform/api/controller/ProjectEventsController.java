@@ -1,9 +1,12 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.dto.EventDiffResponse;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.service.EventDiffService;
 import com.webhook.platform.api.service.EventService;
+import com.webhook.platform.api.service.PiiMaskingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -27,9 +30,15 @@ import java.util.UUID;
 public class ProjectEventsController {
 
     private final EventService eventService;
+    private final EventDiffService eventDiffService;
+    private final PiiMaskingService piiMaskingService;
 
-    public ProjectEventsController(EventService eventService) {
+    public ProjectEventsController(EventService eventService,
+                                   EventDiffService eventDiffService,
+                                   PiiMaskingService piiMaskingService) {
         this.eventService = eventService;
+        this.eventDiffService = eventDiffService;
+        this.piiMaskingService = piiMaskingService;
     }
 
     @Operation(summary = "List events", description = "Returns paginated event history for the project")
@@ -51,6 +60,32 @@ public class ProjectEventsController {
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         EventResponse response = eventService.getEvent(projectId, id, auth.organizationId());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Get event with sanitized payload", description = "Returns event details with PII-masked payload")
+    @GetMapping("/{id}/sanitized")
+    public ResponseEntity<EventResponse> getEventSanitized(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("id") UUID id,
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        EventResponse response = eventService.getEvent(projectId, id, auth.organizationId());
+        String sanitized = piiMaskingService.sanitizePayload(projectId, response.getPayload());
+        response.setPayload(sanitized);
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Diff two events", description = "Computes a structural diff between two events of the same project")
+    @GetMapping("/diff")
+    public ResponseEntity<EventDiffResponse> diffEvents(
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam("left") UUID leftEventId,
+            @RequestParam("right") UUID rightEventId,
+            @RequestParam(value = "sanitize", defaultValue = "true") boolean sanitize,
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        EventDiffResponse response = eventDiffService.diff(projectId, leftEventId, rightEventId, sanitize, auth.organizationId());
         return ResponseEntity.ok(response);
     }
 

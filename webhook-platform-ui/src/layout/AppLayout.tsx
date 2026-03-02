@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -53,6 +53,8 @@ const getProjectIncomingNav = (projectId: string): NavItem[] => [
 
 const getProjectToolsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
+  { nameKey: 'nav.piiRules', path: `/admin/projects/${projectId}/pii-rules`, icon: Shield },
+  { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
   { nameKey: 'nav.apiKeys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
   { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
@@ -115,6 +117,8 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   'incoming-sources': { key: 'breadcrumb.incoming-sources', icon: ArrowDownToLine },
   'incoming-events': { key: 'breadcrumb.incoming-events', icon: Activity },
   schemas: { key: 'breadcrumb.schemas', icon: FileJson2 },
+  'pii-rules': { key: 'breadcrumb.pii-rules', icon: Shield },
+  'event-diff': { key: 'breadcrumb.event-diff', icon: GitCompare },
   members: { key: 'breadcrumb.members', icon: Users },
   'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
   settings: { key: 'breadcrumb.settings', icon: Settings },

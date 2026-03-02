@@ -85,7 +85,9 @@
     "collapseSidebar": "Collapse sidebar",
     "logout": "Logout",
     "loggedOut": "Logged out successfully",
-    "schemas": "Schemas"
+    "schemas": "Schemas",
+    "piiRules": "PII Masking",
+    "eventDiff": "Event Diff"
   },
   "auth": {
     "login": {
@@ -1638,7 +1640,86 @@
     "members": "Members",
     "audit-log": "Audit Log",
     "settings": "Settings",
-    "schemas": "Schemas"
+    "schemas": "Schemas",
+    "pii-rules": "PII Masking",
+    "event-diff": "Event Diff"
+  },
+  "piiRules": {
+    "title": "PII Masking Rules",
+    "subtitle": "Configure which fields are masked before sharing event payloads",
+    "seedDefaults": "Seed defaults",
+    "addRule": "Add rule",
+    "newRule": "New custom rule",
+    "newRuleDesc": "Specify a JSON path or pattern name to mask in event payloads",
+    "patternName": "Pattern name",
+    "jsonPath": "JSON path",
+    "maskStyle": "Mask style",
+    "pattern": "Pattern",
+    "type": "Type",
+    "example": "Example",
+    "status": "Status",
+    "builtin": "Built-in",
+    "custom": "Custom",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "noRules": "No masking rules configured",
+    "noRulesHint": "Seed defaults to add email, phone, and card masking",
+    "deleteDialog": {
+      "title": "Delete masking rule?",
+      "description": "This rule will be permanently removed. Event payloads will no longer be masked by this rule."
+    },
+    "toast": {
+      "loadFailed": "Failed to load PII rules",
+      "created": "Masking rule created",
+      "createFailed": "Failed to create rule",
+      "updated": "Masking rule updated",
+      "updateFailed": "Failed to update rule",
+      "deleted": "Masking rule deleted",
+      "deleteFailed": "Failed to delete rule",
+      "seeded": "Default rules added",
+      "seedFailed": "Failed to seed defaults"
+    }
+  },
+  "sharedDebug": {
+    "title": "Shared Debug Link",
+    "subtitle": "PII-masked event payload shared for debugging",
+    "loading": "Loading debug info…",
+    "unavailable": "Link unavailable",
+    "expired": "This debug link has expired or does not exist.",
+    "error": "Something went wrong loading this debug link.",
+    "project": "Project",
+    "eventType": "Event type",
+    "eventTime": "Event time",
+    "expiresAt": "Expires {{date}}",
+    "piiMasked": "PII masked",
+    "sanitizedPayload": "Sanitized payload",
+    "footer": "Sensitive data has been masked. This link will expire automatically."
+  },
+  "eventDiff": {
+    "title": "Event Diff",
+    "subtitle": "Compare two event payloads side by side",
+    "selectEvents": "Select events to compare",
+    "leftEvent": "Left event",
+    "rightEvent": "Right event",
+    "selectPlaceholder": "Select an event…",
+    "compare": "Compare",
+    "sanitizePii": "Mask PII before comparing",
+    "changes": "{{count}} difference(s)",
+    "noDiffs": "No differences found — payloads are identical",
+    "left": "Left",
+    "right": "Right",
+    "toast": {
+      "loadEventsFailed": "Failed to load events",
+      "diffFailed": "Failed to compute diff"
+    }
+  },
+  "debugLinks": {
+    "share": "Share debug link",
+    "creating": "Creating link…",
+    "created": "Debug link created",
+    "createFailed": "Failed to create debug link",
+    "copied": "Link copied to clipboard",
+    "expiryHours": "Expires in (hours)"
   },
   "schemas": {
     "title": "Schema Registry",
@@ -1811,4 +1892,5 @@
     "newUserHint": "Don't have an account yet? Register first, then you'll be redirected back to accept the invite."
   }
 }
+
 

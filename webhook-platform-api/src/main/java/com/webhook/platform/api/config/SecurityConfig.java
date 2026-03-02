@@ -57,6 +57,7 @@ public class SecurityConfig {
                                                         .requestMatchers("/actuator/**").authenticated()
                                                         .requestMatchers("/hook/**").permitAll()
                                                         .requestMatchers("/ingress/**").permitAll()
+                                                        .requestMatchers("/api/v1/public/**").permitAll()
                                                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                                                         "/api/v1/auth/refresh",
                                                                         "/api/v1/auth/verify-email",

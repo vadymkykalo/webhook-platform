@@ -32,6 +32,9 @@ const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
 const IncomingSourceDetailPage = lazy(() => import('./pages/IncomingSourceDetailPage'));
 const IncomingEventsPage = lazy(() => import('./pages/IncomingEventsPage'));
 const SchemasPage = lazy(() => import('./pages/SchemasPage'));
+const PiiRulesPage = lazy(() => import('./pages/PiiRulesPage'));
+const EventDiffPage = lazy(() => import('./pages/EventDiffPage'));
+const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoader() {
@@ -157,6 +160,14 @@ export const router = createBrowserRouter([
         element: <S><SchemasPage /></S>,
       },
       {
+        path: 'projects/:projectId/pii-rules',
+        element: <S><PiiRulesPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/event-diff',
+        element: <S><EventDiffPage /></S>,
+      },
+      {
         path: 'members',
         element: <ProtectedRoute requiredRole="OWNER"><S><MembersPage /></S></ProtectedRoute>,
       },
@@ -173,6 +184,10 @@ export const router = createBrowserRouter([
         element: <S><NotFoundPage /></S>,
       },
     ],
+  },
+  {
+    path: '/shared/debug/:token',
+    element: <S><SharedDebugPage /></S>,
   },
   {
     path: '*',
