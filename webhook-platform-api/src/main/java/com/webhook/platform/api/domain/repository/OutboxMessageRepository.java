@@ -15,18 +15,22 @@ import java.util.UUID;
 @Repository
 public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UUID> {
     @Query(value = """
-            SELECT * FROM (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn
-                FROM outbox_messages WHERE status = :status
-            ) sub WHERE rn <= :maxPerKey ORDER BY created_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED
+            SELECT * FROM outbox_messages WHERE id IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn
+                    FROM outbox_messages WHERE status = :status
+                ) sub WHERE rn <= :maxPerKey ORDER BY rn ASC LIMIT :limit
+            ) FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<OutboxMessage> findPendingBatchForUpdate(@Param("status") String status, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey);
 
     @Query(value = """
-            SELECT * FROM (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn
-                FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries
-            ) sub WHERE rn <= :maxPerKey ORDER BY created_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED
+            SELECT * FROM outbox_messages WHERE id IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn
+                    FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries
+                ) sub WHERE rn <= :maxPerKey ORDER BY rn ASC LIMIT :limit
+            ) FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<OutboxMessage> findFailedMessagesForRetry(@Param("status") String status, @Param("maxRetries") int maxRetries, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey);
     

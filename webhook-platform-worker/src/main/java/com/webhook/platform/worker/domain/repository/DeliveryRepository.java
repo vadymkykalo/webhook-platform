@@ -23,10 +23,12 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     int resetStuckDeliveries(@Param("threshold") Instant threshold);
     
     @Query(value = """
-            SELECT * FROM (
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY endpoint_id ORDER BY next_retry_at ASC) AS rn
-                FROM deliveries WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now
-            ) sub WHERE rn <= :maxPerEndpoint ORDER BY next_retry_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED
+            SELECT * FROM deliveries WHERE id IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY endpoint_id ORDER BY next_retry_at ASC) AS rn
+                    FROM deliveries WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now
+                ) sub WHERE rn <= :maxPerEndpoint ORDER BY rn ASC LIMIT :limit
+            ) FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<Delivery> findPendingRetriesForUpdate(
             @Param("status") Delivery.DeliveryStatus status,
@@ -34,6 +36,12 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("limit") int limit,
             @Param("maxPerEndpoint") int maxPerEndpoint
     );
+
+    @Modifying
+    @Query(value = "UPDATE deliveries SET status = 'PROCESSING', attempt_count = attempt_count + 1, " +
+            "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
+            "WHERE id = :id AND status = 'PENDING'", nativeQuery = true)
+    int claimForProcessing(@Param("id") UUID id);
 
     @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.status IN ('PENDING', 'PROCESSING')")
     Instant findOldestPendingCreatedAt(
