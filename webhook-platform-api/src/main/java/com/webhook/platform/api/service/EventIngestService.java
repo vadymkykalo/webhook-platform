@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.common.constants.KafkaTopics;
+import com.webhook.platform.common.util.EventTypeMatcher;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -90,8 +91,10 @@ public class EventIngestService {
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
         List<Subscription> subscriptions = subscriptionRepository
-                .findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getType());
-        log.info("Found {} active subscriptions for event type: {}", subscriptions.size(), request.getType());
+                .findByProjectIdAndEnabledTrue(projectId).stream()
+                .filter(s -> EventTypeMatcher.matches(s.getEventType(), request.getType()))
+                .toList();
+        log.info("Found {} matching subscriptions for event type: {}", subscriptions.size(), request.getType());
 
         int deliveriesCreated = 0;
         for (Subscription subscription : subscriptions) {

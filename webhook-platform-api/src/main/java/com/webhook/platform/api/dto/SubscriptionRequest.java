@@ -21,7 +21,7 @@ public class SubscriptionRequest {
     private UUID endpointId;
 
     @NotBlank(message = "Event type is required")
-    @Pattern(regexp = "^[a-z][a-z0-9_.]*$", message = "Event type must be lowercase with dots/underscores (e.g. order.created)")
+    @Pattern(regexp = "^(\\*{1,2}|[a-z][a-z0-9_]*)(\\.([a-z][a-z0-9_]*|\\*{1,2}))*$", message = "Event type must be lowercase with dots/underscores, supports wildcards * and ** (e.g. order.created, order.*, **)")
     private String eventType;
 
     private Boolean enabled;
