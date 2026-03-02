@@ -17,7 +17,10 @@
     "justNow": "щойно",
     "minutesAgo": "{{count}}хв тому",
     "hoursAgo": "{{count}}год тому",
-    "daysAgo": "{{count}}д тому"
+    "daysAgo": "{{count}}д тому",
+    "inSeconds": "через {{count}}с",
+    "inMinutes": "через {{count}}хв",
+    "inHours": "через {{count}}год"
   },
   "common": {
     "cancel": "Скасувати",
@@ -426,13 +429,14 @@
   "events": {
     "title": "Події",
     "subtitle": "Webhook події для <strong>{{project}}</strong>",
-    "sendTest": "Надіслати тестову подію",
+    "sendTest": "Надіслати подію",
     "noEvents": "Подій ще немає",
     "noEventsDesc": "Надішліть першу webhook подію для початку обробки доставок",
     "created": "Створено",
     "eventType": "Тип події",
     "eventId": "ID події",
     "deliveriesCount": "Доставки",
+    "viewDeliveries": "Переглянути доставки цієї події",
     "toast": {
       "idCopied": "ID події скопійовано"
     }
@@ -460,7 +464,8 @@
       "status": "Статус",
       "endpoint": "Ендпоінт",
       "attempts": "Спроби",
-      "nextRetry": "Наступний повтор"
+      "nextRetry": "Наступний повтор",
+      "lastError": "Остання помилка"
     },
     "status": {
       "SUCCESS": "Успіх",
@@ -469,6 +474,16 @@
       "PENDING": "Очікує",
       "PROCESSING": "Обробка"
     },
+    "statusExplain": {
+      "SUCCESS": "Успішно доставлено",
+      "FAILED": "Доставка остаточно провалилась",
+      "DLQ": "Переміщено в чергу мертвих листів після {{count}} спроб",
+      "PENDING_RETRY": "Повтор {{time}}",
+      "PENDING_NEW": "В черзі на першу спробу",
+      "PROCESSING": "Доставляється зараз..."
+    },
+    "filteringByEvent": "Доставки для події",
+    "clearEventFilter": "Показати всі",
     "bulkReplay": "Повторити всі {{status}}",
     "replaying": "Повторення...",
     "replayError": "Оберіть фільтр статусу (FAILED або DLQ) перед масовим повтором",
@@ -1790,6 +1805,8 @@
     "title": "Деталі доставки",
     "description": "Перегляд статусу доставки, спроб та відповідей",
     "summary": "Підсумок",
+    "references": "Посилання",
+    "statusAndProgress": "Статус і прогрес",
     "deliveryId": "ID доставки",
     "status": "Статус",
     "eventId": "ID події",
@@ -1797,6 +1814,7 @@
     "created": "Створено",
     "attempts": "Спроби",
     "nextRetry": "Наступний повтор",
+    "lastAttemptAt": "Остання спроба",
     "succeededAt": "Успішно о",
     "failedAt": "Невдало о",
     "deliveryAttempts": "Спроби доставки",
@@ -1835,7 +1853,8 @@
       "replaySuccess": "Повтор доставки успішно ініційовано",
       "replayFailed": "Не вдалося повторити доставку",
       "dryRunFailed": "Не вдалося виконати тест-запуск",
-      "idCopied": "ID доставки скопійовано"
+      "idCopied": "ID доставки скопійовано",
+      "copied": "{{label}} скопійовано"
     },
     "troubleshooting": {
       "title": "Поради з усунення проблем",

@@ -17,7 +17,10 @@
     "justNow": "just now",
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
-    "daysAgo": "{{count}}d ago"
+    "daysAgo": "{{count}}d ago",
+    "inSeconds": "in {{count}}s",
+    "inMinutes": "in {{count}}m",
+    "inHours": "in {{count}}h"
   },
   "common": {
     "cancel": "Cancel",
@@ -426,13 +429,14 @@
   "events": {
     "title": "Events",
     "subtitle": "Webhook events for <strong>{{project}}</strong>",
-    "sendTest": "Send Test Event",
+    "sendTest": "Send Event",
     "noEvents": "No events yet",
     "noEventsDesc": "Send your first webhook event to start processing deliveries",
     "created": "Created",
     "eventType": "Event Type",
     "eventId": "Event ID",
     "deliveriesCount": "Deliveries",
+    "viewDeliveries": "View deliveries for this event",
     "toast": {
       "idCopied": "Event ID copied to clipboard"
     }
@@ -460,7 +464,8 @@
       "status": "Status",
       "endpoint": "Endpoint",
       "attempts": "Attempts",
-      "nextRetry": "Next Retry"
+      "nextRetry": "Next Retry",
+      "lastError": "Last Error"
     },
     "status": {
       "SUCCESS": "Success",
@@ -469,6 +474,16 @@
       "PENDING": "Pending",
       "PROCESSING": "Processing"
     },
+    "statusExplain": {
+      "SUCCESS": "Delivered successfully",
+      "FAILED": "Delivery failed permanently",
+      "DLQ": "Moved to dead letter queue after {{count}} attempts",
+      "PENDING_RETRY": "Retrying {{time}}",
+      "PENDING_NEW": "Queued for first attempt",
+      "PROCESSING": "Delivering now..."
+    },
+    "filteringByEvent": "Showing deliveries for event",
+    "clearEventFilter": "Show all",
     "bulkReplay": "Replay All {{status}}",
     "replaying": "Replaying...",
     "replayError": "Please select a status filter (FAILED or DLQ) before bulk replay",
@@ -1790,6 +1805,8 @@
     "title": "Delivery Details",
     "description": "View delivery status, attempts, and responses",
     "summary": "Summary",
+    "references": "References",
+    "statusAndProgress": "Status & Progress",
     "deliveryId": "Delivery ID",
     "status": "Status",
     "eventId": "Event ID",
@@ -1797,6 +1814,7 @@
     "created": "Created",
     "attempts": "Attempts",
     "nextRetry": "Next Retry",
+    "lastAttemptAt": "Last Attempt",
     "succeededAt": "Succeeded At",
     "failedAt": "Failed At",
     "deliveryAttempts": "Delivery Attempts",
@@ -1835,7 +1853,8 @@
       "replaySuccess": "Delivery replay initiated successfully",
       "replayFailed": "Failed to replay delivery",
       "dryRunFailed": "Failed to run dry-run preview",
-      "idCopied": "Delivery ID copied to clipboard"
+      "idCopied": "Delivery ID copied to clipboard",
+      "copied": "{{label}} copied to clipboard"
     },
     "troubleshooting": {
       "title": "Troubleshooting Tips",

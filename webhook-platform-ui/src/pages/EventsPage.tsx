@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Plus, Eye, Copy, Share2, Loader2 } from 'lucide-react';
+import { Radio, Plus, Copy, Share2, Loader2, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { useEvents } from '../api/queries';
@@ -105,39 +105,42 @@ export default function EventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">{t('events.created')}</TableHead>
                   <TableHead className="text-xs">{t('events.eventType')}</TableHead>
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
                   <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="text-xs">{t('events.created')}</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {events.map((event) => (
                   <TableRow key={event.id} className="hover:bg-muted/30">
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{formatRelativeTime(event.createdAt)}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
-                      </div>
+                      <span className="font-mono text-sm font-semibold">{event.eventType}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="font-mono text-[13px] font-medium">{event.eventType}</span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 group">
                         <code className="text-[13px] font-mono text-muted-foreground">{event.id.substring(0, 8)}...</code>
-                        <Button variant="ghost" size="icon-sm" className="h-6 w-6" onClick={() => handleCopyId(event.id)}>
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }}>
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {event.deliveriesCreated !== undefined && (
-                        <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 rounded-full bg-muted text-xs font-medium">
-                          {event.deliveriesCreated}
-                        </span>
+                      {event.deliveriesCreated !== undefined && event.deliveriesCreated > 0 ? (
+                        <div className="flex items-center gap-1.5">
+                          <Send className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-sm font-medium">{event.deliveriesCreated}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-sm">{formatRelativeTime(event.createdAt)}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -145,7 +148,7 @@ export default function EventsPage() {
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={() => handleShareDebugLink(event.id)}
+                            onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
                             disabled={sharingEventId === event.id}
                             title={t('debugLinks.share')}
                           >
@@ -156,8 +159,13 @@ export default function EventsPage() {
                             )}
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title={t('common.viewAll')}>
-                          <Eye className="h-3.5 w-3.5" />
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => navigate(`/admin/projects/${projectId}/deliveries?eventId=${event.id}`)}
+                          title={t('events.viewDeliveries')}
+                        >
+                          <Send className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>

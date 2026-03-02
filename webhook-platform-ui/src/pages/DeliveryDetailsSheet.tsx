@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
-import { formatDateTime } from '../lib/date';
+import { formatDateTime, formatRelativeFuture } from '../lib/date';
 import { useTranslation } from 'react-i18next';
 import { deliveriesApi } from '../api/deliveries.api';
 import type { DryRunReplayResponse } from '../api/deliveries.api';
@@ -58,6 +58,14 @@ export default function DeliveryDetailsSheet({
       loadAttempts();
     }
   }, [deliveryId, open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refresh for active deliveries
+  useEffect(() => {
+    if (!delivery || !open) return;
+    if (delivery.status !== 'PENDING' && delivery.status !== 'PROCESSING') return;
+    const interval = setInterval(() => { loadDelivery(); loadAttempts(); }, 3000);
+    return () => clearInterval(interval);
+  }, [delivery?.status, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDelivery = async () => {
     if (!deliveryId) return;
@@ -126,11 +134,9 @@ export default function DeliveryDetailsSheet({
     }
   };
 
-  const handleCopyId = () => {
-    if (deliveryId) {
-      navigator.clipboard.writeText(deliveryId);
-      showSuccess(t('deliveryDetails.toast.idCopied'));
-    }
+  const copyToClipboard = (value: string, label: string) => {
+    navigator.clipboard.writeText(value);
+    showSuccess(t('deliveryDetails.toast.copied', { label }));
   };
 
   const getStatusBadge = (status: DeliveryResponse['status']) => {
@@ -249,68 +255,134 @@ export default function DeliveryDetailsSheet({
             </div>
           ) : delivery ? (
             <div className="space-y-6 mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">{t('deliveryDetails.summary')}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.deliveryId')}</span>
-                    <div className="flex items-center gap-2">
-                      <code className="text-sm font-mono">{delivery.id.substring(0, 8)}...</code>
-                      <Button variant="ghost" size="icon" onClick={handleCopyId}>
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
+              {/* Status Banner */}
+              {delivery.status === 'PROCESSING' && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('deliveries.statusExplain.PROCESSING')}</span>
+                </div>
+              )}
+              {delivery.status === 'PENDING' && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                    {delivery.attemptCount > 0 && delivery.nextRetryAt
+                      ? t('deliveries.statusExplain.PENDING_RETRY', { time: formatRelativeFuture(delivery.nextRetryAt) })
+                      : t('deliveries.statusExplain.PENDING_NEW')}
+                  </span>
+                </div>
+              )}
+              {delivery.status === 'SUCCESS' && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700 dark:text-green-300">{t('deliveries.statusExplain.SUCCESS')}</span>
+                </div>
+              )}
+              {(delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+                  <XCircle className="h-4 w-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                    {delivery.status === 'DLQ'
+                      ? t('deliveries.statusExplain.DLQ', { count: delivery.attemptCount })
+                      : t('deliveries.statusExplain.FAILED')}
+                  </span>
+                </div>
+              )}
 
+              {/* References */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.references')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {[
+                    { label: t('deliveryDetails.deliveryId'), value: delivery.id },
+                    { label: t('deliveryDetails.eventId'), value: delivery.eventId },
+                    { label: t('deliveryDetails.endpointId'), value: delivery.endpointId },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
+                      <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <code className="text-xs font-mono truncate" title={value}>{value}</code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => copyToClipboard(value, label)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Status & Progress */}
+              <Card>
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.status')}</span>
+                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.statusAndProgress')}</CardTitle>
                     {getStatusBadge(delivery.status)}
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.eventId')}</span>
-                    <code className="text-sm font-mono">{delivery.eventId.substring(0, 8)}...</code>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.endpointId')}</span>
-                    <code className="text-sm font-mono">{delivery.endpointId.substring(0, 8)}...</code>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.created')}</span>
-                    <span className="text-sm">{formatDateTime(delivery.createdAt)}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.attempts')}</span>
-                    <span className="text-sm font-medium">
-                      {delivery.attemptCount} / {delivery.maxAttempts}
-                    </span>
-                  </div>
-
-                  {delivery.nextRetryAt && (
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.nextRetry')}</span>
-                      <span className="text-sm">{formatDateTime(delivery.nextRetryAt)}</span>
+                      <span className="text-sm text-muted-foreground">{t('deliveryDetails.attempts')}</span>
+                      <span className="text-sm font-semibold">
+                        {delivery.attemptCount} / {delivery.maxAttempts}
+                      </span>
                     </div>
-                  )}
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          delivery.status === 'SUCCESS' ? 'bg-green-500' :
+                          delivery.status === 'FAILED' || delivery.status === 'DLQ' ? 'bg-red-500' :
+                          'bg-blue-500'
+                        }`}
+                        style={{ width: `${Math.max(5, (delivery.attemptCount / delivery.maxAttempts) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
 
-                  {delivery.succeededAt && (
+                  <div className="border-t pt-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.succeededAt')}</span>
-                      <span className="text-sm">{formatDateTime(delivery.succeededAt)}</span>
+                      <span className="text-sm text-muted-foreground">{t('deliveryDetails.created')}</span>
+                      <span className="text-sm">{formatDateTime(delivery.createdAt)}</span>
                     </div>
-                  )}
 
-                  {delivery.failedAt && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">{t('deliveryDetails.failedAt')}</span>
-                      <span className="text-sm">{formatDateTime(delivery.failedAt)}</span>
-                    </div>
-                  )}
+                    {delivery.lastAttemptAt && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{t('deliveryDetails.lastAttemptAt')}</span>
+                        <span className="text-sm">{formatDateTime(delivery.lastAttemptAt)}</span>
+                      </div>
+                    )}
+
+                    {delivery.status === 'PENDING' && delivery.nextRetryAt && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{t('deliveryDetails.nextRetry')}</span>
+                        <div className="text-right">
+                          <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{formatRelativeFuture(delivery.nextRetryAt)}</span>
+                          <span className="text-[11px] text-muted-foreground block">{formatDateTime(delivery.nextRetryAt)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {delivery.succeededAt && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{t('deliveryDetails.succeededAt')}</span>
+                        <span className="text-sm font-medium text-green-600 dark:text-green-400">{formatDateTime(delivery.succeededAt)}</span>
+                      </div>
+                    )}
+
+                    {delivery.failedAt && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{t('deliveryDetails.failedAt')}</span>
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatDateTime(delivery.failedAt)}</span>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
