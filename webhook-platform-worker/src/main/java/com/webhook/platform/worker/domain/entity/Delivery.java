@@ -76,6 +76,10 @@ public class Delivery {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     public enum DeliveryStatus {
         PENDING, PROCESSING, SUCCESS, FAILED, DLQ
     }

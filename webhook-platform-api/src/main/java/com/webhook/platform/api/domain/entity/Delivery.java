@@ -91,6 +91,10 @@ public class Delivery {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", insertable = false, updatable = false)
     private Event event;

@@ -9,6 +9,9 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +27,10 @@ public class RedisConcurrencyControlService {
 
     private final RedissonClient redissonClient;
     private final ConcurrentHashMap<String, String> acquiredPermits = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<UUID, AtomicInteger> localPermits = new ConcurrentHashMap<>();
+    private final Cache<UUID, AtomicInteger> localPermits = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterAccess(Duration.ofMinutes(5))
+            .build();
     private final int maxConcurrentPerEndpoint;
     private final Counter concurrencyAcquired;
     private final Counter concurrencyRejected;
@@ -90,7 +96,7 @@ public class RedisConcurrencyControlService {
     }
 
     private boolean tryAcquireLocal(UUID endpointId) {
-        AtomicInteger permits = localPermits.computeIfAbsent(endpointId, k -> new AtomicInteger(0));
+        AtomicInteger permits = localPermits.get(endpointId, k -> new AtomicInteger(0));
         int current = permits.incrementAndGet();
         if (current <= maxConcurrentPerEndpoint) {
             activePermits.incrementAndGet();
@@ -104,7 +110,7 @@ public class RedisConcurrencyControlService {
     }
 
     private void releaseLocal(UUID endpointId) {
-        AtomicInteger permits = localPermits.get(endpointId);
+        AtomicInteger permits = localPermits.getIfPresent(endpointId);
         if (permits != null) {
             permits.decrementAndGet();
         }

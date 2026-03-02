@@ -309,8 +309,9 @@ public class ReplayService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId) {
-        int deliveriesCreated = 0;
         int errors = 0;
+
+        List<Delivery> deliveriesToSave = new ArrayList<>();
 
         for (Event event : events) {
             for (Subscription subscription : subscriptions) {
@@ -343,12 +344,7 @@ public class ReplayService {
                             .replaySessionId(sessionId)
                             .build();
 
-                    delivery = deliveryRepository.save(delivery);
-
-                    OutboxMessage outbox = createOutboxMessage(delivery);
-                    outboxMessageRepository.save(outbox);
-
-                    deliveriesCreated++;
+                    deliveriesToSave.add(delivery);
                 } catch (Exception e) {
                     errors++;
                     log.warn("Failed to create delivery for event {} subscription {}: {}",
@@ -357,10 +353,25 @@ public class ReplayService {
             }
         }
 
+        // Batch save all deliveries (generates IDs)
+        List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
         deliveryRepository.flush();
+
+        // Batch create and save all outbox messages
+        List<OutboxMessage> outboxMessages = new ArrayList<>();
+        for (Delivery delivery : savedDeliveries) {
+            try {
+                outboxMessages.add(createOutboxMessage(delivery));
+            } catch (Exception e) {
+                errors++;
+                log.warn("Failed to create outbox message for delivery {}: {}",
+                        delivery.getId(), e.getMessage());
+            }
+        }
+        outboxMessageRepository.saveAll(outboxMessages);
         outboxMessageRepository.flush();
 
-        return new BatchResult(deliveriesCreated, errors);
+        return new BatchResult(savedDeliveries.size() - errors, errors);
     }
 
     // ========== Helpers ==========

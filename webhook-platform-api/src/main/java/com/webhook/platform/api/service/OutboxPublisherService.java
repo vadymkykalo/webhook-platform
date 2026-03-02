@@ -12,6 +12,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -19,9 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+
+import org.springframework.kafka.support.SendResult;
 
 @Service
 @Slf4j
@@ -44,6 +47,7 @@ public class OutboxPublisherService {
     }
 
     @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
+    @SchedulerLock(name = "outbox-publisher", lockAtLeastFor = "PT1S", lockAtMostFor = "PT30S")
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void publishPendingMessages() {
         List<OutboxMessage> pendingMessages = outboxMessageRepository
@@ -54,19 +58,11 @@ public class OutboxPublisherService {
         }
 
         log.info("Publishing {} pending outbox messages", pendingMessages.size());
-
-        for (OutboxMessage message : pendingMessages) {
-            try {
-                publishMessageSynchronously(message);
-                markAsPublished(message);
-            } catch (Exception e) {
-                log.error("Failed to publish outbox message: {}", message.getId(), e);
-                markAsFailed(message, e.getMessage());
-            }
-        }
+        publishBatchAsync(pendingMessages, false);
     }
 
     @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
+    @SchedulerLock(name = "outbox-publisher-retry", lockAtLeastFor = "PT5S", lockAtMostFor = "PT2M")
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void retryFailedMessages() {
         List<OutboxMessage> failedMessages = outboxMessageRepository
@@ -78,6 +74,7 @@ public class OutboxPublisherService {
 
         log.info("Retrying {} failed outbox messages", failedMessages.size());
 
+        List<OutboxMessage> messagesToRetry = new ArrayList<>();
         for (OutboxMessage message : failedMessages) {
             long backoffSeconds = calculateBackoff(message.getRetryCount());
             Instant baseTime = message.getLastAttemptAt() != null ? message.getLastAttemptAt() : message.getCreatedAt();
@@ -88,21 +85,18 @@ public class OutboxPublisherService {
                         message.getId(), nextRetryTime);
                 continue;
             }
-            
-            try {
-                publishMessageSynchronously(message);
-                markAsPublished(message);
-                log.info("Successfully retried outbox message: {}", message.getId());
-            } catch (Exception e) {
-                log.error("Failed to retry outbox message {} (attempt {}): {}", 
-                        message.getId(), message.getRetryCount() + 1, e.getMessage());
-                incrementRetryCount(message, e.getMessage());
-            }
+            messagesToRetry.add(message);
+        }
+
+        if (!messagesToRetry.isEmpty()) {
+            publishBatchAsync(messagesToRetry, true);
         }
     }
 
     private long calculateBackoff(int retryCount) {
-        return (long) Math.min(Math.pow(2, retryCount) * 10, 600);
+        long base = (long) Math.min(Math.pow(2, retryCount) * 10, 600);
+        long jitter = java.util.concurrent.ThreadLocalRandom.current().nextLong(0, base / 4 + 1);
+        return base + jitter;
     }
 
     private void incrementRetryCount(OutboxMessage message, String errorMessage) {
@@ -117,26 +111,69 @@ public class OutboxPublisherService {
         outboxMessageRepository.save(message);
     }
 
-    private void publishMessageSynchronously(OutboxMessage message) throws Exception {
-        Object payload = deserializePayload(message);
+    private void publishBatchAsync(List<OutboxMessage> messages, boolean isRetry) {
+        Map<UUID, CompletableFuture<SendResult<String, Object>>> futures = new LinkedHashMap<>();
+        Map<UUID, OutboxMessage> messageMap = new LinkedHashMap<>();
 
-        String correlationId = CorrelationIdFilter.getCurrentCorrelationId();
-        if (correlationId == null) {
-            correlationId = UUID.randomUUID().toString();
+        for (OutboxMessage message : messages) {
+            try {
+                Object payload = deserializePayload(message);
+
+                String correlationId = CorrelationIdFilter.getCurrentCorrelationId();
+                if (correlationId == null) {
+                    correlationId = UUID.randomUUID().toString();
+                }
+
+                ProducerRecord<String, Object> record = new ProducerRecord<>(
+                        message.getKafkaTopic(),
+                        null,
+                        message.getKafkaKey(),
+                        payload
+                );
+                record.headers().add(new RecordHeader("X-Correlation-ID", correlationId.getBytes(StandardCharsets.UTF_8)));
+
+                futures.put(message.getId(), kafkaTemplate.send(record));
+                messageMap.put(message.getId(), message);
+            } catch (Exception e) {
+                log.error("Failed to prepare outbox message {}: {}", message.getId(), e.getMessage());
+                if (isRetry) {
+                    incrementRetryCount(message, e.getMessage());
+                } else {
+                    markAsFailed(message, e.getMessage());
+                }
+            }
         }
 
-        ProducerRecord<String, Object> record = new ProducerRecord<>(
-                message.getKafkaTopic(),
-                null,
-                message.getKafkaKey(),
-                payload
-        );
-        record.headers().add(new RecordHeader("X-Correlation-ID", correlationId.getBytes(StandardCharsets.UTF_8)));
+        if (futures.isEmpty()) return;
 
-        kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
-        
-        log.debug("Published message {} to topic {} with key {} correlationId={}",
-                message.getId(), message.getKafkaTopic(), message.getKafkaKey(), correlationId);
+        // Wait for all sends to complete
+        try {
+            CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]))
+                    .get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Batch Kafka send did not fully complete within timeout: {}", e.getMessage());
+        }
+
+        // Check each future individually
+        for (var entry : futures.entrySet()) {
+            OutboxMessage message = messageMap.get(entry.getKey());
+            CompletableFuture<SendResult<String, Object>> future = entry.getValue();
+
+            try {
+                future.get(0, TimeUnit.MILLISECONDS);
+                markAsPublished(message);
+                if (isRetry) {
+                    log.info("Successfully retried outbox message: {}", message.getId());
+                }
+            } catch (Exception e) {
+                log.error("Failed to publish outbox message {}: {}", message.getId(), e.getMessage());
+                if (isRetry) {
+                    incrementRetryCount(message, e.getMessage());
+                } else {
+                    markAsFailed(message, e.getMessage());
+                }
+            }
+        }
     }
 
     private void markAsPublished(OutboxMessage message) {

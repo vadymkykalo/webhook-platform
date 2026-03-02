@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
+import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.*;
@@ -34,6 +35,7 @@ public class EventService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
+    private final SchemaRegistryService schemaRegistryService;
 
     public EventService(
             EventRepository eventRepository,
@@ -43,7 +45,8 @@ public class EventService {
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
-            SequenceGeneratorService sequenceGeneratorService) {
+            SequenceGeneratorService sequenceGeneratorService,
+            SchemaRegistryService schemaRegistryService) {
         this.eventRepository = eventRepository;
         this.projectRepository = projectRepository;
         this.subscriptionRepository = subscriptionRepository;
@@ -52,6 +55,7 @@ public class EventService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
+        this.schemaRegistryService = schemaRegistryService;
     }
 
     public Page<EventResponse> listEvents(UUID projectId, UUID organizationId, Pageable pageable) {
@@ -87,6 +91,29 @@ public class EventService {
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
             throw new ForbiddenException("Access denied");
+        }
+
+        // Schema validation (same logic as EventIngestService)
+        if (Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
+            String payloadJson;
+            try {
+                payloadJson = objectMapper.writeValueAsString(request.getData());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to serialize event payload", e);
+            }
+
+            schemaRegistryService.autoDiscover(projectId, request.getType(), payloadJson);
+
+            List<String> validationErrors = schemaRegistryService.validatePayload(
+                    projectId, request.getType(), payloadJson);
+            if (!validationErrors.isEmpty()) {
+                log.warn("Schema validation failed for test event (type '{}'): {}",
+                        request.getType(), validationErrors);
+                if (project.getSchemaValidationPolicy() == SchemaValidationPolicy.BLOCK) {
+                    throw new IllegalArgumentException(
+                            "Schema validation failed: " + String.join("; ", validationErrors));
+                }
+            }
         }
 
         Event event = createEvent(projectId, request);

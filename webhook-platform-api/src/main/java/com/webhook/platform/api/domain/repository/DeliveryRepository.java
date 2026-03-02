@@ -106,18 +106,18 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
         SELECT CAST(d.status AS text), COUNT(*)
         FROM deliveries d
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId
+        WHERE e.project_id = :projectId AND d.created_at >= :since
         GROUP BY d.status
         """, nativeQuery = true)
-    List<Object[]> countByProjectIdGroupByStatus(@Param("projectId") UUID projectId);
+    List<Object[]> countByProjectIdGroupByStatus(@Param("projectId") UUID projectId, @Param("since") Instant since);
 
     @Query(value = """
         SELECT d.endpoint_id, CAST(d.status AS text), COUNT(*)
         FROM deliveries d
-        WHERE d.endpoint_id IN :endpointIds
+        WHERE d.endpoint_id IN :endpointIds AND d.created_at >= :since
         GROUP BY d.endpoint_id, d.status
         """, nativeQuery = true)
-    List<Object[]> countByEndpointIdsGroupByEndpointAndStatus(@Param("endpointIds") List<UUID> endpointIds);
+    List<Object[]> countByEndpointIdsGroupByEndpointAndStatus(@Param("endpointIds") List<UUID> endpointIds, @Param("since") Instant since);
 
     @Modifying
     @Query("DELETE FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")

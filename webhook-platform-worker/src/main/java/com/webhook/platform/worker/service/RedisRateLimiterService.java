@@ -9,9 +9,11 @@ import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -27,7 +29,10 @@ public class RedisRateLimiterService {
     private final Counter rateLimitMisses;
     private final Counter rateLimitFallback;
 
-    private final ConcurrentHashMap<UUID, LocalWindow> localWindows = new ConcurrentHashMap<>();
+    private final Cache<UUID, LocalWindow> localWindows = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterAccess(Duration.ofMinutes(5))
+            .build();
 
     public RedisRateLimiterService(RedissonClient redissonClient, MeterRegistry meterRegistry) {
         this.redissonClient = redissonClient;
@@ -72,7 +77,7 @@ public class RedisRateLimiterService {
     }
 
     private boolean tryAcquireLocal(UUID endpointId, int ratePerSecond) {
-        LocalWindow window = localWindows.computeIfAbsent(endpointId, k -> new LocalWindow());
+        LocalWindow window = localWindows.get(endpointId, k -> new LocalWindow());
         long nowSecond = System.currentTimeMillis() / 1000;
 
         if (window.windowStart.get() != nowSecond) {

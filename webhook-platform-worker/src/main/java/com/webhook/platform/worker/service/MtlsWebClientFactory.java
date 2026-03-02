@@ -21,11 +21,13 @@ import java.security.PrivateKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.util.Base64;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -34,7 +36,10 @@ public class MtlsWebClientFactory {
     private final String encryptionKey;
     private final String encryptionSalt;
     private final WebClient.Builder webClientBuilder;
-    private final Map<UUID, CachedClient> mtlsClientCache = new ConcurrentHashMap<>();
+    private final Cache<UUID, CachedClient> mtlsClientCache = Caffeine.newBuilder()
+            .maximumSize(500)
+            .expireAfterAccess(Duration.ofHours(1))
+            .build();
 
     private record CachedClient(WebClient webClient, Instant updatedAt) {}
 
@@ -52,15 +57,15 @@ public class MtlsWebClientFactory {
             return webClientBuilder.build();
         }
 
-        CachedClient cached = mtlsClientCache.get(endpoint.getId());
         Instant endpointUpdatedAt = endpoint.getUpdatedAt();
+        CachedClient cached = mtlsClientCache.getIfPresent(endpoint.getId());
         
         // Invalidate cache if endpoint was updated after cache entry was created
         if (cached != null && endpointUpdatedAt != null 
                 && cached.updatedAt() != null 
                 && endpointUpdatedAt.isAfter(cached.updatedAt())) {
             log.info("mTLS config changed for endpoint {}, invalidating cached client", endpoint.getId());
-            mtlsClientCache.remove(endpoint.getId());
+            mtlsClientCache.invalidate(endpoint.getId());
             cached = null;
         }
         
@@ -79,7 +84,7 @@ public class MtlsWebClientFactory {
     }
 
     public void invalidateCache(UUID endpointId) {
-        mtlsClientCache.remove(endpointId);
+        mtlsClientCache.invalidate(endpointId);
         log.debug("Invalidated mTLS WebClient cache for endpoint {}", endpointId);
     }
 

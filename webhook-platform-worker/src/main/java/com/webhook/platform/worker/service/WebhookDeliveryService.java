@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import com.webhook.platform.common.constants.KafkaTopics;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import jakarta.annotation.PreDestroy;
+import jakarta.persistence.OptimisticLockException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
@@ -51,6 +55,8 @@ public class WebhookDeliveryService {
     private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final PayloadTransformService payloadTransformService;
+    private final Executor deliveryExecutor;
+    private final ObjectMapper objectMapper;
 
     private final Counter deliverySuccessCounter;
     private final Counter deliveryFailureCounter;
@@ -81,7 +87,8 @@ public class WebhookDeliveryService {
             ObjectMapper objectMapper,
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
-            PayloadTransformService payloadTransformService) {
+            PayloadTransformService payloadTransformService,
+            @Qualifier("deliveryExecutor") Executor deliveryExecutor) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -101,6 +108,8 @@ public class WebhookDeliveryService {
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
         this.payloadTransformService = payloadTransformService;
+        this.deliveryExecutor = deliveryExecutor;
+        this.objectMapper = objectMapper;
 
         this.deliverySuccessCounter = Counter.builder("webhook_delivery_attempts_total")
                 .tag("result", "success").tag("status_class", "2xx")
@@ -150,6 +159,9 @@ public class WebhookDeliveryService {
         inFlightCount.incrementAndGet();
         try {
             doProcessDelivery(message);
+        } catch (OptimisticLockException | ObjectOptimisticLockingFailureException e) {
+            log.info("Delivery {} already being processed by another consumer, skipping (optimistic lock)",
+                    message.getDeliveryId());
         } finally {
             inFlightCount.decrementAndGet();
         }
@@ -212,7 +224,14 @@ public class WebhookDeliveryService {
         delivery.setLastAttemptAt(Instant.now());
         deliveryRepository.save(delivery);
 
-        attemptDelivery(delivery, endpoint, event);
+        deliveryExecutor.execute(() -> {
+            try {
+                attemptDelivery(delivery, endpoint, event);
+            } catch (Exception e) {
+                log.error("Unexpected error in async delivery {}: {}", delivery.getId(), e.getMessage(), e);
+                handleError(delivery, e, null, null, 0);
+            }
+        });
     }
 
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
@@ -538,7 +557,7 @@ public class WebhookDeliveryService {
                     headerMap.put(key, values.get(0));
                 }
             });
-            return new ObjectMapper().writeValueAsString(headerMap);
+            return objectMapper.writeValueAsString(headerMap);
         } catch (Exception e) {
             log.warn("Failed to serialize response headers: {}", e.getMessage());
             return "{}";
@@ -565,7 +584,7 @@ public class WebhookDeliveryService {
             return;
         }
         try {
-            Map<String, String> headers = new ObjectMapper().readValue(customHeadersJson, Map.class);
+            Map<String, String> headers = objectMapper.readValue(customHeadersJson, Map.class);
             headers.forEach((key, value) -> {
                 if (key != null && value != null && !key.isBlank()) {
                     // Skip headers that could cause security issues

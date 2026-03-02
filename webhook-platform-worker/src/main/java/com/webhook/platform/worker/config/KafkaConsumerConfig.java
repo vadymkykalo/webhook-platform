@@ -37,6 +37,12 @@ public class KafkaConsumerConfig {
     @Value("${kafka.consumer.retry-interval-ms:5000}")
     private long retryIntervalMs;
 
+    @Value("${kafka.consumer.delivery-concurrency:6}")
+    private int deliveryConcurrency;
+
+    @Value("${kafka.consumer.incoming-concurrency:3}")
+    private int incomingConcurrency;
+
     @Bean
     public ConsumerFactory<String, DeliveryMessage> consumerFactory() {
         return buildConsumerFactory(groupId, DeliveryMessage.class);
@@ -67,7 +73,7 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, DeliveryMessage> factory = 
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
-        configureFactory(factory);
+        configureFactory(factory, deliveryConcurrency);
         return factory;
     }
 
@@ -76,12 +82,12 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, IncomingForwardMessage> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(incomingForwardConsumerFactory());
-        configureFactory(factory);
+        configureFactory(factory, incomingConcurrency);
         return factory;
     }
 
-    private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory) {
-        factory.setConcurrency(3);
+    private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency) {
+        factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.getContainerProperties().setShutdownTimeout(30_000L);
         

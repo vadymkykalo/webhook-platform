@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.dto.RateLimitInfo;
+import com.webhook.platform.api.dto.RateLimitResult;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.service.EventIngestService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
@@ -60,21 +61,21 @@ public class EventController {
 
         ApiKeyAuthenticationToken apiKeyAuth = (ApiKeyAuthenticationToken) authentication;
         
-        RateLimitInfo rateLimitInfo = rateLimiterService.getRateLimitInfo(apiKeyAuth.getProjectId());
+        RateLimitResult rateLimitResult = rateLimiterService.tryAcquireWithInfo(apiKeyAuth.getProjectId());
+        RateLimitInfo info = rateLimitResult.getInfo();
         
-        if (!rateLimiterService.tryAcquire(apiKeyAuth.getProjectId())) {
+        if (!rateLimitResult.isAcquired()) {
             log.warn("Rate limit exceeded for project: {}", apiKeyAuth.getProjectId());
-            long retryAfter = rateLimiterService.getSecondsToWaitForRefill(apiKeyAuth.getProjectId());
             ErrorResponse errorBody = new ErrorResponse(
                     "rate_limit_exceeded",
-                    "Too many requests. Please retry after " + retryAfter + " seconds.",
+                    "Too many requests. Please retry after " + rateLimitResult.getRetryAfterSeconds() + " seconds.",
                     HttpStatus.TOO_MANY_REQUESTS.value()
             );
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .header("X-RateLimit-Limit", String.valueOf(rateLimitInfo.getLimit()))
+                    .header("X-RateLimit-Limit", String.valueOf(info.getLimit()))
                     .header("X-RateLimit-Remaining", "0")
-                    .header("X-RateLimit-Reset", String.valueOf(rateLimitInfo.getResetTimestamp()))
-                    .header("Retry-After", String.valueOf(retryAfter))
+                    .header("X-RateLimit-Reset", String.valueOf(info.getResetTimestamp()))
+                    .header("Retry-After", String.valueOf(rateLimitResult.getRetryAfterSeconds()))
                     .body(errorBody);
         }
         
@@ -86,11 +87,10 @@ public class EventController {
                 idempotencyKey
         );
 
-        RateLimitInfo updatedInfo = rateLimiterService.getRateLimitInfo(apiKeyAuth.getProjectId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .header("X-RateLimit-Limit", String.valueOf(updatedInfo.getLimit()))
-                .header("X-RateLimit-Remaining", String.valueOf(updatedInfo.getRemaining()))
-                .header("X-RateLimit-Reset", String.valueOf(updatedInfo.getResetTimestamp()))
+                .header("X-RateLimit-Limit", String.valueOf(info.getLimit()))
+                .header("X-RateLimit-Remaining", String.valueOf(info.getRemaining()))
+                .header("X-RateLimit-Reset", String.valueOf(info.getResetTimestamp()))
                 .body(response);
     }
 }
