@@ -16,7 +16,7 @@ public class EmailService {
     @Value("${app.email.from:noreply@hookflow.dev}")
     private String fromAddress;
 
-    @Value("${app.email.base-url:http://localhost:5173}")
+    @Value("${app.base-url:http://localhost:5173}")
     private String baseUrl;
 
     @Value("${app.email.enabled:false}")

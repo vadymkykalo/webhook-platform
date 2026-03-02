@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Plus, Eye, Copy } from 'lucide-react';
+import { Radio, Plus, Eye, Copy, Share2, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { showSuccess } from '../lib/toast';
+import { showSuccess, showApiError } from '../lib/toast';
 import { useEvents } from '../api/queries';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
@@ -14,6 +14,7 @@ import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import SendTestEventModal from '../components/SendTestEventModal';
 import { usePermissions } from '../auth/usePermissions';
+import { debugLinksApi } from '../api/debugLinks.api';
 
 export default function EventsPage() {
   const { t } = useTranslation();
@@ -23,7 +24,8 @@ export default function EventsPage() {
   const [page, setPage] = useState(0);
   const pageSize = 20;
   const [showSendModal, setShowSendModal] = useState(false);
-  const { canSendEvents } = usePermissions();
+  const { canSendEvents, canCreateDebugLinks } = usePermissions();
+  const [sharingEventId, setSharingEventId] = useState<string | null>(null);
 
   const { data: project } = useQuery({
     queryKey: ['projects', projectId],
@@ -39,6 +41,20 @@ export default function EventsPage() {
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
     showSuccess(t('events.toast.idCopied'));
+  };
+
+  const handleShareDebugLink = async (eventId: string) => {
+    if (!projectId) return;
+    try {
+      setSharingEventId(eventId);
+      const link = await debugLinksApi.create(projectId, eventId);
+      await navigator.clipboard.writeText(link.shareUrl);
+      showSuccess(t('debugLinks.copied'));
+    } catch (err: any) {
+      showApiError(err, 'debugLinks.createFailed');
+    } finally {
+      setSharingEventId(null);
+    }
   };
 
 
@@ -120,9 +136,26 @@ export default function EventsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title={t('common.viewAll')}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {canCreateDebugLinks && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => handleShareDebugLink(event.id)}
+                            disabled={sharingEventId === event.id}
+                            title={t('debugLinks.share')}
+                          >
+                            {sharingEventId === event.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Share2 className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/deliveries`)} title={t('common.viewAll')}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

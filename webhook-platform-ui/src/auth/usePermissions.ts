@@ -74,5 +74,11 @@ export function usePermissions() {
 
         // Settings
         canManageOrgSettings: role === 'OWNER',
+
+        // PII Masking
+        canManagePiiRules: hasMinRole(role, 'DEVELOPER'),
+
+        // Debug Links
+        canCreateDebugLinks: hasMinRole(role, 'DEVELOPER'),
     };
 }
