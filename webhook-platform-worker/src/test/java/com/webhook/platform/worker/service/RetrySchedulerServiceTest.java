@@ -60,6 +60,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(dueDelivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
@@ -75,7 +76,8 @@ class RetrySchedulerServiceTest {
                 verify(deliveryRepository).findPendingRetriesForUpdate(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
-                                limitCaptor.capture());
+                                limitCaptor.capture(),
+                                anyInt());
 
                 assertEquals(batchSize, limitCaptor.getValue());
                 verify(kafkaTemplate, times(1)).send(anyString(), anyString(), any(DeliveryMessage.class));
@@ -93,6 +95,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt())).thenReturn(deliveries);
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
@@ -117,6 +120,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(delivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
@@ -140,6 +144,7 @@ class RetrySchedulerServiceTest {
         when(deliveryRepository.findPendingRetriesForUpdate(
                 any(Delivery.DeliveryStatus.class),
                 any(Instant.class),
+                anyInt(),
                 anyInt()
         )).thenReturn(Collections.emptyList());
 
@@ -160,6 +165,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(delivery));
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> failedFuture = new CompletableFuture<>();
@@ -194,6 +200,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt()))
                                 .thenReturn(Collections.singletonList(delivery1))
                                 .thenReturn(Collections.singletonList(delivery2))
@@ -224,6 +231,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt()))
                                 .thenReturn(Arrays.asList(completedDelivery, incompleteDelivery));
 
@@ -258,6 +266,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetriesForUpdate(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(delivery));
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> exceptionalFuture = new CompletableFuture<>();
