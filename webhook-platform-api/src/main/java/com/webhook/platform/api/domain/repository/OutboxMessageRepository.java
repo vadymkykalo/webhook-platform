@@ -23,4 +23,6 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     @Modifying
     @Query(value = "DELETE FROM outbox_messages WHERE id IN (SELECT id FROM outbox_messages WHERE status = :status AND created_at < :cutoffTime ORDER BY created_at ASC LIMIT :limit)", nativeQuery = true)
     int deleteOldPublishedMessages(@Param("status") String status, @Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
+
+    long countByStatus(OutboxStatus status);
 }

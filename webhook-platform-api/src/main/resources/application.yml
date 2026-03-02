@@ -74,8 +74,10 @@ management:
 
 outbox:
   publisher:
-    poll-interval-ms: 1000
-    batch-size: 100
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    retry-interval-ms: ${OUTBOX_RETRY_INTERVAL_MS:30000}
+    cleanup-interval-ms: ${OUTBOX_CLEANUP_INTERVAL_MS:3600000}
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
 
 data-retention:
   outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}

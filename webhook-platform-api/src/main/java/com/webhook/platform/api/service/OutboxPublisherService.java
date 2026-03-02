@@ -93,6 +93,28 @@ public class OutboxPublisherService {
         }
     }
 
+    @Scheduled(fixedDelayString = "${outbox.publisher.cleanup-interval-ms:3600000}")
+    @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
+    @Transactional
+    public void cleanupOldMessages() {
+        Instant publishedCutoff = Instant.now().minus(java.time.Duration.ofDays(3));
+        int deletedPublished = outboxMessageRepository.deleteOldPublishedMessages(
+                OutboxStatus.PUBLISHED.name(), publishedCutoff, 5000);
+
+        Instant deadCutoff = Instant.now().minus(java.time.Duration.ofDays(7));
+        int deletedDead = outboxMessageRepository.deleteOldPublishedMessages(
+                OutboxStatus.DEAD.name(), deadCutoff, 1000);
+
+        if (deletedPublished > 0 || deletedDead > 0) {
+            log.info("Outbox cleanup: deleted {} published, {} dead messages", deletedPublished, deletedDead);
+        }
+
+        long deadCount = outboxMessageRepository.countByStatus(OutboxStatus.DEAD);
+        if (deadCount > 0) {
+            log.warn("Outbox has {} DEAD messages (exceeded max retries) awaiting purge", deadCount);
+        }
+    }
+
     private long calculateBackoff(int retryCount) {
         long base = (long) Math.min(Math.pow(2, retryCount) * 10, 600);
         long jitter = java.util.concurrent.ThreadLocalRandom.current().nextLong(0, base / 4 + 1);
@@ -105,7 +127,9 @@ public class OutboxPublisherService {
         message.setLastAttemptAt(Instant.now());
         
         if (message.getRetryCount() >= 5) {
-            log.error("Outbox message {} exceeded max retries, giving up", message.getId());
+            message.setStatus(OutboxStatus.DEAD);
+            log.error("Outbox message {} exceeded max retries, moved to DEAD. Topic: {}, Key: {}, Error: {}",
+                    message.getId(), message.getKafkaTopic(), message.getKafkaKey(), errorMessage);
         }
         
         outboxMessageRepository.save(message);
