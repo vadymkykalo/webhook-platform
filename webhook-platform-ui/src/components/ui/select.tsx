@@ -4,6 +4,8 @@ import { ChevronDown, Check } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 /* ── Option extraction helper ── */
+const EMPTY_SENTINEL = '__EMPTY__'
+
 interface OptionItem {
   value: string
   label: string
@@ -16,8 +18,9 @@ function extractOptions(children: React.ReactNode): OptionItem[] {
     if (!React.isValidElement(child)) return
     if (child.type === 'option') {
       const props = child.props as { value?: string; disabled?: boolean; children?: React.ReactNode }
+      const raw = String(props.value ?? '')
       options.push({
-        value: String(props.value ?? ''),
+        value: raw === '' ? EMPTY_SENTINEL : raw,
         label: String(props.children ?? props.value ?? ''),
         disabled: props.disabled,
       })
@@ -38,13 +41,14 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     const options = extractOptions(children)
 
     const handleValueChange = (newValue: string) => {
-      onChange?.({ target: { value: newValue } })
+      onChange?.({ target: { value: newValue === EMPTY_SENTINEL ? '' : newValue } })
     }
 
-    const selectedLabel = options.find((o) => o.value === value)?.label
+    const internalValue = value === '' ? EMPTY_SENTINEL : value
+    const selectedLabel = options.find((o) => o.value === internalValue)?.label
 
     return (
-      <SelectPrimitive.Root value={value} onValueChange={handleValueChange} disabled={disabled}>
+      <SelectPrimitive.Root value={internalValue} onValueChange={handleValueChange} disabled={disabled}>
         <SelectPrimitive.Trigger
           ref={ref}
           id={id}

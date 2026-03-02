@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
@@ -39,6 +40,7 @@ export default function EndpointsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageEndpoints } = usePermissions();
+  const queryClient = useQueryClient();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,7 @@ export default function EndpointsPage() {
       setAllowedSourceIps('');
       setNewSecret(secret);
       showSuccess(t('endpoints.toast.created'));
+      queryClient.invalidateQueries({ queryKey: ['endpoints', projectId] });
       loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.createFailed');
@@ -128,6 +131,7 @@ export default function EndpointsPage() {
       await endpointsApi.delete(projectId, deleteId);
       showCriticalSuccess(t('endpoints.toast.deleted'));
       setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ['endpoints', projectId] });
       loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.deleteFailed');
