@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Shield, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 const MASK_STYLE_OPTIONS: { value: MaskStyle; label: string }[] = [
   { value: 'PARTIAL', label: 'Partial' },
@@ -44,11 +45,7 @@ export default function PiiRulesPage() {
   const [newJsonPath, setNewJsonPath] = useState('');
   const [newMaskStyle, setNewMaskStyle] = useState<MaskStyle>('PARTIAL');
 
-  useEffect(() => {
-    if (projectId) loadRules();
-  }, [projectId]);
-
-  const loadRules = async () => {
+  const loadRules = useCallback(async () => {
     if (!projectId) return;
     try {
       setLoading(true);
@@ -59,7 +56,11 @@ export default function PiiRulesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) loadRules();
+  }, [projectId, loadRules]);
 
   const handleSeedDefaults = async () => {
     if (!projectId) return;
@@ -181,7 +182,7 @@ export default function PiiRulesPage() {
             {t('piiRules.subtitle')}
           </p>
         </div>
-        {canManagePiiRules && (
+        <PermissionGate allowed={canManagePiiRules}>
           <div className="flex gap-2">
             {rules.length === 0 && (
               <Button variant="outline" onClick={handleSeedDefaults} disabled={seeding}>
@@ -193,7 +194,7 @@ export default function PiiRulesPage() {
               <Plus className="h-4 w-4" /> {t('piiRules.addRule')}
             </Button>
           </div>
-        )}
+        </PermissionGate>
       </div>
 
       {showAddForm && (

@@ -28,6 +28,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { Select } from '../components/ui/select';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'CUSTOM'];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
@@ -64,7 +65,7 @@ export default function IncomingSourcesPage() {
 
   useEffect(() => {
     if (projectId) loadData();
-  }, [projectId, currentPage]);
+  }, [projectId, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     if (!projectId) return;
@@ -184,11 +185,11 @@ export default function IncomingSourcesPage() {
           <h1 className="text-title tracking-tight">{t('incomingSources.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingSources.subtitle', { project: project.name }) }} />
         </div>
-        {canManageIncomingSources && (
+        <PermissionGate allowed={canManageIncomingSources}>
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4" /> {t('incomingSources.create')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       {sources.length === 0 ? (
@@ -196,11 +197,14 @@ export default function IncomingSourcesPage() {
           icon={ArrowDownToLine}
           title={t('incomingSources.noSources')}
           description={t('incomingSources.noSourcesDesc')}
-          action={canManageIncomingSources ? (
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> {t('incomingSources.create')}
-            </Button>
-          ) : undefined}
+          action={
+            <PermissionGate allowed={canManageIncomingSources}>
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4" /> {t('incomingSources.create')}
+              </Button>
+            </PermissionGate>
+          }
+          docsLink="/docs#incoming-webhooks"
         />
       ) : (
         <div className="space-y-3 animate-fade-in">

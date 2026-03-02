@@ -35,6 +35,7 @@ const IncomingEventsPage = lazy(() => import('./pages/IncomingEventsPage'));
 const SchemasPage = lazy(() => import('./pages/SchemasPage'));
 const PiiRulesPage = lazy(() => import('./pages/PiiRulesPage'));
 const EventDiffPage = lazy(() => import('./pages/EventDiffPage'));
+const DevWorkspacePage = lazy(() => import('./pages/DevWorkspacePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -147,6 +148,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/test-endpoints',
         element: <S><TestEndpointsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/dev-workspace',
+        element: <S><DevWorkspacePage /></S>,
       },
       {
         path: 'projects/:projectId/incoming-sources',

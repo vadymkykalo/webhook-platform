@@ -7,6 +7,7 @@ import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
 import OnboardingChecklist from '../components/OnboardingChecklist';
+import OnboardingWizard, { hasSeenWizard } from '../components/OnboardingWizard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
@@ -67,6 +68,9 @@ export default function DashboardPage() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
+  // Show wizard on first visit
+  const [showWizard, setShowWizard] = useState(() => !hasSeenWizard());
+
   if (loading) return <SkeletonDashboard />;
 
   return (
@@ -105,6 +109,13 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Onboarding Wizard (first login modal) */}
+      <OnboardingWizard
+        open={showWizard}
+        onClose={() => setShowWizard(false)}
+        projectId={selectedProjectId || undefined}
+      />
 
       {/* Onboarding Checklist */}
       <OnboardingChecklist

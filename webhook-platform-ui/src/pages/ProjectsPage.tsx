@@ -7,6 +7,7 @@ import { useProjects, useCreateProject, useDeleteProject } from '../api/queries'
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 import EmptyState from '../components/EmptyState';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,16 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
+import DangerConfirmDialog from '../components/DangerConfirmDialog';
 
 export default function ProjectsPage() {
   const { t } = useTranslation();
@@ -102,12 +94,12 @@ export default function ProjectsPage() {
             {t('projects.subtitle')}
           </p>
         </div>
-        {canCreateProject && (
+        <PermissionGate allowed={canCreateProject}>
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4" />
             {t('projects.newProject')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       {projects.length === 0 ? (
@@ -115,12 +107,15 @@ export default function ProjectsPage() {
           icon={FolderKanban}
           title={t('projects.noProjects')}
           description={canCreateProject ? t('projects.noProjectsDesc') : t('projects.noProjectsViewer')}
-          action={canCreateProject ? (
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" />
-              {t('projects.createFirst')}
-            </Button>
-          ) : undefined}
+          action={
+            <PermissionGate allowed={canCreateProject}>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4" />
+                {t('projects.createFirst')}
+              </Button>
+            </PermissionGate>
+          }
+          docsLink="/docs#getting-started"
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
@@ -229,27 +224,20 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('projects.deleteDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('projects.deleteDialog.description')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deleting ? t('common.deleting') : t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DangerConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title={t('projects.deleteDialog.title')}
+        description={t('projects.deleteDialog.description')}
+        confirmName={projects.find(p => p.id === deleteId)?.name || ''}
+        impact={[
+          t('projects.deleteDialog.impactEndpoints'),
+          t('projects.deleteDialog.impactEvents'),
+          t('projects.deleteDialog.impactKeys'),
+        ]}
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </div>
   );
 }

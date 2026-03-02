@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward } from 'lucide-react';
+import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { classifyError } from '../lib/errorClassifier';
 
 interface DeliveryDetailsSheetProps {
   deliveryId: string | null;
@@ -56,7 +57,7 @@ export default function DeliveryDetailsSheet({
       loadDelivery();
       loadAttempts();
     }
-  }, [deliveryId, open]);
+  }, [deliveryId, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDelivery = async () => {
     if (!deliveryId) return;
@@ -153,22 +154,82 @@ export default function DeliveryDetailsSheet({
   };
 
 
-  const getGuidanceText = (status: DeliveryResponse['status']) => {
-    if (status === 'FAILED' || status === 'DLQ') {
-      return (
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-          <h4 className="text-sm font-semibold text-yellow-900 mb-2">{t('deliveryDetails.troubleshooting.title')}</h4>
-          <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
-            <li>{t('deliveryDetails.troubleshooting.tip1')}</li>
-            <li>{t('deliveryDetails.troubleshooting.tip2')}</li>
-            <li>{t('deliveryDetails.troubleshooting.tip3')}</li>
-            <li>{t('deliveryDetails.troubleshooting.tip4')}</li>
-            <li>{t('deliveryDetails.troubleshooting.tip5')}</li>
-          </ul>
-        </div>
-      );
-    }
-    return null;
+  const getDiagnosisPanel = () => {
+    if (!delivery || (delivery.status !== 'FAILED' && delivery.status !== 'DLQ')) return null;
+    const failedAttempts = attempts.filter(a => a.errorMessage || (a.httpStatusCode && a.httpStatusCode >= 400));
+    const lastFailed = failedAttempts[failedAttempts.length - 1];
+    if (!lastFailed) return null;
+
+    const classification = classifyError(lastFailed);
+    const severityConfig = {
+      error: { border: 'border-destructive/30', bg: 'bg-destructive/5', icon: XCircle, iconColor: 'text-destructive' },
+      warning: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/5', icon: AlertTriangle, iconColor: 'text-yellow-600' },
+      info: { border: 'border-blue-500/30', bg: 'bg-blue-500/5', icon: Info, iconColor: 'text-blue-600' },
+    }[classification.severity];
+
+    const SeverityIcon = severityConfig.icon;
+
+    return (
+      <Card className={`${severityConfig.border} ${severityConfig.bg}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <SeverityIcon className={`h-4 w-4 ${severityConfig.iconColor}`} />
+            {t('deliveryDetails.diagnosis.title')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {t('deliveryDetails.diagnosis.category')}
+            </span>
+            <p className="text-sm font-semibold mt-0.5">{t(classification.labelKey)}</p>
+          </div>
+          <div>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              <Lightbulb className="h-3 w-3" />
+              {t('deliveryDetails.diagnosis.suggestedFix')}
+            </span>
+            <p className="text-sm mt-0.5">{t(classification.fixKey)}</p>
+          </div>
+
+          {attempts.length > 1 && (
+            <div>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {t('deliveryDetails.diagnosis.retryTimeline')}
+              </span>
+              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                {attempts.map((attempt, i) => {
+                  const isSuccess = attempt.httpStatusCode && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
+                  const isFail = attempt.errorMessage || (attempt.httpStatusCode && attempt.httpStatusCode >= 400);
+                  return (
+                    <div key={attempt.id} className="flex items-center gap-1">
+                      {i > 0 && <div className="w-3 h-px bg-border" />}
+                      <div
+                        className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          isSuccess
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : isFail
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-muted text-muted-foreground'
+                        }`}
+                        title={`${t('deliveryDetails.diagnosis.attemptLabel', { number: attempt.attemptNumber })} — ${attempt.httpStatusCode || attempt.errorMessage || 'pending'}`}
+                      >
+                        {attempt.attemptNumber}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {delivery.status === 'DLQ' && (
+                <p className="text-xs text-muted-foreground mt-1.5 italic">
+                  {t('deliveryDetails.diagnosis.noMoreRetries')}
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -253,7 +314,7 @@ export default function DeliveryDetailsSheet({
                 </CardContent>
               </Card>
 
-              {getGuidanceText(delivery.status)}
+              {getDiagnosisPanel()}
 
               <Card>
                 <CardHeader>

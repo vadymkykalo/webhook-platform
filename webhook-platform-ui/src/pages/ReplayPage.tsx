@@ -25,6 +25,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
 
 const STATUS_VARIANTS: Record<string, { variant: any; icon: any }> = {
   PENDING: { variant: 'secondary', icon: Clock },
@@ -100,27 +101,17 @@ export default function ReplayPage() {
 
   useEffect(() => {
     if (projectId) loadData();
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll running sessions
-  useEffect(() => {
-    const hasRunning = sessions.some(s =>
-      s.status === 'RUNNING' || s.status === 'PENDING' || s.status === 'ESTIMATING' || s.status === 'CANCELLING'
-    );
-    setPollingActive(hasRunning);
-
-    if (hasRunning) {
-      const interval = setInterval(() => loadSessions(), 2000);
-      return () => clearInterval(interval);
+  const loadSessions = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const data = await replayApi.list(projectId, 0, 50);
+      setSessions(data.content);
+    } catch {
+      // Silent — polling
     }
-  }, [sessions]);
-
-  // Set default date range
-  useEffect(() => {
-    const range = quickRange('24h');
-    setFromDate(toLocalDatetime(range.from));
-    setToDate(toLocalDatetime(range.to));
-  }, []);
+  }, [projectId]);
 
   const loadData = async () => {
     if (!projectId) return;
@@ -141,15 +132,25 @@ export default function ReplayPage() {
     }
   };
 
-  const loadSessions = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      const data = await replayApi.list(projectId, 0, 50);
-      setSessions(data.content);
-    } catch {
-      // Silent — polling
+  // Poll running sessions
+  useEffect(() => {
+    const hasRunning = sessions.some(s =>
+      s.status === 'RUNNING' || s.status === 'PENDING' || s.status === 'ESTIMATING' || s.status === 'CANCELLING'
+    );
+    setPollingActive(hasRunning);
+
+    if (hasRunning) {
+      const interval = setInterval(() => loadSessions(), 2000);
+      return () => clearInterval(interval);
     }
-  }, [projectId]);
+  }, [sessions, loadSessions]);
+
+  // Set default date range
+  useEffect(() => {
+    const range = quickRange('24h');
+    setFromDate(toLocalDatetime(range.from));
+    setToDate(toLocalDatetime(range.to));
+  }, []);
 
   const handleQuickRange = (key: string) => {
     setSelectedRange(key);
@@ -254,12 +255,12 @@ export default function ReplayPage() {
           <h1 className="text-title tracking-tight">{t('replay.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('replay.subtitle', { project: project.name }) }} />
         </div>
-        {canReplayDeliveries && (
+        <PermissionGate allowed={canReplayDeliveries}>
           <Button onClick={() => setShowForm(!showForm)} size="sm">
             {showForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
             {t('replay.newReplay')}
           </Button>
-        )}
+        </PermissionGate>
       </div>
 
       {/* New Replay Form */}
@@ -390,7 +391,7 @@ export default function ReplayPage() {
       </div>
 
       {sessions.length === 0 ? (
-        <EmptyState icon={History} title={t('replay.noSessions')} description={t('replay.noSessionsDesc')} />
+        <EmptyState icon={History} title={t('replay.noSessions')} description={t('replay.noSessionsDesc')} docsLink="/docs#deterministic-replay" />
       ) : (
         <div className="space-y-3 animate-fade-in">
           {sessions.map((session) => (

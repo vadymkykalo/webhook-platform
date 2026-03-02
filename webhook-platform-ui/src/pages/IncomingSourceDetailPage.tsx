@@ -65,7 +65,7 @@ export default function IncomingSourceDetailPage() {
 
   useEffect(() => {
     if (projectId && sourceId) loadData();
-  }, [projectId, sourceId, destPage]);
+  }, [projectId, sourceId, destPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     if (!projectId || !sourceId) return;

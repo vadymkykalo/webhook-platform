@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, X, ChevronDown, Quote, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -14,16 +14,15 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Hero isAuthenticated={isAuthenticated} />
+      <QuickWins />
       <LogoCloud />
       <FlowDiagram />
-      <SocialProof />
-      <ProblemSolution />
+      <CapabilityShowcase />
       <Features />
-      <ArchitectureShowcase />
-      <Integrations />
-      <VisibilityAndControl />
-      <DeveloperConfidence />
       <HowItWorks />
+      <DeveloperConfidence />
+      <Integrations />
+      <TrustGrid />
       <FAQ />
       <FinalCTA />
     </div>
@@ -52,8 +51,8 @@ function Navigation() {
             <span className="text-lg font-bold tracking-tight">Hookflow</span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.features')}</a>
-            <a href="#architecture" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.architecture')}</a>
+            <a href="#capabilities" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.capabilities')}</a>
+            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.howItWorks')}</a>
             <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.docs')}</Link>
             <Link to="/quickstart" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.quickstart')}</Link>
             <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.sdks')}</Link>
@@ -92,9 +91,15 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
       <div className="max-w-7xl mx-auto px-6 pt-20 pb-24 relative">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div className="animate-fade-in-up">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
-              <Zap className="h-3 w-3" />
-              {t('landing.hero.badge')}
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              <a href="https://github.com/vadymkykalo/webhook-platform" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground/5 text-foreground text-xs font-semibold border border-border hover:bg-foreground/10 transition-colors">
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                {t('landing.hero.openSource')}
+              </a>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
+                <Zap className="h-3 w-3" />
+                {t('landing.hero.badge')}
+              </div>
             </div>
             <h1 className="text-display text-foreground mb-6 leading-[1.1]">
               {t('landing.hero.title1')}
@@ -116,9 +121,9 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
                 </Button>
               </Link>
             </div>
-            <div className="flex items-center gap-6 mt-8 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.noCreditCard')}</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.freeTier')}</span>
+            <div className="flex flex-wrap items-center gap-4 mt-8 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.openSourceFree')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.selfHosted')}</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-success" />{t('landing.hero.fiveMinSetup')}</span>
             </div>
           </div>
@@ -201,6 +206,35 @@ function DashboardMockup() {
         </div>
       </div>
     </div>
+  );
+}
+
+function QuickWins() {
+  const { t } = useTranslation();
+
+  const cards = [
+    { icon: RefreshCw, title: t('landing.quickWins.queueing'), desc: t('landing.quickWins.queueingDesc'), color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { icon: Eye, title: t('landing.quickWins.replay'), desc: t('landing.quickWins.replayDesc'), color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { icon: Code2, title: t('landing.quickWins.devTools'), desc: t('landing.quickWins.devToolsDesc'), color: 'text-violet-500', bg: 'bg-violet-500/10' },
+    { icon: GitBranch, title: t('landing.quickWins.routing'), desc: t('landing.quickWins.routingDesc'), color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  ];
+
+  return (
+    <section className="py-12 -mt-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {cards.map((card, i) => (
+            <div key={i} className="group p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300 hover:-translate-y-0.5">
+              <div className={`h-9 w-9 rounded-lg ${card.bg} flex items-center justify-center mb-3`}>
+                <card.icon className={`h-4.5 w-4.5 ${card.color}`} />
+              </div>
+              <h3 className="text-sm font-semibold mb-1">{card.title}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -424,20 +458,227 @@ function FlowDiagram() {
   );
 }
 
+function CapabilityShowcase() {
+  const { t } = useTranslation();
+
+  return (
+    <section id="capabilities" className="py-24 bg-muted/30 relative overflow-hidden">
+      <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+            <Zap className="h-3 w-3" />
+            {t('landing.capabilities.badge')}
+          </div>
+          <h2 className="text-headline mb-4">{t('landing.capabilities.title')}<br /><span className="gradient-text">{t('landing.capabilities.titleHighlight')}</span></h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.capabilities.subtitle')}
+          </p>
+        </div>
+
+        <div className="space-y-12">
+          {/* Capability 1: Smart Retries + DLQ */}
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold mb-4 border border-emerald-500/20">
+                <RefreshCw className="h-3 w-3" />
+                {t('landing.capabilities.retries.badge')}
+              </div>
+              <h3 className="text-2xl font-bold mb-3">{t('landing.capabilities.retries.title')}</h3>
+              <p className="text-muted-foreground mb-6">{t('landing.capabilities.retries.desc')}</p>
+              <div className="space-y-3">
+                {['exponential', 'dlq', 'replay'].map((key) => (
+                  <div key={key} className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold">{t(`landing.capabilities.retries.${key}`)}</div>
+                      <div className="text-xs text-muted-foreground">{t(`landing.capabilities.retries.${key}Desc`)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/10 to-primary/10 rounded-2xl blur-2xl" />
+              <div className="relative bg-card rounded-xl border shadow-elevated overflow-hidden">
+                <div className="bg-muted/50 border-b px-4 py-3 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <span className="ml-auto text-[10px] text-muted-foreground font-mono">delivery: order.completed</span>
+                </div>
+                <div className="p-4 space-y-2">
+                  {[
+                    { attempt: 1, status: 'failed', code: 503, delay: '—', time: '10:42:00' },
+                    { attempt: 2, status: 'failed', code: 503, delay: '1m', time: '10:43:00' },
+                    { attempt: 3, status: 'failed', code: 503, delay: '5m', time: '10:48:00' },
+                    { attempt: 4, status: 'success', code: 200, delay: '15m', time: '11:03:00' },
+                  ].map((row) => (
+                    <div key={row.attempt} className={`flex items-center gap-3 p-2.5 rounded-lg text-xs ${row.status === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800' : 'bg-muted/50'}`}>
+                      {row.status === 'success' ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+                      )}
+                      <span className="font-mono text-muted-foreground w-6">#{row.attempt}</span>
+                      <span className={`font-mono font-bold w-8 ${row.status === 'success' ? 'text-emerald-600' : 'text-destructive'}`}>{row.code}</span>
+                      <span className="text-muted-foreground flex-1">{row.delay !== '—' ? `+${row.delay}` : '—'}</span>
+                      <span className="text-muted-foreground/60">{row.time}</span>
+                    </div>
+                  ))}
+                  <div className="pt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-destructive via-amber-500 to-emerald-500 rounded-full" style={{ width: '100%' }} />
+                    </div>
+                    <span className="text-[10px] font-semibold text-emerald-600">4/4 delivered</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Capability 2: Error Diagnostics */}
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div className="lg:order-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-xs font-semibold mb-4 border border-amber-500/20">
+                <Eye className="h-3 w-3" />
+                {t('landing.capabilities.diagnostics.badge')}
+              </div>
+              <h3 className="text-2xl font-bold mb-3">{t('landing.capabilities.diagnostics.title')}</h3>
+              <p className="text-muted-foreground mb-6">{t('landing.capabilities.diagnostics.desc')}</p>
+              <div className="space-y-3">
+                {['classify', 'suggest', 'timeline'].map((key) => (
+                  <div key={key} className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold">{t(`landing.capabilities.diagnostics.${key}`)}</div>
+                      <div className="text-xs text-muted-foreground">{t(`landing.capabilities.diagnostics.${key}Desc`)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="lg:order-1 relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/10 to-rose-500/10 rounded-2xl blur-2xl" />
+              <div className="relative bg-card rounded-xl border shadow-elevated overflow-hidden">
+                <div className="bg-muted/50 border-b px-4 py-3 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <span className="ml-auto text-[10px] text-muted-foreground font-mono">error diagnosis</span>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <span className="text-sm font-semibold text-destructive">Connection Timeout</span>
+                      <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">HIGH</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Endpoint did not respond within 30s timeout window</p>
+                  </div>
+                  <div className="p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Zap className="h-3.5 w-3.5 text-amber-600" />
+                      <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Suggested Fix</span>
+                    </div>
+                    <p className="text-xs text-amber-600 dark:text-amber-300/80">Increase endpoint timeout or check if the target server is under heavy load. Consider adding a health check.</p>
+                  </div>
+                  <div className="flex items-center gap-1 pt-1">
+                    <span className="text-[10px] text-muted-foreground mr-2">Attempts:</span>
+                    {[false, false, false, true].map((ok, i) => (
+                      <div key={i} className={`h-2 w-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-destructive'}`} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Capability 3: Incoming Webhooks */}
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 text-xs font-semibold mb-4 border border-blue-500/20">
+                <ArrowDownToLine className="h-3 w-3" />
+                {t('landing.capabilities.incoming.badge')}
+              </div>
+              <h3 className="text-2xl font-bold mb-3">{t('landing.capabilities.incoming.title')}</h3>
+              <p className="text-muted-foreground mb-6">{t('landing.capabilities.incoming.desc')}</p>
+              <div className="space-y-3">
+                {['ingest', 'verify', 'forward'].map((key) => (
+                  <div key={key} className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold">{t(`landing.capabilities.incoming.${key}`)}</div>
+                      <div className="text-xs text-muted-foreground">{t(`landing.capabilities.incoming.${key}Desc`)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 to-violet-500/10 rounded-2xl blur-2xl" />
+              <div className="relative bg-card rounded-xl border shadow-elevated overflow-hidden">
+                <div className="bg-muted/50 border-b px-4 py-3 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <span className="ml-auto text-[10px] text-muted-foreground font-mono">incoming webhook pipeline</span>
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    {['Stripe', 'GitHub', 'Twilio'].map((name) => (
+                      <div key={name} className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-muted/30">
+                        <img src={`/logos/${name.toLowerCase()}.svg`} alt={name} className="h-4 w-4 object-contain" />
+                        <span className="text-xs font-medium">{name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <div className="h-px flex-1 bg-border" />
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                      <Shield className="h-3 w-3 text-primary" />
+                      <span className="text-[10px] font-semibold text-primary">HMAC Verified</span>
+                    </div>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 mb-4">
+                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                      <HookflowIcon className="h-4 w-4 text-white" />
+                    </div>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
+                      <Globe className="h-3.5 w-3.5 text-emerald-600" />
+                      <span className="text-xs font-medium">api.internal.com/hooks</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[10px] text-muted-foreground">Receive → Verify → Route → Forward — zero code required</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Features() {
   const { t } = useTranslation();
   const features = [
     { icon: RefreshCw, title: t('landing.features.retries'), desc: t('landing.features.retriesDesc') },
-    { icon: Eye, title: t('landing.features.visibility'), desc: t('landing.features.visibilityDesc') },
     { icon: Shield, title: t('landing.features.hmac'), desc: t('landing.features.hmacDesc') },
-    { icon: Activity, title: t('landing.features.replay'), desc: t('landing.features.replayDesc') },
+    { icon: AlertCircle, title: t('landing.features.dlq'), desc: t('landing.features.dlqDesc') },
+    { icon: Eye, title: t('landing.features.diagnostics'), desc: t('landing.features.diagnosticsDesc') },
     { icon: ArrowDownToLine, title: t('landing.features.incomingIngress'), desc: t('landing.features.incomingIngressDesc') },
-    { icon: Globe, title: t('landing.features.incomingRouting'), desc: t('landing.features.incomingRoutingDesc') },
     { icon: FileCheck, title: t('landing.features.schemaRegistry'), desc: t('landing.features.schemaRegistryDesc') },
     { icon: GitBranch, title: t('landing.features.wildcardRouting'), desc: t('landing.features.wildcardRoutingDesc') },
     { icon: Fingerprint, title: t('landing.features.deterministicReplay'), desc: t('landing.features.deterministicReplayDesc') },
     { icon: BarChart3, title: t('landing.features.analytics'), desc: t('landing.features.analyticsDesc') },
-    { icon: Lock, title: t('landing.features.mtls'), desc: t('landing.features.mtlsDesc') },
+    { icon: Lock, title: t('landing.features.piiMasking'), desc: t('landing.features.piiMaskingDesc') },
+    { icon: Activity, title: t('landing.features.auditLog'), desc: t('landing.features.auditLogDesc') },
+    { icon: Webhook, title: t('landing.features.rbac'), desc: t('landing.features.rbacDesc') },
   ];
 
   return (
@@ -449,17 +690,17 @@ function Features() {
             {t('landing.features.subtitle')}
           </p>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {features.map((f, i) => (
             <div
               key={i}
-              className="group relative bg-card rounded-xl border p-6 hover:shadow-card-hover hover:border-primary/20 transition-all duration-300 hover:-translate-y-0.5"
+              className="group relative bg-card rounded-xl border p-5 hover:shadow-card-hover hover:border-primary/20 transition-all duration-300 hover:-translate-y-0.5"
             >
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 transition-colors">
-                <f.icon className="h-5 w-5 text-primary" />
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/15 transition-colors">
+                <f.icon className="h-4.5 w-4.5 text-primary" />
               </div>
-              <h3 className="text-base font-semibold mb-2">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+              <h3 className="text-sm font-semibold mb-1">{f.title}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -468,340 +709,9 @@ function Features() {
   );
 }
 
-function ArchNode({ name, sub, logoSrc, icon, color, isActive, onClick }: {
-  name: string; sub: string; logoSrc?: string; icon?: React.ReactNode; color: string;
-  isActive: boolean; onClick: () => void;
-}) {
-  return (
-    <div className="flex flex-col items-center cursor-pointer group" onClick={onClick}>
-      <div
-        className={`relative w-[5.5rem] h-[5.5rem] lg:w-[6.5rem] lg:h-[6.5rem] rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-700 ${isActive
-            ? 'border-transparent scale-110 shadow-xl'
-            : 'border-border bg-card hover:border-primary/20 hover:shadow-md hover:-translate-y-0.5'
-          }`}
-        style={isActive ? {
-          borderColor: `${color}40`,
-          background: `linear-gradient(135deg, ${color}08, ${color}15)`,
-          boxShadow: `0 0 30px ${color}20, 0 4px 20px ${color}10`,
-        } : {}}
-      >
-        {isActive && (
-          <div className="absolute inset-0 rounded-2xl" style={{
-            background: `radial-gradient(circle at 50% 0%, ${color}15, transparent 70%)`,
-          }} />
-        )}
-        {logoSrc ? (
-          <img
-            src={logoSrc}
-            alt={name}
-            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 object-contain transition-all duration-500 ${isActive ? 'opacity-100 grayscale-0' : 'opacity-50 grayscale group-hover:opacity-80 group-hover:grayscale-0'
-              }`}
-          />
-        ) : (
-          <div
-            className={`h-7 w-7 lg:h-8 lg:w-8 mb-1.5 transition-all duration-500 [&>svg]:w-full [&>svg]:h-full ${isActive ? '' : 'text-muted-foreground/60 group-hover:text-foreground/80'
-              }`}
-            style={isActive ? { color } : {}}
-          >
-            {icon}
-          </div>
-        )}
-        <div className={`text-[11px] lg:text-xs font-bold tracking-wide transition-colors duration-500 ${isActive ? 'text-foreground' : 'text-foreground/80'
-          }`}>
-          {name}
-        </div>
-        <div className={`text-[9px] lg:text-[10px] transition-colors duration-500 ${isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'
-          }`}>
-          {sub}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AnimatedConnector({ isActive, isPast, color, delay }: { isActive: boolean; isPast: boolean; color: string; delay: number }) {
-  return (
-    <div className="relative w-8 lg:w-14 h-8 mx-0.5 lg:mx-1 flex items-center">
-      <div className={`w-full h-[2px] rounded-full transition-all duration-700 ${isPast ? 'bg-primary/40' : 'bg-border'
-        }`} />
-      {(isActive || isPast) && (
-        <div
-          className="absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full"
-          style={{
-            background: color,
-            boxShadow: `0 0 8px ${color}, 0 0 16px ${color}80`,
-            animation: `data-packet 1.5s ease-in-out ${delay}s infinite`,
-          }}
-        />
-      )}
-      {isPast && (
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full h-[2px] rounded-full bg-gradient-to-r from-primary/20 via-primary/50 to-primary/20" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ArchitectureShowcase() {
-  const { t } = useTranslation();
-  const [activeStep, setActiveStep] = useState(0);
-  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (hoveredStep !== null) return;
-    const interval = setInterval(() => setActiveStep((prev) => (prev + 1) % 7), 2200);
-    return () => clearInterval(interval);
-  }, [hoveredStep]);
-
-  const components = [
-    {
-      name: 'Client', sub: 'POST /events', color: '#8B5CF6',
-      icon: <Code2 className="w-full h-full" />
-    },
-    {
-      name: 'API', sub: 'Spring Boot', color: '#6DB33F',
-      logoSrc: '/logos/springboot.svg'
-    },
-    {
-      name: 'DB', sub: 'Event + Outbox', color: '#4169E1',
-      logoSrc: '/logos/postgresql.svg'
-    },
-    {
-      name: 'Publisher', sub: 'Scheduled', color: '#F59E0B',
-      icon: <Clock className="w-full h-full" />
-    },
-    {
-      name: 'Kafka', sub: 'Queue', color: '#231F20',
-      logoSrc: '/logos/apachekafka.svg'
-    },
-    {
-      name: 'Worker', sub: 'Consumer', color: '#10B981',
-      icon: <RefreshCw className="w-full h-full" />
-    },
-    {
-      name: 'Endpoint', sub: 'HMAC', color: '#EF4444',
-      icon: <Lock className="w-full h-full" />
-    },
-  ];
-
-  const current = hoveredStep ?? activeStep;
-
-  return (
-    <section id="architecture" className="py-24 bg-muted/30 relative overflow-hidden">
-      <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-6 relative">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
-            <Activity className="h-3 w-3" />
-            {t('landing.architecture.badge')}
-          </div>
-          <h2 className="text-headline mb-4">{t('landing.architecture.title')} <span className="gradient-text">{t('landing.architecture.titleHighlight')}</span></h2>
-          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
-            {t('landing.architecture.subtitle')}
-          </p>
-        </div>
-
-        <div className="relative">
-          <div className="absolute -inset-4 bg-gradient-to-r from-primary/10 via-purple-500/5 to-primary/10 rounded-3xl blur-2xl" />
-          <div className="relative bg-card/80 backdrop-blur-sm rounded-2xl border shadow-elevated overflow-hidden">
-            <div className="bg-muted/50 border-b px-5 py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-400/80" />
-                <div className="w-3 h-3 rounded-full bg-yellow-400/80" />
-                <div className="w-3 h-3 rounded-full bg-green-400/80" />
-              </div>
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                </span>
-                {t('landing.architecture.flowLabel')}
-              </div>
-              <div className="w-16" />
-            </div>
-
-            <div className="p-6 lg:p-10">
-              <div className="hidden md:flex items-center justify-center mb-10">
-                {components.map((component, index) => (
-                  <div key={index} className="flex items-center">
-                    <div
-                      onMouseEnter={() => setHoveredStep(index)}
-                      onMouseLeave={() => setHoveredStep(null)}
-                      style={{ animation: current === index ? 'float 3s ease-in-out infinite' : 'none' }}
-                    >
-                      <ArchNode
-                        name={component.name}
-                        sub={component.sub}
-                        logoSrc={component.logoSrc}
-                        icon={component.icon}
-                        color={component.color}
-                        isActive={current === index}
-                        onClick={() => setActiveStep(index)}
-                      />
-                    </div>
-                    {index < components.length - 1 && (
-                      <AnimatedConnector
-                        isActive={current === index}
-                        isPast={current > index}
-                        color={components[index].color}
-                        delay={index * 0.15}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Mobile: vertical list */}
-              <div className="md:hidden space-y-3 mb-8">
-                {components.map((component, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 ${current === index ? 'border-primary/30 bg-accent shadow-sm' : 'border-transparent'
-                      }`}
-                    onClick={() => setActiveStep(index)}
-                  >
-                    <div className="h-10 w-10 rounded-lg flex items-center justify-center [&>svg]:w-5 [&>svg]:h-5"
-                      style={{ background: `${component.color}15`, color: component.color }}>
-                      {component.logoSrc
-                        ? <img src={component.logoSrc} alt={component.name} className="h-5 w-5 object-contain" />
-                        : component.icon}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold">{component.name}</div>
-                      <div className="text-xs text-muted-foreground">{component.sub}</div>
-                    </div>
-                    {index < components.length - 1 && (
-                      <ArrowRight className="h-4 w-4 text-muted-foreground/30 ml-auto" />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                {[
-                  { title: t('landing.architecture.atomicWrites'), desc: t('landing.architecture.atomicWritesDesc'), icon: <Shield className="h-4 w-4" /> },
-                  { title: t('landing.architecture.zeroDataLoss'), desc: t('landing.architecture.zeroDataLossDesc'), icon: <CheckCircle2 className="h-4 w-4" /> },
-                  { title: t('landing.architecture.atLeastOnce'), desc: t('landing.architecture.atLeastOnceDesc'), icon: <RefreshCw className="h-4 w-4" /> },
-                ].map((item) => (
-                  <div key={item.title} className="group p-5 rounded-xl border bg-gradient-to-br from-muted/30 to-transparent hover:from-accent hover:to-accent/50 hover:border-primary/20 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="text-primary/70 group-hover:text-primary transition-colors">{item.icon}</div>
-                      <div className="font-semibold text-sm">{item.title}</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground leading-relaxed">{item.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 
-function VisibilityAndControl() {
-  const { t } = useTranslation();
-  const [selectedAttempt, setSelectedAttempt] = useState(2);
 
-  const attempts = [
-    { id: 1, status: 'success', code: 200, latency: '124ms', time: '10:42:15' },
-    { id: 2, status: 'failed', code: 503, latency: '5002ms', time: '10:42:45', error: 'Service Unavailable' },
-    { id: 3, status: 'success', code: 200, latency: '98ms', time: '10:43:45' },
-  ];
-
-  return (
-    <section className="py-24">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
-              <Eye className="h-3 w-3" />
-              {t('landing.observability.badge')}
-            </div>
-            <h2 className="text-headline mb-6">
-              {t('landing.observability.title')}<br /><span className="gradient-text">{t('landing.observability.titleHighlight')}</span>
-            </h2>
-            <p className="text-body-lg text-muted-foreground mb-8">
-              {t('landing.observability.subtitle')}
-            </p>
-            <div className="space-y-4">
-              {[
-                { title: t('landing.observability.timeline'), desc: t('landing.observability.timelineDesc') },
-                { title: t('landing.observability.errorDetails'), desc: t('landing.observability.errorDetailsDesc') },
-                { title: t('landing.observability.perfMetrics'), desc: t('landing.observability.perfMetricsDesc') },
-              ].map((item) => (
-                <div key={item.title} className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div className="text-sm font-semibold">{item.title}</div>
-                    <div className="text-sm text-muted-foreground">{item.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="relative">
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary/10 to-purple-500/10 rounded-2xl blur-2xl" />
-              <div className="relative bg-card rounded-xl border shadow-elevated overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-4 text-white">
-                  <div className="text-sm font-medium">Delivery: order.completed</div>
-                  <div className="text-xs text-white/50 mt-0.5">Endpoint: https://api.customer.com/webhooks</div>
-                </div>
-                <div className="p-5">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t('landing.observability.attemptHistory')}</div>
-                  <div className="space-y-2">
-                    {attempts.map((attempt) => (
-                      <div
-                        key={attempt.id}
-                        onClick={() => setSelectedAttempt(attempt.id)}
-                        className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selectedAttempt === attempt.id
-                            ? 'border-primary/40 bg-accent ring-1 ring-primary/20'
-                            : 'border-border hover:border-primary/20 hover:bg-muted/50'
-                          }`}
-                      >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            {attempt.status === 'success' ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                            ) : (
-                              <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-                            )}
-                            <span className="text-sm font-medium">Attempt #{attempt.id}</span>
-                          </div>
-                          <span className="text-[11px] text-muted-foreground">{attempt.time}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className={`font-mono font-semibold ${attempt.status === 'success' ? 'text-success' : 'text-destructive'}`}>
-                            {attempt.code}
-                          </span>
-                          <span className="text-muted-foreground">{attempt.latency}</span>
-                        </div>
-                        {attempt.error && selectedAttempt === attempt.id && (
-                          <div className="mt-2 p-2 bg-destructive/5 rounded border border-destructive/10 animate-scale-in">
-                            <div className="text-xs text-destructive font-medium">{attempt.error}</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <Button className="w-full mt-4" size="sm">
-                    <RefreshCw className="h-3.5 w-3.5" /> {t('landing.observability.replayDelivery')}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function DeveloperConfidence() {
   const { t } = useTranslation();
@@ -911,7 +821,7 @@ function HowItWorks() {
   ];
 
   return (
-    <section className="py-24 bg-muted/30 relative overflow-hidden">
+    <section id="how-it-works" className="py-24 bg-muted/30 relative overflow-hidden">
       <div className="absolute top-1/2 left-0 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
       <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-purple-500/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
@@ -1126,135 +1036,6 @@ function HowItWorks() {
   );
 }
 
-function SocialProof() {
-  const { t } = useTranslation();
-
-  const stats = [
-    { value: t('landing.socialProof.stat1Value'), label: t('landing.socialProof.stat1Label'), desc: t('landing.socialProof.stat1Desc'), color: 'text-green-500' },
-    { value: t('landing.socialProof.stat2Value'), label: t('landing.socialProof.stat2Label'), desc: t('landing.socialProof.stat2Desc'), color: 'text-blue-500' },
-    { value: t('landing.socialProof.stat3Value'), label: t('landing.socialProof.stat3Label'), desc: t('landing.socialProof.stat3Desc'), color: 'text-violet-500' },
-    { value: t('landing.socialProof.stat4Value'), label: t('landing.socialProof.stat4Label'), desc: t('landing.socialProof.stat4Desc'), color: 'text-amber-500' },
-  ];
-
-  const quotes = [
-    { text: t('landing.socialProof.quote1'), author: t('landing.socialProof.quote1Author'), role: t('landing.socialProof.quote1Role') },
-    { text: t('landing.socialProof.quote2'), author: t('landing.socialProof.quote2Author'), role: t('landing.socialProof.quote2Role') },
-    { text: t('landing.socialProof.quote3'), author: t('landing.socialProof.quote3Author'), role: t('landing.socialProof.quote3Role') },
-  ];
-
-  return (
-    <section className="py-24">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-headline mb-4">{t('landing.socialProof.title')}<span className="gradient-text">{t('landing.socialProof.titleHighlight')}</span></h2>
-          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">{t('landing.socialProof.subtitle')}</p>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {stats.map((stat) => (
-            <div key={stat.label} className="text-center p-6 rounded-2xl border bg-card hover:shadow-card-hover transition-all duration-300">
-              <div className={`text-4xl lg:text-5xl font-bold ${stat.color} mb-2`}>{stat.value}</div>
-              <div className="text-sm font-semibold mb-1">{stat.label}</div>
-              <div className="text-xs text-muted-foreground">{stat.desc}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {quotes.map((quote) => (
-            <div key={quote.author} className="relative p-6 rounded-2xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
-              <Quote className="h-8 w-8 text-primary/20 mb-4" />
-              <p className="text-sm text-muted-foreground leading-relaxed mb-6">{quote.text}</p>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-sm font-bold text-primary">{quote.author.charAt(0)}</span>
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{quote.author}</div>
-                  <div className="text-xs text-muted-foreground">{quote.role}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProblemSolution() {
-  const { t } = useTranslation();
-
-  const items = [
-    { before: t('landing.problem.item1Before'), after: t('landing.problem.item1After') },
-    { before: t('landing.problem.item2Before'), after: t('landing.problem.item2After') },
-    { before: t('landing.problem.item3Before'), after: t('landing.problem.item3After') },
-    { before: t('landing.problem.item4Before'), after: t('landing.problem.item4After') },
-    { before: t('landing.problem.item5Before'), after: t('landing.problem.item5After') },
-    { before: t('landing.problem.item6Before'), after: t('landing.problem.item6After') },
-    { before: t('landing.problem.item7Before'), after: t('landing.problem.item7After') },
-  ];
-
-  return (
-    <section className="py-24 bg-muted/30 relative overflow-hidden">
-      <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-destructive/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="max-w-7xl mx-auto px-6 relative">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold mb-6 border border-destructive/20">
-            <AlertCircle className="h-3 w-3" />
-            {t('landing.problem.badge')}
-          </div>
-          <h2 className="text-headline mb-4">{t('landing.problem.title')}<span className="gradient-text">{t('landing.problem.titleHighlight')}</span></h2>
-          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">{t('landing.problem.subtitle')}</p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8 mb-12">
-          <div>
-            <div className="flex items-center gap-2 mb-6">
-              <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-                <X className="h-4 w-4 text-destructive" />
-              </div>
-              <span className="text-sm font-bold text-destructive uppercase tracking-wider">{t('landing.problem.before')}</span>
-            </div>
-            <div className="space-y-3">
-              {items.map((item) => (
-                <div key={item.before} className="flex items-start gap-3 p-4 rounded-xl border border-destructive/10 bg-destructive/[0.02]">
-                  <X className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-muted-foreground">{item.before}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-6">
-              <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
-                <CheckCircle2 className="h-4 w-4 text-success" />
-              </div>
-              <span className="text-sm font-bold text-success uppercase tracking-wider">{t('landing.problem.after')}</span>
-            </div>
-            <div className="space-y-3">
-              {items.map((item) => (
-                <div key={item.after} className="flex items-start gap-3 p-4 rounded-xl border border-success/10 bg-success/[0.02]">
-                  <CheckCircle2 className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-foreground">{item.after}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center">
-          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-primary/10 border border-primary/20">
-            <Zap className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold text-primary">{t('landing.problem.saveBadge')}</span>
-          </div>
-          <p className="text-sm text-muted-foreground mt-3">{t('landing.problem.saveDesc')}</p>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function Integrations() {
   const { t } = useTranslation();
@@ -1337,6 +1118,54 @@ function Integrations() {
   );
 }
 
+function TrustGrid() {
+  const { t } = useTranslation();
+
+  const items = [
+    { icon: Lock, title: t('landing.trust.encryption'), desc: t('landing.trust.encryptionDesc'), color: 'text-emerald-500' },
+    { icon: Shield, title: t('landing.trust.hmac'), desc: t('landing.trust.hmacDesc'), color: 'text-blue-500' },
+    { icon: Globe, title: t('landing.trust.ssrf'), desc: t('landing.trust.ssrfDesc'), color: 'text-violet-500' },
+    { icon: Webhook, title: t('landing.trust.rbac'), desc: t('landing.trust.rbacDesc'), color: 'text-amber-500' },
+    { icon: Fingerprint, title: t('landing.trust.apiKeys'), desc: t('landing.trust.apiKeysDesc'), color: 'text-rose-500' },
+    { icon: Activity, title: t('landing.trust.audit'), desc: t('landing.trust.auditDesc'), color: 'text-cyan-500' },
+    { icon: RefreshCw, title: t('landing.trust.atLeastOnce'), desc: t('landing.trust.atLeastOnceDesc'), color: 'text-green-500' },
+    { icon: Code2, title: t('landing.trust.selfHosted'), desc: t('landing.trust.selfHostedDesc'), color: 'text-orange-500' },
+    { icon: CheckCircle2, title: t('landing.trust.openSource'), desc: t('landing.trust.openSourceDesc'), color: 'text-primary' },
+  ];
+
+  return (
+    <section className="py-24 bg-muted/30 relative overflow-hidden">
+      <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-semibold mb-6 border border-emerald-500/20">
+            <Shield className="h-3 w-3" />
+            {t('landing.trust.badge')}
+          </div>
+          <h2 className="text-headline mb-4">{t('landing.trust.title')}<br /><span className="gradient-text">{t('landing.trust.titleHighlight')}</span></h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.trust.subtitle')}
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {items.map((item, i) => (
+            <div key={i} className="group flex items-start gap-4 p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
+              <div className={`h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors`}>
+                <item.icon className={`h-5 w-5 ${item.color}`} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-0.5">{item.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FAQ() {
   const { t } = useTranslation();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -1346,12 +1175,8 @@ function FAQ() {
     { q: t('landing.faq.q2'), a: t('landing.faq.a2') },
     { q: t('landing.faq.q3'), a: t('landing.faq.a3') },
     { q: t('landing.faq.q7'), a: t('landing.faq.a7') },
-    { q: t('landing.faq.q8'), a: t('landing.faq.a8') },
-    { q: t('landing.faq.q9'), a: t('landing.faq.a9') },
-    { q: t('landing.faq.q10'), a: t('landing.faq.a10') },
     { q: t('landing.faq.q4'), a: t('landing.faq.a4') },
     { q: t('landing.faq.q5'), a: t('landing.faq.a5') },
-    { q: t('landing.faq.q6'), a: t('landing.faq.a6') },
   ];
 
   return (
@@ -1398,8 +1223,8 @@ function FinalCTA() {
               {t('landing.cta.subtitle')}
             </p>
             <div className="flex items-center justify-center gap-4 mb-8 text-sm text-white/60">
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.noCreditCard')}</span>
-              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.freeTier')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.openSourceFree')}</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.selfHosted')}</span>
               <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-green-300" />{t('landing.hero.fiveMinSetup')}</span>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -1408,7 +1233,7 @@ function FinalCTA() {
                   {t('landing.cta.getStartedFree')} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <a href="mailto:sales@hookflow.dev">
+              <a href="mailto:vadymkykalo@gmail.com">
                 <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 bg-transparent">
                   <Mail className="h-4 w-4" /> {t('landing.cta.contactSales')}
                 </Button>
