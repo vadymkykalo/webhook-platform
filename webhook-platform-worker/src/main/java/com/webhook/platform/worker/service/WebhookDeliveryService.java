@@ -407,7 +407,11 @@ public class WebhookDeliveryService {
     private Instant calculateNextRetry(int attemptCount, String retryDelaysStr) {
         long[] delays = parseRetryDelays(retryDelaysStr);
         int index = Math.min(attemptCount - 1, delays.length - 1);
-        return Instant.now().plusSeconds(delays[index]);
+        long baseDelay = delays[index];
+        // Full jitter: 50%-150% of base delay to prevent thundering herd
+        double jitterMultiplier = 0.5 + java.util.concurrent.ThreadLocalRandom.current().nextDouble(1.0);
+        long jitteredDelay = (long) (baseDelay * jitterMultiplier);
+        return Instant.now().plusSeconds(jitteredDelay);
     }
 
     private long[] parseRetryDelays(String retryDelaysStr) {

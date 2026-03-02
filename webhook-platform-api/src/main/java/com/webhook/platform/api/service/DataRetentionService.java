@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
+import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -21,9 +22,11 @@ public class DataRetentionService {
 
     private final OutboxMessageRepository outboxMessageRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
+    private final IncomingEventRepository incomingEventRepository;
     private final MeterRegistry meterRegistry;
     private final int outboxRetentionDays;
     private final int deliveryAttemptsRetentionDays;
+    private final int incomingEventsRetentionDays;
     private final int maxAttemptsPerDelivery;
     private final int batchSize;
     private final AtomicLong totalAttemptsCount = new AtomicLong(0);
@@ -31,16 +34,20 @@ public class DataRetentionService {
     public DataRetentionService(
             OutboxMessageRepository outboxMessageRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
+            IncomingEventRepository incomingEventRepository,
             MeterRegistry meterRegistry,
             @Value("${data-retention.outbox-retention-days:7}") int outboxRetentionDays,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
+            @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
             @Value("${data-retention.max-attempts-per-delivery:10}") int maxAttemptsPerDelivery,
             @Value("${data-retention.batch-size:1000}") int batchSize) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
+        this.incomingEventRepository = incomingEventRepository;
         this.meterRegistry = meterRegistry;
         this.outboxRetentionDays = outboxRetentionDays;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
+        this.incomingEventsRetentionDays = incomingEventsRetentionDays;
         this.maxAttemptsPerDelivery = maxAttemptsPerDelivery;
         this.batchSize = batchSize;
         
@@ -48,8 +55,8 @@ public class DataRetentionService {
                 .description("Total number of delivery attempts in storage")
                 .register(meterRegistry);
         
-        log.info("Data retention configured: outbox={}d, attempts={}d, maxPerDelivery={}, batchSize={}", 
-                outboxRetentionDays, deliveryAttemptsRetentionDays, maxAttemptsPerDelivery, batchSize);
+        log.info("Data retention configured: outbox={}d, attempts={}d, incoming={}d, maxPerDelivery={}, batchSize={}", 
+                outboxRetentionDays, deliveryAttemptsRetentionDays, incomingEventsRetentionDays, maxAttemptsPerDelivery, batchSize);
     }
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
@@ -157,6 +164,36 @@ public class DataRetentionService {
         updateMetrics();
     }
     
+    @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
+    @SchedulerLock(name = "cleanupOldIncomingEvents", lockAtMostFor = "9m", lockAtLeastFor = "1m")
+    @Transactional
+    public void cleanupOldIncomingEvents() {
+        Instant cutoffTime = Instant.now().minusSeconds(incomingEventsRetentionDays * 86400L);
+
+        log.info("Starting incoming events cleanup for events older than {}", cutoffTime);
+
+        int totalDeleted = 0;
+        int deletedInBatch;
+
+        do {
+            deletedInBatch = incomingEventRepository.deleteOldIncomingEvents(cutoffTime, batchSize);
+            totalDeleted += deletedInBatch;
+
+            if (deletedInBatch > 0) {
+                log.debug("Deleted {} incoming events in batch", deletedInBatch);
+            }
+        } while (deletedInBatch >= batchSize);
+
+        if (totalDeleted > 0) {
+            Counter.builder("incoming_events_cleanup_total")
+                    .register(meterRegistry)
+                    .increment(totalDeleted);
+            log.info("Incoming events cleanup: deleted {} old events (older than {}d)", totalDeleted, incomingEventsRetentionDays);
+        } else {
+            log.debug("Incoming events cleanup: no old events to delete");
+        }
+    }
+
     private void updateMetrics() {
         try {
             long count = deliveryAttemptRepository.countAllAttempts();

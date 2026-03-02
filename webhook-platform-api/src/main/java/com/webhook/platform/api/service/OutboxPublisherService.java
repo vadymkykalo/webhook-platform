@@ -18,8 +18,10 @@ import org.springframework.kafka.core.KafkaTemplate;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -38,17 +40,20 @@ public class OutboxPublisherService {
     private final ObjectMapper objectMapper;
     private final int batchSize;
     private final Timer publishLatency;
+    private final TransactionTemplate txTemplate;
 
     public OutboxPublisherService(
             OutboxMessageRepository outboxMessageRepository,
             KafkaTemplate<String, Object> kafkaTemplate,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
+            PlatformTransactionManager txManager,
             @Value("${outbox.publisher.batch-size:100}") int batchSize) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
+        this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
                 .description("Time to publish a batch of outbox messages to Kafka")
@@ -82,17 +87,24 @@ public class OutboxPublisherService {
 
     @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
     @SchedulerLock(name = "outbox-publisher", lockAtLeastFor = "PT1S", lockAtMostFor = "PT30S")
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void publishPendingMessages() {
-        List<OutboxMessage> pendingMessages = outboxMessageRepository
-                .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize);
+        // Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
+        List<OutboxMessage> claimed = txTemplate.execute(status -> {
+            List<OutboxMessage> batch = outboxMessageRepository
+                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, 10);
+            for (OutboxMessage msg : batch) {
+                msg.setStatus(OutboxStatus.SENDING);
+            }
+            return batch.isEmpty() ? batch : outboxMessageRepository.saveAll(batch);
+        });
 
-        if (pendingMessages.isEmpty()) {
+        if (claimed == null || claimed.isEmpty()) {
             return;
         }
 
-        log.info("Publishing {} pending outbox messages", pendingMessages.size());
-        publishBatchAsync(pendingMessages, false);
+        // Phase 2: publish to Kafka outside transaction — no DB locks held
+        log.info("Publishing {} pending outbox messages", claimed.size());
+        publishBatchAsync(claimed, false);
     }
 
     @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
@@ -100,7 +112,7 @@ public class OutboxPublisherService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void retryFailedMessages() {
         List<OutboxMessage> failedMessages = outboxMessageRepository
-                .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), 5, batchSize);
+                .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), 5, batchSize, 10);
 
         if (failedMessages.isEmpty()) {
             return;
@@ -131,6 +143,13 @@ public class OutboxPublisherService {
     @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
     @Transactional
     public void cleanupOldMessages() {
+        // Recover stuck SENDING messages (claimed but app crashed before publish)
+        Instant sendingCutoff = Instant.now().minusSeconds(120);
+        int recovered = outboxMessageRepository.recoverStuckSendingMessages(sendingCutoff);
+        if (recovered > 0) {
+            log.warn("Recovered {} stuck SENDING outbox messages back to PENDING", recovered);
+        }
+
         Instant publishedCutoff = Instant.now().minus(java.time.Duration.ofDays(3));
         int deletedPublished = outboxMessageRepository.deleteOldPublishedMessages(
                 OutboxStatus.PUBLISHED.name(), publishedCutoff, 5000);

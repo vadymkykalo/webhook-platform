@@ -43,6 +43,9 @@ public class IncomingEvent {
     @Column(name = "body_sha256", length = 64)
     private String bodySha256;
 
+    @Column(name = "provider_event_id", length = 255)
+    private String providerEventId;
+
     @Column(name = "content_type", length = 255)
     private String contentType;
 

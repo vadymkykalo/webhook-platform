@@ -115,6 +115,21 @@ public class IngressService {
         String headersJson = extractHeadersJson(request);
         String bodySha256 = computeSha256(body);
 
+        // Extract provider event ID for dedup (well-known headers, fallback to body hash)
+        String providerEventId = extractProviderEventId(request, bodySha256);
+
+        // Dedup: if same source + same provider event ID already exists, return existing (idempotent)
+        if (providerEventId != null) {
+            var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
+            if (existing.isPresent()) {
+                log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
+                        source.getId(), providerEventId, existing.get().getId());
+                meterRegistry.counter("incoming_events_deduplicated_total",
+                        "source_id", source.getId().toString()).increment();
+                return existing.get();
+            }
+        }
+
         // Verify signature via strategy pattern
         Boolean verified = null;
         String verificationError = null;
@@ -144,6 +159,7 @@ public class IngressService {
                 .headersJson(headersJson)
                 .bodyRaw(body)
                 .bodySha256(bodySha256)
+                .providerEventId(providerEventId)
                 .contentType(contentType)
                 .clientIp(clientIp)
                 .userAgent(userAgent != null ? truncate(userAgent, 512) : null)
@@ -272,6 +288,27 @@ public class IngressService {
             log.warn("Failed to compute SHA-256: {}", e.getMessage());
             return null;
         }
+    }
+
+    private static final List<String> PROVIDER_EVENT_ID_HEADERS = List.of(
+            "X-Webhook-Id",              // Generic
+            "Stripe-Webhook-Id",         // Stripe
+            "X-GitHub-Delivery",         // GitHub
+            "X-Shopify-Webhook-Id",      // Shopify
+            "X-Request-Id",              // Generic fallback
+            "X-Twilio-Webhook-Id",       // Twilio
+            "X-Slack-Request-Timestamp"  // Slack (timestamp as dedup key)
+    );
+
+    private String extractProviderEventId(HttpServletRequest request, String bodySha256) {
+        for (String header : PROVIDER_EVENT_ID_HEADERS) {
+            String value = request.getHeader(header);
+            if (value != null && !value.isBlank()) {
+                return truncate(value.trim(), 255);
+            }
+        }
+        // Fallback: use body hash as dedup key (same payload = duplicate)
+        return bodySha256;
     }
 
     private String truncate(String str, int maxLength) {

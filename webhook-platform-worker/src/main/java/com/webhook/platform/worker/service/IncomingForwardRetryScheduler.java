@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -65,9 +66,8 @@ public class IncomingForwardRetryScheduler {
                             KafkaTopics.INCOMING_FORWARD_RETRY,
                             attempt.getDestinationId().toString(),
                             message
-                    );
+                    ).get(10, TimeUnit.SECONDS);
 
-                    // Clear the next_retry_at so we don't re-pick it
                     attempt.setNextRetryAt(null);
                     attempt.setStatus(ForwardAttemptStatus.PROCESSING);
                     attemptRepository.save(attempt);
@@ -80,6 +80,9 @@ public class IncomingForwardRetryScheduler {
                 } catch (Exception e) {
                     log.error("Failed to schedule incoming forward retry: attemptId={}: {}",
                             attempt.getId(), e.getMessage());
+                    // Leave as PENDING, push nextRetryAt forward to avoid tight retry loop
+                    attempt.setNextRetryAt(Instant.now().plusSeconds(30));
+                    attemptRepository.save(attempt);
                 }
             }
         } catch (Exception e) {

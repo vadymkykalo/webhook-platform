@@ -22,12 +22,17 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
            "WHERE d.status = 'PROCESSING' AND d.lastAttemptAt < :threshold")
     int resetStuckDeliveries(@Param("threshold") Instant threshold);
     
-    @Query(value = "SELECT * FROM deliveries WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now ORDER BY next_retry_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED",
-            nativeQuery = true)
+    @Query(value = """
+            SELECT * FROM (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY endpoint_id ORDER BY next_retry_at ASC) AS rn
+                FROM deliveries WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now
+            ) sub WHERE rn <= :maxPerEndpoint ORDER BY next_retry_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
     List<Delivery> findPendingRetriesForUpdate(
             @Param("status") Delivery.DeliveryStatus status,
             @Param("now") Instant now,
-            @Param("limit") int limit
+            @Param("limit") int limit,
+            @Param("maxPerEndpoint") int maxPerEndpoint
     );
 
     @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.status IN ('PENDING', 'PROCESSING')")
