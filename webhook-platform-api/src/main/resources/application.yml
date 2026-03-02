@@ -85,6 +85,11 @@ data-retention:
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
   limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
 
+replay:
+  batch-size: ${REPLAY_BATCH_SIZE:200}
+  batch-delay-ms: ${REPLAY_BATCH_DELAY_MS:50}
+  max-events-per-session: ${REPLAY_MAX_EVENTS_PER_SESSION:500000}
+
 auth:
   rate-limit:
     login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}

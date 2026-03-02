@@ -53,4 +53,62 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
+
+    // --- Event Time Machine: cursor-based scanning (no OFFSET, highload-safe) ---
+
+    @Query(value = """
+        SELECT e.* FROM events e
+        WHERE e.project_id = :projectId
+          AND e.created_at >= :fromDate AND e.created_at <= :toDate
+          AND (e.created_at, e.id) > (:cursorCreatedAt, :cursorId)
+        ORDER BY e.created_at, e.id
+        LIMIT :batchSize
+        """, nativeQuery = true)
+    List<Event> findByCursorForReplay(
+            @Param("projectId") UUID projectId,
+            @Param("fromDate") Instant fromDate,
+            @Param("toDate") Instant toDate,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") UUID cursorId,
+            @Param("batchSize") int batchSize);
+
+    @Query(value = """
+        SELECT e.* FROM events e
+        WHERE e.project_id = :projectId
+          AND e.created_at >= :fromDate AND e.created_at <= :toDate
+          AND e.event_type = :eventType
+          AND (e.created_at, e.id) > (:cursorCreatedAt, :cursorId)
+        ORDER BY e.created_at, e.id
+        LIMIT :batchSize
+        """, nativeQuery = true)
+    List<Event> findByCursorForReplayWithEventType(
+            @Param("projectId") UUID projectId,
+            @Param("fromDate") Instant fromDate,
+            @Param("toDate") Instant toDate,
+            @Param("eventType") String eventType,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") UUID cursorId,
+            @Param("batchSize") int batchSize);
+
+    @Query(value = """
+        SELECT COUNT(*) FROM events e
+        WHERE e.project_id = :projectId
+          AND e.created_at >= :fromDate AND e.created_at <= :toDate
+        """, nativeQuery = true)
+    long countForReplay(
+            @Param("projectId") UUID projectId,
+            @Param("fromDate") Instant fromDate,
+            @Param("toDate") Instant toDate);
+
+    @Query(value = """
+        SELECT COUNT(*) FROM events e
+        WHERE e.project_id = :projectId
+          AND e.created_at >= :fromDate AND e.created_at <= :toDate
+          AND e.event_type = :eventType
+        """, nativeQuery = true)
+    long countForReplayWithEventType(
+            @Param("projectId") UUID projectId,
+            @Param("fromDate") Instant fromDate,
+            @Param("toDate") Instant toDate,
+            @Param("eventType") String eventType);
 }

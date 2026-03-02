@@ -68,6 +68,9 @@ public class Delivery {
     @Column(name = "idempotency_key")
     private String idempotencyKey;
 
+    @Column(name = "replay_session_id")
+    private UUID replaySessionId;
+
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 

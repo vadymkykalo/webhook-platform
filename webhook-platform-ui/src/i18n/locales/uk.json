@@ -67,6 +67,7 @@
     "subscriptions": "Підписки",
     "apiKeys": "API Ключі",
     "analytics": "Аналітика",
+    "replay": "Машина часу",
     "dlq": "Черга мертвих листів",
     "testEndpoints": "Тестові ендпоінти",
     "incomingSources": "Вхідні джерела",
@@ -643,6 +644,81 @@
       "deliveries": "Доставки",
       "success": "Успішність",
       "latency": "Затримка"
+    }
+  },
+  "replay": {
+    "title": "Машина часу подій",
+    "subtitle": "Переграти події за часовий діапазон для <strong>{{project}}</strong>",
+    "projectNotFound": "Проєкт не знайдено",
+    "newReplay": "Нове переграшвання",
+    "estimate": "Оцінити",
+    "estimating": "Оцінка...",
+    "startReplay": "Почати переграшвання",
+    "starting": "Запуск...",
+    "cancel": "Скасувати",
+    "cancelling": "Скасування...",
+    "noSessions": "Немає сесій переграшвання",
+    "noSessionsDesc": "Створіть переграшвання для повторної доставки подій за обраний період",
+    "filters": {
+      "fromDate": "Від",
+      "toDate": "До",
+      "eventType": "Тип події",
+      "eventTypePlaceholder": "напр. order.created",
+      "endpoint": "Ендпоінт",
+      "allEndpoints": "Всі ендпоінти",
+      "sourceStatus": "Оригінальний статус",
+      "allStatuses": "Всі статуси"
+    },
+    "estimate_result": {
+      "title": "Оцінка переграшвання",
+      "totalEvents": "Подій для переграшвання",
+      "estimatedDeliveries": "Очікувані доставки",
+      "activeSubscriptions": "Активні підписки",
+      "warning": "Попередження"
+    },
+    "session": {
+      "status": "Статус",
+      "progress": "Прогрес",
+      "events": "Події",
+      "deliveries": "Створено доставок",
+      "errors": "Помилки",
+      "duration": "Тривалість",
+      "created": "Створено",
+      "started": "Розпочато",
+      "completed": "Завершено",
+      "cancelled": "Скасовано",
+      "timeRange": "Часовий діапазон",
+      "eventType": "Тип події",
+      "endpoint": "Ендпоінт",
+      "allTypes": "Всі типи",
+      "allEndpoints": "Всі ендпоінти"
+    },
+    "status": {
+      "PENDING": "Очікує",
+      "ESTIMATING": "Оцінка",
+      "RUNNING": "Виконується",
+      "COMPLETED": "Завершено",
+      "FAILED": "Помилка",
+      "CANCELLED": "Скасовано",
+      "CANCELLING": "Скасування"
+    },
+    "toast": {
+      "created": "Сесію переграшвання розпочато",
+      "cancelled": "Сесію переграшвання скасовано",
+      "estimateFailed": "Не вдалось оцінити переграшвання",
+      "createFailed": "Не вдалось розпочати переграшвання",
+      "cancelFailed": "Не вдалось скасувати переграшвання",
+      "loadFailed": "Не вдалось завантажити сесії"
+    },
+    "history": "Історія переграшвань",
+    "createNew": "Нова сесія переграшвання",
+    "confirmStart": "Це створить нові доставки для всіх відповідних подій. Існуючі доставки не змінюються. Продовжити?",
+    "quickRanges": {
+      "1h": "Остання година",
+      "6h": "Останні 6 годин",
+      "24h": "Останні 24 години",
+      "7d": "Останні 7 днів",
+      "custom": "Довільний"
     }
   },
   "dlq": {
@@ -1633,6 +1709,7 @@
     "subscriptions": "Підписки",
     "api-keys": "API Ключі",
     "analytics": "Аналітика",
+    "replay": "Машина часу",
     "dlq": "Черга мертвих листів",
     "test-endpoints": "Тестові ендпоінти",
     "incoming-sources": "Вхідні джерела",
