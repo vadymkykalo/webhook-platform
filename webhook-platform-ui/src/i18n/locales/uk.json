@@ -705,9 +705,12 @@
       "deleteFailed": "Не вдалося видалити",
       "urlCopied": "URL скопійовано",
       "loadFailed": "Не вдалося завантажити тестові ендпоінти",
-      "loadRequestsFailed": "Не вдалося завантажити запити"
+      "loadRequestsFailed": "Не вдалося завантажити запити",
+      "cleared": "Перехоплені запити очищено",
+      "clearFailed": "Не вдалося очистити запити"
     },
-    "refresh": "Оновити"
+    "refresh": "Оновити",
+    "clearRequests": "Очистити"
   },
   "landing": {
     "nav": {
