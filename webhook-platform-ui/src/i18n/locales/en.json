@@ -67,6 +67,7 @@
     "subscriptions": "Subscriptions",
     "apiKeys": "API Keys",
     "analytics": "Analytics",
+    "replay": "Time Machine",
     "dlq": "Dead Letter Queue",
     "testEndpoints": "Test Endpoints",
     "incomingSources": "Incoming Sources",
@@ -643,6 +644,81 @@
       "deliveries": "Deliveries",
       "success": "Success",
       "latency": "Latency"
+    }
+  },
+  "replay": {
+    "title": "Event Time Machine",
+    "subtitle": "Replay events by time range for <strong>{{project}}</strong>",
+    "projectNotFound": "Project not found",
+    "newReplay": "New Replay",
+    "estimate": "Estimate",
+    "estimating": "Estimating...",
+    "startReplay": "Start Replay",
+    "starting": "Starting...",
+    "cancel": "Cancel Replay",
+    "cancelling": "Cancelling...",
+    "noSessions": "No replay sessions",
+    "noSessionsDesc": "Create a replay to re-deliver events from a specific time range",
+    "filters": {
+      "fromDate": "From",
+      "toDate": "To",
+      "eventType": "Event Type",
+      "eventTypePlaceholder": "e.g. order.created",
+      "endpoint": "Endpoint",
+      "allEndpoints": "All Endpoints",
+      "sourceStatus": "Original Status",
+      "allStatuses": "All Statuses"
+    },
+    "estimate_result": {
+      "title": "Replay Estimate",
+      "totalEvents": "Events to replay",
+      "estimatedDeliveries": "Estimated deliveries",
+      "activeSubscriptions": "Active subscriptions",
+      "warning": "Warning"
+    },
+    "session": {
+      "status": "Status",
+      "progress": "Progress",
+      "events": "Events",
+      "deliveries": "Deliveries created",
+      "errors": "Errors",
+      "duration": "Duration",
+      "created": "Created",
+      "started": "Started",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "timeRange": "Time range",
+      "eventType": "Event type",
+      "endpoint": "Endpoint",
+      "allTypes": "All types",
+      "allEndpoints": "All endpoints"
+    },
+    "status": {
+      "PENDING": "Pending",
+      "ESTIMATING": "Estimating",
+      "RUNNING": "Running",
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled",
+      "CANCELLING": "Cancelling"
+    },
+    "toast": {
+      "created": "Replay session started",
+      "cancelled": "Replay session cancelled",
+      "estimateFailed": "Failed to estimate replay",
+      "createFailed": "Failed to start replay",
+      "cancelFailed": "Failed to cancel replay",
+      "loadFailed": "Failed to load replay sessions"
+    },
+    "history": "Replay History",
+    "createNew": "New Replay Session",
+    "confirmStart": "This will create new deliveries for all matching events. Existing deliveries are not affected. Continue?",
+    "quickRanges": {
+      "1h": "Last hour",
+      "6h": "Last 6 hours",
+      "24h": "Last 24 hours",
+      "7d": "Last 7 days",
+      "custom": "Custom"
     }
   },
   "dlq": {
@@ -1633,6 +1709,7 @@
     "subscriptions": "Subscriptions",
     "api-keys": "API Keys",
     "analytics": "Analytics",
+    "replay": "Time Machine",
     "dlq": "Dead Letter Queue",
     "test-endpoints": "Test Endpoints",
     "incoming-sources": "Incoming Sources",

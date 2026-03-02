@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -57,6 +57,7 @@ const getProjectToolsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
   { nameKey: 'nav.apiKeys', path: `/admin/projects/${projectId}/api-keys`, icon: Key },
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
+  { nameKey: 'nav.replay', path: `/admin/projects/${projectId}/replay`, icon: History },
   { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
   { nameKey: 'nav.testEndpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
@@ -112,6 +113,7 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   subscriptions: { key: 'breadcrumb.subscriptions', icon: Bell },
   'api-keys': { key: 'breadcrumb.api-keys', icon: Key },
   analytics: { key: 'breadcrumb.analytics', icon: BarChart3 },
+  replay: { key: 'breadcrumb.replay', icon: History },
   dlq: { key: 'breadcrumb.dlq', icon: AlertTriangle },
   'test-endpoints': { key: 'breadcrumb.test-endpoints', icon: TestTube },
   'incoming-sources': { key: 'breadcrumb.incoming-sources', icon: ArrowDownToLine },
