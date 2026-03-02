@@ -1875,7 +1875,7 @@ dest = client.incoming_sources.create_destination(
   );
 }
 
-function SchemaRegistryDocs({ activeLanguage, setActiveLanguage }: { activeLanguage: 'curl' | 'node' | 'python'; setActiveLanguage: (l: 'curl' | 'node' | 'python') => void }) {
+function SchemaRegistryDocs(_props: { activeLanguage: 'curl' | 'node' | 'python'; setActiveLanguage: (l: 'curl' | 'node' | 'python') => void }) {
   const { t } = useTranslation();
 
   const createEventTypeCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/schemas \\
