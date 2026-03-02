@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
+import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
@@ -34,6 +35,8 @@ public class EventIngestService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
+    private final SchemaRegistryService schemaRegistryService;
+    private final ProjectRepository projectRepository;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
 
@@ -45,6 +48,8 @@ public class EventIngestService {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
+            SchemaRegistryService schemaRegistryService,
+            ProjectRepository projectRepository,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
         this.eventRepository = eventRepository;
@@ -54,6 +59,8 @@ public class EventIngestService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
+        this.schemaRegistryService = schemaRegistryService;
+        this.projectRepository = projectRepository;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
     }
@@ -89,6 +96,23 @@ public class EventIngestService {
         event = eventRepository.saveAndFlush(event);
         Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
         log.info("Created event: {} for project: {}", event.getId(), projectId);
+
+        // Schema validation (optional, per-project setting)
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project != null && Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
+            schemaRegistryService.autoDiscover(projectId, request.getType(), event.getPayload());
+
+            List<String> validationErrors = schemaRegistryService.validatePayload(
+                    projectId, request.getType(), event.getPayload());
+            if (!validationErrors.isEmpty()) {
+                log.warn("Schema validation failed for event {} (type '{}'): {}",
+                        event.getId(), request.getType(), validationErrors);
+                if (project.getSchemaValidationPolicy() == SchemaValidationPolicy.BLOCK) {
+                    throw new IllegalArgumentException(
+                            "Schema validation failed: " + String.join("; ", validationErrors));
+                }
+            }
+        }
 
         List<Subscription> subscriptions = subscriptionRepository
                 .findByProjectIdAndEnabledTrue(projectId).stream()

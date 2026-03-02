@@ -31,6 +31,7 @@ const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
 const IncomingSourceDetailPage = lazy(() => import('./pages/IncomingSourceDetailPage'));
 const IncomingEventsPage = lazy(() => import('./pages/IncomingEventsPage'));
+const SchemasPage = lazy(() => import('./pages/SchemasPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoader() {
@@ -150,6 +151,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/incoming-events',
         element: <S><IncomingEventsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/schemas',
+        element: <S><SchemasPage /></S>,
       },
       {
         path: 'members',

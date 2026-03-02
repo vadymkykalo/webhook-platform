@@ -13,6 +13,7 @@ import { auditLogApi } from './auditLog.api';
 import { incomingSourcesApi } from './incomingSources.api';
 import { incomingDestinationsApi } from './incomingDestinations.api';
 import { incomingEventsApi, type IncomingEventFilters } from './incomingEvents.api';
+import { schemasApi, type EventTypeCatalogRequest, type EventSchemaVersionRequest } from './schemas.api';
 import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
@@ -68,6 +69,12 @@ export const queryKeys = {
         list: (projectId: string, filters: IncomingEventFilters) => ['incoming-events', projectId, filters] as const,
         detail: (projectId: string, id: string) => ['incoming-events', projectId, id] as const,
         attempts: (projectId: string, eventId: string) => ['incoming-events', projectId, eventId, 'attempts'] as const,
+    },
+    schemas: {
+        eventTypes: (projectId: string) => ['schemas', projectId] as const,
+        versions: (projectId: string, eventTypeId: string) => ['schemas', projectId, eventTypeId, 'versions'] as const,
+        changes: (projectId: string, eventTypeId: string) => ['schemas', projectId, eventTypeId, 'changes'] as const,
+        projectChanges: (projectId: string) => ['schemas', projectId, 'all-changes'] as const,
     },
 } as const;
 
@@ -534,5 +541,98 @@ export function useBulkReplayIncomingEvents(projectId: string) {
     return useMutation({
         mutationFn: (request: IncomingBulkReplayRequest) => incomingEventsApi.bulkReplay(projectId, request),
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-events', projectId] }); },
+    });
+}
+
+// ─── Schema Registry ─────────────────────────────────────────────
+
+export function useEventTypes(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.schemas.eventTypes(projectId!),
+        queryFn: () => schemasApi.listEventTypes(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useCreateEventType(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: EventTypeCatalogRequest) => schemasApi.createEventType(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) }); },
+    });
+}
+
+export function useDeleteEventType(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => schemasApi.deleteEventType(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) }); },
+    });
+}
+
+export function useSchemaVersions(projectId: string | undefined, eventTypeId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.schemas.versions(projectId!, eventTypeId!),
+        queryFn: () => schemasApi.listVersions(projectId!, eventTypeId!),
+        enabled: !!projectId && !!eventTypeId,
+    });
+}
+
+export function useCreateSchemaVersion(projectId: string, eventTypeId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: EventSchemaVersionRequest) => schemasApi.createVersion(projectId, eventTypeId, data),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.versions(projectId, eventTypeId) });
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) });
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.changes(projectId, eventTypeId) });
+        },
+    });
+}
+
+export function usePromoteSchema(projectId: string, eventTypeId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (versionId: string) => schemasApi.promoteVersion(projectId, eventTypeId, versionId),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.versions(projectId, eventTypeId) });
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) });
+        },
+    });
+}
+
+export function useDeprecateSchema(projectId: string, eventTypeId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (versionId: string) => schemasApi.deprecateVersion(projectId, eventTypeId, versionId),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.versions(projectId, eventTypeId) });
+            qc.invalidateQueries({ queryKey: queryKeys.schemas.eventTypes(projectId) });
+        },
+    });
+}
+
+export function useSchemaChanges(projectId: string | undefined, eventTypeId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.schemas.changes(projectId!, eventTypeId!),
+        queryFn: () => schemasApi.listChanges(projectId!, eventTypeId!),
+        enabled: !!projectId && !!eventTypeId,
+    });
+}
+
+export function useProjectSchemaChanges(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.schemas.projectChanges(projectId!),
+        queryFn: () => schemasApi.listProjectChanges(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useUpdateProject(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: { name: string; description?: string; schemaValidationEnabled?: boolean; schemaValidationPolicy?: string }) =>
+            projectsApi.update(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) }); },
     });
 }

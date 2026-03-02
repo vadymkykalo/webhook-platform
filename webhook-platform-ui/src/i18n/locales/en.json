@@ -83,7 +83,8 @@
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
     "logout": "Logout",
-    "loggedOut": "Logged out successfully"
+    "loggedOut": "Logged out successfully",
+    "schemas": "Schemas"
   },
   "auth": {
     "login": {
@@ -1539,7 +1540,73 @@
     "incoming-events": "Incoming Events",
     "members": "Members",
     "audit-log": "Audit Log",
-    "settings": "Settings"
+    "settings": "Settings",
+    "schemas": "Schemas"
+  },
+  "schemas": {
+    "title": "Schema Registry",
+    "subtitle": "Manage event type contracts, versioned schemas, and track breaking changes",
+    "eventTypes": "Event Types",
+    "addType": "Add Type",
+    "eventTypeName": "Event type name",
+    "eventTypeNameHint": "Use dot notation, e.g. order.created, user.updated",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description of this event type",
+    "searchTypes": "Filter event types…",
+    "noSearchResults": "No event types match your search",
+    "noEventTypes": "No event types registered",
+    "noEventTypesHint": "Create one manually or send an event — schemas are auto-discovered",
+    "eventTypeCreated": "Event type created",
+    "eventTypeDeleted": "Event type deleted",
+    "createFailed": "Failed to create event type",
+    "deleteFailed": "Failed to delete event type",
+    "confirmDelete": "Delete event type \"{{name}}\" and all its schema versions?",
+    "created": "Created",
+    "latestVersion": "Latest",
+    "versions": "Versions",
+    "changeHistory": "Change History",
+    "uploadSchema": "Upload Schema",
+    "jsonSchema": "JSON Schema",
+    "versionNote": "Version note",
+    "versionNotePlaceholder": "What changed in this version?",
+    "uploadVersion": "Upload",
+    "uploadHint": "Schema will be fingerprinted and diffed automatically",
+    "invalidJson": "Invalid JSON — please check your schema",
+    "versionCreated": "Schema version created",
+    "createVersionFailed": "Failed to create schema version",
+    "noVersions": "No schema versions yet",
+    "noVersionsHint": "Upload a JSON schema or send an event to auto-discover one",
+    "promote": "Activate",
+    "deprecate": "Deprecate",
+    "versionPromoted": "Schema version activated",
+    "versionDeprecated": "Schema version deprecated",
+    "promoteFailed": "Failed to activate schema",
+    "deprecateFailed": "Failed to deprecate schema",
+    "copySchema": "Copy",
+    "noChanges": "No schema changes recorded",
+    "noChangesHint": "Changes appear when new schema versions are uploaded",
+    "breakingChange": "Breaking",
+    "selectEventType": "Select an event type",
+    "selectEventTypeHint": "Choose an event type from the left panel to view its schemas and history",
+    "board": {
+      "title": "Recent Changes",
+      "breakingCount": "breaking",
+      "added": "added",
+      "removed": "removed",
+      "changed": "changed",
+      "showAll": "Show all {{count}} changes",
+      "showLess": "Show less"
+    },
+    "validation": {
+      "title": "Schema Validation",
+      "description": "Validate incoming events against active schemas",
+      "enabled": "Schema validation enabled",
+      "enabledHint": "When enabled, incoming events are validated against the active schema for their event type",
+      "policy": "Validation policy",
+      "policyWarn": "Warn — log validation errors but accept the event",
+      "policyBlock": "Block — reject events that fail schema validation",
+      "saved": "Schema validation settings saved"
+    }
   },
   "onboarding": {
     "title": "Getting Started",
@@ -1639,3 +1706,4 @@
     "newUserHint": "Don't have an account yet? Register first, then you'll be redirected back to accept the invite."
   }
 }
+

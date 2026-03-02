@@ -1,6 +1,5 @@
 package com.webhook.platform.api.domain.entity;
 
-import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -10,23 +9,23 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "projects")
+@Table(name = "event_type_catalog")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Project {
+public class EventTypeCatalog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "project_id", nullable = false)
+    private UUID projectId;
+
     @Column(nullable = false)
     private String name;
-
-    @Column(name = "organization_id", nullable = false)
-    private UUID organizationId;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -39,15 +38,7 @@ public class Project {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
-
-    @Column(name = "schema_validation_enabled", nullable = false)
-    @Builder.Default
-    private Boolean schemaValidationEnabled = false;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "schema_validation_policy", nullable = false, length = 10)
-    @Builder.Default
-    private SchemaValidationPolicy schemaValidationPolicy = SchemaValidationPolicy.WARN;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id", insertable = false, updatable = false)
+    private Project project;
 }
