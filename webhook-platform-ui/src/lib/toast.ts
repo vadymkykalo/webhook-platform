@@ -55,6 +55,7 @@ const STATUS_MESSAGE_KEYS: Record<number, string> = {
   404: 'toast.errors.notFound',
   409: 'toast.errors.conflict',
   422: 'toast.errors.validation',
+  413: 'toast.errors.payloadTooLarge',
   429: 'toast.errors.tooManyRequests',
   500: 'toast.errors.server',
   502: 'toast.errors.server',

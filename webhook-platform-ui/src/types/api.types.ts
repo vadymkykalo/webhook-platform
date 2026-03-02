@@ -51,6 +51,7 @@ export interface ProjectRequest {
   description?: string;
   schemaValidationEnabled?: boolean;
   schemaValidationPolicy?: string;
+  idempotencyPolicy?: string;
 }
 
 export interface ProjectResponse {
@@ -60,6 +61,7 @@ export interface ProjectResponse {
   organizationId: string;
   schemaValidationEnabled: boolean;
   schemaValidationPolicy: string;
+  idempotencyPolicy: string;
   createdAt: string;
   updatedAt: string;
 }

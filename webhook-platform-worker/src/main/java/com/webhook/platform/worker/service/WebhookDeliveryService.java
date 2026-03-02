@@ -275,6 +275,10 @@ public class WebhookDeliveryService {
                 ? mtlsWebClientFactory.getWebClient(endpoint) 
                 : defaultWebClient;
         
+        String idempotencyKey = delivery.getIdempotencyKey() != null 
+                ? delivery.getIdempotencyKey() 
+                : event.getId().toString() + "-" + delivery.getEndpointId().toString();
+        
         var requestSpec = client.post()
                 .uri(endpoint.getUrl())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -282,7 +286,8 @@ public class WebhookDeliveryService {
                 .header("X-Event-Id", event.getId().toString())
                 .header("X-Delivery-Id", delivery.getId().toString())
                 .header("X-Timestamp", String.valueOf(timestamp))
-                .header("X-Sequence-Number", sequenceHeader);
+                .header("X-Sequence-Number", sequenceHeader)
+                .header("Idempotency-Key", idempotencyKey);
         
         // Add custom headers if configured
         addCustomHeaders(requestSpec, delivery.getCustomHeaders());

@@ -22,4 +22,6 @@ public class ProjectRequest {
     private Boolean schemaValidationEnabled;
 
     private String schemaValidationPolicy;
+
+    private String idempotencyPolicy;
 }

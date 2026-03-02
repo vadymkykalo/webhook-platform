@@ -52,7 +52,7 @@ class RequestSizeLimitFilterTest {
 
         verify(response).setStatus(413);
         verify(filterChain, never()).doFilter(any(), any());
-        assertTrue(sw.toString().contains("PAYLOAD_TOO_LARGE"));
+        assertTrue(sw.toString().contains("payload_too_large"));
     }
 
     @Test
@@ -90,7 +90,7 @@ class RequestSizeLimitFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(response).setStatus(413);
-        assertTrue(sw.toString().contains("PAYLOAD_TOO_LARGE"));
+        assertTrue(sw.toString().contains("payload_too_large"));
     }
 
     @Test

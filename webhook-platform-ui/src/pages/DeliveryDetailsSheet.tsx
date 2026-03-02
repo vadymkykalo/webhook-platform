@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import { useTranslation } from 'react-i18next';
 import { deliveriesApi } from '../api/deliveries.api';
+import type { DryRunReplayResponse } from '../api/deliveries.api';
 import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -46,6 +47,9 @@ export default function DeliveryDetailsSheet({
   const [attemptsLoading, setAttemptsLoading] = useState(false);
   const [showReplayDialog, setShowReplayDialog] = useState(false);
   const [replaying, setReplaying] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<DryRunReplayResponse | null>(null);
+  const [dryRunLoading, setDryRunLoading] = useState(false);
+  const [replayFromStep, setReplayFromStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (deliveryId && open) {
@@ -88,9 +92,15 @@ export default function DeliveryDetailsSheet({
 
     setReplaying(true);
     try {
-      await deliveriesApi.replay(deliveryId);
+      if (replayFromStep !== null) {
+        await deliveriesApi.replayFromAttempt(deliveryId, replayFromStep);
+      } else {
+        await deliveriesApi.replay(deliveryId);
+      }
       showSuccess(t('deliveryDetails.toast.replaySuccess'));
       setShowReplayDialog(false);
+      setReplayFromStep(null);
+      setDryRunResult(null);
       onRefresh();
       loadDelivery();
       loadAttempts();
@@ -98,6 +108,20 @@ export default function DeliveryDetailsSheet({
       showApiError(err, 'deliveryDetails.toast.replayFailed');
     } finally {
       setReplaying(false);
+    }
+  };
+
+  const handleDryRun = async () => {
+    if (!deliveryId) return;
+
+    setDryRunLoading(true);
+    try {
+      const result = await deliveriesApi.dryRunReplay(deliveryId);
+      setDryRunResult(result);
+    } catch (err: any) {
+      showApiError(err, 'deliveryDetails.toast.dryRunFailed');
+    } finally {
+      setDryRunLoading(false);
     }
   };
 
@@ -352,7 +376,47 @@ export default function DeliveryDetailsSheet({
                 </CardContent>
               </Card>
 
+              {dryRunResult && (
+                <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Eye className="h-4 w-4 text-blue-600" />
+                      {t('deliveryDetails.dryRun.title')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.plan')}</span>
+                      <span className="font-mono text-xs max-w-[60%] text-right">{dryRunResult.plan}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.endpoint')}</span>
+                      <span className="font-mono text-xs truncate max-w-[60%]">{dryRunResult.endpointUrl}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.idempotencyKey')}</span>
+                      <span className="font-mono text-xs truncate max-w-[60%]">{dryRunResult.idempotencyKey}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('deliveryDetails.dryRun.eventType')}</span>
+                      <span className="font-mono text-xs">{dryRunResult.eventType}</span>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setDryRunResult(null)} className="w-full mt-2">
+                      {t('deliveryDetails.dryRun.dismiss')}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="flex gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleDryRun}
+                  disabled={delivery.status === 'SUCCESS' || dryRunLoading}
+                >
+                  {dryRunLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+                  {t('deliveryDetails.dryRun.button')}
+                </Button>
                 <Button
                   onClick={() => setShowReplayDialog(true)}
                   disabled={delivery.status === 'SUCCESS'}
@@ -362,6 +426,29 @@ export default function DeliveryDetailsSheet({
                   {t('deliveryDetails.replayDelivery')}
                 </Button>
               </div>
+
+              {delivery.attemptCount > 1 && delivery.status !== 'SUCCESS' && (
+                <div className="pt-2">
+                  <p className="text-xs text-muted-foreground mb-2">{t('deliveryDetails.replayFromStep.label')}</p>
+                  <div className="flex gap-1 flex-wrap">
+                    {Array.from({ length: delivery.attemptCount }, (_, i) => i + 1).map((step) => (
+                      <Button
+                        key={step}
+                        variant={replayFromStep === step ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs h-7 px-2"
+                        onClick={() => {
+                          setReplayFromStep(replayFromStep === step ? null : step);
+                          setShowReplayDialog(true);
+                        }}
+                      >
+                        <SkipForward className="mr-1 h-3 w-3" />
+                        {t('deliveryDetails.replayFromStep.step', { number: step })}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center py-16">
@@ -376,7 +463,9 @@ export default function DeliveryDetailsSheet({
           <AlertDialogHeader>
             <AlertDialogTitle>{t('deliveryDetails.replayDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('deliveryDetails.replayDialog.description')}
+              {replayFromStep !== null
+                ? t('deliveryDetails.replayDialog.description') + ' ' + t('deliveryDetails.replayFromStep.step', { number: replayFromStep })
+                : t('deliveryDetails.replayDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

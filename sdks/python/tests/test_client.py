@@ -74,6 +74,35 @@ class TestHookflowClient:
         assert client.deliveries is not None
 
 
+class TestGenericRequestMethods:
+    """Tests for generic request methods."""
+
+    def test_exposes_get_method(self):
+        """Should expose public get method."""
+        client = Hookflow(api_key="test_api_key")
+        assert callable(client.get)
+
+    def test_exposes_post_method(self):
+        """Should expose public post method."""
+        client = Hookflow(api_key="test_api_key")
+        assert callable(client.post)
+
+    def test_exposes_put_method(self):
+        """Should expose public put method."""
+        client = Hookflow(api_key="test_api_key")
+        assert callable(client.put)
+
+    def test_exposes_patch_method(self):
+        """Should expose public patch method."""
+        client = Hookflow(api_key="test_api_key")
+        assert callable(client.patch)
+
+    def test_exposes_delete_method(self):
+        """Should expose public delete method."""
+        client = Hookflow(api_key="test_api_key")
+        assert callable(client.delete)
+
+
 class TestErrorClasses:
     """Tests for error classes."""
 

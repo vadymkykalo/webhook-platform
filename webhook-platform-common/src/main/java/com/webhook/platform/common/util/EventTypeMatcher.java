@@ -91,7 +91,7 @@ public final class EventTypeMatcher {
         if (pattern == null || pattern.isBlank()) {
             return false;
         }
-        String[] parts = pattern.split("\\.");
+        String[] parts = pattern.split("\\.", -1);
         for (String part : parts) {
             if (part.isEmpty()) {
                 return false;

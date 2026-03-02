@@ -72,7 +72,7 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
         response.setContentType("application/json");
         response.getWriter().write(
-                "{\"error\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds maximum allowed size of "
+                "{\"error\":\"payload_too_large\",\"message\":\"Request body exceeds maximum allowed size of "
                         + maxPayloadSizeBytes + " bytes\",\"status\":413}");
     }
 

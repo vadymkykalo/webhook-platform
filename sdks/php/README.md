@@ -345,6 +345,67 @@ try {
 }
 ```
 
+### Error Response Format
+
+All API errors return a consistent JSON body:
+
+```json
+{
+  "error": "error_code",
+  "message": "Human-readable description",
+  "status": 400,
+  "fieldErrors": { "field": "reason" }
+}
+```
+
+- **`error`** — machine-readable error code (`snake_case`), always present
+- **`message`** — human-readable description, always present
+- **`status`** — HTTP status code (integer), always present
+- **`fieldErrors`** — field-level validation details (only present for `validation_error`)
+
+### Error Codes Reference
+
+| HTTP Status | `error` Code | SDK Exception | Description |
+|---|---|---|---|
+| 400 | `validation_error` | `ValidationException` | Invalid request parameters; see `fieldErrors` |
+| 400 | `invalid_request` | `HookflowException` | Malformed or semantically invalid request |
+| 401 | `unauthorized` | `AuthenticationException` | Missing or invalid API key / expired token |
+| 403 | `forbidden` | `HookflowException` | Insufficient permissions for the action |
+| 404 | `not_found` | `NotFoundException` | Requested resource does not exist |
+| 413 | `payload_too_large` | `HookflowException` | Request body exceeds maximum allowed size |
+| 422 | `unprocessable_entity` | `HookflowException` | Valid syntax but violates business rules |
+| 429 | `rate_limit_exceeded` | `RateLimitException` | Too many requests; check `X-RateLimit-*` headers |
+| 500 | `internal_error` | `HookflowException` | Unexpected server error |
+
+## Generic Requests
+
+As the API expands, you can call any endpoint directly without waiting for SDK updates:
+
+```php
+// GET
+$schemas = $client->get('/api/v1/projects/proj_123/schemas');
+
+// GET with query params
+$items = $client->get('/api/v1/projects/proj_123/items', ['status' => 'active']);
+
+// POST with body and idempotency key
+$result = $client->post('/api/v1/some/new/endpoint', ['key' => 'value'], 'unique-key');
+
+// PUT
+$client->put('/api/v1/projects/proj_123/settings', ['timezone' => 'UTC']);
+
+// PATCH
+$client->patch('/api/v1/projects/proj_123/settings', ['timezone' => 'UTC']);
+
+// DELETE
+$client->delete('/api/v1/projects/proj_123/tags/old-tag');
+
+// Fully custom request (any HTTP method)
+$data = $client->request('OPTIONS', '/api/v1/some/path');
+```
+
+All generic methods use the same authentication, error handling, and rate-limit logic as the built-in methods.
+
 ## Configuration
 
 ```php

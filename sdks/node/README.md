@@ -279,6 +279,64 @@ try {
 }
 ```
 
+### Error Response Format
+
+All API errors return a consistent JSON body:
+
+```json
+{
+  "error": "error_code",
+  "message": "Human-readable description",
+  "status": 400,
+  "fieldErrors": { "field": "reason" }
+}
+```
+
+- **`error`** — machine-readable error code (`snake_case`), always present
+- **`message`** — human-readable description, always present
+- **`status`** — HTTP status code (integer), always present
+- **`fieldErrors`** — field-level validation details (only present for `validation_error`)
+
+### Error Codes Reference
+
+| HTTP Status | `error` Code | SDK Exception | Description |
+|---|---|---|---|
+| 400 | `validation_error` | `ValidationError` | Invalid request parameters; see `fieldErrors` |
+| 400 | `invalid_request` | `HookflowError` | Malformed or semantically invalid request |
+| 401 | `unauthorized` | `AuthenticationError` | Missing or invalid API key / expired token |
+| 403 | `forbidden` | `HookflowError` | Insufficient permissions for the action |
+| 404 | `not_found` | `NotFoundError` | Requested resource does not exist |
+| 413 | `payload_too_large` | `HookflowError` | Request body exceeds maximum allowed size |
+| 422 | `unprocessable_entity` | `HookflowError` | Valid syntax but violates business rules |
+| 429 | `rate_limit_exceeded` | `RateLimitError` | Too many requests; check `X-RateLimit-*` headers |
+| 500 | `internal_error` | `HookflowError` | Unexpected server error |
+
+## Generic Requests
+
+As the API expands, you can call any endpoint directly without waiting for SDK updates:
+
+```typescript
+// GET
+const schemas = await client.get<any[]>('/api/v1/projects/proj_123/schemas');
+
+// POST with body and idempotency key
+const result = await client.post('/api/v1/some/new/endpoint', { key: 'value' }, 'idempotency-key');
+
+// PUT
+await client.put('/api/v1/projects/proj_123/settings', { timezone: 'UTC' });
+
+// PATCH
+await client.patch('/api/v1/projects/proj_123/settings', { timezone: 'UTC' });
+
+// DELETE
+await client.delete('/api/v1/projects/proj_123/tags/old-tag');
+
+// Fully custom request (any HTTP method)
+const data = await client.request<any>('OPTIONS', '/api/v1/some/path');
+```
+
+All generic methods use the same authentication, error handling, and rate-limit logic as the built-in methods.
+
 ## Configuration
 
 ```typescript

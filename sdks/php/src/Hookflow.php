@@ -13,7 +13,7 @@ use Hookflow\Api\IncomingEvents;
 
 class Hookflow
 {
-    private const SDK_VERSION = '2.0.0';
+    private const SDK_VERSION = '2.1.0';
 
     private string $apiKey;
     private string $baseUrl;
@@ -45,6 +45,46 @@ class Hookflow
         $this->deliveries = new Deliveries($this);
         $this->incomingSources = new IncomingSources($this);
         $this->incomingEvents = new IncomingEvents($this);
+    }
+
+    /**
+     * Generic GET request. Use for endpoints not yet covered by the SDK.
+     */
+    public function get(string $path, ?array $queryParams = null): mixed
+    {
+        return $this->request('GET', $path, queryParams: $queryParams);
+    }
+
+    /**
+     * Generic POST request. Use for endpoints not yet covered by the SDK.
+     */
+    public function post(string $path, ?array $body = null, ?string $idempotencyKey = null): mixed
+    {
+        return $this->request('POST', $path, body: $body, idempotencyKey: $idempotencyKey);
+    }
+
+    /**
+     * Generic PUT request. Use for endpoints not yet covered by the SDK.
+     */
+    public function put(string $path, ?array $body = null): mixed
+    {
+        return $this->request('PUT', $path, body: $body);
+    }
+
+    /**
+     * Generic PATCH request. Use for endpoints not yet covered by the SDK.
+     */
+    public function patch(string $path, ?array $body = null): mixed
+    {
+        return $this->request('PATCH', $path, body: $body);
+    }
+
+    /**
+     * Generic DELETE request. Use for endpoints not yet covered by the SDK.
+     */
+    public function delete(string $path): mixed
+    {
+        return $this->request('DELETE', $path);
     }
 
     public function request(
@@ -88,6 +128,12 @@ class Hookflow
                 break;
             case 'PUT':
                 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+                if ($body !== null) {
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+                }
+                break;
+            case 'PATCH':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
                 if ($body !== null) {
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
                 }

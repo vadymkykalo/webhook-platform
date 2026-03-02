@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight, Eraser } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
@@ -33,6 +33,7 @@ export default function TestEndpointsPage() {
   const [requests, setRequests] = useState<CapturedRequestResponse[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -103,6 +104,21 @@ export default function TestEndpointsPage() {
     } finally {
       setDeleting(false);
       setDeleteId(null);
+    }
+  };
+
+  const handleClearRequests = async () => {
+    if (!selectedEndpoint || !projectId) return;
+    try {
+      setClearing(true);
+      await testEndpointsApi.clearRequests(projectId, selectedEndpoint);
+      setRequests([]);
+      setEndpoints(endpoints.map(e => e.id === selectedEndpoint ? { ...e, requestCount: 0 } : e));
+      showSuccess(t('testEndpoints.toast.cleared'));
+    } catch (err: any) {
+      showApiError(err, 'testEndpoints.toast.clearFailed');
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -220,9 +236,16 @@ export default function TestEndpointsPage() {
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('testEndpoints.capturedRequests')}</p>
             {selectedEndpoint && (
-              <Button variant="outline" size="sm" onClick={() => loadRequests(selectedEndpoint)} disabled={loadingRequests}>
-                <RefreshCw className={`h-3.5 w-3.5 ${loadingRequests ? 'animate-spin' : ''}`} /> {t('testEndpoints.refresh')}
-              </Button>
+              <div className="flex gap-2">
+                {canManageTestEndpoints && requests.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleClearRequests} disabled={clearing} className="text-destructive hover:text-destructive">
+                    {clearing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eraser className="h-3.5 w-3.5" />} {t('testEndpoints.clearRequests')}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => loadRequests(selectedEndpoint)} disabled={loadingRequests}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingRequests ? 'animate-spin' : ''}`} /> {t('testEndpoints.refresh')}
+                </Button>
+              </div>
             )}
           </div>
 

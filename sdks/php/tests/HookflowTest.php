@@ -65,6 +65,45 @@ class HookflowTest extends TestCase
     }
 }
 
+class GenericRequestMethodsTest extends TestCase
+{
+    public function testExposeGetMethod(): void
+    {
+        $client = new Hookflow('test_api_key');
+        $this->assertTrue(method_exists($client, 'get'));
+    }
+
+    public function testExposePostMethod(): void
+    {
+        $client = new Hookflow('test_api_key');
+        $this->assertTrue(method_exists($client, 'post'));
+    }
+
+    public function testExposePutMethod(): void
+    {
+        $client = new Hookflow('test_api_key');
+        $this->assertTrue(method_exists($client, 'put'));
+    }
+
+    public function testExposePatchMethod(): void
+    {
+        $client = new Hookflow('test_api_key');
+        $this->assertTrue(method_exists($client, 'patch'));
+    }
+
+    public function testExposeDeleteMethod(): void
+    {
+        $client = new Hookflow('test_api_key');
+        $this->assertTrue(method_exists($client, 'delete'));
+    }
+
+    public function testExposeRequestMethod(): void
+    {
+        $client = new Hookflow('test_api_key');
+        $this->assertTrue(method_exists($client, 'request'));
+    }
+}
+
 class ExceptionTest extends TestCase
 {
     public function testHookflowException(): void

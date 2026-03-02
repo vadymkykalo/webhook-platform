@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
 import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ProjectRequest;
@@ -79,6 +80,13 @@ public class ProjectService {
             } catch (IllegalArgumentException ignored) {
             }
         }
+        if (request.getIdempotencyPolicy() != null) {
+            try {
+                project.setIdempotencyPolicy(
+                        IdempotencyPolicy.valueOf(request.getIdempotencyPolicy().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         project = projectRepository.save(project);
 
         return mapToResponse(project);
@@ -105,6 +113,7 @@ public class ProjectService {
                 .description(project.getDescription())
                 .schemaValidationEnabled(project.getSchemaValidationEnabled())
                 .schemaValidationPolicy(project.getSchemaValidationPolicy().name())
+                .idempotencyPolicy(project.getIdempotencyPolicy().name())
                 .createdAt(project.getCreatedAt())
                 .updatedAt(project.getUpdatedAt())
                 .build();

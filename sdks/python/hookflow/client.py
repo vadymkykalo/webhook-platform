@@ -37,7 +37,7 @@ from .errors import (
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 30
-SDK_VERSION = "2.0.0"
+SDK_VERSION = "2.1.0"
 
 
 class Hookflow:
@@ -62,6 +62,31 @@ class Hookflow:
         self.deliveries = Deliveries(self)
         self.incoming_sources = IncomingSources(self)
         self.incoming_events = IncomingEventsApi(self)
+
+    def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        """Generic GET request. Use for endpoints not yet covered by the SDK."""
+        return self._request("GET", path, params=params)
+
+    def post(
+        self,
+        path: str,
+        body: Optional[Dict[str, Any]] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Any:
+        """Generic POST request. Use for endpoints not yet covered by the SDK."""
+        return self._request("POST", path, body=body, idempotency_key=idempotency_key)
+
+    def put(self, path: str, body: Optional[Dict[str, Any]] = None) -> Any:
+        """Generic PUT request. Use for endpoints not yet covered by the SDK."""
+        return self._request("PUT", path, body=body)
+
+    def patch(self, path: str, body: Optional[Dict[str, Any]] = None) -> Any:
+        """Generic PATCH request. Use for endpoints not yet covered by the SDK."""
+        return self._request("PATCH", path, body=body)
+
+    def delete(self, path: str) -> Any:
+        """Generic DELETE request. Use for endpoints not yet covered by the SDK."""
+        return self._request("DELETE", path)
 
     def _request(
         self,

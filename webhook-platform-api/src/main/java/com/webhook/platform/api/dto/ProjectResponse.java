@@ -18,6 +18,7 @@ public class ProjectResponse {
     private String description;
     private Boolean schemaValidationEnabled;
     private String schemaValidationPolicy;
+    private String idempotencyPolicy;
     private Instant createdAt;
     private Instant updatedAt;
 }
