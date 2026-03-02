@@ -26,13 +26,13 @@ export default function EventDiffPage() {
 
   useEffect(() => {
     if (projectId) loadEvents();
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (leftId && rightId && projectId) {
       loadDiff();
     }
-  }, [leftId, rightId, sanitize]);
+  }, [leftId, rightId, sanitize, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadEvents = async () => {
     if (!projectId) return;

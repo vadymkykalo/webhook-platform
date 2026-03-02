@@ -237,7 +237,7 @@ function VerifySignatureTab() {
   );
 }
 
-function QuickReplayTab({ }: { projectId: string }) {
+function QuickReplayTab(_props: { projectId: string }) {
   const { t } = useTranslation();
   const [deliveryId, setDeliveryId] = useState('');
   const [replaying, setReplaying] = useState(false);

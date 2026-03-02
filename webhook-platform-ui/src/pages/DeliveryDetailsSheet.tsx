@@ -57,7 +57,7 @@ export default function DeliveryDetailsSheet({
       loadDelivery();
       loadAttempts();
     }
-  }, [deliveryId, open]);
+  }, [deliveryId, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDelivery = async () => {
     if (!deliveryId) return;

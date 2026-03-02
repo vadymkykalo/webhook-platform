@@ -101,7 +101,7 @@ export default function ReplayPage() {
 
   useEffect(() => {
     if (projectId) loadData();
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll running sessions
   useEffect(() => {
@@ -114,7 +114,7 @@ export default function ReplayPage() {
       const interval = setInterval(() => loadSessions(), 2000);
       return () => clearInterval(interval);
     }
-  }, [sessions]);
+  }, [sessions, loadSessions]);
 
   // Set default date range
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Shield, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -45,11 +45,7 @@ export default function PiiRulesPage() {
   const [newJsonPath, setNewJsonPath] = useState('');
   const [newMaskStyle, setNewMaskStyle] = useState<MaskStyle>('PARTIAL');
 
-  useEffect(() => {
-    if (projectId) loadRules();
-  }, [projectId]);
-
-  const loadRules = async () => {
+  const loadRules = useCallback(async () => {
     if (!projectId) return;
     try {
       setLoading(true);
@@ -60,7 +56,11 @@ export default function PiiRulesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) loadRules();
+  }, [projectId, loadRules]);
 
   const handleSeedDefaults = async () => {
     if (!projectId) return;

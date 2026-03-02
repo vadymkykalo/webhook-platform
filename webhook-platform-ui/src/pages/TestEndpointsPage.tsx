@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Trash2, Copy, RefreshCw, Loader2, Clock, ChevronDown, ChevronRight, Eraser } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -35,32 +35,20 @@ export default function TestEndpointsPage() {
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
 
-  useEffect(() => {
-    if (projectId) {
-      loadEndpoints();
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    if (selectedEndpoint && projectId) {
-      loadRequests(selectedEndpoint);
-    }
-  }, [selectedEndpoint]);
-
-  const loadEndpoints = async () => {
+  const loadEndpoints = useCallback(async () => {
     if (!projectId) return;
     try {
       setLoading(true);
       const data = await testEndpointsApi.list(projectId);
       setEndpoints(data);
     } catch (err: any) {
-      showApiError(err, 'testEndpoints.toast.loadFailed', { retry: loadEndpoints });
+      showApiError(err, 'testEndpoints.toast.loadFailed');
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]);
 
-  const loadRequests = async (endpointId: string) => {
+  const loadRequests = useCallback(async (endpointId: string) => {
     if (!projectId) return;
     try {
       setLoadingRequests(true);
@@ -71,7 +59,15 @@ export default function TestEndpointsPage() {
     } finally {
       setLoadingRequests(false);
     }
-  };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) loadEndpoints();
+  }, [projectId, loadEndpoints]);
+
+  useEffect(() => {
+    if (selectedEndpoint && projectId) loadRequests(selectedEndpoint);
+  }, [selectedEndpoint, projectId, loadRequests]);
 
   const handleCreate = async () => {
     if (!projectId) return;

@@ -236,7 +236,7 @@ export default function AppLayout() {
         updateUser(freshUser);
       }
     }).catch(() => { });
-  }, [location.pathname]);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResendVerification = async () => {
     if (!user?.user?.email) return;

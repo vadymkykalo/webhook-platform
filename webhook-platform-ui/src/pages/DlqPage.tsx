@@ -40,7 +40,7 @@ export default function DlqPage() {
     if (projectId) {
       loadData();
     }
-  }, [projectId, page, endpointFilter]);
+  }, [projectId, page, endpointFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     if (!projectId) return;

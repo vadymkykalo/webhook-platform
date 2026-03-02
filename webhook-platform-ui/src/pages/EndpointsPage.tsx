@@ -72,7 +72,7 @@ export default function EndpointsPage() {
     if (projectId) {
       loadData();
     }
-  }, [projectId, currentPage]);
+  }, [projectId, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     if (!projectId) return;

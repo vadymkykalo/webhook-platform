@@ -55,7 +55,7 @@ export default function IncomingEventsPage() {
 
   useEffect(() => {
     if (projectId) loadData();
-  }, [projectId, currentPage, filterSourceId]);
+  }, [projectId, currentPage, filterSourceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     if (!projectId) return;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Shield, Clock, Eye, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -13,11 +13,7 @@ export default function SharedDebugPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (token) loadData();
-  }, [token]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!token) return;
     try {
       setLoading(true);
@@ -33,7 +29,11 @@ export default function SharedDebugPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, t]);
+
+  useEffect(() => {
+    if (token) loadData();
+  }, [token, loadData]);
 
   const formatPayload = (payload: string) => {
     try {

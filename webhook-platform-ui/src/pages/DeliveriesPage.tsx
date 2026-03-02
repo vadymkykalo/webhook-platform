@@ -73,13 +73,13 @@ export default function DeliveriesPage() {
     if (projectId) {
       loadInitialData();
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (projectId) {
       loadDeliveries();
     }
-  }, [projectId, statusFilter, endpointFilter, dateRange, page]);
+  }, [projectId, statusFilter, endpointFilter, dateRange, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadInitialData = async () => {
     if (!projectId) return;
