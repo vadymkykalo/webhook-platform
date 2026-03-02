@@ -14,6 +14,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
+import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
+import { TablePagination } from '../components/ui/table-pagination';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
 import {
@@ -64,8 +66,9 @@ export default function DeliveriesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [page, setPage] = useState(0);
-  const [pageSize] = useState(20);
-  
+  const [pageSize, setPageSize] = useState(20);
+  const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
+
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
   const [bulkReplaying, setBulkReplaying] = useState(false);
   const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
@@ -81,7 +84,7 @@ export default function DeliveriesPage() {
     if (projectId) {
       loadDeliveries();
     }
-  }, [projectId, statusFilter, endpointFilter, eventIdFilter, dateRange, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, statusFilter, endpointFilter, eventIdFilter, dateRange, page, pageSize, sortParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh when there are active deliveries
   useEffect(() => {
@@ -136,6 +139,7 @@ export default function DeliveriesPage() {
       const response = await deliveriesApi.listByProject(projectId, {
         page,
         size: pageSize,
+        sort: sortParam,
         status: statusFilter || undefined,
         endpointId: endpointFilter || undefined,
         eventId: eventIdFilter || undefined,
@@ -288,11 +292,11 @@ export default function DeliveriesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">{t('deliveries.columns.created')}</TableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.status')}</TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.created')}</SortableTableHead>
+                  <SortableTableHead field="status" sort={sort} onSort={toggleSort}>{t('deliveries.columns.status')}</SortableTableHead>
                   <TableHead className="text-xs">{t('deliveries.columns.endpoint')}</TableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.attempts')}</TableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.nextRetry')}</TableHead>
+                  <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort}>{t('deliveries.columns.attempts')}</SortableTableHead>
+                  <SortableTableHead field="nextRetryAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.nextRetry')}</SortableTableHead>
                   <TableHead className="text-xs hidden lg:table-cell">{t('deliveries.columns.lastError')}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
@@ -356,17 +360,14 @@ export default function DeliveriesPage() {
             </Table>
           </Card>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-muted-foreground">
-                {t('common.showing', { from: page * pageSize + 1, to: Math.min((page + 1) * pageSize, totalElements), total: totalElements })}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 

@@ -12,6 +12,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
+import { TablePagination } from '../components/ui/table-pagination';
 import SendTestEventModal from '../components/SendTestEventModal';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
@@ -23,7 +25,8 @@ export default function EventsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
+  const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
   const [showSendModal, setShowSendModal] = useState(false);
   const { canSendEvents, canCreateDebugLinks } = usePermissions();
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export default function EventsPage() {
     enabled: !!projectId,
   });
 
-  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize);
+  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize, sortParam);
   const events = eventsData?.content ?? [];
   const totalElements = eventsData?.totalElements ?? 0;
   const totalPages = eventsData?.totalPages ?? 0;
@@ -105,9 +108,9 @@ export default function EventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">{t('events.eventType')}</TableHead>
+                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort}>{t('events.eventType')}</SortableTableHead>
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
-                  <TableHead className="text-xs">{t('events.created')}</TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('events.created')}</SortableTableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -164,17 +167,14 @@ export default function EventsPage() {
             </Table>
           </Card>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <p className="text-xs text-muted-foreground">
-                {t('common.showing', { from: page * pageSize + 1, to: Math.min((page + 1) * pageSize, totalElements), total: totalElements })}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>{t('common.previous')}</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>{t('common.next')}</Button>
-              </div>
-            </div>
-          )}
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalElements={totalElements}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
 
