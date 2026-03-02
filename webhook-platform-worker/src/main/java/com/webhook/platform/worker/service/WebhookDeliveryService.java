@@ -24,6 +24,7 @@ import jakarta.annotation.PreDestroy;
 import jakarta.persistence.OptimisticLockException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -58,6 +59,7 @@ public class WebhookDeliveryService {
     private final PayloadTransformService payloadTransformService;
     private final Executor deliveryExecutor;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     private final Counter deliverySuccessCounter;
     private final Counter deliveryFailureCounter;
@@ -89,7 +91,8 @@ public class WebhookDeliveryService {
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             PayloadTransformService payloadTransformService,
-            @Qualifier("deliveryExecutor") Executor deliveryExecutor) {
+            @Qualifier("deliveryExecutor") Executor deliveryExecutor,
+            TransactionTemplate transactionTemplate) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -111,6 +114,7 @@ public class WebhookDeliveryService {
         this.payloadTransformService = payloadTransformService;
         this.deliveryExecutor = deliveryExecutor;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
 
         this.deliverySuccessCounter = Counter.builder("webhook_delivery_attempts_total")
                 .tag("result", "success").tag("status_class", "2xx")
@@ -271,6 +275,10 @@ public class WebhookDeliveryService {
             return;
         }
         
+        // Increment attempt count NOW — only when we actually attempt the HTTP call
+        transactionTemplate.executeWithoutResult(tx -> deliveryRepository.incrementAttemptCount(delivery.getId()));
+        delivery.setAttemptCount(delivery.getAttemptCount() + 1);
+
         String secret = decryptSecret(endpoint);
         String originalPayload = event.getPayload();
         String body = payloadTransformService.transform(originalPayload, delivery.getPayloadTemplate());
@@ -380,35 +388,34 @@ public class WebhookDeliveryService {
     }
 
     private void scheduleRetry(Delivery delivery) {
-        // Re-read to get fresh version after async gap
-        Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
-        if (fresh == null) {
-            log.warn("Delivery {} disappeared during retry scheduling", delivery.getId());
-            return;
-        }
-        // Carry over attempt count from in-memory state (already incremented)
-        fresh.setAttemptCount(delivery.getAttemptCount());
-        fresh.setLastAttemptAt(delivery.getLastAttemptAt());
-
-        if (fresh.getAttemptCount() >= fresh.getMaxAttempts()) {
-            log.warn("Max attempts reached for delivery {}, moving to DLQ", fresh.getId());
-            fresh.setStatus(Delivery.DeliveryStatus.DLQ);
-            fresh.setFailedAt(Instant.now());
-            
-            // For ordered deliveries, advance sequence and release buffered deliveries
-            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
-                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                triggerBufferedDeliveries(fresh.getEndpointId());
+        transactionTemplate.executeWithoutResult(tx -> {
+            // Re-read to get fresh version after async gap
+            Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
+            if (fresh == null) {
+                log.warn("Delivery {} disappeared during retry scheduling", delivery.getId());
+                return;
             }
-        } else {
-            fresh.setStatus(Delivery.DeliveryStatus.PENDING);
-            fresh.setNextRetryAt(calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
-            log.info("Scheduled retry {} for delivery {} at {}", 
-                    fresh.getAttemptCount(), fresh.getId(), fresh.getNextRetryAt());
-        }
-        fresh.setUpdatedAt(Instant.now());
-        deliveryRepository.save(fresh);
+
+            if (fresh.getAttemptCount() >= fresh.getMaxAttempts()) {
+                log.warn("Max attempts reached for delivery {}, moving to DLQ", fresh.getId());
+                fresh.setStatus(Delivery.DeliveryStatus.DLQ);
+                fresh.setFailedAt(Instant.now());
+
+                // For ordered deliveries, advance sequence and release buffered deliveries
+                if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
+                    orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
+                    orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
+                    triggerBufferedDeliveries(fresh.getEndpointId());
+                }
+            } else {
+                fresh.setStatus(Delivery.DeliveryStatus.PENDING);
+                fresh.setNextRetryAt(calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
+                log.info("Scheduled retry {} for delivery {} at {}",
+                        fresh.getAttemptCount(), fresh.getId(), fresh.getNextRetryAt());
+            }
+            fresh.setUpdatedAt(Instant.now());
+            deliveryRepository.save(fresh);
+        });
     }
 
     private Instant calculateNextRetry(int attemptCount, String retryDelaysStr) {
@@ -439,36 +446,39 @@ public class WebhookDeliveryService {
     }
 
     private void rescheduleDelivery(UUID deliveryId, Instant nextRetryAt) {
-        Delivery fresh = deliveryRepository.findById(deliveryId).orElse(null);
-        if (fresh == null) {
-            log.warn("Delivery {} disappeared during reschedule", deliveryId);
-            return;
-        }
-        fresh.setStatus(Delivery.DeliveryStatus.PENDING);
-        fresh.setNextRetryAt(nextRetryAt);
-        fresh.setUpdatedAt(Instant.now());
-        deliveryRepository.save(fresh);
+        transactionTemplate.executeWithoutResult(tx -> {
+            Delivery fresh = deliveryRepository.findById(deliveryId).orElse(null);
+            if (fresh == null) {
+                log.warn("Delivery {} disappeared during reschedule", deliveryId);
+                return;
+            }
+            fresh.setStatus(Delivery.DeliveryStatus.PENDING);
+            fresh.setNextRetryAt(nextRetryAt);
+            fresh.setUpdatedAt(Instant.now());
+            deliveryRepository.save(fresh);
+        });
     }
 
     private void markAsSuccess(Delivery delivery) {
-        // Re-read to get fresh version after async gap
-        Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
-        if (fresh == null) {
-            log.warn("Delivery {} disappeared during success marking", delivery.getId());
-            return;
-        }
-        fresh.setStatus(Delivery.DeliveryStatus.SUCCESS);
-        fresh.setSucceededAt(Instant.now());
-        fresh.setUpdatedAt(Instant.now());
-        fresh.setAttemptCount(delivery.getAttemptCount());
-        deliveryRepository.save(fresh);
-        log.info("Delivery {} succeeded after {} attempts", fresh.getId(), fresh.getAttemptCount());
-        
-        // For ordered deliveries, advance sequence and trigger buffered deliveries
-        if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-            orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-            triggerBufferedDeliveries(fresh.getEndpointId());
-        }
+        transactionTemplate.executeWithoutResult(tx -> {
+            // Re-read to get fresh version after async gap
+            Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
+            if (fresh == null) {
+                log.warn("Delivery {} disappeared during success marking", delivery.getId());
+                return;
+            }
+            fresh.setStatus(Delivery.DeliveryStatus.SUCCESS);
+            fresh.setSucceededAt(Instant.now());
+            fresh.setUpdatedAt(Instant.now());
+            deliveryRepository.save(fresh);
+            log.info("Delivery {} succeeded after {} attempts", fresh.getId(), fresh.getAttemptCount());
+
+            // For ordered deliveries, advance sequence and trigger buffered deliveries
+            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
+                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
+                triggerBufferedDeliveries(fresh.getEndpointId());
+            }
+        });
     }
     
     /**
@@ -536,24 +546,26 @@ public class WebhookDeliveryService {
     }
 
     private void markAsFailed(Delivery delivery, String reason) {
-        // Re-read to get fresh version after async gap
-        Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
-        if (fresh == null) {
-            log.warn("Delivery {} disappeared during failure marking", delivery.getId());
-            return;
-        }
-        fresh.setStatus(Delivery.DeliveryStatus.FAILED);
-        fresh.setFailedAt(Instant.now());
-        fresh.setUpdatedAt(Instant.now());
-        deliveryRepository.save(fresh);
-        log.error("Delivery {} failed: {}", fresh.getId(), reason);
-        
-        // For ordered deliveries, advance sequence and release buffered deliveries
-        if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-            orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
-            orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-            triggerBufferedDeliveries(fresh.getEndpointId());
-        }
+        transactionTemplate.executeWithoutResult(tx -> {
+            // Re-read to get fresh version after async gap
+            Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
+            if (fresh == null) {
+                log.warn("Delivery {} disappeared during failure marking", delivery.getId());
+                return;
+            }
+            fresh.setStatus(Delivery.DeliveryStatus.FAILED);
+            fresh.setFailedAt(Instant.now());
+            fresh.setUpdatedAt(Instant.now());
+            deliveryRepository.save(fresh);
+            log.error("Delivery {} failed: {}", fresh.getId(), reason);
+
+            // For ordered deliveries, advance sequence and release buffered deliveries
+            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
+                orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
+                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
+                triggerBufferedDeliveries(fresh.getEndpointId());
+            }
+        });
     }
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody, 

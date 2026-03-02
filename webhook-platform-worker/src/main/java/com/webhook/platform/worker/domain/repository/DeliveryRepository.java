@@ -16,10 +16,9 @@ import java.util.UUID;
 public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
     @Modifying
-    @Query("UPDATE Delivery d SET d.status = 'PENDING', " +
-           "d.nextRetryAt = CURRENT_TIMESTAMP, " +
-           "d.attemptCount = CASE WHEN d.attemptCount > 0 THEN d.attemptCount - 1 ELSE 0 END " +
-           "WHERE d.status = 'PROCESSING' AND d.lastAttemptAt < :threshold")
+    @Query(value = "UPDATE deliveries SET status = 'PENDING', " +
+           "next_retry_at = now(), updated_at = now(), version = version + 1 " +
+           "WHERE status = 'PROCESSING' AND (last_attempt_at < :threshold OR (last_attempt_at IS NULL AND updated_at < :threshold))", nativeQuery = true)
     int resetStuckDeliveries(@Param("threshold") Instant threshold);
     
     @Query(value = """
@@ -38,10 +37,16 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     );
 
     @Modifying
-    @Query(value = "UPDATE deliveries SET status = 'PROCESSING', attempt_count = attempt_count + 1, " +
+    @Query(value = "UPDATE deliveries SET status = 'PROCESSING', " +
             "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
             "WHERE id = :id AND status = 'PENDING'", nativeQuery = true)
     int claimForProcessing(@Param("id") UUID id);
+
+    @Modifying
+    @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
+            "updated_at = now(), version = version + 1 " +
+            "WHERE id = :id", nativeQuery = true)
+    int incrementAttemptCount(@Param("id") UUID id);
 
     @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.status IN ('PENDING', 'PROCESSING')")
     Instant findOldestPendingCreatedAt(
