@@ -57,11 +57,12 @@ class RetrySchedulerServiceTest {
                 Instant now = Instant.now();
                 Delivery dueDelivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
                                 anyInt(),
-                                anyInt())).thenReturn(Collections.singletonList(dueDelivery));
+                                anyInt())).thenReturn(Collections.singletonList(dueDelivery.getId()));
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(dueDelivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
@@ -73,7 +74,7 @@ class RetrySchedulerServiceTest {
 
                 // Assert
                 ArgumentCaptor<Integer> limitCaptor = ArgumentCaptor.forClass(Integer.class);
-                verify(deliveryRepository).findPendingRetriesForUpdate(
+                verify(deliveryRepository).findPendingRetryIds(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
                                 limitCaptor.capture(),
@@ -92,11 +93,12 @@ class RetrySchedulerServiceTest {
                                 createDelivery(UUID.randomUUID(), 2, now.minusSeconds(20)),
                                 createDelivery(UUID.randomUUID(), 3, now.minusSeconds(30)));
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
-                                anyInt())).thenReturn(deliveries);
+                                anyInt())).thenReturn(deliveries.stream().map(Delivery::getId).toList());
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(deliveries);
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
@@ -117,11 +119,12 @@ class RetrySchedulerServiceTest {
                 Instant now = Instant.now();
                 Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
-                                anyInt())).thenReturn(Collections.singletonList(delivery));
+                                anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
@@ -141,7 +144,7 @@ class RetrySchedulerServiceTest {
     @Test
     void scheduleRetries_shouldHandleEmptyResult() {
         // Arrange
-        when(deliveryRepository.findPendingRetriesForUpdate(
+        when(deliveryRepository.findPendingRetryIds(
                 any(Delivery.DeliveryStatus.class),
                 any(Instant.class),
                 anyInt(),
@@ -162,11 +165,12 @@ class RetrySchedulerServiceTest {
                 Instant now = Instant.now();
                 Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
-                                anyInt())).thenReturn(Collections.singletonList(delivery));
+                                anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> failedFuture = new CompletableFuture<>();
                 failedFuture.completeExceptionally(new RuntimeException("Kafka error"));
@@ -197,13 +201,19 @@ class RetrySchedulerServiceTest {
                                 .completedFuture(sendResult);
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
                                 anyInt()))
-                                .thenReturn(Collections.singletonList(delivery1))
-                                .thenReturn(Collections.singletonList(delivery2))
+                                .thenReturn(Collections.singletonList(delivery1.getId()))
+                                .thenReturn(Collections.singletonList(delivery2.getId()))
+                                .thenReturn(Collections.singletonList(delivery6.getId()));
+                when(deliveryRepository.lockByIds(Collections.singletonList(delivery1.getId())))
+                                .thenReturn(Collections.singletonList(delivery1));
+                when(deliveryRepository.lockByIds(Collections.singletonList(delivery2.getId())))
+                                .thenReturn(Collections.singletonList(delivery2));
+                when(deliveryRepository.lockByIds(Collections.singletonList(delivery6.getId())))
                                 .thenReturn(Collections.singletonList(delivery6));
 
                 // Act
@@ -228,11 +238,13 @@ class RetrySchedulerServiceTest {
                 Delivery completedDelivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
                 Delivery incompleteDelivery = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(20));
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
                                 anyInt()))
+                                .thenReturn(Arrays.asList(completedDelivery.getId(), incompleteDelivery.getId()));
+                when(deliveryRepository.lockByIds(anyList()))
                                 .thenReturn(Arrays.asList(completedDelivery, incompleteDelivery));
 
                 SendResult<String, DeliveryMessage> sendResult = mockSendResult();
@@ -263,11 +275,12 @@ class RetrySchedulerServiceTest {
                 Instant now = Instant.now();
                 Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
 
-                when(deliveryRepository.findPendingRetriesForUpdate(
+                when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
-                                anyInt())).thenReturn(Collections.singletonList(delivery));
+                                anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> exceptionalFuture = new CompletableFuture<>();
                 exceptionalFuture.completeExceptionally(new RuntimeException("Broker unavailable"));
