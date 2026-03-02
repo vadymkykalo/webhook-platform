@@ -25,4 +25,7 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     int deleteOldPublishedMessages(@Param("status") String status, @Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
 
     long countByStatus(OutboxStatus status);
+
+    @Query(value = "SELECT MIN(created_at) FROM outbox_messages WHERE status = 'PENDING'", nativeQuery = true)
+    Instant findOldestPendingCreatedAt();
 }

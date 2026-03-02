@@ -97,6 +97,11 @@ auth:
     login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
     register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
 
+rate-limit:
+  global:
+    requests-per-second: ${GLOBAL_RATE_LIMIT_PER_SECOND:5000}
+    enabled: ${GLOBAL_RATE_LIMIT_ENABLED:true}
+
 event:
   ingestion:
     rate-limit-per-second: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:100}

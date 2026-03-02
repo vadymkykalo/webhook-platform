@@ -48,6 +48,7 @@ spring:
         spring.json.trusted.packages: "com.webhook.platform.common.dto"
     listener:
       ack-mode: manual
+      observation-enabled: true
 
 management:
   endpoints:

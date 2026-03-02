@@ -7,6 +7,9 @@ import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.filter.CorrelationIdFilter;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -34,16 +37,47 @@ public class OutboxPublisherService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final int batchSize;
+    private final Timer publishLatency;
 
     public OutboxPublisherService(
             OutboxMessageRepository outboxMessageRepository,
             KafkaTemplate<String, Object> kafkaTemplate,
             ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
             @Value("${outbox.publisher.batch-size:100}") int batchSize) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
+
+        this.publishLatency = Timer.builder("outbox_publish_latency")
+                .description("Time to publish a batch of outbox messages to Kafka")
+                .register(meterRegistry);
+
+        Gauge.builder("outbox_queue_depth", outboxMessageRepository,
+                        repo -> repo.countByStatus(OutboxStatus.PENDING))
+                .description("Number of outbox messages by status")
+                .tag("status", "pending")
+                .register(meterRegistry);
+
+        Gauge.builder("outbox_queue_depth", outboxMessageRepository,
+                        repo -> repo.countByStatus(OutboxStatus.FAILED))
+                .description("Number of outbox messages by status")
+                .tag("status", "failed")
+                .register(meterRegistry);
+
+        Gauge.builder("outbox_queue_depth", outboxMessageRepository,
+                        repo -> repo.countByStatus(OutboxStatus.DEAD))
+                .description("Number of outbox messages by status")
+                .tag("status", "dead")
+                .register(meterRegistry);
+
+        Gauge.builder("outbox_oldest_pending_age_seconds", outboxMessageRepository, repo -> {
+                    Instant oldest = repo.findOldestPendingCreatedAt();
+                    return oldest != null ? java.time.Duration.between(oldest, Instant.now()).getSeconds() : 0;
+                })
+                .description("Age in seconds of the oldest PENDING outbox message")
+                .register(meterRegistry);
     }
 
     @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
@@ -136,6 +170,7 @@ public class OutboxPublisherService {
     }
 
     private void publishBatchAsync(List<OutboxMessage> messages, boolean isRetry) {
+        Timer.Sample sample = Timer.start();
         Map<UUID, CompletableFuture<SendResult<String, Object>>> futures = new LinkedHashMap<>();
         Map<UUID, OutboxMessage> messageMap = new LinkedHashMap<>();
 
@@ -177,6 +212,8 @@ public class OutboxPublisherService {
         } catch (Exception e) {
             log.warn("Batch Kafka send did not fully complete within timeout: {}", e.getMessage());
         }
+
+        sample.stop(publishLatency);
 
         // Check each future individually
         for (var entry : futures.entrySet()) {
