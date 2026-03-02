@@ -43,6 +43,38 @@ describe('Hookflow Client', () => {
   });
 });
 
+describe('Generic Request Methods', () => {
+  it('should expose get method', () => {
+    const client = new Hookflow({ apiKey: 'test_api_key' });
+    expect(typeof client.get).toBe('function');
+  });
+
+  it('should expose post method', () => {
+    const client = new Hookflow({ apiKey: 'test_api_key' });
+    expect(typeof client.post).toBe('function');
+  });
+
+  it('should expose put method', () => {
+    const client = new Hookflow({ apiKey: 'test_api_key' });
+    expect(typeof client.put).toBe('function');
+  });
+
+  it('should expose patch method', () => {
+    const client = new Hookflow({ apiKey: 'test_api_key' });
+    expect(typeof client.patch).toBe('function');
+  });
+
+  it('should expose delete method', () => {
+    const client = new Hookflow({ apiKey: 'test_api_key' });
+    expect(typeof client.delete).toBe('function');
+  });
+
+  it('should expose request method for fully custom calls', () => {
+    const client = new Hookflow({ apiKey: 'test_api_key' });
+    expect(typeof client.request).toBe('function');
+  });
+});
+
 describe('Error Classes', () => {
   describe('HookflowError', () => {
     it('should have correct properties', () => {

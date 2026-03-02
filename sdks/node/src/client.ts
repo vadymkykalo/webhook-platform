@@ -37,7 +37,7 @@ import {
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '2.0.0';
+const SDK_VERSION = '2.1.0';
 
 export class Hookflow {
   private readonly apiKey: string;
@@ -139,6 +139,46 @@ export class Hookflow {
 
       req.end();
     });
+  }
+
+  /**
+   * Generic GET request to any API path.
+   * Use this for endpoints not yet covered by the SDK.
+   */
+  async get<T = unknown>(path: string): Promise<T> {
+    return this.request<T>('GET', path);
+  }
+
+  /**
+   * Generic POST request to any API path.
+   * Use this for endpoints not yet covered by the SDK.
+   */
+  async post<T = unknown>(path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
+    return this.request<T>('POST', path, body, idempotencyKey);
+  }
+
+  /**
+   * Generic PUT request to any API path.
+   * Use this for endpoints not yet covered by the SDK.
+   */
+  async put<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PUT', path, body);
+  }
+
+  /**
+   * Generic PATCH request to any API path.
+   * Use this for endpoints not yet covered by the SDK.
+   */
+  async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PATCH', path, body);
+  }
+
+  /**
+   * Generic DELETE request to any API path.
+   * Use this for endpoints not yet covered by the SDK.
+   */
+  async delete<T = void>(path: string): Promise<T> {
+    return this.request<T>('DELETE', path);
   }
 
   private extractRateLimitInfo(headers: http.IncomingHttpHeaders): RateLimitInfo | undefined {

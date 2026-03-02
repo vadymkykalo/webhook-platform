@@ -7,6 +7,7 @@
       "notFound": "The requested resource was not found.",
       "conflict": "This action conflicts with an existing resource.",
       "validation": "Please check your input and try again.",
+      "payloadTooLarge": "Request body is too large. Please reduce the payload size.",
       "tooManyRequests": "Too many requests. Please wait a moment.",
       "server": "Something went wrong on our end. Please try again later.",
       "network": "Network error. Check your connection and try again."
