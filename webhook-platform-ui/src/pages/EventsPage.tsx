@@ -107,7 +107,6 @@ export default function EventsPage() {
                 <TableRow>
                   <TableHead className="text-xs">{t('events.eventType')}</TableHead>
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
-                  <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
                   <TableHead className="text-xs">{t('events.created')}</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
@@ -125,16 +124,6 @@ export default function EventsPage() {
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {event.deliveriesCreated !== undefined && event.deliveriesCreated > 0 ? (
-                        <div className="flex items-center gap-1.5">
-                          <Send className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm font-medium">{event.deliveriesCreated}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">

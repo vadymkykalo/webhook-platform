@@ -122,4 +122,5 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     @Modifying
     @Query("DELETE FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")
     void deleteDlqByProjectId(@Param("projectId") UUID projectId);
+
 }

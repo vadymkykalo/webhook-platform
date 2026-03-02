@@ -23,8 +23,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -46,6 +47,7 @@ public class ReplayService {
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
     private final SequenceGeneratorService sequenceGeneratorService;
+    private final TransactionTemplate txTemplate;
 
     private final Counter replayEventsProcessedCounter;
     private final Counter replayDeliveriesCreatedCounter;
@@ -70,6 +72,7 @@ public class ReplayService {
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
             SequenceGeneratorService sequenceGeneratorService,
+            PlatformTransactionManager transactionManager,
             MeterRegistry meterRegistry) {
         this.replaySessionRepository = replaySessionRepository;
         this.eventRepository = eventRepository;
@@ -79,6 +82,7 @@ public class ReplayService {
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
         this.sequenceGeneratorService = sequenceGeneratorService;
+        this.txTemplate = new TransactionTemplate(transactionManager);
 
         this.replayEventsProcessedCounter = Counter.builder("replay.events.processed")
                 .description("Total events processed by replay").register(meterRegistry);
@@ -233,6 +237,8 @@ public class ReplayService {
                     .filter(s -> s.getEndpointId().equals(session.getEndpointId()))
                     .toList();
         }
+        final List<Subscription> activeSubscriptions = subscriptions;
+        final UUID sid = sessionId;
 
         // Cursor-based batch processing
         Instant cursorCreatedAt = session.getFromDate().minusNanos(1);
@@ -267,22 +273,25 @@ public class ReplayService {
                 break;
             }
 
-            // Process batch in a single transaction
+            // Process batch in a new transaction
             Timer.Sample sample = Timer.start();
+            final List<Event> currentBatch = batch;
             try {
-                BatchResult result = processBatch(batch, subscriptions, sessionId);
-                totalProcessed += batch.size();
-                totalDeliveries += result.deliveriesCreated;
-                totalErrors += result.errors;
-
-                replayEventsProcessedCounter.increment(batch.size());
-                replayDeliveriesCreatedCounter.increment(result.deliveriesCreated);
-                if (result.errors > 0) {
-                    replayErrorsCounter.increment(result.errors);
+                BatchResult result = txTemplate.execute(status ->
+                        processBatch(currentBatch, activeSubscriptions, sid));
+                if (result != null) {
+                    totalProcessed += currentBatch.size();
+                    totalDeliveries += result.deliveriesCreated;
+                    totalErrors += result.errors;
+                    replayEventsProcessedCounter.increment(currentBatch.size());
+                    replayDeliveriesCreatedCounter.increment(result.deliveriesCreated);
+                    if (result.errors > 0) {
+                        replayErrorsCounter.increment(result.errors);
+                    }
                 }
             } catch (Exception e) {
-                totalErrors += batch.size();
-                replayErrorsCounter.increment(batch.size());
+                totalErrors += currentBatch.size();
+                replayErrorsCounter.increment(currentBatch.size());
                 log.error("Replay batch failed for session {}", sessionId, e);
             }
             sample.stop(replayBatchTimer);
@@ -307,8 +316,7 @@ public class ReplayService {
                 sessionId, totalProcessed, totalDeliveries, totalErrors);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId) {
+    private BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId) {
         int errors = 0;
 
         List<Delivery> deliveriesToSave = new ArrayList<>();
@@ -353,7 +361,7 @@ public class ReplayService {
             }
         }
 
-        // Batch save all deliveries (generates IDs)
+        // Batch save all deliveries
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
         deliveryRepository.flush();
 
