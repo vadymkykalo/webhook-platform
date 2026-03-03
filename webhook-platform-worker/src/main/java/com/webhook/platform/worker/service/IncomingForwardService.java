@@ -68,8 +68,7 @@ public class IncomingForwardService {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
-        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.apply(
-                reactor.netty.http.client.HttpClient.create(), allowPrivateIps);
+        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(allowPrivateIps);
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-IncomingForward")
