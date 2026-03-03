@@ -10,6 +10,7 @@ import com.webhook.platform.common.dto.IncomingForwardMessage;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -39,6 +40,8 @@ public class OutboxPublisherService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final ObjectMapper objectMapper;
     private final int batchSize;
+    private final int maxRetries;
+    private final int deadRetentionDays;
     private final Timer publishLatency;
     private final TransactionTemplate txTemplate;
 
@@ -48,11 +51,15 @@ public class OutboxPublisherService {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             PlatformTransactionManager txManager,
-            @Value("${outbox.publisher.batch-size:100}") int batchSize) {
+            @Value("${outbox.publisher.batch-size:100}") int batchSize,
+            @Value("${outbox.publisher.max-retries:5}") int maxRetries,
+            @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
+        this.maxRetries = maxRetries;
+        this.deadRetentionDays = deadRetentionDays;
         this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
@@ -112,7 +119,7 @@ public class OutboxPublisherService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void retryFailedMessages() {
         List<OutboxMessage> failedMessages = outboxMessageRepository
-                .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), 5, batchSize, 10);
+                .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10);
 
         if (failedMessages.isEmpty()) {
             return;
@@ -150,11 +157,11 @@ public class OutboxPublisherService {
             log.warn("Recovered {} stuck SENDING outbox messages back to PENDING", recovered);
         }
 
-        Instant publishedCutoff = Instant.now().minus(java.time.Duration.ofDays(3));
+        Instant publishedCutoff = Instant.now().minus(Duration.ofDays(3));
         int deletedPublished = outboxMessageRepository.deleteOldPublishedMessages(
                 OutboxStatus.PUBLISHED.name(), publishedCutoff, 5000);
 
-        Instant deadCutoff = Instant.now().minus(java.time.Duration.ofDays(7));
+        Instant deadCutoff = Instant.now().minus(Duration.ofDays(deadRetentionDays));
         int deletedDead = outboxMessageRepository.deleteOldPublishedMessages(
                 OutboxStatus.DEAD.name(), deadCutoff, 1000);
 
@@ -179,7 +186,7 @@ public class OutboxPublisherService {
         message.setErrorMessage(errorMessage);
         message.setLastAttemptAt(Instant.now());
         
-        if (message.getRetryCount() >= 5) {
+        if (message.getRetryCount() >= maxRetries) {
             message.setStatus(OutboxStatus.DEAD);
             log.error("Outbox message {} exceeded max retries, moved to DEAD. Topic: {}, Key: {}, Error: {}",
                     message.getId(), message.getKafkaTopic(), message.getKafkaKey(), errorMessage);
