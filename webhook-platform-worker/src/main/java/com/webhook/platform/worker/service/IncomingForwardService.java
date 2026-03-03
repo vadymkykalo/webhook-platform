@@ -134,13 +134,27 @@ public class IncomingForwardService {
         // Contract:
         //   First dispatch (attemptCount == 0): IngressService already created a PENDING
         //     row with attempt_number=1.  We claim it via atomic UPDATE … SET PROCESSING.
-        //   Retry (attemptCount > 0): IncomingForwardRetryScheduler already claimed the
-        //     existing row (set PROCESSING) and published attemptCount = attemptNumber.
-        //     No re-claim needed — just proceed with the HTTP call.
+        //   Replay (replay == true, attemptCount > 0): API created a PENDING row with
+        //     attempt_number = attemptCount.  We claim it the same way as first dispatch.
+        //   Retry (attemptCount > 0, replay == false): IncomingForwardRetryScheduler
+        //     already claimed the existing row (set PROCESSING) and published
+        //     attemptCount = attemptNumber.  No re-claim needed.
         int attemptNumber;
         boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
+        boolean isReplay = message.isReplay();
 
-        if (isRetry) {
+        if (isReplay && isRetry) {
+            // Replay path: API created a PENDING row — claim it
+            attemptNumber = message.getAttemptCount();
+            final int an = attemptNumber;
+            Integer claimed = transactionTemplate
+                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, an));
+            if (claimed == null || claimed == 0) {
+                log.debug("Replay attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
+                        eventId, destinationId, attemptNumber);
+                return;
+            }
+        } else if (isRetry) {
             // Retry path: scheduler already set the row to PROCESSING.
             // attemptCount IS the current attempt number (not previous).
             attemptNumber = message.getAttemptCount();
