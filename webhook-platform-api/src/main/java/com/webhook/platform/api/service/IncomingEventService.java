@@ -134,10 +134,13 @@ public class IncomingEventService {
 
         int replayed = 0;
         for (IncomingDestination destination : destinations) {
+            Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(eventId, destination.getId());
+            int nextAttempt = (maxAttempt != null ? maxAttempt : 0) + 1;
+
             IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
                     .incomingEventId(eventId)
                     .destinationId(destination.getId())
-                    .attemptNumber(1)
+                    .attemptNumber(nextAttempt)
                     .status(ForwardAttemptStatus.PENDING)
                     .build();
             forwardAttemptRepository.save(attempt);
@@ -147,7 +150,7 @@ public class IncomingEventService {
                         .incomingEventId(eventId)
                         .destinationId(destination.getId())
                         .incomingSourceId(event.getIncomingSourceId())
-                        .attemptCount(0)
+                        .attemptCount(nextAttempt)
                         .replay(true)
                         .build();
 
@@ -223,10 +226,13 @@ public class IncomingEventService {
         int totalAttempts = 0;
         for (IncomingEvent event : events) {
             for (IncomingDestination destination : destinations) {
+                Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(event.getId(), destination.getId());
+                int nextAttempt = (maxAttempt != null ? maxAttempt : 0) + 1;
+
                 IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
                         .incomingEventId(event.getId())
                         .destinationId(destination.getId())
-                        .attemptNumber(1)
+                        .attemptNumber(nextAttempt)
                         .status(ForwardAttemptStatus.PENDING)
                         .build();
                 forwardAttemptRepository.save(attempt);
@@ -236,7 +242,7 @@ public class IncomingEventService {
                             .incomingEventId(event.getId())
                             .destinationId(destination.getId())
                             .incomingSourceId(source.getId())
-                            .attemptCount(0)
+                            .attemptCount(nextAttempt)
                             .replay(true)
                             .build();
 

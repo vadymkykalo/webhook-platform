@@ -123,6 +123,7 @@ incoming-forward:
   retry:
     poll-interval-ms: ${INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS:10000}
     batch-size: ${INCOMING_FORWARD_RETRY_BATCH_SIZE:50}
+    max-per-destination: ${INCOMING_FORWARD_RETRY_MAX_PER_DEST:10}
 
 logging:
   level:

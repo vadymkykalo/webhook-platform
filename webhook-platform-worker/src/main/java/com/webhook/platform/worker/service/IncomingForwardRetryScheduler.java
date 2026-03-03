@@ -33,6 +33,7 @@ public class IncomingForwardRetryScheduler {
     private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
     private final int batchSize;
+    private final int maxPerDest;
     private final Counter retryScheduledCounter;
 
     public IncomingForwardRetryScheduler(
@@ -40,11 +41,13 @@ public class IncomingForwardRetryScheduler {
             KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry,
-            @Value("${incoming-forward.retry.batch-size:50}") int batchSize) {
+            @Value("${incoming-forward.retry.batch-size:50}") int batchSize,
+            @Value("${incoming-forward.retry.max-per-destination:10}") int maxPerDest) {
         this.attemptRepository = attemptRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
         this.batchSize = batchSize;
+        this.maxPerDest = maxPerDest;
         this.retryScheduledCounter = Counter.builder("incoming_forward_retries_scheduled_total")
                 .register(meterRegistry);
     }
@@ -54,8 +57,14 @@ public class IncomingForwardRetryScheduler {
         try {
             // ── Phase 1: Short transaction — claim pending retries ──
             List<IncomingForwardAttempt> claimed = transactionTemplate.execute(tx -> {
-                List<IncomingForwardAttempt> pendingRetries = attemptRepository
-                        .findPendingRetriesForUpdate(ForwardAttemptStatus.PENDING, Instant.now(), batchSize);
+                List<UUID> candidateIds = attemptRepository
+                        .findPendingRetryIds(ForwardAttemptStatus.PENDING, Instant.now(), batchSize, maxPerDest);
+
+                if (candidateIds.isEmpty()) {
+                    return List.<IncomingForwardAttempt>of();
+                }
+
+                List<IncomingForwardAttempt> pendingRetries = attemptRepository.lockByIds(candidateIds);
 
                 if (pendingRetries.isEmpty()) {
                     return List.<IncomingForwardAttempt>of();

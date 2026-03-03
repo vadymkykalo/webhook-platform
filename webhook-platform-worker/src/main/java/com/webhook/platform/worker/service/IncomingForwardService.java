@@ -17,9 +17,9 @@ import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepos
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.util.concurrent.ThreadLocalRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -130,38 +130,42 @@ public class IncomingForwardService {
         }
 
         // --- Atomic claim: prevent duplicate HTTP sends ---
+        //
+        // Contract:
+        //   First dispatch (attemptCount == 0): IngressService already created a PENDING
+        //     row with attempt_number=1.  We claim it via atomic UPDATE … SET PROCESSING.
+        //   Replay (replay == true, attemptCount > 0): API created a PENDING row with
+        //     attempt_number = attemptCount.  We claim it the same way as first dispatch.
+        //   Retry (attemptCount > 0, replay == false): IncomingForwardRetryScheduler
+        //     already claimed the existing row (set PROCESSING) and published
+        //     attemptCount = attemptNumber.  No re-claim needed.
         int attemptNumber;
         boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
+        boolean isReplay = message.isReplay();
 
-        if (isRetry) {
-            // Retry path: claim existing PENDING attempt row with atomic UPDATE
-            attemptNumber = message.getAttemptCount() + 1;
+        if (isReplay && isRetry) {
+            // Replay path: API created a PENDING row — claim it
+            attemptNumber = message.getAttemptCount();
+            final int an = attemptNumber;
             Integer claimed = transactionTemplate
-                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, attemptNumber));
+                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, an));
             if (claimed == null || claimed == 0) {
-                log.debug("Forward attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
+                log.debug("Replay attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
                         eventId, destinationId, attemptNumber);
                 return;
             }
+        } else if (isRetry) {
+            // Retry path: scheduler already set the row to PROCESSING.
+            // attemptCount IS the current attempt number (not previous).
+            attemptNumber = message.getAttemptCount();
         } else {
-            // First dispatch: INSERT attempt with PROCESSING status atomically
-            // Unique constraint (event_id, dest_id, attempt_number) guards against
-            // duplicates
+            // First dispatch: claim the PENDING row created by IngressService
             attemptNumber = 1;
-            try {
-                transactionTemplate.executeWithoutResult(tx -> {
-                    IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
-                            .incomingEventId(eventId)
-                            .destinationId(destinationId)
-                            .attemptNumber(1)
-                            .status(ForwardAttemptStatus.PROCESSING)
-                            .startedAt(Instant.now())
-                            .build();
-                    attemptRepository.saveAndFlush(attempt);
-                });
-            } catch (DataIntegrityViolationException e) {
-                log.debug("Forward already claimed (unique constraint): eventId={}, destId={}",
-                        eventId, destinationId);
+            Integer claimed = transactionTemplate
+                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, 1));
+            if (claimed == null || claimed == 0) {
+                log.debug("Forward attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
+                        eventId, destinationId, attemptNumber);
                 return;
             }
         }
@@ -340,18 +344,16 @@ public class IncomingForwardService {
     }
 
     private void saveFailedAttempt(UUID eventId, UUID destinationId, String errorMessage, int durationMs) {
-        transactionTemplate.executeWithoutResult(tx -> {
-            IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
-                    .incomingEventId(eventId)
-                    .destinationId(destinationId)
-                    .attemptNumber(1)
-                    .status(ForwardAttemptStatus.FAILED)
-                    .startedAt(Instant.now().minusMillis(durationMs))
-                    .finishedAt(Instant.now())
-                    .errorMessage(errorMessage)
-                    .build();
-            attemptRepository.save(attempt);
-        });
+        // Claim the existing PENDING row (created by IngressService) and mark FAILED
+        Integer claimed = transactionTemplate
+                .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, 1));
+        if (claimed != null && claimed > 0) {
+            updateAttempt(eventId, destinationId, 1, ForwardAttemptStatus.FAILED,
+                    null, null, null, errorMessage, durationMs, null);
+        } else {
+            log.warn("Could not claim attempt row for early failure: eventId={}, destId={}",
+                    eventId, destinationId);
+        }
     }
 
     private boolean isRetryable(int statusCode) {
@@ -363,7 +365,7 @@ public class IncomingForwardService {
         int index = Math.min(attemptNumber - 1, delays.length - 1);
         long baseDelay = delays[index];
         // Full jitter: 50%-150% of base delay to prevent thundering herd
-        double jitterMultiplier = 0.5 + java.util.concurrent.ThreadLocalRandom.current().nextDouble(1.0);
+        double jitterMultiplier = 0.5 + ThreadLocalRandom.current().nextDouble(1.0);
         long jitteredDelay = (long) (baseDelay * jitterMultiplier);
         return Instant.now().plusSeconds(jitteredDelay);
     }

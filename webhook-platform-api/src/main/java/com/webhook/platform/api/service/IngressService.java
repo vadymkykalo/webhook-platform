@@ -28,6 +28,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -37,6 +39,7 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -52,6 +55,7 @@ public class IngressService {
     private final MeterRegistry meterRegistry;
     private final WebhookVerifierFactory verifierFactory;
     private final RedisRateLimiterService rateLimiterService;
+    private final List<String> trustedProxies;
     private final String encryptionKey;
     private final String encryptionSalt;
     private final long maxPayloadSizeBytes;
@@ -66,6 +70,7 @@ public class IngressService {
             MeterRegistry meterRegistry,
             WebhookVerifierFactory verifierFactory,
             RedisRateLimiterService rateLimiterService,
+            @Value("${webhook.incoming.trusted-proxies:127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}") List<String> trustedProxies,
             @Value("${webhook.encryption-key}") String encryptionKey,
             @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes) {
@@ -78,6 +83,7 @@ public class IngressService {
         this.meterRegistry = meterRegistry;
         this.verifierFactory = verifierFactory;
         this.rateLimiterService = rateLimiterService;
+        this.trustedProxies = trustedProxies;
         this.encryptionKey = encryptionKey;
         this.encryptionSalt = encryptionSalt;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
@@ -250,16 +256,71 @@ public class IngressService {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        // Only trust proxy headers when the direct connection comes from a known proxy
+        if (isTrustedProxy(remoteAddr)) {
+            String xForwardedFor = request.getHeader("X-Forwarded-For");
+            if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+                return xForwardedFor.split(",")[0].trim();
+            }
+            String xRealIp = request.getHeader("X-Real-IP");
+            if (xRealIp != null && !xRealIp.isBlank()) {
+                return xRealIp.trim();
+            }
         }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
-        }
-        return request.getRemoteAddr();
+        return remoteAddr;
     }
+
+    private boolean isTrustedProxy(String remoteAddr) {
+        if (trustedProxies == null || trustedProxies.isEmpty()) {
+            return false;
+        }
+        try {
+            InetAddress remote = InetAddress.getByName(remoteAddr);
+            byte[] remoteBytes = remote.getAddress();
+            for (String proxy : trustedProxies) {
+                String trimmed = proxy.trim();
+                if (trimmed.isEmpty()) continue;
+                if (trimmed.contains("/")) {
+                    // CIDR notation
+                    String[] parts = trimmed.split("/");
+                    InetAddress network = InetAddress.getByName(parts[0]);
+                    int prefixLen = Integer.parseInt(parts[1]);
+                    if (isInCidr(remoteBytes, network.getAddress(), prefixLen)) {
+                        return true;
+                    }
+                } else {
+                    InetAddress trusted = InetAddress.getByName(trimmed);
+                    if (remote.equals(trusted)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (UnknownHostException e) {
+            log.warn("Failed to resolve remote address for trusted proxy check: {}", remoteAddr);
+        }
+        return false;
+    }
+
+    private static boolean isInCidr(byte[] addr, byte[] network, int prefixLen) {
+        if (addr.length != network.length) return false;
+        int fullBytes = prefixLen / 8;
+        int remainingBits = prefixLen % 8;
+        for (int i = 0; i < fullBytes; i++) {
+            if (addr[i] != network[i]) return false;
+        }
+        if (remainingBits > 0 && fullBytes < addr.length) {
+            int mask = (0xFF << (8 - remainingBits)) & 0xFF;
+            if ((addr[fullBytes] & mask) != (network[fullBytes] & mask)) return false;
+        }
+        return true;
+    }
+
+    private static final Set<String> SENSITIVE_HEADERS = Set.of(
+            "authorization", "cookie", "set-cookie",
+            "x-api-key", "proxy-authorization"
+    );
+    private static final String MASKED_VALUE = "***MASKED***";
 
     private String extractHeadersJson(HttpServletRequest request) {
         try {
@@ -267,7 +328,10 @@ public class IngressService {
             Enumeration<String> headerNames = request.getHeaderNames();
             while (headerNames.hasMoreElements()) {
                 String name = headerNames.nextElement();
-                headers.put(name, request.getHeader(name));
+                String value = SENSITIVE_HEADERS.contains(name.toLowerCase())
+                        ? MASKED_VALUE
+                        : request.getHeader(name);
+                headers.put(name, value);
             }
             return objectMapper.writeValueAsString(headers);
         } catch (Exception e) {
