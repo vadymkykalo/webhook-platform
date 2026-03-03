@@ -160,7 +160,8 @@ public class WebhookDeliveryService {
     public void processDelivery(DeliveryMessage message) {
         if (shuttingDown) {
             log.warn("Shutdown in progress, rejecting new delivery: {}", message.getDeliveryId());
-            return;
+            throw new ShutdownRejectedException(
+                    "Worker is shutting down, delivery " + message.getDeliveryId() + " must be redelivered");
         }
         inFlightCount.incrementAndGet();
         try {

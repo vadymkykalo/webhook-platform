@@ -104,6 +104,10 @@ stuck-delivery:
   threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
   check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
 
+stuck-forward:
+  threshold-minutes: ${STUCK_FORWARD_THRESHOLD_MINUTES:5}
+  check-interval-ms: ${STUCK_FORWARD_CHECK_INTERVAL_MS:60000}
+
 incoming-forward:
   retry:
     poll-interval-ms: ${INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS:10000}
