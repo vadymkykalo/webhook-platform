@@ -39,6 +39,7 @@ public class Endpoint {
     @Column(name = "allowed_source_ips", columnDefinition = "TEXT")
     private String allowedSourceIps;
 
+    @Builder.Default
     @Column(name = "mtls_enabled", nullable = false)
     private Boolean mtlsEnabled = false;
 
@@ -60,6 +61,7 @@ public class Endpoint {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 32)
     private VerificationStatus verificationStatus = VerificationStatus.SKIPPED;

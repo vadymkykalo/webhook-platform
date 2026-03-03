@@ -70,7 +70,7 @@ class MtlsWebClientFactoryTest {
 
     @BeforeEach
     void setUp() {
-        factory = new MtlsWebClientFactory(ENCRYPTION_KEY, ENCRYPTION_SALT, WebClient.builder());
+        factory = new MtlsWebClientFactory(ENCRYPTION_KEY, ENCRYPTION_SALT, true, WebClient.builder());
     }
 
     // -----------------------------------------------------------------------
