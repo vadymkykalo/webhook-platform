@@ -37,7 +37,8 @@ spring:
     consumer:
       delivery-concurrency: ${KAFKA_DELIVERY_CONCURRENCY:6}
       incoming-concurrency: ${KAFKA_INCOMING_CONCURRENCY:3}
-      group-id: webhook-worker
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:webhook-worker}
+      incoming-group-id: ${KAFKA_INCOMING_GROUP_ID:incoming-forward-worker}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}

@@ -25,7 +25,7 @@ public class IncomingForwardConsumer {
 
     @KafkaListener(
             topics = {KafkaTopics.INCOMING_FORWARD_DISPATCH, KafkaTopics.INCOMING_FORWARD_RETRY},
-            groupId = "incoming-forward-worker",
+            groupId = "${spring.kafka.consumer.incoming-group-id:incoming-forward-worker}",
             containerFactory = "incomingForwardListenerContainerFactory"
     )
     public void consume(ConsumerRecord<String, IncomingForwardMessage> record, Acknowledgment ack) {

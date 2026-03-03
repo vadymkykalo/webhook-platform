@@ -31,6 +31,9 @@ public class KafkaConsumerConfig {
 
     @Value("${spring.kafka.consumer.group-id}")
     private String groupId;
+
+    @Value("${spring.kafka.consumer.incoming-group-id:incoming-forward-worker}")
+    private String incomingGroupId;
     
     @Value("${spring.kafka.consumer.max-retries:3}")
     private int maxRetries;
@@ -49,8 +52,8 @@ public class KafkaConsumerConfig {
 
     @PostConstruct
     void logEffectiveConfig() {
-        log.info("Kafka consumer effective config: bootstrapServers={}, groupId={}, autoOffsetReset={}, deliveryConcurrency={}, incomingConcurrency={}, maxRetries={}, retryIntervalMs={}",
-                bootstrapServers, groupId, autoOffsetReset, deliveryConcurrency, incomingConcurrency, maxRetries, retryIntervalMs);
+        log.info("Kafka consumer effective config: bootstrapServers={}, groupId={}, incomingGroupId={}, autoOffsetReset={}, deliveryConcurrency={}, incomingConcurrency={}, maxRetries={}, retryIntervalMs={}",
+                bootstrapServers, groupId, incomingGroupId, autoOffsetReset, deliveryConcurrency, incomingConcurrency, maxRetries, retryIntervalMs);
     }
 
     @Bean
@@ -60,7 +63,7 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConsumerFactory<String, IncomingForwardMessage> incomingForwardConsumerFactory() {
-        return buildConsumerFactory("incoming-forward-worker", IncomingForwardMessage.class);
+        return buildConsumerFactory(incomingGroupId, IncomingForwardMessage.class);
     }
 
     private <T> ConsumerFactory<String, T> buildConsumerFactory(String consumerGroupId, Class<T> valueType) {
