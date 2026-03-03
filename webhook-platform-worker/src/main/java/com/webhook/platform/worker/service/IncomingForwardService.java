@@ -19,10 +19,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
@@ -48,6 +50,7 @@ public class IncomingForwardService {
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
     private final MeterRegistry meterRegistry;
+    private final TransactionTemplate transactionTemplate;
 
     private final Counter forwardSuccessCounter;
     private final Counter forwardFailureCounter;
@@ -64,7 +67,8 @@ public class IncomingForwardService {
             @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            TransactionTemplate transactionTemplate) {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
@@ -79,6 +83,7 @@ public class IncomingForwardService {
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
         this.meterRegistry = meterRegistry;
+        this.transactionTemplate = transactionTemplate;
 
         this.forwardSuccessCounter = Counter.builder("incoming_forward_attempts_total")
                 .tag("result", "success").register(meterRegistry);
@@ -124,14 +129,49 @@ public class IncomingForwardService {
             return;
         }
 
-        int attemptNumber = attemptRepository.findMaxAttemptNumber(eventId, destinationId) + 1;
-        int maxAttempts = destination.getMaxAttempts();
+        // --- Atomic claim: prevent duplicate HTTP sends ---
+        int attemptNumber;
+        boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
 
+        if (isRetry) {
+            // Retry path: claim existing PENDING attempt row with atomic UPDATE
+            attemptNumber = message.getAttemptCount() + 1;
+            Integer claimed = transactionTemplate
+                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, attemptNumber));
+            if (claimed == null || claimed == 0) {
+                log.debug("Forward attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
+                        eventId, destinationId, attemptNumber);
+                return;
+            }
+        } else {
+            // First dispatch: INSERT attempt with PROCESSING status atomically
+            // Unique constraint (event_id, dest_id, attempt_number) guards against
+            // duplicates
+            attemptNumber = 1;
+            try {
+                transactionTemplate.executeWithoutResult(tx -> {
+                    IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
+                            .incomingEventId(eventId)
+                            .destinationId(destinationId)
+                            .attemptNumber(1)
+                            .status(ForwardAttemptStatus.PROCESSING)
+                            .startedAt(Instant.now())
+                            .build();
+                    attemptRepository.saveAndFlush(attempt);
+                });
+            } catch (DataIntegrityViolationException e) {
+                log.debug("Forward already claimed (unique constraint): eventId={}, destId={}",
+                        eventId, destinationId);
+                return;
+            }
+        }
+
+        int maxAttempts = destination.getMaxAttempts();
         attemptForward(event, destination, attemptNumber, maxAttempts);
     }
 
     private void attemptForward(IncomingEvent event, IncomingDestination destination,
-                                 int attemptNumber, int maxAttempts) {
+            int attemptNumber, int maxAttempts) {
         long startTime = System.currentTimeMillis();
         UUID eventId = event.getId();
         UUID destinationId = destination.getId();
@@ -143,13 +183,17 @@ public class IncomingForwardService {
         String body = transformPayload(event.getBodyRaw(), destination.getPayloadTransform());
         String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
 
+        // Idempotency key for downstream dedup
+        String idempotencyKey = eventId + "-" + destinationId + "-" + attemptNumber;
+
         try {
             var requestSpec = webClient.post()
                     .uri(destination.getUrl())
                     .header("Content-Type", contentType)
                     .header("X-Incoming-Event-Id", eventId.toString())
                     .header("X-Incoming-Request-Id", event.getRequestId())
-                    .header("X-Forward-Attempt", String.valueOf(attemptNumber));
+                    .header("X-Forward-Attempt", String.valueOf(attemptNumber))
+                    .header("Idempotency-Key", idempotencyKey);
 
             // Add auth headers
             addAuthHeaders(requestSpec, destination);
@@ -190,34 +234,37 @@ public class IncomingForwardService {
     }
 
     private void handleResponse(UUID eventId, UUID destinationId, int attemptNumber, int maxAttempts,
-                                 int statusCode, String responseBody, String responseHeaders,
-                                 String errorMessage, int durationMs, String retryDelays) {
+            int statusCode, String responseBody, String responseHeaders,
+            String errorMessage, int durationMs, String retryDelays) {
         boolean success = statusCode >= 200 && statusCode < 300;
 
         if (success) {
             forwardSuccessCounter.increment();
-            saveAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.SUCCESS,
+            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.SUCCESS,
                     statusCode, responseHeaders, responseBody, null, durationMs, null);
             log.info("Forward succeeded: eventId={}, destId={}, attempt={}, status={}",
                     eventId, destinationId, attemptNumber, statusCode);
         } else if (isRetryable(statusCode)) {
             forwardFailureCounter.increment();
             if (attemptNumber >= maxAttempts) {
-                saveAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
+                updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
                         statusCode, responseHeaders, responseBody,
                         "Max attempts reached (HTTP " + statusCode + ")", durationMs, null);
                 log.warn("Forward DLQ: eventId={}, destId={}, maxAttempts reached", eventId, destinationId);
             } else {
+                // Schedule retry: update current attempt to final state, create next PENDING
+                // attempt
                 Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays);
-                saveAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.PENDING,
+                updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
                         statusCode, responseHeaders, responseBody,
-                        "Retryable HTTP " + statusCode, durationMs, nextRetry);
+                        "Retryable HTTP " + statusCode, durationMs, null);
+                createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
                 log.info("Forward retry scheduled: eventId={}, destId={}, attempt={}, nextRetry={}",
                         eventId, destinationId, attemptNumber, nextRetry);
             }
         } else {
             forwardFailureCounter.increment();
-            saveAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
+            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
                     statusCode, responseHeaders, responseBody,
                     "Non-retryable HTTP " + statusCode, durationMs, null);
             log.error("Forward failed (non-retryable): eventId={}, destId={}, status={}",
@@ -226,45 +273,85 @@ public class IncomingForwardService {
     }
 
     private void handleError(UUID eventId, UUID destinationId, int attemptNumber, int maxAttempts,
-                              String errorMessage, int durationMs, String retryDelays) {
+            String errorMessage, int durationMs, String retryDelays) {
         forwardErrorCounter.increment();
         if (attemptNumber >= maxAttempts) {
-            saveAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
+            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
                     null, null, null,
                     "Max attempts reached: " + errorMessage, durationMs, null);
             log.warn("Forward DLQ (error): eventId={}, destId={}", eventId, destinationId);
         } else {
             Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays);
-            saveAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.PENDING,
+            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
                     null, null, null,
-                    errorMessage, durationMs, nextRetry);
+                    errorMessage, durationMs, null);
+            createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
             log.info("Forward retry scheduled (error): eventId={}, destId={}, nextRetry={}",
                     eventId, destinationId, nextRetry);
         }
     }
 
-    private void saveAttempt(UUID eventId, UUID destinationId, int attemptNumber, ForwardAttemptStatus status,
-                              Integer responseCode, String responseHeaders, String responseBody,
-                              String errorMessage, int durationMs, Instant nextRetryAt) {
-        IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
-                .incomingEventId(eventId)
-                .destinationId(destinationId)
-                .attemptNumber(attemptNumber)
-                .status(status)
-                .startedAt(Instant.now().minusMillis(durationMs))
-                .finishedAt(Instant.now())
-                .responseCode(responseCode)
-                .responseHeadersJson(responseHeaders)
-                .responseBodySnippet(responseBody)
-                .errorMessage(errorMessage)
-                .nextRetryAt(nextRetryAt)
-                .build();
-        attemptRepository.save(attempt);
+    /**
+     * Updates the existing PROCESSING attempt row with the final result.
+     * The row was created/claimed atomically before the HTTP call.
+     */
+    private void updateAttempt(UUID eventId, UUID destinationId, int attemptNumber, ForwardAttemptStatus status,
+            Integer responseCode, String responseHeaders, String responseBody,
+            String errorMessage, int durationMs, Instant nextRetryAt) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            List<IncomingForwardAttempt> attempts = attemptRepository
+                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
+            IncomingForwardAttempt attempt = attempts.stream()
+                    .filter(a -> a.getAttemptNumber() == attemptNumber)
+                    .findFirst()
+                    .orElse(null);
+            if (attempt == null) {
+                log.error("Attempt row not found for update: eventId={}, destId={}, attempt={}",
+                        eventId, destinationId, attemptNumber);
+                return;
+            }
+            attempt.setStatus(status);
+            attempt.setFinishedAt(Instant.now());
+            attempt.setResponseCode(responseCode);
+            attempt.setResponseHeadersJson(responseHeaders);
+            attempt.setResponseBodySnippet(responseBody);
+            attempt.setErrorMessage(errorMessage);
+            attempt.setNextRetryAt(nextRetryAt);
+            attemptRepository.save(attempt);
+        });
+    }
+
+    /**
+     * Creates a new PENDING attempt row for the next retry.
+     * This row will be picked up by IncomingForwardRetryScheduler.
+     */
+    private void createPendingRetryAttempt(UUID eventId, UUID destinationId,
+            int nextAttemptNumber, Instant nextRetryAt) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            IncomingForwardAttempt nextAttempt = IncomingForwardAttempt.builder()
+                    .incomingEventId(eventId)
+                    .destinationId(destinationId)
+                    .attemptNumber(nextAttemptNumber)
+                    .status(ForwardAttemptStatus.PENDING)
+                    .nextRetryAt(nextRetryAt)
+                    .build();
+            attemptRepository.save(nextAttempt);
+        });
     }
 
     private void saveFailedAttempt(UUID eventId, UUID destinationId, String errorMessage, int durationMs) {
-        saveAttempt(eventId, destinationId, 1, ForwardAttemptStatus.FAILED,
-                null, null, null, errorMessage, durationMs, null);
+        transactionTemplate.executeWithoutResult(tx -> {
+            IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
+                    .incomingEventId(eventId)
+                    .destinationId(destinationId)
+                    .attemptNumber(1)
+                    .status(ForwardAttemptStatus.FAILED)
+                    .startedAt(Instant.now().minusMillis(durationMs))
+                    .finishedAt(Instant.now())
+                    .errorMessage(errorMessage)
+                    .build();
+            attemptRepository.save(attempt);
+        });
     }
 
     private boolean isRetryable(int statusCode) {
@@ -283,7 +370,7 @@ public class IncomingForwardService {
 
     private long[] parseRetryDelays(String retryDelaysStr) {
         if (retryDelaysStr == null || retryDelaysStr.isEmpty()) {
-            return new long[]{60, 300, 900, 3600, 21600};
+            return new long[] { 60, 300, 900, 3600, 21600 };
         }
         try {
             String[] parts = retryDelaysStr.split(",");
@@ -294,7 +381,7 @@ public class IncomingForwardService {
             return delays;
         } catch (NumberFormatException e) {
             log.warn("Invalid retry delays format: {}, using defaults", retryDelaysStr);
-            return new long[]{60, 300, 900, 3600, 21600};
+            return new long[] { 60, 300, 900, 3600, 21600 };
         }
     }
 
@@ -332,7 +419,8 @@ public class IncomingForwardService {
                         requestSpec.header(headerName, headerValue);
                     }
                 }
-                default -> {}
+                default -> {
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to apply auth headers for destination {}: {}", destination.getId(), e.getMessage());
@@ -377,9 +465,9 @@ public class IncomingForwardService {
     /**
      * Applies JSONPath transformation to the payload if configured.
      * Supports expressions like:
-     *   "$.data"          — extract a subtree
-     *   "$.events[0]"     — extract first element
-     *   "$.payload.body"  — nested extraction
+     * "$.data" — extract a subtree
+     * "$.events[0]" — extract first element
+     * "$.payload.body" — nested extraction
      * Returns original body if no transform is configured or on error.
      */
     private String transformPayload(String body, String payloadTransform) {
@@ -396,7 +484,8 @@ public class IncomingForwardService {
             log.warn("JSONPath '{}' not found in payload, forwarding as-is: {}", payloadTransform, e.getMessage());
             return body;
         } catch (Exception e) {
-            log.warn("Payload transform failed for expression '{}', forwarding as-is: {}", payloadTransform, e.getMessage());
+            log.warn("Payload transform failed for expression '{}', forwarding as-is: {}", payloadTransform,
+                    e.getMessage());
             return body;
         }
     }

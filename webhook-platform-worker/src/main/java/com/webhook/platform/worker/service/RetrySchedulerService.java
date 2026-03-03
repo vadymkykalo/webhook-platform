@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,6 +29,7 @@ public class RetrySchedulerService {
 
     private final DeliveryRepository deliveryRepository;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
+    private final TransactionTemplate transactionTemplate;
     private final int batchSize;
     private final long sendTimeoutSeconds;
     private final long rescheduleDelaySeconds;
@@ -36,46 +37,57 @@ public class RetrySchedulerService {
     public RetrySchedulerService(
             DeliveryRepository deliveryRepository,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
+            TransactionTemplate transactionTemplate,
             @Value("${retry.scheduler.batch-size:100}") int batchSize,
             @Value("${retry.scheduler.send-timeout-seconds:30}") long sendTimeoutSeconds,
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
+        this.transactionTemplate = transactionTemplate;
         this.batchSize = batchSize;
         this.sendTimeoutSeconds = sendTimeoutSeconds;
         this.rescheduleDelaySeconds = rescheduleDelaySeconds;
     }
 
     @Scheduled(fixedDelayString = "${retry.scheduler.poll-interval-ms:10000}")
-    @Transactional
     public void scheduleRetries() {
-        Instant now = Instant.now();
+        // ── Phase 1: Short transaction — claim candidates ──
+        List<Delivery> claimed = transactionTemplate.execute(tx -> {
+            Instant now = Instant.now();
 
-        // Step 1: find candidate IDs (window function, no locking)
-        List<UUID> candidateIds = deliveryRepository.findPendingRetryIds(
-                Delivery.DeliveryStatus.PENDING,
-                now,
-                batchSize,
-                10);
+            List<UUID> candidateIds = deliveryRepository.findPendingRetryIds(
+                    Delivery.DeliveryStatus.PENDING, now, batchSize, 10);
+            if (candidateIds.isEmpty()) {
+                return List.<Delivery>of();
+            }
 
-        if (candidateIds.isEmpty()) {
+            // FOR UPDATE SKIP LOCKED — only lock rows not already held
+            List<Delivery> locked = deliveryRepository.lockByIds(candidateIds);
+            if (locked.isEmpty()) {
+                return List.<Delivery>of();
+            }
+
+            // Nullify nextRetryAt to prevent re-pick by another scheduler instance
+            for (Delivery d : locked) {
+                d.setNextRetryAt(null);
+                d.setUpdatedAt(Instant.now());
+            }
+            deliveryRepository.saveAll(locked);
+
+            return locked;
+        });
+
+        if (claimed == null || claimed.isEmpty()) {
             return;
         }
 
-        // Step 2: lock rows for update (no window function)
-        List<Delivery> pendingRetries = deliveryRepository.lockByIds(candidateIds);
+        log.info("Claimed {} deliveries for retry dispatch", claimed.size());
 
-        if (pendingRetries.isEmpty()) {
-            return;
-        }
-
-        log.info("Found {} deliveries ready for retry (batch size: {})", pendingRetries.size(), batchSize);
-
-        // Send all messages asynchronously (non-blocking, highload-friendly)
+        // ── Phase 2: Outside transaction — Kafka I/O ──
         Map<UUID, CompletableFuture<SendResult<String, DeliveryMessage>>> futures = new HashMap<>();
         Map<UUID, String> deliveryTopics = new HashMap<>();
 
-        for (Delivery delivery : pendingRetries) {
+        for (Delivery delivery : claimed) {
             try {
                 String topic = getRetryTopic(delivery.getAttemptCount());
                 deliveryTopics.put(delivery.getId(), topic);
@@ -98,6 +110,8 @@ public class RetrySchedulerService {
         }
 
         if (futures.isEmpty()) {
+            // All sends failed to initiate, reschedule everything
+            rescheduleAll(claimed, "Send not initiated");
             return;
         }
 
@@ -109,14 +123,13 @@ public class RetrySchedulerService {
             log.warn("Batch send timeout or error, will check individual results: {}", e.getMessage());
         }
 
-        // Process results - update DB only after Kafka confirmation
+        // ── Phase 3: Short transaction — update results ──
         List<Delivery> successfulDeliveries = new ArrayList<>();
         List<Delivery> failedDeliveries = new ArrayList<>();
 
-        for (Delivery delivery : pendingRetries) {
+        for (Delivery delivery : claimed) {
             CompletableFuture<SendResult<String, DeliveryMessage>> future = futures.get(delivery.getId());
             if (future == null) {
-                // Send was not initiated, reschedule
                 rescheduleDelivery(delivery, "Send not initiated");
                 failedDeliveries.add(delivery);
                 continue;
@@ -124,16 +137,13 @@ public class RetrySchedulerService {
 
             try {
                 if (!future.isDone()) {
-                    // Future genuinely not completed — timed out
                     rescheduleDelivery(delivery, "Send confirmation timeout");
                     failedDeliveries.add(delivery);
                     continue;
                 }
-                // future.get() will throw if the future completed exceptionally
                 SendResult<String, DeliveryMessage> result = future.get();
-                // Successfully sent and confirmed
                 RecordMetadata metadata = result.getRecordMetadata();
-                delivery.setNextRetryAt(null);
+                // nextRetryAt already null from Phase 1
                 successfulDeliveries.add(delivery);
 
                 log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
@@ -142,7 +152,6 @@ public class RetrySchedulerService {
                         metadata.partition(),
                         metadata.offset());
             } catch (Exception e) {
-                // Send failed
                 rescheduleDelivery(delivery, e.getMessage());
                 failedDeliveries.add(delivery);
 
@@ -154,21 +163,31 @@ public class RetrySchedulerService {
             }
         }
 
-        // Batch save all updates
-        if (!successfulDeliveries.isEmpty()) {
-            deliveryRepository.saveAll(successfulDeliveries);
-        }
-        if (!failedDeliveries.isEmpty()) {
-            deliveryRepository.saveAll(failedDeliveries);
-        }
+        // Batch save in a short transaction
+        transactionTemplate.executeWithoutResult(tx -> {
+            if (!successfulDeliveries.isEmpty()) {
+                deliveryRepository.saveAll(successfulDeliveries);
+            }
+            if (!failedDeliveries.isEmpty()) {
+                deliveryRepository.saveAll(failedDeliveries);
+            }
+        });
 
         log.info("Retry scheduling complete: {} successful, {} failed/rescheduled",
                 successfulDeliveries.size(), failedDeliveries.size());
     }
 
+    private void rescheduleAll(List<Delivery> deliveries, String reason) {
+        for (Delivery d : deliveries) {
+            rescheduleDelivery(d, reason);
+        }
+        transactionTemplate.executeWithoutResult(tx -> deliveryRepository.saveAll(deliveries));
+    }
+
     private void rescheduleDelivery(Delivery delivery, String reason) {
         Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds);
         delivery.setNextRetryAt(rescheduleTime);
+        delivery.setUpdatedAt(Instant.now());
 
         log.warn("Rescheduling delivery {} to {} due to: {}",
                 delivery.getId(), rescheduleTime, reason);

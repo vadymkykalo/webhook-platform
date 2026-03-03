@@ -10,6 +10,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -21,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -35,6 +38,9 @@ class RetrySchedulerServiceTest {
         @Mock
         private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
 
+        @Mock
+        private TransactionTemplate transactionTemplate;
+
         private RetrySchedulerService retrySchedulerService;
 
         private final int batchSize = 100;
@@ -43,9 +49,22 @@ class RetrySchedulerServiceTest {
 
         @BeforeEach
         void setUp() {
+                // Make TransactionTemplate execute the callbacks directly
+                when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+                        var callback = invocation.getArgument(0, org.springframework.transaction.support.TransactionCallback.class);
+                        return callback.doInTransaction(null);
+                });
+                lenient().doAnswer(invocation -> {
+                        @SuppressWarnings("unchecked")
+                        Consumer<TransactionStatus> callback = invocation.getArgument(0, Consumer.class);
+                        callback.accept(null);
+                        return null;
+                }).when(transactionTemplate).executeWithoutResult(any());
+
                 retrySchedulerService = new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
+                                transactionTemplate,
                                 batchSize,
                                 sendTimeoutSeconds,
                                 rescheduleDelaySeconds);
@@ -110,7 +129,7 @@ class RetrySchedulerServiceTest {
 
                 // Assert
                 verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any(DeliveryMessage.class));
-                verify(deliveryRepository).saveAll(anyList());
+                verify(deliveryRepository, times(2)).saveAll(anyList()); // Phase 1 claim + Phase 3 results
         }
 
         @Test
@@ -134,11 +153,13 @@ class RetrySchedulerServiceTest {
                 // Act
                 retrySchedulerService.scheduleRetries();
 
-                // Assert
+                // Assert — Phase 1 nullifies nextRetryAt, Phase 3 keeps it null for successful sends
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
-                verify(deliveryRepository).saveAll(deliveryCaptor.capture());
-                assertNull(deliveryCaptor.getValue().get(0).getNextRetryAt());
+                verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
+                // Phase 1 save nullified nextRetryAt; Phase 3 save preserves it
+                List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
+                assertNull(allSaves.get(0).get(0).getNextRetryAt());
         }
 
     @Test
@@ -179,11 +200,13 @@ class RetrySchedulerServiceTest {
                 // Act & Assert - should not throw exception, delivery should be rescheduled
                 assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries());
 
-                // Verify failed delivery is saved with new nextRetryAt
+                // Verify failed delivery is saved with new nextRetryAt (Phase 3)
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
-                verify(deliveryRepository).saveAll(deliveryCaptor.capture());
-                assertNotNull(deliveryCaptor.getValue().get(0).getNextRetryAt());
+                verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
+                // Phase 3 is the second saveAll — contains rescheduled delivery
+                List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
+                assertNotNull(allSaves.get(1).get(0).getNextRetryAt());
         }
 
         @Test
@@ -292,11 +315,12 @@ class RetrySchedulerServiceTest {
 
                 // Assert — delivery is rescheduled with nextRetryAt set
                 assertNotNull(delivery.getNextRetryAt());
-                // Verify it ends up in the failed batch (saveAll is called)
+                // Verify it ends up in the failed batch (Phase 3 saveAll)
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
-                verify(deliveryRepository).saveAll(deliveryCaptor.capture());
-                assertTrue(deliveryCaptor.getValue().contains(delivery));
+                verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
+                List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
+                assertTrue(allSaves.get(1).contains(delivery));
         }
 
         private Delivery createDelivery(UUID id, int attemptCount, Instant nextRetryAt) {
