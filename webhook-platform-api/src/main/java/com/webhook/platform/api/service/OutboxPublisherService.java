@@ -116,34 +116,40 @@ public class OutboxPublisherService {
 
     @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
     @SchedulerLock(name = "outbox-publisher-retry", lockAtLeastFor = "PT5S", lockAtMostFor = "PT2M")
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void retryFailedMessages() {
-        List<OutboxMessage> failedMessages = outboxMessageRepository
-                .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10);
+        // Phase 1: claim inside short transaction — SELECT FOR UPDATE + mark SENDING, commit immediately
+        List<OutboxMessage> messagesToRetry = txTemplate.execute(status -> {
+            List<OutboxMessage> failedMessages = outboxMessageRepository
+                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10);
 
-        if (failedMessages.isEmpty()) {
+            if (failedMessages.isEmpty()) {
+                return List.<OutboxMessage>of();
+            }
+
+            List<OutboxMessage> eligible = new ArrayList<>();
+            for (OutboxMessage message : failedMessages) {
+                long backoffSeconds = calculateBackoff(message.getRetryCount());
+                Instant baseTime = message.getLastAttemptAt() != null ? message.getLastAttemptAt() : message.getCreatedAt();
+                Instant nextRetryTime = baseTime.plusSeconds(backoffSeconds);
+
+                if (Instant.now().isBefore(nextRetryTime)) {
+                    log.debug("Skipping message {} - backoff not expired (retry at {})",
+                            message.getId(), nextRetryTime);
+                    continue;
+                }
+                message.setStatus(OutboxStatus.SENDING);
+                eligible.add(message);
+            }
+            return eligible.isEmpty() ? eligible : outboxMessageRepository.saveAll(eligible);
+        });
+
+        if (messagesToRetry == null || messagesToRetry.isEmpty()) {
             return;
         }
 
-        log.info("Retrying {} failed outbox messages", failedMessages.size());
-
-        List<OutboxMessage> messagesToRetry = new ArrayList<>();
-        for (OutboxMessage message : failedMessages) {
-            long backoffSeconds = calculateBackoff(message.getRetryCount());
-            Instant baseTime = message.getLastAttemptAt() != null ? message.getLastAttemptAt() : message.getCreatedAt();
-            Instant nextRetryTime = baseTime.plusSeconds(backoffSeconds);
-            
-            if (Instant.now().isBefore(nextRetryTime)) {
-                log.debug("Skipping message {} - backoff not expired (retry at {})", 
-                        message.getId(), nextRetryTime);
-                continue;
-            }
-            messagesToRetry.add(message);
-        }
-
-        if (!messagesToRetry.isEmpty()) {
-            publishBatchAsync(messagesToRetry, true);
-        }
+        // Phase 2: publish to Kafka outside transaction — no DB locks held
+        log.info("Retrying {} failed outbox messages", messagesToRetry.size());
+        publishBatchAsync(messagesToRetry, true);
     }
 
     @Scheduled(fixedDelayString = "${outbox.publisher.cleanup-interval-ms:3600000}")

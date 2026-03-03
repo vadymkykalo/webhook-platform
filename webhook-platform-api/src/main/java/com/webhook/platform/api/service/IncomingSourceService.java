@@ -206,10 +206,10 @@ public class IncomingSourceService {
     }
 
     private String generateSlug(String name) {
-        return name.toLowerCase()
+        String normalized = name.toLowerCase()
                 .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-|-$", "")
-                .substring(0, Math.min(name.length(), 50));
+                .replaceAll("^-|-$", "");
+        return normalized.substring(0, Math.min(normalized.length(), 50));
     }
 
 }
