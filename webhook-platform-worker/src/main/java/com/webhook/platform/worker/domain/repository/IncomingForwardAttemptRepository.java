@@ -16,33 +16,40 @@ import java.util.UUID;
 @Repository
 public interface IncomingForwardAttemptRepository extends JpaRepository<IncomingForwardAttempt, UUID> {
 
-    List<IncomingForwardAttempt> findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
-            UUID incomingEventId, UUID destinationId);
+        List<IncomingForwardAttempt> findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
+                        UUID incomingEventId, UUID destinationId);
 
-    @Query(value = "SELECT * FROM incoming_forward_attempts WHERE status = :#{#status.name()} AND next_retry_at <= :now " +
-            "ORDER BY next_retry_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED",
-            nativeQuery = true)
-    List<IncomingForwardAttempt> findPendingRetriesForUpdate(@Param("status") ForwardAttemptStatus status,
-                                                             @Param("now") Instant now,
-                                                             @Param("limit") int limit);
+        @Query(value = "SELECT * FROM incoming_forward_attempts WHERE status = :#{#status.name()} AND next_retry_at <= :now "
+                        +
+                        "ORDER BY next_retry_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)
+        List<IncomingForwardAttempt> findPendingRetriesForUpdate(@Param("status") ForwardAttemptStatus status,
+                        @Param("now") Instant now,
+                        @Param("limit") int limit);
 
-    @Query("SELECT COALESCE(MAX(a.attemptNumber), 0) FROM IncomingForwardAttempt a " +
-            "WHERE a.incomingEventId = :eventId AND a.destinationId = :destinationId")
-    int findMaxAttemptNumber(@Param("eventId") UUID eventId, @Param("destinationId") UUID destinationId);
+        @Query("SELECT COALESCE(MAX(a.attemptNumber), 0) FROM IncomingForwardAttempt a " +
+                        "WHERE a.incomingEventId = :eventId AND a.destinationId = :destinationId")
+        int findMaxAttemptNumber(@Param("eventId") UUID eventId, @Param("destinationId") UUID destinationId);
 
-    @Modifying
-    @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', " +
-            "next_retry_at = now() " +
-            "WHERE status = 'PROCESSING' AND started_at < :threshold",
-            nativeQuery = true)
-    int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PROCESSING', started_at = now() " +
+                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
+                        "AND attempt_number = :attemptNumber AND status = 'PENDING'", nativeQuery = true)
+        int claimForProcessing(@Param("eventId") UUID eventId,
+                        @Param("destinationId") UUID destinationId,
+                        @Param("attemptNumber") int attemptNumber);
 
-    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PENDING' AND a.createdAt > :since")
-    long countPending(@Param("since") Instant since);
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', " +
+                        "next_retry_at = now() " +
+                        "WHERE status = 'PROCESSING' AND started_at < :threshold", nativeQuery = true)
+        int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
 
-    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PROCESSING' AND a.createdAt > :since")
-    long countProcessing(@Param("since") Instant since);
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PENDING' AND a.createdAt > :since")
+        long countPending(@Param("since") Instant since);
 
-    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since")
-    long countDlq(@Param("since") Instant since);
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PROCESSING' AND a.createdAt > :since")
+        long countProcessing(@Param("since") Instant since);
+
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since")
+        long countDlq(@Param("since") Instant since);
 }

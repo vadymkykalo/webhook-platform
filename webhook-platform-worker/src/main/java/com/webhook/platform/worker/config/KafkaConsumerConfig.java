@@ -17,6 +17,7 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.FixedBackOff;
 
+import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,17 +32,23 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.consumer.group-id}")
     private String groupId;
     
-    @Value("${kafka.consumer.max-retries:3}")
+    @Value("${spring.kafka.consumer.max-retries:3}")
     private int maxRetries;
     
-    @Value("${kafka.consumer.retry-interval-ms:5000}")
+    @Value("${spring.kafka.consumer.retry-interval-ms:5000}")
     private long retryIntervalMs;
 
-    @Value("${kafka.consumer.delivery-concurrency:6}")
+    @Value("${spring.kafka.consumer.delivery-concurrency:6}")
     private int deliveryConcurrency;
 
-    @Value("${kafka.consumer.incoming-concurrency:3}")
+    @Value("${spring.kafka.consumer.incoming-concurrency:3}")
     private int incomingConcurrency;
+
+    @PostConstruct
+    void logEffectiveConfig() {
+        log.info("Kafka consumer effective config: bootstrapServers={}, groupId={}, deliveryConcurrency={}, incomingConcurrency={}, maxRetries={}, retryIntervalMs={}",
+                bootstrapServers, groupId, deliveryConcurrency, incomingConcurrency, maxRetries, retryIntervalMs);
+    }
 
     @Bean
     public ConsumerFactory<String, DeliveryMessage> consumerFactory() {

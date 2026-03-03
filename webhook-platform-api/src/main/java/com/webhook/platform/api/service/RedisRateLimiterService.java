@@ -2,9 +2,12 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.dto.RateLimitInfo;
 import com.webhook.platform.api.dto.RateLimitResult;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RRateLimiter;
@@ -17,8 +20,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Service
 @Slf4j
@@ -38,8 +39,9 @@ public class RedisRateLimiterService {
      * Local in-memory fallback rate limiters (Bucket4j) used when Redis is
      * unavailable.
      * Keyed by projectId to maintain per-project isolation.
+     * Bounded by Caffeine: max 10k entries, 5min expireAfterAccess to prevent memory growth.
      */
-    private final ConcurrentMap<UUID, Bucket> localFallbackBuckets = new ConcurrentHashMap<>();
+    private final Cache<UUID, Bucket> localFallbackBuckets;
 
     public RedisRateLimiterService(
             RedissonClient redissonClient,
@@ -47,6 +49,11 @@ public class RedisRateLimiterService {
             @Value("${event.ingestion.rate-limit-per-second:100}") int defaultRateLimit) {
         this.redissonClient = redissonClient;
         this.defaultRateLimit = defaultRateLimit;
+
+        this.localFallbackBuckets = Caffeine.newBuilder()
+                .maximumSize(10_000)
+                .expireAfterAccess(Duration.ofMinutes(5))
+                .build();
 
         this.rateLimitHits = Counter.builder("api_rate_limit_hits_total")
                 .description("Number of requests that passed rate limiting")
@@ -56,6 +63,9 @@ public class RedisRateLimiterService {
                 .register(meterRegistry);
         this.rateLimitFallback = Counter.builder("api_rate_limit_fallback_total")
                 .description("Number of requests rate-limited via local fallback (Redis unavailable)")
+                .register(meterRegistry);
+        Gauge.builder("api_rate_limit_fallback_cache_size", localFallbackBuckets, Cache::estimatedSize)
+                .description("Number of entries in the local fallback rate limiter cache")
                 .register(meterRegistry);
     }
 
@@ -189,13 +199,12 @@ public class RedisRateLimiterService {
      * Provides emergency throttling when Redis is unavailable.
      */
     private boolean tryLocalFallback(UUID projectId, int ratePerSecond) {
-        Bucket bucket = localFallbackBuckets.computeIfAbsent(projectId,
-                id -> Bucket.builder()
-                        .addLimit(Bandwidth.builder()
-                                .capacity(ratePerSecond)
-                                .refillGreedy(ratePerSecond, Duration.ofSeconds(1))
-                                .build())
-                        .build());
+        Bucket bucket = localFallbackBuckets.get(projectId, id -> Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(ratePerSecond)
+                        .refillGreedy(ratePerSecond, Duration.ofSeconds(1))
+                        .build())
+                .build());
 
         boolean acquired = bucket.tryConsume(1);
         if (acquired) {
