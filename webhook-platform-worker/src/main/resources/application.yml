@@ -79,10 +79,6 @@ webhook:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
   max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
-  delivery-executor:
-    core-pool-size: ${WEBHOOK_DELIVERY_POOL_CORE:10}
-    max-pool-size: ${WEBHOOK_DELIVERY_POOL_MAX:50}
-    queue-capacity: ${WEBHOOK_DELIVERY_POOL_QUEUE:200}
 
 retry:
   scheduler:
