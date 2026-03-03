@@ -40,7 +40,7 @@ spring:
       group-id: webhook-worker
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      auto-offset-reset: earliest
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
       enable-auto-commit: false
       max-retries: ${KAFKA_CONSUMER_MAX_RETRIES:3}
       retry-interval-ms: ${KAFKA_CONSUMER_RETRY_INTERVAL_MS:5000}

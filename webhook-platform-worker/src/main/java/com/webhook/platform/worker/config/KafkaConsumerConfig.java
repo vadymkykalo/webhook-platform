@@ -44,10 +44,13 @@ public class KafkaConsumerConfig {
     @Value("${spring.kafka.consumer.incoming-concurrency:3}")
     private int incomingConcurrency;
 
+    @Value("${spring.kafka.consumer.auto-offset-reset:earliest}")
+    private String autoOffsetReset;
+
     @PostConstruct
     void logEffectiveConfig() {
-        log.info("Kafka consumer effective config: bootstrapServers={}, groupId={}, deliveryConcurrency={}, incomingConcurrency={}, maxRetries={}, retryIntervalMs={}",
-                bootstrapServers, groupId, deliveryConcurrency, incomingConcurrency, maxRetries, retryIntervalMs);
+        log.info("Kafka consumer effective config: bootstrapServers={}, groupId={}, autoOffsetReset={}, deliveryConcurrency={}, incomingConcurrency={}, maxRetries={}, retryIntervalMs={}",
+                bootstrapServers, groupId, autoOffsetReset, deliveryConcurrency, incomingConcurrency, maxRetries, retryIntervalMs);
     }
 
     @Bean
@@ -66,7 +69,7 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.webhook.platform.common.dto");
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, valueType.getName());
