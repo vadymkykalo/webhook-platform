@@ -36,4 +36,13 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
             "WHERE status = 'PROCESSING' AND started_at < :threshold",
             nativeQuery = true)
     int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
+
+    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PENDING' AND a.createdAt > :since")
+    long countPending(@Param("since") Instant since);
+
+    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PROCESSING' AND a.createdAt > :since")
+    long countProcessing(@Param("since") Instant since);
+
+    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since")
+    long countDlq(@Param("since") Instant since);
 }

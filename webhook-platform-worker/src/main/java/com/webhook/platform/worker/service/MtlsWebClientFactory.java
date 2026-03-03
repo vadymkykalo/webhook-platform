@@ -132,7 +132,7 @@ public class MtlsWebClientFactory {
         SslContext sslContext = sslContextBuilder.build();
 
         HttpClient httpClient = SsrfProtectionCustomizer.apply(
-                HttpClient.create(), allowPrivateIps)
+                HttpClient.create(SsrfProtectionCustomizer.CONNECTION_PROVIDER), allowPrivateIps)
                 .secure(spec -> spec.sslContext(sslContext));
 
         log.info("Created mTLS WebClient for endpoint {}", endpoint.getId());

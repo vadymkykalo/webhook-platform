@@ -56,4 +56,13 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             @Param("endpointId") UUID endpointId,
             @Param("sequenceNumber") Long sequenceNumber
     );
+
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'PENDING' AND d.createdAt > :since")
+    long countPending(@Param("since") Instant since);
+
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'PROCESSING' AND d.createdAt > :since")
+    long countProcessing(@Param("since") Instant since);
+
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.createdAt > :since")
+    long countDlq(@Param("since") Instant since);
 }

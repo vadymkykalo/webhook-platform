@@ -99,8 +99,7 @@ public class WebhookDeliveryService {
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
-        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.apply(
-                reactor.netty.http.client.HttpClient.create(), allowPrivateIps);
+        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(allowPrivateIps);
         this.defaultWebClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
