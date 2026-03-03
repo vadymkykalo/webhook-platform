@@ -3,6 +3,11 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.dto.IngressResponse;
 import com.webhook.platform.api.service.IngressService;
+import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
+import com.webhook.platform.api.service.ingress.RateLimitExceededException;
+import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
+import com.webhook.platform.api.service.ingress.SourceDisabledException;
+import com.webhook.platform.api.service.ingress.SourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -56,32 +61,32 @@ public class IngressController {
                             .status("accepted")
                             .requestId(event.getRequestId())
                             .build());
-        } catch (IngressService.SourceNotFoundException e) {
+        } catch (SourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(IngressResponse.builder()
                             .error("not_found")
                             .message("Invalid ingress endpoint")
                             .build());
-        } catch (IngressService.SourceDisabledException e) {
+        } catch (SourceDisabledException e) {
             return ResponseEntity.status(HttpStatus.GONE)
                     .body(IngressResponse.builder()
                             .error("disabled")
                             .message("This ingress endpoint is disabled")
                             .build());
-        } catch (IngressService.PayloadTooLargeException e) {
+        } catch (PayloadTooLargeException e) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                     .body(IngressResponse.builder()
                             .error("payload_too_large")
                             .message(e.getMessage())
                             .build());
-        } catch (IngressService.RateLimitExceededException e) {
+        } catch (RateLimitExceededException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("Retry-After", "1")
                     .body(IngressResponse.builder()
                             .error("rate_limit_exceeded")
                             .message("Too many requests. Please retry later.")
                             .build());
-        } catch (IngressService.SignatureVerificationFailedException e) {
+        } catch (SignatureVerificationFailedException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(IngressResponse.builder()
                             .error("signature_verification_failed")

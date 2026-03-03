@@ -8,7 +8,6 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
@@ -17,6 +16,14 @@ import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
+import com.webhook.platform.api.service.ingress.ClientIpResolver;
+import com.webhook.platform.api.service.ingress.HeaderSanitizer;
+import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
+import com.webhook.platform.api.service.ingress.ProviderEventIdExtractor;
+import com.webhook.platform.api.service.ingress.RateLimitExceededException;
+import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
+import com.webhook.platform.api.service.ingress.SourceDisabledException;
+import com.webhook.platform.api.service.ingress.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
@@ -25,21 +32,19 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.interceptor.NoRollbackRuleAttribute;
+import org.springframework.transaction.interceptor.RuleBasedTransactionAttribute;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -55,7 +60,8 @@ public class IngressService {
     private final MeterRegistry meterRegistry;
     private final WebhookVerifierFactory verifierFactory;
     private final RedisRateLimiterService rateLimiterService;
-    private final List<String> trustedProxies;
+    private final ClientIpResolver clientIpResolver;
+    private final TransactionTemplate transactionTemplate;
     private final String encryptionKey;
     private final String encryptionSalt;
     private final long maxPayloadSizeBytes;
@@ -70,7 +76,8 @@ public class IngressService {
             MeterRegistry meterRegistry,
             WebhookVerifierFactory verifierFactory,
             RedisRateLimiterService rateLimiterService,
-            @Value("${webhook.incoming.trusted-proxies:127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}") List<String> trustedProxies,
+            ClientIpResolver clientIpResolver,
+            PlatformTransactionManager transactionManager,
             @Value("${webhook.encryption-key}") String encryptionKey,
             @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes) {
@@ -83,14 +90,46 @@ public class IngressService {
         this.meterRegistry = meterRegistry;
         this.verifierFactory = verifierFactory;
         this.rateLimiterService = rateLimiterService;
-        this.trustedProxies = trustedProxies;
+        this.clientIpResolver = clientIpResolver;
         this.encryptionKey = encryptionKey;
         this.encryptionSalt = encryptionSalt;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
+
+        RuleBasedTransactionAttribute txAttr = new RuleBasedTransactionAttribute();
+        txAttr.getRollbackRules().add(new NoRollbackRuleAttribute(SignatureVerificationFailedException.class));
+        this.transactionTemplate = new TransactionTemplate(transactionManager, txAttr);
     }
 
-    @Transactional(noRollbackFor = SignatureVerificationFailedException.class)
     public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
+        try {
+            return transactionTemplate.execute(status -> doReceiveWebhook(token, body, request));
+        } catch (DataIntegrityViolationException e) {
+            return handleDuplicateRace(token, body, request, e);
+        }
+    }
+
+    private IncomingEvent handleDuplicateRace(String token, String body, HttpServletRequest request,
+                                               DataIntegrityViolationException e) {
+        String bodySha256 = computeSha256(body);
+        String providerEventId = ProviderEventIdExtractor.extract(request, bodySha256);
+        if (providerEventId != null) {
+            var source = sourceRepository.findByIngressPathToken(token);
+            if (source.isPresent()) {
+                var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(
+                        source.get().getId(), providerEventId);
+                if (existing.isPresent()) {
+                    log.info("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
+                            source.get().getId(), providerEventId, existing.get().getId());
+                    meterRegistry.counter("incoming_events_deduplicated_total",
+                            "source_id", source.get().getId().toString()).increment();
+                    return existing.get();
+                }
+            }
+        }
+        throw e;
+    }
+
+    private IncomingEvent doReceiveWebhook(String token, String body, HttpServletRequest request) {
         IncomingSource source = sourceRepository.findByIngressPathToken(token)
                 .orElseThrow(() -> new SourceNotFoundException("Invalid ingress token"));
 
@@ -116,13 +155,13 @@ public class IngressService {
         String path = request.getRequestURI();
         String queryParams = request.getQueryString();
         String contentType = request.getContentType();
-        String clientIp = extractClientIp(request);
+        String clientIp = clientIpResolver.resolve(request);
         String userAgent = request.getHeader("User-Agent");
-        String headersJson = extractHeadersJson(request);
+        String headersJson = HeaderSanitizer.toJson(request, objectMapper);
         String bodySha256 = computeSha256(body);
 
         // Extract provider event ID for dedup (well-known headers, fallback to body hash)
-        String providerEventId = extractProviderEventId(request, bodySha256);
+        String providerEventId = ProviderEventIdExtractor.extract(request, bodySha256);
 
         // Dedup: if same source + same provider event ID already exists, return existing (idempotent)
         if (providerEventId != null) {
@@ -168,7 +207,7 @@ public class IngressService {
                 .providerEventId(providerEventId)
                 .contentType(contentType)
                 .clientIp(clientIp)
-                .userAgent(userAgent != null ? truncate(userAgent, 512) : null)
+                .userAgent(userAgent != null && userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent)
                 .verified(verified)
                 .verificationError(verificationError)
                 .receivedAt(Instant.now())
@@ -255,91 +294,6 @@ public class IngressService {
         );
     }
 
-    private String extractClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        // Only trust proxy headers when the direct connection comes from a known proxy
-        if (isTrustedProxy(remoteAddr)) {
-            String xForwardedFor = request.getHeader("X-Forwarded-For");
-            if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-                return xForwardedFor.split(",")[0].trim();
-            }
-            String xRealIp = request.getHeader("X-Real-IP");
-            if (xRealIp != null && !xRealIp.isBlank()) {
-                return xRealIp.trim();
-            }
-        }
-        return remoteAddr;
-    }
-
-    private boolean isTrustedProxy(String remoteAddr) {
-        if (trustedProxies == null || trustedProxies.isEmpty()) {
-            return false;
-        }
-        try {
-            InetAddress remote = InetAddress.getByName(remoteAddr);
-            byte[] remoteBytes = remote.getAddress();
-            for (String proxy : trustedProxies) {
-                String trimmed = proxy.trim();
-                if (trimmed.isEmpty()) continue;
-                if (trimmed.contains("/")) {
-                    // CIDR notation
-                    String[] parts = trimmed.split("/");
-                    InetAddress network = InetAddress.getByName(parts[0]);
-                    int prefixLen = Integer.parseInt(parts[1]);
-                    if (isInCidr(remoteBytes, network.getAddress(), prefixLen)) {
-                        return true;
-                    }
-                } else {
-                    InetAddress trusted = InetAddress.getByName(trimmed);
-                    if (remote.equals(trusted)) {
-                        return true;
-                    }
-                }
-            }
-        } catch (UnknownHostException e) {
-            log.warn("Failed to resolve remote address for trusted proxy check: {}", remoteAddr);
-        }
-        return false;
-    }
-
-    private static boolean isInCidr(byte[] addr, byte[] network, int prefixLen) {
-        if (addr.length != network.length) return false;
-        int fullBytes = prefixLen / 8;
-        int remainingBits = prefixLen % 8;
-        for (int i = 0; i < fullBytes; i++) {
-            if (addr[i] != network[i]) return false;
-        }
-        if (remainingBits > 0 && fullBytes < addr.length) {
-            int mask = (0xFF << (8 - remainingBits)) & 0xFF;
-            if ((addr[fullBytes] & mask) != (network[fullBytes] & mask)) return false;
-        }
-        return true;
-    }
-
-    private static final Set<String> SENSITIVE_HEADERS = Set.of(
-            "authorization", "cookie", "set-cookie",
-            "x-api-key", "proxy-authorization"
-    );
-    private static final String MASKED_VALUE = "***MASKED***";
-
-    private String extractHeadersJson(HttpServletRequest request) {
-        try {
-            Map<String, String> headers = new HashMap<>();
-            Enumeration<String> headerNames = request.getHeaderNames();
-            while (headerNames.hasMoreElements()) {
-                String name = headerNames.nextElement();
-                String value = SENSITIVE_HEADERS.contains(name.toLowerCase())
-                        ? MASKED_VALUE
-                        : request.getHeader(name);
-                headers.put(name, value);
-            }
-            return objectMapper.writeValueAsString(headers);
-        } catch (Exception e) {
-            log.warn("Failed to serialize request headers: {}", e.getMessage());
-            return "{}";
-        }
-    }
-
     private String computeSha256(String body) {
         if (body == null || body.isEmpty()) {
             return null;
@@ -351,64 +305,6 @@ public class IngressService {
         } catch (Exception e) {
             log.warn("Failed to compute SHA-256: {}", e.getMessage());
             return null;
-        }
-    }
-
-    private static final List<String> PROVIDER_EVENT_ID_HEADERS = List.of(
-            "X-Webhook-Id",              // Generic
-            "Stripe-Webhook-Id",         // Stripe
-            "X-GitHub-Delivery",         // GitHub
-            "X-Shopify-Webhook-Id",      // Shopify
-            "X-Request-Id",              // Generic fallback
-            "X-Twilio-Webhook-Id",       // Twilio
-            "X-Slack-Request-Timestamp"  // Slack (timestamp as dedup key)
-    );
-
-    private String extractProviderEventId(HttpServletRequest request, String bodySha256) {
-        for (String header : PROVIDER_EVENT_ID_HEADERS) {
-            String value = request.getHeader(header);
-            if (value != null && !value.isBlank()) {
-                return truncate(value.trim(), 255);
-            }
-        }
-        // Fallback: use body hash as dedup key (same payload = duplicate)
-        return bodySha256;
-    }
-
-    private String truncate(String str, int maxLength) {
-        if (str == null || str.length() <= maxLength) {
-            return str;
-        }
-        return str.substring(0, maxLength);
-    }
-
-    // Custom exceptions for ingress handling
-    public static class SourceNotFoundException extends RuntimeException {
-        public SourceNotFoundException(String message) { super(message); }
-    }
-
-    public static class SourceDisabledException extends RuntimeException {
-        public SourceDisabledException(String message) { super(message); }
-    }
-
-    public static class PayloadTooLargeException extends RuntimeException {
-        public PayloadTooLargeException(String message) { super(message); }
-    }
-
-    public static class RateLimitExceededException extends RuntimeException {
-        public RateLimitExceededException(String message) { super(message); }
-    }
-
-    public static class SignatureVerificationFailedException extends RuntimeException {
-        private final IncomingEvent event;
-
-        public SignatureVerificationFailedException(String message, IncomingEvent event) {
-            super(message);
-            this.event = event;
-        }
-
-        public IncomingEvent getEvent() {
-            return event;
         }
     }
 }

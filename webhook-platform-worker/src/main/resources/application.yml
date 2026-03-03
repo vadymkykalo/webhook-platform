@@ -37,10 +37,11 @@ spring:
     consumer:
       delivery-concurrency: ${KAFKA_DELIVERY_CONCURRENCY:6}
       incoming-concurrency: ${KAFKA_INCOMING_CONCURRENCY:3}
-      group-id: webhook-worker
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:webhook-worker}
+      incoming-group-id: ${KAFKA_INCOMING_GROUP_ID:incoming-forward-worker}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      auto-offset-reset: earliest
+      auto-offset-reset: ${KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
       enable-auto-commit: false
       max-retries: ${KAFKA_CONSUMER_MAX_RETRIES:3}
       retry-interval-ms: ${KAFKA_CONSUMER_RETRY_INTERVAL_MS:5000}
@@ -79,10 +80,6 @@ webhook:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
   max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
-  delivery-executor:
-    core-pool-size: ${WEBHOOK_DELIVERY_POOL_CORE:10}
-    max-pool-size: ${WEBHOOK_DELIVERY_POOL_MAX:50}
-    queue-capacity: ${WEBHOOK_DELIVERY_POOL_QUEUE:200}
 
 retry:
   scheduler:

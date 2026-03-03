@@ -78,6 +78,8 @@ outbox:
     retry-interval-ms: ${OUTBOX_RETRY_INTERVAL_MS:30000}
     cleanup-interval-ms: ${OUTBOX_CLEANUP_INTERVAL_MS:3600000}
     batch-size: ${OUTBOX_BATCH_SIZE:100}
+    max-retries: ${OUTBOX_MAX_RETRIES:5}
+    dead-retention-days: ${OUTBOX_DEAD_RETENTION_DAYS:90}
 
 data-retention:
   outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
@@ -117,6 +119,7 @@ webhook:
   ingress-base-url: ${WEBHOOK_INGRESS_BASE_URL:http://localhost:8080}
   incoming:
     max-payload-size-bytes: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:524288}
+    trusted-proxies: ${WEBHOOK_INCOMING_TRUSTED_PROXIES:127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}

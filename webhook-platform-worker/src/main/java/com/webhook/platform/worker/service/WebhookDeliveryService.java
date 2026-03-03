@@ -12,7 +12,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import com.webhook.platform.common.constants.KafkaTopics;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,9 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import reactor.netty.http.client.HttpClient;
@@ -59,7 +55,6 @@ public class WebhookDeliveryService {
     private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final PayloadTransformService payloadTransformService;
-    private final Executor deliveryExecutor;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
 
@@ -93,7 +88,6 @@ public class WebhookDeliveryService {
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             PayloadTransformService payloadTransformService,
-            @Qualifier("deliveryExecutor") Executor deliveryExecutor,
             TransactionTemplate transactionTemplate) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
@@ -116,7 +110,6 @@ public class WebhookDeliveryService {
         this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
         this.payloadTransformService = payloadTransformService;
-        this.deliveryExecutor = deliveryExecutor;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
 
@@ -142,29 +135,8 @@ public class WebhookDeliveryService {
     @PreDestroy
     public void onShutdown() {
         shuttingDown = true;
-        log.info("Graceful shutdown initiated, waiting for {} in-flight deliveries...", inFlightCount.get());
-
-        // Drain the delivery executor and wait for in-flight tasks to complete
-        if (deliveryExecutor instanceof ExecutorService executorService) {
-            executorService.shutdown();
-            try {
-                if (!executorService.awaitTermination(25, TimeUnit.SECONDS)) {
-                    log.warn("Delivery executor did not terminate in 25s, forcing shutdown");
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                log.warn("Interrupted while waiting for delivery executor shutdown");
-                executorService.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        int remaining = inFlightCount.get();
-        if (remaining > 0) {
-            log.warn("Shutdown with {} in-flight deliveries still running", remaining);
-        } else {
-            log.info("All in-flight deliveries completed, shutting down cleanly");
-        }
+        log.info("Graceful shutdown initiated, {} in-flight deliveries (handled by Kafka container shutdown)",
+                inFlightCount.get());
     }
 
     public void processDelivery(DeliveryMessage message) {
@@ -232,23 +204,19 @@ public class WebhookDeliveryService {
 
         Event event = eventOpt.get();
 
-        // Increment BEFORE submitting to executor — decrement inside async task's
-        // finally
         inFlightCount.incrementAndGet();
-        deliveryExecutor.execute(() -> {
+        try {
+            attemptDelivery(delivery, endpoint, event);
+        } catch (Exception e) {
+            log.error("Unexpected error in delivery {}: {}", delivery.getId(), e.getMessage(), e);
             try {
-                attemptDelivery(delivery, endpoint, event);
-            } catch (Exception e) {
-                log.error("Unexpected error in async delivery {}: {}", delivery.getId(), e.getMessage(), e);
-                try {
-                    handleError(delivery, e, null, null, 0);
-                } catch (Exception ex) {
-                    log.error("Failed to handle error for delivery {}: {}", delivery.getId(), ex.getMessage());
-                }
-            } finally {
-                inFlightCount.decrementAndGet();
+                handleError(delivery, e, null, null, 0);
+            } catch (Exception ex) {
+                log.error("Failed to handle error for delivery {}: {}", delivery.getId(), ex.getMessage());
             }
-        });
+        } finally {
+            inFlightCount.decrementAndGet();
+        }
     }
 
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
