@@ -100,6 +100,12 @@ ordering:
   delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
   buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
 
+circuit-breaker:
+  failure-rate-threshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}
+  minimum-calls: ${CIRCUIT_BREAKER_MINIMUM_CALLS:5}
+  wait-duration-seconds: ${CIRCUIT_BREAKER_WAIT_DURATION_SECONDS:30}
+  window-ttl-seconds: ${CIRCUIT_BREAKER_WINDOW_TTL_SECONDS:120}
+
 stuck-delivery:
   threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
   check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
