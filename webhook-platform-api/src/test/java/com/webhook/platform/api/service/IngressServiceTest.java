@@ -29,6 +29,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -58,6 +61,10 @@ class IngressServiceTest {
     private HttpServletRequest httpRequest;
     @Mock
     private RedisRateLimiterService rateLimiterService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
+    @Mock
+    private TransactionStatus transactionStatus;
 
     private IngressService service;
     private final WebhookVerifierFactory verifierFactory = new WebhookVerifierFactory();
@@ -72,10 +79,12 @@ class IngressServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, meterRegistry, verifierFactory, rateLimiterService,
+                transactionManager,
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"),
                 encryptionKey, encryptionSalt, 524288
         );
@@ -386,6 +395,50 @@ class IngressServiceTest {
         IncomingEvent result = service.receiveWebhook("validtoken", "{}", httpRequest);
 
         assertThat(result.getProviderEventId()).isEqualTo("evt_stripe_456");
+    }
+
+    @Test
+    void receiveWebhook_duplicateRace_resolvesGracefully() {
+        IncomingSource source = buildActiveSource();
+        IncomingEvent existing = IncomingEvent.builder()
+                .id(eventId).incomingSourceId(sourceId)
+                .requestId("first-req").method("POST")
+                .providerEventId("evt_race")
+                .receivedAt(Instant.now())
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_race");
+        // First call: dedup check returns empty (race window)
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_race"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existing));
+        // save() throws DataIntegrityViolationException (unique index violation)
+        when(eventRepository.save(any(IncomingEvent.class)))
+                .thenThrow(new DataIntegrityViolationException("Unique index violation"));
+
+        IncomingEvent result = service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        assertThat(result.getProviderEventId()).isEqualTo("evt_race");
+        // No forwarding created
+        verify(forwardAttemptRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void receiveWebhook_duplicateRace_noProviderEventId_rethrows() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        // No provider event ID header — providerEventId will be body SHA256
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(eq(sourceId), anyString()))
+                .thenReturn(Optional.empty());
+        when(eventRepository.save(any(IncomingEvent.class)))
+                .thenThrow(new DataIntegrityViolationException("Unique index violation"));
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     private String computeHmac(String secret, String body) {

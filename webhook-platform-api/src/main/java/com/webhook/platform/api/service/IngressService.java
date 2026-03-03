@@ -8,7 +8,6 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
@@ -25,8 +24,12 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.interceptor.NoRollbackRuleAttribute;
+import org.springframework.transaction.interceptor.RuleBasedTransactionAttribute;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -55,6 +58,7 @@ public class IngressService {
     private final MeterRegistry meterRegistry;
     private final WebhookVerifierFactory verifierFactory;
     private final RedisRateLimiterService rateLimiterService;
+    private final TransactionTemplate transactionTemplate;
     private final List<String> trustedProxies;
     private final String encryptionKey;
     private final String encryptionSalt;
@@ -70,6 +74,7 @@ public class IngressService {
             MeterRegistry meterRegistry,
             WebhookVerifierFactory verifierFactory,
             RedisRateLimiterService rateLimiterService,
+            PlatformTransactionManager transactionManager,
             @Value("${webhook.incoming.trusted-proxies:127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}") List<String> trustedProxies,
             @Value("${webhook.encryption-key}") String encryptionKey,
             @Value("${webhook.encryption-salt}") String encryptionSalt,
@@ -87,10 +92,42 @@ public class IngressService {
         this.encryptionKey = encryptionKey;
         this.encryptionSalt = encryptionSalt;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
+
+        RuleBasedTransactionAttribute txAttr = new RuleBasedTransactionAttribute();
+        txAttr.getRollbackRules().add(new NoRollbackRuleAttribute(SignatureVerificationFailedException.class));
+        this.transactionTemplate = new TransactionTemplate(transactionManager, txAttr);
     }
 
-    @Transactional(noRollbackFor = SignatureVerificationFailedException.class)
     public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
+        try {
+            return transactionTemplate.execute(status -> doReceiveWebhook(token, body, request));
+        } catch (DataIntegrityViolationException e) {
+            return handleDuplicateRace(token, body, request, e);
+        }
+    }
+
+    private IncomingEvent handleDuplicateRace(String token, String body, HttpServletRequest request,
+                                               DataIntegrityViolationException e) {
+        String bodySha256 = computeSha256(body);
+        String providerEventId = extractProviderEventId(request, bodySha256);
+        if (providerEventId != null) {
+            var source = sourceRepository.findByIngressPathToken(token);
+            if (source.isPresent()) {
+                var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(
+                        source.get().getId(), providerEventId);
+                if (existing.isPresent()) {
+                    log.info("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
+                            source.get().getId(), providerEventId, existing.get().getId());
+                    meterRegistry.counter("incoming_events_deduplicated_total",
+                            "source_id", source.get().getId().toString()).increment();
+                    return existing.get();
+                }
+            }
+        }
+        throw e;
+    }
+
+    private IncomingEvent doReceiveWebhook(String token, String body, HttpServletRequest request) {
         IncomingSource source = sourceRepository.findByIngressPathToken(token)
                 .orElseThrow(() -> new SourceNotFoundException("Invalid ingress token"));
 
