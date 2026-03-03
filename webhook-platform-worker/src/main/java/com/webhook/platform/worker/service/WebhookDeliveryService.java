@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -35,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
+import reactor.netty.http.client.HttpClient;
 
 @Service
 @Slf4j
@@ -97,7 +99,10 @@ public class WebhookDeliveryService {
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
+        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.apply(
+                reactor.netty.http.client.HttpClient.create(), allowPrivateIps);
         this.defaultWebClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
         this.mtlsWebClientFactory = mtlsWebClientFactory;
@@ -160,7 +165,8 @@ public class WebhookDeliveryService {
     public void processDelivery(DeliveryMessage message) {
         if (shuttingDown) {
             log.warn("Shutdown in progress, rejecting new delivery: {}", message.getDeliveryId());
-            return;
+            throw new ShutdownRejectedException(
+                    "Worker is shutting down, delivery " + message.getDeliveryId() + " must be redelivered");
         }
         inFlightCount.incrementAndGet();
         try {

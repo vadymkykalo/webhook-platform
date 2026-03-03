@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 class RequestSizeLimitFilterTest {
 
     private static final long MAX_SIZE = 100; // 100 bytes max for testing
+    private static final long INGRESS_MAX_SIZE = 200; // 200 bytes max for ingress
 
     @Mock
     private HttpServletRequest request;
@@ -37,7 +38,7 @@ class RequestSizeLimitFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new RequestSizeLimitFilter(MAX_SIZE);
+        filter = new RequestSizeLimitFilter(MAX_SIZE, INGRESS_MAX_SIZE);
     }
 
     @Test
@@ -59,6 +60,7 @@ class RequestSizeLimitFilterTest {
     void shouldAllowSmallPayloadWithContentLength() throws Exception {
         byte[] payload = "small".getBytes();
         when(request.getContentLengthLong()).thenReturn((long) payload.length);
+        when(request.getRequestURI()).thenReturn("/api/events");
 
         filter.doFilterInternal(request, response, filterChain);
 
@@ -97,6 +99,7 @@ class RequestSizeLimitFilterTest {
     void shouldAllowChunkedTransferWithinLimit() throws Exception {
         byte[] payload = "within limit".getBytes();
         when(request.getContentLengthLong()).thenReturn(-1L);
+        when(request.getRequestURI()).thenReturn("/api/events");
         when(request.getInputStream()).thenReturn(mockServletInputStream(payload));
 
         doAnswer(invocation -> {
@@ -117,11 +120,40 @@ class RequestSizeLimitFilterTest {
     @Test
     void shouldPassThroughRequestsWithNoBody() throws Exception {
         when(request.getContentLengthLong()).thenReturn(-1L);
+        when(request.getRequestURI()).thenReturn("/api/events");
 
         filter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain).doFilter(any(), eq(response));
         verify(response, never()).setStatus(413);
+    }
+
+    @Test
+    void shouldUseIngressLimitForIngressPath() throws Exception {
+        // 150 bytes > MAX_SIZE (100) but < INGRESS_MAX_SIZE (200)
+        byte[] payload = new byte[150];
+        when(request.getContentLengthLong()).thenReturn((long) payload.length);
+        when(request.getRequestURI()).thenReturn("/ingress/abc123");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(any(), eq(response));
+        verify(response, never()).setStatus(413);
+    }
+
+    @Test
+    void shouldRejectIngressPayloadExceedingIngressLimit() throws Exception {
+        // 250 bytes > INGRESS_MAX_SIZE (200)
+        when(request.getContentLengthLong()).thenReturn(250L);
+        when(request.getRequestURI()).thenReturn("/ingress/abc123");
+        StringWriter sw = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(sw));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(413);
+        verify(filterChain, never()).doFilter(any(), any());
+        assertTrue(sw.toString().contains("payload_too_large"));
     }
 
     private ServletInputStream mockServletInputStream(byte[] data) {

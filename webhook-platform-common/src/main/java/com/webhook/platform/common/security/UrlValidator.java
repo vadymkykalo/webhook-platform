@@ -59,7 +59,7 @@ public class UrlValidator {
         }
     }
 
-    private static boolean isPrivateOrLocalAddress(InetAddress address) {
+    public static boolean isPrivateOrLocalAddress(InetAddress address) {
         if (address.isLoopbackAddress()) {
             return true;
         }

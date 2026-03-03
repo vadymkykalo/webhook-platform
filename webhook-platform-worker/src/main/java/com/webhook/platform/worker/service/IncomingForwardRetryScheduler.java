@@ -70,6 +70,7 @@ public class IncomingForwardRetryScheduler {
 
                     attempt.setNextRetryAt(null);
                     attempt.setStatus(ForwardAttemptStatus.PROCESSING);
+                    attempt.setStartedAt(Instant.now());
                     attemptRepository.save(attempt);
 
                     retryScheduledCounter.increment();

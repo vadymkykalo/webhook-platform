@@ -4,6 +4,7 @@ import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -28,4 +29,11 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
     @Query("SELECT COALESCE(MAX(a.attemptNumber), 0) FROM IncomingForwardAttempt a " +
             "WHERE a.incomingEventId = :eventId AND a.destinationId = :destinationId")
     int findMaxAttemptNumber(@Param("eventId") UUID eventId, @Param("destinationId") UUID destinationId);
+
+    @Modifying
+    @Query(value = "UPDATE incoming_forward_attempts SET status = 'PENDING', " +
+            "next_retry_at = now() " +
+            "WHERE status = 'PROCESSING' AND started_at < :threshold",
+            nativeQuery = true)
+    int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
 }

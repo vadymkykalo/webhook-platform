@@ -40,12 +40,15 @@ public class Delivery {
     @Column(name = "sequence_number")
     private Long sequenceNumber;
 
+    @Builder.Default
     @Column(name = "ordering_enabled", nullable = false)
     private Boolean orderingEnabled = false;
 
+    @Builder.Default
     @Column(name = "timeout_seconds")
     private Integer timeoutSeconds = 30;
 
+    @Builder.Default
     @Column(name = "retry_delays", columnDefinition = "TEXT")
     private String retryDelays = "60,300,900,3600,21600,86400";
 
