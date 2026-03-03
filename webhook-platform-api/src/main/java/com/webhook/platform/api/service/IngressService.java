@@ -110,8 +110,7 @@ public class IngressService {
 
     private IncomingEvent handleDuplicateRace(String token, String body, HttpServletRequest request,
                                                DataIntegrityViolationException e) {
-        String bodySha256 = computeSha256(body);
-        String providerEventId = ProviderEventIdExtractor.extract(request, bodySha256);
+        String providerEventId = ProviderEventIdExtractor.extract(request, body);
         if (providerEventId != null) {
             var source = sourceRepository.findByIngressPathToken(token);
             if (source.isPresent()) {
@@ -160,8 +159,8 @@ public class IngressService {
         String headersJson = HeaderSanitizer.toJson(request, objectMapper);
         String bodySha256 = computeSha256(body);
 
-        // Extract provider event ID for dedup (well-known headers, fallback to body hash)
-        String providerEventId = ProviderEventIdExtractor.extract(request, bodySha256);
+        // Extract provider event ID for dedup (well-known headers only, no body hash fallback)
+        String providerEventId = ProviderEventIdExtractor.extract(request, body);
 
         // Dedup: if same source + same provider event ID already exists, return existing (idempotent)
         if (providerEventId != null) {

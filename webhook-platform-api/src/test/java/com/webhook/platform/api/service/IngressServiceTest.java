@@ -438,14 +438,81 @@ class IngressServiceTest {
         IncomingSource source = buildActiveSource();
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
         stubHttpRequest();
-        // No provider event ID header — providerEventId will be body SHA256
-        when(eventRepository.findByIncomingSourceIdAndProviderEventId(eq(sourceId), anyString()))
-                .thenReturn(Optional.empty());
+        // No provider event ID header — providerEventId will be null (no body hash fallback)
         when(eventRepository.save(any(IncomingEvent.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void receiveWebhook_noProviderEventId_noDedupOnBodyHash() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(UUID.randomUUID());
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+
+        // Two events with identical body but no provider event ID header — both must be saved
+        IncomingEvent first = service.receiveWebhook("validtoken", "{\"status\":\"active\"}", httpRequest);
+        IncomingEvent second = service.receiveWebhook("validtoken", "{\"status\":\"active\"}", httpRequest);
+
+        assertThat(first.getId()).isNotEqualTo(second.getId());
+        assertThat(first.getProviderEventId()).isNull();
+        assertThat(second.getProviderEventId()).isNull();
+        assertThat(first.getBodySha256()).isEqualTo(second.getBodySha256());
+        verify(eventRepository, times(2)).save(any(IncomingEvent.class));
+    }
+
+    @Test
+    void receiveWebhook_slackEventId_extractedFromBody() {
+        IncomingSource source = buildActiveSource();
+        String slackBody = "{\"event_id\":\"Ev0PV52K25\",\"event\":{\"type\":\"message\"}}";
+        IncomingEvent existing = IncomingEvent.builder()
+                .id(eventId).incomingSourceId(sourceId)
+                .requestId("old-req").method("POST")
+                .providerEventId("Ev0PV52K25")
+                .receivedAt(Instant.now())
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Slack-Signature")).thenReturn("v0=somesig");
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "Ev0PV52K25"))
+                .thenReturn(Optional.of(existing));
+
+        IncomingEvent result = service.receiveWebhook("validtoken", slackBody, httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        assertThat(result.getProviderEventId()).isEqualTo("Ev0PV52K25");
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+    }
+
+    @Test
+    void receiveWebhook_slackNoEventId_noDedupOnTimestamp() {
+        IncomingSource source = buildActiveSource();
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(UUID.randomUUID());
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        // Slack url_verification challenge — no event_id in body
+        when(httpRequest.getHeader("X-Slack-Signature")).thenReturn("v0=sig");
+        when(httpRequest.getHeader("X-Slack-Request-Timestamp")).thenReturn("1531420618");
+
+        String challengeBody = "{\"type\":\"url_verification\",\"challenge\":\"abc\"}";
+        IncomingEvent result = service.receiveWebhook("validtoken", challengeBody, httpRequest);
+
+        assertThat(result.getProviderEventId()).isNull();
+        verify(eventRepository).save(any(IncomingEvent.class));
     }
 
     @Test
