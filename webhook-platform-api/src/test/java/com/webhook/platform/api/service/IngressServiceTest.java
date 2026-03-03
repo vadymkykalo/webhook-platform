@@ -16,6 +16,12 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.api.service.ingress.ClientIpResolver;
+import com.webhook.platform.api.service.ingress.HeaderSanitizer;
+import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
+import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
+import com.webhook.platform.api.service.ingress.SourceDisabledException;
+import com.webhook.platform.api.service.ingress.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -80,12 +86,13 @@ class IngressServiceTest {
     @BeforeEach
     void setUp() {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        ClientIpResolver clientIpResolver = new ClientIpResolver(
+                List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, meterRegistry, verifierFactory, rateLimiterService,
-                transactionManager,
-                List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"),
+                clientIpResolver, transactionManager,
                 encryptionKey, encryptionSalt, 524288
         );
     }
@@ -182,7 +189,7 @@ class IngressServiceTest {
         when(sourceRepository.findByIngressPathToken("invalid")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}", httpRequest))
-                .isInstanceOf(IngressService.SourceNotFoundException.class);
+                .isInstanceOf(SourceNotFoundException.class);
     }
 
     @Test
@@ -192,7 +199,7 @@ class IngressServiceTest {
         when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
-                .isInstanceOf(IngressService.SourceDisabledException.class);
+                .isInstanceOf(SourceDisabledException.class);
     }
 
     @Test
@@ -204,7 +211,7 @@ class IngressServiceTest {
         String hugeBody = "x".repeat(600000);
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", hugeBody, httpRequest))
-                .isInstanceOf(IngressService.PayloadTooLargeException.class)
+                .isInstanceOf(PayloadTooLargeException.class)
                 .hasMessageContaining("524288");
     }
 
@@ -262,10 +269,10 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest))
-                .isInstanceOf(IngressService.SignatureVerificationFailedException.class)
+                .isInstanceOf(SignatureVerificationFailedException.class)
                 .satisfies(ex -> {
-                    IngressService.SignatureVerificationFailedException sve =
-                            (IngressService.SignatureVerificationFailedException) ex;
+                    SignatureVerificationFailedException sve =
+                            (SignatureVerificationFailedException) ex;
                     assertThat(sve.getEvent().getVerified()).isFalse();
                     assertThat(sve.getEvent().getVerificationError()).isEqualTo("Signature mismatch");
                 });
@@ -309,7 +316,7 @@ class IngressServiceTest {
         when(httpRequest.getHeader("X-Signature")).thenReturn("bad-sig");
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
-                .isInstanceOf(IngressService.SignatureVerificationFailedException.class);
+                .isInstanceOf(SignatureVerificationFailedException.class);
 
         // Event saved for audit, but forwarding completely blocked
         verify(eventRepository).save(any(IncomingEvent.class));
@@ -439,6 +446,41 @@ class IngressServiceTest {
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void isSensitiveHeader_exactMatches() {
+        assertThat(HeaderSanitizer.isSensitiveHeader("Authorization")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("cookie")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("Set-Cookie")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Api-Key")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("Proxy-Authorization")).isTrue();
+    }
+
+    @Test
+    void isSensitiveHeader_patternMatches_providerSignatures() {
+        assertThat(HeaderSanitizer.isSensitiveHeader("Stripe-Signature")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Hub-Signature-256")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Shopify-Hmac-SHA256")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Twilio-Signature")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Slack-Signature")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Webhook-Secret")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Auth-Token")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Access-Token")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Credential-Id")).isTrue();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Password-Hash")).isTrue();
+    }
+
+    @Test
+    void isSensitiveHeader_safeHeaders_notMasked() {
+        assertThat(HeaderSanitizer.isSensitiveHeader("Content-Type")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("User-Agent")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("Accept")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Request-Id")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-Webhook-Id")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-GitHub-Event")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("X-GitHub-Delivery")).isFalse();
+        assertThat(HeaderSanitizer.isSensitiveHeader("Host")).isFalse();
     }
 
     private String computeHmac(String secret, String body) {
