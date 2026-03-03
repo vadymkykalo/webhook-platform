@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import reactor.netty.http.client.HttpClient;
 
 @Service
 @Slf4j
@@ -66,7 +68,10 @@ public class IncomingForwardService {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
+        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.apply(
+                reactor.netty.http.client.HttpClient.create(), allowPrivateIps);
         this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-IncomingForward")
                 .build();
         this.objectMapper = objectMapper;
