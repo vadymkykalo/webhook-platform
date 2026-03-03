@@ -2,11 +2,9 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.repository.DeliveryRepository;
-import com.webhook.platform.api.domain.repository.EndpointRepository;
-import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
+import com.webhook.platform.api.dto.OnboardingStatusResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -26,18 +24,47 @@ public class DashboardService {
     private final EventRepository eventRepository;
     private final DeliveryRepository deliveryRepository;
     private final EndpointRepository endpointRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final ApiKeyRepository apiKeyRepository;
+    private final IncomingSourceRepository incomingSourceRepository;
+    private final IncomingDestinationRepository incomingDestinationRepository;
     
     public DashboardService(
             ProjectRepository projectRepository,
             EventRepository eventRepository,
             DeliveryRepository deliveryRepository,
-            EndpointRepository endpointRepository) {
+            EndpointRepository endpointRepository,
+            SubscriptionRepository subscriptionRepository,
+            ApiKeyRepository apiKeyRepository,
+            IncomingSourceRepository incomingSourceRepository,
+            IncomingDestinationRepository incomingDestinationRepository) {
         this.projectRepository = projectRepository;
         this.eventRepository = eventRepository;
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.apiKeyRepository = apiKeyRepository;
+        this.incomingSourceRepository = incomingSourceRepository;
+        this.incomingDestinationRepository = incomingDestinationRepository;
     }
     
+    public OnboardingStatusResponse getOnboardingStatus(UUID projectId, UUID organizationId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found"));
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new ForbiddenException("Access denied");
+        }
+        return OnboardingStatusResponse.builder()
+                .hasEndpoints(endpointRepository.existsByProjectIdAndDeletedAtIsNull(projectId))
+                .hasSubscriptions(subscriptionRepository.existsByProjectId(projectId))
+                .hasApiKeys(apiKeyRepository.existsByProjectIdAndRevokedAtIsNull(projectId))
+                .hasEvents(eventRepository.existsByProjectId(projectId))
+                .hasDeliveries(deliveryRepository.existsByProjectId(projectId))
+                .hasIncomingSources(incomingSourceRepository.existsByProjectId(projectId))
+                .hasIncomingDestinations(incomingDestinationRepository.existsByProjectId(projectId))
+                .build();
+    }
+
     public DashboardStatsResponse getProjectStats(UUID projectId, UUID organizationId) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -102,7 +129,8 @@ public class DashboardService {
     }
     
     private List<DashboardStatsResponse.EndpointHealthSummary> getEndpointHealth(UUID projectId, Instant since) {
-        List<Endpoint> endpoints = endpointRepository.findByProjectId(projectId);
+        List<Endpoint> endpoints = endpointRepository.findByProjectIdAndDeletedAtIsNull(projectId,
+                org.springframework.data.domain.PageRequest.of(0, 100)).getContent();
         
         if (endpoints.isEmpty()) {
             return new ArrayList<>();
@@ -121,7 +149,6 @@ public class DashboardService {
         }
         
         return endpoints.stream()
-                .filter(e -> e.getDeletedAt() == null)
                 .map(endpoint -> {
                     Map<String, Long> counts = statsMap.getOrDefault(endpoint.getId(), Map.of());
                     long successful = counts.getOrDefault("SUCCESS", 0L);

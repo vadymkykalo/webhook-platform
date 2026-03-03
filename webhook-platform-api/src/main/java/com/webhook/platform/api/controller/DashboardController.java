@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.AnalyticsResponse;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
+import com.webhook.platform.api.dto.OnboardingStatusResponse;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.AnalyticsService;
 import com.webhook.platform.api.service.DashboardService;
@@ -40,6 +41,16 @@ public class DashboardController {
         log.info("Dashboard stats request for projectId: {}", projectId);
         DashboardStatsResponse stats = dashboardService.getProjectStats(projectId, auth.organizationId());
         return ResponseEntity.ok(stats);
+    }
+
+    @Operation(summary = "Get onboarding status", description = "Returns server-derived onboarding checklist status")
+    @GetMapping("/projects/{projectId}/onboarding")
+    public ResponseEntity<OnboardingStatusResponse> getOnboardingStatus(
+            @PathVariable("projectId") UUID projectId,
+            AuthContext auth) {
+        auth.validateProjectAccess(projectId);
+        OnboardingStatusResponse status = dashboardService.getOnboardingStatus(projectId, auth.organizationId());
+        return ResponseEntity.ok(status);
     }
 
     @Operation(summary = "Get project analytics", description = "Returns detailed analytics with time series data")

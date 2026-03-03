@@ -18,6 +18,7 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     Optional<Event> findByProjectIdAndIdempotencyKey(UUID projectId, String idempotencyKey);
     List<Event> findByProjectId(UUID projectId);
     Page<Event> findByProjectId(UUID projectId, Pageable pageable);
+    boolean existsByProjectId(UUID projectId);
 
     @Query("SELECT COUNT(e) FROM Event e WHERE e.projectId = :projectId AND e.createdAt BETWEEN :from AND :to")
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);

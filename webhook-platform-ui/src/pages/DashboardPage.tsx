@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle, ArrowDownToLine, Activity } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useProjects, useDashboardStats, useEndpoints, useSubscriptions, useApiKeysPaged, useIncomingSources } from '../api/queries';
+import { useProjects, useDashboardStats, useEndpoints, useOnboardingStatus } from '../api/queries';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -60,11 +60,7 @@ export default function DashboardPage() {
   );
 
   const { data: endpoints = [] } = useEndpoints(selectedProjectId || undefined);
-  const { data: subscriptions = [] } = useSubscriptions(selectedProjectId || undefined);
-  const { data: apiKeysData } = useApiKeysPaged(selectedProjectId || undefined, 0, 1);
-  const { data: incomingSourcesData } = useIncomingSources(selectedProjectId || undefined, 0, 1);
-
-  const hasIncomingSources = (incomingSourcesData?.totalElements ?? 0) > 0;
+  const { data: onboarding } = useOnboardingStatus(selectedProjectId || undefined);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -117,17 +113,17 @@ export default function DashboardPage() {
         projectId={selectedProjectId || undefined}
       />
 
-      {/* Onboarding Checklist */}
+      {/* Onboarding Checklist (server-derived truth) */}
       <OnboardingChecklist
         projectId={selectedProjectId || undefined}
         hasProjects={projects.length > 0}
-        hasEndpoints={endpoints.length > 0}
-        hasSubscriptions={subscriptions.length > 0}
-        hasApiKeys={(apiKeysData?.content?.length ?? 0) > 0}
-        hasEvents={(dashboardStats?.recentEvents?.length ?? 0) > 0}
-        hasDeliveries={(dashboardStats?.deliveryStats?.totalDeliveries ?? 0) > 0}
-        hasIncomingSources={hasIncomingSources}
-        hasIncomingDestinations={hasIncomingSources}
+        hasEndpoints={onboarding?.hasEndpoints ?? endpoints.length > 0}
+        hasSubscriptions={onboarding?.hasSubscriptions ?? false}
+        hasApiKeys={onboarding?.hasApiKeys ?? false}
+        hasEvents={onboarding?.hasEvents ?? (dashboardStats?.recentEvents?.length ?? 0) > 0}
+        hasDeliveries={onboarding?.hasDeliveries ?? (dashboardStats?.deliveryStats?.totalDeliveries ?? 0) > 0}
+        hasIncomingSources={onboarding?.hasIncomingSources ?? false}
+        hasIncomingDestinations={onboarding?.hasIncomingDestinations ?? false}
       />
 
       {!selectedProject ? (

@@ -14,6 +14,7 @@ import com.webhook.platform.common.util.EventTypeMatcher;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.ArrayList;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -138,7 +139,7 @@ public class EventIngestService {
                 .toList();
         log.info("Found {} matching subscriptions for event type: {}", subscriptions.size(), request.getType());
 
-        int deliveriesCreated = 0;
+        List<Delivery> deliveriesToSave = new ArrayList<>(subscriptions.size());
         for (Subscription subscription : subscriptions) {
             Long sequenceNumber = null;
             boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
@@ -148,14 +149,17 @@ public class EventIngestService {
                 log.debug("Generated sequence {} for endpoint {}", sequenceNumber, subscription.getEndpointId());
             }
             
-            Delivery delivery = createDelivery(event, subscription, sequenceNumber, orderingEnabled);
-            deliveryRepository.save(delivery);
-
-            OutboxMessage outboxMessage = createOutboxMessage(delivery);
-            outboxMessageRepository.save(outboxMessage);
-
-            deliveriesCreated++;
+            deliveriesToSave.add(createDelivery(event, subscription, sequenceNumber, orderingEnabled));
         }
+        List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
+
+        List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
+        for (Delivery delivery : savedDeliveries) {
+            outboxMessages.add(createOutboxMessage(delivery));
+        }
+        outboxMessageRepository.saveAll(outboxMessages);
+
+        int deliveriesCreated = savedDeliveries.size();
         Counter.builder("deliveries_created_total").tag("project_id", projectId.toString()).register(meterRegistry).increment(deliveriesCreated);
 
         log.info("Created {} deliveries for event: {}", deliveriesCreated, event.getId());

@@ -24,6 +24,9 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.event.projectId = :projectId AND d.createdAt BETWEEN :from AND :to")
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
 
+    @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM Delivery d WHERE d.event.projectId = :projectId")
+    boolean existsByProjectId(@Param("projectId") UUID projectId);
+
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.event.projectId = :projectId AND d.status = :status AND d.createdAt BETWEEN :from AND :to")
     long countByProjectIdAndStatusAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("status") DeliveryStatus status, @Param("from") Instant from, @Param("to") Instant to);
 

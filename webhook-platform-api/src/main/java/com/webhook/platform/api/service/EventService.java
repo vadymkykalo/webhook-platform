@@ -11,6 +11,7 @@ import com.webhook.platform.api.dto.EventResponse;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.ArrayList;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -124,7 +125,7 @@ public class EventService {
                 .findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getType());
         log.info("Found {} active subscriptions for event type: {}", subscriptions.size(), request.getType());
 
-        int deliveriesCreated = 0;
+        List<Delivery> deliveriesToSave = new ArrayList<>(subscriptions.size());
         for (Subscription subscription : subscriptions) {
             Long sequenceNumber = null;
             boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
@@ -133,15 +134,17 @@ public class EventService {
                 sequenceNumber = sequenceGeneratorService.nextSequence(subscription.getEndpointId());
             }
             
-            Delivery delivery = createDelivery(event, subscription, sequenceNumber, orderingEnabled);
-            deliveryRepository.save(delivery);
-
-            OutboxMessage outboxMessage = createOutboxMessage(delivery);
-            outboxMessageRepository.save(outboxMessage);
-
-            deliveriesCreated++;
+            deliveriesToSave.add(createDelivery(event, subscription, sequenceNumber, orderingEnabled));
         }
+        List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
 
+        List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
+        for (Delivery delivery : savedDeliveries) {
+            outboxMessages.add(createOutboxMessage(delivery));
+        }
+        outboxMessageRepository.saveAll(outboxMessages);
+
+        int deliveriesCreated = savedDeliveries.size();
         log.info("Created {} deliveries for test event: {}", deliveriesCreated, event.getId());
         return mapToResponseWithDeliveries(event, deliveriesCreated);
     }

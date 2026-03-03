@@ -50,10 +50,14 @@ const getProjectOutgoingNav = (projectId: string): NavItem[] => [
 const getProjectIncomingNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.incomingSources', path: `/admin/projects/${projectId}/incoming-sources`, icon: ArrowDownToLine },
   { nameKey: 'nav.incomingEvents', path: `/admin/projects/${projectId}/incoming-events`, icon: Activity },
+  { nameKey: 'nav.transformStudio', path: `/admin/projects/${projectId}/transform-studio`, icon: GitCompare },
 ];
 
 const getProjectOperationsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
+  { nameKey: 'nav.alerts', path: `/admin/projects/${projectId}/alerts`, icon: Bell },
+  { nameKey: 'nav.incidents', path: `/admin/projects/${projectId}/incidents`, icon: AlertTriangle },
+  { nameKey: 'nav.usage', path: `/admin/projects/${projectId}/usage`, icon: Activity },
   { nameKey: 'nav.replay', path: `/admin/projects/${projectId}/replay`, icon: History },
   { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
 ];
@@ -129,6 +133,10 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   schemas: { key: 'breadcrumb.schemas', icon: FileJson2 },
   'pii-rules': { key: 'breadcrumb.pii-rules', icon: Shield },
   'event-diff': { key: 'breadcrumb.event-diff', icon: GitCompare },
+  alerts: { key: 'breadcrumb.alerts', icon: Bell },
+  usage: { key: 'breadcrumb.usage', icon: Activity },
+  incidents: { key: 'breadcrumb.incidents', icon: AlertTriangle },
+  'transform-studio': { key: 'breadcrumb.transform-studio', icon: GitCompare },
   members: { key: 'breadcrumb.members', icon: Users },
   'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
   settings: { key: 'breadcrumb.settings', icon: Settings },

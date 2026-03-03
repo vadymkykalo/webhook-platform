@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Filter, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
 import { formatDateTimeCompact } from '../lib/date';
@@ -7,6 +7,7 @@ import { SkeletonTable } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
 import { type AuditLogEntry } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
+import { Select } from '../components/ui/select';
 import {
   Table,
   TableBody,
@@ -39,8 +40,25 @@ function shortId(id: string | null) {
 export default function AuditLogPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);
+  const [actionFilter, setActionFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const { data, isLoading } = useAuditLog(page);
 
+  const uniqueActions = useMemo(() => {
+    if (!data?.content) return [];
+    return [...new Set(data.content.map((e: AuditLogEntry) => e.action))].sort();
+  }, [data]);
+
+  const filteredEntries = useMemo(() => {
+    if (!data?.content) return [];
+    return data.content.filter((entry: AuditLogEntry) => {
+      if (actionFilter && entry.action !== actionFilter) return false;
+      if (statusFilter && entry.status !== statusFilter) return false;
+      return true;
+    });
+  }, [data, actionFilter, statusFilter]);
+
+  const hasFilters = actionFilter || statusFilter;
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -55,6 +73,39 @@ export default function AuditLogPage() {
           </p>
         </div>
       </div>
+
+      {/* Filters */}
+      {data && data.content.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <div className="w-40">
+            <Select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
+              <option value="">{t('auditLog.filters.allActions', 'All Actions')}</option>
+              {uniqueActions.map((action) => (
+                <option key={action} value={action}>{action}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="w-36">
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">{t('auditLog.filters.allStatuses', 'All Statuses')}</option>
+              <option value="SUCCESS">{t('auditLog.filters.success', 'Success')}</option>
+              <option value="FAILURE">{t('auditLog.filters.failure', 'Failure')}</option>
+            </Select>
+          </div>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" onClick={() => { setActionFilter(''); setStatusFilter(''); }}>
+              <X className="h-3.5 w-3.5 mr-1" /> {t('auditLog.filters.clear', 'Clear')}
+            </Button>
+          )}
+          {hasFilters && (
+            <span className="text-xs text-muted-foreground">
+              {t('auditLog.filters.showing', { count: filteredEntries.length, total: data.content.length,
+                defaultValue: 'Showing {{count}} of {{total}} on this page' })}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="border rounded-lg bg-card overflow-hidden">
         {isLoading ? (
@@ -77,7 +128,7 @@ export default function AuditLogPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.content.map((entry: AuditLogEntry) => (
+                {filteredEntries.map((entry: AuditLogEntry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDateTimeCompact(entry.createdAt)}

@@ -14,6 +14,10 @@ import { incomingSourcesApi } from './incomingSources.api';
 import { incomingDestinationsApi } from './incomingDestinations.api';
 import { incomingEventsApi, type IncomingEventFilters } from './incomingEvents.api';
 import { schemasApi, type EventTypeCatalogRequest, type EventSchemaVersionRequest } from './schemas.api';
+import { alertsApi, type AlertRuleRequest } from './alerts.api';
+import { usageApi } from './usage.api';
+import { incidentsApi, type IncidentRequest, type TimelineEntryRequest } from './incidents.api';
+import { transformApi, type TransformPreviewRequest } from './transform.api';
 import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
@@ -26,6 +30,7 @@ export const queryKeys = {
     dashboard: {
         stats: (projectId: string) => ['dashboard', 'stats', projectId] as const,
         analytics: (projectId: string, period: string) => ['dashboard', 'analytics', projectId, period] as const,
+        onboarding: (projectId: string) => ['dashboard', 'onboarding', projectId] as const,
     },
     endpoints: {
         list: (projectId: string) => ['endpoints', projectId] as const,
@@ -36,6 +41,7 @@ export const queryKeys = {
     },
     events: {
         list: (projectId: string, page: number, size: number, sort?: string) => ['events', projectId, page, size, sort] as const,
+        detail: (projectId: string, id: string) => ['events', projectId, id] as const,
     },
     subscriptions: {
         list: (projectId: string) => ['subscriptions', projectId] as const,
@@ -75,6 +81,19 @@ export const queryKeys = {
         versions: (projectId: string, eventTypeId: string) => ['schemas', projectId, eventTypeId, 'versions'] as const,
         changes: (projectId: string, eventTypeId: string) => ['schemas', projectId, eventTypeId, 'changes'] as const,
         projectChanges: (projectId: string) => ['schemas', projectId, 'all-changes'] as const,
+    },
+    alerts: {
+        rules: (projectId: string) => ['alerts', 'rules', projectId] as const,
+        events: (projectId: string, page: number, size: number) => ['alerts', 'events', projectId, page, size] as const,
+        unresolvedCount: (projectId: string) => ['alerts', 'unresolved', projectId] as const,
+    },
+    usage: {
+        stats: (projectId: string, days: number) => ['usage', projectId, days] as const,
+    },
+    incidents: {
+        list: (projectId: string, openOnly: boolean, page: number) => ['incidents', projectId, openOnly, page] as const,
+        detail: (projectId: string, incidentId: string) => ['incidents', projectId, incidentId] as const,
+        openCount: (projectId: string) => ['incidents', 'open-count', projectId] as const,
     },
 } as const;
 
@@ -128,6 +147,15 @@ export function useAnalytics(projectId: string | undefined, period: string) {
         queryKey: queryKeys.dashboard.analytics(projectId!, period),
         queryFn: () => dashboardApi.getAnalytics(projectId!, period),
         enabled: !!projectId,
+    });
+}
+
+export function useOnboardingStatus(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.dashboard.onboarding(projectId!),
+        queryFn: () => dashboardApi.getOnboardingStatus(projectId!),
+        enabled: !!projectId,
+        staleTime: 30_000,
     });
 }
 
@@ -237,6 +265,14 @@ export function useEvents(projectId: string | undefined, page: number, size = 20
         queryKey: queryKeys.events.list(projectId!, page, size, sort),
         queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort }),
         enabled: !!projectId,
+    });
+}
+
+export function useEvent(projectId: string | undefined, eventId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.events.detail(projectId!, eventId!),
+        queryFn: () => eventsApi.get(projectId!, eventId!),
+        enabled: !!projectId && !!eventId,
     });
 }
 
@@ -633,6 +669,152 @@ export function useProjectSchemaChanges(projectId: string | undefined) {
         enabled: !!projectId,
     });
 }
+
+// ─── Alerts ──────────────────────────────────────────────────────
+
+export function useAlertRules(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.alerts.rules(projectId!),
+        queryFn: () => alertsApi.listRules(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useCreateAlertRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: AlertRuleRequest) => alertsApi.createRule(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.alerts.rules(projectId) }); },
+    });
+}
+
+export function useUpdateAlertRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ ruleId, data }: { ruleId: string; data: Partial<AlertRuleRequest> }) =>
+            alertsApi.updateRule(projectId, ruleId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.alerts.rules(projectId) }); },
+    });
+}
+
+export function useDeleteAlertRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (ruleId: string) => alertsApi.deleteRule(projectId, ruleId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.alerts.rules(projectId) }); },
+    });
+}
+
+export function useAlertEvents(projectId: string | undefined, page: number, size = 20) {
+    return useQuery({
+        queryKey: queryKeys.alerts.events(projectId!, page, size),
+        queryFn: () => alertsApi.listEvents(projectId!, page, size),
+        enabled: !!projectId,
+    });
+}
+
+export function useUnresolvedAlertCount(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.alerts.unresolvedCount(projectId!),
+        queryFn: () => alertsApi.unresolvedCount(projectId!),
+        enabled: !!projectId,
+        refetchInterval: 30000,
+    });
+}
+
+export function useResolveAlert(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (eventId: string) => alertsApi.resolveEvent(projectId, eventId),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['alerts', 'events', projectId] });
+            qc.invalidateQueries({ queryKey: queryKeys.alerts.unresolvedCount(projectId) });
+        },
+    });
+}
+
+export function useResolveAllAlerts(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => alertsApi.resolveAll(projectId),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['alerts', 'events', projectId] });
+            qc.invalidateQueries({ queryKey: queryKeys.alerts.unresolvedCount(projectId) });
+        },
+    });
+}
+
+// ─── Usage ──────────────────────────────────────────────────────
+
+export function useUsageStats(projectId: string | undefined, days = 30) {
+    return useQuery({
+        queryKey: queryKeys.usage.stats(projectId!, days),
+        queryFn: () => usageApi.getUsage(projectId!, days),
+        enabled: !!projectId,
+    });
+}
+
+// ─── Incidents ──────────────────────────────────────────────────
+
+export function useIncidents(projectId: string | undefined, openOnly = false, page = 0, size = 20) {
+    return useQuery({
+        queryKey: queryKeys.incidents.list(projectId!, openOnly, page),
+        queryFn: () => incidentsApi.list(projectId!, openOnly, page, size),
+        enabled: !!projectId,
+    });
+}
+
+export function useIncident(projectId: string | undefined, incidentId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.incidents.detail(projectId!, incidentId!),
+        queryFn: () => incidentsApi.get(projectId!, incidentId!),
+        enabled: !!projectId && !!incidentId,
+    });
+}
+
+export function useOpenIncidentCount(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.incidents.openCount(projectId!),
+        queryFn: () => incidentsApi.countOpen(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useCreateIncident(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: IncidentRequest) => incidentsApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidents', projectId] }); },
+    });
+}
+
+export function useUpdateIncident(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ incidentId, data }: { incidentId: string; data: Partial<IncidentRequest> }) =>
+            incidentsApi.update(projectId, incidentId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidents', projectId] }); },
+    });
+}
+
+export function useAddTimelineEntry(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ incidentId, data }: { incidentId: string; data: TimelineEntryRequest }) =>
+            incidentsApi.addTimeline(projectId, incidentId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidents', projectId] }); },
+    });
+}
+
+// ─── Transform Preview ──────────────────────────────────────────
+
+export function useTransformPreview(projectId: string) {
+    return useMutation({
+        mutationFn: (data: TransformPreviewRequest) => transformApi.preview(projectId, data),
+    });
+}
+
+// ─── Project Settings ───────────────────────────────────────────
 
 export function useUpdateProject(projectId: string) {
     const qc = useQueryClient();
