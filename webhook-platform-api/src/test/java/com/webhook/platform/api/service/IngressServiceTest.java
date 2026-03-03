@@ -76,6 +76,7 @@ class IngressServiceTest {
                 sourceRepository, eventRepository, destinationRepository,
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, meterRegistry, verifierFactory, rateLimiterService,
+                List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"),
                 encryptionKey, encryptionSalt, 524288
         );
     }

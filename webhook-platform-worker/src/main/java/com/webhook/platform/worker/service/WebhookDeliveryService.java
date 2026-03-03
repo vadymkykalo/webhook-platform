@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import reactor.netty.http.client.HttpClient;
 
@@ -263,15 +264,18 @@ public class WebhookDeliveryService {
 
         Integer rateLimit = endpoint.getRateLimitPerSecond();
         if (rateLimit != null && !rateLimiterService.tryAcquire(endpoint.getId(), rateLimit)) {
-            log.warn("Rate limited for endpoint {}, rescheduling delivery {}", endpoint.getId(), delivery.getId());
-            rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(1));
+            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 2, 60);
+            log.warn("Rate limited for endpoint {}, rescheduling delivery {} in {}s",
+                    endpoint.getId(), delivery.getId(), delaySec);
+            rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
             return;
         }
 
         if (!concurrencyControlService.tryAcquire(endpoint.getId())) {
-            log.warn("Max concurrency reached for endpoint {}, rescheduling delivery {}", endpoint.getId(),
-                    delivery.getId());
-            rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(1));
+            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 2, 60);
+            log.warn("Max concurrency reached for endpoint {}, rescheduling delivery {} in {}s",
+                    endpoint.getId(), delivery.getId(), delaySec);
+            rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
             return;
         }
 
@@ -488,6 +492,16 @@ public class WebhookDeliveryService {
             log.warn("Invalid retry delays format: {}, using defaults", retryDelaysStr);
             return new long[] { 60, 300, 900, 3600, 21600, 86400 };
         }
+    }
+
+    /**
+     * Exponential backoff with ±25% jitter.
+     * base * 2^attempt capped at maxSeconds.
+     */
+    private static long backoffWithJitter(int attempt, long baseSeconds, long maxSeconds) {
+        long delay = Math.min(baseSeconds * (1L << Math.min(attempt, 10)), maxSeconds);
+        long jitter = (long) (delay * 0.25);
+        return delay - jitter + ThreadLocalRandom.current().nextLong(2 * jitter + 1);
     }
 
     private void rescheduleDelivery(UUID deliveryId, Instant nextRetryAt) {
