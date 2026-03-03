@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
 import { TablePagination } from '../components/ui/table-pagination';
 import SendTestEventModal from '../components/SendTestEventModal';
+import EventDetailsSheet from '../components/EventDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import { debugLinksApi } from '../api/debugLinks.api';
@@ -30,6 +31,7 @@ export default function EventsPage() {
   const [showSendModal, setShowSendModal] = useState(false);
   const { canSendEvents, canCreateDebugLinks } = usePermissions();
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const { data: project } = useQuery({
     queryKey: ['projects', projectId],
@@ -116,7 +118,7 @@ export default function EventsPage() {
               </TableHeader>
               <TableBody>
                 {events.map((event) => (
-                  <TableRow key={event.id} className="hover:bg-muted/30">
+                  <TableRow key={event.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedEventId(event.id)}>
                     <TableCell>
                       <span className="font-mono text-sm font-semibold">{event.eventType}</span>
                     </TableCell>
@@ -177,6 +179,16 @@ export default function EventsPage() {
           />
         </div>
       )}
+
+      <EventDetailsSheet
+        projectId={projectId!}
+        eventId={selectedEventId}
+        onClose={() => setSelectedEventId(null)}
+        onViewDeliveries={(id) => {
+          setSelectedEventId(null);
+          navigate(`/admin/projects/${projectId}/deliveries?eventId=${id}`);
+        }}
+      />
 
       <SendTestEventModal
         projectId={projectId!}

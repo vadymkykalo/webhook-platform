@@ -6,6 +6,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -17,4 +20,10 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
     List<IncomingDestination> findByIncomingSourceIdAndEnabledTrue(UUID incomingSourceId);
 
     Page<IncomingDestination> findByIncomingSourceId(UUID incomingSourceId, Pageable pageable);
+
+    @Query("SELECT COUNT(d) FROM IncomingDestination d JOIN IncomingSource s ON d.incomingSourceId = s.id WHERE s.projectId = :projectId")
+    long countByProjectId(@Param("projectId") UUID projectId);
+
+    @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM IncomingDestination d JOIN IncomingSource s ON d.incomingSourceId = s.id WHERE s.projectId = :projectId")
+    boolean existsByProjectId(@Param("projectId") UUID projectId);
 }

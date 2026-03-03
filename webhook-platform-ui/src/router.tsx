@@ -36,6 +36,11 @@ const SchemasPage = lazy(() => import('./pages/SchemasPage'));
 const PiiRulesPage = lazy(() => import('./pages/PiiRulesPage'));
 const EventDiffPage = lazy(() => import('./pages/EventDiffPage'));
 const DevWorkspacePage = lazy(() => import('./pages/DevWorkspacePage'));
+const AlertsPage = lazy(() => import('./pages/AlertsPage'));
+const UsagePage = lazy(() => import('./pages/UsagePage'));
+const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
+const TransformStudioPage = lazy(() => import('./pages/TransformStudioPage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -176,6 +181,26 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/event-diff',
         element: <S><EventDiffPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/alerts',
+        element: <S><AlertsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/usage',
+        element: <S><UsagePage /></S>,
+      },
+      {
+        path: 'projects/:projectId/events/:eventId',
+        element: <S><EventDetailPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/incidents',
+        element: <S><IncidentsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/transform-studio',
+        element: <S><TransformStudioPage /></S>,
       },
       {
         path: 'members',

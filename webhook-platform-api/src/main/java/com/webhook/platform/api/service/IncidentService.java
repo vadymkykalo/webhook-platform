@@ -1,0 +1,179 @@
+package com.webhook.platform.api.service;
+
+import com.webhook.platform.api.domain.entity.Incident;
+import com.webhook.platform.api.domain.entity.IncidentTimeline;
+import com.webhook.platform.api.domain.enums.AlertSeverity;
+import com.webhook.platform.api.domain.enums.IncidentStatus;
+import com.webhook.platform.api.domain.enums.IncidentTimelineType;
+import com.webhook.platform.api.domain.repository.IncidentRepository;
+import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.dto.IncidentRequest;
+import com.webhook.platform.api.dto.IncidentResponse;
+import com.webhook.platform.api.dto.TimelineEntryRequest;
+import com.webhook.platform.api.exception.NotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class IncidentService {
+
+    private final IncidentRepository incidentRepository;
+    private final IncidentTimelineRepository timelineRepository;
+    private final ProjectRepository projectRepository;
+
+    @Transactional(readOnly = true)
+    public Page<IncidentResponse> listIncidents(UUID projectId, UUID organizationId, boolean openOnly, int page, int size) {
+        validateProjectAccess(projectId, organizationId);
+        Page<Incident> incidents;
+        if (openOnly) {
+            incidents = incidentRepository.findByProjectIdAndStatusNotOrderByCreatedAtDesc(
+                    projectId, IncidentStatus.RESOLVED, PageRequest.of(page, Math.min(size, 100)));
+        } else {
+            incidents = incidentRepository.findByProjectIdOrderByCreatedAtDesc(
+                    projectId, PageRequest.of(page, Math.min(size, 100)));
+        }
+        return incidents.map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public IncidentResponse getIncident(UUID projectId, UUID incidentId, UUID organizationId) {
+        validateProjectAccess(projectId, organizationId);
+        Incident incident = incidentRepository.findByIdAndProjectId(incidentId, projectId)
+                .orElseThrow(() -> new NotFoundException("Incident not found"));
+        IncidentResponse response = toResponse(incident);
+        List<IncidentTimeline> timeline = timelineRepository.findByIncidentIdOrderByCreatedAtAsc(incidentId);
+        response.setTimeline(timeline.stream().map(this::toTimelineEntry).toList());
+        return response;
+    }
+
+    @Transactional
+    public IncidentResponse createIncident(UUID projectId, IncidentRequest request, UUID organizationId) {
+        validateProjectAccess(projectId, organizationId);
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new IllegalArgumentException("Incident title is required");
+        }
+
+        Incident incident = Incident.builder()
+                .projectId(projectId)
+                .title(request.getTitle())
+                .severity(request.getSeverity() != null ? request.getSeverity() : AlertSeverity.WARNING)
+                .status(IncidentStatus.OPEN)
+                .rcaNotes(request.getRcaNotes())
+                .build();
+
+        incident = incidentRepository.save(incident);
+
+        // Add initial timeline entry
+        IncidentTimeline entry = IncidentTimeline.builder()
+                .incidentId(incident.getId())
+                .entryType(IncidentTimelineType.STATUS_CHANGE)
+                .title("Incident created")
+                .detail(request.getTitle())
+                .build();
+        timelineRepository.save(entry);
+
+        log.info("Created incident '{}' for project {}", incident.getTitle(), projectId);
+        return getIncident(projectId, incident.getId(), organizationId);
+    }
+
+    @Transactional
+    public IncidentResponse updateIncident(UUID projectId, UUID incidentId, IncidentRequest request, UUID organizationId) {
+        validateProjectAccess(projectId, organizationId);
+        Incident incident = incidentRepository.findByIdAndProjectId(incidentId, projectId)
+                .orElseThrow(() -> new NotFoundException("Incident not found"));
+
+        IncidentStatus oldStatus = incident.getStatus();
+
+        if (request.getTitle() != null) incident.setTitle(request.getTitle());
+        if (request.getSeverity() != null) incident.setSeverity(request.getSeverity());
+        if (request.getRcaNotes() != null) incident.setRcaNotes(request.getRcaNotes());
+        if (request.getStatus() != null) {
+            incident.setStatus(request.getStatus());
+            if (request.getStatus() == IncidentStatus.RESOLVED && incident.getResolvedAt() == null) {
+                incident.setResolvedAt(Instant.now());
+            }
+        }
+
+        incident = incidentRepository.save(incident);
+
+        // Add status change timeline entry if status changed
+        if (request.getStatus() != null && request.getStatus() != oldStatus) {
+            IncidentTimeline entry = IncidentTimeline.builder()
+                    .incidentId(incidentId)
+                    .entryType(IncidentTimelineType.STATUS_CHANGE)
+                    .title("Status changed to " + request.getStatus())
+                    .build();
+            timelineRepository.save(entry);
+        }
+
+        return getIncident(projectId, incidentId, organizationId);
+    }
+
+    @Transactional
+    public IncidentResponse addTimelineEntry(UUID projectId, UUID incidentId, TimelineEntryRequest request, UUID organizationId) {
+        validateProjectAccess(projectId, organizationId);
+        incidentRepository.findByIdAndProjectId(incidentId, projectId)
+                .orElseThrow(() -> new NotFoundException("Incident not found"));
+
+        IncidentTimeline entry = IncidentTimeline.builder()
+                .incidentId(incidentId)
+                .entryType(request.getEntryType())
+                .title(request.getTitle())
+                .detail(request.getDetail())
+                .deliveryId(request.getDeliveryId())
+                .endpointId(request.getEndpointId())
+                .build();
+        timelineRepository.save(entry);
+
+        return getIncident(projectId, incidentId, organizationId);
+    }
+
+    @Transactional(readOnly = true)
+    public long countOpen(UUID projectId, UUID organizationId) {
+        validateProjectAccess(projectId, organizationId);
+        return incidentRepository.countByProjectIdAndStatusNot(projectId, IncidentStatus.RESOLVED);
+    }
+
+    private IncidentResponse toResponse(Incident incident) {
+        return IncidentResponse.builder()
+                .id(incident.getId())
+                .projectId(incident.getProjectId())
+                .title(incident.getTitle())
+                .status(incident.getStatus())
+                .severity(incident.getSeverity())
+                .rcaNotes(incident.getRcaNotes())
+                .resolvedAt(incident.getResolvedAt())
+                .createdAt(incident.getCreatedAt())
+                .updatedAt(incident.getUpdatedAt())
+                .build();
+    }
+
+    private IncidentResponse.TimelineEntry toTimelineEntry(IncidentTimeline tl) {
+        return IncidentResponse.TimelineEntry.builder()
+                .id(tl.getId())
+                .entryType(tl.getEntryType().name())
+                .title(tl.getTitle())
+                .detail(tl.getDetail())
+                .deliveryId(tl.getDeliveryId())
+                .endpointId(tl.getEndpointId())
+                .createdAt(tl.getCreatedAt())
+                .build();
+    }
+
+    private void validateProjectAccess(UUID projectId, UUID organizationId) {
+        projectRepository.findById(projectId)
+                .filter(p -> p.getOrganizationId().equals(organizationId))
+                .orElseThrow(() -> new NotFoundException("Project not found"));
+    }
+}

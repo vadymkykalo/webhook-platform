@@ -16,4 +16,5 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
     List<ApiKey> findByProjectIdAndRevokedAtIsNull(UUID projectId);
     Page<ApiKey> findByProjectIdAndRevokedAtIsNull(UUID projectId, Pageable pageable);
     Optional<ApiKey> findByIdAndProjectId(UUID id, UUID projectId);
+    boolean existsByProjectIdAndRevokedAtIsNull(UUID projectId);
 }

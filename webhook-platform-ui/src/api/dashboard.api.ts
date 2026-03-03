@@ -94,6 +94,16 @@ export interface EndpointPerformance {
   status: 'HEALTHY' | 'DEGRADED' | 'FAILING';
 }
 
+export interface OnboardingStatus {
+  hasEndpoints: boolean;
+  hasSubscriptions: boolean;
+  hasApiKeys: boolean;
+  hasEvents: boolean;
+  hasDeliveries: boolean;
+  hasIncomingSources: boolean;
+  hasIncomingDestinations: boolean;
+}
+
 export const dashboardApi = {
   getProjectStats: (projectId: string): Promise<DashboardStats> => {
     return http.get<DashboardStats>(`/api/v1/dashboard/projects/${projectId}`);
@@ -101,5 +111,9 @@ export const dashboardApi = {
 
   getAnalytics: (projectId: string, period: string = '24h'): Promise<AnalyticsData> => {
     return http.get<AnalyticsData>(`/api/v1/dashboard/projects/${projectId}/analytics?period=${period}`);
+  },
+
+  getOnboardingStatus: (projectId: string): Promise<OnboardingStatus> => {
+    return http.get<OnboardingStatus>(`/api/v1/dashboard/projects/${projectId}/onboarding`);
   },
 };

@@ -24,4 +24,7 @@ public interface IncomingSourceRepository extends JpaRepository<IncomingSource, 
     boolean existsByProjectIdAndSlug(UUID projectId, String slug);
 
     boolean existsByIngressPathToken(String ingressPathToken);
+
+    long countByProjectId(UUID projectId);
+    boolean existsByProjectId(UUID projectId);
 }

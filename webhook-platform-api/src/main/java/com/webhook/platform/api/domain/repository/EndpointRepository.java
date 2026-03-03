@@ -13,4 +13,6 @@ import java.util.UUID;
 public interface EndpointRepository extends JpaRepository<Endpoint, UUID> {
     List<Endpoint> findByProjectId(UUID projectId);
     Page<Endpoint> findByProjectIdAndDeletedAtIsNull(UUID projectId, Pageable pageable);
+    long countByProjectIdAndDeletedAtIsNull(UUID projectId);
+    boolean existsByProjectIdAndDeletedAtIsNull(UUID projectId);
 }

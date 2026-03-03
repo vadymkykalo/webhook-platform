@@ -83,6 +83,10 @@
     "analytics": "Analytics",
     "replay": "Time Machine",
     "dlq": "Dead Letter Queue",
+    "alerts": "Alerts",
+    "usage": "Usage",
+    "incidents": "Incidents",
+    "transformStudio": "Transform Studio",
     "testEndpoints": "Test Endpoints",
     "devWorkspace": "DX Workspace",
     "incomingSources": "Incoming Sources",
@@ -439,6 +443,17 @@
     "viewDeliveries": "View deliveries for this event",
     "toast": {
       "idCopied": "Event ID copied to clipboard"
+    },
+    "details": {
+      "title": "Event Details",
+      "raw": "Raw",
+      "sanitized": "Sanitized",
+      "deliveries": "Deliveries",
+      "noPayload": "No payload",
+      "sanitizedUnavailable": "Sanitized view unavailable. Configure PII rules first.",
+      "noDeliveries": "No deliveries for this event",
+      "openFull": "Open Full Details",
+      "notFound": "Event not found"
     }
   },
   "deliveries": {
@@ -1729,7 +1744,25 @@
       "retryDelaysPlaceholder": "60,300,900,3600,21600",
       "payloadTransform": "Payload Transform (JSONPath)",
       "payloadTransformPlaceholder": "$.data",
-      "payloadTransformHint": "Optional JSONPath expression to transform payload before forwarding"
+      "payloadTransformHint": "Optional JSONPath expression to transform payload before forwarding",
+      "retryPolicy": "Retry Policy"
+    },
+    "validation": {
+      "invalidJson": "Invalid JSON format",
+      "validJson": "Valid JSON",
+      "urlRequired": "URL is required",
+      "invalidUrl": "Invalid URL format",
+      "headersInvalidJson": "Custom headers must be valid JSON",
+      "transformInvalidJson": "Payload transform must be valid JSON",
+      "attemptsRange": "Max attempts must be between 1 and 20",
+      "timeoutRange": "Timeout must be between 1 and 120 seconds",
+      "retryDelaysFormat": "Retry delays must be comma-separated positive numbers (seconds)",
+      "allValid": "All configuration is valid",
+      "validate": "Validate",
+      "format": "Format",
+      "testPreview": "Test Preview",
+      "previewOutput": "Preview Output",
+      "previewFailed": "Transform preview failed"
     },
     "editDialog": {
       "title": "Edit Destination",
@@ -1960,7 +1993,11 @@
     "settings": "Settings",
     "schemas": "Schemas",
     "pii-rules": "PII Masking",
-    "event-diff": "Event Diff"
+    "event-diff": "Event Diff",
+    "alerts": "Alerts",
+    "usage": "Usage",
+    "incidents": "Incidents",
+    "transform-studio": "Transform Studio"
   },
   "piiRules": {
     "title": "PII Masking Rules",
@@ -2248,6 +2285,145 @@
     "goToLogin": "Log in to continue",
     "goToRegister": "Create an account",
     "newUserHint": "Don't have an account yet? Register first, then you'll be redirected back to accept the invite."
+  },
+  "alerts": {
+    "title": "Alerts",
+    "subtitle": "Monitor delivery health and get notified of issues",
+    "unresolved": "unresolved",
+    "resolveAll": "Resolve All",
+    "createRule": "Create Rule",
+    "resolved": "Resolved",
+    "active": "Active",
+    "resolve": "Resolve",
+    "noEvents": "No alerts fired",
+    "noEventsDesc": "Alert rules will fire events here when conditions are met",
+    "noRules": "No alert rules",
+    "noRulesDesc": "Create your first alert rule to monitor delivery health",
+    "muted": "Muted",
+    "snoozed": "Snoozed",
+    "threshold": "Threshold",
+    "window": "Window",
+    "tabs": {
+      "events": "Alert History",
+      "rules": "Alert Rules"
+    },
+    "columns": {
+      "title": "Alert",
+      "severity": "Severity",
+      "value": "Value",
+      "time": "Time",
+      "status": "Status"
+    },
+    "createDialog": {
+      "title": "Create Alert Rule",
+      "description": "Define conditions that trigger alerts",
+      "submit": "Create Rule"
+    },
+    "deleteDialog": {
+      "title": "Delete alert rule?",
+      "description": "This will permanently delete the rule and stop monitoring. Existing alert events will remain."
+    },
+    "form": {
+      "name": "Name",
+      "type": "Alert Type",
+      "threshold": "Threshold",
+      "window": "Window (min)",
+      "severity": "Severity",
+      "description": "Description (optional)",
+      "channel": "Notification Channel",
+      "webhookUrl": "Webhook URL",
+      "emailRecipients": "Email Recipients"
+    },
+    "toast": {
+      "ruleCreated": "Alert rule created",
+      "ruleDeleted": "Alert rule deleted",
+      "createFailed": "Failed to create alert rule",
+      "deleteFailed": "Failed to delete alert rule",
+      "updateFailed": "Failed to update alert rule",
+      "muted": "Rule muted",
+      "unmuted": "Rule unmuted",
+      "snoozed": "Snoozed for {{hours}}h",
+      "resolveFailed": "Failed to resolve alert",
+      "allResolved": "{{count}} alerts resolved"
+    }
+  },
+  "incidents": {
+    "title": "Incidents",
+    "openCount": "{{count}} open incidents",
+    "noOpen": "No open incidents",
+    "showAll": "Show All",
+    "openOnly": "Open Only",
+    "create": "Create Incident",
+    "empty": "No incidents",
+    "emptyDesc": "Incidents group related failures for tracking and RCA",
+    "investigate": "Investigate",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "addNote": "Add Note",
+    "rcaNotes": "Root Cause Analysis",
+    "rcaPlaceholder": "Document the root cause, impact, and remediation steps...",
+    "timeline": "Timeline",
+    "resolvedAt": "Resolved",
+    "createDialog": {
+      "title": "Create Incident",
+      "desc": "Track a group of related failures",
+      "submit": "Create"
+    },
+    "noteDialog": {
+      "title": "Add Timeline Note",
+      "noteTitle": "Title",
+      "detail": "Detail (optional)",
+      "submit": "Add Note"
+    },
+    "form": {
+      "title": "Title",
+      "severity": "Severity"
+    },
+    "toast": {
+      "created": "Incident created",
+      "statusUpdated": "Status updated",
+      "updateFailed": "Failed to update incident",
+      "rcaSaved": "RCA notes saved",
+      "noteAdded": "Note added"
+    }
+  },
+  "usage": {
+    "title": "Usage & Metrics",
+    "subtitle": "Resource usage for <strong>{{project}}</strong>",
+    "noData": "No usage data",
+    "noDataDesc": "Start sending events to see usage metrics",
+    "periods": {
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "90d": "Last 90 days"
+    },
+    "stats": {
+      "events": "Events (30d)",
+      "deliveries": "Deliveries (30d)",
+      "successRate": "Success Rate",
+      "dlq": "DLQ"
+    },
+    "breakdown": {
+      "title": "Delivery Breakdown (30d)",
+      "success": "Successful",
+      "failed": "Failed",
+      "dlq": "Dead Letter Queue",
+      "pending": "Pending / Processing"
+    },
+    "resources": {
+      "endpoints": "Active Endpoints",
+      "sources": "Incoming Sources",
+      "alertRules": "Alert Rules"
+    },
+    "history": {
+      "title": "Daily History",
+      "date": "Date",
+      "events": "Events",
+      "deliveries": "Deliveries",
+      "success": "Success",
+      "failed": "Failed",
+      "dlq": "DLQ"
+    }
   }
 }
 

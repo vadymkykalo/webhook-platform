@@ -30,7 +30,7 @@ public class IncomingForwardConsumer {
     )
     public void consume(ConsumerRecord<String, IncomingForwardMessage> record, Acknowledgment ack) {
         IncomingForwardMessage message = record.value();
-        String correlationId = UUID.randomUUID().toString();
+        String correlationId = extractCorrelationId(record);
 
         MDC.put("correlationId", correlationId);
         MDC.put("incomingEventId", String.valueOf(message.getIncomingEventId()));
@@ -55,5 +55,13 @@ public class IncomingForwardConsumer {
             MDC.remove("incomingEventId");
             MDC.remove("destinationId");
         }
+    }
+
+    private String extractCorrelationId(ConsumerRecord<String, IncomingForwardMessage> record) {
+        org.apache.kafka.common.header.Header header = record.headers().lastHeader("X-Correlation-ID");
+        if (header != null && header.value() != null && header.value().length > 0) {
+            return new String(header.value(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+        return UUID.randomUUID().toString();
     }
 }
