@@ -25,42 +25,46 @@ import java.io.InputStreamReader;
 public class RequestSizeLimitFilter extends OncePerRequestFilter {
 
     private final long maxPayloadSizeBytes;
+    private final long ingressMaxPayloadSizeBytes;
 
     public RequestSizeLimitFilter(
-            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
+            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
+            @Value("${webhook.incoming.max-payload-size-bytes:524288}") long ingressMaxPayloadSizeBytes) {
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
+        this.ingressMaxPayloadSizeBytes = ingressMaxPayloadSizeBytes;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
+        long effectiveLimit = resolveLimit(request);
         // Fast path: reject if Content-Length header is present and exceeds the limit
         long contentLength = request.getContentLengthLong();
-        if (contentLength > maxPayloadSizeBytes) {
+        if (contentLength > effectiveLimit) {
             log.warn("Request rejected: Content-Length {} exceeds max payload size {} bytes (URI: {})",
-                    contentLength, maxPayloadSizeBytes, request.getRequestURI());
-            rejectRequest(response);
+                    contentLength, effectiveLimit, request.getRequestURI());
+            rejectRequest(response, effectiveLimit);
             return;
         }
 
         // Wrap request to enforce size limit at stream level (handles chunked transfer)
-        HttpServletRequest wrappedRequest = new ContentLimitedRequestWrapper(request, maxPayloadSizeBytes);
+        HttpServletRequest wrappedRequest = new ContentLimitedRequestWrapper(request, effectiveLimit);
 
         try {
             filterChain.doFilter(wrappedRequest, response);
         } catch (PayloadTooLargeException e) {
             log.warn("Request rejected mid-stream: body exceeds max payload size {} bytes (URI: {})",
-                    maxPayloadSizeBytes, request.getRequestURI());
+                    effectiveLimit, request.getRequestURI());
             if (!response.isCommitted()) {
-                rejectRequest(response);
+                rejectRequest(response, effectiveLimit);
             }
         } catch (ServletException e) {
             // Unwrap nested PayloadTooLargeException from framework wrapping
             if (hasPayloadTooLargeCause(e)) {
                 log.warn("Request rejected mid-stream: body exceeds max payload size {} bytes (URI: {})",
-                        maxPayloadSizeBytes, request.getRequestURI());
+                        effectiveLimit, request.getRequestURI());
                 if (!response.isCommitted()) {
-                    rejectRequest(response);
+                    rejectRequest(response, effectiveLimit);
                 }
             } else {
                 throw e;
@@ -68,12 +72,20 @@ public class RequestSizeLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private void rejectRequest(HttpServletResponse response) throws IOException {
+    private long resolveLimit(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri != null && uri.startsWith("/ingress/")) {
+            return ingressMaxPayloadSizeBytes;
+        }
+        return maxPayloadSizeBytes;
+    }
+
+    private void rejectRequest(HttpServletResponse response, long limit) throws IOException {
         response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
         response.setContentType("application/json");
         response.getWriter().write(
                 "{\"error\":\"payload_too_large\",\"message\":\"Request body exceeds maximum allowed size of "
-                        + maxPayloadSizeBytes + " bytes\",\"status\":413}");
+                        + limit + " bytes\",\"status\":413}");
     }
 
     private boolean hasPayloadTooLargeCause(Throwable e) {
