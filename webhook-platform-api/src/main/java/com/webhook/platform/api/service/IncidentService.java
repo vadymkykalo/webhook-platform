@@ -60,6 +60,9 @@ public class IncidentService {
     @Transactional
     public IncidentResponse createIncident(UUID projectId, IncidentRequest request, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new IllegalArgumentException("Incident title is required");
+        }
 
         Incident incident = Incident.builder()
                 .projectId(projectId)
