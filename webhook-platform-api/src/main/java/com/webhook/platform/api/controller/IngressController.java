@@ -91,7 +91,6 @@ public class IngressController {
                     .body(IngressResponse.builder()
                             .error("signature_verification_failed")
                             .message("Webhook signature verification failed")
-                            .requestId(e.getEvent().getRequestId())
                             .build());
         }
     }

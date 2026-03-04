@@ -35,8 +35,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.interceptor.NoRollbackRuleAttribute;
-import org.springframework.transaction.interceptor.RuleBasedTransactionAttribute;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -95,9 +93,7 @@ public class IngressService {
         this.encryptionSalt = encryptionSalt;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
 
-        RuleBasedTransactionAttribute txAttr = new RuleBasedTransactionAttribute();
-        txAttr.getRollbackRules().add(new NoRollbackRuleAttribute(SignatureVerificationFailedException.class));
-        this.transactionTemplate = new TransactionTemplate(transactionManager, txAttr);
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
@@ -159,22 +155,9 @@ public class IngressService {
         String headersJson = HeaderSanitizer.toJson(request, objectMapper);
         String bodySha256 = computeSha256(body);
 
-        // Extract provider event ID for dedup (well-known headers only, no body hash fallback)
-        String providerEventId = ProviderEventIdExtractor.extract(request, body);
-
-        // Dedup: if same source + same provider event ID already exists, return existing (idempotent)
-        if (providerEventId != null) {
-            var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
-            if (existing.isPresent()) {
-                log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
-                        source.getId(), providerEventId, existing.get().getId());
-                meterRegistry.counter("incoming_events_deduplicated_total",
-                        "source_id", source.getId().toString()).increment();
-                return existing.get();
-            }
-        }
-
-        // Verify signature via strategy pattern
+        // Verify signature BEFORE dedup to prevent dedup poisoning (P0 security fix).
+        // An attacker could send a webhook with a known providerEventId but invalid signature;
+        // if we dedup/persist first, the poisoned record blocks the real webhook.
         Boolean verified = null;
         String verificationError = null;
         WebhookVerificationStrategy verifier = verifierFactory.getVerifier(source);
@@ -190,6 +173,32 @@ public class IngressService {
                 verified = false;
                 verificationError = "Verification error: " + e.getMessage();
                 log.warn("Webhook verification failed for source {}: {}", source.getId(), e.getMessage());
+            }
+        }
+
+        // Block immediately when signature verification is configured and not verified
+        if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verified)) {
+            meterRegistry.counter("incoming_events_rejected_total",
+                    "source_id", source.getId().toString(),
+                    "reason", "signature_verification_failed").increment();
+            String reason = verificationError != null ? verificationError : "Verification not completed";
+            log.warn("Rejecting incoming webhook due to failed signature verification: sourceId={}, error={}",
+                    source.getId(), reason);
+            throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
+        }
+
+        // Extract provider event ID for dedup (well-known headers only, no body hash fallback)
+        String providerEventId = ProviderEventIdExtractor.extract(request, body);
+
+        // Dedup: if same source + same provider event ID already exists, return existing (idempotent)
+        if (providerEventId != null) {
+            var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
+            if (existing.isPresent()) {
+                log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
+                        source.getId(), providerEventId, existing.get().getId());
+                meterRegistry.counter("incoming_events_deduplicated_total",
+                        "source_id", source.getId().toString()).increment();
+                return existing.get();
             }
         }
 
@@ -221,18 +230,6 @@ public class IngressService {
         log.info("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
                 event.getId(), source.getId(), requestId, verified);
 
-        // Block forwarding when signature verification is configured and not verified
-        if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verified)) {
-            meterRegistry.counter("incoming_events_rejected_total",
-                    "source_id", source.getId().toString(),
-                    "reason", "signature_verification_failed").increment();
-            String reason = verificationError != null ? verificationError : "Verification not completed";
-            log.warn("Blocking incoming webhook due to failed signature verification: eventId={}, sourceId={}, error={}",
-                    event.getId(), source.getId(), reason);
-            throw new SignatureVerificationFailedException(
-                    "Signature verification failed: " + reason, event);
-        }
-
         // Create forward attempts + outbox messages in batch
         List<IncomingDestination> destinations = destinationRepository
                 .findByIncomingSourceIdAndEnabledTrue(source.getId());
@@ -242,6 +239,23 @@ public class IngressService {
             List<OutboxMessage> outboxMessages = new ArrayList<>(destinations.size());
 
             for (IncomingDestination destination : destinations) {
+                IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
+                        .incomingEventId(event.getId())
+                        .destinationId(destination.getId())
+                        .incomingSourceId(source.getId())
+                        .attemptCount(0)
+                        .replay(false)
+                        .build();
+
+                String payload;
+                try {
+                    payload = objectMapper.writeValueAsString(forwardMessage);
+                } catch (Exception e) {
+                    throw new RuntimeException(
+                            "Failed to serialize outbox message for incoming forward: eventId="
+                                    + event.getId() + ", destId=" + destination.getId(), e);
+                }
+
                 attempts.add(IncomingForwardAttempt.builder()
                         .incomingEventId(event.getId())
                         .destinationId(destination.getId())
@@ -249,29 +263,16 @@ public class IngressService {
                         .status(ForwardAttemptStatus.PENDING)
                         .build());
 
-                try {
-                    IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
-                            .incomingEventId(event.getId())
-                            .destinationId(destination.getId())
-                            .incomingSourceId(source.getId())
-                            .attemptCount(0)
-                            .replay(false)
-                            .build();
-
-                    outboxMessages.add(OutboxMessage.builder()
-                            .aggregateType("IncomingForward")
-                            .aggregateId(event.getId())
-                            .eventType("IncomingForwardCreated")
-                            .payload(objectMapper.writeValueAsString(forwardMessage))
-                            .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
-                            .kafkaKey(destination.getId().toString())
-                            .status(OutboxStatus.PENDING)
-                            .retryCount(0)
-                            .build());
-                } catch (Exception e) {
-                    log.error("Failed to serialize outbox message for incoming forward: eventId={}, destId={}",
-                            event.getId(), destination.getId(), e);
-                }
+                outboxMessages.add(OutboxMessage.builder()
+                        .aggregateType("IncomingForward")
+                        .aggregateId(event.getId())
+                        .eventType("IncomingForwardCreated")
+                        .payload(payload)
+                        .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
+                        .kafkaKey(destination.getId().toString())
+                        .status(OutboxStatus.PENDING)
+                        .retryCount(0)
+                        .build());
             }
 
             forwardAttemptRepository.saveAll(attempts);

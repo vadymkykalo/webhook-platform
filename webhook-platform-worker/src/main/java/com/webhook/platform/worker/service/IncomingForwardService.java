@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 @Service
 @Slf4j
@@ -72,13 +73,14 @@ public class IncomingForwardService {
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             MeterRegistry meterRegistry,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            ConnectionProvider webhookConnectionProvider) {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
-        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(allowPrivateIps);
+        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(webhookConnectionProvider, allowPrivateIps);
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-IncomingForward")

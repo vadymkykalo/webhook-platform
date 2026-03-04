@@ -54,7 +54,6 @@ function Navigation() {
             <a href="#capabilities" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.capabilities')}</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.howItWorks')}</a>
             <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.docs')}</Link>
-            <Link to="/quickstart" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.quickstart')}</Link>
             <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.sdks')}</Link>
           </div>
         </div>

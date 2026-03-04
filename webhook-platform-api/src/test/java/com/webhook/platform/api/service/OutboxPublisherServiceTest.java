@@ -54,7 +54,7 @@ class OutboxPublisherServiceTest {
 
         service = new OutboxPublisherService(
                 outboxMessageRepository, kafkaTemplate, objectMapper,
-                new SimpleMeterRegistry(), txManager, 100, 5, 90);
+                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1);
     }
 
     @Test
@@ -128,6 +128,68 @@ class OutboxPublisherServiceTest {
             msg.getRetryCount() == 1 &&
             msg.getErrorMessage() != null
         ));
+    }
+
+    @Test
+    void shouldMarkAsFailedOnKafkaSendFailure() throws Exception {
+        OutboxMessage message = createTestMessage();
+        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
+                .deliveryId(UUID.randomUUID())
+                .build();
+
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(message));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(deliveryMessage);
+
+        // Kafka send fails definitively
+        CompletableFuture<SendResult<String, Object>> future = new CompletableFuture<>();
+        future.completeExceptionally(new RuntimeException("Broker unavailable"));
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(future);
+
+        service.publishPendingMessages();
+
+        // handle() callback should mark FAILED based on actual Kafka error
+        verify(outboxMessageRepository).save(argThat(msg ->
+            msg.getStatus() == OutboxStatus.FAILED &&
+            msg.getErrorMessage() != null &&
+            msg.getErrorMessage().contains("Broker unavailable")
+        ));
+    }
+
+    @Test
+    void shouldNotMarkAsFailedWhenKafkaSendStillInFlight() throws Exception {
+        // Regression test for P0 duplicate dispatch bug.
+        // Previously, get(0ms) after batch timeout would mark in-flight sends as FAILED,
+        // even though they would eventually succeed — causing duplicate dispatch on retry.
+        OutboxMessage message = createTestMessage();
+        DeliveryMessage deliveryMessage = DeliveryMessage.builder()
+                .deliveryId(UUID.randomUUID())
+                .build();
+
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+                .thenReturn(List.of(message));
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(deliveryMessage);
+
+        // Kafka send never completes (simulates slow broker)
+        CompletableFuture<SendResult<String, Object>> neverCompletingFuture = new CompletableFuture<>();
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenReturn(neverCompletingFuture);
+
+        service.publishPendingMessages();
+
+        // Message must NOT be marked FAILED — it stays SENDING.
+        // cleanupOldMessages() will recover it back to PENDING after 120s.
+        verify(outboxMessageRepository, never()).save(argThat(msg ->
+            msg.getStatus() == OutboxStatus.FAILED
+        ));
+        verify(outboxMessageRepository, never()).save(argThat(msg ->
+            msg.getStatus() == OutboxStatus.PUBLISHED
+        ));
+        // Message remains SENDING (set during claim phase)
+        assertThat(message.getStatus()).isEqualTo(OutboxStatus.SENDING);
     }
 
     private OutboxMessage createTestMessage() {

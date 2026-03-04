@@ -7,7 +7,6 @@ import ProtectedRoute from './auth/ProtectedRoute';
 
 // Lazy-loaded pages — each becomes its own chunk
 const LandingPage = lazy(() => import('./pages/LandingPage'));
-const QuickstartPage = lazy(() => import('./pages/QuickstartPage'));
 const LoginPage = lazy(() => import('./auth/LoginPage'));
 const RegisterPage = lazy(() => import('./auth/RegisterPage'));
 const VerifyEmailPage = lazy(() => import('./auth/VerifyEmailPage'));
@@ -69,10 +68,6 @@ export const router = createBrowserRouter([
       {
         path: '/',
         element: <S><LandingPage /></S>,
-      },
-      {
-        path: '/quickstart',
-        element: <S><QuickstartPage /></S>,
       },
     ],
   },

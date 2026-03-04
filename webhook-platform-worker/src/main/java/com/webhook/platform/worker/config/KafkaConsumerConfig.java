@@ -2,6 +2,7 @@ package com.webhook.platform.worker.config;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
+import com.webhook.platform.worker.service.ShutdownRejectedException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -122,6 +123,11 @@ public class KafkaConsumerConfig {
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
             recoverer,
             new FixedBackOff(retryIntervalMs, maxRetries)
+        );
+
+        // ShutdownRejectedException: no point retrying on a dying instance — send straight to DLT
+        errorHandler.addNotRetryableExceptions(
+                ShutdownRejectedException.class
         );
 
         errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->

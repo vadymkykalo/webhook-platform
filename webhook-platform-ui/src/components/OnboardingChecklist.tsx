@@ -239,7 +239,7 @@ export default function OnboardingChecklist({
                   variant="outline"
                   size="sm"
                   className="mt-3"
-                  onClick={() => navigate('/quickstart')}
+                  onClick={() => navigate('/docs')}
                 >
                   {t('onboarding.allDoneAction')} <ArrowRight className="h-3.5 w-3.5 ml-1" />
                 </Button>

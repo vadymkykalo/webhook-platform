@@ -270,19 +270,12 @@ class IngressServiceTest {
 
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class)
-                .satisfies(ex -> {
-                    SignatureVerificationFailedException sve =
-                            (SignatureVerificationFailedException) ex;
-                    assertThat(sve.getEvent().getVerified()).isFalse();
-                    assertThat(sve.getEvent().getVerificationError()).isEqualTo("Signature mismatch");
-                });
+                .hasMessageContaining("Signature mismatch");
 
-        // Event is saved for audit trail
-        verify(eventRepository).save(any(IncomingEvent.class));
-        // But no forward attempts or outbox messages are created
+        // Event is NOT persisted — rejected before dedup/save to prevent dedup poisoning
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
         verify(forwardAttemptRepository, never()).saveAll(any());
         verify(outboxMessageRepository, never()).saveAll(any());
-        // Destinations are never queried since we short-circuit before that
         verify(destinationRepository, never()).findByIncomingSourceIdAndEnabledTrue(any());
     }
 
@@ -318,10 +311,61 @@ class IngressServiceTest {
         assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"data\":1}", httpRequest))
                 .isInstanceOf(SignatureVerificationFailedException.class);
 
-        // Event saved for audit, but forwarding completely blocked
-        verify(eventRepository).save(any(IncomingEvent.class));
+        // Event is NOT persisted — rejected before dedup/save to prevent dedup poisoning
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
         verify(forwardAttemptRepository, never()).saveAll(any());
         verify(outboxMessageRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void receiveWebhook_dedupPoisoning_attackerCannotBlockLegitimateWebhook() {
+        // Regression test for P0 dedup poisoning vulnerability.
+        // Attacker sends webhook with known providerEventId but invalid signature.
+        // The legitimate webhook with the same providerEventId must still be accepted.
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+
+        String body = "{\"data\":\"important\"}";
+
+        // Step 1: Attacker sends webhook with known providerEventId but bad signature
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_target");
+        when(httpRequest.getHeader("X-Signature")).thenReturn("attacker-bad-sig");
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body, httpRequest))
+                .isInstanceOf(SignatureVerificationFailedException.class);
+
+        // Attacker's event must NOT be persisted
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+
+        // Step 2: Legitimate webhook with same providerEventId and valid signature
+        String validHmac = computeHmac(secret, body);
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_target"))
+                .thenReturn(Optional.empty());
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+
+        IncomingEvent result = service.receiveWebhook("validtoken", body, httpRequest);
+
+        // Legitimate webhook is accepted and persisted
+        assertThat(result.getId()).isEqualTo(eventId);
+        assertThat(result.getVerified()).isTrue();
+        assertThat(result.getProviderEventId()).isEqualTo("evt_target");
+        verify(eventRepository).save(any(IncomingEvent.class));
     }
 
     @Test

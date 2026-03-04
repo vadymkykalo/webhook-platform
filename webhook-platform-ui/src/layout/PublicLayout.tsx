@@ -35,7 +35,6 @@ export function Footer() {
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t('footer.product')}</h3>
             <ul className="space-y-2">
               <li><a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('footer.features')}</a></li>
-              <li><Link to="/quickstart" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('footer.quickstart')}</Link></li>
               <li><Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('footer.documentation')}</Link></li>
             </ul>
           </div>

@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 @Service
 @Slf4j
@@ -90,12 +91,13 @@ public class WebhookDeliveryService {
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             PayloadTransformService payloadTransformService,
             TransactionTemplate transactionTemplate,
-            TransformationCacheService transformationCacheService) {
+            TransformationCacheService transformationCacheService,
+            ConnectionProvider webhookConnectionProvider) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
-        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(allowPrivateIps);
+        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(webhookConnectionProvider, allowPrivateIps);
         this.defaultWebClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
