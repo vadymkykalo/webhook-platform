@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.resources.ConnectionProvider;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -70,7 +71,7 @@ class MtlsWebClientFactoryTest {
 
     @BeforeEach
     void setUp() {
-        factory = new MtlsWebClientFactory(ENCRYPTION_KEY, ENCRYPTION_SALT, true, WebClient.builder());
+        factory = new MtlsWebClientFactory(ENCRYPTION_KEY, ENCRYPTION_SALT, true, WebClient.builder(), ConnectionProvider.newConnection());
     }
 
     // -----------------------------------------------------------------------
