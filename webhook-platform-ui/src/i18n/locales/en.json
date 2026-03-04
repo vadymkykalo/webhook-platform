@@ -55,7 +55,8 @@
     "error": "An unexpected error occurred",
     "retry": "Retry",
     "backToHome": "Back to home",
-    "learnMore": "Learn more"
+    "learnMore": "Learn more",
+    "optional": "optional"
   },
   "dangerConfirm": {
     "impact": "This action will affect:",
@@ -478,6 +479,83 @@
       "rebindConfirm": "Rebind",
       "done": "{{count}} subscription(s) updated",
       "rebound": "{{count}} subscription(s) rebound to new endpoint"
+    }
+  },
+  "createSubscription": {
+    "titleCreate": "Create Subscription",
+    "titleEdit": "Edit Subscription",
+    "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
+    "descriptionEdit": "Update how events are routed to this endpoint",
+    "submitCreate": "Create Subscription",
+    "submitEdit": "Update Subscription",
+    "sections": {
+      "essentials": "Essentials",
+      "behavior": "Behavior",
+      "advanced": "Advanced Settings",
+      "advancedHint": "retry, timeout, transformation, headers"
+    },
+    "fields": {
+      "endpoint": "Endpoint",
+      "selectEndpoint": "Select an endpoint...",
+      "noEndpoints": "No endpoints available. Create an endpoint first.",
+      "endpointHint": "The webhook URL that will receive matching events.",
+      "selected": "Selected",
+      "enabled": "Enabled",
+      "enabledHint": "Events will be delivered",
+      "disabledHint": "Paused — no deliveries",
+      "fifoOrdering": "FIFO Ordering",
+      "fifoOnHint": "Strict order (slower)",
+      "fifoOffHint": "Parallel (fastest)",
+      "maxAttempts": "Max Attempts",
+      "maxAttemptsHint": "How many times to try (1–20)",
+      "timeout": "Timeout (sec)",
+      "timeoutHint": "Per-request timeout (1–60)",
+      "retryDelays": "Retry Delays",
+      "retryDelaysHint": "Seconds between retries",
+      "transformation": "Transformation",
+      "noTransformation": "None — send original payload",
+      "payloadTemplate": "Payload Template",
+      "customHeaders": "Custom Headers",
+      "customHeadersHint": "JSON key-value pairs added to each request."
+    },
+    "validation": {
+      "endpointRequired": "Please select an endpoint that will receive the events",
+      "eventTypeRequired": "Event type is required — specify which events this subscription should receive",
+      "eventTypeFormat": "Use lowercase letters, dots, underscores. Wildcards: order.* (one level), order.** (all nested), ** (catch-all)",
+      "maxAttempts": "Must be between 1 and 20 attempts",
+      "timeout": "Must be between 1 and 60 seconds",
+      "retryDelays": "Must be comma-separated numbers (seconds), e.g. 60,300,900",
+      "invalidJson": "Invalid JSON — check syntax",
+      "headersObject": "Must be a JSON object with key-value pairs"
+    },
+    "summary": {
+      "title": "What happens next?",
+      "description": "Every time an event matching {{eventType}} is received, it will be delivered to {{endpoint}}. You can send a test event from the Events page to verify everything works.",
+      "theEndpoint": "the selected endpoint"
+    },
+    "toast": {
+      "created": "Subscription created successfully",
+      "updated": "Subscription updated successfully"
+    }
+  },
+  "mtls": {
+    "title": "mTLS Configuration",
+    "description": "Configure mutual TLS (client certificate authentication) for secure webhook delivery.",
+    "enabledBanner": "mTLS is currently enabled for this endpoint. Upload new certificates to update or disable below.",
+    "securityWarning": "Keep your private key secure. It will be encrypted before storage but never share it.",
+    "clientCert": "Client Certificate (PEM)",
+    "clientKey": "Client Private Key (PEM)",
+    "caCert": "CA Certificate (PEM) — Optional",
+    "caCertHint": "Optional: Provide a custom CA certificate for server verification.",
+    "uploadCert": "Upload .pem/.crt",
+    "uploadKey": "Upload .pem/.key",
+    "uploadCa": "Upload CA cert",
+    "enable": "Enable mTLS",
+    "disable": "Disable mTLS",
+    "updateCerts": "Update Certificates",
+    "toast": {
+      "configured": "mTLS configured successfully",
+      "disabled": "mTLS disabled"
     }
   },
   "events": {
@@ -2257,6 +2335,23 @@
     "noDiffs": "No differences found — payloads are identical",
     "left": "Left",
     "right": "Right",
+    "selectDescription": "Choose two events to compare their payloads. Search by event type or ID. Differences will be highlighted automatically.",
+    "searchPlaceholder": "Search by type or ID...",
+    "noSearchResults": "No events match your search",
+    "noEvents": "No events found",
+    "sameEventWarning": "Same event selected on both sides",
+    "comparing": "Comparing events...",
+    "noDiffsTitle": "No differences found",
+    "noDiffsSubtitle": "Both events have identical payloads",
+    "differencesDetected": "{{count}} difference(s) detected",
+    "betweenEvents": "Between these two events of type",
+    "added": "{{count}} added",
+    "removed": "{{count}} removed",
+    "changed": "{{count}} changed",
+    "emptyTitle": "Compare Event Payloads",
+    "emptyDescription": "Select two events above to compare their payloads side by side. Structural differences like added, removed, or changed fields will be highlighted automatically.",
+    "eventsCount": "{{count}} events",
+    "pageInfo": "Page {{current}}/{{total}}",
     "toast": {
       "loadEventsFailed": "Failed to load events",
       "diffFailed": "Failed to compute diff"
@@ -2542,6 +2637,24 @@
       "snoozed": "Snoozed for {{hours}}h",
       "resolveFailed": "Failed to resolve alert",
       "allResolved": "{{count}} alerts resolved"
+    },
+    "types": {
+      "FAILURE_RATE": {
+        "label": "Failure Rate",
+        "hint": "Triggers when failure % exceeds threshold in window"
+      },
+      "DLQ_THRESHOLD": {
+        "label": "DLQ Threshold",
+        "hint": "Triggers when DLQ count exceeds threshold"
+      },
+      "CONSECUTIVE_FAILURES": {
+        "label": "Consecutive Failures",
+        "hint": "Triggers after N consecutive failures for an endpoint"
+      },
+      "LATENCY_THRESHOLD": {
+        "label": "Latency Threshold",
+        "hint": "Triggers when avg latency exceeds threshold (ms)"
+      }
     }
   },
   "incidents": {
@@ -2669,6 +2782,40 @@
       "expression": "expression",
       "expressions": "expressions"
     }
+  },
+  "transform": {
+    "title": "Transform Studio",
+    "subtitle": "Test payload transformations for incoming destinations",
+    "hints": {
+      "title": "Quick Expressions",
+      "extractData": "Extract the data object",
+      "extractItems": "Extract items array",
+      "extractCustomer": "Extract customer info",
+      "extractMetadata": "Extract metadata",
+      "passThrough": "Pass through entire payload"
+    },
+    "inputPayload": "Input Payload",
+    "format": "Format",
+    "savedTransformation": "Saved Transformation",
+    "noSavedTransformation": "— Use custom expression below —",
+    "expression": "Transform Expression (JSONPath-like)",
+    "customHeaders": "Custom Headers (JSON object)",
+    "run": "Run Preview",
+    "running": "Running...",
+    "reset": "Reset",
+    "outputPayload": "Output Payload",
+    "outputHeaders": "Output Headers",
+    "noOutput": "Click \"Run Preview\" to see the transform output",
+    "errors": "Validation Errors",
+    "howItWorks": "How it works",
+    "help": {
+      "extractField": "extract a nested field",
+      "drillArrays": "drill into arrays",
+      "emptyExpr": "Empty expression = forward full payload as-is",
+      "headersMerge": "Custom headers are merged with system headers",
+      "testBefore": "Use this to test before saving to a destination"
+    },
+    "previewFailed": "Failed to run transform preview"
   }
 }
 

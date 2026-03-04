@@ -31,12 +31,7 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 
-const ALERT_TYPES: { value: AlertType; label: string; hint: string }[] = [
-  { value: 'FAILURE_RATE', label: 'Failure Rate', hint: 'Triggers when failure % exceeds threshold in window' },
-  { value: 'DLQ_THRESHOLD', label: 'DLQ Threshold', hint: 'Triggers when DLQ count exceeds threshold' },
-  { value: 'CONSECUTIVE_FAILURES', label: 'Consecutive Failures', hint: 'Triggers after N consecutive failures for an endpoint' },
-  { value: 'LATENCY_THRESHOLD', label: 'Latency Threshold', hint: 'Triggers when avg latency exceeds threshold (ms)' },
-];
+const ALERT_TYPE_VALUES: AlertType[] = ['FAILURE_RATE', 'DLQ_THRESHOLD', 'CONSECUTIVE_FAILURES', 'LATENCY_THRESHOLD'];
 
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -455,9 +450,9 @@ export default function AlertsPage() {
             <div className="space-y-2">
               <Label>{t('alerts.form.type', 'Alert Type')}</Label>
               <Select value={formType} onChange={(e) => setFormType(e.target.value as AlertType)}>
-                {ALERT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {ALERT_TYPE_VALUES.map((v) => <option key={v} value={v}>{t(`alerts.types.${v}.label`)}</option>)}
               </Select>
-              <p className="text-xs text-muted-foreground">{ALERT_TYPES.find((a) => a.value === formType)?.hint}</p>
+              <p className="text-xs text-muted-foreground">{t(`alerts.types.${formType}.hint`)}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

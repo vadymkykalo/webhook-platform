@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
   BookOpen, ChevronRight, ChevronDown, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Terminal, Repeat2, Cable, Play
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -78,7 +78,6 @@ const getProjectSecurityNav = (projectId: string): NavItem[] => [
 
 const getProjectDevToolsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.testConsole', path: `/admin/projects/${projectId}/test-console`, icon: Play },
-  { nameKey: 'nav.devWorkspace', path: `/admin/projects/${projectId}/dev-workspace`, icon: Terminal },
   { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
   { nameKey: 'nav.testEndpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
@@ -443,6 +442,20 @@ export default function AppLayout() {
           </SidebarSection>
         )}
       </nav>
+
+      {/* Search shortcut hint */}
+      {(!collapsed || isMobile) && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span className="flex-1 text-left">{t('nav.search')}</span>
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+          </button>
+        </div>
+      )}
 
       {/* User section */}
       <div className="border-t border-border/50 p-3">

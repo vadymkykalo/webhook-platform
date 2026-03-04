@@ -29,12 +29,12 @@ const SAMPLE_PAYLOAD = JSON.stringify({
   metadata: { source: "checkout-v2", region: "us-east-1" }
 }, null, 2);
 
-const HINT_EXPRESSIONS = [
-  { expr: '$.data', desc: 'Extract the data object' },
-  { expr: '$.data.items', desc: 'Extract items array' },
-  { expr: '$.data.customer', desc: 'Extract customer info' },
-  { expr: '$.metadata', desc: 'Extract metadata' },
-  { expr: '$', desc: 'Pass through entire payload' },
+const HINT_EXPRESSION_KEYS = [
+  { expr: '$.data', descKey: 'transform.hints.extractData' },
+  { expr: '$.data.items', descKey: 'transform.hints.extractItems' },
+  { expr: '$.data.customer', descKey: 'transform.hints.extractCustomer' },
+  { expr: '$.metadata', descKey: 'transform.hints.extractMetadata' },
+  { expr: '$', descKey: 'transform.hints.passThrough' },
 ];
 
 export default function TransformStudioPage() {
@@ -79,9 +79,9 @@ export default function TransformStudioPage() {
     }
   };
 
-  const handleCopy = (text: string, label: string) => {
+  const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    showSuccess(`${label} copied`);
+    showSuccess(t('common.copied'));
   };
 
   const handleReset = () => {
@@ -123,15 +123,15 @@ export default function TransformStudioPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            {HINT_EXPRESSIONS.map((h) => (
+            {HINT_EXPRESSION_KEYS.map((h) => (
               <button
                 key={h.expr}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs border hover:bg-accent transition-colors"
                 onClick={() => setTransformExpr(h.expr)}
-                title={h.desc}
+                title={t(h.descKey)}
               >
                 <code className="font-mono text-primary">{h.expr}</code>
-                <span className="text-muted-foreground">— {h.desc}</span>
+                <span className="text-muted-foreground">— {t(h.descKey)}</span>
               </button>
             ))}
           </div>
@@ -148,7 +148,7 @@ export default function TransformStudioPage() {
               </CardTitle>
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" onClick={handleFormatInput}>{t('transform.format', 'Format')}</Button>
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(inputPayload, 'Input')}>
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(inputPayload)}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -231,7 +231,7 @@ export default function TransformStudioPage() {
                 {success === false && <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Errors</Badge>}
               </CardTitle>
               {outputPayload && (
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(outputPayload, 'Output')}>
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(outputPayload)}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               )}
@@ -288,11 +288,11 @@ export default function TransformStudioPage() {
               <CardContent className="p-4 text-sm text-muted-foreground space-y-2">
                 <p className="font-medium text-foreground">{t('transform.howItWorks', 'How it works')}</p>
                 <ul className="space-y-1 text-xs">
-                  <li>• <code className="bg-muted px-1 rounded">$.data</code> — extract a nested field</li>
-                  <li>• <code className="bg-muted px-1 rounded">$.data.items</code> — drill into arrays</li>
-                  <li>• Empty expression = forward full payload as-is</li>
-                  <li>• Custom headers are merged with system headers</li>
-                  <li>• Use this to test before saving to a destination</li>
+                  <li>• <code className="bg-muted px-1 rounded">$.data</code> — {t('transform.help.extractField')}</li>
+                  <li>• <code className="bg-muted px-1 rounded">$.data.items</code> — {t('transform.help.drillArrays')}</li>
+                  <li>• {t('transform.help.emptyExpr')}</li>
+                  <li>• {t('transform.help.headersMerge')}</li>
+                  <li>• {t('transform.help.testBefore')}</li>
                 </ul>
               </CardContent>
             </Card>

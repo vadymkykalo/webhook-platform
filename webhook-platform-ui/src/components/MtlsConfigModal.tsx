@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Loader2, ShieldCheck, Upload, X, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
@@ -34,6 +35,7 @@ export default function MtlsConfigModal({
   endpoint,
   onUpdate,
 }: MtlsConfigModalProps) {
+  const { t } = useTranslation();
   const [clientCert, setClientCert] = useState('');
   const [clientKey, setClientKey] = useState('');
   const [caCert, setCaCert] = useState('');
@@ -73,7 +75,7 @@ export default function MtlsConfigModal({
       };
       const updated = await endpointsApi.configureMtls(projectId, endpoint.id, data);
       onUpdate(updated);
-      showSuccess('mTLS configured successfully');
+      showSuccess(t('mtls.toast.configured'));
       onOpenChange(false);
       resetForm();
     } catch (err: any) {
@@ -88,7 +90,7 @@ export default function MtlsConfigModal({
       setDisabling(true);
       const updated = await endpointsApi.disableMtls(projectId, endpoint.id);
       onUpdate(updated);
-      showSuccess('mTLS disabled');
+      showSuccess(t('mtls.toast.disabled'));
       onOpenChange(false);
       resetForm();
     } catch (err: any) {
@@ -110,10 +112,10 @@ export default function MtlsConfigModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            mTLS Configuration
+            {t('mtls.title')}
           </DialogTitle>
           <DialogDescription>
-            Configure mutual TLS (client certificate authentication) for secure webhook delivery.
+            {t('mtls.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -121,7 +123,7 @@ export default function MtlsConfigModal({
           <Alert className="border-green-500/50 bg-green-500/10">
             <ShieldCheck className="h-4 w-4 text-green-500" />
             <AlertDescription className="text-green-700 dark:text-green-400">
-              mTLS is currently enabled for this endpoint. Upload new certificates to update or disable below.
+              {t('mtls.enabledBanner')}
             </AlertDescription>
           </Alert>
         )}
@@ -130,12 +132,12 @@ export default function MtlsConfigModal({
           <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-amber-700 dark:text-amber-400">
-              Keep your private key secure. It will be encrypted before storage but never share it.
+              {t('mtls.securityWarning')}
             </AlertDescription>
           </Alert>
 
           <div className="space-y-2">
-            <Label htmlFor="clientCert">Client Certificate (PEM) *</Label>
+            <Label htmlFor="clientCert">{t('mtls.clientCert')} *</Label>
             <div className="flex gap-2">
               <Textarea
                 id="clientCert"
@@ -160,7 +162,7 @@ export default function MtlsConfigModal({
                 onClick={() => document.getElementById('certUpload')?.click()}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload .pem/.crt
+                {t('mtls.uploadCert')}
               </Button>
               {clientCert && (
                 <Button
@@ -176,7 +178,7 @@ export default function MtlsConfigModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="clientKey">Client Private Key (PEM) *</Label>
+            <Label htmlFor="clientKey">{t('mtls.clientKey')} *</Label>
             <Textarea
               id="clientKey"
               placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
@@ -199,7 +201,7 @@ export default function MtlsConfigModal({
                 onClick={() => document.getElementById('keyUpload')?.click()}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload .pem/.key
+                {t('mtls.uploadKey')}
               </Button>
               {clientKey && (
                 <Button
@@ -215,7 +217,7 @@ export default function MtlsConfigModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="caCert">CA Certificate (PEM) - Optional</Label>
+            <Label htmlFor="caCert">{t('mtls.caCert')}</Label>
             <Textarea
               id="caCert"
               placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
@@ -224,7 +226,7 @@ export default function MtlsConfigModal({
               className="font-mono text-xs min-h-[100px]"
             />
             <p className="text-xs text-muted-foreground">
-              Optional: Provide a custom CA certificate for server verification.
+              {t('mtls.caCertHint')}
             </p>
             <div className="flex items-center gap-2">
               <input
@@ -241,7 +243,7 @@ export default function MtlsConfigModal({
                 onClick={() => document.getElementById('caUpload')?.click()}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Upload CA cert
+                {t('mtls.uploadCa')}
               </Button>
               {caCert && (
                 <Button
@@ -266,16 +268,16 @@ export default function MtlsConfigModal({
               className="w-full sm:w-auto"
             >
               {disabling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Disable mTLS
+              {t('mtls.disable')}
             </Button>
           )}
           <div className="flex-1" />
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSave} disabled={saving || disabling}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {endpoint.mtlsEnabled ? 'Update Certificates' : 'Enable mTLS'}
+            {endpoint.mtlsEnabled ? t('mtls.updateCerts') : t('mtls.enable')}
           </Button>
         </DialogFooter>
       </DialogContent>

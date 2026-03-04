@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, FileJson2, CheckCircle2, AlertTriangle, Info, Settings2, Zap, ChevronDown, ChevronRight, HelpCircle, Bell } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
 import { useTransformations, useEventTypes, useSchemaVersions } from '../api/queries';
@@ -35,6 +36,7 @@ export default function CreateSubscriptionModal({
   onClose,
   onSuccess,
 }: CreateSubscriptionModalProps) {
+  const { t } = useTranslation();
   const [endpointId, setEndpointId] = useState('');
   const [eventType, setEventType] = useState('');
   const [enabled, setEnabled] = useState(true);
@@ -82,35 +84,35 @@ export default function CreateSubscriptionModal({
     const newErrors: Record<string, string> = {};
 
     if (!endpointId) {
-      newErrors.endpointId = 'Please select an endpoint that will receive the events';
+      newErrors.endpointId = t('createSubscription.validation.endpointRequired');
     }
     if (!eventType.trim()) {
-      newErrors.eventType = 'Event type is required — specify which events this subscription should receive';
+      newErrors.eventType = t('createSubscription.validation.eventTypeRequired');
     } else if (!/^(\*{1,2}|[a-z][a-z0-9_]*)(\.(\*{1,2}|[a-z][a-z0-9_]*))*$/.test(eventType)) {
-      newErrors.eventType = 'Use lowercase letters, dots, underscores. Wildcards: order.* (one level), order.** (all nested), ** (catch-all)';
+      newErrors.eventType = t('createSubscription.validation.eventTypeFormat');
     }
     if (maxAttempts < 1 || maxAttempts > 20) {
-      newErrors.maxAttempts = 'Must be between 1 and 20 attempts';
+      newErrors.maxAttempts = t('createSubscription.validation.maxAttempts');
     }
     if (timeoutSeconds < 1 || timeoutSeconds > 60) {
-      newErrors.timeoutSeconds = 'Must be between 1 and 60 seconds';
+      newErrors.timeoutSeconds = t('createSubscription.validation.timeout');
     }
     if (retryDelays.trim() && !/^\d+(,\d+)*$/.test(retryDelays.trim())) {
-      newErrors.retryDelays = 'Must be comma-separated numbers (seconds), e.g. 60,300,900';
+      newErrors.retryDelays = t('createSubscription.validation.retryDelays');
     }
     if (payloadTemplate.trim()) {
       try { JSON.parse(payloadTemplate); } catch {
-        newErrors.payloadTemplate = 'Invalid JSON — check syntax';
+        newErrors.payloadTemplate = t('createSubscription.validation.invalidJson');
       }
     }
     if (customHeaders.trim()) {
       try {
         const parsed = JSON.parse(customHeaders);
         if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-          newErrors.customHeaders = 'Must be a JSON object with key-value pairs';
+          newErrors.customHeaders = t('createSubscription.validation.headersObject');
         }
       } catch {
-        newErrors.customHeaders = 'Invalid JSON — check syntax';
+        newErrors.customHeaders = t('createSubscription.validation.invalidJson');
       }
     }
 
@@ -144,10 +146,10 @@ export default function CreateSubscriptionModal({
 
       if (subscription) {
         await subscriptionsApi.update(projectId, subscription.id, payload);
-        showSuccess('Subscription updated successfully');
+        showSuccess(t('createSubscription.toast.updated'));
       } else {
         await subscriptionsApi.create(projectId, payload);
-        showSuccess('Subscription created successfully');
+        showSuccess(t('createSubscription.toast.created'));
       }
 
       onClose();
@@ -176,12 +178,12 @@ export default function CreateSubscriptionModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
-            {subscription ? 'Edit Subscription' : 'Create Subscription'}
+            {subscription ? t('createSubscription.titleEdit') : t('createSubscription.titleCreate')}
           </DialogTitle>
           <DialogDescription>
             {subscription
-              ? 'Update how events are routed to this endpoint'
-              : 'A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.'}
+              ? t('createSubscription.descriptionEdit')
+              : t('createSubscription.descriptionCreate')}
           </DialogDescription>
         </DialogHeader>
 
@@ -191,13 +193,13 @@ export default function CreateSubscriptionModal({
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Zap className="h-4 w-4 text-primary" />
-                Essentials
+                {t('createSubscription.sections.essentials')}
               </div>
 
               {/* Endpoint */}
               <div className="space-y-2">
                 <Label htmlFor="endpoint">
-                  Endpoint <span className="text-destructive">*</span>
+                  {t('createSubscription.fields.endpoint')} <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   id="endpoint"
@@ -206,7 +208,7 @@ export default function CreateSubscriptionModal({
                   disabled={saving}
                   required
                 >
-                  <option value="">Select an endpoint...</option>
+                  <option value="">{t('createSubscription.fields.selectEndpoint')}</option>
                   {endpoints.map(endpoint => (
                     <option key={endpoint.id} value={endpoint.id}>
                       {endpoint.url}
@@ -219,13 +221,13 @@ export default function CreateSubscriptionModal({
                 {endpoints.length === 0 ? (
                   <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    No endpoints available. Create an endpoint first.
+                    {t('createSubscription.fields.noEndpoints')}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    The webhook URL that will receive matching events.
+                    {t('createSubscription.fields.endpointHint')}
                     {selectedEndpoint && (
-                      <span className="ml-1">Selected: <code className="bg-muted px-1 rounded text-[11px]">{selectedEndpoint.url}</code></span>
+                      <span className="ml-1">{t('createSubscription.fields.selected')}: <code className="bg-muted px-1 rounded text-[11px]">{selectedEndpoint.url}</code></span>
                     )}
                   </p>
                 )}
@@ -245,7 +247,7 @@ export default function CreateSubscriptionModal({
             <div className="space-y-3 border-t pt-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
-                Behavior
+                {t('createSubscription.sections.behavior')}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -258,12 +260,12 @@ export default function CreateSubscriptionModal({
                   />
                   <div>
                     <Label htmlFor="enabled" className="cursor-pointer text-sm">
-                      Enabled
+                      {t('createSubscription.fields.enabled')}
                     </Label>
                     <p className="text-[11px] text-muted-foreground">
                       {enabled
-                        ? 'Events will be delivered'
-                        : 'Paused — no deliveries'}
+                        ? t('createSubscription.fields.enabledHint')
+                        : t('createSubscription.fields.disabledHint')}
                     </p>
                   </div>
                 </div>
@@ -277,12 +279,12 @@ export default function CreateSubscriptionModal({
                   />
                   <div>
                     <Label htmlFor="orderingEnabled" className="cursor-pointer text-sm">
-                      FIFO Ordering
+                      {t('createSubscription.fields.fifoOrdering')}
                     </Label>
                     <p className="text-[11px] text-muted-foreground">
                       {orderingEnabled
-                        ? 'Strict order (slower)'
-                        : 'Parallel (fastest)'}
+                        ? t('createSubscription.fields.fifoOnHint')
+                        : t('createSubscription.fields.fifoOffHint')}
                     </p>
                   </div>
                 </div>
@@ -298,8 +300,8 @@ export default function CreateSubscriptionModal({
               >
                 {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
-                Advanced Settings
-                <span className="text-xs font-normal text-muted-foreground ml-1">— retry, timeout, transformation, headers</span>
+                {t('createSubscription.sections.advanced')}
+                <span className="text-xs font-normal text-muted-foreground ml-1">— {t('createSubscription.sections.advancedHint')}</span>
               </button>
 
               {showAdvanced && (
@@ -307,7 +309,7 @@ export default function CreateSubscriptionModal({
                   {/* Retry row */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="maxAttempts" className="text-xs">Max Attempts</Label>
+                      <Label htmlFor="maxAttempts" className="text-xs">{t('createSubscription.fields.maxAttempts')}</Label>
                       <Input
                         id="maxAttempts"
                         type="number"
@@ -320,11 +322,11 @@ export default function CreateSubscriptionModal({
                       {errors.maxAttempts ? (
                         <p className="text-[11px] text-destructive">{errors.maxAttempts}</p>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground">How many times to try (1–20)</p>
+                        <p className="text-[11px] text-muted-foreground">{t('createSubscription.fields.maxAttemptsHint')}</p>
                       )}
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="timeoutSeconds" className="text-xs">Timeout (sec)</Label>
+                      <Label htmlFor="timeoutSeconds" className="text-xs">{t('createSubscription.fields.timeout')}</Label>
                       <Input
                         id="timeoutSeconds"
                         type="number"
@@ -337,11 +339,11 @@ export default function CreateSubscriptionModal({
                       {errors.timeoutSeconds ? (
                         <p className="text-[11px] text-destructive">{errors.timeoutSeconds}</p>
                       ) : (
-                        <p className="text-[11px] text-muted-foreground">Per-request timeout (1–60)</p>
+                        <p className="text-[11px] text-muted-foreground">{t('createSubscription.fields.timeoutHint')}</p>
                       )}
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="retryDelays" className="text-xs">Retry Delays</Label>
+                      <Label htmlFor="retryDelays" className="text-xs">{t('createSubscription.fields.retryDelays')}</Label>
                       <Input
                         id="retryDelays"
                         placeholder="60,300,900,3600"
@@ -353,7 +355,7 @@ export default function CreateSubscriptionModal({
                         <p className="text-[11px] text-destructive">{errors.retryDelays}</p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">
-                          {retryDelays.trim() ? formatRetryDelaysHuman(retryDelays) : 'Seconds between retries'}
+                          {retryDelays.trim() ? formatRetryDelaysHuman(retryDelays) : t('createSubscription.fields.retryDelaysHint')}
                         </p>
                       )}
                     </div>
@@ -362,8 +364,8 @@ export default function CreateSubscriptionModal({
                   {/* Transformation */}
                   <div className="space-y-1.5">
                     <Label htmlFor="transformationId" className="text-xs flex items-center gap-1.5">
-                      Transformation
-                      <span className="text-muted-foreground font-normal">(optional)</span>
+                      {t('createSubscription.fields.transformation')}
+                      <span className="text-muted-foreground font-normal">({t('common.optional')})</span>
                     </Label>
                     <Select
                       id="transformationId"
@@ -371,7 +373,7 @@ export default function CreateSubscriptionModal({
                       onChange={(e) => setTransformationId(e.target.value)}
                       disabled={saving}
                     >
-                      <option value="">None — send original payload</option>
+                      <option value="">{t('createSubscription.fields.noTransformation')}</option>
                       {transformations.filter(tr => tr.enabled).map(tr => (
                         <option key={tr.id} value={tr.id}>{tr.name} (v{tr.version})</option>
                       ))}
@@ -394,8 +396,8 @@ export default function CreateSubscriptionModal({
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="payloadTemplate" className="text-xs flex items-center gap-1.5">
-                        Payload Template
-                        <span className="text-muted-foreground font-normal">(optional)</span>
+                        {t('createSubscription.fields.payloadTemplate')}
+                        <span className="text-muted-foreground font-normal">({t('common.optional')})</span>
                       </Label>
                       <textarea
                         id="payloadTemplate"
@@ -415,8 +417,8 @@ export default function CreateSubscriptionModal({
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="customHeaders" className="text-xs flex items-center gap-1.5">
-                        Custom Headers
-                        <span className="text-muted-foreground font-normal">(optional)</span>
+                        {t('createSubscription.fields.customHeaders')}
+                        <span className="text-muted-foreground font-normal">({t('common.optional')})</span>
                       </Label>
                       <textarea
                         id="customHeaders"
@@ -430,7 +432,7 @@ export default function CreateSubscriptionModal({
                         <p className="text-[11px] text-destructive">{errors.customHeaders}</p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">
-                          JSON key-value pairs added to each request.
+                          {t('createSubscription.fields.customHeadersHint')}
                         </p>
                       )}
                     </div>
@@ -444,11 +446,9 @@ export default function CreateSubscriptionModal({
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-2.5">
                 <HelpCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                 <div className="text-xs space-y-1">
-                  <p className="font-medium text-foreground">What happens next?</p>
+                  <p className="font-medium text-foreground">{t('createSubscription.summary.title')}</p>
                   <p className="text-muted-foreground">
-                    Every time an event matching <code className="bg-muted px-1 rounded font-mono">{eventType}</code> is received,
-                    it will be delivered to <code className="bg-muted px-1 rounded font-mono text-[11px]">{selectedEndpoint?.url || 'the selected endpoint'}</code>.
-                    You can send a test event from the Events page to verify everything works.
+                    {t('createSubscription.summary.description', { eventType, endpoint: selectedEndpoint?.url || t('createSubscription.summary.theEndpoint') })}
                   </p>
                 </div>
               </div>
@@ -462,11 +462,11 @@ export default function CreateSubscriptionModal({
               onClick={onClose}
               disabled={saving}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={saving || endpoints.length === 0}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {saving ? 'Saving...' : (subscription ? 'Update Subscription' : 'Create Subscription')}
+              {saving ? t('common.saving') : (subscription ? t('createSubscription.submitEdit') : t('createSubscription.submitCreate'))}
             </Button>
           </DialogFooter>
         </form>

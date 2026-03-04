@@ -29,7 +29,7 @@ interface EventPickerProps {
   totalElements: number;
 }
 
-function EventPicker({ label, events, selectedId, onSelect, totalPages, currentPage, onPageChange, searchQuery, onSearchChange, loading, totalElements }: EventPickerProps) {
+function EventPicker({ label, events, selectedId, onSelect, totalPages, currentPage, onPageChange, searchQuery, onSearchChange, loading, totalElements, t }: EventPickerProps & { t: (key: string, opts?: any) => string }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selected = events.find(e => e.id === selectedId);
@@ -58,7 +58,7 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
               <span className="text-muted-foreground ml-2 text-xs">{selected.id.substring(0, 8)}… · {formatRelativeTime(selected.createdAt)}</span>
             </span>
           ) : (
-            <span>Select an event...</span>
+            <span>{t('eventDiff.selectPlaceholder')}</span>
           )}
           {selectedId && (
             <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground shrink-0" onClick={(e) => { e.stopPropagation(); onSelect(''); }} />
@@ -73,7 +73,7 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
-                  placeholder="Search by type or ID..."
+                  placeholder={t('eventDiff.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => onSearchChange(e.target.value)}
                   className="h-8 pl-8 text-xs"
@@ -90,7 +90,7 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
                 </div>
               ) : events.length === 0 ? (
                 <div className="py-6 text-center text-xs text-muted-foreground">
-                  {searchQuery ? 'No events match your search' : 'No events found'}
+                  {searchQuery ? t('eventDiff.noSearchResults') : t('eventDiff.noEvents')}
                 </div>
               ) : (
                 events.map(ev => (
@@ -121,7 +121,7 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
-                <span>{totalElements} events · Page {currentPage + 1}/{totalPages}</span>
+                <span>{t('eventDiff.eventsCount', { count: totalElements })} · {t('eventDiff.pageInfo', { current: currentPage + 1, total: totalPages })}</span>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon-sm" className="h-6 w-6" disabled={currentPage === 0} onClick={() => onPageChange(currentPage - 1)}>
                     <ChevronLeft className="h-3.5 w-3.5" />
@@ -242,7 +242,7 @@ export default function EventDiffPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm">{t('eventDiff.selectEvents')}</CardTitle>
           <CardDescription className="text-xs">
-            Choose two events to compare their payloads. Search by event type or ID. Differences will be highlighted automatically.
+            {t('eventDiff.selectDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -259,6 +259,7 @@ export default function EventDiffPage() {
               onSearchChange={setSearchQuery}
               loading={loadingEvents}
               totalElements={totalElements}
+              t={t}
             />
             <div className="flex items-center justify-center pt-7">
               <GitCompare className="h-5 w-5 text-muted-foreground" />
@@ -275,6 +276,7 @@ export default function EventDiffPage() {
               onSearchChange={setSearchQuery}
               loading={loadingEvents}
               totalElements={totalElements}
+              t={t}
             />
           </div>
 
@@ -291,7 +293,7 @@ export default function EventDiffPage() {
             {leftId && rightId && leftId === rightId && (
               <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                Same event selected on both sides
+                {t('eventDiff.sameEventWarning')}
               </p>
             )}
           </div>
@@ -302,7 +304,7 @@ export default function EventDiffPage() {
       {diffing && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">Comparing events...</span>
+          <span className="ml-2 text-sm text-muted-foreground">{t('eventDiff.comparing')}</span>
         </div>
       )}
 
@@ -316,8 +318,8 @@ export default function EventDiffPage() {
                   <GitCompare className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">No differences found</p>
-                  <p className="text-xs text-muted-foreground">Both events have identical payloads</p>
+                  <p className="text-sm font-semibold">{t('eventDiff.noDiffsTitle')}</p>
+                  <p className="text-xs text-muted-foreground">{t('eventDiff.noDiffsSubtitle')}</p>
                 </div>
               </div>
             ) : (
@@ -326,23 +328,23 @@ export default function EventDiffPage() {
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold">{diffSummary.total} {diffSummary.total === 1 ? 'difference' : 'differences'} detected</p>
-                  <p className="text-xs text-muted-foreground">Between these two events of type <code className="bg-muted px-1 rounded">{diffResult.eventType}</code></p>
+                  <p className="text-sm font-semibold">{t('eventDiff.differencesDetected', { count: diffSummary.total })}</p>
+                  <p className="text-xs text-muted-foreground">{t('eventDiff.betweenEvents')} <code className="bg-muted px-1 rounded">{diffResult.eventType}</code></p>
                 </div>
                 <div className="flex items-center gap-2">
                   {diffSummary.added > 0 && (
                     <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-700 gap-1">
-                      <Plus className="h-3 w-3" /> {diffSummary.added} added
+                      <Plus className="h-3 w-3" /> {t('eventDiff.added', { count: diffSummary.added })}
                     </Badge>
                   )}
                   {diffSummary.removed > 0 && (
                     <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-700 gap-1">
-                      <Minus className="h-3 w-3" /> {diffSummary.removed} removed
+                      <Minus className="h-3 w-3" /> {t('eventDiff.removed', { count: diffSummary.removed })}
                     </Badge>
                   )}
                   {diffSummary.changed > 0 && (
                     <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-300 dark:border-amber-700 gap-1">
-                      <ArrowLeftRight className="h-3 w-3" /> {diffSummary.changed} changed
+                      <ArrowLeftRight className="h-3 w-3" /> {t('eventDiff.changed', { count: diffSummary.changed })}
                     </Badge>
                   )}
                 </div>
@@ -369,9 +371,9 @@ export default function EventDiffPage() {
           <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
             <GitCompare className="h-7 w-7 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-1">Compare Event Payloads</h3>
+          <h3 className="text-lg font-semibold mb-1">{t('eventDiff.emptyTitle')}</h3>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Select two events above to compare their payloads side by side. Structural differences like added, removed, or changed fields will be highlighted automatically.
+            {t('eventDiff.emptyDescription')}
           </p>
         </div>
       )}
