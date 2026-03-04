@@ -35,6 +35,7 @@ services:
       DB_SSL_MODE: ${DB_SSL_MODE:-require}
       LOG_LEVEL: ${LOG_LEVEL:-WARN}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+      ALERTS_NOTIFICATIONS_ENABLED: ${ALERTS_NOTIFICATIONS_ENABLED:-true}
 
   worker:
     image: ${DOCKER_REGISTRY:-webhook-platform}-worker:${WORKER_IMAGE_TAG:-latest}

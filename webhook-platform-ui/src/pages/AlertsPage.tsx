@@ -273,7 +273,7 @@ export default function AlertsPage() {
                           </TableCell>
                           <TableCell>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${SEVERITY_COLORS[event.severity] || ''}`}>
-                              {event.severity}
+                              {t(`alerts.severities.${event.severity}`, event.severity)}
                             </span>
                           </TableCell>
                           <TableCell className="font-mono text-xs">
@@ -377,7 +377,7 @@ export default function AlertsPage() {
                 <CardContent className="pt-0 space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="secondary">{t(`alerts.types.${rule.alertType}.label`)}</Badge>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${SEVERITY_COLORS[rule.severity] || ''}`}>{rule.severity}</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${SEVERITY_COLORS[rule.severity] || ''}`}>{t(`alerts.severities.${rule.severity}`, rule.severity)}</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-muted">
                       {rule.channel === 'EMAIL' ? <Mail className="h-3 w-3" /> : rule.channel === 'WEBHOOK' ? <Webhook className="h-3 w-3" /> : rule.channel === 'SLACK' ? <MessageSquare className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
                       {t(`alerts.channels.${rule.channel}`, rule.channel)}
@@ -467,9 +467,9 @@ export default function AlertsPage() {
             <div className="space-y-2">
               <Label>{t('alerts.form.severity', 'Severity')}</Label>
               <Select value={formSeverity} onChange={(e) => setFormSeverity(e.target.value as AlertSeverity)}>
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="CRITICAL">Critical</option>
+                <option value="INFO">{t('alerts.severities.INFO')}</option>
+                <option value="WARNING">{t('alerts.severities.WARNING')}</option>
+                <option value="CRITICAL">{t('alerts.severities.CRITICAL')}</option>
               </Select>
             </div>
             <div className="space-y-2">

@@ -24,5 +24,6 @@ public class AuditLogResponse {
     private String errorMessage;
     private Integer durationMs;
     private String clientIp;
+    private String details;
     private Instant createdAt;
 }

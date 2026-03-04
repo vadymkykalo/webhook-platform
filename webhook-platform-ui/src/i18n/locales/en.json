@@ -949,7 +949,12 @@
     },
     "export": {
       "csv": "Export CSV",
-      "done": "Exported {{count}} audit log entries"
+      "done": "Exported {{count}} audit log entries",
+      "failed": "Failed to export audit log"
+    },
+    "detail": {
+      "title": "Audit Event Details",
+      "changes": "Details"
     },
     "pagination": "{{total}} total events · Page {{page}} of {{pages}}"
   },
@@ -2814,6 +2819,11 @@
         "label": "Latency Threshold",
         "hint": "Triggers when avg latency exceeds threshold (ms)"
       }
+    },
+    "severities": {
+      "INFO": "Info",
+      "WARNING": "Warning",
+      "CRITICAL": "Critical"
     },
     "channels": {
       "IN_APP": "In-App",

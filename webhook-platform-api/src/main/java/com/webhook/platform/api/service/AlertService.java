@@ -41,6 +41,7 @@ public class AlertService {
     private final ProjectRepository projectRepository;
     private final IncidentRepository incidentRepository;
     private final IncidentTimelineRepository timelineRepository;
+    private final AlertNotificationService notificationService;
 
     // ─── Rule CRUD ──────────────────────────────────────────────────────
 
@@ -163,6 +164,9 @@ public class AlertService {
         event = eventRepository.save(event);
         log.warn("Alert fired: rule='{}', project={}, current={}, threshold={}",
                 rule.getName(), rule.getProjectId(), currentValue, rule.getThresholdValue());
+
+        // Send notification (Slack / Webhook / Email) — async, fire-and-forget
+        notificationService.dispatch(rule, event);
 
         // Auto-create incident for CRITICAL severity alerts
         if (rule.getSeverity() == AlertSeverity.CRITICAL) {

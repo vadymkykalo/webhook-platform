@@ -1,15 +1,22 @@
-import { useState, useMemo } from 'react';
-import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Filter, X, Download } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { FileText, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Filter, X, Download, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
 import { formatDateTimeCompact } from '../lib/date';
 import { SkeletonTable } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
-import { type AuditLogEntry } from '../api/auditLog.api';
+import { auditLogApi, type AuditLogEntry, type AuditLogFilters } from '../api/auditLog.api';
 import { Button } from '../components/ui/button';
 import { Select } from '../components/ui/select';
 import { Input } from '../components/ui/input';
-import { showSuccess } from '../lib/toast';
+import { Label } from '../components/ui/label';
+import { showSuccess, showApiError } from '../lib/toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -18,6 +25,21 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
+
+const ALL_ACTIONS = [
+  'CREATE', 'UPDATE', 'DELETE', 'ROTATE_SECRET', 'REVOKE',
+  'REGISTER', 'LOGIN', 'LOGOUT', 'CONFIGURE_MTLS', 'TEST_WEBHOOK',
+  'PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET', 'PASSWORD_CHANGED',
+  'MEMBER_INVITED', 'MEMBER_ROLE_CHANGED', 'MEMBER_REMOVED',
+  'INVITE_ACCEPTED', 'RESOLVE_INCIDENT',
+];
+
+const ALL_RESOURCE_TYPES = [
+  'Endpoint', 'Subscription', 'ApiKey', 'Project', 'Member',
+  'AlertRule', 'Incident', 'IncidentTimeline',
+  'IncomingSource', 'IncomingDestination', 'Transformation', 'SchemaRegistry',
+  'Auth',
+];
 
 const ACTION_COLORS: Record<string, string> = {
   CREATE: 'bg-green-500/10 text-green-700 dark:text-green-400',
@@ -53,35 +75,18 @@ export default function AuditLogPage() {
   const [resourceTypeFilter, setResourceTypeFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const { data, isLoading } = useAuditLog(page);
+  const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<AuditLogEntry | null>(null);
 
-  const uniqueActions = useMemo(() => {
-    if (!data?.content) return [];
-    return [...new Set(data.content.map((e: AuditLogEntry) => e.action))].sort();
-  }, [data]);
+  const filters: AuditLogFilters = useMemo(() => ({
+    action: actionFilter || undefined,
+    status: statusFilter || undefined,
+    resourceType: resourceTypeFilter || undefined,
+    from: dateFrom || undefined,
+    to: dateTo || undefined,
+  }), [actionFilter, statusFilter, resourceTypeFilter, dateFrom, dateTo]);
 
-  const uniqueResourceTypes = useMemo(() => {
-    if (!data?.content) return [];
-    return [...new Set(data.content.map((e: AuditLogEntry) => e.resourceType))].sort();
-  }, [data]);
-
-  const filteredEntries = useMemo(() => {
-    if (!data?.content) return [];
-    return data.content.filter((entry: AuditLogEntry) => {
-      if (actionFilter && entry.action !== actionFilter) return false;
-      if (statusFilter && entry.status !== statusFilter) return false;
-      if (resourceTypeFilter && entry.resourceType !== resourceTypeFilter) return false;
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        if (new Date(entry.createdAt) < from) return false;
-      }
-      if (dateTo) {
-        const to = new Date(dateTo + 'T23:59:59');
-        if (new Date(entry.createdAt) > to) return false;
-      }
-      return true;
-    });
-  }, [data, actionFilter, statusFilter, resourceTypeFilter, dateFrom, dateTo]);
+  const { data, isLoading } = useAuditLog(page, 20, filters);
 
   const hasFilters = actionFilter || statusFilter || resourceTypeFilter || dateFrom || dateTo;
 
@@ -91,31 +96,32 @@ export default function AuditLogPage() {
     setResourceTypeFilter('');
     setDateFrom('');
     setDateTo('');
+    setPage(0);
   };
 
-  const handleExportCsv = () => {
-    if (!filteredEntries.length) return;
-    const headers = ['Time', 'Action', 'Resource Type', 'Resource ID', 'User', 'Status', 'Duration (ms)', 'IP', 'Error'];
-    const rows = filteredEntries.map((e: AuditLogEntry) => [
-      e.createdAt,
-      e.action,
-      e.resourceType,
-      e.resourceId || '',
-      e.userEmail || e.userId || '',
-      e.status,
-      e.durationMs != null ? String(e.durationMs) : '',
-      e.clientIp || '',
-      (e.errorMessage || '').replace(/"/g, '""'),
-    ]);
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showSuccess(t('auditLog.export.done', { count: filteredEntries.length }));
+  const applyFilter = useCallback((setter: (v: string) => void) => {
+    return (e: { target: { value: string } }) => {
+      setter(e.target.value);
+      setPage(0);
+    };
+  }, []);
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const blob = await auditLogApi.exportCsv(filters);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showSuccess(t('auditLog.export.done', { count: data?.totalElements ?? 0 }));
+    } catch (err: any) {
+      showApiError(err, 'auditLog.export.failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const actionLabel = (action: string) =>
@@ -135,67 +141,58 @@ export default function AuditLogPage() {
             </p>
           </div>
         </div>
-        {data && data.content.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={filteredEntries.length === 0}>
-            <Download className="h-4 w-4 mr-2" />
+        {data && data.totalElements > 0 && (
+          <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exporting}>
+            {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
             {t('auditLog.export.csv')}
           </Button>
         )}
       </div>
 
-      {/* Filters */}
-      {data && data.content.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <div className="w-44">
-            <Select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
-              <option value="">{t('auditLog.filters.allActions')}</option>
-              {uniqueActions.map((action) => (
-                <option key={action} value={action}>{actionLabel(action)}</option>
-              ))}
-            </Select>
-          </div>
-          <div className="w-36">
-            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="">{t('auditLog.filters.allStatuses')}</option>
-              <option value="SUCCESS">{t('auditLog.filters.success')}</option>
-              <option value="FAILURE">{t('auditLog.filters.failure')}</option>
-            </Select>
-          </div>
-          <div className="w-44">
-            <Select value={resourceTypeFilter} onChange={(e) => setResourceTypeFilter(e.target.value)}>
-              <option value="">{t('auditLog.filters.allResources')}</option>
-              {uniqueResourceTypes.map((rt) => (
-                <option key={rt} value={rt}>{rt}</option>
-              ))}
-            </Select>
-          </div>
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-36 h-9"
-            placeholder={t('auditLog.filters.from')}
-          />
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-36 h-9"
-            placeholder={t('auditLog.filters.to')}
-          />
-          {hasFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              <X className="h-3.5 w-3.5 mr-1" /> {t('auditLog.filters.clear')}
-            </Button>
-          )}
-          {hasFilters && (
-            <span className="text-xs text-muted-foreground">
-              {t('auditLog.filters.showing', { count: filteredEntries.length, total: data.content.length })}
-            </span>
-          )}
+      {/* Filters — always visible */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <div className="w-44">
+          <Select value={actionFilter} onChange={applyFilter(setActionFilter)}>
+            <option value="">{t('auditLog.filters.allActions')}</option>
+            {ALL_ACTIONS.map((action) => (
+              <option key={action} value={action}>{actionLabel(action)}</option>
+            ))}
+          </Select>
         </div>
-      )}
+        <div className="w-36">
+          <Select value={statusFilter} onChange={applyFilter(setStatusFilter)}>
+            <option value="">{t('auditLog.filters.allStatuses')}</option>
+            <option value="SUCCESS">{t('auditLog.filters.success')}</option>
+            <option value="FAILURE">{t('auditLog.filters.failure')}</option>
+          </Select>
+        </div>
+        <div className="w-44">
+          <Select value={resourceTypeFilter} onChange={applyFilter(setResourceTypeFilter)}>
+            <option value="">{t('auditLog.filters.allResources')}</option>
+            {ALL_RESOURCE_TYPES.map((rt) => (
+              <option key={rt} value={rt}>{rt}</option>
+            ))}
+          </Select>
+        </div>
+        <Input
+          type="date"
+          value={dateFrom}
+          onChange={applyFilter(setDateFrom)}
+          className="w-36 h-9"
+        />
+        <Input
+          type="date"
+          value={dateTo}
+          onChange={applyFilter(setDateTo)}
+          className="w-36 h-9"
+        />
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="h-3.5 w-3.5 mr-1" /> {t('auditLog.filters.clear')}
+          </Button>
+        )}
+      </div>
 
       <div className="border rounded-lg bg-card overflow-hidden">
         {isLoading ? (
@@ -219,8 +216,8 @@ export default function AuditLogPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEntries.map((entry: AuditLogEntry) => (
-                  <TableRow key={entry.id}>
+                {data.content.map((entry: AuditLogEntry) => (
+                  <TableRow key={entry.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelected(entry)}>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDateTimeCompact(entry.createdAt)}
                     </TableCell>
@@ -285,6 +282,63 @@ export default function AuditLogPage() {
           </>
         )}
       </div>
+
+      {/* Detail Modal */}
+      <Dialog open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('auditLog.detail.title')}</DialogTitle>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-3 text-sm">
+              <DetailRow label={t('auditLog.columns.time')} value={formatDateTimeCompact(selected.createdAt)} />
+              <DetailRow label={t('auditLog.columns.action')}>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACTION_COLORS[selected.action] || 'bg-muted text-muted-foreground'}`}>
+                  {actionLabel(selected.action)}
+                </span>
+              </DetailRow>
+              <DetailRow label={t('auditLog.columns.status')}>
+                <span className="flex items-center gap-1.5">
+                  {selected.status === 'SUCCESS' ? (
+                    <><CheckCircle2 className="h-4 w-4 text-green-600" /> {t('auditLog.filters.success')}</>
+                  ) : (
+                    <><XCircle className="h-4 w-4 text-red-500" /> {t('auditLog.filters.failure')}</>
+                  )}
+                </span>
+              </DetailRow>
+              <DetailRow label={t('auditLog.columns.resource')} value={selected.resourceType} />
+              <DetailRow label={t('auditLog.columns.resourceId')} mono value={selected.resourceId || '—'} />
+              <DetailRow label={t('auditLog.columns.user')} value={selected.userEmail || '—'} />
+              <DetailRow label="User ID" mono value={selected.userId || '—'} />
+              <DetailRow label={t('auditLog.columns.duration')} value={selected.durationMs != null ? `${selected.durationMs}ms` : '—'} />
+              <DetailRow label={t('auditLog.columns.ip')} mono value={selected.clientIp || '—'} />
+              {selected.details && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">{t('auditLog.detail.changes')}</Label>
+                  <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto max-h-48 whitespace-pre-wrap break-all">
+                    {(() => { try { return JSON.stringify(JSON.parse(selected.details), null, 2); } catch { return selected.details; } })()}
+                  </pre>
+                </div>
+              )}
+              {selected.errorMessage && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">{t('auditLog.columns.error')}</Label>
+                  <p className="text-sm text-red-600 mt-1 break-all">{selected.errorMessage}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function DetailRow({ label, value, mono, children }: { label: string; value?: string; mono?: boolean; children?: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-xs text-muted-foreground w-28 shrink-0 pt-0.5">{label}</span>
+      {children || <span className={`text-sm break-all ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>}
     </div>
   );
 }
