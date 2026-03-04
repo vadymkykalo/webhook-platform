@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import IntentPicker from '../components/IntentPicker';
+import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -220,7 +221,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 className="h-11"
               />
-              <p className="text-[11px] text-muted-foreground">{t('auth.register.passwordHint')}</p>
+              <PasswordStrengthIndicator password={password} />
             </div>
 
             {error && (

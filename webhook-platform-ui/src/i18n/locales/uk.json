@@ -58,6 +58,19 @@
     "learnMore": "Дізнатися більше",
     "optional": "необов'язково"
   },
+  "passwordStrength": {
+    "weak": "Слабкий",
+    "fair": "Середній",
+    "good": "Добрий",
+    "strong": "Надійний",
+    "rules": {
+      "minLength": "Мінімум 8 символів",
+      "uppercase": "Велика літера",
+      "lowercase": "Мала літера",
+      "digit": "Цифра",
+      "special": "Спецсимвол"
+    }
+  },
   "dangerConfirm": {
     "impact": "Ця дія вплине на:",
     "typeToConfirm": "Введіть \"{{name}}\" для підтвердження"
@@ -97,6 +110,9 @@
     "incomingEvents": "Отримані",
     "members": "Учасники",
     "auditLog": "Журнал дій",
+    "connections": "Зв'язки",
+    "orgSettings": "Організація",
+    "billing": "Білінг",
     "settings": "Налаштування",
     "outgoing": "Вихідні",
     "incoming": "Вхідні",
@@ -612,7 +628,9 @@
       "last7d": "Останні 7 днів",
       "last30d": "Останні 30 днів",
       "searchById": "Пошук за ID",
-      "searchPlaceholder": "Введіть ID доставки..."
+      "searchPlaceholder": "Введіть ID доставки...",
+      "searchByEventType": "Пошук за типом події",
+      "eventTypePlaceholder": "напр. order.created"
     },
     "columns": {
       "created": "Створено",
@@ -730,11 +748,59 @@
       "removeFailed": "Не вдалося видалити учасника"
     }
   },
+  "billing": {
+    "title": "Білінг",
+    "subtitle": "Керуйте планом та використанням",
+    "comingSoon": "Скоро",
+    "comingSoonTitle": "Білінг та плани",
+    "comingSoonDesc": "Управління планами, лімітами використання та рахунками з'явиться найближчим часом. Наразі всі функції доступні на безкоштовному тарифі."
+  },
+  "connections": {
+    "title": "Карта зв'язків",
+    "subtitle": "Візуальний огляд маршрутизації подій для <strong>{{project}}</strong>",
+    "eventTypes": "{{count}} типів подій",
+    "endpoints": "{{count}} ендпоінтів",
+    "subscriptions": "{{count}} підписок",
+    "empty": "Зв'язків ще немає",
+    "emptyDesc": "Створіть ендпоінти та підписки, щоб побачити карту зв'язків",
+    "endpointDisabled": "Ендпоінт вимк.",
+    "subDisabled": "Підписка вимк.",
+    "unsubscribed": "Ендпоінти без підписок",
+    "unsubscribedDesc": "Ці ендпоінти не мають активних підписок і не отримуватимуть подій",
+    "noSubscriptions": "Немає підписок"
+  },
+  "orgSettings": {
+    "title": "Налаштування організації",
+    "subtitle": "Керуйте деталями організації та учасниками",
+    "details": "Деталі організації",
+    "detailsDesc": "Основна інформація про вашу організацію",
+    "orgName": "Назва організації",
+    "orgNamePlaceholder": "Acme Inc.",
+    "orgId": "ID організації",
+    "createdAt": "Створено",
+    "membersOverview": "Учасники",
+    "membersOverviewDesc": "Огляд учасників організації",
+    "totalMembers": "Всього",
+    "owners": "Власники",
+    "developers": "Розробники",
+    "viewers": "Глядачі",
+    "security": "Безпека",
+    "securityDesc": "Конфігурація автентифікації та контролю доступу",
+    "authMethod": "Метод автентифікації",
+    "rbac": "Контроль доступу",
+    "toast": {
+      "updated": "Організацію оновлено",
+      "updateFailed": "Не вдалося оновити організацію"
+    }
+  },
   "settings": {
     "title": "Налаштування",
     "subtitle": "Керуйте обліковим записом та налаштуваннями організації",
     "profile": "Профіль",
     "profileDesc": "Інформація про ваш обліковий запис",
+    "fullName": "Повне ім'я",
+    "fullNamePlaceholder": "Іван Петренко",
+    "profileUpdateFailed": "Не вдалося оновити профіль",
     "email": "Електронна пошта",
     "role": "Роль",
     "accountStatus": "Статус облікового запису",

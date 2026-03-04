@@ -68,6 +68,7 @@ export default function DeliveriesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [endpointFilter, setEndpointFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -88,7 +89,12 @@ export default function DeliveriesPage() {
     if (projectId) {
       loadDeliveries();
     }
-  }, [projectId, statusFilter, endpointFilter, eventIdFilter, dateRange, page, pageSize, sortParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, statusFilter, endpointFilter, eventIdFilter, debouncedSearch, dateRange, page, pageSize, sortParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(searchQuery); setPage(0); }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (projectId && eventIdFilter) {
@@ -155,6 +161,7 @@ export default function DeliveriesPage() {
         status: statusFilter || undefined,
         endpointId: endpointFilter || undefined,
         eventId: eventIdFilter || undefined,
+        eventType: debouncedSearch || undefined,
         fromDate: eventIdFilter ? undefined : fromDate,
         toDate: eventIdFilter ? undefined : toDate,
       });
@@ -223,9 +230,7 @@ export default function DeliveriesPage() {
     }
   };
 
-  const filteredDeliveries = searchQuery
-    ? deliveries.filter(d => d.id.toLowerCase().includes(searchQuery.toLowerCase()))
-    : deliveries;
+  const filteredDeliveries = deliveries;
 
   if (!project) {
     return (
@@ -277,8 +282,8 @@ export default function DeliveriesPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="search" className="text-xs">{t('deliveries.filters.searchById')}</Label>
-              <Input id="search" placeholder={t('deliveries.filters.searchPlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <Label htmlFor="search" className="text-xs">{t('deliveries.filters.searchByEventType')}</Label>
+              <Input id="search" placeholder={t('deliveries.filters.eventTypePlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </div>
           {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (

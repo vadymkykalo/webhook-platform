@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import {
-  Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
+  Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings, Building2, CreditCard,
   BookOpen, ChevronRight, ChevronDown, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play, Network
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -37,11 +37,14 @@ const mainNav: NavItem[] = [
 const orgNav: NavItem[] = [
   { nameKey: 'nav.members', path: '/admin/members', icon: Users, requiredRole: 'OWNER' },
   { nameKey: 'nav.auditLog', path: '/admin/audit-log', icon: FileText },
+  { nameKey: 'nav.orgSettings', path: '/admin/org-settings', icon: Building2, requiredRole: 'OWNER' },
+  { nameKey: 'nav.billing', path: '/admin/billing', icon: CreditCard, requiredRole: 'OWNER' },
   { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings, requiredRole: 'OWNER' },
 ];
 
 const getProjectOutgoingNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.connectionSetup', path: `/admin/projects/${projectId}/connection-setup`, icon: Cable },
+  { nameKey: 'nav.connections', path: `/admin/projects/${projectId}/connections`, icon: Network },
   { nameKey: 'nav.endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
   { nameKey: 'nav.subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
   { nameKey: 'nav.events', path: `/admin/projects/${projectId}/events`, icon: Radio },

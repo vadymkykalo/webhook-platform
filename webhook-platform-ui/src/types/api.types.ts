@@ -31,6 +31,7 @@ export interface AuthResponse {
 export interface UserResponse {
   id: string;
   email: string;
+  fullName: string | null;
   status: string;
 }
 

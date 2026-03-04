@@ -26,6 +26,9 @@ public class RegisterRequest {
     )
     private String password;
 
+    @Size(max = 255, message = "Full name must be at most 255 characters")
+    private String fullName;
+
     @NotBlank(message = "Organization name is required")
     @Size(min = 2, max = 100, message = "Organization name must be 2-100 characters")
     private String organizationName;

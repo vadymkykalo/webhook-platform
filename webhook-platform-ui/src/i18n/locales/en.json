@@ -58,6 +58,19 @@
     "learnMore": "Learn more",
     "optional": "optional"
   },
+  "passwordStrength": {
+    "weak": "Weak",
+    "fair": "Fair",
+    "good": "Good",
+    "strong": "Strong",
+    "rules": {
+      "minLength": "At least 8 characters",
+      "uppercase": "Uppercase letter",
+      "lowercase": "Lowercase letter",
+      "digit": "Number",
+      "special": "Special character"
+    }
+  },
   "dangerConfirm": {
     "impact": "This action will affect:",
     "typeToConfirm": "Type \"{{name}}\" to confirm"
@@ -97,6 +110,9 @@
     "incomingEvents": "Received",
     "members": "Members",
     "auditLog": "Audit Log",
+    "connections": "Connections",
+    "orgSettings": "Organization",
+    "billing": "Billing",
     "settings": "Settings",
     "outgoing": "Outgoing",
     "incoming": "Incoming",
@@ -612,7 +628,9 @@
       "last7d": "Last 7 days",
       "last30d": "Last 30 days",
       "searchById": "Search by ID",
-      "searchPlaceholder": "Enter delivery ID..."
+      "searchPlaceholder": "Enter delivery ID...",
+      "searchByEventType": "Search by event type",
+      "eventTypePlaceholder": "e.g. order.created"
     },
     "columns": {
       "created": "Created",
@@ -730,11 +748,59 @@
       "removeFailed": "Failed to remove member"
     }
   },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Manage your plan and usage",
+    "comingSoon": "Coming Soon",
+    "comingSoonTitle": "Billing & Plans",
+    "comingSoonDesc": "Plan management, usage limits, and invoices are coming soon. Currently all features are available on the free tier."
+  },
+  "connections": {
+    "title": "Connection Map",
+    "subtitle": "Visual overview of event routing for <strong>{{project}}</strong>",
+    "eventTypes": "{{count}} event types",
+    "endpoints": "{{count}} endpoints",
+    "subscriptions": "{{count}} subscriptions",
+    "empty": "No connections yet",
+    "emptyDesc": "Create endpoints and subscriptions to see the connection map",
+    "endpointDisabled": "Endpoint off",
+    "subDisabled": "Sub off",
+    "unsubscribed": "Unsubscribed Endpoints",
+    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events",
+    "noSubscriptions": "No subscriptions"
+  },
+  "orgSettings": {
+    "title": "Organization Settings",
+    "subtitle": "Manage your organization details and membership",
+    "details": "Organization Details",
+    "detailsDesc": "Basic information about your organization",
+    "orgName": "Organization Name",
+    "orgNamePlaceholder": "Acme Inc.",
+    "orgId": "Organization ID",
+    "createdAt": "Created",
+    "membersOverview": "Members",
+    "membersOverviewDesc": "Overview of organization membership",
+    "totalMembers": "Total",
+    "owners": "Owners",
+    "developers": "Developers",
+    "viewers": "Viewers",
+    "security": "Security",
+    "securityDesc": "Authentication and access control configuration",
+    "authMethod": "Auth method",
+    "rbac": "Access control",
+    "toast": {
+      "updated": "Organization updated",
+      "updateFailed": "Failed to update organization"
+    }
+  },
   "settings": {
     "title": "Settings",
     "subtitle": "Manage your account and organization settings",
     "profile": "Profile",
     "profileDesc": "Your account information",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "John Doe",
+    "profileUpdateFailed": "Failed to update profile",
     "email": "Email",
     "role": "Role",
     "accountStatus": "Account status",

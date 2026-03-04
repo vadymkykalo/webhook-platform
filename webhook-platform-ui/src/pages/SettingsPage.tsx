@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
-import { User, Building2, Loader2, KeyRound, CheckCircle2, ShieldCheck, AlertTriangle, RotateCcw, Lock, Eye } from 'lucide-react';
+import { User, Building2, Loader2, KeyRound, CheckCircle2, ShieldCheck, AlertTriangle, RotateCcw, Lock, Eye, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -10,16 +10,40 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
+import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const [fullName, setFullName] = useState(user?.user?.fullName || '');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const profileDirty = fullName !== (user?.user?.fullName || '');
+
+  useEffect(() => {
+    setFullName(user?.user?.fullName || '');
+  }, [user?.user?.fullName]);
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      const updated = await authApi.updateProfile({ fullName: fullName.trim() || undefined });
+      if (user) {
+        updateUser({ ...user, user: { ...user.user, fullName: updated.fullName } });
+      }
+      showSuccess(t('settings.toast.profileUpdated'));
+    } catch (err: any) {
+      showApiError(err, 'settings.profileUpdateFailed');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +99,28 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">{t('settings.fullName')}</Label>
+                <div className="flex gap-2 max-w-md">
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder={t('settings.fullNamePlaceholder')}
+                    disabled={savingProfile}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveProfile}
+                    disabled={!profileDirty || savingProfile}
+                    className="shrink-0"
+                  >
+                    {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-3.5 w-3.5 mr-1" />}
+                    {savingProfile ? t('common.saving') : t('common.save')}
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">{t('settings.email')}</Label>
                 <Input
@@ -149,9 +195,7 @@ export default function SettingsPage() {
                   placeholder="••••••••"
                   className="max-w-md"
                 />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.newPasswordHint')}
-                </p>
+                <PasswordStrengthIndicator password={newPassword} />
               </div>
 
               <div className="space-y-2">

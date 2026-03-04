@@ -9,6 +9,8 @@ import com.webhook.platform.api.dto.LogoutRequest;
 import com.webhook.platform.api.dto.RefreshTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.dto.ResetPasswordRequest;
+import com.webhook.platform.api.dto.UpdateProfileRequest;
+import com.webhook.platform.api.dto.UserResponse;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.AuthService;
@@ -161,6 +163,20 @@ public class AuthController {
             AuthContext auth) {
         authService.changePassword(auth.requireUserId(), request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Update profile", description = "Updates the authenticated user's profile information")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile updated successfully"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @PutMapping("/profile")
+    public ResponseEntity<UserResponse> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            AuthContext auth) {
+        UserResponse response = authService.updateProfile(auth.requireUserId(), request);
+        return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Get current user", description = "Returns information about the authenticated user")
