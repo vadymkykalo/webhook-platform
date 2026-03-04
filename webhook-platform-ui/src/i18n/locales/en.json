@@ -532,7 +532,13 @@
       "noTransformation": "None — send original payload",
       "payloadTemplate": "Payload Template",
       "customHeaders": "Custom Headers",
-      "customHeadersHint": "JSON key-value pairs added to each request."
+      "customHeadersHint": "JSON key-value pairs added to each request.",
+      "eventType": "Event Type",
+      "eventTypePlaceholder": "e.g., user.created, order.*, **",
+      "eventTypeHint": "Dot notation: order.created exact, order.* one level, order.** all nested, ** catch-all.",
+      "noSchema": "No matching schema found — this event type has no registered schema.",
+      "breaking": "Breaking",
+      "payloadFields": "Payload fields (v{{version}})"
     },
     "validation": {
       "endpointRequired": "Please select an endpoint that will receive the events",
@@ -2721,6 +2727,11 @@
         "label": "Latency Threshold",
         "hint": "Triggers when avg latency exceeds threshold (ms)"
       }
+    },
+    "channels": {
+      "IN_APP": "In-App",
+      "EMAIL": "Email",
+      "WEBHOOK": "Webhook"
     }
   },
   "incidents": {

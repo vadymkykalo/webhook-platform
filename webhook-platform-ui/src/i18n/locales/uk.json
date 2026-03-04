@@ -532,7 +532,13 @@
       "noTransformation": "Без трансформації — оригінальне тіло",
       "payloadTemplate": "Шаблон тіла",
       "customHeaders": "Власні заголовки",
-      "customHeadersHint": "JSON пари ключ-значення, що додаються до кожного запиту."
+      "customHeadersHint": "JSON пари ключ-значення, що додаються до кожного запиту.",
+      "eventType": "Тип події",
+      "eventTypePlaceholder": "напр., user.created, order.*, **",
+      "eventTypeHint": "Крапкова нотація: order.created точний, order.* один рівень, order.** всі вкладені, ** все.",
+      "noSchema": "Схему не знайдено — цей тип події не має зареєстрованої схеми.",
+      "breaking": "Зміни",
+      "payloadFields": "Поля (v{{version}})"
     },
     "validation": {
       "endpointRequired": "Оберіть ендпоінт, який отримуватиме події",
@@ -2721,6 +2727,11 @@
         "label": "Поріг затримки",
         "hint": "Спрацьовує, коли середня затримка перевищує поріг (мс)"
       }
+    },
+    "channels": {
+      "IN_APP": "В додатку",
+      "EMAIL": "Email",
+      "WEBHOOK": "Webhook"
     }
   },
   "incidents": {

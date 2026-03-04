@@ -309,7 +309,7 @@ export default function AlertsPage() {
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span>{t('alerts.triggeredBy', 'Triggered by rule:')}</span>
                                     <Badge variant="secondary" className="text-[11px]">{rule.name}</Badge>
-                                    <span>({rule.alertType.replace(/_/g, ' ')})</span>
+                                    <span>({t(`alerts.types.${rule.alertType}.label`)})</span>
                                     {rule.endpointId && <span className="font-mono">endpoint: {rule.endpointId.slice(0, 8)}…</span>}
                                   </div>
                                 )}
@@ -376,20 +376,20 @@ export default function AlertsPage() {
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">{rule.alertType.replace(/_/g, ' ')}</Badge>
+                    <Badge variant="secondary">{t(`alerts.types.${rule.alertType}.label`)}</Badge>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${SEVERITY_COLORS[rule.severity] || ''}`}>{rule.severity}</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-muted">
                       {rule.channel === 'EMAIL' ? <Mail className="h-3 w-3" /> : rule.channel === 'WEBHOOK' ? <Webhook className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
-                      {rule.channel.replace(/_/g, ' ')}
+                      {t(`alerts.channels.${rule.channel}`, rule.channel)}
                     </span>
-                    {rule.muted && <Badge variant="outline" className="text-muted-foreground"><VolumeX className="h-3 w-3 mr-1" />Muted</Badge>}
+                    {rule.muted && <Badge variant="outline" className="text-muted-foreground"><VolumeX className="h-3 w-3 mr-1" />{t('alerts.muted')}</Badge>}
                     {rule.snoozedUntil && new Date(rule.snoozedUntil) > new Date() && (
-                      <Badge variant="outline" className="text-orange-600"><BellOff className="h-3 w-3 mr-1" />Snoozed</Badge>
+                      <Badge variant="outline" className="text-orange-600"><BellOff className="h-3 w-3 mr-1" />{t('alerts.snoozed')}</Badge>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <div>Threshold: <span className="font-mono text-foreground">{rule.thresholdValue}</span></div>
-                    <div>Window: <span className="font-mono text-foreground">{rule.windowMinutes}m</span></div>
+                    <div>{t('alerts.threshold')}: <span className="font-mono text-foreground">{rule.thresholdValue}</span></div>
+                    <div>{t('alerts.window')}: <span className="font-mono text-foreground">{rule.windowMinutes}m</span></div>
                   </div>
                   {rule.channel === 'WEBHOOK' && rule.webhookUrl && (
                     <div className="text-[11px] text-muted-foreground truncate">→ {rule.webhookUrl}</div>

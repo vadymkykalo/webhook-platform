@@ -490,6 +490,7 @@ function EventTypeField({
   disabled: boolean;
   error?: string;
 }) {
+  const { t } = useTranslation();
   const { data: catalogTypes = [] } = useEventTypes(projectId);
   const [focused, setFocused] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -521,12 +522,12 @@ function EventTypeField({
   return (
     <div className="space-y-2" ref={wrapperRef}>
       <Label htmlFor="eventType">
-        Event Type <span className="text-destructive">*</span>
+        {t('createSubscription.fields.eventType')} <span className="text-destructive">*</span>
       </Label>
       <div className="relative">
         <Input
           id="eventType"
-          placeholder="e.g., user.created, order.*, **"
+          placeholder={t('createSubscription.fields.eventTypePlaceholder')}
           value={eventType}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -587,12 +588,12 @@ function EventTypeField({
                 )}
                 {exactMatch.activeVersionStatus === 'ACTIVE' && (
                   <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
-                    <CheckCircle2 className="h-2.5 w-2.5" /> Active
+                    <CheckCircle2 className="h-2.5 w-2.5" /> {t('common.active', 'Active')}
                   </span>
                 )}
                 {exactMatch.hasBreakingChanges && (
                   <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
-                    <AlertTriangle className="h-2.5 w-2.5" /> Breaking
+                    <AlertTriangle className="h-2.5 w-2.5" /> {t('createSubscription.fields.breaking', 'Breaking')}
                   </span>
                 )}
               </div>
@@ -609,12 +610,12 @@ function EventTypeField({
       {!exactMatch && eventType.trim() && catalogTypes.length > 0 && !focused && (
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <Info className="h-3 w-3" />
-          No matching schema found — this event type has no registered schema.
+          {t('createSubscription.fields.noSchema')}
         </p>
       )}
 
       <p className="text-xs text-muted-foreground">
-        Dot notation: <code className="bg-muted px-1 rounded">order.created</code> exact, <code className="bg-muted px-1 rounded">order.*</code> one level, <code className="bg-muted px-1 rounded">order.**</code> all nested, <code className="bg-muted px-1 rounded">**</code> catch-all.
+        {t('createSubscription.fields.eventTypeHint')}
       </p>
     </div>
   );
@@ -644,6 +645,7 @@ function parseSchemaFields(schemaJson: string): SchemaField[] {
 }
 
 function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; eventTypeId: string }) {
+  const { t } = useTranslation();
   const { data: versions, isLoading } = useSchemaVersions(projectId, eventTypeId);
 
   // Find the latest active version, or just the latest
@@ -656,7 +658,7 @@ function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; ev
   if (isLoading) {
     return (
       <div className="px-2.5 pb-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-        <Loader2 className="h-2.5 w-2.5 animate-spin" /> Loading schema…
+        <Loader2 className="h-2.5 w-2.5 animate-spin" /> {t('common.loading')}
       </div>
     );
   }
@@ -678,7 +680,7 @@ function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; ev
   return (
     <div className="border-t border-primary/10 px-2.5 py-2 space-y-1">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Payload fields (v{latest.version})
+        {t('createSubscription.fields.payloadFields', { version: latest.version })}
       </p>
       <div className="flex flex-wrap gap-1">
         {fields.slice(0, 12).map((f) => (
@@ -693,7 +695,7 @@ function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; ev
         ))}
         {fields.length > 12 && (
           <span className="text-[10px] text-muted-foreground self-center">
-            +{fields.length - 12} more
+            +{fields.length - 12} {t('common.more', 'more')}
           </span>
         )}
       </div>
