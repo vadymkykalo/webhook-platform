@@ -21,18 +21,32 @@ public final class SsrfProtectionCustomizer {
     private SsrfProtectionCustomizer() {
     }
 
-    static final ConnectionProvider CONNECTION_PROVIDER = ConnectionProvider.builder("webhook-pool")
-            .maxConnections(200)
-            .pendingAcquireTimeout(Duration.ofSeconds(10))
-            .maxIdleTime(Duration.ofSeconds(60))
-            .build();
+    /**
+     * Creates a configurable ConnectionProvider with metrics enabled.
+     * Reactor Netty auto-registers Micrometer gauges when metrics(true):
+     *   reactor.netty.connection.provider.{pool-name}.pending-connections
+     *   reactor.netty.connection.provider.{pool-name}.active-connections
+     *   reactor.netty.connection.provider.{pool-name}.idle-connections
+     *   reactor.netty.connection.provider.{pool-name}.total-connections
+     */
+    public static ConnectionProvider createConnectionProvider(
+            int maxConnections, int pendingAcquireTimeoutSeconds, int maxIdleTimeSeconds) {
+        log.info("Creating webhook connection pool: maxConnections={}, pendingAcquireTimeout={}s, maxIdleTime={}s",
+                maxConnections, pendingAcquireTimeoutSeconds, maxIdleTimeSeconds);
+        return ConnectionProvider.builder("webhook-pool")
+                .maxConnections(maxConnections)
+                .pendingAcquireTimeout(Duration.ofSeconds(pendingAcquireTimeoutSeconds))
+                .maxIdleTime(Duration.ofSeconds(maxIdleTimeSeconds))
+                .metrics(true)
+                .build();
+    }
 
     /**
-     * Creates a new HttpClient with shared connection pool, connect timeout,
+     * Creates a new HttpClient with the given connection provider, connect timeout,
      * and SSRF protection.
      */
-    public static HttpClient createHttpClient(boolean allowPrivateIps) {
-        return apply(HttpClient.create(CONNECTION_PROVIDER), allowPrivateIps);
+    public static HttpClient createHttpClient(ConnectionProvider connectionProvider, boolean allowPrivateIps) {
+        return apply(HttpClient.create(connectionProvider), allowPrivateIps);
     }
 
     public static HttpClient apply(HttpClient httpClient, boolean allowPrivateIps) {

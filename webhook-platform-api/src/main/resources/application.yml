@@ -85,6 +85,7 @@ outbox:
     max-retries: ${OUTBOX_MAX_RETRIES:5}
     dead-retention-days: ${OUTBOX_DEAD_RETENTION_DAYS:90}
     sending-recovery-seconds: ${OUTBOX_SENDING_RECOVERY_SECONDS:300}
+    batch-send-timeout-seconds: ${OUTBOX_BATCH_SEND_TIMEOUT_SECONDS:30}
 
 data-retention:
   outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}

@@ -10,6 +10,7 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.ConnectionProvider;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
@@ -37,6 +38,7 @@ public class MtlsWebClientFactory {
     private final String encryptionSalt;
     private final boolean allowPrivateIps;
     private final WebClient.Builder webClientBuilder;
+    private final ConnectionProvider connectionProvider;
     private final Cache<UUID, CachedClient> mtlsClientCache = Caffeine.newBuilder()
             .maximumSize(500)
             .expireAfterAccess(Duration.ofHours(1))
@@ -48,11 +50,13 @@ public class MtlsWebClientFactory {
             @Value("${webhook.encryption-key}") String encryptionKey,
             @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            WebClient.Builder webClientBuilder) {
+            WebClient.Builder webClientBuilder,
+            ConnectionProvider webhookConnectionProvider) {
         this.encryptionKey = encryptionKey;
         this.encryptionSalt = encryptionSalt;
         this.allowPrivateIps = allowPrivateIps;
         this.webClientBuilder = webClientBuilder;
+        this.connectionProvider = webhookConnectionProvider;
     }
 
     public WebClient getWebClient(Endpoint endpoint) {
@@ -132,7 +136,7 @@ public class MtlsWebClientFactory {
         SslContext sslContext = sslContextBuilder.build();
 
         HttpClient httpClient = SsrfProtectionCustomizer.apply(
-                HttpClient.create(SsrfProtectionCustomizer.CONNECTION_PROVIDER), allowPrivateIps)
+                HttpClient.create(connectionProvider), allowPrivateIps)
                 .secure(spec -> spec.sslContext(sslContext));
 
         log.info("Created mTLS WebClient for endpoint {}", endpoint.getId());

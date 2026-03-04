@@ -80,6 +80,10 @@ webhook:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
   max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
+  connection-pool:
+    max-connections: ${WEBHOOK_POOL_MAX_CONNECTIONS:200}
+    pending-acquire-timeout-seconds: ${WEBHOOK_POOL_PENDING_ACQUIRE_TIMEOUT_SECONDS:10}
+    max-idle-time-seconds: ${WEBHOOK_POOL_MAX_IDLE_TIME_SECONDS:60}
 
 retry:
   scheduler:

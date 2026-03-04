@@ -40,6 +40,7 @@ public class OutboxPublisherService {
     private final int maxRetries;
     private final int deadRetentionDays;
     private final long sendingRecoverySeconds;
+    private final long batchSendTimeoutSeconds;
     private final Timer publishLatency;
     private final TransactionTemplate txTemplate;
 
@@ -52,7 +53,8 @@ public class OutboxPublisherService {
             @Value("${outbox.publisher.batch-size:100}") int batchSize,
             @Value("${outbox.publisher.max-retries:5}") int maxRetries,
             @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays,
-            @Value("${outbox.publisher.sending-recovery-seconds:300}") long sendingRecoverySeconds) {
+            @Value("${outbox.publisher.sending-recovery-seconds:300}") long sendingRecoverySeconds,
+            @Value("${outbox.publisher.batch-send-timeout-seconds:30}") long batchSendTimeoutSeconds) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
@@ -60,6 +62,7 @@ public class OutboxPublisherService {
         this.maxRetries = maxRetries;
         this.deadRetentionDays = deadRetentionDays;
         this.sendingRecoverySeconds = sendingRecoverySeconds;
+        this.batchSendTimeoutSeconds = batchSendTimeoutSeconds;
         this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
@@ -269,11 +272,11 @@ public class OutboxPublisherService {
         // cleanupOldMessages() recovers them back to PENDING after 120s.
         try {
             CompletableFuture.allOf(completionFutures.toArray(new CompletableFuture[0]))
-                    .get(30, TimeUnit.SECONDS);
+                    .get(batchSendTimeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
-            log.warn("Batch Kafka send did not fully complete within 30s: {} — " +
+            log.warn("Batch Kafka send did not fully complete within {}s: {} — " +
                     "in-flight messages remain SENDING and will be recovered by cleanup",
-                    e.getMessage());
+                    batchSendTimeoutSeconds, e.getMessage());
         }
 
         sample.stop(publishLatency);
