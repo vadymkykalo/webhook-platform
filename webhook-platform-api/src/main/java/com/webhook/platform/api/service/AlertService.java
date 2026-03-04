@@ -2,11 +2,17 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
+import com.webhook.platform.api.domain.entity.Incident;
+import com.webhook.platform.api.domain.entity.IncidentTimeline;
 import com.webhook.platform.api.domain.enums.AlertChannel;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.enums.AlertType;
+import com.webhook.platform.api.domain.enums.IncidentStatus;
+import com.webhook.platform.api.domain.enums.IncidentTimelineType;
 import com.webhook.platform.api.domain.repository.AlertEventRepository;
 import com.webhook.platform.api.domain.repository.AlertRuleRepository;
+import com.webhook.platform.api.domain.repository.IncidentRepository;
+import com.webhook.platform.api.domain.repository.IncidentTimelineRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
@@ -31,6 +37,8 @@ public class AlertService {
     private final AlertRuleRepository ruleRepository;
     private final AlertEventRepository eventRepository;
     private final ProjectRepository projectRepository;
+    private final IncidentRepository incidentRepository;
+    private final IncidentTimelineRepository timelineRepository;
 
     // ─── Rule CRUD ──────────────────────────────────────────────────────
 
@@ -150,6 +158,28 @@ public class AlertService {
         event = eventRepository.save(event);
         log.warn("Alert fired: rule='{}', project={}, current={}, threshold={}",
                 rule.getName(), rule.getProjectId(), currentValue, rule.getThresholdValue());
+
+        // Auto-create incident for CRITICAL severity alerts
+        if (rule.getSeverity() == AlertSeverity.CRITICAL) {
+            Incident incident = Incident.builder()
+                    .projectId(rule.getProjectId())
+                    .title("[Auto] " + rule.getName() + " — " + message)
+                    .severity(AlertSeverity.CRITICAL)
+                    .status(IncidentStatus.OPEN)
+                    .build();
+            incident = incidentRepository.save(incident);
+
+            IncidentTimeline entry = IncidentTimeline.builder()
+                    .incidentId(incident.getId())
+                    .entryType(IncidentTimelineType.STATUS_CHANGE)
+                    .title("Auto-created from alert rule: " + rule.getName())
+                    .detail(String.format("Current value: %.2f, Threshold: %.2f", currentValue, rule.getThresholdValue()))
+                    .build();
+            timelineRepository.save(entry);
+
+            log.info("Auto-created incident '{}' for CRITICAL alert rule '{}'", incident.getId(), rule.getName());
+        }
+
         return event;
     }
 

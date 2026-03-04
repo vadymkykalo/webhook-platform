@@ -691,6 +691,10 @@
     "lastUsed": "Last used",
     "never": "Never",
     "justNow": "Just now",
+    "scopeReadWrite": "Read & Write",
+    "scopeReadOnly": "Read Only",
+    "expired": "Expired",
+    "expiresAt": "Expires {{date}}",
     "createDialog": {
       "title": "Create New API Key",
       "description": "Add a new API key to send events to this project",
@@ -698,7 +702,16 @@
       "namePlaceholder": "Production API Key",
       "nameHint": "A descriptive name to identify this API key",
       "submit": "Create API Key",
-      "submitting": "Creating..."
+      "submitting": "Creating...",
+      "scope": "Permissions",
+      "scopeReadWriteHint": "Can send events and read project data",
+      "scopeReadOnlyHint": "Can only read project data, cannot send events",
+      "expiration": "Expiration",
+      "noExpiration": "No expiration",
+      "expires7d": "7 days",
+      "expires30d": "30 days",
+      "expires90d": "90 days",
+      "expires1y": "1 year"
     },
     "revokeDialog": {
       "title": "Revoke API Key?",
@@ -747,8 +760,26 @@
       "title": "Remove Member?",
       "description": "This member will lose access to the organization and all its resources. This action cannot be undone."
     },
+    "addModal": {
+      "title": "Add Member",
+      "description": "Invite a new member to this organization",
+      "email": "Email",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Invalid email format",
+      "role": "Role",
+      "roleHint": "Developer: Can create and manage resources. Viewer: Read-only access.",
+      "emailNote": "The member will receive an invitation email to join the organization.",
+      "submit": "Add Member",
+      "adding": "Adding...",
+      "inviteSent": "Invitation sent successfully!",
+      "inviteLink": "Invite Link",
+      "copyLink": "Copy link",
+      "inviteLinkHint": "Share this link with the member. The link expires in 48 hours."
+    },
     "toast": {
       "added": "Member added successfully",
+      "invited": "Invitation sent! The member will need to accept the invite.",
+      "linkCopied": "Invite link copied to clipboard",
       "roleChanged": "Member role updated successfully",
       "roleChangeFailed": "Failed to update member role",
       "removed": "Member removed successfully",
@@ -842,6 +873,23 @@
       "tip2": "Rotate signing secrets and API keys every 90 days",
       "tip3": "Use RBAC — grant DEVELOPER role instead of OWNER where possible",
       "tip4": "Review the Audit Log weekly for suspicious activity"
+    },
+    "timezone": {
+      "title": "Timezone",
+      "description": "Set your preferred timezone for displaying dates and times",
+      "select": "Timezone",
+      "hint": "All dates will be displayed in {{tz}}",
+      "saved": "Timezone updated"
+    },
+    "notifications": {
+      "title": "Notification Preferences",
+      "description": "Choose how you want to receive notifications",
+      "inApp": "In-App Notifications",
+      "inAppDesc": "Show notifications within the application",
+      "email": "Email Notifications",
+      "emailDesc": "Receive important alerts via email",
+      "browser": "Browser Notifications",
+      "browserDesc": "Push notifications in your browser (requires permission)"
     },
     "dangerZone": "Danger Zone",
     "dangerZoneDesc": "Irreversible and destructive actions",

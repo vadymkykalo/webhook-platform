@@ -1,16 +1,57 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { authApi } from '../api/auth.api';
-import { User, Building2, Loader2, KeyRound, CheckCircle2, ShieldCheck, AlertTriangle, RotateCcw, Lock, Eye, Pencil } from 'lucide-react';
+import { User, Building2, Loader2, KeyRound, CheckCircle2, ShieldCheck, AlertTriangle, RotateCcw, Lock, Eye, Pencil, Globe, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
-import { formatDate } from '../lib/date';
+import { formatDate, getStoredTimezone, setStoredTimezone } from '../lib/date';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
+import { Select } from '../components/ui/select';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+
+const COMMON_TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Sao_Paulo',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Kyiv',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+];
+
+const NOTIF_STORAGE_KEY = 'hookflow_notification_prefs';
+
+interface NotificationPrefs {
+  inApp: boolean;
+  email: boolean;
+  browser: boolean;
+}
+
+function getNotifPrefs(): NotificationPrefs {
+  try {
+    const stored = localStorage.getItem(NOTIF_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return { inApp: true, email: true, browser: false };
+}
+
+function setNotifPrefs(prefs: NotificationPrefs) {
+  localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(prefs));
+}
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -25,6 +66,9 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState(user?.user?.fullName || '');
   const [savingProfile, setSavingProfile] = useState(false);
   const profileDirty = fullName !== (user?.user?.fullName || '');
+
+  const [selectedTz, setSelectedTz] = useState(getStoredTimezone);
+  const [notifPrefs, setNotifPrefsState] = useState<NotificationPrefs>(getNotifPrefs);
 
   useEffect(() => {
     setFullName(user?.user?.fullName || '');
@@ -232,6 +276,88 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-primary" />
+              <CardTitle>{t('settings.timezone.title')}</CardTitle>
+            </div>
+            <CardDescription>
+              {t('settings.timezone.description')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t('settings.timezone.select')}</Label>
+                <Select
+                  value={selectedTz}
+                  onChange={(e) => {
+                    const tz = e.target.value;
+                    setSelectedTz(tz);
+                    setStoredTimezone(tz);
+                    showSuccess(t('settings.timezone.saved'));
+                  }}
+                  className="max-w-md"
+                >
+                  {!COMMON_TIMEZONES.includes(selectedTz) && (
+                    <option value={selectedTz}>{selectedTz}</option>
+                  )}
+                  {COMMON_TIMEZONES.map(tz => (
+                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t('settings.timezone.hint', { tz: selectedTz })}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              <CardTitle>{t('settings.notifications.title')}</CardTitle>
+            </div>
+            <CardDescription>
+              {t('settings.notifications.description')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {(['inApp', 'email', 'browser'] as const).map((channel) => (
+                <label key={channel} className="flex items-center justify-between max-w-md cursor-pointer">
+                  <div>
+                    <p className="text-sm font-medium">{t(`settings.notifications.${channel}`)}</p>
+                    <p className="text-xs text-muted-foreground">{t(`settings.notifications.${channel}Desc`)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notifPrefs[channel]}
+                    onClick={() => {
+                      const updated = { ...notifPrefs, [channel]: !notifPrefs[channel] };
+                      setNotifPrefsState(updated);
+                      setNotifPrefs(updated);
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                      notifPrefs[channel] ? 'bg-primary' : 'bg-input'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
+                        notifPrefs[channel] ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
