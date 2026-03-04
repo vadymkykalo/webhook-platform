@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Bell, Plus, Trash2, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Info, Check, VolumeX, Clock, Mail, Webhook, BellOff, ChevronDown, Search } from 'lucide-react';
+import { Bell, Plus, Trash2, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Info, Check, VolumeX, Clock, Mail, Webhook, BellOff, ChevronDown, Search, MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import {
@@ -102,7 +102,7 @@ export default function AlertsPage() {
       windowMinutes: parseInt(formWindow),
       description: formDescription || undefined,
       channel: formChannel,
-      webhookUrl: formChannel === 'WEBHOOK' ? formWebhookUrl : undefined,
+      webhookUrl: (formChannel === 'WEBHOOK' || formChannel === 'SLACK') ? formWebhookUrl : undefined,
       emailRecipients: formChannel === 'EMAIL' ? formEmailRecipients : undefined,
     };
     try {
@@ -379,7 +379,7 @@ export default function AlertsPage() {
                     <Badge variant="secondary">{t(`alerts.types.${rule.alertType}.label`)}</Badge>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${SEVERITY_COLORS[rule.severity] || ''}`}>{rule.severity}</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-muted">
-                      {rule.channel === 'EMAIL' ? <Mail className="h-3 w-3" /> : rule.channel === 'WEBHOOK' ? <Webhook className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
+                      {rule.channel === 'EMAIL' ? <Mail className="h-3 w-3" /> : rule.channel === 'WEBHOOK' ? <Webhook className="h-3 w-3" /> : rule.channel === 'SLACK' ? <MessageSquare className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
                       {t(`alerts.channels.${rule.channel}`, rule.channel)}
                     </span>
                     {rule.muted && <Badge variant="outline" className="text-muted-foreground"><VolumeX className="h-3 w-3 mr-1" />{t('alerts.muted')}</Badge>}
@@ -479,15 +479,23 @@ export default function AlertsPage() {
             <div className="space-y-2">
               <Label>{t('alerts.form.channel', 'Notification Channel')}</Label>
               <Select value={formChannel} onChange={(e) => setFormChannel(e.target.value as AlertChannel)}>
-                <option value="IN_APP">In-App</option>
-                <option value="EMAIL">Email</option>
-                <option value="WEBHOOK">Webhook</option>
+                <option value="IN_APP">{t('alerts.channels.IN_APP')}</option>
+                <option value="EMAIL">{t('alerts.channels.EMAIL')}</option>
+                <option value="WEBHOOK">{t('alerts.channels.WEBHOOK')}</option>
+                <option value="SLACK">{t('alerts.channels.SLACK')}</option>
               </Select>
             </div>
             {formChannel === 'WEBHOOK' && (
               <div className="space-y-2">
-                <Label>{t('alerts.form.webhookUrl', 'Webhook URL')}</Label>
-                <Input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://hooks.slack.com/..." />
+                <Label>{t('alerts.form.webhookUrl')}</Label>
+                <Input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://example.com/webhook" />
+              </div>
+            )}
+            {formChannel === 'SLACK' && (
+              <div className="space-y-2">
+                <Label>{t('alerts.form.slackWebhookUrl')}</Label>
+                <Input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://hooks.slack.com/services/..." />
+                <p className="text-xs text-muted-foreground">{t('alerts.form.slackHint')}</p>
               </div>
             )}
             {formChannel === 'EMAIL' && (

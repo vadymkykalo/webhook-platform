@@ -2697,6 +2697,8 @@
       "description": "Description (optional)",
       "channel": "Notification Channel",
       "webhookUrl": "Webhook URL",
+      "slackWebhookUrl": "Slack Webhook URL",
+      "slackHint": "Create an Incoming Webhook in your Slack workspace settings to get the URL.",
       "emailRecipients": "Email Recipients"
     },
     "toast": {
@@ -2732,7 +2734,8 @@
     "channels": {
       "IN_APP": "In-App",
       "EMAIL": "Email",
-      "WEBHOOK": "Webhook"
+      "WEBHOOK": "Webhook",
+      "SLACK": "Slack"
     }
   },
   "incidents": {

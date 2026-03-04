@@ -2697,6 +2697,8 @@
       "description": "Опис (необов'язково)",
       "channel": "Канал сповіщень",
       "webhookUrl": "Webhook URL",
+      "slackWebhookUrl": "Slack Webhook URL",
+      "slackHint": "Створіть Incoming Webhook у налаштуваннях вашого Slack-воркспейсу, щоб отримати URL.",
       "emailRecipients": "Отримувачі email"
     },
     "toast": {
@@ -2732,7 +2734,8 @@
     "channels": {
       "IN_APP": "В додатку",
       "EMAIL": "Email",
-      "WEBHOOK": "Webhook"
+      "WEBHOOK": "Webhook",
+      "SLACK": "Slack"
     }
   },
   "incidents": {
