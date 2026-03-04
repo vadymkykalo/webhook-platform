@@ -22,6 +22,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.resources.ConnectionProvider;
 
 import java.time.Instant;
 import java.util.List;
@@ -97,7 +98,8 @@ class IncomingForwardServiceTest {
                 webClientBuilder, new ObjectMapper(),
                 "test_encryption_key_32_chars_pad", "test_salt",
                 true, List.of(),
-                new SimpleMeterRegistry(), transactionTemplate
+                new SimpleMeterRegistry(), transactionTemplate,
+                ConnectionProvider.newConnection()
         );
     }
 
@@ -201,7 +203,8 @@ class IncomingForwardServiceTest {
                 webClientBuilder, new ObjectMapper(),
                 "test_encryption_key_32_chars_pad", "test_salt",
                 false, List.of(),
-                new SimpleMeterRegistry(), transactionTemplate
+                new SimpleMeterRegistry(), transactionTemplate,
+                ConnectionProvider.newConnection()
         );
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
