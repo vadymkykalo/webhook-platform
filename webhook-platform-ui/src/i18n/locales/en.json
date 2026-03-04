@@ -2945,6 +2945,28 @@
       "testBefore": "Use this to test before saving to a destination"
     },
     "previewFailed": "Failed to run transform preview"
+  },
+  "configExport": {
+    "title": "Config Export / Import",
+    "description": "Export or import project configuration (endpoints and subscriptions) as JSON",
+    "selectProject": "Select project",
+    "exportBtn": "Export Config",
+    "exporting": "Exporting...",
+    "importBtn": "Import Config",
+    "importing": "Importing...",
+    "hint": "Export saves endpoints and subscriptions. Import skips duplicates by URL.",
+    "importResult": "Created {{endpoints}} endpoints, {{subscriptions}} subscriptions",
+    "moreErrors": "...and {{count}} more errors",
+    "toast": {
+      "exported": "Exported {{endpoints}} endpoints and {{subscriptions}} subscriptions",
+      "exportFailed": "Failed to export configuration",
+      "imported": "Imported {{endpoints}} endpoints and {{subscriptions}} subscriptions",
+      "importedWithErrors": "Import completed with {{errors}} warnings",
+      "importFailed": "Failed to import configuration",
+      "unsupportedVersion": "Unsupported config file version",
+      "endpointSkipped": "Endpoint already exists: {{url}}",
+      "subscriptionSkipped": "No endpoint found for subscription {{eventType}} → {{url}}"
+    }
   }
 }
 

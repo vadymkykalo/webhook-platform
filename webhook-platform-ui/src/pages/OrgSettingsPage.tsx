@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/auth.store';
 import { organizationsApi } from '../api/organizations.api';
 import { membersApi } from '../api/members.api';
+import { useProjects } from '../api/queries';
 import { Building2, Users, Loader2, Pencil, Calendar, Hash, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
@@ -11,6 +12,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Select } from '../components/ui/select';
+import ConfigExportImport from '../components/ConfigExportImport';
 
 interface MemberInfo {
   id: string;
@@ -31,6 +34,16 @@ export default function OrgSettingsPage() {
   const [members, setMembers] = useState<MemberInfo[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const dirty = name !== orgName;
+
+  const { data: projects = [] } = useProjects();
+  const [exportProjectId, setExportProjectId] = useState('');
+  const selectedProject = projects.find(p => p.id === exportProjectId);
+
+  useEffect(() => {
+    if (projects.length > 0 && !exportProjectId) {
+      setExportProjectId(projects[0].id);
+    }
+  }, [projects, exportProjectId]);
 
   useEffect(() => {
     setName(orgName);
@@ -183,6 +196,32 @@ export default function OrgSettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Config Export/Import */}
+        {projects.length > 0 && (
+          <div className="space-y-3">
+            {projects.length > 1 && (
+              <div className="space-y-2">
+                <Label>{t('configExport.selectProject')}</Label>
+                <Select
+                  value={exportProjectId}
+                  onChange={(e) => setExportProjectId(e.target.value)}
+                  className="max-w-md"
+                >
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            {exportProjectId && selectedProject && (
+              <ConfigExportImport
+                projectId={exportProjectId}
+                projectName={selectedProject.name}
+              />
+            )}
+          </div>
+        )}
 
         {/* Security Overview */}
         <Card>
