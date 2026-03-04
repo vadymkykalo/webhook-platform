@@ -104,6 +104,29 @@ public class EmailService {
         }
     }
 
+    public void sendAlertEmail(String to, String subject, String htmlBody) {
+        if (!emailEnabled) {
+            log.info("========== ALERT EMAIL ==========");
+            log.info("To: {}", to);
+            log.info("Subject: {}", subject);
+            log.info("=================================");
+            return;
+        }
+
+        try {
+            var message = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            mailSender.send(message);
+            log.info("Alert email sent to {}", to);
+        } catch (Exception e) {
+            log.error("Failed to send alert email to {}: {}", to, e.getMessage());
+        }
+    }
+
     private String buildInviteHtml(String inviteUrl) {
         return """
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
