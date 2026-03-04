@@ -458,6 +458,7 @@
     "newSubscription": "Create Subscription",
     "noSubscriptions": "No subscriptions yet",
     "noSubscriptionsDesc": "Create a subscription to route events to your endpoints",
+    "noEventTypesHint": "Tip: Define event types in Schemas to get autocomplete and validation when creating subscriptions.",
     "noMatching": "No matching subscriptions",
     "noMatchingDesc": "Try adjusting your filters",
     "createFirst": "Create Subscription",

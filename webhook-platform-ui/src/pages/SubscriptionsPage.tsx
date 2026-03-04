@@ -264,21 +264,28 @@ export default function SubscriptionsPage() {
       )}
 
       {filteredSubscriptions.length === 0 ? (
-        <EmptyState
-          icon={LinkIcon}
-          title={subscriptions.length === 0 ? t('subscriptions.noSubscriptions') : t('subscriptions.noMatching')}
-          description={subscriptions.length === 0 ? t('subscriptions.noSubscriptionsDesc') : t('subscriptions.noMatchingDesc')}
-          action={subscriptions.length === 0 ? (
-            <PermissionGate allowed={canManageSubscriptions}>
-              <VerificationGate>
-                <Button onClick={() => setShowCreateModal(true)}>
-                  <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
-                </Button>
-              </VerificationGate>
-            </PermissionGate>
-          ) : undefined}
-          docsLink="/docs#subscriptions-api"
-        />
+        <div className="space-y-4">
+          <EmptyState
+            icon={LinkIcon}
+            title={subscriptions.length === 0 ? t('subscriptions.noSubscriptions') : t('subscriptions.noMatching')}
+            description={subscriptions.length === 0 ? t('subscriptions.noSubscriptionsDesc') : t('subscriptions.noMatchingDesc')}
+            action={subscriptions.length === 0 ? (
+              <PermissionGate allowed={canManageSubscriptions}>
+                <VerificationGate>
+                  <Button onClick={() => setShowCreateModal(true)}>
+                    <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
+                  </Button>
+                </VerificationGate>
+              </PermissionGate>
+            ) : undefined}
+            docsLink="/docs#subscriptions-api"
+          />
+          {subscriptions.length === 0 && catalogTypes.length === 0 && endpoints.length > 0 && (
+            <p className="text-xs text-center text-muted-foreground">
+              {t('subscriptions.noEventTypesHint')}
+            </p>
+          )}
+        </div>
       ) : (
         <Card className="overflow-hidden animate-fade-in">
           <Table>
