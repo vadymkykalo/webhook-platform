@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeFuture } from '../lib/date';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +43,8 @@ export default function DeliveryDetailsSheet({
   onRefresh,
 }: DeliveryDetailsSheetProps) {
   const { t } = useTranslation();
+  const params = useParams<{ projectId: string }>();
+  const projectId = params.projectId;
   const [delivery, setDelivery] = useState<DeliveryResponse | null>(null);
   const [attempts, setAttempts] = useState<DeliveryAttemptResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -289,21 +292,27 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
 
-              {/* References */}
+              {/* Correlation Trail */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.references')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {[
-                    { label: t('deliveryDetails.deliveryId'), value: delivery.id },
-                    { label: t('deliveryDetails.eventId'), value: delivery.eventId },
-                    { label: t('deliveryDetails.endpointId'), value: delivery.endpointId },
-                  ].map(({ label, value }) => (
+                    { label: t('deliveryDetails.deliveryId'), value: delivery.id, link: null },
+                    { label: t('deliveryDetails.eventId'), value: delivery.eventId, link: projectId ? `/admin/projects/${projectId}/events?eventId=${delivery.eventId}` : null },
+                    { label: t('deliveryDetails.endpointId'), value: delivery.endpointId, link: projectId ? `/admin/projects/${projectId}/endpoints` : null },
+                    ...(delivery.subscriptionId ? [{ label: t('deliveryDetails.subscriptionId'), value: delivery.subscriptionId, link: projectId ? `/admin/projects/${projectId}/subscriptions` : null }] : []),
+                  ].map(({ label, value, link }) => (
                     <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
                       <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
                       <div className="flex items-center gap-1.5 min-w-0">
                         <code className="text-xs font-mono truncate" title={value}>{value}</code>
+                        {link && (
+                          <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')}>
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -388,6 +397,49 @@ export default function DeliveryDetailsSheet({
 
               {getDiagnosisPanel()}
 
+              {/* Latency Sparkline — only when ≥2 attempts with duration data */}
+              {attempts.filter(a => a.durationMs != null).length >= 2 && (() => {
+                const durations = attempts.filter(a => a.durationMs != null).map(a => a.durationMs!);
+                const maxDur = Math.max(...durations);
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Timer className="h-3.5 w-3.5" />
+                        {t('deliveryDetails.latencyTrend')}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-end gap-1.5 h-12">
+                        {attempts.map((attempt, i) => {
+                          if (attempt.durationMs == null) return null;
+                          const pct = maxDur > 0 ? (attempt.durationMs / maxDur) * 100 : 0;
+                          const isSuccess = attempt.httpStatusCode && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
+                          const prev = i > 0 ? attempts[i - 1] : null;
+                          const prevDur = prev?.durationMs;
+                          return (
+                            <div key={attempt.id} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
+                              <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                {prevDur != null && attempt.durationMs > prevDur && <TrendingUp className="h-2.5 w-2.5 text-red-500" />}
+                                {prevDur != null && attempt.durationMs < prevDur && <TrendingDown className="h-2.5 w-2.5 text-green-500" />}
+                                {prevDur != null && attempt.durationMs === prevDur && <Minus className="h-2.5 w-2.5" />}
+                                <span>{attempt.durationMs}ms</span>
+                              </div>
+                              <div
+                                className={`w-full rounded-t transition-all ${isSuccess ? 'bg-green-500' : 'bg-red-400'}`}
+                                style={{ height: `${Math.max(4, pct)}%` }}
+                                title={`#${attempt.attemptNumber}: ${attempt.durationMs}ms — ${attempt.httpStatusCode || 'no response'}`}
+                              />
+                              <span className="text-[9px] text-muted-foreground">#{attempt.attemptNumber}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">{t('deliveryDetails.deliveryAttempts')}</CardTitle>
@@ -402,108 +454,135 @@ export default function DeliveryDetailsSheet({
                       {t('deliveryDetails.noAttempts')}
                     </p>
                   ) : (
-                    <div className="space-y-4">
-                      {attempts.map((attempt) => (
-                        <div
-                          key={attempt.id}
-                          className="border rounded-lg p-4 space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-sm">
-                              {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDateTime(attempt.createdAt)}
-                            </span>
-                          </div>
+                    <div className="relative">
+                      {attempts.map((attempt, i) => {
+                        const isSuccess = attempt.httpStatusCode && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
+                        const isFail = attempt.errorMessage || (attempt.httpStatusCode && attempt.httpStatusCode >= 400);
+                        const prev = i > 0 ? attempts[i - 1] : null;
+                        const timeGap = prev ? Math.round((new Date(attempt.createdAt).getTime() - new Date(prev.createdAt).getTime()) / 1000) : null;
 
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {attempt.httpStatusCode && (
-                              <div>
-                                <span className="text-muted-foreground">{t('deliveryDetails.statusLabel')}</span>
-                                <span className={`ml-2 font-medium ${
-                                  attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300
-                                    ? 'text-green-600'
-                                    : 'text-red-600'
-                                }`}>
-                                  {attempt.httpStatusCode}
+                        return (
+                          <div key={attempt.id} className="relative">
+                            {/* Time gap indicator */}
+                            {timeGap !== null && timeGap > 0 && (
+                              <div className="flex items-center gap-2 py-1.5 pl-[18px]">
+                                <div className="w-px h-4 bg-border" />
+                                <span className="text-[10px] text-muted-foreground/60 italic">
+                                  {timeGap >= 3600 ? `${Math.round(timeGap / 3600)}h` : timeGap >= 60 ? `${Math.round(timeGap / 60)}m` : `${timeGap}s`} {t('deliveryDetails.later')}
                                 </span>
                               </div>
                             )}
-                            {attempt.durationMs !== null && attempt.durationMs !== undefined && (
-                              <div>
-                                <span className="text-muted-foreground">{t('deliveryDetails.duration')}</span>
-                                <span className="ml-2 font-medium">{attempt.durationMs}ms</span>
+
+                            {/* Timeline row */}
+                            <div className="flex gap-3">
+                              {/* Timeline dot + line */}
+                              <div className="flex flex-col items-center pt-1">
+                                <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                  isSuccess
+                                    ? 'border-green-500 bg-green-100 dark:bg-green-900/40'
+                                    : isFail
+                                      ? 'border-red-500 bg-red-100 dark:bg-red-900/40'
+                                      : 'border-muted-foreground bg-muted'
+                                }`}>
+                                  {isSuccess && <CheckCircle2 className="h-2.5 w-2.5 text-green-600" />}
+                                  {isFail && <XCircle className="h-2.5 w-2.5 text-red-600" />}
+                                  {!isSuccess && !isFail && <Clock className="h-2.5 w-2.5 text-muted-foreground" />}
+                                </div>
+                                {i < attempts.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
                               </div>
-                            )}
-                          </div>
 
-                          {attempt.requestHeaders && (
-                            <details className="mt-2">
-                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                {t('deliveryDetails.requestHeaders')}
-                              </summary>
-                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
-                                {JSON.stringify(JSON.parse(attempt.requestHeaders), null, 2)}
-                              </pre>
-                            </details>
-                          )}
+                              {/* Attempt content */}
+                              <div className="flex-1 pb-4 min-w-0">
+                                <div className="border rounded-lg p-4 space-y-2">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-sm">
+                                        {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
+                                      </span>
+                                      {attempt.httpStatusCode && (
+                                        <Badge variant={isSuccess ? 'success' : 'destructive'} className="text-[10px] px-1.5 py-0">
+                                          {attempt.httpStatusCode}
+                                        </Badge>
+                                      )}
+                                      {attempt.durationMs != null && (
+                                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                          <Timer className="h-3 w-3" />
+                                          {attempt.durationMs}ms
+                                          {prev?.durationMs != null && (
+                                            attempt.durationMs > prev.durationMs
+                                              ? <TrendingUp className="h-3 w-3 text-red-500 ml-0.5" />
+                                              : attempt.durationMs < prev.durationMs
+                                                ? <TrendingDown className="h-3 w-3 text-green-500 ml-0.5" />
+                                                : null
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDateTime(attempt.createdAt)}
+                                    </span>
+                                  </div>
 
-                          {attempt.requestBody && (
-                            <details className="mt-2">
-                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                {t('deliveryDetails.requestBody')}
-                              </summary>
-                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
-                                {(() => {
-                                  try {
-                                    return JSON.stringify(JSON.parse(attempt.requestBody), null, 2);
-                                  } catch {
-                                    return attempt.requestBody;
-                                  }
-                                })()}
-                              </pre>
-                            </details>
-                          )}
+                                  {attempt.errorMessage && (
+                                    <div className="mt-1">
+                                      <p className="text-xs text-red-600 dark:text-red-400 font-mono bg-red-50 dark:bg-red-950/30 p-2 rounded">
+                                        {attempt.errorMessage}
+                                      </p>
+                                    </div>
+                                  )}
 
-                          {attempt.responseHeaders && (
-                            <details className="mt-2">
-                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                {t('deliveryDetails.responseHeaders')}
-                              </summary>
-                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
-                                {JSON.stringify(JSON.parse(attempt.responseHeaders), null, 2)}
-                              </pre>
-                            </details>
-                          )}
+                                  {/* Collapsible request/response details */}
+                                  <div className="space-y-1 mt-2">
+                                    {attempt.requestHeaders && (
+                                      <details>
+                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                                          {t('deliveryDetails.requestHeaders')}
+                                        </summary>
+                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
+                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.requestHeaders), null, 2); } catch { return attempt.requestHeaders; } })()}
+                                        </pre>
+                                      </details>
+                                    )}
 
-                          {attempt.errorMessage && (
-                            <div className="mt-2">
-                              <span className="text-sm text-muted-foreground">{t('deliveryDetails.error')}</span>
-                              <p className="text-sm text-red-600 mt-1 font-mono bg-red-50 p-2 rounded">
-                                {attempt.errorMessage}
-                              </p>
+                                    {attempt.requestBody && (
+                                      <details>
+                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                                          {t('deliveryDetails.requestBody')}
+                                        </summary>
+                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
+                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.requestBody), null, 2); } catch { return attempt.requestBody; } })()}
+                                        </pre>
+                                      </details>
+                                    )}
+
+                                    {attempt.responseHeaders && (
+                                      <details>
+                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                                          {t('deliveryDetails.responseHeaders')}
+                                        </summary>
+                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-32">
+                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.responseHeaders), null, 2); } catch { return attempt.responseHeaders; } })()}
+                                        </pre>
+                                      </details>
+                                    )}
+
+                                    {attempt.responseBody && (
+                                      <details>
+                                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                                          {t('deliveryDetails.responseBody')}
+                                        </summary>
+                                        <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
+                                          {(() => { try { return JSON.stringify(JSON.parse(attempt.responseBody), null, 2); } catch { return attempt.responseBody; } })()}
+                                        </pre>
+                                      </details>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          )}
-
-                          {attempt.responseBody && (
-                            <details className="mt-2">
-                              <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground">
-                                {t('deliveryDetails.responseBody')}
-                              </summary>
-                              <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-x-auto max-h-48">
-                                {(() => {
-                                  try {
-                                    return JSON.stringify(JSON.parse(attempt.responseBody), null, 2);
-                                  } catch {
-                                    return attempt.responseBody;
-                                  }
-                                })()}
-                              </pre>
-                            </details>
-                          )}
-                        </div>
-                      ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>

@@ -82,16 +82,16 @@
     "apiKeys": "API Keys",
     "analytics": "Analytics",
     "replay": "Time Machine",
-    "dlq": "Dead Letter Queue",
+    "dlq": "Failed Messages",
     "alerts": "Alerts",
     "usage": "Usage",
     "incidents": "Incidents",
     "transformStudio": "Transform Studio",
     "transformations": "Transformations",
     "testEndpoints": "Test Endpoints",
-    "devWorkspace": "DX Workspace",
-    "incomingSources": "Incoming Sources",
-    "incomingEvents": "Incoming Events",
+    "devWorkspace": "Dev Console",
+    "incomingSources": "Sources",
+    "incomingEvents": "Received",
     "members": "Members",
     "auditLog": "Audit Log",
     "settings": "Settings",
@@ -99,6 +99,9 @@
     "incoming": "Incoming",
     "tools": "Tools",
     "operations": "Operations",
+    "pipeline": "Pipeline",
+    "observability": "Observability",
+    "recovery": "Recovery",
     "security": "Security",
     "devTools": "Developer Tools",
     "selectProject": "Select project",
@@ -264,7 +267,7 @@
       "successRate": "{{rate}}% success rate",
       "failed": "Failed",
       "failedDesc": "Retriable failures",
-      "dlq": "Dead Letter Queue",
+      "dlq": "Failed Messages",
       "dlqDesc": "Max retries exceeded",
       "pending": "Pending",
       "pendingDesc": "In progress"
@@ -289,9 +292,9 @@
       "endpoints": "Endpoints",
       "events": "Events",
       "deliveries": "Deliveries",
-      "dlq": "Dead Letter Queue",
-      "incomingSources": "Incoming Sources",
-      "incomingEvents": "Incoming Events"
+      "dlq": "Failed Messages",
+      "incomingSources": "Sources",
+      "incomingEvents": "Received"
     }
   },
   "endpoints": {
@@ -772,7 +775,7 @@
     }
   },
   "dlq": {
-    "title": "Dead Letter Queue",
+    "title": "Failed Messages",
     "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
     "projectNotFound": "Project not found",
     "noItems": "No items in DLQ",
@@ -796,7 +799,7 @@
     "unknownError": "Unknown error",
     "purgeDialog": {
       "title": "Purge All DLQ Items?",
-      "description": "This will permanently delete all {{count}} items from the Dead Letter Queue. This action cannot be undone.",
+      "description": "This will permanently delete all {{count}} failed messages. This action cannot be undone.",
       "impactItems": "{{count}} failed deliveries will be permanently deleted",
       "impactIrreversible": "These items cannot be recovered or retried after purging"
     },
@@ -1871,6 +1874,10 @@
     "status": "Status",
     "eventId": "Event ID",
     "endpointId": "Endpoint ID",
+    "subscriptionId": "Subscription ID",
+    "goTo": "Navigate to resource",
+    "latencyTrend": "Latency Trend",
+    "later": "later",
     "created": "Created",
     "attempts": "Attempts",
     "nextRetry": "Next Retry",
@@ -1989,10 +1996,10 @@
     "api-keys": "API Keys",
     "analytics": "Analytics",
     "replay": "Time Machine",
-    "dlq": "Dead Letter Queue",
+    "dlq": "Failed Messages",
     "test-endpoints": "Test Endpoints",
-    "incoming-sources": "Incoming Sources",
-    "incoming-events": "Incoming Events",
+    "incoming-sources": "Sources",
+    "incoming-events": "Received",
     "members": "Members",
     "audit-log": "Audit Log",
     "settings": "Settings",
@@ -2201,7 +2208,8 @@
     "goThere": "Go there",
     "welcome": {
       "title": "Welcome to Hookflow! 🎉",
-      "description": "We'll walk you through the key steps to set up your webhook infrastructure in just a few minutes."
+      "description": "We'll walk you through the key steps to set up your webhook infrastructure in just a few minutes.",
+      "timeEstimate": "~5 minutes to first delivery"
     },
     "project": {
       "title": "Create a Project",
@@ -2226,7 +2234,9 @@
     "send": {
       "title": "Send Your First Event",
       "description": "Use the API or the UI to send a test event. It will be matched against subscriptions and delivered to the right endpoints.",
-      "tip": "Check the Deliveries page to see real-time status, attempts, and response details."
+      "tip": "Check the Deliveries page to see real-time status, attempts, and response details.",
+      "curlLabel": "Quick test with curl:",
+      "curlCopied": "Curl command copied!"
     },
     "done": {
       "title": "You're All Set!",

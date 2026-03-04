@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, ArrowRight, ArrowLeft, X, FolderKanban,
-  Webhook, Bell, Key, Send, CheckCircle2, Rocket
+  Webhook, Bell, Key, Send, CheckCircle2, Rocket, Clock, Copy, Check
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
+import { showSuccess } from '../lib/toast';
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,38 @@ const STEPS: WizardStep[] = [
   { key: 'send', icon: Send, iconColor: 'text-rose-600', iconBg: 'bg-rose-100 dark:bg-rose-900/30' },
   { key: 'done', icon: Rocket, iconColor: 'text-success', iconBg: 'bg-success/10' },
 ];
+
+function CurlSnippet({ t }: { t: (key: string) => string }) {
+  const [copied, setCopied] = useState(false);
+  const curlCmd = `curl -X POST http://localhost:8080/api/v1/events \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: YOUR_API_KEY" \\
+  -d '{
+    "type": "order.completed",
+    "payload": { "orderId": "12345", "amount": 99.99 }
+  }'`;
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(curlCmd);
+    setCopied(true);
+    showSuccess(t('wizard.send.curlCopied'));
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{t('wizard.send.curlLabel')}</span>
+        <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors">
+          {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      <pre className="text-[11px] font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+        {curlCmd}
+      </pre>
+    </div>
+  );
+}
 
 export default function OnboardingWizard({ open, onClose, projectId }: OnboardingWizardProps) {
   const { t } = useTranslation();
@@ -115,6 +148,12 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
           <DialogDescription className="text-sm mt-2 max-w-sm mx-auto">
             {t(`wizard.${step.key}.description`)}
           </DialogDescription>
+          {step.key === 'welcome' && (
+            <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+              <Clock className="h-3.5 w-3.5" />
+              {t('wizard.welcome.timeEstimate')}
+            </div>
+          )}
         </DialogHeader>
 
         {/* Step indicator dots */}
@@ -141,6 +180,11 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
               {t(`wizard.${step.key}.tip`)}
             </p>
           </div>
+        )}
+
+        {/* Curl snippet on send step */}
+        {step.key === 'send' && (
+          <CurlSnippet t={t} />
         )}
 
         {step.key === 'done' && (

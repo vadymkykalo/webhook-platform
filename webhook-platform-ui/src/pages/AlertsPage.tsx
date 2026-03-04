@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Bell, Plus, Trash2, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Info, Check, VolumeX, Clock, Mail, Webhook, BellOff } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { Bell, Plus, Trash2, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Info, Check, VolumeX, Clock, Mail, Webhook, BellOff, ChevronDown, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import {
@@ -59,6 +59,8 @@ export default function AlertsPage() {
   const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
   const [eventsPage, setEventsPage] = useState(0);
   const [eventsPageSize, setEventsPageSize] = useState(20);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [snoozeDropdownId, setSnoozeDropdownId] = useState<string | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -248,48 +250,95 @@ export default function AlertsPage() {
                 <TableBody>
                   {events.map((event) => {
                     const SevIcon = SEVERITY_ICONS[event.severity] || Info;
+                    const isExpanded = expandedEventId === event.id;
+                    const rule = rules.find(r => r.id === event.alertRuleId);
+                    const investigateUrl = projectId
+                      ? `/admin/projects/${projectId}/deliveries?status=FAILED${rule?.endpointId ? `&endpointId=${rule.endpointId}` : ''}`
+                      : null;
                     return (
-                      <TableRow key={event.id} className={event.resolved ? 'opacity-60' : ''}>
-                        <TableCell>
-                          <SevIcon className={`h-4 w-4 ${event.severity === 'CRITICAL' ? 'text-red-500' : event.severity === 'WARNING' ? 'text-yellow-500' : 'text-blue-500'}`} />
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="text-sm font-medium">{event.title}</p>
-                            {event.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{event.message}</p>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${SEVERITY_COLORS[event.severity] || ''}`}>
-                            {event.severity}
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {event.currentValue != null && event.thresholdValue != null
-                            ? `${event.currentValue.toFixed(1)} / ${event.thresholdValue.toFixed(1)}`
-                            : '—'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="text-sm">{formatRelativeTime(event.createdAt)}</span>
-                            <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {event.resolved ? (
-                            <Badge variant="outline" className="text-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />{t('alerts.resolved', 'Resolved')}</Badge>
-                          ) : (
-                            <Badge variant="destructive">{t('alerts.active', 'Active')}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {!event.resolved && canManageEndpoints && (
-                            <Button variant="ghost" size="icon-sm" onClick={() => handleResolve(event.id)} title={t('alerts.resolve', 'Resolve')}>
-                              <Check className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow
+                          key={event.id}
+                          className={`cursor-pointer ${event.resolved ? 'opacity-60' : ''} ${isExpanded ? 'bg-muted/30' : ''}`}
+                          onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
+                        >
+                          <TableCell>
+                            <SevIcon className={`h-4 w-4 ${event.severity === 'CRITICAL' ? 'text-red-500' : event.severity === 'WARNING' ? 'text-yellow-500' : 'text-blue-500'}`} />
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="text-sm font-medium">{event.title}</p>
+                              {event.message && !isExpanded && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{event.message}</p>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${SEVERITY_COLORS[event.severity] || ''}`}>
+                              {event.severity}
+                            </span>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {event.currentValue != null && event.thresholdValue != null
+                              ? `${event.currentValue.toFixed(1)} / ${event.thresholdValue.toFixed(1)}`
+                              : '—'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm">{formatRelativeTime(event.createdAt)}</span>
+                              <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {event.resolved ? (
+                              <Badge variant="outline" className="text-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />{t('alerts.resolved', 'Resolved')}</Badge>
+                            ) : (
+                              <Badge variant="destructive">{t('alerts.active', 'Active')}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow key={`${event.id}-detail`} className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={7} className="py-3">
+                              <div className="space-y-3 pl-8">
+                                {event.message && (
+                                  <p className="text-sm text-muted-foreground">{event.message}</p>
+                                )}
+                                {rule && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{t('alerts.triggeredBy', 'Triggered by rule:')}</span>
+                                    <Badge variant="secondary" className="text-[11px]">{rule.name}</Badge>
+                                    <span>({rule.alertType.replace(/_/g, ' ')})</span>
+                                    {rule.endpointId && <span className="font-mono">endpoint: {rule.endpointId.slice(0, 8)}…</span>}
+                                  </div>
+                                )}
+                                {event.resolvedAt && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {t('alerts.resolvedAt', 'Resolved')}: {formatDateTime(event.resolvedAt)}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  {investigateUrl && (
+                                    <Link to={investigateUrl}>
+                                      <Button variant="outline" size="sm">
+                                        <Search className="h-3.5 w-3.5 mr-1.5" />
+                                        {t('alerts.investigate', 'Investigate Deliveries')}
+                                      </Button>
+                                    </Link>
+                                  )}
+                                  {!event.resolved && canManageEndpoints && (
+                                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleResolve(event.id); }}>
+                                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                                      {t('alerts.resolve', 'Resolve')}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     );
                   })}
                 </TableBody>
@@ -355,9 +404,24 @@ export default function AlertsPage() {
                         <Button variant="ghost" size="icon-sm" onClick={() => handleMuteRule(rule.id, !rule.muted)} title={rule.muted ? 'Unmute' : 'Mute'}>
                           <VolumeX className={`h-3.5 w-3.5 ${rule.muted ? 'text-muted-foreground' : ''}`} />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleSnoozeRule(rule.id, 1)} title="Snooze 1h">
-                          <Clock className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="relative">
+                          <Button variant="ghost" size="icon-sm" onClick={() => setSnoozeDropdownId(snoozeDropdownId === rule.id ? null : rule.id)} title={t('alerts.snooze', 'Snooze')}>
+                            <Clock className="h-3.5 w-3.5" />
+                          </Button>
+                          {snoozeDropdownId === rule.id && (
+                            <div className="absolute right-0 top-full mt-1 z-10 bg-popover border rounded-md shadow-md py-1 min-w-[120px]">
+                              {[1, 4, 8, 24].map((h) => (
+                                <button
+                                  key={h}
+                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors"
+                                  onClick={() => { handleSnoozeRule(rule.id, h); setSnoozeDropdownId(null); }}
+                                >
+                                  {t('alerts.snoozeFor', { hours: h, defaultValue: 'Snooze {{hours}}h' })}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <Button variant="ghost" size="icon-sm" className="text-destructive" onClick={() => setDeleteRuleId(rule.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
