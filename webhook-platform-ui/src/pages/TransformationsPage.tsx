@@ -44,6 +44,13 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import type { TransformationResponse, TransformationRequest } from '../types/api.types';
 
+const sampleInput = {
+  id: "evt_abc123",
+  type: "order.created",
+  data: { orderId: "ord_456", amount: 99.99, currency: "USD" },
+  createdAt: "2026-03-04T11:00:00Z"
+};
+
 export default function TransformationsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -72,13 +79,6 @@ export default function TransformationsPage() {
   const templateHasContent = formTemplate.trim().length > 0;
   const templateIsJson = templateHasContent && isValidJson(formTemplate);
   const exprCount = countExpressions(formTemplate);
-
-  const sampleInput = {
-    id: "evt_abc123",
-    type: "order.created",
-    data: { orderId: "ord_456", amount: 99.99, currency: "USD" },
-    createdAt: "2026-03-04T11:00:00Z"
-  };
 
   const livePreview = useMemo(() => {
     if (!templateHasContent || !templateIsJson) return null;

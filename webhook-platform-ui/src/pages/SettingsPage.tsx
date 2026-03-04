@@ -45,7 +45,7 @@ function getNotifPrefs(): NotificationPrefs {
   try {
     const stored = localStorage.getItem(NOTIF_STORAGE_KEY);
     if (stored) return JSON.parse(stored);
-  } catch {}
+  } catch { /* ignore parse errors */ }
   return { inApp: true, email: true, browser: false };
 }
 
