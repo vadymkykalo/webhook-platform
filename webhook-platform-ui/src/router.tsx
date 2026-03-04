@@ -43,6 +43,7 @@ const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const TransformationsPage = lazy(() => import('./pages/TransformationsPage'));
 const TransformStudioPage = lazy(() => import('./pages/TransformStudioPage'));
 const ConnectionSetupPage = lazy(() => import('./pages/ConnectionSetupPage'));
+const TestConsolePage = lazy(() => import('./pages/TestConsolePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -211,6 +212,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/connection-setup',
         element: <S><ConnectionSetupPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/test-console',
+        element: <S><TestConsolePage /></S>,
       },
       {
         path: 'members',
