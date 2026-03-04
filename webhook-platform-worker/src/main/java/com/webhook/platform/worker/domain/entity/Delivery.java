@@ -61,6 +61,9 @@ public class Delivery {
     @Column(name = "idempotency_key")
     private String idempotencyKey;
 
+    @Column(name = "transformation_id")
+    private UUID transformationId;
+
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 

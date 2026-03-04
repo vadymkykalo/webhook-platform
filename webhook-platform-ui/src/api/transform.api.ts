@@ -4,6 +4,8 @@ export interface TransformPreviewRequest {
   inputPayload: string;
   transformExpression?: string;
   customHeaders?: string;
+  template?: string;
+  transformationId?: string;
 }
 
 export interface TransformPreviewResponse {

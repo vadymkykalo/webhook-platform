@@ -57,6 +57,7 @@ public class WebhookDeliveryService {
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final TransformationCacheService transformationCacheService;
 
     private final Counter deliverySuccessCounter;
     private final Counter deliveryFailureCounter;
@@ -88,7 +89,8 @@ public class WebhookDeliveryService {
             OrderingBufferService orderingBufferService,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             PayloadTransformService payloadTransformService,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            TransformationCacheService transformationCacheService) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -112,6 +114,7 @@ public class WebhookDeliveryService {
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
         this.transactionTemplate = transactionTemplate;
+        this.transformationCacheService = transformationCacheService;
 
         this.deliverySuccessCounter = Counter.builder("webhook_delivery_attempts_total")
                 .tag("result", "success").tag("status_class", "2xx")
@@ -264,7 +267,8 @@ public class WebhookDeliveryService {
 
         String secret = decryptSecret(endpoint);
         String originalPayload = event.getPayload();
-        String body = payloadTransformService.transform(originalPayload, delivery.getPayloadTemplate());
+        String template = resolveTransformTemplate(delivery);
+        String body = payloadTransformService.transform(originalPayload, template);
         long timestamp = System.currentTimeMillis();
 
         String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
@@ -674,6 +678,18 @@ public class WebhookDeliveryService {
         } catch (Exception e) {
             log.warn("Failed to parse custom headers: {}", e.getMessage());
         }
+    }
+
+    private String resolveTransformTemplate(Delivery delivery) {
+        if (delivery.getTransformationId() != null) {
+            String template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
+            if (template != null) {
+                return template;
+            }
+            log.warn("Transformation {} not found or disabled for delivery {}, falling back to inline payloadTemplate",
+                    delivery.getTransformationId(), delivery.getId());
+        }
+        return delivery.getPayloadTemplate();
     }
 
     private int clampTimeout(Integer timeoutSeconds) {

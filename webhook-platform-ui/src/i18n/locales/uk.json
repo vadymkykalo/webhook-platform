@@ -87,6 +87,7 @@
     "usage": "Використання",
     "incidents": "Інциденти",
     "transformStudio": "Студія трансформацій",
+    "transformations": "Трансформації",
     "testEndpoints": "Тестові ендпоінти",
     "devWorkspace": "DX Простір",
     "incomingSources": "Вхідні джерела",
@@ -329,7 +330,7 @@
       "url": "URL ендпоінта",
       "urlPlaceholder": "https://example.com/webhooks",
       "urlHint": "URL, на який надсилатимуться webhook події",
-      "description": "Опис (необов'язково)",
+      "descriptionLabel": "Опис (необов'язково)",
       "descPlaceholder": "Продакшн webhook ендпоінт",
       "rateLimit": "Ліміт запитів (необов'язково)",
       "rateLimitPlaceholder": "Запитів на секунду",
@@ -1745,6 +1746,10 @@
       "payloadTransform": "Трансформація даних (JSONPath)",
       "payloadTransformPlaceholder": "$.data",
       "payloadTransformHint": "Необов'язковий JSONPath вираз для трансформації даних перед пересиланням",
+      "transformation": "Трансформація",
+      "noTransformation": "Немає (використати вбудований вираз нижче)",
+      "transformationHint": "Оберіть збережену трансформацію або використайте вбудоване поле JSONPath нижче.",
+      "transformationOverrides": "Збережена трансформація має пріоритет над вбудованим полем JSONPath нижче.",
       "retryPolicy": "Політика повторів"
     },
     "validation": {
@@ -1997,6 +2002,7 @@
     "alerts": "Алерти",
     "usage": "Використання",
     "incidents": "Інциденти",
+    "transformations": "Трансформації",
     "transform-studio": "Студія трансформацій"
   },
   "piiRules": {
@@ -2423,6 +2429,54 @@
       "success": "Успішні",
       "failed": "Невдалі",
       "dlq": "DLQ"
+    }
+  },
+  "transformations": {
+    "title": "Трансформації",
+    "subtitle": "Повторно використовувані шаблони трансформації payload для нормалізації та перетворення даних вебхуків.",
+    "projectNotFound": "Проєкт не знайдено",
+    "create": "Нова трансформація",
+    "createFirst": "Створіть першу трансформацію",
+    "createTitle": "Створити трансформацію",
+    "createDesc": "Визначте повторно використовуваний JSON-шаблон з виразами ${$.jsonpath} для перетворення payload.",
+    "editTitle": "Редагувати трансформацію",
+    "editDesc": "Оновіть шаблон трансформації. Зміна шаблону автоматично збільшує версію.",
+    "empty": "Трансформацій ще немає",
+    "emptyDesc": "Створіть повторно використовувані трансформації для нормалізації payload між підписками та вхідними призначеннями.",
+    "noMatching": "Трансформацій не знайдено",
+    "noMatchingDesc": "Спробуйте змінити фільтр пошуку.",
+    "search": "Пошук",
+    "searchPlaceholder": "Фільтр за назвою або описом…",
+    "name": "Назва",
+    "namePlaceholder": "напр. Stripe v2 → CRM v1",
+    "description": "Опис",
+    "descriptionPlaceholder": "Що робить ця трансформація?",
+    "template": "Шаблон",
+    "templateHint": "JSON-шаблон з виразами ${$.jsonpath}. Приклад: {\"event\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}",
+    "version": "Версія",
+    "status": "Статус",
+    "updated": "Оновлено",
+    "duplicate": "Дублювати",
+    "toast": {
+      "created": "Трансформацію створено",
+      "updated": "Трансформацію оновлено",
+      "deleted": "Трансформацію видалено",
+      "createFailed": "Не вдалося створити трансформацію",
+      "updateFailed": "Не вдалося оновити трансформацію",
+      "deleteFailed": "Не вдалося видалити трансформацію"
+    },
+    "deleteDialog": {
+      "title": "Видалити трансформацію",
+      "description": "Це видалить трансформацію. Підписки та призначення, що посилаються на неї, втратять зв'язок з трансформацією. Цю дію неможливо скасувати."
+    },
+    "format": "Форматувати",
+    "validation": {
+      "nameRequired": "Назва обов'язкова",
+      "templateRequired": "Шаблон обов'язковий",
+      "invalidJson": "Невалідний JSON формат",
+      "validJson": "Валідний JSON",
+      "expression": "вираз",
+      "expressions": "виразів"
     }
   }
 }

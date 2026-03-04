@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
@@ -42,6 +43,8 @@ class IncomingDestinationServiceTest {
     private IncomingSourceRepository sourceRepository;
     @Mock
     private ProjectRepository projectRepository;
+    @Mock
+    private TransformationRepository transformationRepository;
 
     private IncomingDestinationService service;
 
@@ -57,6 +60,7 @@ class IncomingDestinationServiceTest {
     void setUp() {
         service = new IncomingDestinationService(
                 destinationRepository, sourceRepository, projectRepository,
+                transformationRepository,
                 "test_encryption_key_32_chars_pad", "test_salt",
                 true, List.of()
         );

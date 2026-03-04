@@ -5,10 +5,12 @@ import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
@@ -32,6 +34,7 @@ public class IncomingDestinationService {
     private final IncomingDestinationRepository destinationRepository;
     private final IncomingSourceRepository sourceRepository;
     private final ProjectRepository projectRepository;
+    private final TransformationRepository transformationRepository;
     private final String encryptionKey;
     private final String encryptionSalt;
     private final boolean allowPrivateIps;
@@ -41,6 +44,7 @@ public class IncomingDestinationService {
             IncomingDestinationRepository destinationRepository,
             IncomingSourceRepository sourceRepository,
             ProjectRepository projectRepository,
+            TransformationRepository transformationRepository,
             @Value("${webhook.encryption-key}") String encryptionKey,
             @Value("${webhook.encryption-salt}") String encryptionSalt,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
@@ -48,6 +52,7 @@ public class IncomingDestinationService {
         this.destinationRepository = destinationRepository;
         this.sourceRepository = sourceRepository;
         this.projectRepository = projectRepository;
+        this.transformationRepository = transformationRepository;
         this.encryptionKey = encryptionKey;
         this.encryptionSalt = encryptionSalt;
         this.allowPrivateIps = allowPrivateIps;
@@ -80,6 +85,7 @@ public class IncomingDestinationService {
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600")
                 .payloadTransform(request.getPayloadTransform())
+                .transformationId(request.getTransformationId())
                 .build();
 
         // Encrypt auth config if provided
@@ -146,6 +152,9 @@ public class IncomingDestinationService {
         if (request.getPayloadTransform() != null) {
             destination.setPayloadTransform(request.getPayloadTransform().isBlank() ? null : request.getPayloadTransform());
         }
+        if (request.getTransformationId() != null) {
+            destination.setTransformationId(request.getTransformationId());
+        }
 
         destination = destinationRepository.saveAndFlush(destination);
         log.info("Updated incoming destination: id={}", id);
@@ -163,6 +172,12 @@ public class IncomingDestinationService {
     }
 
     private IncomingDestinationResponse mapToResponse(IncomingDestination destination) {
+        String transformationName = null;
+        if (destination.getTransformationId() != null) {
+            transformationName = transformationRepository.findById(destination.getTransformationId())
+                    .map(Transformation::getName)
+                    .orElse(null);
+        }
         return IncomingDestinationResponse.builder()
                 .id(destination.getId())
                 .incomingSourceId(destination.getIncomingSourceId())
@@ -175,6 +190,8 @@ public class IncomingDestinationService {
                 .timeoutSeconds(destination.getTimeoutSeconds())
                 .retryDelays(destination.getRetryDelays())
                 .payloadTransform(destination.getPayloadTransform())
+                .transformationId(destination.getTransformationId())
+                .transformationName(transformationName)
                 .createdAt(destination.getCreatedAt())
                 .updatedAt(destination.getUpdatedAt())
                 .build();

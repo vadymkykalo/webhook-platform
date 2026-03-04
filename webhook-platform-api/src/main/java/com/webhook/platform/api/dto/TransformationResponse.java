@@ -12,20 +12,14 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SubscriptionResponse {
+public class TransformationResponse {
     private UUID id;
     private UUID projectId;
-    private UUID endpointId;
-    private String eventType;
+    private String name;
+    private String description;
+    private String template;
+    private Integer version;
     private Boolean enabled;
-    private Boolean orderingEnabled;
-    private Integer maxAttempts;
-    private Integer timeoutSeconds;
-    private String retryDelays;
-    private String payloadTemplate;
-    private String customHeaders;
-    private UUID transformationId;
-    private String transformationName;
     private Instant createdAt;
     private Instant updatedAt;
 }

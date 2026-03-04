@@ -17,6 +17,7 @@ import type {
   IncomingAuthType, PageResponse,
 } from '../types/api.types';
 import { transformApi } from '../api/transform.api';
+import { useTransformations } from '../api/queries';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -65,6 +66,7 @@ export default function IncomingSourceDetailPage() {
   const { projectId, sourceId } = useParams<{ projectId: string; sourceId: string }>();
   const navigate = useNavigate();
   const { canManageIncomingSources } = usePermissions();
+  const { data: transformationsList } = useTransformations(projectId!);
 
   const [source, setSource] = useState<IncomingSourceResponse | null>(null);
   const [destinations, setDestinations] = useState<IncomingDestinationResponse[]>([]);
@@ -84,6 +86,7 @@ export default function IncomingSourceDetailPage() {
   const [destTimeout, setDestTimeout] = useState('30');
   const [destRetryDelays, setDestRetryDelays] = useState('60,300,900,3600');
   const [destPayloadTransform, setDestPayloadTransform] = useState('');
+  const [destTransformationId, setDestTransformationId] = useState('');
   const [destSaving, setDestSaving] = useState(false);
 
   // Validation & transform preview state
@@ -145,6 +148,7 @@ export default function IncomingSourceDetailPage() {
     setDestTimeout('30');
     setDestRetryDelays('60,300,900,3600');
     setDestPayloadTransform('');
+    setDestTransformationId('');
     resetValidation();
     setShowDestDialog(true);
   };
@@ -160,6 +164,7 @@ export default function IncomingSourceDetailPage() {
     setDestTimeout(d.timeoutSeconds.toString());
     setDestRetryDelays(d.retryDelays || '');
     setDestPayloadTransform(d.payloadTransform || '');
+    setDestTransformationId(d.transformationId || '');
     resetValidation();
     setShowDestDialog(true);
   };
@@ -225,6 +230,7 @@ export default function IncomingSourceDetailPage() {
       timeoutSeconds: parseInt(destTimeout) || 30,
       retryDelays: destRetryDelays || undefined,
       payloadTransform: destPayloadTransform || undefined,
+      transformationId: destTransformationId || null,
     };
 
     setDestSaving(true);
@@ -549,6 +555,39 @@ export default function IncomingSourceDetailPage() {
                     <Input id="dest-retry" placeholder="60,300,900" value={destRetryDelays} onChange={(e) => { setDestRetryDelays(e.target.value); resetValidation(); }} disabled={destSaving} className="h-8 text-xs font-mono" />
                   </div>
                 </div>
+              </div>
+
+              {/* Transformation selector */}
+              <div className="space-y-2">
+                <Label htmlFor="dest-transformation">{t('incomingDestinations.createDialog.transformation')}</Label>
+                <Select
+                  id="dest-transformation"
+                  value={destTransformationId}
+                  onChange={(e) => { setDestTransformationId(e.target.value); resetValidation(); }}
+                  disabled={destSaving}
+                >
+                  <option value="">{t('incomingDestinations.createDialog.noTransformation')}</option>
+                  {(transformationsList ?? []).filter(tr => tr.enabled).map(tr => (
+                    <option key={tr.id} value={tr.id}>{tr.name} (v{tr.version})</option>
+                  ))}
+                </Select>
+                {destTransformationId && (() => {
+                  const selected = (transformationsList ?? []).find(tr => tr.id === destTransformationId);
+                  return selected ? (
+                    <div className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{selected.name}</span>
+                        <span className="text-muted-foreground">v{selected.version}</span>
+                      </div>
+                      {selected.description && <p className="text-muted-foreground">{selected.description}</p>}
+                    </div>
+                  ) : null;
+                })()}
+                <p className="text-xs text-muted-foreground">
+                  {destTransformationId
+                    ? t('incomingDestinations.createDialog.transformationOverrides')
+                    : t('incomingDestinations.createDialog.transformationHint')}
+                </p>
               </div>
 
               {/* Payload Transform — JSON Textarea + Preview */}

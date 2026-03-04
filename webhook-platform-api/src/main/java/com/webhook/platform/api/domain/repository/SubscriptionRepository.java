@@ -13,4 +13,5 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     List<Subscription> findByProjectIdAndEnabledTrue(UUID projectId);
     List<Subscription> findByProjectId(UUID projectId);
     boolean existsByProjectId(UUID projectId);
+    long countByTransformationId(UUID transformationId);
 }

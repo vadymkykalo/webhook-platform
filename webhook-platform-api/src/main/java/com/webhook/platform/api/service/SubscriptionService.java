@@ -5,8 +5,10 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Subscription;
+import com.webhook.platform.api.domain.entity.Transformation;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
+import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
 import org.springframework.stereotype.Service;
@@ -24,14 +26,17 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final ProjectRepository projectRepository;
+    private final TransformationRepository transformationRepository;
     private final ObjectMapper objectMapper;
 
     public SubscriptionService(
             SubscriptionRepository subscriptionRepository,
             ProjectRepository projectRepository,
+            TransformationRepository transformationRepository,
             ObjectMapper objectMapper) {
         this.subscriptionRepository = subscriptionRepository;
         this.projectRepository = projectRepository;
+        this.transformationRepository = transformationRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -59,6 +64,7 @@ public class SubscriptionService {
                 .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600,86400")
                 .payloadTemplate(request.getPayloadTemplate())
                 .customHeaders(request.getCustomHeaders())
+                .transformationId(request.getTransformationId())
                 .build();
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
@@ -114,6 +120,10 @@ public class SubscriptionService {
         if (request.getCustomHeaders() != null) {
             subscription.setCustomHeaders(request.getCustomHeaders());
         }
+        // transformationId: explicit null clears the link, non-null sets it
+        if (request.getTransformationId() != null) {
+            subscription.setTransformationId(request.getTransformationId());
+        }
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
         return mapToResponse(subscription);
@@ -140,6 +150,12 @@ public class SubscriptionService {
     }
 
     private SubscriptionResponse mapToResponse(Subscription subscription) {
+        String transformationName = null;
+        if (subscription.getTransformationId() != null) {
+            transformationName = transformationRepository.findById(subscription.getTransformationId())
+                    .map(Transformation::getName)
+                    .orElse(null);
+        }
         return SubscriptionResponse.builder()
                 .id(subscription.getId())
                 .projectId(subscription.getProjectId())
@@ -152,6 +168,8 @@ public class SubscriptionService {
                 .retryDelays(subscription.getRetryDelays())
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
+                .transformationId(subscription.getTransformationId())
+                .transformationName(transformationName)
                 .createdAt(subscription.getCreatedAt())
                 .updatedAt(subscription.getUpdatedAt())
                 .build();

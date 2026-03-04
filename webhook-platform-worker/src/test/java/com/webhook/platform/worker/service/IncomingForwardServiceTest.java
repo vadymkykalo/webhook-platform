@@ -55,6 +55,10 @@ class IncomingForwardServiceTest {
     @Mock
     private IncomingForwardAttemptRepository attemptRepository;
     @Mock
+    private TransformationCacheService transformationCacheService;
+    @Mock
+    private PayloadTransformService payloadTransformService;
+    @Mock
     private WebClient.Builder webClientBuilder;
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -89,6 +93,7 @@ class IncomingForwardServiceTest {
 
         service = new IncomingForwardService(
                 eventRepository, destinationRepository, attemptRepository,
+                transformationCacheService, payloadTransformService,
                 webClientBuilder, new ObjectMapper(),
                 "test_encryption_key_32_chars_pad", "test_salt",
                 true, List.of(),
@@ -192,6 +197,7 @@ class IncomingForwardServiceTest {
         // Re-create service with allowPrivateIps=false for SSRF to trigger
         IncomingForwardService ssrfService = new IncomingForwardService(
                 eventRepository, destinationRepository, attemptRepository,
+                transformationCacheService, payloadTransformService,
                 webClientBuilder, new ObjectMapper(),
                 "test_encryption_key_32_chars_pad", "test_salt",
                 false, List.of(),

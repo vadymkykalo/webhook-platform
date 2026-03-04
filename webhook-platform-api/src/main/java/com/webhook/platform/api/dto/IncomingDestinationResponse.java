@@ -25,6 +25,8 @@ public class IncomingDestinationResponse {
     private int timeoutSeconds;
     private String retryDelays;
     private String payloadTransform;
+    private UUID transformationId;
+    private String transformationName;
     private Instant createdAt;
     private Instant updatedAt;
 }

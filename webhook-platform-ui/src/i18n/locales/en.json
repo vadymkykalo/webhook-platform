@@ -87,6 +87,7 @@
     "usage": "Usage",
     "incidents": "Incidents",
     "transformStudio": "Transform Studio",
+    "transformations": "Transformations",
     "testEndpoints": "Test Endpoints",
     "devWorkspace": "DX Workspace",
     "incomingSources": "Incoming Sources",
@@ -329,7 +330,7 @@
       "url": "Endpoint URL",
       "urlPlaceholder": "https://example.com/webhooks",
       "urlHint": "The URL where webhook events will be sent",
-      "description": "Description (optional)",
+      "descriptionLabel": "Description (optional)",
       "descPlaceholder": "Production webhook endpoint",
       "rateLimit": "Rate Limit (optional)",
       "rateLimitPlaceholder": "Requests per second",
@@ -1745,6 +1746,10 @@
       "payloadTransform": "Payload Transform (JSONPath)",
       "payloadTransformPlaceholder": "$.data",
       "payloadTransformHint": "Optional JSONPath expression to transform payload before forwarding",
+      "transformation": "Transformation",
+      "noTransformation": "None (use inline transform below)",
+      "transformationHint": "Select a reusable transformation or use the inline JSONPath field below.",
+      "transformationOverrides": "Saved transformation takes priority over the inline JSONPath field below.",
       "retryPolicy": "Retry Policy"
     },
     "validation": {
@@ -1997,6 +2002,7 @@
     "alerts": "Alerts",
     "usage": "Usage",
     "incidents": "Incidents",
+    "transformations": "Transformations",
     "transform-studio": "Transform Studio"
   },
   "piiRules": {
@@ -2423,6 +2429,54 @@
       "success": "Success",
       "failed": "Failed",
       "dlq": "DLQ"
+    }
+  },
+  "transformations": {
+    "title": "Transformations",
+    "subtitle": "Reusable payload transformation templates for normalizing and reshaping webhook data.",
+    "projectNotFound": "Project not found",
+    "create": "New Transformation",
+    "createFirst": "Create your first transformation",
+    "createTitle": "Create Transformation",
+    "createDesc": "Define a reusable JSON template with ${$.jsonpath} expressions to reshape payloads.",
+    "editTitle": "Edit Transformation",
+    "editDesc": "Update the transformation template. Changing the template auto-increments the version.",
+    "empty": "No transformations yet",
+    "emptyDesc": "Create reusable transformations to normalize payloads across subscriptions and incoming destinations.",
+    "noMatching": "No matching transformations",
+    "noMatchingDesc": "Try adjusting your search filter.",
+    "search": "Search",
+    "searchPlaceholder": "Filter by name or description…",
+    "name": "Name",
+    "namePlaceholder": "e.g. Stripe v2 → CRM v1",
+    "description": "Description",
+    "descriptionPlaceholder": "What does this transformation do?",
+    "template": "Template",
+    "templateHint": "JSON template with ${$.jsonpath} expressions. Example: {\"event\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}",
+    "version": "Version",
+    "status": "Status",
+    "updated": "Updated",
+    "duplicate": "Duplicate",
+    "toast": {
+      "created": "Transformation created",
+      "updated": "Transformation updated",
+      "deleted": "Transformation deleted",
+      "createFailed": "Failed to create transformation",
+      "updateFailed": "Failed to update transformation",
+      "deleteFailed": "Failed to delete transformation"
+    },
+    "deleteDialog": {
+      "title": "Delete Transformation",
+      "description": "This will remove the transformation. Subscriptions and destinations referencing it will lose their transformation link. This action cannot be undone."
+    },
+    "format": "Format",
+    "validation": {
+      "nameRequired": "Name is required",
+      "templateRequired": "Template is required",
+      "invalidJson": "Invalid JSON format",
+      "validJson": "Valid JSON",
+      "expression": "expression",
+      "expressions": "expressions"
     }
   }
 }

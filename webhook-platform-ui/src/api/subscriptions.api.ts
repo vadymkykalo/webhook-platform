@@ -10,6 +10,7 @@ export interface SubscriptionRequest {
   retryDelays?: string;
   payloadTemplate?: string;
   customHeaders?: string;
+  transformationId?: string | null;
 }
 
 export interface SubscriptionResponse {
@@ -24,6 +25,8 @@ export interface SubscriptionResponse {
   retryDelays: string;
   payloadTemplate: string | null;
   customHeaders: string | null;
+  transformationId: string | null;
+  transformationName: string | null;
   createdAt: string;
   updatedAt: string;
 }

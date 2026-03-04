@@ -68,6 +68,9 @@ public class Delivery {
     @Column(name = "idempotency_key")
     private String idempotencyKey;
 
+    @Column(name = "transformation_id")
+    private UUID transformationId;
+
     @Column(name = "replay_session_id")
     private UUID replaySessionId;
 

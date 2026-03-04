@@ -53,6 +53,9 @@ public class IncomingDestination {
     @Column(name = "payload_transform", columnDefinition = "TEXT")
     private String payloadTransform;
 
+    @Column(name = "transformation_id")
+    private UUID transformationId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
