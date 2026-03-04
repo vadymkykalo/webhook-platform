@@ -54,7 +54,7 @@ class OutboxPublisherServiceTest {
 
         service = new OutboxPublisherService(
                 outboxMessageRepository, kafkaTemplate, objectMapper,
-                new SimpleMeterRegistry(), txManager, 100, 5, 90);
+                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300);
     }
 
     @Test

@@ -39,6 +39,7 @@ public class OutboxPublisherService {
     private final int batchSize;
     private final int maxRetries;
     private final int deadRetentionDays;
+    private final long sendingRecoverySeconds;
     private final Timer publishLatency;
     private final TransactionTemplate txTemplate;
 
@@ -50,13 +51,15 @@ public class OutboxPublisherService {
             PlatformTransactionManager txManager,
             @Value("${outbox.publisher.batch-size:100}") int batchSize,
             @Value("${outbox.publisher.max-retries:5}") int maxRetries,
-            @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays) {
+            @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays,
+            @Value("${outbox.publisher.sending-recovery-seconds:300}") long sendingRecoverySeconds) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
         this.maxRetries = maxRetries;
         this.deadRetentionDays = deadRetentionDays;
+        this.sendingRecoverySeconds = sendingRecoverySeconds;
         this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
@@ -153,8 +156,9 @@ public class OutboxPublisherService {
     @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
     @Transactional
     public void cleanupOldMessages() {
-        // Recover stuck SENDING messages (claimed but app crashed before publish)
-        Instant sendingCutoff = Instant.now().minusSeconds(120);
+        // Recover stuck SENDING messages (claimed but app crashed before publish).
+        // Default 300s provides margin over Kafka's delivery.timeout.ms (default 120s).
+        Instant sendingCutoff = Instant.now().minusSeconds(sendingRecoverySeconds);
         int recovered = outboxMessageRepository.recoverStuckSendingMessages(sendingCutoff);
         if (recovered > 0) {
             log.warn("Recovered {} stuck SENDING outbox messages back to PENDING", recovered);

@@ -239,6 +239,23 @@ public class IngressService {
             List<OutboxMessage> outboxMessages = new ArrayList<>(destinations.size());
 
             for (IncomingDestination destination : destinations) {
+                IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
+                        .incomingEventId(event.getId())
+                        .destinationId(destination.getId())
+                        .incomingSourceId(source.getId())
+                        .attemptCount(0)
+                        .replay(false)
+                        .build();
+
+                String payload;
+                try {
+                    payload = objectMapper.writeValueAsString(forwardMessage);
+                } catch (Exception e) {
+                    throw new RuntimeException(
+                            "Failed to serialize outbox message for incoming forward: eventId="
+                                    + event.getId() + ", destId=" + destination.getId(), e);
+                }
+
                 attempts.add(IncomingForwardAttempt.builder()
                         .incomingEventId(event.getId())
                         .destinationId(destination.getId())
@@ -246,29 +263,16 @@ public class IngressService {
                         .status(ForwardAttemptStatus.PENDING)
                         .build());
 
-                try {
-                    IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
-                            .incomingEventId(event.getId())
-                            .destinationId(destination.getId())
-                            .incomingSourceId(source.getId())
-                            .attemptCount(0)
-                            .replay(false)
-                            .build();
-
-                    outboxMessages.add(OutboxMessage.builder()
-                            .aggregateType("IncomingForward")
-                            .aggregateId(event.getId())
-                            .eventType("IncomingForwardCreated")
-                            .payload(objectMapper.writeValueAsString(forwardMessage))
-                            .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
-                            .kafkaKey(destination.getId().toString())
-                            .status(OutboxStatus.PENDING)
-                            .retryCount(0)
-                            .build());
-                } catch (Exception e) {
-                    log.error("Failed to serialize outbox message for incoming forward: eventId={}, destId={}",
-                            event.getId(), destination.getId(), e);
-                }
+                outboxMessages.add(OutboxMessage.builder()
+                        .aggregateType("IncomingForward")
+                        .aggregateId(event.getId())
+                        .eventType("IncomingForwardCreated")
+                        .payload(payload)
+                        .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
+                        .kafkaKey(destination.getId().toString())
+                        .status(OutboxStatus.PENDING)
+                        .retryCount(0)
+                        .build());
             }
 
             forwardAttemptRepository.saveAll(attempts);
