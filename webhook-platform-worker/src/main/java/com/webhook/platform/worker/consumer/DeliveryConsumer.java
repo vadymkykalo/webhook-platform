@@ -12,7 +12,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.util.UUID;
 
 @Component
@@ -49,10 +48,6 @@ public class DeliveryConsumer {
             webhookDeliveryService.processDelivery(message);
             acknowledgment.acknowledge();
             log.debug("Acknowledged message for delivery: {}", message.getDeliveryId());
-        } catch (Exception e) {
-            log.error("Failed to process delivery: deliveryId={}, error={}. Will nack for redelivery.",
-                    message.getDeliveryId(), e.getMessage(), e);
-            acknowledgment.nack(Duration.ofSeconds(10));
         } finally {
             MDC.remove(CORRELATION_ID_KEY);
         }
@@ -87,10 +82,6 @@ public class DeliveryConsumer {
             webhookDeliveryService.processDelivery(message);
             acknowledgment.acknowledge();
             log.debug("Acknowledged retry message for delivery: {}", message.getDeliveryId());
-        } catch (Exception e) {
-            log.error("Failed to process retry delivery: deliveryId={}, error={}. Will nack for redelivery.",
-                    message.getDeliveryId(), e.getMessage(), e);
-            acknowledgment.nack(Duration.ofSeconds(10));
         } finally {
             MDC.remove(CORRELATION_ID_KEY);
         }

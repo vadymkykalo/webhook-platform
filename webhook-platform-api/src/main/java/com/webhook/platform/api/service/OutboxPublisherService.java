@@ -20,7 +20,6 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -29,8 +28,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
-import org.springframework.kafka.support.SendResult;
 
 @Service
 @Slf4j
@@ -203,8 +200,7 @@ public class OutboxPublisherService {
 
     private void publishBatchAsync(List<OutboxMessage> messages, boolean isRetry) {
         Timer.Sample sample = Timer.start();
-        Map<UUID, CompletableFuture<SendResult<String, Object>>> futures = new LinkedHashMap<>();
-        Map<UUID, OutboxMessage> messageMap = new LinkedHashMap<>();
+        List<CompletableFuture<Void>> completionFutures = new ArrayList<>();
 
         for (OutboxMessage message : messages) {
             try {
@@ -223,8 +219,35 @@ public class OutboxPublisherService {
                 );
                 record.headers().add(new RecordHeader("X-Correlation-ID", correlationId.getBytes(StandardCharsets.UTF_8)));
 
-                futures.put(message.getId(), kafkaTemplate.send(record));
-                messageMap.put(message.getId(), message);
+                // Use handle() callback to mark status based on the ACTUAL Kafka outcome.
+                // This prevents the previous bug where get(0ms) after a batch timeout
+                // would mark in-flight (but eventually successful) sends as FAILED,
+                // causing duplicate dispatch on retry.
+                CompletableFuture<Void> done = kafkaTemplate.send(record)
+                        .<Void>handle((result, ex) -> {
+                            try {
+                                if (ex != null) {
+                                    log.error("Failed to publish outbox message {}: {}",
+                                            message.getId(), ex.getMessage());
+                                    if (isRetry) {
+                                        incrementRetryCount(message, ex.getMessage());
+                                    } else {
+                                        markAsFailed(message, ex.getMessage());
+                                    }
+                                } else {
+                                    markAsPublished(message);
+                                    if (isRetry) {
+                                        log.info("Successfully retried outbox message: {}",
+                                                message.getId());
+                                    }
+                                }
+                            } catch (Exception dbEx) {
+                                log.error("Failed to update outbox status for message {}: {}",
+                                        message.getId(), dbEx.getMessage());
+                            }
+                            return null;
+                        });
+                completionFutures.add(done);
             } catch (Exception e) {
                 log.error("Failed to prepare outbox message {}: {}", message.getId(), e.getMessage());
                 if (isRetry) {
@@ -235,38 +258,21 @@ public class OutboxPublisherService {
             }
         }
 
-        if (futures.isEmpty()) return;
+        if (completionFutures.isEmpty()) return;
 
-        // Wait for all sends to complete
+        // Wait for all send callbacks to complete (bounded).
+        // Messages still in-flight after timeout stay SENDING —
+        // cleanupOldMessages() recovers them back to PENDING after 120s.
         try {
-            CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]))
+            CompletableFuture.allOf(completionFutures.toArray(new CompletableFuture[0]))
                     .get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
-            log.warn("Batch Kafka send did not fully complete within timeout: {}", e.getMessage());
+            log.warn("Batch Kafka send did not fully complete within 30s: {} — " +
+                    "in-flight messages remain SENDING and will be recovered by cleanup",
+                    e.getMessage());
         }
 
         sample.stop(publishLatency);
-
-        // Check each future individually
-        for (var entry : futures.entrySet()) {
-            OutboxMessage message = messageMap.get(entry.getKey());
-            CompletableFuture<SendResult<String, Object>> future = entry.getValue();
-
-            try {
-                future.get(0, TimeUnit.MILLISECONDS);
-                markAsPublished(message);
-                if (isRetry) {
-                    log.info("Successfully retried outbox message: {}", message.getId());
-                }
-            } catch (Exception e) {
-                log.error("Failed to publish outbox message {}: {}", message.getId(), e.getMessage());
-                if (isRetry) {
-                    incrementRetryCount(message, e.getMessage());
-                } else {
-                    markAsFailed(message, e.getMessage());
-                }
-            }
-        }
     }
 
     private void markAsPublished(OutboxMessage message) {
