@@ -910,10 +910,46 @@
       "action": "Action",
       "resource": "Resource",
       "resourceId": "Resource ID",
-      "userId": "User ID",
+      "user": "User",
       "status": "Status",
       "duration": "Duration",
+      "ip": "IP Address",
       "error": "Error"
+    },
+    "filters": {
+      "allActions": "All Actions",
+      "allStatuses": "All Statuses",
+      "allResources": "All Resources",
+      "success": "Success",
+      "failure": "Failure",
+      "from": "From",
+      "to": "To",
+      "clear": "Clear",
+      "showing": "Showing {{count}} of {{total}} on this page"
+    },
+    "actions": {
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "DELETE": "Delete",
+      "ROTATE_SECRET": "Rotate Secret",
+      "REVOKE": "Revoke",
+      "REGISTER": "Register",
+      "LOGIN": "Login",
+      "LOGOUT": "Logout",
+      "CONFIGURE_MTLS": "Configure mTLS",
+      "TEST_WEBHOOK": "Test Webhook",
+      "PASSWORD_RESET_REQUESTED": "Password Reset Requested",
+      "PASSWORD_RESET": "Password Reset",
+      "PASSWORD_CHANGED": "Password Changed",
+      "MEMBER_INVITED": "Member Invited",
+      "MEMBER_ROLE_CHANGED": "Role Changed",
+      "MEMBER_REMOVED": "Member Removed",
+      "INVITE_ACCEPTED": "Invite Accepted",
+      "RESOLVE_INCIDENT": "Resolve Incident"
+    },
+    "export": {
+      "csv": "Export CSV",
+      "done": "Exported {{count}} audit log entries"
     },
     "pagination": "{{total}} total events · Page {{page}} of {{pages}}"
   },

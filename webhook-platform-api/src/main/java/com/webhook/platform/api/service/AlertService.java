@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.domain.entity.AlertEvent;
 import com.webhook.platform.api.domain.entity.AlertRule;
 import com.webhook.platform.api.domain.entity.Incident;
@@ -50,6 +52,7 @@ public class AlertService {
                 .toList();
     }
 
+    @Auditable(action = AuditAction.CREATE, resourceType = "AlertRule")
     @Transactional
     public AlertRuleResponse createRule(UUID projectId, AlertRuleRequest request, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);
@@ -76,6 +79,7 @@ public class AlertService {
         return toRuleResponse(rule);
     }
 
+    @Auditable(action = AuditAction.UPDATE, resourceType = "AlertRule")
     @Transactional
     public AlertRuleResponse updateRule(UUID projectId, UUID ruleId, AlertRuleRequest request, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);
@@ -102,6 +106,7 @@ public class AlertService {
         return toRuleResponse(rule);
     }
 
+    @Auditable(action = AuditAction.DELETE, resourceType = "AlertRule")
     @Transactional
     public void deleteRule(UUID projectId, UUID ruleId, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);

@@ -910,10 +910,46 @@
       "action": "Дія",
       "resource": "Ресурс",
       "resourceId": "ID ресурсу",
-      "userId": "ID користувача",
+      "user": "Користувач",
       "status": "Статус",
       "duration": "Тривалість",
+      "ip": "IP адреса",
       "error": "Помилка"
+    },
+    "filters": {
+      "allActions": "Всі дії",
+      "allStatuses": "Всі статуси",
+      "allResources": "Всі ресурси",
+      "success": "Успішно",
+      "failure": "Помилка",
+      "from": "Від",
+      "to": "До",
+      "clear": "Очистити",
+      "showing": "Показано {{count}} з {{total}} на цій сторінці"
+    },
+    "actions": {
+      "CREATE": "Створення",
+      "UPDATE": "Оновлення",
+      "DELETE": "Видалення",
+      "ROTATE_SECRET": "Ротація секрету",
+      "REVOKE": "Відкликання",
+      "REGISTER": "Реєстрація",
+      "LOGIN": "Вхід",
+      "LOGOUT": "Вихід",
+      "CONFIGURE_MTLS": "Налаштування mTLS",
+      "TEST_WEBHOOK": "Тест вебхука",
+      "PASSWORD_RESET_REQUESTED": "Запит скидання пароля",
+      "PASSWORD_RESET": "Скидання пароля",
+      "PASSWORD_CHANGED": "Зміна пароля",
+      "MEMBER_INVITED": "Запрошення учасника",
+      "MEMBER_ROLE_CHANGED": "Зміна ролі",
+      "MEMBER_REMOVED": "Видалення учасника",
+      "INVITE_ACCEPTED": "Прийняття запрошення",
+      "RESOLVE_INCIDENT": "Вирішення інциденту"
+    },
+    "export": {
+      "csv": "Експорт CSV",
+      "done": "Експортовано {{count}} записів журналу дій"
     },
     "pagination": "{{total}} подій всього · Сторінка {{page}} з {{pages}}"
   },

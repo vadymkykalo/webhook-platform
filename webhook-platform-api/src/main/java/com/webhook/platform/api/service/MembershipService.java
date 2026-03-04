@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
@@ -67,6 +69,7 @@ public class MembershipService {
                 .collect(Collectors.toList());
     }
 
+    @Auditable(action = AuditAction.MEMBER_INVITED, resourceType = "Member")
     @Transactional
     public MemberResponse addMember(UUID organizationId, AddMemberRequest request, MembershipRole requestingRole) {
         if (requestingRole != MembershipRole.OWNER) {
@@ -123,6 +126,7 @@ public class MembershipService {
                 .build();
     }
 
+    @Auditable(action = AuditAction.INVITE_ACCEPTED, resourceType = "Member")
     @Transactional
     public MemberResponse acceptInvite(String inviteToken, UUID organizationId, UUID authenticatedUserId) {
         Membership membership = membershipRepository.findByInviteToken(inviteToken)
@@ -178,6 +182,7 @@ public class MembershipService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    @Auditable(action = AuditAction.MEMBER_ROLE_CHANGED, resourceType = "Member")
     @Transactional
     public MemberResponse changeMemberRole(UUID organizationId, UUID userId, MembershipRole newRole,
             MembershipRole requestingRole) {
@@ -214,6 +219,7 @@ public class MembershipService {
                 .build();
     }
 
+    @Auditable(action = AuditAction.MEMBER_REMOVED, resourceType = "Member")
     @Transactional
     public void removeMember(UUID organizationId, UUID userId, MembershipRole requestingRole) {
         if (requestingRole != MembershipRole.OWNER) {

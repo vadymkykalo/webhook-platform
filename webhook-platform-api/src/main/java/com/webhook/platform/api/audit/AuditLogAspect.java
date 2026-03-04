@@ -2,8 +2,10 @@ package com.webhook.platform.api.audit;
 
 import com.webhook.platform.api.domain.entity.AuditLog;
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
+import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import jakarta.annotation.PreDestroy;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -12,6 +14,8 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -55,33 +59,44 @@ public class AuditLogAspect {
         UUID resourceId = extractResourceId(joinPoint);
         UUID userId = null;
         UUID orgId = null;
+        String clientIp = resolveClientIp();
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             userId = jwtAuth.getUserId();
             orgId = jwtAuth.getOrganizationId();
+        } else if (auth instanceof ApiKeyAuthenticationToken) {
+            // API Key auth — resolve orgId from method args (organizationId parameter)
+            orgId = extractOrganizationId(joinPoint);
+        }
+
+        // Fallback: if orgId is still null, try extracting from method args
+        if (orgId == null) {
+            orgId = extractOrganizationId(joinPoint);
         }
 
         final UUID uid = userId;
         final UUID oid = orgId;
+        final String ip = clientIp;
 
         try {
             Object result = joinPoint.proceed();
             int durationMs = (int) (System.currentTimeMillis() - start);
 
-            executor.execute(() -> saveAuditLog(action, resourceType, resourceId, uid, oid, "SUCCESS", null, durationMs));
+            executor.execute(() -> saveAuditLog(action, resourceType, resourceId, uid, oid, "SUCCESS", null, durationMs, ip));
             return result;
         } catch (Throwable ex) {
             int durationMs = (int) (System.currentTimeMillis() - start);
             String errorMsg = ex.getMessage() != null ? ex.getMessage().substring(0, Math.min(ex.getMessage().length(), 500)) : null;
 
-            executor.execute(() -> saveAuditLog(action, resourceType, resourceId, uid, oid, "FAILURE", errorMsg, durationMs));
+            executor.execute(() -> saveAuditLog(action, resourceType, resourceId, uid, oid, "FAILURE", errorMsg, durationMs, ip));
             throw ex;
         }
     }
 
     public void saveAuditLog(String action, String resourceType, UUID resourceId,
-                              UUID userId, UUID orgId, String status, String errorMessage, int durationMs) {
+                              UUID userId, UUID orgId, String status, String errorMessage,
+                              int durationMs, String clientIp) {
         try {
             AuditLog entry = AuditLog.builder()
                     .action(action)
@@ -92,6 +107,7 @@ public class AuditLogAspect {
                     .status(status)
                     .errorMessage(errorMessage)
                     .durationMs(durationMs)
+                    .clientIp(clientIp)
                     .build();
             auditLogRepository.save(entry);
         } catch (Exception e) {
@@ -128,7 +144,38 @@ public class AuditLogAspect {
         return null;
     }
 
+    private UUID extractOrganizationId(ProceedingJoinPoint joinPoint) {
+        MethodSignature sig = (MethodSignature) joinPoint.getSignature();
+        String[] names = sig.getParameterNames();
+        Object[] args = joinPoint.getArgs();
+
+        if (names != null) {
+            for (int i = 0; i < names.length; i++) {
+                if (args[i] instanceof UUID && "organizationId".equals(names[i])) {
+                    return (UUID) args[i];
+                }
+            }
+        }
+        return null;
+    }
+
     private boolean isResourceIdParam(String name) {
         return name.equals("id") || name.endsWith("Id") || name.endsWith("ID");
+    }
+
+    private String resolveClientIp() {
+        try {
+            ServletRequestAttributes attrs =
+                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attrs == null) return null;
+            HttpServletRequest request = attrs.getRequest();
+            String xff = request.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isBlank()) {
+                return xff.split(",")[0].trim();
+            }
+            return request.getRemoteAddr();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
