@@ -30,9 +30,9 @@ import org.apache.kafka.common.TopicPartition;
 @Slf4j
 public class KafkaConsumerConfig {
 
-    private final KafkaOperations<Object, Object> deadLetterKafkaTemplate;
+    private final KafkaOperations<String, Object> deadLetterKafkaTemplate;
 
-    public KafkaConsumerConfig(@Qualifier("deadLetterKafkaTemplate") KafkaOperations<Object, Object> deadLetterKafkaTemplate) {
+    public KafkaConsumerConfig(@Qualifier("deadLetterKafkaTemplate") KafkaOperations<String, Object> deadLetterKafkaTemplate) {
         this.deadLetterKafkaTemplate = deadLetterKafkaTemplate;
     }
 
