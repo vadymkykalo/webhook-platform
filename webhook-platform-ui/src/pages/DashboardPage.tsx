@@ -2,18 +2,20 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle, ArrowDownToLine, Activity } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useProjects, useDashboardStats, useEndpoints, useOnboardingStatus } from '../api/queries';
+import { useProjects, useDashboardStats, useEndpoints, useOnboardingStatus, useAnalytics } from '../api/queries';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import OnboardingWizard, { hasSeenWizard } from '../components/OnboardingWizard';
+import Sparkline from '../components/Sparkline';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
 
-function StatCard({ title, value, icon: Icon, iconColor, subtitle, loading }: {
+function StatCard({ title, value, icon: Icon, iconColor, subtitle, loading, sparkData, sparkColor }: {
   title: string; value: number | string; icon: React.ElementType; iconColor: string; subtitle: string; loading: boolean;
+  sparkData?: number[]; sparkColor?: string;
 }) {
   return (
     <Card className="relative overflow-hidden">
@@ -24,10 +26,23 @@ function StatCard({ title, value, icon: Icon, iconColor, subtitle, loading }: {
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className="text-2xl font-bold tracking-tight">
-          {loading ? <div className="h-8 w-16 bg-muted animate-pulse rounded" /> : value}
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <div className="text-2xl font-bold tracking-tight">
+              {loading ? <div className="h-8 w-16 bg-muted animate-pulse rounded" /> : value}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          </div>
+          {sparkData && sparkData.length >= 2 && (
+            <Sparkline
+              data={sparkData}
+              width={80}
+              height={32}
+              strokeColor={sparkColor || 'hsl(var(--primary))'}
+              fillColor={sparkColor || 'hsl(var(--primary))'}
+            />
+          )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
       </CardContent>
     </Card>
   );
@@ -58,6 +73,12 @@ export default function DashboardPage() {
   const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats(
     selectedProjectId || undefined
   );
+
+  const { data: analytics } = useAnalytics(selectedProjectId || undefined, '7d');
+
+  const sparkTotal = analytics?.deliveryTimeSeries?.map(p => p.total) || [];
+  const sparkSuccess = analytics?.deliveryTimeSeries?.map(p => p.success) || [];
+  const sparkFailed = analytics?.deliveryTimeSeries?.map(p => p.failed) || [];
 
   const { data: endpoints = [] } = useEndpoints(selectedProjectId || undefined);
   const { data: onboarding } = useOnboardingStatus(selectedProjectId || undefined);
@@ -148,6 +169,8 @@ export default function DashboardPage() {
               iconColor="bg-primary/10 text-primary"
               subtitle={t('dashboard.stats.totalDeliveriesDesc')}
               loading={statsLoading}
+              sparkData={sparkTotal}
+              sparkColor="hsl(var(--primary))"
             />
             <StatCard
               title={t('dashboard.stats.successful')}
@@ -156,6 +179,8 @@ export default function DashboardPage() {
               iconColor="bg-success/10 text-success"
               subtitle={t('dashboard.stats.successRate', { rate: dashboardStats?.deliveryStats.successRate || 0 })}
               loading={statsLoading}
+              sparkData={sparkSuccess}
+              sparkColor="hsl(var(--success))"
             />
             <StatCard
               title={t('dashboard.stats.failed')}
@@ -164,6 +189,8 @@ export default function DashboardPage() {
               iconColor="bg-destructive/10 text-destructive"
               subtitle={t('dashboard.stats.failedDesc')}
               loading={statsLoading}
+              sparkData={sparkFailed}
+              sparkColor="hsl(var(--destructive))"
             />
             <StatCard
               title={t('dashboard.stats.dlq')}
@@ -227,7 +254,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                          {event.deliveryCount} {event.deliveryCount === 1 ? t('dashboard.recentEvents.delivery', { count: 1 }) : t('dashboard.recentEvents.delivery_other', { count: event.deliveryCount })}
+                          {event.deliveryCount === 1 ? t('dashboard.recentEvents.delivery', { count: 1 }) : t('dashboard.recentEvents.delivery_other', { count: event.deliveryCount })}
                         </span>
                       </div>
                     ))}

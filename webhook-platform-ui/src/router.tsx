@@ -24,6 +24,8 @@ const SubscriptionsPage = lazy(() => import('./pages/SubscriptionsPage'));
 const MembersPage = lazy(() => import('./pages/MembersPage'));
 const ApiKeysPage = lazy(() => import('./pages/ApiKeysPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const OrgSettingsPage = lazy(() => import('./pages/OrgSettingsPage'));
+const BillingPage = lazy(() => import('./pages/BillingPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const ReplayPage = lazy(() => import('./pages/ReplayPage'));
 const DlqPage = lazy(() => import('./pages/DlqPage'));
@@ -42,6 +44,9 @@ const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const TransformationsPage = lazy(() => import('./pages/TransformationsPage'));
 const TransformStudioPage = lazy(() => import('./pages/TransformStudioPage'));
+const ConnectionSetupPage = lazy(() => import('./pages/ConnectionSetupPage'));
+const ConnectionsPage = lazy(() => import('./pages/ConnectionsPage'));
+const TestConsolePage = lazy(() => import('./pages/TestConsolePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
@@ -208,6 +213,18 @@ export const router = createBrowserRouter([
         element: <S><TransformStudioPage /></S>,
       },
       {
+        path: 'projects/:projectId/connection-setup',
+        element: <S><ConnectionSetupPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/connections',
+        element: <S><ConnectionsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/test-console',
+        element: <S><TestConsolePage /></S>,
+      },
+      {
         path: 'members',
         element: <ProtectedRoute requiredRole="OWNER"><S><MembersPage /></S></ProtectedRoute>,
       },
@@ -218,6 +235,14 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <ProtectedRoute requiredRole="OWNER"><S><SettingsPage /></S></ProtectedRoute>,
+      },
+      {
+        path: 'org-settings',
+        element: <ProtectedRoute requiredRole="OWNER"><S><OrgSettingsPage /></S></ProtectedRoute>,
+      },
+      {
+        path: 'billing',
+        element: <ProtectedRoute requiredRole="OWNER"><S><BillingPage /></S></ProtectedRoute>,
       },
       {
         path: '*',

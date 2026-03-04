@@ -23,6 +23,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 const MASK_STYLE_OPTIONS: { value: MaskStyle; label: string }[] = [
   { value: 'PARTIAL', label: 'Partial' },
@@ -183,17 +184,19 @@ export default function PiiRulesPage() {
           </p>
         </div>
         <PermissionGate allowed={canManagePiiRules}>
-          <div className="flex gap-2">
-            {rules.length === 0 && (
-              <Button variant="outline" onClick={handleSeedDefaults} disabled={seeding}>
-                {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {t('piiRules.seedDefaults')}
+          <VerificationGate>
+            <div className="flex gap-2">
+              {rules.length === 0 && (
+                <Button variant="outline" onClick={handleSeedDefaults} disabled={seeding}>
+                  {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {t('piiRules.seedDefaults')}
+                </Button>
+              )}
+              <Button onClick={() => setShowAddForm(true)}>
+                <Plus className="h-4 w-4" /> {t('piiRules.addRule')}
               </Button>
-            )}
-            <Button onClick={() => setShowAddForm(true)}>
-              <Plus className="h-4 w-4" /> {t('piiRules.addRule')}
-            </Button>
-          </div>
+            </div>
+          </VerificationGate>
         </PermissionGate>
       </div>
 

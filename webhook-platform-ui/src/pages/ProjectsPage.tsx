@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Key } from 'lucide-react';
+import { useEffect } from 'react';
+import { Plus, FolderKanban, Calendar, Loader2, Trash2, Copy, Settings, Send, Radio, Key, CreditCard, ShoppingCart, Github, Zap, CheckCircle2, XCircle, Activity } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { useProjects, useCreateProject, useDeleteProject } from '../api/queries';
-import { formatDate } from '../lib/date';
+import { dashboardApi, type DashboardStats } from '../api/dashboard.api';
+import { formatDate, formatRelativeTime } from '../lib/date';
+import { cn } from '../lib/utils';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 import EmptyState from '../components/EmptyState';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -24,6 +28,22 @@ import {
 } from '../components/ui/dialog';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 
+type ProjectTemplate = 'custom' | 'stripe' | 'shopify' | 'github';
+
+const TEMPLATES: { key: ProjectTemplate; icon: React.ElementType; iconColor: string }[] = [
+  { key: 'custom', icon: Zap, iconColor: 'text-muted-foreground' },
+  { key: 'stripe', icon: CreditCard, iconColor: 'text-purple-600' },
+  { key: 'shopify', icon: ShoppingCart, iconColor: 'text-green-600' },
+  { key: 'github', icon: Github, iconColor: 'text-gray-800 dark:text-gray-200' },
+];
+
+const TEMPLATE_DEFAULTS: Record<ProjectTemplate, { name: string; description: string }> = {
+  custom: { name: '', description: '' },
+  stripe: { name: 'Stripe Payments', description: 'Payment webhook integration — charge.succeeded, invoice.paid, refund.created' },
+  shopify: { name: 'Shopify Store', description: 'E-commerce webhook integration — order.created, product.updated, checkout.completed' },
+  github: { name: 'GitHub CI/CD', description: 'Repository webhook integration — push, pull_request.opened, workflow.completed' },
+};
+
 export default function ProjectsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -33,23 +53,38 @@ export default function ProjectsPage() {
   const { canCreateProject, canDeleteProject } = usePermissions();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate>('custom');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [healthStats, setHealthStats] = useState<Record<string, DashboardStats>>({});
 
   const creating = createProject.isPending;
   const deleting = deleteProject.isPending;
+
+  useEffect(() => {
+    if (projects.length > 0) {
+      projects.forEach((project) => {
+        if (!healthStats[project.id]) {
+          dashboardApi.getProjectStats(project.id).then((stats) => {
+            setHealthStats((prev) => ({ ...prev, [project.id]: stats }));
+          }).catch(() => { /* ignore — health is best-effort */ });
+        }
+      });
+    }
+  }, [projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     createProject.mutate(
       { name, description },
       {
-        onSuccess: () => {
+        onSuccess: (project) => {
           setShowCreateDialog(false);
           setName('');
           setDescription('');
           showSuccess(t('projects.toast.created'));
+          navigate(`/admin/projects/${project.id}/connection-setup`);
         },
         onError: (err: any) => {
           showApiError(err, 'projects.toast.createFailed');
@@ -95,10 +130,12 @@ export default function ProjectsPage() {
           </p>
         </div>
         <PermissionGate allowed={canCreateProject}>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" />
-            {t('projects.newProject')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" />
+              {t('projects.newProject')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -109,10 +146,12 @@ export default function ProjectsPage() {
           description={canCreateProject ? t('projects.noProjectsDesc') : t('projects.noProjectsViewer')}
           action={
             <PermissionGate allowed={canCreateProject}>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4" />
-                {t('projects.createFirst')}
-              </Button>
+              <VerificationGate>
+                <Button onClick={() => setShowCreateDialog(true)}>
+                  <Plus className="h-4 w-4" />
+                  {t('projects.createFirst')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           }
           docsLink="/docs#getting-started"
@@ -145,6 +184,47 @@ export default function ProjectsPage() {
                 )}
               </CardHeader>
               <CardContent>
+                {/* Health stats */}
+                {(() => {
+                  const stats = healthStats[project.id];
+                  if (!stats) return null;
+                  const ds = stats.deliveryStats;
+                  const hasDeliveries = ds.totalDeliveries > 0;
+                  const lastEvent = stats.recentEvents?.[0];
+                  const endpointCount = stats.endpointHealth?.length ?? 0;
+                  return (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] mb-3">
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Settings className="h-3 w-3" />
+                        {endpointCount > 0 ? t('projects.health.endpoints', { count: endpointCount }) : t('projects.health.noEndpoints')}
+                      </span>
+                      {hasDeliveries ? (
+                        <span className={cn('inline-flex items-center gap-1 font-medium',
+                          ds.successRate >= 95 ? 'text-green-600' : ds.successRate >= 80 ? 'text-amber-600' : 'text-red-600'
+                        )}>
+                          {ds.successRate >= 95 ? <CheckCircle2 className="h-3 w-3" /> : ds.successRate >= 80 ? <Activity className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                          {t('projects.health.successRate', { rate: Math.round(ds.successRate) })}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{t('projects.health.noDeliveries')}</span>
+                      )}
+                      {ds.failedDeliveries + ds.dlqDeliveries > 0 && (
+                        <span className="inline-flex items-center gap-1 text-red-500 font-medium">
+                          <XCircle className="h-3 w-3" />
+                          {t('projects.health.errors', { count: ds.failedDeliveries + ds.dlqDeliveries })}
+                        </span>
+                      )}
+                      {lastEvent ? (
+                        <span className="text-muted-foreground">
+                          {t('projects.health.lastEvent', { time: formatRelativeTime(lastEvent.createdAt) })}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">{t('projects.health.noEvents')}</span>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div className="flex items-center text-[11px] text-muted-foreground mb-4">
                   <Calendar className="mr-1.5 h-3 w-3" />
                   {t('projects.created', { date: formatDate(project.createdAt) })}
@@ -172,8 +252,8 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { setShowCreateDialog(open); if (!open) { setSelectedTemplate('custom'); setName(''); setDescription(''); } }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('projects.createDialog.title')}</DialogTitle>
             <DialogDescription>
@@ -182,6 +262,41 @@ export default function ProjectsPage() {
           </DialogHeader>
           <form onSubmit={handleCreate}>
             <div className="space-y-4 py-4">
+              {/* Template selector */}
+              <div className="space-y-2">
+                <Label>{t('projects.createDialog.templateLabel')}</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {TEMPLATES.map(({ key, icon: TIcon, iconColor }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate(key);
+                        const defaults = TEMPLATE_DEFAULTS[key];
+                        setName(defaults.name);
+                        setDescription(defaults.description);
+                      }}
+                      className={cn(
+                        'flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center transition-all',
+                        selectedTemplate === key
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'border-border hover:border-primary/30 hover:bg-muted/30'
+                      )}
+                    >
+                      <TIcon className={cn('h-5 w-5', iconColor)} />
+                      <span className="text-[10px] font-medium leading-tight">
+                        {t(`projects.createDialog.template${key.charAt(0).toUpperCase() + key.slice(1)}`)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {selectedTemplate !== 'custom' && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t(`projects.createDialog.template${selectedTemplate.charAt(0).toUpperCase() + selectedTemplate.slice(1)}Desc`)}
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="name">{t('projects.createDialog.name')}</Label>
                 <Input

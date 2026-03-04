@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight, Shield, Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
-import { apiKeysApi, ApiKeyResponse } from '../api/apiKeys.api';
+import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
+import { Select } from '../components/ui/select';
+import { Badge } from '../components/ui/badge';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
@@ -42,6 +44,8 @@ export default function ApiKeysPage() {
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [name, setName] = useState('');
+  const [scope, setScope] = useState<ApiKeyScope>('READ_WRITE');
+  const [expiresIn, setExpiresIn] = useState('');
   const [creating, setCreating] = useState(false);
   const [revokeId, setRevokeId] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
@@ -82,9 +86,17 @@ export default function ApiKeysPage() {
     
     setCreating(true);
     try {
-      const response = await apiKeysApi.create(projectId, { name });
+      let expiresAt: string | undefined;
+      if (expiresIn) {
+        const d = new Date();
+        d.setDate(d.getDate() + parseInt(expiresIn));
+        expiresAt = d.toISOString();
+      }
+      const response = await apiKeysApi.create(projectId, { name, scope, expiresAt });
       setShowCreateDialog(false);
       setName('');
+      setScope('READ_WRITE');
+      setExpiresIn('');
       setNewApiKey(response);
       showSuccess(t('apiKeys.toast.created'));
       loadData();
@@ -180,9 +192,21 @@ export default function ApiKeysPage() {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">{apiKey.name}</p>
                       <code className="text-[13px] font-mono text-muted-foreground">{apiKey.keyPrefix}...</code>
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground flex-wrap">
+                        <Badge variant="outline" className="text-[10px] gap-1 py-0 px-1.5">
+                          <Shield className="h-2.5 w-2.5" />
+                          {apiKey.scope === 'READ_ONLY' ? t('apiKeys.scopeReadOnly') : t('apiKeys.scopeReadWrite')}
+                        </Badge>
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDateTimeShort(apiKey.createdAt)}</span>
                         <span>{t('apiKeys.lastUsed')}: {formatRelativeTimeOrNever(apiKey.lastUsedAt)}</span>
+                        {apiKey.expiresAt && (
+                          <span className={`flex items-center gap-1 ${new Date(apiKey.expiresAt) < new Date() ? 'text-destructive' : ''}`}>
+                            <Clock className="h-3 w-3" />
+                            {new Date(apiKey.expiresAt) < new Date()
+                              ? t('apiKeys.expired')
+                              : t('apiKeys.expiresAt', { date: formatDateTimeShort(apiKey.expiresAt) })}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -251,6 +275,26 @@ export default function ApiKeysPage() {
                 <p className="text-xs text-muted-foreground">
                   {t('apiKeys.createDialog.nameHint')}
                 </p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('apiKeys.createDialog.scope')}</Label>
+                <Select value={scope} onChange={(e) => setScope(e.target.value as ApiKeyScope)} disabled={creating}>
+                  <option value="READ_WRITE">{t('apiKeys.scopeReadWrite')}</option>
+                  <option value="READ_ONLY">{t('apiKeys.scopeReadOnly')}</option>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {scope === 'READ_ONLY' ? t('apiKeys.createDialog.scopeReadOnlyHint') : t('apiKeys.createDialog.scopeReadWriteHint')}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('apiKeys.createDialog.expiration')}</Label>
+                <Select value={expiresIn} onChange={(e) => setExpiresIn(e.target.value)} disabled={creating}>
+                  <option value="">{t('apiKeys.createDialog.noExpiration')}</option>
+                  <option value="7">{t('apiKeys.createDialog.expires7d')}</option>
+                  <option value="30">{t('apiKeys.createDialog.expires30d')}</option>
+                  <option value="90">{t('apiKeys.createDialog.expires90d')}</option>
+                  <option value="365">{t('apiKeys.createDialog.expires1y')}</option>
+                </Select>
               </div>
             </div>
             <DialogFooter>

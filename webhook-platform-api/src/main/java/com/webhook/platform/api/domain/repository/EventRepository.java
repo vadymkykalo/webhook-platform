@@ -17,6 +17,7 @@ import java.util.UUID;
 public interface EventRepository extends JpaRepository<Event, UUID> {
     Optional<Event> findByProjectIdAndIdempotencyKey(UUID projectId, String idempotencyKey);
     List<Event> findByProjectId(UUID projectId);
+    List<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType);
     Page<Event> findByProjectId(UUID projectId, Pageable pageable);
     boolean existsByProjectId(UUID projectId);
 

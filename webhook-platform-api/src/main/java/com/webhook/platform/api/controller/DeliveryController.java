@@ -64,16 +64,17 @@ public class DeliveryController {
             @RequestParam(value = "status", required = false) DeliveryStatus status,
             @RequestParam(value = "endpointId", required = false) UUID endpointId,
             @RequestParam(value = "eventId", required = false) UUID eventId,
+            @RequestParam(value = "eventType", required = false) String eventType,
             @RequestParam(value = "fromDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromDate,
             @RequestParam(value = "toDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toDate,
             Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        log.info("Deliveries request - projectId: {}, status: {}, endpointId: {}, eventId: {}, fromDate: {}, toDate: {}", 
-                 projectId, status, endpointId, eventId, fromDate, toDate);
+        log.info("Deliveries request - projectId: {}, status: {}, endpointId: {}, eventId: {}, eventType: {}, fromDate: {}, toDate: {}", 
+                 projectId, status, endpointId, eventId, eventType, fromDate, toDate);
         
         Page<DeliveryResponse> response = deliveryService.listDeliveriesByProject(
-                projectId, auth.organizationId(), status, endpointId, eventId, fromDate, toDate, pageable);
+                projectId, auth.organizationId(), status, endpointId, eventId, eventType, fromDate, toDate, pageable);
         return ResponseEntity.ok(response);
     }
 

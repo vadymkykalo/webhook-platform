@@ -5,8 +5,22 @@ const LOCALE_MAP: Record<string, string> = {
   uk: 'uk-UA',
 };
 
+const TZ_STORAGE_KEY = 'hookflow_timezone';
+
 function getLocale(): string {
   return LOCALE_MAP[i18n.language] || 'en-US';
+}
+
+export function getStoredTimezone(): string {
+  return localStorage.getItem(TZ_STORAGE_KEY) || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+export function setStoredTimezone(tz: string): void {
+  localStorage.setItem(TZ_STORAGE_KEY, tz);
+}
+
+function tzOption(): { timeZone: string } {
+  return { timeZone: getStoredTimezone() };
 }
 
 /**
@@ -14,6 +28,7 @@ function getLocale(): string {
  */
 export function formatDateTime(dateString: string): string {
   return new Date(dateString).toLocaleString(getLocale(), {
+    ...tzOption(),
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -28,6 +43,7 @@ export function formatDateTime(dateString: string): string {
  */
 export function formatDateTimeShort(dateString: string): string {
   return new Date(dateString).toLocaleString(getLocale(), {
+    ...tzOption(),
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -41,6 +57,7 @@ export function formatDateTimeShort(dateString: string): string {
  */
 export function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString(getLocale(), {
+    ...tzOption(),
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -52,6 +69,7 @@ export function formatDate(dateString: string): string {
  */
 export function formatDateTimeCompact(dateString: string): string {
   return new Date(dateString).toLocaleString(getLocale(), {
+    ...tzOption(),
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -65,6 +83,7 @@ export function formatDateTimeCompact(dateString: string): string {
  */
 export function formatTime(dateString: string): string {
   return new Date(dateString).toLocaleTimeString(getLocale(), {
+    ...tzOption(),
     hour: '2-digit',
     minute: '2-digit',
   });

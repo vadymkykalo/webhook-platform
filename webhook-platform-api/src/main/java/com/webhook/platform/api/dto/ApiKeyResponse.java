@@ -21,5 +21,6 @@ public class ApiKeyResponse {
     private Instant createdAt;
     private Instant revokedAt;
     private Instant expiresAt;
+    private String scope;
     private String key;
 }

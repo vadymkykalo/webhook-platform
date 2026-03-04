@@ -6,10 +6,12 @@ export interface AuditLogEntry {
   resourceType: string;
   resourceId: string | null;
   userId: string | null;
+  userEmail: string | null;
   organizationId: string | null;
   status: string;
   errorMessage: string | null;
   durationMs: number | null;
+  clientIp: string | null;
   createdAt: string;
 }
 

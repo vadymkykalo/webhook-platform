@@ -1,7 +1,10 @@
-import { useState } from 'react';
-import { Loader2, Send } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { eventsApi } from '../api/events.api';
+import { subscriptionsApi } from '../api/subscriptions.api';
+import type { SubscriptionResponse } from '../api/subscriptions.api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -14,6 +17,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+
+function eventTypeMatchesSubscription(eventType: string, pattern: string): boolean {
+  if (pattern === '**') return true;
+  const eventParts = eventType.split('.');
+  const patternParts = pattern.split('.');
+  let ei = 0, pi = 0;
+  while (ei < eventParts.length && pi < patternParts.length) {
+    if (patternParts[pi] === '**') return true;
+    if (patternParts[pi] === '*' || patternParts[pi] === eventParts[ei]) {
+      ei++; pi++;
+    } else {
+      return false;
+    }
+  }
+  return ei === eventParts.length && pi === patternParts.length;
+}
 
 interface SendTestEventModalProps {
   projectId: string;
@@ -28,10 +47,23 @@ export default function SendTestEventModal({
   onClose,
   onSuccess,
 }: SendTestEventModalProps) {
+  const { t } = useTranslation();
   const [eventType, setEventType] = useState('');
   const [payload, setPayload] = useState('{\n  "user_id": "123",\n  "action": "created"\n}');
   const [sending, setSending] = useState(false);
   const [jsonError, setJsonError] = useState('');
+  const [subscriptions, setSubscriptions] = useState<SubscriptionResponse[]>([]);
+
+  useEffect(() => {
+    if (open && projectId) {
+      subscriptionsApi.list(projectId).then(setSubscriptions).catch(() => {});
+    }
+  }, [open, projectId]);
+
+  const matchingCount = useMemo(() => {
+    if (!eventType.trim()) return -1;
+    return subscriptions.filter(s => s.enabled && eventTypeMatchesSubscription(eventType.trim(), s.eventType)).length;
+  }, [eventType, subscriptions]);
 
   const validateJson = (text: string): boolean => {
     try {
@@ -70,10 +102,15 @@ export default function SendTestEventModal({
         data,
       });
 
-      showSuccess(
-        `Event sent successfully! Created ${response.deliveriesCreated || 0} deliveries.`,
-        { duration: 5000 }
-      );
+      const count = response.deliveriesCreated || 0;
+      if (count === 0) {
+        showWarning(t('events.toast.noSubscriptionMatch', { eventType }), { duration: 8000 });
+      } else {
+        showSuccess(
+          `Event sent successfully! Created ${count} deliveries.`,
+          { duration: 5000 }
+        );
+      }
       
       setEventType('');
       setPayload('{\n  "user_id": "123",\n  "action": "created"\n}');
@@ -133,12 +170,32 @@ export default function SendTestEventModal({
               </p>
             </div>
 
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                <strong>Note:</strong> This event will create deliveries for all active subscriptions 
-                matching this event type. Check the Deliveries page to see processing results.
-              </p>
-            </div>
+            {eventType.trim() && matchingCount === 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
+                <p className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{t('events.sendModal.noMatchWarning')}</span>
+                </p>
+              </div>
+            )}
+
+            {eventType.trim() && matchingCount > 0 && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-md p-3">
+                <p className="text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{t('events.sendModal.matchInfo', { count: matchingCount })}</span>
+                </p>
+              </div>
+            )}
+
+            {!eventType.trim() && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Note:</strong> This event will create deliveries for all active subscriptions 
+                  matching this event type. Check the Deliveries page to see processing results.
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

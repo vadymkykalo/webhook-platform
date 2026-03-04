@@ -64,6 +64,7 @@ public class AuthService {
 
         User user = User.builder()
                 .email(request.getEmail())
+                .fullName(request.getFullName())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .status(UserStatus.PENDING_VERIFICATION)
                 .emailVerified(false)
@@ -265,6 +266,26 @@ public class AuthService {
         log.info("Password reset completed for user {}", user.getEmail());
     }
 
+    @Transactional
+    public UserResponse updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (request.getFullName() != null) {
+            user.setFullName(request.getFullName().isBlank() ? null : request.getFullName().trim());
+        }
+
+        user = userRepository.save(user);
+        log.info("Profile updated for user {}", userId);
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .status(user.getStatus())
+                .build();
+    }
+
     public CurrentUserResponse getCurrentUser(UUID userId, UUID organizationId, MembershipRole role) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -275,6 +296,7 @@ public class AuthService {
         UserResponse userResponse = UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .fullName(user.getFullName())
                 .status(user.getStatus())
                 .build();
 

@@ -1,11 +1,13 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.dto.OrganizationResponse;
+import com.webhook.platform.api.dto.UpdateOrganizationRequest;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.OrganizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +42,17 @@ public class OrganizationController {
             @PathVariable("orgId") UUID orgId,
             AuthContext auth) {
         OrganizationResponse response = organizationService.getOrganization(orgId, auth.requireUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Update organization", description = "Updates organization details (owner only)")
+    @PutMapping("/{orgId}")
+    public ResponseEntity<OrganizationResponse> updateOrganization(
+            @PathVariable("orgId") UUID orgId,
+            @Valid @RequestBody UpdateOrganizationRequest request,
+            AuthContext auth) {
+        auth.requireOwnerAccess();
+        OrganizationResponse response = organizationService.updateOrganization(orgId, auth.organizationId(), request);
         return ResponseEntity.ok(response);
     }
 }

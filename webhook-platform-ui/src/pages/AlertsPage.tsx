@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Bell, Plus, Trash2, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Info, Check, VolumeX, Clock, Mail, Webhook, BellOff, ChevronDown, Search } from 'lucide-react';
+import { Bell, Plus, Trash2, Loader2, CheckCircle2, AlertTriangle, AlertCircle, Info, Check, VolumeX, Clock, Mail, Webhook, BellOff, ChevronDown, Search, MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import {
@@ -29,13 +29,9 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
-const ALERT_TYPES: { value: AlertType; label: string; hint: string }[] = [
-  { value: 'FAILURE_RATE', label: 'Failure Rate', hint: 'Triggers when failure % exceeds threshold in window' },
-  { value: 'DLQ_THRESHOLD', label: 'DLQ Threshold', hint: 'Triggers when DLQ count exceeds threshold' },
-  { value: 'CONSECUTIVE_FAILURES', label: 'Consecutive Failures', hint: 'Triggers after N consecutive failures for an endpoint' },
-  { value: 'LATENCY_THRESHOLD', label: 'Latency Threshold', hint: 'Triggers when avg latency exceeds threshold (ms)' },
-];
+const ALERT_TYPE_VALUES: AlertType[] = ['FAILURE_RATE', 'DLQ_THRESHOLD', 'CONSECUTIVE_FAILURES', 'LATENCY_THRESHOLD'];
 
 const SEVERITY_COLORS: Record<string, string> = {
   INFO: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
@@ -106,7 +102,7 @@ export default function AlertsPage() {
       windowMinutes: parseInt(formWindow),
       description: formDescription || undefined,
       channel: formChannel,
-      webhookUrl: formChannel === 'WEBHOOK' ? formWebhookUrl : undefined,
+      webhookUrl: (formChannel === 'WEBHOOK' || formChannel === 'SLACK') ? formWebhookUrl : undefined,
       emailRecipients: formChannel === 'EMAIL' ? formEmailRecipients : undefined,
     };
     try {
@@ -196,15 +192,19 @@ export default function AlertsPage() {
         <div className="flex items-center gap-2">
           {activeTab === 'events' && unresolvedCount > 0 && (
             <PermissionGate allowed={canManageEndpoints}>
-              <Button variant="outline" size="sm" onClick={handleResolveAll} disabled={resolveAll.isPending}>
-                <Check className="h-4 w-4 mr-1" /> {t('alerts.resolveAll', 'Resolve All')}
-              </Button>
+              <VerificationGate>
+                <Button variant="outline" size="sm" onClick={handleResolveAll} disabled={resolveAll.isPending}>
+                  <Check className="h-4 w-4 mr-1" /> {t('alerts.resolveAll', 'Resolve All')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           )}
           <PermissionGate allowed={canManageEndpoints}>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}
-            </Button>
+            <VerificationGate>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}
+              </Button>
+            </VerificationGate>
           </PermissionGate>
         </div>
       </div>
@@ -309,7 +309,7 @@ export default function AlertsPage() {
                                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <span>{t('alerts.triggeredBy', 'Triggered by rule:')}</span>
                                     <Badge variant="secondary" className="text-[11px]">{rule.name}</Badge>
-                                    <span>({rule.alertType.replace(/_/g, ' ')})</span>
+                                    <span>({t(`alerts.types.${rule.alertType}.label`)})</span>
                                     {rule.endpointId && <span className="font-mono">endpoint: {rule.endpointId.slice(0, 8)}…</span>}
                                   </div>
                                 )}
@@ -360,7 +360,7 @@ export default function AlertsPage() {
       {activeTab === 'rules' && (
         rules.length === 0 ? (
           <EmptyState icon={Bell} title={t('alerts.noRules', 'No alert rules')} description={t('alerts.noRulesDesc', 'Create your first alert rule to monitor delivery health')}
-            action={<PermissionGate allowed={canManageEndpoints}><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}</Button></PermissionGate>} />
+            action={<PermissionGate allowed={canManageEndpoints}><VerificationGate><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}</Button></VerificationGate></PermissionGate>} />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 animate-fade-in">
             {rules.map((rule) => (
@@ -376,20 +376,20 @@ export default function AlertsPage() {
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">{rule.alertType.replace(/_/g, ' ')}</Badge>
+                    <Badge variant="secondary">{t(`alerts.types.${rule.alertType}.label`)}</Badge>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${SEVERITY_COLORS[rule.severity] || ''}`}>{rule.severity}</span>
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-muted">
-                      {rule.channel === 'EMAIL' ? <Mail className="h-3 w-3" /> : rule.channel === 'WEBHOOK' ? <Webhook className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
-                      {rule.channel.replace(/_/g, ' ')}
+                      {rule.channel === 'EMAIL' ? <Mail className="h-3 w-3" /> : rule.channel === 'WEBHOOK' ? <Webhook className="h-3 w-3" /> : rule.channel === 'SLACK' ? <MessageSquare className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
+                      {t(`alerts.channels.${rule.channel}`, rule.channel)}
                     </span>
-                    {rule.muted && <Badge variant="outline" className="text-muted-foreground"><VolumeX className="h-3 w-3 mr-1" />Muted</Badge>}
+                    {rule.muted && <Badge variant="outline" className="text-muted-foreground"><VolumeX className="h-3 w-3 mr-1" />{t('alerts.muted')}</Badge>}
                     {rule.snoozedUntil && new Date(rule.snoozedUntil) > new Date() && (
-                      <Badge variant="outline" className="text-orange-600"><BellOff className="h-3 w-3 mr-1" />Snoozed</Badge>
+                      <Badge variant="outline" className="text-orange-600"><BellOff className="h-3 w-3 mr-1" />{t('alerts.snoozed')}</Badge>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <div>Threshold: <span className="font-mono text-foreground">{rule.thresholdValue}</span></div>
-                    <div>Window: <span className="font-mono text-foreground">{rule.windowMinutes}m</span></div>
+                    <div>{t('alerts.threshold')}: <span className="font-mono text-foreground">{rule.thresholdValue}</span></div>
+                    <div>{t('alerts.window')}: <span className="font-mono text-foreground">{rule.windowMinutes}m</span></div>
                   </div>
                   {rule.channel === 'WEBHOOK' && rule.webhookUrl && (
                     <div className="text-[11px] text-muted-foreground truncate">→ {rule.webhookUrl}</div>
@@ -450,9 +450,9 @@ export default function AlertsPage() {
             <div className="space-y-2">
               <Label>{t('alerts.form.type', 'Alert Type')}</Label>
               <Select value={formType} onChange={(e) => setFormType(e.target.value as AlertType)}>
-                {ALERT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {ALERT_TYPE_VALUES.map((v) => <option key={v} value={v}>{t(`alerts.types.${v}.label`)}</option>)}
               </Select>
-              <p className="text-xs text-muted-foreground">{ALERT_TYPES.find((a) => a.value === formType)?.hint}</p>
+              <p className="text-xs text-muted-foreground">{t(`alerts.types.${formType}.hint`)}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -479,15 +479,23 @@ export default function AlertsPage() {
             <div className="space-y-2">
               <Label>{t('alerts.form.channel', 'Notification Channel')}</Label>
               <Select value={formChannel} onChange={(e) => setFormChannel(e.target.value as AlertChannel)}>
-                <option value="IN_APP">In-App</option>
-                <option value="EMAIL">Email</option>
-                <option value="WEBHOOK">Webhook</option>
+                <option value="IN_APP">{t('alerts.channels.IN_APP')}</option>
+                <option value="EMAIL">{t('alerts.channels.EMAIL')}</option>
+                <option value="WEBHOOK">{t('alerts.channels.WEBHOOK')}</option>
+                <option value="SLACK">{t('alerts.channels.SLACK')}</option>
               </Select>
             </div>
             {formChannel === 'WEBHOOK' && (
               <div className="space-y-2">
-                <Label>{t('alerts.form.webhookUrl', 'Webhook URL')}</Label>
-                <Input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://hooks.slack.com/..." />
+                <Label>{t('alerts.form.webhookUrl')}</Label>
+                <Input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://example.com/webhook" />
+              </div>
+            )}
+            {formChannel === 'SLACK' && (
+              <div className="space-y-2">
+                <Label>{t('alerts.form.slackWebhookUrl')}</Label>
+                <Input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} placeholder="https://hooks.slack.com/services/..." />
+                <p className="text-xs text-muted-foreground">{t('alerts.form.slackHint')}</p>
               </div>
             )}
             {formChannel === 'EMAIL' && (

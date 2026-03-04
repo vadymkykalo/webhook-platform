@@ -29,6 +29,7 @@ import {
 import { Select } from '../components/ui/select';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'CUSTOM'];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
@@ -186,9 +187,11 @@ export default function IncomingSourcesPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingSources.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canManageIncomingSources}>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> {t('incomingSources.create')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> {t('incomingSources.create')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -199,9 +202,11 @@ export default function IncomingSourcesPage() {
           description={t('incomingSources.noSourcesDesc')}
           action={
             <PermissionGate allowed={canManageIncomingSources}>
-              <Button onClick={openCreate}>
-                <Plus className="h-4 w-4" /> {t('incomingSources.create')}
-              </Button>
+              <VerificationGate>
+                <Button onClick={openCreate}>
+                  <Plus className="h-4 w-4" /> {t('incomingSources.create')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           }
           docsLink="/docs#incoming-webhooks"

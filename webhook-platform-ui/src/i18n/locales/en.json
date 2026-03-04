@@ -55,7 +55,21 @@
     "error": "An unexpected error occurred",
     "retry": "Retry",
     "backToHome": "Back to home",
-    "learnMore": "Learn more"
+    "learnMore": "Learn more",
+    "optional": "optional"
+  },
+  "passwordStrength": {
+    "weak": "Weak",
+    "fair": "Fair",
+    "good": "Good",
+    "strong": "Strong",
+    "rules": {
+      "minLength": "At least 8 characters",
+      "uppercase": "Uppercase letter",
+      "lowercase": "Lowercase letter",
+      "digit": "Number",
+      "special": "Special character"
+    }
   },
   "dangerConfirm": {
     "impact": "This action will affect:",
@@ -75,6 +89,7 @@
     "resources": "Resources",
     "dashboard": "Dashboard",
     "projects": "Projects",
+    "connectionSetup": "Connection Setup",
     "endpoints": "Endpoints",
     "events": "Events",
     "deliveries": "Deliveries",
@@ -88,12 +103,16 @@
     "incidents": "Incidents",
     "transformStudio": "Transform Studio",
     "transformations": "Transformations",
+    "testConsole": "Test Console",
     "testEndpoints": "Test Endpoints",
     "devWorkspace": "Dev Console",
     "incomingSources": "Sources",
     "incomingEvents": "Received",
     "members": "Members",
     "auditLog": "Audit Log",
+    "connections": "Connections",
+    "orgSettings": "Organization",
+    "billing": "Billing",
     "settings": "Settings",
     "outgoing": "Outgoing",
     "incoming": "Incoming",
@@ -211,7 +230,19 @@
       "resend": "Resend email",
       "resending": "Sending...",
       "sent": "Verification email sent!",
-      "failed": "Failed to resend"
+      "failed": "Failed to resend",
+      "gateTooltip": "Verify your email to unlock this action"
+    },
+    "intent": {
+      "title": "What brings you to Hookflow?",
+      "subtitle": "This helps us tailor your experience. You can always change later.",
+      "send": "I send webhooks",
+      "sendDesc": "Deliver events to your customers' endpoints with retries, monitoring, and delivery guarantees.",
+      "receive": "I receive webhooks",
+      "receiveDesc": "Ingest webhooks from providers like Stripe or GitHub, verify signatures, and forward to your services.",
+      "both": "Both",
+      "bothDesc": "Full bidirectional webhook infrastructure — send and receive.",
+      "continue": "Continue"
     }
   },
   "projects": {
@@ -231,7 +262,16 @@
       "descriptionLabel": "Description (optional)",
       "descriptionPlaceholder": "What is this project for?",
       "submit": "Create Project",
-      "submitting": "Creating..."
+      "submitting": "Creating...",
+      "templateLabel": "Start from a template",
+      "templateCustom": "Blank project",
+      "templateCustomDesc": "Empty project — configure everything yourself",
+      "templateStripe": "Stripe-like",
+      "templateStripeDesc": "Payment events: charge.succeeded, invoice.paid, refund.created",
+      "templateShopify": "Shopify-like",
+      "templateShopifyDesc": "E-commerce events: order.created, product.updated, checkout.completed",
+      "templateGithub": "GitHub-like",
+      "templateGithubDesc": "CI/CD events: push, pull_request.opened, workflow.completed"
     },
     "deleteDialog": {
       "title": "Are you sure?",
@@ -252,6 +292,16 @@
       "events": "Events",
       "keys": "Keys",
       "deliveries": "Deliveries"
+    },
+    "health": {
+      "endpoints": "{{count}} endpoints",
+      "noEndpoints": "No endpoints",
+      "successRate": "{{rate}}% success",
+      "noDeliveries": "No deliveries yet",
+      "lastEvent": "Last event {{time}}",
+      "noEvents": "No events yet",
+      "errors": "{{count}} errors",
+      "healthy": "Healthy"
     }
   },
   "dashboard": {
@@ -304,6 +354,7 @@
     "noEndpoints": "No endpoints yet",
     "noEndpointsDesc": "Create your first endpoint to start receiving webhook deliveries",
     "createFirst": "Create endpoint",
+    "guidedSetup": "Guided Setup",
     "projectNotFound": "Project not found",
     "url": "URL",
     "status": "Status",
@@ -407,6 +458,7 @@
     "newSubscription": "Create Subscription",
     "noSubscriptions": "No subscriptions yet",
     "noSubscriptionsDesc": "Create a subscription to route events to your endpoints",
+    "noEventTypesHint": "Tip: Define event types in Schemas to get autocomplete and validation when creating subscriptions.",
     "noMatching": "No matching subscriptions",
     "noMatchingDesc": "Try adjusting your filters",
     "createFirst": "Create Subscription",
@@ -432,6 +484,101 @@
       "fifoEnabled": "FIFO ordering enabled",
       "fifoDisabled": "FIFO ordering disabled",
       "deleted": "Subscription deleted successfully"
+    },
+    "bulk": {
+      "selected": "{{count}} selected",
+      "enableAll": "Enable",
+      "disableAll": "Disable",
+      "rebind": "Rebind endpoint",
+      "rebindTitle": "Rebind Endpoint",
+      "rebindDesc": "Move {{count}} subscription(s) to a different endpoint.",
+      "selectEndpoint": "Select target endpoint…",
+      "rebindConfirm": "Rebind",
+      "done": "{{count}} subscription(s) updated",
+      "rebound": "{{count}} subscription(s) rebound to new endpoint"
+    }
+  },
+  "createSubscription": {
+    "titleCreate": "Create Subscription",
+    "titleEdit": "Edit Subscription",
+    "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
+    "descriptionEdit": "Update how events are routed to this endpoint",
+    "submitCreate": "Create Subscription",
+    "submitEdit": "Update Subscription",
+    "sections": {
+      "essentials": "Essentials",
+      "behavior": "Behavior",
+      "advanced": "Advanced Settings",
+      "advancedHint": "retry, timeout, transformation, headers"
+    },
+    "fields": {
+      "endpoint": "Endpoint",
+      "selectEndpoint": "Select an endpoint...",
+      "noEndpoints": "No endpoints available. Create an endpoint first.",
+      "endpointHint": "The webhook URL that will receive matching events.",
+      "selected": "Selected",
+      "enabled": "Enabled",
+      "enabledHint": "Events will be delivered",
+      "disabledHint": "Paused — no deliveries",
+      "fifoOrdering": "FIFO Ordering",
+      "fifoOnHint": "Strict order (slower)",
+      "fifoOffHint": "Parallel (fastest)",
+      "maxAttempts": "Max Attempts",
+      "maxAttemptsHint": "How many times to try (1–20)",
+      "timeout": "Timeout (sec)",
+      "timeoutHint": "Per-request timeout (1–60)",
+      "retryDelays": "Retry Delays",
+      "retryDelaysHint": "Seconds between retries",
+      "transformation": "Transformation",
+      "noTransformation": "None — send original payload",
+      "payloadTemplate": "Payload Template",
+      "customHeaders": "Custom Headers",
+      "customHeadersHint": "JSON key-value pairs added to each request.",
+      "eventType": "Event Type",
+      "eventTypePlaceholder": "e.g., user.created, order.*, **",
+      "eventTypeHint": "Dot notation: order.created exact, order.* one level, order.** all nested, ** catch-all.",
+      "noSchema": "No matching schema found — this event type has no registered schema.",
+      "breaking": "Breaking",
+      "payloadFields": "Payload fields (v{{version}})"
+    },
+    "validation": {
+      "endpointRequired": "Please select an endpoint that will receive the events",
+      "eventTypeRequired": "Event type is required — specify which events this subscription should receive",
+      "eventTypeFormat": "Use lowercase letters, dots, underscores. Wildcards: order.* (one level), order.** (all nested), ** (catch-all)",
+      "maxAttempts": "Must be between 1 and 20 attempts",
+      "timeout": "Must be between 1 and 60 seconds",
+      "retryDelays": "Must be comma-separated numbers (seconds), e.g. 60,300,900",
+      "invalidJson": "Invalid JSON — check syntax",
+      "headersObject": "Must be a JSON object with key-value pairs"
+    },
+    "summary": {
+      "title": "What happens next?",
+      "description": "Every time an event matching {{eventType}} is received, it will be delivered to {{endpoint}}. You can send a test event from the Events page to verify everything works.",
+      "theEndpoint": "the selected endpoint"
+    },
+    "toast": {
+      "created": "Subscription created successfully",
+      "updated": "Subscription updated successfully"
+    }
+  },
+  "mtls": {
+    "title": "mTLS Configuration",
+    "description": "Configure mutual TLS (client certificate authentication) for secure webhook delivery.",
+    "enabledBanner": "mTLS is currently enabled for this endpoint. Upload new certificates to update or disable below.",
+    "securityWarning": "Keep your private key secure. It will be encrypted before storage but never share it.",
+    "clientCert": "Client Certificate (PEM)",
+    "clientKey": "Client Private Key (PEM)",
+    "caCert": "CA Certificate (PEM) — Optional",
+    "caCertHint": "Optional: Provide a custom CA certificate for server verification.",
+    "uploadCert": "Upload .pem/.crt",
+    "uploadKey": "Upload .pem/.key",
+    "uploadCa": "Upload CA cert",
+    "enable": "Enable mTLS",
+    "disable": "Disable mTLS",
+    "updateCerts": "Update Certificates",
+    "toast": {
+      "configured": "mTLS configured successfully",
+      "disabled": "mTLS disabled"
     }
   },
   "events": {
@@ -446,7 +593,13 @@
     "deliveriesCount": "Deliveries",
     "viewDeliveries": "View deliveries for this event",
     "toast": {
-      "idCopied": "Event ID copied to clipboard"
+      "idCopied": "Event ID copied to clipboard",
+      "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
+      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
+    },
+    "sendModal": {
+      "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
+      "matchInfo": "{{count}} subscription(s) will receive this event."
     },
     "details": {
       "title": "Event Details",
@@ -456,6 +609,8 @@
       "noPayload": "No payload",
       "sanitizedUnavailable": "Sanitized view unavailable. Configure PII rules first.",
       "noDeliveries": "No deliveries for this event",
+      "noDeliveriesNoSub": "No active subscriptions match event type <strong>{{eventType}}</strong>. Create a subscription for this event type to start receiving deliveries.",
+      "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
       "openFull": "Open Full Details",
       "notFound": "Event not found"
     }
@@ -465,6 +620,10 @@
     "subtitle": "Track webhook delivery attempts for <strong>{{project}}</strong>",
     "noDeliveries": "No deliveries found",
     "noDeliveriesDesc": "Deliveries will appear here once events are sent to your endpoints",
+    "noDeliveriesForEvent": "No deliveries for this event",
+    "noDeliveriesForEventDesc": "Event type <strong>{{eventType}}</strong> didn't match any active subscription. Deliveries are only created when an event type matches at least one subscription.",
+    "noDeliveriesForEventAction": "Create Subscription",
+    "viewSubscriptions": "View Subscriptions",
     "projectNotFound": "Project not found",
     "filters": {
       "status": "Status",
@@ -476,7 +635,9 @@
       "last7d": "Last 7 days",
       "last30d": "Last 30 days",
       "searchById": "Search by ID",
-      "searchPlaceholder": "Enter delivery ID..."
+      "searchPlaceholder": "Enter delivery ID...",
+      "searchByEventType": "Search by event type",
+      "eventTypePlaceholder": "e.g. order.created"
     },
     "columns": {
       "created": "Created",
@@ -530,6 +691,10 @@
     "lastUsed": "Last used",
     "never": "Never",
     "justNow": "Just now",
+    "scopeReadWrite": "Read & Write",
+    "scopeReadOnly": "Read Only",
+    "expired": "Expired",
+    "expiresAt": "Expires {{date}}",
     "createDialog": {
       "title": "Create New API Key",
       "description": "Add a new API key to send events to this project",
@@ -537,7 +702,16 @@
       "namePlaceholder": "Production API Key",
       "nameHint": "A descriptive name to identify this API key",
       "submit": "Create API Key",
-      "submitting": "Creating..."
+      "submitting": "Creating...",
+      "scope": "Permissions",
+      "scopeReadWriteHint": "Can send events and read project data",
+      "scopeReadOnlyHint": "Can only read project data, cannot send events",
+      "expiration": "Expiration",
+      "noExpiration": "No expiration",
+      "expires7d": "7 days",
+      "expires30d": "30 days",
+      "expires90d": "90 days",
+      "expires1y": "1 year"
     },
     "revokeDialog": {
       "title": "Revoke API Key?",
@@ -586,12 +760,75 @@
       "title": "Remove Member?",
       "description": "This member will lose access to the organization and all its resources. This action cannot be undone."
     },
+    "addModal": {
+      "title": "Add Member",
+      "description": "Invite a new member to this organization",
+      "email": "Email",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Invalid email format",
+      "role": "Role",
+      "roleHint": "Developer: Can create and manage resources. Viewer: Read-only access.",
+      "emailNote": "The member will receive an invitation email to join the organization.",
+      "submit": "Add Member",
+      "adding": "Adding...",
+      "inviteSent": "Invitation sent successfully!",
+      "inviteLink": "Invite Link",
+      "copyLink": "Copy link",
+      "inviteLinkHint": "Share this link with the member. The link expires in 48 hours."
+    },
     "toast": {
       "added": "Member added successfully",
+      "invited": "Invitation sent! The member will need to accept the invite.",
+      "linkCopied": "Invite link copied to clipboard",
       "roleChanged": "Member role updated successfully",
       "roleChangeFailed": "Failed to update member role",
       "removed": "Member removed successfully",
       "removeFailed": "Failed to remove member"
+    }
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Manage your plan and usage",
+    "comingSoon": "Coming Soon",
+    "comingSoonTitle": "Billing & Plans",
+    "comingSoonDesc": "Plan management, usage limits, and invoices are coming soon. Currently all features are available on the free tier."
+  },
+  "connections": {
+    "title": "Connection Map",
+    "subtitle": "Visual overview of event routing for <strong>{{project}}</strong>",
+    "eventTypes": "{{count}} event types",
+    "endpoints": "{{count}} endpoints",
+    "subscriptions": "{{count}} subscriptions",
+    "empty": "No connections yet",
+    "emptyDesc": "Create endpoints and subscriptions to see the connection map",
+    "endpointDisabled": "Endpoint off",
+    "subDisabled": "Sub off",
+    "unsubscribed": "Unsubscribed Endpoints",
+    "unsubscribedDesc": "These endpoints have no active subscriptions and won't receive any events",
+    "noSubscriptions": "No subscriptions"
+  },
+  "orgSettings": {
+    "title": "Organization Settings",
+    "subtitle": "Manage your organization details and membership",
+    "details": "Organization Details",
+    "detailsDesc": "Basic information about your organization",
+    "orgName": "Organization Name",
+    "orgNamePlaceholder": "Acme Inc.",
+    "orgId": "Organization ID",
+    "createdAt": "Created",
+    "membersOverview": "Members",
+    "membersOverviewDesc": "Overview of organization membership",
+    "totalMembers": "Total",
+    "owners": "Owners",
+    "developers": "Developers",
+    "viewers": "Viewers",
+    "security": "Security",
+    "securityDesc": "Authentication and access control configuration",
+    "authMethod": "Auth method",
+    "rbac": "Access control",
+    "toast": {
+      "updated": "Organization updated",
+      "updateFailed": "Failed to update organization"
     }
   },
   "settings": {
@@ -599,6 +836,9 @@
     "subtitle": "Manage your account and organization settings",
     "profile": "Profile",
     "profileDesc": "Your account information",
+    "fullName": "Full name",
+    "fullNamePlaceholder": "John Doe",
+    "profileUpdateFailed": "Failed to update profile",
     "email": "Email",
     "role": "Role",
     "accountStatus": "Account status",
@@ -634,6 +874,23 @@
       "tip3": "Use RBAC — grant DEVELOPER role instead of OWNER where possible",
       "tip4": "Review the Audit Log weekly for suspicious activity"
     },
+    "timezone": {
+      "title": "Timezone",
+      "description": "Set your preferred timezone for displaying dates and times",
+      "select": "Timezone",
+      "hint": "All dates will be displayed in {{tz}}",
+      "saved": "Timezone updated"
+    },
+    "notifications": {
+      "title": "Notification Preferences",
+      "description": "Choose how you want to receive notifications",
+      "inApp": "In-App Notifications",
+      "inAppDesc": "Show notifications within the application",
+      "email": "Email Notifications",
+      "emailDesc": "Receive important alerts via email",
+      "browser": "Browser Notifications",
+      "browserDesc": "Push notifications in your browser (requires permission)"
+    },
     "dangerZone": "Danger Zone",
     "dangerZoneDesc": "Irreversible and destructive actions",
     "deleteAccount": "Delete Account",
@@ -653,10 +910,46 @@
       "action": "Action",
       "resource": "Resource",
       "resourceId": "Resource ID",
-      "userId": "User ID",
+      "user": "User",
       "status": "Status",
       "duration": "Duration",
+      "ip": "IP Address",
       "error": "Error"
+    },
+    "filters": {
+      "allActions": "All Actions",
+      "allStatuses": "All Statuses",
+      "allResources": "All Resources",
+      "success": "Success",
+      "failure": "Failure",
+      "from": "From",
+      "to": "To",
+      "clear": "Clear",
+      "showing": "Showing {{count}} of {{total}} on this page"
+    },
+    "actions": {
+      "CREATE": "Create",
+      "UPDATE": "Update",
+      "DELETE": "Delete",
+      "ROTATE_SECRET": "Rotate Secret",
+      "REVOKE": "Revoke",
+      "REGISTER": "Register",
+      "LOGIN": "Login",
+      "LOGOUT": "Logout",
+      "CONFIGURE_MTLS": "Configure mTLS",
+      "TEST_WEBHOOK": "Test Webhook",
+      "PASSWORD_RESET_REQUESTED": "Password Reset Requested",
+      "PASSWORD_RESET": "Password Reset",
+      "PASSWORD_CHANGED": "Password Changed",
+      "MEMBER_INVITED": "Member Invited",
+      "MEMBER_ROLE_CHANGED": "Role Changed",
+      "MEMBER_REMOVED": "Member Removed",
+      "INVITE_ACCEPTED": "Invite Accepted",
+      "RESOLVE_INCIDENT": "Resolve Incident"
+    },
+    "export": {
+      "csv": "Export CSV",
+      "done": "Exported {{count}} audit log entries"
     },
     "pagination": "{{total}} total events · Page {{page}} of {{pages}}"
   },
@@ -1915,13 +2208,22 @@
       "label": "Replay from specific attempt:",
       "step": "From #{{number}}"
     },
+    "trace": "Trace",
+    "requestId": "Request ID",
+    "compareAttempts": "Compare Attempts",
+    "compareHint": "Click two attempts to compare status, latency, errors, and response bodies",
+    "responseBodyDiff": "Response Body Diff",
+    "openIncidents": "Open Incidents",
+    "createIncident": "Create Incident",
     "toast": {
       "loadFailed": "Failed to load delivery details",
       "replaySuccess": "Delivery replay initiated successfully",
       "replayFailed": "Failed to replay delivery",
       "dryRunFailed": "Failed to run dry-run preview",
       "idCopied": "Delivery ID copied to clipboard",
-      "copied": "{{label}} copied to clipboard"
+      "copied": "{{label}} copied to clipboard",
+      "incidentCreated": "Incident created from delivery",
+      "incidentFailed": "Failed to create incident"
     },
     "troubleshooting": {
       "title": "Troubleshooting Tips",
@@ -2010,7 +2312,121 @@
     "usage": "Usage",
     "incidents": "Incidents",
     "transformations": "Transformations",
-    "transform-studio": "Transform Studio"
+    "transform-studio": "Transform Studio",
+    "connection-setup": "Connection Setup",
+    "test-console": "Test Console"
+  },
+  "testConsole": {
+    "title": "Test Console",
+    "subtitle": "Send events and inspect delivery results for <strong>{{project}}</strong>",
+    "sendEvent": "Send Event",
+    "sendEventDesc": "Send a test event and watch deliveries in real time",
+    "pingEndpoint": "Ping Endpoint",
+    "pingDesc": "Send a health-check ping to an endpoint and inspect the response",
+    "eventType": "Event Type",
+    "payload": "Event Payload (JSON)",
+    "invalidJson": "Invalid JSON format",
+    "fixJson": "Please fix JSON errors before sending",
+    "selectEndpoint": "Endpoint",
+    "chooseEndpoint": "Select an endpoint…",
+    "runTest": "Send & Inspect",
+    "sending": "Sending…",
+    "runPing": "Ping & Inspect",
+    "pinging": "Pinging…",
+    "eventSent": "Event sent — {{count}} delivery(ies) created",
+    "expectedDeliveries": "Expected deliveries",
+    "noMatchingSubs": "No active subscriptions match this event type",
+    "emptyTitle": "Ready to test",
+    "emptyDesc": "Send an event or ping an endpoint to see results here",
+    "processing": "Processing…",
+    "pingResult": "Ping Result",
+    "status": "Status",
+    "latency": "Latency",
+    "result": "Result",
+    "pass": "Pass",
+    "fail": "Fail",
+    "message": "Message",
+    "responseBody": "Response Body",
+    "error": "Error",
+    "eventCreated": "Event Created",
+    "eventId": "Event ID",
+    "deliveriesCreated": "Deliveries",
+    "deliveryResults": "Delivery Results",
+    "noDeliveries": "No deliveries created",
+    "noDeliveriesDesc": "No active subscriptions matched this event type, or deliveries haven't been created yet.",
+    "statusSuccess": "Success",
+    "statusFailed": "Failed",
+    "statusPending": "Pending",
+    "statusProcessing": "Processing",
+    "attempts": "attempts",
+    "noAttempts": "No delivery attempts yet",
+    "request": "Request",
+    "response": "Response",
+    "requestHeaders": "Request Headers",
+    "requestBody": "Request Body",
+    "responseHeaders": "Response Headers"
+  },
+  "connectionSetup": {
+    "title": "Connection Setup",
+    "subtitle": "Set up a new webhook connection for {{project}} step by step",
+    "next": "Continue",
+    "steps": {
+      "url": {
+        "title": "Endpoint URL",
+        "desc": "Where should we deliver webhook events?",
+        "urlLabel": "Endpoint URL",
+        "descLabel": "Description (optional)",
+        "descPlaceholder": "e.g. Production payment handler",
+        "create": "Create Endpoint"
+      },
+      "secret": {
+        "title": "Signing Secret",
+        "desc": "Copy the HMAC secret to verify webhook signatures on your server",
+        "pending": "Create an endpoint first to generate a signing secret.",
+        "warning": "Store this secret securely — it won't be shown again. Use it to verify the X-Webhook-Signature header."
+      },
+      "test": {
+        "title": "Test Ping",
+        "desc": "Send a test event to verify your endpoint is reachable",
+        "pending": "Create an endpoint first to run a test.",
+        "send": "Send Test Ping",
+        "passed": "Connection successful!",
+        "failed": "Connection failed",
+        "retryHint": "Check your endpoint URL and server, then try again."
+      },
+      "events": {
+        "title": "Event Types",
+        "desc": "Which events should this endpoint receive?",
+        "pending": "Create an endpoint first to subscribe to events.",
+        "add": "Add event type",
+        "create": "Create Subscriptions",
+        "done": "{{count}} event type(s) subscribed"
+      },
+      "retry": {
+        "title": "Retry Policy",
+        "desc": "Configure how failed deliveries are retried",
+        "maxAttempts": "Max attempts",
+        "timeout": "Timeout (seconds)",
+        "delays": "Retry delays (seconds, comma-separated)",
+        "delaysHint": "Comma-separated seconds between retries. Default: 1m, 5m, 15m, 1h, 6h, 24h",
+        "preview": "Schedule",
+        "save": "Confirm Retry Policy",
+        "done": "{{attempts}} attempts, {{timeout}}s timeout"
+      }
+    },
+    "toast": {
+      "endpointCreated": "Endpoint created",
+      "secretCopied": "Secret copied to clipboard",
+      "testPassed": "Test ping successful",
+      "subscriptionsCreated": "{{count}} subscription(s) created",
+      "retryConfigured": "Retry policy configured"
+    },
+    "complete": {
+      "title": "Connection Ready!",
+      "desc": "Your webhook endpoint is fully configured and ready to receive events.",
+      "viewEndpoints": "View Endpoints",
+      "sendEvent": "Send First Event"
+    }
   },
   "piiRules": {
     "title": "PII Masking Rules",
@@ -2076,6 +2492,23 @@
     "noDiffs": "No differences found — payloads are identical",
     "left": "Left",
     "right": "Right",
+    "selectDescription": "Choose two events to compare their payloads. Search by event type or ID. Differences will be highlighted automatically.",
+    "searchPlaceholder": "Search by type or ID...",
+    "noSearchResults": "No events match your search",
+    "noEvents": "No events found",
+    "sameEventWarning": "Same event selected on both sides",
+    "comparing": "Comparing events...",
+    "noDiffsTitle": "No differences found",
+    "noDiffsSubtitle": "Both events have identical payloads",
+    "differencesDetected": "{{count}} difference(s) detected",
+    "betweenEvents": "Between these two events of type",
+    "added": "{{count}} added",
+    "removed": "{{count}} removed",
+    "changed": "{{count}} changed",
+    "emptyTitle": "Compare Event Payloads",
+    "emptyDescription": "Select two events above to compare their payloads side by side. Structural differences like added, removed, or changed fields will be highlighted automatically.",
+    "eventsCount": "{{count}} events",
+    "pageInfo": "Page {{current}}/{{total}}",
     "toast": {
       "loadEventsFailed": "Failed to load events",
       "diffFailed": "Failed to compute diff"
@@ -2348,6 +2781,8 @@
       "description": "Description (optional)",
       "channel": "Notification Channel",
       "webhookUrl": "Webhook URL",
+      "slackWebhookUrl": "Slack Webhook URL",
+      "slackHint": "Create an Incoming Webhook in your Slack workspace settings to get the URL.",
       "emailRecipients": "Email Recipients"
     },
     "toast": {
@@ -2361,6 +2796,30 @@
       "snoozed": "Snoozed for {{hours}}h",
       "resolveFailed": "Failed to resolve alert",
       "allResolved": "{{count}} alerts resolved"
+    },
+    "types": {
+      "FAILURE_RATE": {
+        "label": "Failure Rate",
+        "hint": "Triggers when failure % exceeds threshold in window"
+      },
+      "DLQ_THRESHOLD": {
+        "label": "DLQ Threshold",
+        "hint": "Triggers when DLQ count exceeds threshold"
+      },
+      "CONSECUTIVE_FAILURES": {
+        "label": "Consecutive Failures",
+        "hint": "Triggers after N consecutive failures for an endpoint"
+      },
+      "LATENCY_THRESHOLD": {
+        "label": "Latency Threshold",
+        "hint": "Triggers when avg latency exceeds threshold (ms)"
+      }
+    },
+    "channels": {
+      "IN_APP": "In-App",
+      "EMAIL": "Email",
+      "WEBHOOK": "Webhook",
+      "SLACK": "Slack"
     }
   },
   "incidents": {
@@ -2487,6 +2946,62 @@
       "validJson": "Valid JSON",
       "expression": "expression",
       "expressions": "expressions"
+    }
+  },
+  "transform": {
+    "title": "Transform Studio",
+    "subtitle": "Test payload transformations for incoming destinations",
+    "hints": {
+      "title": "Quick Expressions",
+      "extractData": "Extract the data object",
+      "extractItems": "Extract items array",
+      "extractCustomer": "Extract customer info",
+      "extractMetadata": "Extract metadata",
+      "passThrough": "Pass through entire payload"
+    },
+    "inputPayload": "Input Payload",
+    "format": "Format",
+    "savedTransformation": "Saved Transformation",
+    "noSavedTransformation": "— Use custom expression below —",
+    "expression": "Transform Expression (JSONPath-like)",
+    "customHeaders": "Custom Headers (JSON object)",
+    "run": "Run Preview",
+    "running": "Running...",
+    "reset": "Reset",
+    "outputPayload": "Output Payload",
+    "outputHeaders": "Output Headers",
+    "noOutput": "Click \"Run Preview\" to see the transform output",
+    "errors": "Validation Errors",
+    "howItWorks": "How it works",
+    "help": {
+      "extractField": "extract a nested field",
+      "drillArrays": "drill into arrays",
+      "emptyExpr": "Empty expression = forward full payload as-is",
+      "headersMerge": "Custom headers are merged with system headers",
+      "testBefore": "Use this to test before saving to a destination"
+    },
+    "previewFailed": "Failed to run transform preview"
+  },
+  "configExport": {
+    "title": "Config Export / Import",
+    "description": "Export or import project configuration (endpoints and subscriptions) as JSON",
+    "selectProject": "Select project",
+    "exportBtn": "Export Config",
+    "exporting": "Exporting...",
+    "importBtn": "Import Config",
+    "importing": "Importing...",
+    "hint": "Export saves endpoints and subscriptions. Import skips duplicates by URL.",
+    "importResult": "Created {{endpoints}} endpoints, {{subscriptions}} subscriptions",
+    "moreErrors": "...and {{count}} more errors",
+    "toast": {
+      "exported": "Exported {{endpoints}} endpoints and {{subscriptions}} subscriptions",
+      "exportFailed": "Failed to export configuration",
+      "imported": "Imported {{endpoints}} endpoints and {{subscriptions}} subscriptions",
+      "importedWithErrors": "Import completed with {{errors}} warnings",
+      "importFailed": "Failed to import configuration",
+      "unsupportedVersion": "Unsupported config file version",
+      "endpointSkipped": "Endpoint already exists: {{url}}",
+      "subscriptionSkipped": "No endpoint found for subscription {{eventType}} → {{url}}"
     }
   }
 }

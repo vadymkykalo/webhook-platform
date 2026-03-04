@@ -43,6 +43,9 @@ public class AuditLog {
     @Column(name = "duration_ms")
     private Integer durationMs;
 
+    @Column(name = "client_ip", length = 45)
+    private String clientIp;
+
     @Builder.Default
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();

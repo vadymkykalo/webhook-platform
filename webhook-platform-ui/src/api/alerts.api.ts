@@ -3,7 +3,7 @@ import type { PageResponse } from '../types/api.types';
 
 export type AlertType = 'FAILURE_RATE' | 'DLQ_THRESHOLD' | 'CONSECUTIVE_FAILURES' | 'LATENCY_THRESHOLD';
 export type AlertSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
-export type AlertChannel = 'IN_APP' | 'EMAIL' | 'WEBHOOK';
+export type AlertChannel = 'IN_APP' | 'EMAIL' | 'WEBHOOK' | 'SLACK';
 
 export interface AlertRuleResponse {
   id: string;

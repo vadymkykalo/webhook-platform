@@ -4,6 +4,7 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.ApiKey;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.repository.ApiKeyRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ApiKeyRequest;
@@ -58,6 +59,8 @@ public class ApiKeyService {
                 .name(request.getName())
                 .keyHash(keyHash)
                 .keyPrefix(keyPrefix)
+                .scope(request.getScope() != null ? request.getScope() : ApiKeyScope.READ_WRITE)
+                .expiresAt(request.getExpiresAt())
                 .build();
 
         apiKey = apiKeyRepository.save(apiKey);
@@ -132,6 +135,7 @@ public class ApiKeyService {
                 .createdAt(apiKey.getCreatedAt())
                 .revokedAt(apiKey.getRevokedAt())
                 .expiresAt(apiKey.getExpiresAt())
+                .scope(apiKey.getScope() != null ? apiKey.getScope().name() : "READ_WRITE")
                 .key(plainKey)
                 .build();
     }

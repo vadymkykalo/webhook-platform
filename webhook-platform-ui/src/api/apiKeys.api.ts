@@ -1,8 +1,12 @@
 import { http } from './http';
 import type { PageResponse } from '../types/api.types';
 
+export type ApiKeyScope = 'READ_WRITE' | 'READ_ONLY';
+
 export interface ApiKeyRequest {
   name: string;
+  scope?: ApiKeyScope;
+  expiresAt?: string;
 }
 
 export interface ApiKeyResponse {
@@ -14,6 +18,7 @@ export interface ApiKeyResponse {
   createdAt: string;
   revokedAt: string | null;
   expiresAt: string | null;
+  scope: string;
   key?: string;
 }
 

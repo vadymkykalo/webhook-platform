@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import {
-  Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
+  Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings, Building2, CreditCard,
   BookOpen, ChevronRight, ChevronDown, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Terminal, Repeat2
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play, Network
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -37,10 +37,14 @@ const mainNav: NavItem[] = [
 const orgNav: NavItem[] = [
   { nameKey: 'nav.members', path: '/admin/members', icon: Users, requiredRole: 'OWNER' },
   { nameKey: 'nav.auditLog', path: '/admin/audit-log', icon: FileText },
+  { nameKey: 'nav.orgSettings', path: '/admin/org-settings', icon: Building2, requiredRole: 'OWNER' },
+  { nameKey: 'nav.billing', path: '/admin/billing', icon: CreditCard, requiredRole: 'OWNER' },
   { nameKey: 'nav.settings', path: '/admin/settings', icon: Settings, requiredRole: 'OWNER' },
 ];
 
 const getProjectOutgoingNav = (projectId: string): NavItem[] => [
+  { nameKey: 'nav.connectionSetup', path: `/admin/projects/${projectId}/connection-setup`, icon: Cable },
+  { nameKey: 'nav.connections', path: `/admin/projects/${projectId}/connections`, icon: Network },
   { nameKey: 'nav.endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
   { nameKey: 'nav.subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
   { nameKey: 'nav.events', path: `/admin/projects/${projectId}/events`, icon: Radio },
@@ -76,7 +80,7 @@ const getProjectSecurityNav = (projectId: string): NavItem[] => [
 ];
 
 const getProjectDevToolsNav = (projectId: string): NavItem[] => [
-  { nameKey: 'nav.devWorkspace', path: `/admin/projects/${projectId}/dev-workspace`, icon: Terminal },
+  { nameKey: 'nav.testConsole', path: `/admin/projects/${projectId}/test-console`, icon: Play },
   { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
   { nameKey: 'nav.testEndpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
@@ -181,6 +185,8 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   incidents: { key: 'breadcrumb.incidents', icon: AlertTriangle },
   transformations: { key: 'breadcrumb.transformations', icon: Repeat2 },
   'transform-studio': { key: 'breadcrumb.transform-studio', icon: GitCompare },
+  'connection-setup': { key: 'breadcrumb.connection-setup', icon: Cable },
+  'test-console': { key: 'breadcrumb.test-console', icon: Play },
   members: { key: 'breadcrumb.members', icon: Users },
   'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
   settings: { key: 'breadcrumb.settings', icon: Settings },
@@ -439,6 +445,20 @@ export default function AppLayout() {
           </SidebarSection>
         )}
       </nav>
+
+      {/* Search shortcut hint */}
+      {(!collapsed || isMobile) && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span className="flex-1 text-left">{t('nav.search')}</span>
+            <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+          </button>
+        </div>
+      )}
 
       {/* User section */}
       <div className="border-t border-border/50 p-3">

@@ -41,4 +41,8 @@ export const authApi = {
   resetPassword: (token: string, newPassword: string): Promise<void> => {
     return http.post<void>('/api/v1/auth/reset-password', { token, newPassword });
   },
+
+  updateProfile: (data: { fullName?: string }): Promise<{ id: string; email: string; fullName: string | null; status: string }> => {
+    return http.put('/api/v1/auth/profile', data);
+  },
 };

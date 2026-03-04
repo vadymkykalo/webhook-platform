@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.domain.entity.Incident;
 import com.webhook.platform.api.domain.entity.IncidentTimeline;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
@@ -57,6 +59,7 @@ public class IncidentService {
         return response;
     }
 
+    @Auditable(action = AuditAction.CREATE, resourceType = "Incident")
     @Transactional
     public IncidentResponse createIncident(UUID projectId, IncidentRequest request, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);
@@ -87,6 +90,7 @@ public class IncidentService {
         return getIncident(projectId, incident.getId(), organizationId);
     }
 
+    @Auditable(action = AuditAction.UPDATE, resourceType = "Incident")
     @Transactional
     public IncidentResponse updateIncident(UUID projectId, UUID incidentId, IncidentRequest request, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);
@@ -120,6 +124,7 @@ public class IncidentService {
         return getIncident(projectId, incidentId, organizationId);
     }
 
+    @Auditable(action = AuditAction.UPDATE, resourceType = "IncidentTimeline")
     @Transactional
     public IncidentResponse addTimelineEntry(UUID projectId, UUID incidentId, TimelineEntryRequest request, UUID organizationId) {
         validateProjectAccess(projectId, organizationId);

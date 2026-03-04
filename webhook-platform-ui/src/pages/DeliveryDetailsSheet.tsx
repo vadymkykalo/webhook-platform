@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, Minus, GitCompare, Flame, Plus } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeFuture } from '../lib/date';
 import { useTranslation } from 'react-i18next';
 import { deliveriesApi } from '../api/deliveries.api';
+import { incidentsApi } from '../api/incidents.api';
 import type { DryRunReplayResponse } from '../api/deliveries.api';
 import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
@@ -54,6 +55,10 @@ export default function DeliveryDetailsSheet({
   const [dryRunResult, setDryRunResult] = useState<DryRunReplayResponse | null>(null);
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [replayFromStep, setReplayFromStep] = useState<number | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareLeft, setCompareLeft] = useState<number | null>(null);
+  const [compareRight, setCompareRight] = useState<number | null>(null);
+  const [creatingIncident, setCreatingIncident] = useState(false);
 
   useEffect(() => {
     if (deliveryId && open) {
@@ -134,6 +139,31 @@ export default function DeliveryDetailsSheet({
       showApiError(err, 'deliveryDetails.toast.dryRunFailed');
     } finally {
       setDryRunLoading(false);
+    }
+  };
+
+  const handleCreateIncident = async () => {
+    if (!delivery || !projectId) return;
+    setCreatingIncident(true);
+    try {
+      const lastFailed = attempts.filter(a => a.errorMessage || (a.httpStatusCode && a.httpStatusCode >= 400)).pop();
+      const title = `Delivery ${delivery.status}: ${delivery.id.substring(0, 8)}… → ${lastFailed?.httpStatusCode || 'error'}`;
+      const incident = await incidentsApi.create(projectId, {
+        title,
+        severity: delivery.status === 'DLQ' ? 'CRITICAL' : 'WARNING',
+      });
+      await incidentsApi.addTimeline(projectId, incident.id, {
+        entryType: 'FAILURE',
+        title: `Delivery ${delivery.status} after ${delivery.attemptCount} attempts`,
+        detail: lastFailed?.errorMessage || `HTTP ${lastFailed?.httpStatusCode}`,
+        deliveryId: delivery.id,
+        endpointId: delivery.endpointId,
+      });
+      showSuccess(t('deliveryDetails.toast.incidentCreated'));
+    } catch (err: any) {
+      showApiError(err, 'deliveryDetails.toast.incidentFailed');
+    } finally {
+      setCreatingIncident(false);
     }
   };
 
@@ -292,40 +322,77 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
 
-              {/* Correlation Trail */}
+              {/* Trace Block */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.references')}</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{t('deliveryDetails.trace')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {[
-                    { label: t('deliveryDetails.deliveryId'), value: delivery.id, link: null },
-                    { label: t('deliveryDetails.eventId'), value: delivery.eventId, link: projectId ? `/admin/projects/${projectId}/events?eventId=${delivery.eventId}` : null },
-                    { label: t('deliveryDetails.endpointId'), value: delivery.endpointId, link: projectId ? `/admin/projects/${projectId}/endpoints` : null },
-                    ...(delivery.subscriptionId ? [{ label: t('deliveryDetails.subscriptionId'), value: delivery.subscriptionId, link: projectId ? `/admin/projects/${projectId}/subscriptions` : null }] : []),
-                  ].map(({ label, value, link }) => (
-                    <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
-                      <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <code className="text-xs font-mono truncate" title={value}>{value}</code>
-                        {link && (
-                          <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')}>
-                            <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => copyToClipboard(value, label)}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                  {(() => {
+                    const firstAttempt = attempts[0];
+                    let requestId: string | null = null;
+                    if (firstAttempt?.requestHeaders) {
+                      try {
+                        const headers = JSON.parse(firstAttempt.requestHeaders);
+                        requestId = headers['X-Request-Id'] || headers['x-request-id'] || headers['X-Webhook-Id'] || headers['x-webhook-id'] || null;
+                      } catch { /* ignore */ }
+                    }
+                    const traceItems = [
+                      { label: t('deliveryDetails.deliveryId'), value: delivery.id, link: null },
+                      { label: t('deliveryDetails.eventId'), value: delivery.eventId, link: projectId ? `/admin/projects/${projectId}/events/${delivery.eventId}` : null },
+                      { label: t('deliveryDetails.endpointId'), value: delivery.endpointId, link: projectId ? `/admin/projects/${projectId}/endpoints` : null },
+                      ...(delivery.subscriptionId ? [{ label: t('deliveryDetails.subscriptionId'), value: delivery.subscriptionId, link: projectId ? `/admin/projects/${projectId}/subscriptions` : null }] : []),
+                      ...(requestId ? [{ label: t('deliveryDetails.requestId'), value: requestId, link: null }] : []),
+                    ];
+                    return traceItems.map(({ label, value, link }) => (
+                      <div key={label} className="group flex items-center justify-between gap-2 p-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors">
+                        <span className="text-xs font-medium text-muted-foreground shrink-0">{label}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <code className="text-xs font-mono truncate" title={value}>{value}</code>
+                          {link && (
+                            <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')}>
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => copyToClipboard(value, label)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </CardContent>
               </Card>
+
+              {/* Quick Actions — incident integration */}
+              {projectId && (delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
+                <Card className="border-orange-200/50 dark:border-orange-800/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/admin/projects/${projectId}/incidents`} onClick={onClose}>
+                        <Button variant="outline" size="sm">
+                          <Flame className="h-3.5 w-3.5 mr-1.5 text-orange-500" />
+                          {t('deliveryDetails.openIncidents')}
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateIncident}
+                        disabled={creatingIncident}
+                      >
+                        {creatingIncident ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                        {t('deliveryDetails.createIncident')}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Status & Progress */}
               <Card>
@@ -442,9 +509,83 @@ export default function DeliveryDetailsSheet({
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">{t('deliveryDetails.deliveryAttempts')}</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{t('deliveryDetails.deliveryAttempts')}</CardTitle>
+                    {attempts.length >= 2 && (
+                      <Button
+                        variant={compareMode ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setCompareMode(!compareMode);
+                          setCompareLeft(null);
+                          setCompareRight(null);
+                        }}
+                      >
+                        <GitCompare className="h-3.5 w-3.5 mr-1.5" />
+                        {t('deliveryDetails.compareAttempts')}
+                      </Button>
+                    )}
+                  </div>
+                  {compareMode && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {t('deliveryDetails.compareHint')}
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
+                  {/* Inline attempt comparison panel */}
+                  {compareMode && compareLeft !== null && compareRight !== null && (() => {
+                    const left = attempts.find(a => a.attemptNumber === compareLeft);
+                    const right = attempts.find(a => a.attemptNumber === compareRight);
+                    if (!left || !right) return null;
+                    const diffs: { field: string; left: string; right: string; changed: boolean }[] = [
+                      { field: 'HTTP Status', left: String(left.httpStatusCode ?? '—'), right: String(right.httpStatusCode ?? '—'), changed: left.httpStatusCode !== right.httpStatusCode },
+                      { field: 'Duration', left: left.durationMs != null ? `${left.durationMs}ms` : '—', right: right.durationMs != null ? `${right.durationMs}ms` : '—', changed: left.durationMs !== right.durationMs },
+                      { field: 'Error', left: left.errorMessage || '—', right: right.errorMessage || '—', changed: left.errorMessage !== right.errorMessage },
+                    ];
+                    const leftBody = left.responseBody || '';
+                    const rightBody = right.responseBody || '';
+                    const bodyChanged = leftBody !== rightBody;
+                    return (
+                      <div className="mb-4 border rounded-lg p-4 bg-muted/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold flex items-center gap-1.5">
+                            <GitCompare className="h-4 w-4 text-primary" />
+                            {t('deliveryDetails.attemptNumber', { number: compareLeft })} vs {t('deliveryDetails.attemptNumber', { number: compareRight })}
+                          </span>
+                          <Button variant="ghost" size="sm" onClick={() => { setCompareLeft(null); setCompareRight(null); }}>
+                            <XCircle className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {diffs.map(d => (
+                            <div key={d.field} className={`flex items-center justify-between text-xs px-2 py-1.5 rounded ${d.changed ? 'bg-yellow-500/10 border border-yellow-500/20' : ''}`}>
+                              <span className="font-medium text-muted-foreground w-24 shrink-0">{d.field}</span>
+                              <span className={`font-mono ${d.changed ? 'text-red-500 line-through' : 'text-muted-foreground'}`}>{d.left}</span>
+                              {d.changed && <span className="text-muted-foreground mx-1">→</span>}
+                              {d.changed && <span className="font-mono text-green-600">{d.right}</span>}
+                            </div>
+                          ))}
+                        </div>
+                        {bodyChanged && leftBody && rightBody && (
+                          <details>
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground font-medium">
+                              {t('deliveryDetails.responseBodyDiff')}
+                            </summary>
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <pre className="text-[10px] font-mono p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded overflow-x-auto max-h-32">
+                                {(() => { try { return JSON.stringify(JSON.parse(leftBody), null, 2); } catch { return leftBody; } })()}
+                              </pre>
+                              <pre className="text-[10px] font-mono p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded overflow-x-auto max-h-32">
+                                {(() => { try { return JSON.stringify(JSON.parse(rightBody), null, 2); } catch { return rightBody; } })()}
+                              </pre>
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {attemptsLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -493,9 +634,40 @@ export default function DeliveryDetailsSheet({
 
                               {/* Attempt content */}
                               <div className="flex-1 pb-4 min-w-0">
-                                <div className="border rounded-lg p-4 space-y-2">
+                                <div
+                                  className={`border rounded-lg p-4 space-y-2 ${
+                                    compareMode
+                                      ? `cursor-pointer transition-all ${
+                                          compareLeft === attempt.attemptNumber ? 'ring-2 ring-red-400 bg-red-50/30 dark:bg-red-950/10' :
+                                          compareRight === attempt.attemptNumber ? 'ring-2 ring-green-400 bg-green-50/30 dark:bg-green-950/10' :
+                                          'hover:ring-2 hover:ring-primary/30'
+                                        }`
+                                      : ''
+                                  }`}
+                                  onClick={compareMode ? () => {
+                                    if (compareLeft === null) {
+                                      setCompareLeft(attempt.attemptNumber);
+                                    } else if (compareRight === null && attempt.attemptNumber !== compareLeft) {
+                                      setCompareRight(attempt.attemptNumber);
+                                    } else if (attempt.attemptNumber === compareLeft) {
+                                      setCompareLeft(compareRight);
+                                      setCompareRight(null);
+                                    } else if (attempt.attemptNumber === compareRight) {
+                                      setCompareRight(null);
+                                    }
+                                  } : undefined}
+                                >
                                   <div className="flex items-center justify-between flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
+                                      {compareMode && (
+                                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                          compareLeft === attempt.attemptNumber ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' :
+                                          compareRight === attempt.attemptNumber ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
+                                          'bg-muted text-muted-foreground'
+                                        }`}>
+                                          {compareLeft === attempt.attemptNumber ? 'A' : compareRight === attempt.attemptNumber ? 'B' : '·'}
+                                        </span>
+                                      )}
                                       <span className="font-semibold text-sm">
                                         {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
                                       </span>

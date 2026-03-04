@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Plus, Copy, Share2, Loader2, Send } from 'lucide-react';
+import { Radio, Plus, Copy, Share2, Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { useEvents } from '../api/queries';
@@ -18,6 +18,7 @@ import SendTestEventModal from '../components/SendTestEventModal';
 import EventDetailsSheet from '../components/EventDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
 
 export default function EventsPage() {
@@ -84,9 +85,11 @@ export default function EventsPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('events.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canSendEvents}>
-          <Button onClick={() => setShowSendModal(true)}>
-            <Plus className="h-4 w-4" /> {t('events.sendTest')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={() => setShowSendModal(true)}>
+              <Plus className="h-4 w-4" /> {t('events.sendTest')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -97,9 +100,11 @@ export default function EventsPage() {
           description={t('events.noEventsDesc')}
           action={
             <PermissionGate allowed={canSendEvents}>
-              <Button onClick={() => setShowSendModal(true)}>
-                <Plus className="h-4 w-4" /> {t('events.sendTest')}
-              </Button>
+              <VerificationGate>
+                <Button onClick={() => setShowSendModal(true)}>
+                  <Plus className="h-4 w-4" /> {t('events.sendTest')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           }
           docsLink="/docs#events-api"
@@ -112,6 +117,7 @@ export default function EventsPage() {
                 <TableRow>
                   <SortableTableHead field="eventType" sort={sort} onSort={toggleSort}>{t('events.eventType')}</SortableTableHead>
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
+                  <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
                   <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('events.created')}</SortableTableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
@@ -129,6 +135,20 @@ export default function EventsPage() {
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {event.deliveriesCreated != null && (
+                        <div className="flex items-center gap-1.5">
+                          {event.deliveriesCreated === 0 ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                          ) : (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          )}
+                          <span className={`text-sm font-medium ${event.deliveriesCreated === 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                            {event.deliveriesCreated}
+                          </span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">

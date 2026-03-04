@@ -18,6 +18,7 @@ import { Label } from '../components/ui/label';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 export default function DlqPage() {
   const { t } = useTranslation();
@@ -151,6 +152,7 @@ export default function DlqPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('dlq.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canManageDlq}>
+          <VerificationGate>
           <div className="flex gap-2">
             {selectedIds.size > 0 && (
               <Button onClick={handleRetrySelected} disabled={retrying} size="sm">
@@ -162,6 +164,7 @@ export default function DlqPage() {
               <Trash2 className="h-3.5 w-3.5" /> {t('dlq.purgeAll')}
             </Button>
           </div>
+          </VerificationGate>
         </PermissionGate>
       </div>
 

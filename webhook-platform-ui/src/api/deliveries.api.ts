@@ -8,6 +8,7 @@ export interface DeliveryFilters {
   status?: string;
   endpointId?: string;
   eventId?: string;
+  eventType?: string;
   fromDate?: string;
   toDate?: string;
 }
@@ -51,6 +52,7 @@ export const deliveriesApi = {
     if (filters?.status) params.append('status', filters.status);
     if (filters?.endpointId) params.append('endpointId', filters.endpointId);
     if (filters?.eventId) params.append('eventId', filters.eventId);
+    if (filters?.eventType) params.append('eventType', filters.eventType);
     if (filters?.sort) params.append('sort', filters.sort);
     if (filters?.fromDate) params.append('fromDate', filters.fromDate);
     if (filters?.toDate) params.append('toDate', filters.toDate);

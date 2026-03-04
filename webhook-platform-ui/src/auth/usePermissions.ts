@@ -33,9 +33,11 @@ function hasMinRole(current: Role, required: Role): boolean {
 export function usePermissions() {
     const { user } = useAuth();
     const role: Role = (user?.role || 'VIEWER') as Role;
+    const emailVerified = user?.user?.status !== 'PENDING_VERIFICATION';
 
     return {
         role,
+        emailVerified,
         isOwner: role === 'OWNER',
         isDeveloper: role === 'DEVELOPER',
         isViewer: role === 'VIEWER',

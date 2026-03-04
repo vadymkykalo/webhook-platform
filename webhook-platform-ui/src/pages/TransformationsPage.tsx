@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, CheckCircle2, XCircle, ArrowRight, Info, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -41,7 +41,15 @@ import {
 } from '../components/ui/dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 import type { TransformationResponse, TransformationRequest } from '../types/api.types';
+
+const sampleInput = {
+  id: "evt_abc123",
+  type: "order.created",
+  data: { orderId: "ord_456", amount: 99.99, currency: "USD" },
+  createdAt: "2026-03-04T11:00:00Z"
+};
 
 export default function TransformationsPage() {
   const { t } = useTranslation();
@@ -71,6 +79,28 @@ export default function TransformationsPage() {
   const templateHasContent = formTemplate.trim().length > 0;
   const templateIsJson = templateHasContent && isValidJson(formTemplate);
   const exprCount = countExpressions(formTemplate);
+
+  const livePreview = useMemo(() => {
+    if (!templateHasContent || !templateIsJson) return null;
+    try {
+      let result = formTemplate;
+      const exprRegex = /\$\{([^}]+)\}/g;
+      let match;
+      while ((match = exprRegex.exec(formTemplate)) !== null) {
+        const path = match[1]; // e.g. $.type or $.data.amount
+        const parts = path.replace(/^\$\.?/, '').split('.');
+        let value: any = sampleInput;
+        for (const p of parts) {
+          if (value && typeof value === 'object' && p in value) value = value[p];
+          else { value = `<${path}>`; break; }
+        }
+        result = result.replace(match[0], typeof value === 'object' ? JSON.stringify(value) : String(value));
+      }
+      return JSON.stringify(JSON.parse(result), null, 2);
+    } catch {
+      return null;
+    }
+  }, [formTemplate, templateHasContent, templateIsJson]);
 
   const loading = projectLoading || listLoading;
 
@@ -183,9 +213,11 @@ export default function TransformationsPage() {
           <p className="text-sm text-muted-foreground mt-1">{t('transformations.subtitle')}</p>
         </div>
         <PermissionGate allowed={canManage}>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> {t('transformations.create')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> {t('transformations.create')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -215,9 +247,11 @@ export default function TransformationsPage() {
           action={
             transformations.length === 0 ? (
               <PermissionGate allowed={canManage}>
-                <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> {t('transformations.createFirst')}
-                </Button>
+                <VerificationGate>
+                  <Button onClick={openCreate}>
+                    <Plus className="h-4 w-4" /> {t('transformations.createFirst')}
+                  </Button>
+                </VerificationGate>
               </PermissionGate>
             ) : undefined
           }
@@ -287,85 +321,194 @@ export default function TransformationsPage() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Repeat2 className="h-5 w-5 text-primary" />
               {editing ? t('transformations.editTitle') : t('transformations.createTitle')}
             </DialogTitle>
             <DialogDescription>
               {editing ? t('transformations.editDesc') : t('transformations.createDesc')}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tf-name">{t('transformations.name')} <span className="text-destructive">*</span></Label>
-              <Input
-                id="tf-name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder={t('transformations.namePlaceholder')}
-                className={formTouched && !formName.trim() ? 'border-destructive' : ''}
-              />
-              {formTouched && !formName.trim() && (
-                <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.nameRequired')}</p>
-              )}
-            </div>
-            {/* Description */}
-            <div className="space-y-1.5">
-              <Label htmlFor="tf-desc">{t('transformations.description')}</Label>
-              <Input
-                id="tf-desc"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder={t('transformations.descriptionPlaceholder')}
-              />
-            </div>
-            {/* Template */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="tf-template">{t('transformations.template')} <span className="text-destructive">*</span></Label>
-                <div className="flex items-center gap-1">
-                  {templateHasContent && (
-                    <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => setFormTemplate(formatJson(formTemplate))}>
-                      <Wand2 className="h-3 w-3 mr-1" /> {t('transformations.format')}
-                    </Button>
-                  )}
-                </div>
+
+          {/* How it works */}
+          <div className="bg-muted/40 border rounded-lg p-4 space-y-3">
+            <p className="text-xs font-semibold flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 text-primary" />
+              How Transformations Work
+            </p>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex-1 bg-background border rounded-md p-2.5 text-center">
+                <p className="font-semibold text-foreground">Incoming Event</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Original payload from your API</p>
               </div>
-              <Textarea
-                id="tf-template"
-                value={formTemplate}
-                onChange={(e) => setFormTemplate(e.target.value)}
-                placeholder='{"event_type": "${$.type}", "data": "${$.data}"}'
-                rows={10}
-                className={`font-mono text-xs ${templateHasContent && !templateIsJson ? 'border-destructive' : templateHasContent && templateIsJson ? 'border-green-500/50' : ''}`}
-              />
-              {/* Feedback row */}
-              <div className="flex items-center justify-between">
-                <div>
-                  {templateHasContent && !templateIsJson && (
-                    <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.invalidJson')}</p>
-                  )}
-                  {templateHasContent && templateIsJson && (
-                    <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {t('transformations.validation.validJson')}</p>
-                  )}
-                  {formTouched && !templateHasContent && (
-                    <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.templateRequired')}</p>
-                  )}
-                </div>
-                {templateHasContent && templateIsJson && exprCount > 0 && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> {exprCount} {'${...}'} {exprCount === 1 ? t('transformations.validation.expression') : t('transformations.validation.expressions')}
-                  </p>
+              <ArrowRight className="h-4 w-4 text-primary shrink-0" />
+              <div className="flex-1 bg-primary/10 border border-primary/20 rounded-md p-2.5 text-center">
+                <p className="font-semibold text-primary">Template</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Your transformation reshapes the data</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-primary shrink-0" />
+              <div className="flex-1 bg-background border rounded-md p-2.5 text-center">
+                <p className="font-semibold text-foreground">Delivered Payload</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">What your endpoint receives</p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Use <code className="bg-muted px-1 rounded">${'{'}$.field{'}'}</code> to reference fields from the original event.
+              Assign this transformation to a subscription to apply it automatically.
+            </p>
+          </div>
+
+          <div className="space-y-4 py-2">
+            {/* Name + Description row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="tf-name">{t('transformations.name')} <span className="text-destructive">*</span></Label>
+                <Input
+                  id="tf-name"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder={t('transformations.namePlaceholder')}
+                  className={formTouched && !formName.trim() ? 'border-destructive' : ''}
+                />
+                {formTouched && !formName.trim() ? (
+                  <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.nameRequired')}</p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">A short name to identify this transformation (e.g. "Slack Format", "Stripe Normalize")</p>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">{t('transformations.templateHint')}</p>
+              <div className="space-y-1.5">
+                <Label htmlFor="tf-desc">{t('transformations.description')} <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Input
+                  id="tf-desc"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder={t('transformations.descriptionPlaceholder')}
+                />
+                <p className="text-[11px] text-muted-foreground">Describe what this transformation does and when to use it</p>
+              </div>
             </div>
+
+            {/* Template + Live Preview side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Left: Template editor */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="tf-template">{t('transformations.template')} <span className="text-destructive">*</span></Label>
+                  <div className="flex items-center gap-1">
+                    {templateHasContent && (
+                      <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => setFormTemplate(formatJson(formTemplate))}>
+                        <Wand2 className="h-3 w-3 mr-1" /> {t('transformations.format')}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Textarea
+                  id="tf-template"
+                  value={formTemplate}
+                  onChange={(e) => setFormTemplate(e.target.value)}
+                  placeholder='{\n  "event": "${$.type}",\n  "order_id": "${$.data.orderId}",\n  "amount": "${$.data.amount}"\n}'
+                  rows={12}
+                  className={`font-mono text-xs ${templateHasContent && !templateIsJson ? 'border-destructive' : templateHasContent && templateIsJson ? 'border-green-500/50' : ''}`}
+                />
+                <div className="flex items-center justify-between">
+                  <div>
+                    {templateHasContent && !templateIsJson && (
+                      <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.invalidJson')}</p>
+                    )}
+                    {templateHasContent && templateIsJson && (
+                      <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {t('transformations.validation.validJson')}</p>
+                    )}
+                    {formTouched && !templateHasContent && (
+                      <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.templateRequired')}</p>
+                    )}
+                  </div>
+                  {templateHasContent && templateIsJson && exprCount > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {exprCount} {'${...}'} {exprCount === 1 ? t('transformations.validation.expression') : t('transformations.validation.expressions')}
+                    </p>
+                  )}
+                </div>
+                <div className="text-[11px] text-muted-foreground space-y-1">
+                  <p className="font-medium">Available expressions:</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                    <code className="bg-muted px-1 rounded">${'{'}$.id{'}'}</code>
+                    <span>Event ID</span>
+                    <code className="bg-muted px-1 rounded">${'{'}$.type{'}'}</code>
+                    <span>Event type</span>
+                    <code className="bg-muted px-1 rounded">${'{'}$.data{'}'}</code>
+                    <span>Full payload object</span>
+                    <code className="bg-muted px-1 rounded">${'{'}$.data.field{'}'}</code>
+                    <span>Nested field</span>
+                    <code className="bg-muted px-1 rounded">${'{'}$.createdAt{'}'}</code>
+                    <span>Timestamp</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Live Preview */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Live Preview</Label>
+
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Sample Input Event</p>
+                    <pre className="bg-muted/50 border rounded-md p-2.5 text-[11px] font-mono overflow-x-auto max-h-[120px] text-muted-foreground">
+                      {JSON.stringify(sampleInput, null, 2)}
+                    </pre>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <ArrowDown className="h-4 w-4 text-primary" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-green-600 dark:text-green-400">Output (what endpoint receives)</p>
+                    {livePreview ? (
+                      <pre className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md p-2.5 text-[11px] font-mono overflow-x-auto max-h-[160px] text-green-800 dark:text-green-300">
+                        {livePreview}
+                      </pre>
+                    ) : templateHasContent && !templateIsJson ? (
+                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
+                        <XCircle className="h-4 w-4 shrink-0" />
+                        Fix the template JSON to see the preview
+                      </div>
+                    ) : (
+                      <div className="bg-muted/30 border border-dashed rounded-md p-6 text-xs text-muted-foreground text-center">
+                        Write a template to see the live output preview
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Enabled */}
-            <div className="flex items-center gap-2">
-              <Switch id="tf-enabled" checked={formEnabled} onCheckedChange={setFormEnabled} />
-              <Label htmlFor="tf-enabled">{t('common.enabled')}</Label>
+            <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Switch id="tf-enabled" checked={formEnabled} onCheckedChange={setFormEnabled} />
+                <div>
+                  <Label htmlFor="tf-enabled" className="cursor-pointer">{t('common.enabled')}</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formEnabled
+                      ? 'This transformation can be assigned to subscriptions'
+                      : 'Disabled — won\'t be available for new subscriptions'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* How to use hint */}
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2.5">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <div className="text-xs space-y-1">
+                <p className="font-medium text-blue-900 dark:text-blue-200">How to apply this transformation</p>
+                <p className="text-blue-700 dark:text-blue-300">
+                  After saving, go to <strong>Subscriptions</strong> → edit or create a subscription → under <strong>Advanced Settings</strong>,
+                  select this transformation from the dropdown. Every delivery for that subscription will use this template instead of the original payload.
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>

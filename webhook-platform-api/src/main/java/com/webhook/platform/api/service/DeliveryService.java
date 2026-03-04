@@ -106,6 +106,7 @@ public class DeliveryService {
             DeliveryStatus status,
             UUID endpointId,
             UUID eventId,
+            String eventType,
             Instant fromDate,
             Instant toDate,
             Pageable pageable
@@ -120,6 +121,11 @@ public class DeliveryService {
         List<UUID> eventIds;
         if (eventId != null) {
             eventIds = List.of(eventId);
+        } else if (eventType != null && !eventType.isBlank()) {
+            eventIds = eventRepository.findByProjectIdAndEventTypeContainingIgnoreCase(projectId, eventType)
+                    .stream()
+                    .map(Event::getId)
+                    .toList();
         } else {
             eventIds = eventRepository.findByProjectId(projectId)
                     .stream()
