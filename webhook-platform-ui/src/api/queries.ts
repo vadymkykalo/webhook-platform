@@ -18,7 +18,8 @@ import { alertsApi, type AlertRuleRequest } from './alerts.api';
 import { usageApi } from './usage.api';
 import { incidentsApi, type IncidentRequest, type TimelineEntryRequest } from './incidents.api';
 import { transformApi, type TransformPreviewRequest } from './transform.api';
-import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest } from '../types/api.types';
+import { transformationsApi } from './transformations.api';
+import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
 
@@ -94,6 +95,10 @@ export const queryKeys = {
         list: (projectId: string, openOnly: boolean, page: number) => ['incidents', projectId, openOnly, page] as const,
         detail: (projectId: string, incidentId: string) => ['incidents', projectId, incidentId] as const,
         openCount: (projectId: string) => ['incidents', 'open-count', projectId] as const,
+    },
+    transformations: {
+        list: (projectId: string) => ['transformations', projectId] as const,
+        detail: (projectId: string, id: string) => ['transformations', projectId, id] as const,
     },
 } as const;
 
@@ -803,6 +808,49 @@ export function useAddTimelineEntry(projectId: string) {
         mutationFn: ({ incidentId, data }: { incidentId: string; data: TimelineEntryRequest }) =>
             incidentsApi.addTimeline(projectId, incidentId, data),
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['incidents', projectId] }); },
+    });
+}
+
+// ─── Transformations ────────────────────────────────────────────
+
+export function useTransformations(projectId: string) {
+    return useQuery({
+        queryKey: queryKeys.transformations.list(projectId),
+        queryFn: () => transformationsApi.list(projectId),
+        enabled: !!projectId,
+    });
+}
+
+export function useTransformation(projectId: string, id: string) {
+    return useQuery({
+        queryKey: queryKeys.transformations.detail(projectId, id),
+        queryFn: () => transformationsApi.get(projectId, id),
+        enabled: !!projectId && !!id,
+    });
+}
+
+export function useCreateTransformation(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: TransformationRequest) => transformationsApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.transformations.list(projectId) }); },
+    });
+}
+
+export function useUpdateTransformation(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: TransformationRequest }) =>
+            transformationsApi.update(projectId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.transformations.list(projectId) }); },
+    });
+}
+
+export function useDeleteTransformation(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => transformationsApi.delete(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.transformations.list(projectId) }); },
     });
 }
 

@@ -5,13 +5,14 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
-import { useTransformPreview } from '../api/queries';
+import { useTransformPreview, useTransformations } from '../api/queries';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { Select } from '../components/ui/select';
 
 const SAMPLE_PAYLOAD = JSON.stringify({
   event: "order.completed",
@@ -47,8 +48,10 @@ export default function TransformStudioPage() {
   const [outputHeaders, setOutputHeaders] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [success, setSuccess] = useState<boolean | null>(null);
+  const [selectedTransformationId, setSelectedTransformationId] = useState('');
 
   const preview = useTransformPreview(projectId!);
+  const { data: transformations = [] } = useTransformations(projectId!);
 
   const handleRun = async () => {
     setErrors([]);
@@ -56,10 +59,16 @@ export default function TransformStudioPage() {
     setOutputPayload(null);
     setOutputHeaders(null);
     try {
+      const isJsonTemplate = transformExpr.trim().startsWith('{') || transformExpr.trim().startsWith('[');
       const result = await preview.mutateAsync({
         inputPayload,
-        transformExpression: transformExpr || undefined,
         customHeaders: customHeaders || undefined,
+        // Saved transformation by ID — highest priority
+        transformationId: selectedTransformationId || undefined,
+        // Inline JSON template with ${$.path} expressions
+        template: !selectedTransformationId && isJsonTemplate ? transformExpr : undefined,
+        // Simple JSONPath pointer ($.data)
+        transformExpression: !selectedTransformationId && !isJsonTemplate && transformExpr ? transformExpr : undefined,
       });
       setOutputPayload(result.outputPayload);
       setOutputHeaders(result.outputHeaders);
@@ -83,6 +92,7 @@ export default function TransformStudioPage() {
     setOutputHeaders(null);
     setErrors([]);
     setSuccess(null);
+    setSelectedTransformationId('');
   };
 
   const formatJson = (text: string) => {
@@ -155,13 +165,37 @@ export default function TransformStudioPage() {
 
           <Card>
             <CardContent className="p-4 space-y-3">
+              {transformations.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs">{t('transform.savedTransformation', 'Saved Transformation')}</Label>
+                  <Select
+                    value={selectedTransformationId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedTransformationId(id);
+                      if (id) {
+                        const tr = transformations.find(t => t.id === id);
+                        if (tr) {
+                          try { setTransformExpr(JSON.stringify(JSON.parse(tr.template), null, 2)); } catch { setTransformExpr(tr.template); }
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">{t('transform.noSavedTransformation', '— Use custom expression below —')}</option>
+                    {transformations.filter(t => t.enabled).map(t => (
+                      <option key={t.id} value={t.id}>{t.name} (v{t.version})</option>
+                    ))}
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-xs">{t('transform.expression', 'Transform Expression (JSONPath-like)')}</Label>
-                <Input
-                  className="font-mono text-sm"
+                <Textarea
+                  className="font-mono text-xs min-h-[80px] resize-y"
                   value={transformExpr}
-                  onChange={(e) => setTransformExpr(e.target.value)}
-                  placeholder="$.data  or  $.data.items  (empty = passthrough)"
+                  onChange={(e) => { setTransformExpr(e.target.value); if (selectedTransformationId) setSelectedTransformationId(''); }}
+                  placeholder={'$.data  or  {"event": "${$.event}", "data": "${$.data}"}'}
+                  rows={4}
                 />
               </div>
               <div className="space-y-2">

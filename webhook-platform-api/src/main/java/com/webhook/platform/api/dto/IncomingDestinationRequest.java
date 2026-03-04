@@ -4,6 +4,7 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -48,4 +49,7 @@ public class IncomingDestinationRequest {
     @Schema(description = "JSONPath expression to transform payload before forwarding (null = forward as-is)", example = "$.data")
     @Size(max = 4096, message = "Payload transform expression must be at most 4096 characters")
     private String payloadTransform;
+
+    @Schema(description = "ID of a reusable transformation template to apply (overrides payloadTransform if set)")
+    private UUID transformationId;
 }

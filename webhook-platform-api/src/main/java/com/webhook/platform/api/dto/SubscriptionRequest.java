@@ -41,4 +41,6 @@ public class SubscriptionRequest {
     private String payloadTemplate;
 
     private String customHeaders;
+
+    private UUID transformationId;
 }

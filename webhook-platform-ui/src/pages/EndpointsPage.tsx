@@ -489,7 +489,7 @@ export default function EndpointsPage() {
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description">{t('endpoints.createDialog.description')}</Label>
+                <Label htmlFor="description">{t('endpoints.createDialog.descriptionLabel')}</Label>
                 <Textarea
                   id="description"
                   placeholder={t('endpoints.createDialog.descPlaceholder')}

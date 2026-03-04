@@ -189,6 +189,7 @@ export interface IncomingDestinationRequest {
   timeoutSeconds?: number;
   retryDelays?: string;
   payloadTransform?: string;
+  transformationId?: string | null;
 }
 
 export interface IncomingDestinationResponse {
@@ -203,6 +204,8 @@ export interface IncomingDestinationResponse {
   timeoutSeconds: number;
   retryDelays: string;
   payloadTransform?: string;
+  transformationId?: string;
+  transformationName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -256,6 +259,27 @@ export interface IncomingBulkReplayRequest {
   verified?: boolean | null;
   eventIds?: string[];
   maxEvents?: number;
+}
+
+// ─── Transformations ─────────────────────────────────────────────────
+
+export interface TransformationRequest {
+  name: string;
+  description?: string;
+  template: string;
+  enabled?: boolean;
+}
+
+export interface TransformationResponse {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  template: string;
+  version: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface IncomingBulkReplayResponse {

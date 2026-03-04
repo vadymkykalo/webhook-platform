@@ -56,6 +56,9 @@ public class Subscription {
     @Column(name = "custom_headers", columnDefinition = "TEXT")
     private String customHeaders;
 
+    @Column(name = "transformation_id")
+    private UUID transformationId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

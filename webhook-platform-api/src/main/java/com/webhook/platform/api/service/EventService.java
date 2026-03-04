@@ -176,6 +176,7 @@ public class EventService {
                 .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
+                .transformationId(subscription.getTransformationId())
                 .build();
     }
 

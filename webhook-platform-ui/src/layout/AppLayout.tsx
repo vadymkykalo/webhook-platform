@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings,
-  BookOpen, ChevronRight, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
+  BookOpen, ChevronRight, ChevronDown, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Terminal
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Terminal, Repeat2
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -42,22 +42,30 @@ const orgNav: NavItem[] = [
 
 const getProjectOutgoingNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.endpoints', path: `/admin/projects/${projectId}/endpoints`, icon: Webhook },
+  { nameKey: 'nav.subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
   { nameKey: 'nav.events', path: `/admin/projects/${projectId}/events`, icon: Radio },
   { nameKey: 'nav.deliveries', path: `/admin/projects/${projectId}/deliveries`, icon: Send },
-  { nameKey: 'nav.subscriptions', path: `/admin/projects/${projectId}/subscriptions`, icon: Bell },
 ];
 
 const getProjectIncomingNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.incomingSources', path: `/admin/projects/${projectId}/incoming-sources`, icon: ArrowDownToLine },
   { nameKey: 'nav.incomingEvents', path: `/admin/projects/${projectId}/incoming-events`, icon: Activity },
-  { nameKey: 'nav.transformStudio', path: `/admin/projects/${projectId}/transform-studio`, icon: GitCompare },
 ];
 
-const getProjectOperationsNav = (projectId: string): NavItem[] => [
+const getProjectPipelineNav = (projectId: string): NavItem[] => [
+  { nameKey: 'nav.transformations', path: `/admin/projects/${projectId}/transformations`, icon: Repeat2 },
+  { nameKey: 'nav.transformStudio', path: `/admin/projects/${projectId}/transform-studio`, icon: GitCompare },
+  { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
+];
+
+const getProjectObservabilityNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
   { nameKey: 'nav.alerts', path: `/admin/projects/${projectId}/alerts`, icon: Bell },
   { nameKey: 'nav.incidents', path: `/admin/projects/${projectId}/incidents`, icon: AlertTriangle },
   { nameKey: 'nav.usage', path: `/admin/projects/${projectId}/usage`, icon: Activity },
+];
+
+const getProjectRecoveryNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.replay', path: `/admin/projects/${projectId}/replay`, icon: History },
   { nameKey: 'nav.dlq', path: `/admin/projects/${projectId}/dlq`, icon: AlertTriangle },
 ];
@@ -69,18 +77,53 @@ const getProjectSecurityNav = (projectId: string): NavItem[] => [
 
 const getProjectDevToolsNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.devWorkspace', path: `/admin/projects/${projectId}/dev-workspace`, icon: Terminal },
-  { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
   { nameKey: 'nav.eventDiff', path: `/admin/projects/${projectId}/event-diff`, icon: GitCompare },
   { nameKey: 'nav.testEndpoints', path: `/admin/projects/${projectId}/test-endpoints`, icon: TestTube },
 ];
 
-function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
+function SidebarSection({ label, children, collapsible = false, storageKey, defaultOpen = true }: {
+  label: string;
+  children: React.ReactNode;
+  collapsible?: boolean;
+  storageKey?: string;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(() => {
+    if (!collapsible || !storageKey) return true;
+    const stored = localStorage.getItem(`sidebar-${storageKey}`);
+    return stored !== null ? stored === '1' : defaultOpen;
+  });
+
+  const toggle = useCallback(() => {
+    if (!collapsible || !storageKey) return;
+    setOpen(prev => {
+      const next = !prev;
+      localStorage.setItem(`sidebar-${storageKey}`, next ? '1' : '0');
+      return next;
+    });
+  }, [collapsible, storageKey]);
+
   return (
     <div className="mb-2">
-      <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-        {label}
-      </p>
-      <div className="space-y-0.5">{children}</div>
+      {collapsible ? (
+        <button
+          onClick={toggle}
+          className="flex items-center justify-between w-full px-3 mb-1 group"
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-hover:text-muted-foreground transition-colors">
+            {label}
+          </span>
+          <ChevronDown className={cn(
+            "h-3 w-3 text-muted-foreground/50 transition-transform duration-200",
+            !open && "-rotate-90"
+          )} />
+        </button>
+      ) : (
+        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+          {label}
+        </p>
+      )}
+      {open && <div className="space-y-0.5">{children}</div>}
     </div>
   );
 }
@@ -136,6 +179,7 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   alerts: { key: 'breadcrumb.alerts', icon: Bell },
   usage: { key: 'breadcrumb.usage', icon: Activity },
   incidents: { key: 'breadcrumb.incidents', icon: AlertTriangle },
+  transformations: { key: 'breadcrumb.transformations', icon: Repeat2 },
   'transform-studio': { key: 'breadcrumb.transform-studio', icon: GitCompare },
   members: { key: 'breadcrumb.members', icon: Users },
   'audit-log': { key: 'breadcrumb.audit-log', icon: FileText },
@@ -313,37 +357,70 @@ export default function AppLayout() {
 
         <ProjectSwitcher currentProjectId={projectId} collapsed={collapsed && !isMobile} />
 
-        {projectId && (
+        {projectId && !collapsed && (
           <>
-            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.outgoing')}>
+            {/* Core delivery — always visible */}
+            <SidebarSection label={t('nav.outgoing')} collapsible storageKey="outgoing" defaultOpen>
               {getProjectOutgoingNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
               ))}
             </SidebarSection>
 
-            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.incoming')}>
+            <SidebarSection label={t('nav.incoming')} collapsible storageKey="incoming" defaultOpen>
               {getProjectIncomingNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
               ))}
             </SidebarSection>
 
-            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.operations')}>
-              {getProjectOperationsNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+            {/* Pipeline & processing */}
+            <SidebarSection label={t('nav.pipeline')} collapsible storageKey="pipeline" defaultOpen>
+              {getProjectPipelineNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
               ))}
             </SidebarSection>
 
-            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.security')}>
+            {/* Observability + Recovery */}
+            <SidebarSection label={t('nav.observability')} collapsible storageKey="observability" defaultOpen>
+              {getProjectObservabilityNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
+            <SidebarSection label={t('nav.recovery')} collapsible storageKey="recovery" defaultOpen={false}>
+              {getProjectRecoveryNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
+            {/* Security & Dev Tools — collapsed by default */}
+            <SidebarSection label={t('nav.security')} collapsible storageKey="security" defaultOpen={false}>
               {getProjectSecurityNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
               ))}
             </SidebarSection>
 
-            <SidebarSection label={collapsed && !isMobile ? "" : t('nav.devTools')}>
+            <SidebarSection label={t('nav.devTools')} collapsible storageKey="devtools" defaultOpen={false}>
               {getProjectDevToolsNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} collapsed={collapsed && !isMobile} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
               ))}
             </SidebarSection>
+          </>
+        )}
+
+        {projectId && collapsed && !isMobile && (
+          <>
+            {/* Collapsed mode — show all items as icons without sections */}
+            {[
+              ...getProjectOutgoingNav(projectId),
+              ...getProjectIncomingNav(projectId),
+              ...getProjectPipelineNav(projectId),
+              ...getProjectObservabilityNav(projectId),
+              ...getProjectRecoveryNav(projectId),
+              ...getProjectSecurityNav(projectId),
+              ...getProjectDevToolsNav(projectId),
+            ].map((item) => (
+              <NavLink key={item.path} item={item} collapsed onClick={undefined} />
+            ))}
           </>
         )}
 

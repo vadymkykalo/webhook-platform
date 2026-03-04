@@ -43,6 +43,8 @@ public class IncomingForwardService {
     private final IncomingEventRepository eventRepository;
     private final IncomingDestinationRepository destinationRepository;
     private final IncomingForwardAttemptRepository attemptRepository;
+    private final TransformationCacheService transformationCacheService;
+    private final PayloadTransformService payloadTransformService;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final String encryptionKey;
@@ -61,6 +63,8 @@ public class IncomingForwardService {
             IncomingEventRepository eventRepository,
             IncomingDestinationRepository destinationRepository,
             IncomingForwardAttemptRepository attemptRepository,
+            TransformationCacheService transformationCacheService,
+            PayloadTransformService payloadTransformService,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper,
             @Value("${webhook.encryption-key}") String encryptionKey,
@@ -72,6 +76,8 @@ public class IncomingForwardService {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
+        this.transformationCacheService = transformationCacheService;
+        this.payloadTransformService = payloadTransformService;
         HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(allowPrivateIps);
         this.webClient = webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
@@ -222,7 +228,7 @@ public class IncomingForwardService {
                 eventId, destinationId, attemptNumber, maxAttempts);
 
         // Build request body — apply payload transformation if configured
-        String body = transformPayload(event.getBodyRaw(), destination.getPayloadTransform());
+        String body = resolveAndTransformPayload(event.getBodyRaw(), destination);
         String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
 
         // Idempotency key for downstream dedup
@@ -503,15 +509,28 @@ public class IncomingForwardService {
     }
 
     /**
-     * Applies JSONPath transformation to the payload if configured.
-     * Supports expressions like:
-     * "$.data" — extract a subtree
-     * "$.events[0]" — extract first element
-     * "$.payload.body" — nested extraction
-     * Returns original body if no transform is configured or on error.
+     * Resolves the transformation template (from reusable Transformation entity or inline payloadTransform)
+     * and applies it to the payload.
+     * Priority: transformationId > inline payloadTransform > passthrough.
      */
-    private String transformPayload(String body, String payloadTransform) {
-        if (payloadTransform == null || payloadTransform.isBlank() || body == null || body.isBlank()) {
+    private String resolveAndTransformPayload(String body, IncomingDestination destination) {
+        if (body == null || body.isBlank()) {
+            return body;
+        }
+
+        // 1. Try reusable transformation by ID
+        if (destination.getTransformationId() != null) {
+            String template = transformationCacheService.findEnabledTemplate(destination.getTransformationId());
+            if (template != null) {
+                return payloadTransformService.transform(body, template);
+            }
+            log.warn("Transformation {} not found or disabled for destination {}, trying inline payloadTransform",
+                    destination.getTransformationId(), destination.getId());
+        }
+
+        // 2. Fallback to inline JSONPath expression
+        String payloadTransform = destination.getPayloadTransform();
+        if (payloadTransform == null || payloadTransform.isBlank()) {
             return body;
         }
         try {

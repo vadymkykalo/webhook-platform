@@ -82,15 +82,16 @@
     "apiKeys": "API Keys",
     "analytics": "Analytics",
     "replay": "Time Machine",
-    "dlq": "Dead Letter Queue",
+    "dlq": "Failed Messages",
     "alerts": "Alerts",
     "usage": "Usage",
     "incidents": "Incidents",
     "transformStudio": "Transform Studio",
+    "transformations": "Transformations",
     "testEndpoints": "Test Endpoints",
-    "devWorkspace": "DX Workspace",
-    "incomingSources": "Incoming Sources",
-    "incomingEvents": "Incoming Events",
+    "devWorkspace": "Dev Console",
+    "incomingSources": "Sources",
+    "incomingEvents": "Received",
     "members": "Members",
     "auditLog": "Audit Log",
     "settings": "Settings",
@@ -98,6 +99,9 @@
     "incoming": "Incoming",
     "tools": "Tools",
     "operations": "Operations",
+    "pipeline": "Pipeline",
+    "observability": "Observability",
+    "recovery": "Recovery",
     "security": "Security",
     "devTools": "Developer Tools",
     "selectProject": "Select project",
@@ -263,7 +267,7 @@
       "successRate": "{{rate}}% success rate",
       "failed": "Failed",
       "failedDesc": "Retriable failures",
-      "dlq": "Dead Letter Queue",
+      "dlq": "Failed Messages",
       "dlqDesc": "Max retries exceeded",
       "pending": "Pending",
       "pendingDesc": "In progress"
@@ -288,9 +292,9 @@
       "endpoints": "Endpoints",
       "events": "Events",
       "deliveries": "Deliveries",
-      "dlq": "Dead Letter Queue",
-      "incomingSources": "Incoming Sources",
-      "incomingEvents": "Incoming Events"
+      "dlq": "Failed Messages",
+      "incomingSources": "Sources",
+      "incomingEvents": "Received"
     }
   },
   "endpoints": {
@@ -329,7 +333,7 @@
       "url": "Endpoint URL",
       "urlPlaceholder": "https://example.com/webhooks",
       "urlHint": "The URL where webhook events will be sent",
-      "description": "Description (optional)",
+      "descriptionLabel": "Description (optional)",
       "descPlaceholder": "Production webhook endpoint",
       "rateLimit": "Rate Limit (optional)",
       "rateLimitPlaceholder": "Requests per second",
@@ -771,7 +775,7 @@
     }
   },
   "dlq": {
-    "title": "Dead Letter Queue",
+    "title": "Failed Messages",
     "subtitle": "Failed deliveries for <strong>{{project}}</strong>",
     "projectNotFound": "Project not found",
     "noItems": "No items in DLQ",
@@ -795,7 +799,7 @@
     "unknownError": "Unknown error",
     "purgeDialog": {
       "title": "Purge All DLQ Items?",
-      "description": "This will permanently delete all {{count}} items from the Dead Letter Queue. This action cannot be undone.",
+      "description": "This will permanently delete all {{count}} failed messages. This action cannot be undone.",
       "impactItems": "{{count}} failed deliveries will be permanently deleted",
       "impactIrreversible": "These items cannot be recovered or retried after purging"
     },
@@ -1745,6 +1749,10 @@
       "payloadTransform": "Payload Transform (JSONPath)",
       "payloadTransformPlaceholder": "$.data",
       "payloadTransformHint": "Optional JSONPath expression to transform payload before forwarding",
+      "transformation": "Transformation",
+      "noTransformation": "None (use inline transform below)",
+      "transformationHint": "Select a reusable transformation or use the inline JSONPath field below.",
+      "transformationOverrides": "Saved transformation takes priority over the inline JSONPath field below.",
       "retryPolicy": "Retry Policy"
     },
     "validation": {
@@ -1866,6 +1874,10 @@
     "status": "Status",
     "eventId": "Event ID",
     "endpointId": "Endpoint ID",
+    "subscriptionId": "Subscription ID",
+    "goTo": "Navigate to resource",
+    "latencyTrend": "Latency Trend",
+    "later": "later",
     "created": "Created",
     "attempts": "Attempts",
     "nextRetry": "Next Retry",
@@ -1984,10 +1996,10 @@
     "api-keys": "API Keys",
     "analytics": "Analytics",
     "replay": "Time Machine",
-    "dlq": "Dead Letter Queue",
+    "dlq": "Failed Messages",
     "test-endpoints": "Test Endpoints",
-    "incoming-sources": "Incoming Sources",
-    "incoming-events": "Incoming Events",
+    "incoming-sources": "Sources",
+    "incoming-events": "Received",
     "members": "Members",
     "audit-log": "Audit Log",
     "settings": "Settings",
@@ -1997,6 +2009,7 @@
     "alerts": "Alerts",
     "usage": "Usage",
     "incidents": "Incidents",
+    "transformations": "Transformations",
     "transform-studio": "Transform Studio"
   },
   "piiRules": {
@@ -2195,7 +2208,8 @@
     "goThere": "Go there",
     "welcome": {
       "title": "Welcome to Hookflow! 🎉",
-      "description": "We'll walk you through the key steps to set up your webhook infrastructure in just a few minutes."
+      "description": "We'll walk you through the key steps to set up your webhook infrastructure in just a few minutes.",
+      "timeEstimate": "~5 minutes to first delivery"
     },
     "project": {
       "title": "Create a Project",
@@ -2220,7 +2234,9 @@
     "send": {
       "title": "Send Your First Event",
       "description": "Use the API or the UI to send a test event. It will be matched against subscriptions and delivered to the right endpoints.",
-      "tip": "Check the Deliveries page to see real-time status, attempts, and response details."
+      "tip": "Check the Deliveries page to see real-time status, attempts, and response details.",
+      "curlLabel": "Quick test with curl:",
+      "curlCopied": "Curl command copied!"
     },
     "done": {
       "title": "You're All Set!",
@@ -2423,6 +2439,54 @@
       "success": "Success",
       "failed": "Failed",
       "dlq": "DLQ"
+    }
+  },
+  "transformations": {
+    "title": "Transformations",
+    "subtitle": "Reusable payload transformation templates for normalizing and reshaping webhook data.",
+    "projectNotFound": "Project not found",
+    "create": "New Transformation",
+    "createFirst": "Create your first transformation",
+    "createTitle": "Create Transformation",
+    "createDesc": "Define a reusable JSON template with ${$.jsonpath} expressions to reshape payloads.",
+    "editTitle": "Edit Transformation",
+    "editDesc": "Update the transformation template. Changing the template auto-increments the version.",
+    "empty": "No transformations yet",
+    "emptyDesc": "Create reusable transformations to normalize payloads across subscriptions and incoming destinations.",
+    "noMatching": "No matching transformations",
+    "noMatchingDesc": "Try adjusting your search filter.",
+    "search": "Search",
+    "searchPlaceholder": "Filter by name or description…",
+    "name": "Name",
+    "namePlaceholder": "e.g. Stripe v2 → CRM v1",
+    "description": "Description",
+    "descriptionPlaceholder": "What does this transformation do?",
+    "template": "Template",
+    "templateHint": "JSON template with ${$.jsonpath} expressions. Example: {\"event\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}",
+    "version": "Version",
+    "status": "Status",
+    "updated": "Updated",
+    "duplicate": "Duplicate",
+    "toast": {
+      "created": "Transformation created",
+      "updated": "Transformation updated",
+      "deleted": "Transformation deleted",
+      "createFailed": "Failed to create transformation",
+      "updateFailed": "Failed to update transformation",
+      "deleteFailed": "Failed to delete transformation"
+    },
+    "deleteDialog": {
+      "title": "Delete Transformation",
+      "description": "This will remove the transformation. Subscriptions and destinations referencing it will lose their transformation link. This action cannot be undone."
+    },
+    "format": "Format",
+    "validation": {
+      "nameRequired": "Name is required",
+      "templateRequired": "Template is required",
+      "invalidJson": "Invalid JSON format",
+      "validJson": "Valid JSON",
+      "expression": "expression",
+      "expressions": "expressions"
     }
   }
 }

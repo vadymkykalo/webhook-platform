@@ -26,4 +26,6 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
 
     @Query("SELECT CASE WHEN COUNT(d) > 0 THEN true ELSE false END FROM IncomingDestination d JOIN IncomingSource s ON d.incomingSourceId = s.id WHERE s.projectId = :projectId")
     boolean existsByProjectId(@Param("projectId") UUID projectId);
+
+    long countByTransformationId(UUID transformationId);
 }

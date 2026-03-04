@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
+import { useTransformations } from '../api/queries';
 import type { EndpointResponse } from '../types/api.types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -43,7 +44,9 @@ export default function CreateSubscriptionModal({
   const [retryDelays, setRetryDelays] = useState('60,300,900,3600,21600,86400');
   const [payloadTemplate, setPayloadTemplate] = useState('');
   const [customHeaders, setCustomHeaders] = useState('');
+  const [transformationId, setTransformationId] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const { data: transformations = [] } = useTransformations(projectId);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -58,6 +61,7 @@ export default function CreateSubscriptionModal({
       setRetryDelays(subscription.retryDelays || '60,300,900,3600,21600,86400');
       setPayloadTemplate(subscription.payloadTemplate || '');
       setCustomHeaders(subscription.customHeaders || '');
+      setTransformationId(subscription.transformationId || '');
     } else {
       setEndpointId('');
       setEventType('');
@@ -68,6 +72,7 @@ export default function CreateSubscriptionModal({
       setRetryDelays('60,300,900,3600,21600,86400');
       setPayloadTemplate('');
       setCustomHeaders('');
+      setTransformationId('');
     }
     setErrors({});
     setShowAdvanced(false);
@@ -114,6 +119,7 @@ export default function CreateSubscriptionModal({
         retryDelays,
         payloadTemplate: payloadTemplate || undefined,
         customHeaders: customHeaders || undefined,
+        transformationId: transformationId || null,
       };
 
       if (subscription) {
@@ -294,6 +300,37 @@ export default function CreateSubscriptionModal({
                   />
                   <p className="text-xs text-muted-foreground">
                     Comma-separated delays in seconds. Default: 1m, 5m, 15m, 1h, 6h, 24h
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transformationId">Transformation</Label>
+                  <Select
+                    id="transformationId"
+                    value={transformationId}
+                    onChange={(e) => setTransformationId(e.target.value)}
+                    disabled={saving}
+                  >
+                    <option value="">None (use inline template below)</option>
+                    {transformations.filter(tr => tr.enabled).map(tr => (
+                      <option key={tr.id} value={tr.id}>{tr.name} (v{tr.version})</option>
+                    ))}
+                  </Select>
+                  {transformationId && (() => {
+                    const selected = transformations.find(tr => tr.id === transformationId);
+                    return selected ? (
+                      <div className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{selected.name}</span>
+                          <span className="text-muted-foreground">v{selected.version}</span>
+                        </div>
+                        {selected.description && <p className="text-muted-foreground">{selected.description}</p>}
+                      </div>
+                    ) : null;
+                  })()}
+                  <p className="text-xs text-muted-foreground">
+                    {transformationId
+                      ? 'Saved transformation takes priority over the inline template below.'
+                      : 'Select a reusable transformation or define an inline template below.'}
                   </p>
                 </div>
                 <div className="space-y-2">
