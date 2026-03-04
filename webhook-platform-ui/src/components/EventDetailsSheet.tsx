@@ -222,7 +222,13 @@ export default function EventDetailsSheet({
                 {deliveriesLoading ? (
                   <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : deliveries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">{t('events.details.noDeliveries', 'No deliveries for this event')}</p>
+                  <div className="py-8 text-center space-y-2">
+                    <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
+                    {event.eventType && (
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto" dangerouslySetInnerHTML={{ __html: t('events.details.noDeliveriesNoSub', { eventType: event.eventType }) }} />
+                    )}
+                    <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
+                  </div>
                 ) : (
                   deliveries.map((d) => (
                     <div key={d.id} className="flex items-center justify-between px-3 py-2 border rounded-lg hover:bg-muted/30">

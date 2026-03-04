@@ -285,7 +285,16 @@ export default function EventDetailPage() {
             {deliveriesLoading ? (
               <CardContent><Loader2 className="h-5 w-5 animate-spin mx-auto my-8" /></CardContent>
             ) : deliveries.length === 0 ? (
-              <CardContent><p className="text-sm text-muted-foreground text-center py-8">{t('eventDetail.noDeliveries', 'No deliveries for this event')}</p></CardContent>
+              <CardContent>
+                <div className="text-center py-8 space-y-2">
+                  <p className="text-sm font-medium">{t('eventDetail.noDeliveries', 'No deliveries for this event')}</p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto" dangerouslySetInnerHTML={{ __html: t('events.details.noDeliveriesNoSub', { eventType: event.eventType }) }} />
+                  <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
+                    {t('deliveries.noDeliveriesForEventAction')}
+                  </Button>
+                </div>
+              </CardContent>
             ) : (
               <Table>
                 <TableHeader>

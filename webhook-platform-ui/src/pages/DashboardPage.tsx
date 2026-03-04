@@ -227,7 +227,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                          {event.deliveryCount} {event.deliveryCount === 1 ? t('dashboard.recentEvents.delivery', { count: 1 }) : t('dashboard.recentEvents.delivery_other', { count: event.deliveryCount })}
+                          {event.deliveryCount === 1 ? t('dashboard.recentEvents.delivery', { count: 1 }) : t('dashboard.recentEvents.delivery_other', { count: event.deliveryCount })}
                         </span>
                       </div>
                     ))}

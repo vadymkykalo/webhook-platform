@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, Bell, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import { deliveriesApi } from '../api/deliveries.api';
 import { projectsApi } from '../api/projects.api';
 import { endpointsApi } from '../api/endpoints.api';
+import { eventsApi } from '../api/events.api';
 import type { DeliveryResponse, ProjectResponse, EndpointResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -53,9 +54,11 @@ const DATE_RANGE_OPTIONS = [
 export default function DeliveriesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const eventIdFilter = searchParams.get('eventId') || '';
   const [project, setProject] = useState<ProjectResponse | null>(null);
+  const [filteredEventType, setFilteredEventType] = useState<string | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +89,14 @@ export default function DeliveriesPage() {
       loadDeliveries();
     }
   }, [projectId, statusFilter, endpointFilter, eventIdFilter, dateRange, page, pageSize, sortParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (projectId && eventIdFilter) {
+      eventsApi.get(projectId, eventIdFilter).then(e => setFilteredEventType(e.eventType)).catch(() => setFilteredEventType(null));
+    } else {
+      setFilteredEventType(null);
+    }
+  }, [projectId, eventIdFilter]);
 
   // Auto-refresh when there are active deliveries
   useEffect(() => {
@@ -288,7 +299,26 @@ export default function DeliveriesPage() {
       {loading ? (
         <SkeletonRows count={5} />
       ) : filteredDeliveries.length === 0 ? (
-        <EmptyState icon={Send} title={t('deliveries.noDeliveries')} description={t('deliveries.noDeliveriesDesc')} docsLink="/docs#deliveries-api" />
+        eventIdFilter && filteredEventType ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
+            <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
+              <Info className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">{t('deliveries.noDeliveriesForEvent')}</h3>
+            <p className="text-sm text-muted-foreground max-w-md mb-6" dangerouslySetInnerHTML={{ __html: t('deliveries.noDeliveriesForEventDesc', { eventType: filteredEventType }) }} />
+            <div className="flex gap-3">
+              <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
+                <Bell className="h-3.5 w-3.5 mr-1.5" />
+                {t('deliveries.viewSubscriptions')}
+              </Button>
+              <Button size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
+                {t('deliveries.noDeliveriesForEventAction')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <EmptyState icon={Send} title={t('deliveries.noDeliveries')} description={t('deliveries.noDeliveriesDesc')} docsLink="/docs#deliveries-api" />
+        )
       ) : (
         <div className="animate-fade-in">
           <Card className="overflow-hidden">

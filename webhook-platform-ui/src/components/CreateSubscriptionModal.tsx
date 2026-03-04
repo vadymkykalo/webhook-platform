@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, FileJson2, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, FileJson2, CheckCircle2, AlertTriangle, Info, Settings2, Zap, ChevronDown, ChevronRight, HelpCircle, Bell } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
 import { useTransformations, useEventTypes, useSchemaVersions } from '../api/queries';
@@ -82,23 +82,43 @@ export default function CreateSubscriptionModal({
     const newErrors: Record<string, string> = {};
 
     if (!endpointId) {
-      newErrors.endpointId = 'Endpoint is required';
+      newErrors.endpointId = 'Please select an endpoint that will receive the events';
     }
     if (!eventType.trim()) {
-      newErrors.eventType = 'Event type is required';
+      newErrors.eventType = 'Event type is required — specify which events this subscription should receive';
     } else if (!/^(\*{1,2}|[a-z][a-z0-9_]*)(\.(\*{1,2}|[a-z][a-z0-9_]*))*$/.test(eventType)) {
-      newErrors.eventType = 'Lowercase with dots/underscores, wildcards * and ** allowed (e.g. order.*, **)';
+      newErrors.eventType = 'Use lowercase letters, dots, underscores. Wildcards: order.* (one level), order.** (all nested), ** (catch-all)';
     }
     if (maxAttempts < 1 || maxAttempts > 20) {
-      newErrors.maxAttempts = 'Must be between 1 and 20';
+      newErrors.maxAttempts = 'Must be between 1 and 20 attempts';
     }
     if (timeoutSeconds < 1 || timeoutSeconds > 60) {
-      newErrors.timeoutSeconds = 'Must be between 1 and 60';
+      newErrors.timeoutSeconds = 'Must be between 1 and 60 seconds';
+    }
+    if (retryDelays.trim() && !/^\d+(,\d+)*$/.test(retryDelays.trim())) {
+      newErrors.retryDelays = 'Must be comma-separated numbers (seconds), e.g. 60,300,900';
+    }
+    if (payloadTemplate.trim()) {
+      try { JSON.parse(payloadTemplate); } catch {
+        newErrors.payloadTemplate = 'Invalid JSON — check syntax';
+      }
+    }
+    if (customHeaders.trim()) {
+      try {
+        const parsed = JSON.parse(customHeaders);
+        if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+          newErrors.customHeaders = 'Must be a JSON object with key-value pairs';
+        }
+      } catch {
+        newErrors.customHeaders = 'Invalid JSON — check syntax';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const selectedEndpoint = endpoints.find(e => e.id === endpointId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,226 +159,298 @@ export default function CreateSubscriptionModal({
     }
   };
 
+  const formatRetryDelaysHuman = (delays: string): string => {
+    if (!delays.trim()) return '';
+    return delays.split(',').map(s => {
+      const sec = parseInt(s.trim());
+      if (isNaN(sec)) return s.trim();
+      if (sec < 60) return `${sec}s`;
+      if (sec < 3600) return `${Math.round(sec / 60)}m`;
+      return `${Math.round(sec / 3600)}h`;
+    }).join(' → ');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" />
             {subscription ? 'Edit Subscription' : 'Create Subscription'}
           </DialogTitle>
           <DialogDescription>
-            Route events of a specific type to an endpoint
+            {subscription
+              ? 'Update how events are routed to this endpoint'
+              : 'A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="endpoint">
-                Endpoint <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                id="endpoint"
-                value={endpointId}
-                onChange={(e) => setEndpointId(e.target.value)}
+          <div className="space-y-5 py-4">
+            {/* ── Section 1: Essential ── */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Zap className="h-4 w-4 text-primary" />
+                Essentials
+              </div>
+
+              {/* Endpoint */}
+              <div className="space-y-2">
+                <Label htmlFor="endpoint">
+                  Endpoint <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  id="endpoint"
+                  value={endpointId}
+                  onChange={(e) => setEndpointId(e.target.value)}
+                  disabled={saving}
+                  required
+                >
+                  <option value="">Select an endpoint...</option>
+                  {endpoints.map(endpoint => (
+                    <option key={endpoint.id} value={endpoint.id}>
+                      {endpoint.url}
+                    </option>
+                  ))}
+                </Select>
+                {errors.endpointId && (
+                  <p className="text-sm text-destructive">{errors.endpointId}</p>
+                )}
+                {endpoints.length === 0 ? (
+                  <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    No endpoints available. Create an endpoint first.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    The webhook URL that will receive matching events.
+                    {selectedEndpoint && (
+                      <span className="ml-1">Selected: <code className="bg-muted px-1 rounded text-[11px]">{selectedEndpoint.url}</code></span>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              {/* Event Type */}
+              <EventTypeField
+                projectId={projectId}
+                eventType={eventType}
+                onChange={setEventType}
                 disabled={saving}
-                required
+                error={errors.eventType}
+              />
+            </div>
+
+            {/* ── Section 2: Behavior ── */}
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+                Behavior
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                  <Switch
+                    id="enabled"
+                    checked={enabled}
+                    onCheckedChange={setEnabled}
+                    disabled={saving}
+                  />
+                  <div>
+                    <Label htmlFor="enabled" className="cursor-pointer text-sm">
+                      Enabled
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {enabled
+                        ? 'Events will be delivered'
+                        : 'Paused — no deliveries'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                  <Switch
+                    id="orderingEnabled"
+                    checked={orderingEnabled}
+                    onCheckedChange={setOrderingEnabled}
+                    disabled={saving}
+                  />
+                  <div>
+                    <Label htmlFor="orderingEnabled" className="cursor-pointer text-sm">
+                      FIFO Ordering
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      {orderingEnabled
+                        ? 'Strict order (slower)'
+                        : 'Parallel (fastest)'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Section 3: Advanced ── */}
+            <div className="border-t pt-4">
+              <button
+                type="button"
+                className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors w-full"
+                onClick={() => setShowAdvanced(!showAdvanced)}
               >
-                <option value="">Select an endpoint...</option>
-                {endpoints.map(endpoint => (
-                  <option key={endpoint.id} value={endpoint.id}>
-                    {endpoint.url}
-                  </option>
-                ))}
-              </Select>
-              {errors.endpointId && (
-                <p className="text-sm text-destructive">{errors.endpointId}</p>
-              )}
-              {endpoints.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No endpoints available. Create an endpoint first.
-                </p>
-              )}
-            </div>
+                {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+                Advanced Settings
+                <span className="text-xs font-normal text-muted-foreground ml-1">— retry, timeout, transformation, headers</span>
+              </button>
 
-            <EventTypeField
-              projectId={projectId}
-              eventType={eventType}
-              onChange={setEventType}
-              disabled={saving}
-              error={errors.eventType}
-            />
-
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
-              <div className="flex items-center gap-3">
-                <Switch
-                  id="enabled"
-                  checked={enabled}
-                  onCheckedChange={setEnabled}
-                  disabled={saving}
-                />
-                <div>
-                  <Label htmlFor="enabled" className="cursor-pointer">
-                    Enabled
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {enabled
-                      ? 'Events will be delivered to this endpoint'
-                      : 'Events will not be delivered'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
-              <div className="flex items-center gap-3">
-                <Switch
-                  id="orderingEnabled"
-                  checked={orderingEnabled}
-                  onCheckedChange={setOrderingEnabled}
-                  disabled={saving}
-                />
-                <div>
-                  <Label htmlFor="orderingEnabled" className="cursor-pointer">
-                    FIFO Ordering
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {orderingEnabled
-                      ? 'Events delivered in strict order (slower)'
-                      : 'Events delivered as fast as possible'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="text-sm text-primary hover:underline"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-            >
-              {showAdvanced ? '▼ Hide' : '▶ Show'} Advanced Retry Settings
-            </button>
-
-            {showAdvanced && (
-              <div className="space-y-4 p-4 border rounded-md bg-muted/30">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="maxAttempts">Max Attempts</Label>
-                    <Input
-                      id="maxAttempts"
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={maxAttempts}
-                      onChange={(e) => setMaxAttempts(parseInt(e.target.value) || 7)}
-                      disabled={saving}
-                    />
-                    {errors.maxAttempts ? (
-                      <p className="text-xs text-destructive">{errors.maxAttempts}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">1–20 attempts</p>
-                    )}
+              {showAdvanced && (
+                <div className="space-y-4 mt-4">
+                  {/* Retry row */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="maxAttempts" className="text-xs">Max Attempts</Label>
+                      <Input
+                        id="maxAttempts"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={maxAttempts}
+                        onChange={(e) => setMaxAttempts(parseInt(e.target.value) || 7)}
+                        disabled={saving}
+                      />
+                      {errors.maxAttempts ? (
+                        <p className="text-[11px] text-destructive">{errors.maxAttempts}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">How many times to try (1–20)</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="timeoutSeconds" className="text-xs">Timeout (sec)</Label>
+                      <Input
+                        id="timeoutSeconds"
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={timeoutSeconds}
+                        onChange={(e) => setTimeoutSeconds(parseInt(e.target.value) || 30)}
+                        disabled={saving}
+                      />
+                      {errors.timeoutSeconds ? (
+                        <p className="text-[11px] text-destructive">{errors.timeoutSeconds}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">Per-request timeout (1–60)</p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="retryDelays" className="text-xs">Retry Delays</Label>
+                      <Input
+                        id="retryDelays"
+                        placeholder="60,300,900,3600"
+                        value={retryDelays}
+                        onChange={(e) => setRetryDelays(e.target.value)}
+                        disabled={saving}
+                      />
+                      {errors.retryDelays ? (
+                        <p className="text-[11px] text-destructive">{errors.retryDelays}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          {retryDelays.trim() ? formatRetryDelaysHuman(retryDelays) : 'Seconds between retries'}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timeoutSeconds">Timeout (seconds)</Label>
-                    <Input
-                      id="timeoutSeconds"
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={timeoutSeconds}
-                      onChange={(e) => setTimeoutSeconds(parseInt(e.target.value) || 30)}
+
+                  {/* Transformation */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="transformationId" className="text-xs flex items-center gap-1.5">
+                      Transformation
+                      <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Select
+                      id="transformationId"
+                      value={transformationId}
+                      onChange={(e) => setTransformationId(e.target.value)}
                       disabled={saving}
-                    />
-                    {errors.timeoutSeconds ? (
-                      <p className="text-xs text-destructive">{errors.timeoutSeconds}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">1–60 seconds</p>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="retryDelays">Retry Delays (seconds)</Label>
-                  <Input
-                    id="retryDelays"
-                    placeholder="60,300,900,3600,21600,86400"
-                    value={retryDelays}
-                    onChange={(e) => setRetryDelays(e.target.value)}
-                    disabled={saving}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Comma-separated delays in seconds. Default: 1m, 5m, 15m, 1h, 6h, 24h
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transformationId">Transformation</Label>
-                  <Select
-                    id="transformationId"
-                    value={transformationId}
-                    onChange={(e) => setTransformationId(e.target.value)}
-                    disabled={saving}
-                  >
-                    <option value="">None (use inline template below)</option>
-                    {transformations.filter(tr => tr.enabled).map(tr => (
-                      <option key={tr.id} value={tr.id}>{tr.name} (v{tr.version})</option>
-                    ))}
-                  </Select>
-                  {transformationId && (() => {
-                    const selected = transformations.find(tr => tr.id === transformationId);
-                    return selected ? (
-                      <div className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{selected.name}</span>
-                          <span className="text-muted-foreground">v{selected.version}</span>
+                    >
+                      <option value="">None — send original payload</option>
+                      {transformations.filter(tr => tr.enabled).map(tr => (
+                        <option key={tr.id} value={tr.id}>{tr.name} (v{tr.version})</option>
+                      ))}
+                    </Select>
+                    {transformationId && (() => {
+                      const selected = transformations.find(tr => tr.id === transformationId);
+                      return selected ? (
+                        <div className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{selected.name}</span>
+                            <span className="text-muted-foreground">v{selected.version}</span>
+                          </div>
+                          {selected.description && <p className="text-muted-foreground">{selected.description}</p>}
                         </div>
-                        {selected.description && <p className="text-muted-foreground">{selected.description}</p>}
-                      </div>
-                    ) : null;
-                  })()}
-                  <p className="text-xs text-muted-foreground">
-                    {transformationId
-                      ? 'Saved transformation takes priority over the inline template below.'
-                      : 'Select a reusable transformation or define an inline template below.'}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="payloadTemplate">Payload Template (JSON)</Label>
-                  <textarea
-                    id="payloadTemplate"
-                    className="w-full h-32 p-2 text-sm font-mono border rounded-md bg-background resize-y"
-                    placeholder={`{\n  "event_id": "\${$.id}",\n  "data": "\${$.data}"\n}`}
-                    value={payloadTemplate}
-                    onChange={(e) => setPayloadTemplate(e.target.value)}
-                    disabled={saving}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    JSON template with JSONPath expressions in <code className="bg-muted px-1 rounded">${'{'}$.path{'}'}</code> syntax.
-                    Leave empty to send original payload.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customHeaders">Custom Headers (JSON)</Label>
-                  <textarea
-                    id="customHeaders"
-                    className="w-full h-24 p-2 text-sm font-mono border rounded-md bg-background resize-y"
-                    placeholder={`{\n  "X-Api-Key": "your-api-key",\n  "Authorization": "Bearer token"\n}`}
-                    value={customHeaders}
-                    onChange={(e) => setCustomHeaders(e.target.value)}
-                    disabled={saving}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    JSON object with header name/value pairs. Added to each webhook request.
-                  </p>
-                </div>
-              </div>
-            )}
+                      ) : null;
+                    })()}
+                  </div>
 
-            {!subscription && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-sm text-blue-900">
-                  <strong>Tip:</strong> After creating this subscription, send test events from the Events page 
-                  to verify delivery to your endpoint.
-                </p>
+                  {/* Payload template + custom headers side by side */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="payloadTemplate" className="text-xs flex items-center gap-1.5">
+                        Payload Template
+                        <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <textarea
+                        id="payloadTemplate"
+                        className="w-full h-28 p-2 text-xs font-mono border rounded-md bg-background resize-y"
+                        placeholder={'{\n  "id": "${$.id}",\n  "data": "${$.data}"\n}'}
+                        value={payloadTemplate}
+                        onChange={(e) => setPayloadTemplate(e.target.value)}
+                        disabled={saving}
+                      />
+                      {errors.payloadTemplate ? (
+                        <p className="text-[11px] text-destructive">{errors.payloadTemplate}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          JSONPath: <code className="bg-muted px-0.5 rounded">${'{'}$.path{'}'}</code>. Empty = original payload.
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="customHeaders" className="text-xs flex items-center gap-1.5">
+                        Custom Headers
+                        <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <textarea
+                        id="customHeaders"
+                        className="w-full h-28 p-2 text-xs font-mono border rounded-md bg-background resize-y"
+                        placeholder={'{\n  "X-Api-Key": "key",\n  "Authorization": "Bearer ..."\n}'}
+                        value={customHeaders}
+                        onChange={(e) => setCustomHeaders(e.target.value)}
+                        disabled={saving}
+                      />
+                      {errors.customHeaders ? (
+                        <p className="text-[11px] text-destructive">{errors.customHeaders}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          JSON key-value pairs added to each request.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Summary / Tip ── */}
+            {!subscription && endpointId && eventType.trim() && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-2.5">
+                <HelpCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                <div className="text-xs space-y-1">
+                  <p className="font-medium text-foreground">What happens next?</p>
+                  <p className="text-muted-foreground">
+                    Every time an event matching <code className="bg-muted px-1 rounded font-mono">{eventType}</code> is received,
+                    it will be delivered to <code className="bg-muted px-1 rounded font-mono text-[11px]">{selectedEndpoint?.url || 'the selected endpoint'}</code>.
+                    You can send a test event from the Events page to verify everything works.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -374,7 +466,7 @@ export default function CreateSubscriptionModal({
             </Button>
             <Button type="submit" disabled={saving || endpoints.length === 0}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {saving ? 'Saving...' : (subscription ? 'Update' : 'Create')}
+              {saving ? 'Saving...' : (subscription ? 'Update Subscription' : 'Create Subscription')}
             </Button>
           </DialogFooter>
         </form>

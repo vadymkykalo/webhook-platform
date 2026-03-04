@@ -103,6 +103,9 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId AND d.failedAt >= :since")
     long countDlqByProjectIdSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
 
+    @Query("SELECT d.eventId, COUNT(d) FROM Delivery d WHERE d.eventId IN :eventIds GROUP BY d.eventId")
+    List<Object[]> countByEventIds(@Param("eventIds") List<UUID> eventIds);
+
     List<Delivery> findByIdInAndStatus(List<UUID> ids, DeliveryStatus status);
 
     @Query(value = """

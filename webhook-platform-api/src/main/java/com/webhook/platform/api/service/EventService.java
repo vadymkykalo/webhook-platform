@@ -22,7 +22,9 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -67,7 +69,22 @@ public class EventService {
         }
         
         Page<Event> events = eventRepository.findByProjectId(projectId, pageable);
-        return events.map(this::mapToResponse);
+
+        List<UUID> eventIds = events.getContent().stream().map(Event::getId).toList();
+        Map<UUID, Long> deliveryCounts = Map.of();
+        if (!eventIds.isEmpty()) {
+            deliveryCounts = deliveryRepository.countByEventIds(eventIds).stream()
+                    .collect(Collectors.toMap(
+                            row -> (UUID) row[0],
+                            row -> (Long) row[1]
+                    ));
+        }
+        Map<UUID, Long> counts = deliveryCounts;
+        return events.map(event -> {
+            EventResponse resp = mapToResponse(event);
+            resp.setDeliveriesCreated(counts.getOrDefault(event.getId(), 0L).intValue());
+            return resp;
+        });
     }
 
     public EventResponse getEvent(UUID projectId, UUID eventId, UUID organizationId) {
@@ -83,7 +100,10 @@ public class EventService {
             throw new ForbiddenException("Event does not belong to this project");
         }
         
-        return mapToResponse(event);
+        EventResponse resp = mapToResponse(event);
+        List<Object[]> counts = deliveryRepository.countByEventIds(List.of(eventId));
+        resp.setDeliveriesCreated(counts.isEmpty() ? 0 : ((Long) counts.get(0)[1]).intValue());
+        return resp;
     }
 
     @Transactional

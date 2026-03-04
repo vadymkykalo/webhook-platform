@@ -492,7 +492,13 @@
     "deliveriesCount": "Deliveries",
     "viewDeliveries": "View deliveries for this event",
     "toast": {
-      "idCopied": "Event ID copied to clipboard"
+      "idCopied": "Event ID copied to clipboard",
+      "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
+      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
+    },
+    "sendModal": {
+      "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
+      "matchInfo": "{{count}} subscription(s) will receive this event."
     },
     "details": {
       "title": "Event Details",
@@ -502,6 +508,8 @@
       "noPayload": "No payload",
       "sanitizedUnavailable": "Sanitized view unavailable. Configure PII rules first.",
       "noDeliveries": "No deliveries for this event",
+      "noDeliveriesNoSub": "No active subscriptions match event type <strong>{{eventType}}</strong>. Create a subscription for this event type to start receiving deliveries.",
+      "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
       "openFull": "Open Full Details",
       "notFound": "Event not found"
     }
@@ -511,6 +519,10 @@
     "subtitle": "Track webhook delivery attempts for <strong>{{project}}</strong>",
     "noDeliveries": "No deliveries found",
     "noDeliveriesDesc": "Deliveries will appear here once events are sent to your endpoints",
+    "noDeliveriesForEvent": "No deliveries for this event",
+    "noDeliveriesForEventDesc": "Event type <strong>{{eventType}}</strong> didn't match any active subscription. Deliveries are only created when an event type matches at least one subscription.",
+    "noDeliveriesForEventAction": "Create Subscription",
+    "viewSubscriptions": "View Subscriptions",
     "projectNotFound": "Project not found",
     "filters": {
       "status": "Status",
