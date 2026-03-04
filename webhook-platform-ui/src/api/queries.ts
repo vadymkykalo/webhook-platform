@@ -9,7 +9,7 @@ import { apiKeysApi, type ApiKeyRequest } from './apiKeys.api';
 import { dashboardApi } from './dashboard.api';
 import { dlqApi } from './dlq.api';
 import { testEndpointsApi } from './testEndpoints.api';
-import { auditLogApi } from './auditLog.api';
+import { auditLogApi, type AuditLogFilters } from './auditLog.api';
 import { incomingSourcesApi } from './incomingSources.api';
 import { incomingDestinationsApi } from './incomingDestinations.api';
 import { incomingEventsApi, type IncomingEventFilters } from './incomingEvents.api';
@@ -61,7 +61,7 @@ export const queryKeys = {
         requests: (projectId: string, endpointId: string) => ['test-endpoints', projectId, 'requests', endpointId] as const,
     },
     auditLog: {
-        list: (page: number, size: number) => ['audit-log', page, size] as const,
+        list: (page: number, size: number, filters?: AuditLogFilters) => ['audit-log', page, size, filters] as const,
     },
     incomingSources: {
         list: (projectId: string, page: number, size: number) => ['incoming-sources', projectId, page, size] as const,
@@ -465,10 +465,10 @@ export function useDeleteTestEndpoint(projectId: string) {
 
 // ─── Audit Log ─────────────────────────────────────────────────────
 
-export function useAuditLog(page: number, size = 20) {
+export function useAuditLog(page: number, size = 20, filters?: AuditLogFilters) {
     return useQuery({
-        queryKey: queryKeys.auditLog.list(page, size),
-        queryFn: () => auditLogApi.list(page, size),
+        queryKey: queryKeys.auditLog.list(page, size, filters),
+        queryFn: () => auditLogApi.list(page, size, filters),
     });
 }
 

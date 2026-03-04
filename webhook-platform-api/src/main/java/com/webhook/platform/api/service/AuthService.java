@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.User;
@@ -54,6 +56,7 @@ public class AuthService {
         this.emailService = emailService;
     }
 
+    @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -97,6 +100,7 @@ public class AuthService {
                 .build();
     }
 
+    @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
@@ -157,6 +161,7 @@ public class AuthService {
                 .build();
     }
 
+    @Auditable(action = AuditAction.LOGOUT, resourceType = "Auth")
     public void logout(String accessToken, String refreshToken) {
         if (accessToken != null && jwtUtil.validateToken(accessToken)) {
             tokenBlacklistService.blacklist(
@@ -212,6 +217,7 @@ public class AuthService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    @Auditable(action = AuditAction.PASSWORD_CHANGED, resourceType = "Auth")
     @Transactional
     public void changePassword(UUID userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
@@ -230,6 +236,7 @@ public class AuthService {
         log.info("Password changed for user {}", userId);
     }
 
+    @Auditable(action = AuditAction.PASSWORD_RESET_REQUESTED, resourceType = "Auth")
     @Transactional
     public void forgotPassword(String email) {
         User user = userRepository.findByEmail(email).orElse(null);
@@ -249,6 +256,7 @@ public class AuthService {
         log.info("Password reset token generated for user {}", user.getEmail());
     }
 
+    @Auditable(action = AuditAction.PASSWORD_RESET, resourceType = "Auth")
     @Transactional
     public void resetPassword(String token, String newPassword) {
         User user = userRepository.findByPasswordResetToken(token)

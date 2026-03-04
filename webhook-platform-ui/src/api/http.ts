@@ -115,6 +115,11 @@ class HttpClient {
     return response.data;
   }
 
+  async getBlob(url: string): Promise<Blob> {
+    const response = await this.client.get(url, { responseType: 'blob' });
+    return response.data;
+  }
+
   async post<T>(url: string, data?: unknown, headers?: Record<string, string>): Promise<T> {
     const response = await this.client.post<T>(url, data, { headers });
     return response.data;
