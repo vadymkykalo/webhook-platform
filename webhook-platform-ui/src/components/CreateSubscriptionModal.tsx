@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Loader2, FileJson2, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
-import { useTransformations } from '../api/queries';
+import { useTransformations, useEventTypes, useSchemaVersions } from '../api/queries';
 import type { EndpointResponse } from '../types/api.types';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -181,25 +181,13 @@ export default function CreateSubscriptionModal({
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="eventType">
-                Event Type <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="eventType"
-                placeholder="e.g., user.created, order.*, **"
-                value={eventType}
-                onChange={(e) => setEventType(e.target.value)}
-                disabled={saving}
-                required
-              />
-              {errors.eventType && (
-                <p className="text-sm text-destructive">{errors.eventType}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Dot notation: <code className="bg-muted px-1 rounded">order.created</code> exact, <code className="bg-muted px-1 rounded">order.*</code> one level, <code className="bg-muted px-1 rounded">order.**</code> all nested, <code className="bg-muted px-1 rounded">**</code> catch-all.
-              </p>
-            </div>
+            <EventTypeField
+              projectId={projectId}
+              eventType={eventType}
+              onChange={setEventType}
+              disabled={saving}
+              error={errors.eventType}
+            />
 
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
               <div className="flex items-center gap-3">
@@ -392,5 +380,231 @@ export default function CreateSubscriptionModal({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Schema-Aware Event Type Field ──────────────────────────────────
+
+function EventTypeField({
+  projectId,
+  eventType,
+  onChange,
+  disabled,
+  error,
+}: {
+  projectId: string;
+  eventType: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  error?: string;
+}) {
+  const { data: catalogTypes = [] } = useEventTypes(projectId);
+  const [focused, setFocused] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Filter catalog by typed value
+  const query = eventType.toLowerCase();
+  const suggestions = catalogTypes.filter(
+    (et) => et.name.toLowerCase().includes(query) || !query
+  );
+
+  // Find exact match for schema hint
+  const exactMatch = catalogTypes.find(
+    (et) => et.name === eventType.trim()
+  );
+
+  const showDropdown = focused && suggestions.length > 0 && !exactMatch;
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div className="space-y-2" ref={wrapperRef}>
+      <Label htmlFor="eventType">
+        Event Type <span className="text-destructive">*</span>
+      </Label>
+      <div className="relative">
+        <Input
+          id="eventType"
+          placeholder="e.g., user.created, order.*, **"
+          value={eventType}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          disabled={disabled}
+          required
+          autoComplete="off"
+        />
+
+        {/* Autocomplete dropdown */}
+        {showDropdown && (
+          <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-lg border bg-popover shadow-lg">
+            {suggestions.map((et) => (
+              <button
+                key={et.id}
+                type="button"
+                className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors border-b last:border-b-0"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(et.name);
+                  setFocused(false);
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs font-medium">{et.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    {et.latestVersion != null && (
+                      <span className="text-[10px] text-muted-foreground">v{et.latestVersion}</span>
+                    )}
+                    {et.activeVersionStatus === 'ACTIVE' && (
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                    )}
+                    {et.hasBreakingChanges && (
+                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                    )}
+                  </div>
+                </div>
+                {et.description && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{et.description}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {/* Schema info badge for exact match */}
+      {exactMatch && (
+        <div className="rounded-lg border bg-primary/5 overflow-hidden">
+          <div className="flex items-start gap-2 p-2.5">
+            <FileJson2 className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+            <div className="text-xs space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono font-semibold">{exactMatch.name}</span>
+                {exactMatch.latestVersion != null && (
+                  <span className="text-muted-foreground">v{exactMatch.latestVersion}</span>
+                )}
+                {exactMatch.activeVersionStatus === 'ACTIVE' && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
+                    <CheckCircle2 className="h-2.5 w-2.5" /> Active
+                  </span>
+                )}
+                {exactMatch.hasBreakingChanges && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                    <AlertTriangle className="h-2.5 w-2.5" /> Breaking
+                  </span>
+                )}
+              </div>
+              {exactMatch.description && (
+                <p className="text-muted-foreground">{exactMatch.description}</p>
+              )}
+            </div>
+          </div>
+          <SchemaFieldsPreview projectId={projectId} eventTypeId={exactMatch.id} />
+        </div>
+      )}
+
+      {/* Hint when no match and catalogTypes exist */}
+      {!exactMatch && eventType.trim() && catalogTypes.length > 0 && !focused && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Info className="h-3 w-3" />
+          No matching schema found — this event type has no registered schema.
+        </p>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Dot notation: <code className="bg-muted px-1 rounded">order.created</code> exact, <code className="bg-muted px-1 rounded">order.*</code> one level, <code className="bg-muted px-1 rounded">order.**</code> all nested, <code className="bg-muted px-1 rounded">**</code> catch-all.
+      </p>
+    </div>
+  );
+}
+
+// ── Schema Fields Preview ──────────────────────────────────────────
+
+interface SchemaField {
+  name: string;
+  type: string;
+  required: boolean;
+}
+
+function parseSchemaFields(schemaJson: string): SchemaField[] {
+  try {
+    const schema = JSON.parse(schemaJson);
+    const props = schema.properties || {};
+    const required = new Set<string>(schema.required || []);
+    return Object.entries(props).map(([name, def]: [string, any]) => ({
+      name,
+      type: Array.isArray(def?.type) ? def.type.join(' | ') : (def?.type || 'any'),
+      required: required.has(name),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; eventTypeId: string }) {
+  const { data: versions, isLoading } = useSchemaVersions(projectId, eventTypeId);
+
+  // Find the latest active version, or just the latest
+  const latest = versions
+    ?.slice()
+    .sort((a, b) => b.version - a.version)
+    .find(v => v.status === 'ACTIVE')
+    || versions?.[0];
+
+  if (isLoading) {
+    return (
+      <div className="px-2.5 pb-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <Loader2 className="h-2.5 w-2.5 animate-spin" /> Loading schema…
+      </div>
+    );
+  }
+
+  if (!latest) return null;
+
+  const fields = parseSchemaFields(latest.schemaJson);
+  if (fields.length === 0) return null;
+
+  const TYPE_COLORS: Record<string, string> = {
+    string: 'text-green-600 dark:text-green-400',
+    number: 'text-blue-600 dark:text-blue-400',
+    integer: 'text-blue-600 dark:text-blue-400',
+    boolean: 'text-purple-600 dark:text-purple-400',
+    object: 'text-orange-600 dark:text-orange-400',
+    array: 'text-cyan-600 dark:text-cyan-400',
+  };
+
+  return (
+    <div className="border-t border-primary/10 px-2.5 py-2 space-y-1">
+      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        Payload fields (v{latest.version})
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {fields.slice(0, 12).map((f) => (
+          <span
+            key={f.name}
+            className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted/60 px-1.5 py-0.5 rounded"
+          >
+            <span className="font-medium">{f.name}</span>
+            <span className={TYPE_COLORS[f.type] || 'text-muted-foreground'}>{f.type}</span>
+            {f.required && <span className="text-destructive">*</span>}
+          </span>
+        ))}
+        {fields.length > 12 && (
+          <span className="text-[10px] text-muted-foreground self-center">
+            +{fields.length - 12} more
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

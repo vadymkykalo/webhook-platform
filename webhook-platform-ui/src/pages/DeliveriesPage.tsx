@@ -33,6 +33,7 @@ import {
 import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -272,10 +273,12 @@ export default function DeliveriesPage() {
           {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
             <div className="flex justify-end mt-3">
               <PermissionGate allowed={canReplayDeliveries}>
+                <VerificationGate>
                 <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline" size="sm">
                   {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
                   {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: statusFilter })}
                 </Button>
+                </VerificationGate>
               </PermissionGate>
             </div>
           )}

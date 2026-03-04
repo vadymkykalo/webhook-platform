@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight, Cable } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
@@ -36,12 +36,14 @@ import {
 import MtlsConfigModal from '../components/MtlsConfigModal';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 export default function EndpointsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageEndpoints } = usePermissions();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -314,9 +316,11 @@ export default function EndpointsPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('endpoints.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canManageEndpoints}>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" /> {t('endpoints.newEndpoint')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" /> {t('endpoints.newEndpoint')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -326,11 +330,18 @@ export default function EndpointsPage() {
           title={t('endpoints.noEndpoints')}
           description={t('endpoints.noEndpointsDesc')}
           action={
-            <PermissionGate allowed={canManageEndpoints}>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4" /> {t('endpoints.createFirst')}
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <Button variant="outline" onClick={() => navigate(`/admin/projects/${projectId}/connection-setup`)}>
+                <Cable className="h-4 w-4" /> {t('endpoints.guidedSetup')}
               </Button>
-            </PermissionGate>
+              <PermissionGate allowed={canManageEndpoints}>
+                <VerificationGate>
+                  <Button onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="h-4 w-4" /> {t('endpoints.createFirst')}
+                  </Button>
+                </VerificationGate>
+              </PermissionGate>
+            </div>
           }
           docsLink="/docs#endpoints-api"
         />

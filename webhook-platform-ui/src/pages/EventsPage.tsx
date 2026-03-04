@@ -18,6 +18,7 @@ import SendTestEventModal from '../components/SendTestEventModal';
 import EventDetailsSheet from '../components/EventDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
 
 export default function EventsPage() {
@@ -84,9 +85,11 @@ export default function EventsPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('events.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canSendEvents}>
-          <Button onClick={() => setShowSendModal(true)}>
-            <Plus className="h-4 w-4" /> {t('events.sendTest')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={() => setShowSendModal(true)}>
+              <Plus className="h-4 w-4" /> {t('events.sendTest')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -97,9 +100,11 @@ export default function EventsPage() {
           description={t('events.noEventsDesc')}
           action={
             <PermissionGate allowed={canSendEvents}>
-              <Button onClick={() => setShowSendModal(true)}>
-                <Plus className="h-4 w-4" /> {t('events.sendTest')}
-              </Button>
+              <VerificationGate>
+                <Button onClick={() => setShowSendModal(true)}>
+                  <Plus className="h-4 w-4" /> {t('events.sendTest')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           }
           docsLink="/docs#events-api"

@@ -29,6 +29,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 const ALERT_TYPES: { value: AlertType; label: string; hint: string }[] = [
   { value: 'FAILURE_RATE', label: 'Failure Rate', hint: 'Triggers when failure % exceeds threshold in window' },
@@ -196,15 +197,19 @@ export default function AlertsPage() {
         <div className="flex items-center gap-2">
           {activeTab === 'events' && unresolvedCount > 0 && (
             <PermissionGate allowed={canManageEndpoints}>
-              <Button variant="outline" size="sm" onClick={handleResolveAll} disabled={resolveAll.isPending}>
-                <Check className="h-4 w-4 mr-1" /> {t('alerts.resolveAll', 'Resolve All')}
-              </Button>
+              <VerificationGate>
+                <Button variant="outline" size="sm" onClick={handleResolveAll} disabled={resolveAll.isPending}>
+                  <Check className="h-4 w-4 mr-1" /> {t('alerts.resolveAll', 'Resolve All')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           )}
           <PermissionGate allowed={canManageEndpoints}>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}
-            </Button>
+            <VerificationGate>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}
+              </Button>
+            </VerificationGate>
           </PermissionGate>
         </div>
       </div>
@@ -360,7 +365,7 @@ export default function AlertsPage() {
       {activeTab === 'rules' && (
         rules.length === 0 ? (
           <EmptyState icon={Bell} title={t('alerts.noRules', 'No alert rules')} description={t('alerts.noRulesDesc', 'Create your first alert rule to monitor delivery health')}
-            action={<PermissionGate allowed={canManageEndpoints}><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}</Button></PermissionGate>} />
+            action={<PermissionGate allowed={canManageEndpoints}><VerificationGate><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4" /> {t('alerts.createRule', 'Create Rule')}</Button></VerificationGate></PermissionGate>} />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 animate-fade-in">
             {rules.map((rule) => (

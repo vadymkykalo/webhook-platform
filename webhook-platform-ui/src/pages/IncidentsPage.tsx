@@ -22,6 +22,7 @@ import { Badge } from '../components/ui/badge';
 import { Textarea } from '../components/ui/textarea';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
@@ -152,9 +153,11 @@ export default function IncidentsPage() {
             {openOnly ? t('incidents.showAll', 'Show All') : t('incidents.openOnly', 'Open Only')}
           </Button>
           <PermissionGate allowed={canManageEndpoints}>
-            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-1" /> {t('incidents.create', 'Create Incident')}
-            </Button>
+            <VerificationGate>
+              <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-1" /> {t('incidents.create', 'Create Incident')}
+              </Button>
+            </VerificationGate>
           </PermissionGate>
         </div>
       </div>
@@ -165,7 +168,7 @@ export default function IncidentsPage() {
           icon={Flame}
           title={t('incidents.empty', 'No incidents')}
           description={t('incidents.emptyDesc', 'Incidents group related failures for tracking and RCA')}
-          action={<PermissionGate allowed={canManageEndpoints}><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> {t('incidents.create', 'Create Incident')}</Button></PermissionGate>}
+          action={<PermissionGate allowed={canManageEndpoints}><VerificationGate><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> {t('incidents.create', 'Create Incident')}</Button></VerificationGate></PermissionGate>}
         />
       ) : (
         <div className="space-y-3 animate-fade-in">

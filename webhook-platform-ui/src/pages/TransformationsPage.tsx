@@ -41,6 +41,7 @@ import {
 } from '../components/ui/dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 import type { TransformationResponse, TransformationRequest } from '../types/api.types';
 
 export default function TransformationsPage() {
@@ -183,9 +184,11 @@ export default function TransformationsPage() {
           <p className="text-sm text-muted-foreground mt-1">{t('transformations.subtitle')}</p>
         </div>
         <PermissionGate allowed={canManage}>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> {t('transformations.create')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> {t('transformations.create')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -215,9 +218,11 @@ export default function TransformationsPage() {
           action={
             transformations.length === 0 ? (
               <PermissionGate allowed={canManage}>
-                <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> {t('transformations.createFirst')}
-                </Button>
+                <VerificationGate>
+                  <Button onClick={openCreate}>
+                    <Plus className="h-4 w-4" /> {t('transformations.createFirst')}
+                  </Button>
+                </VerificationGate>
               </PermissionGate>
             ) : undefined
           }

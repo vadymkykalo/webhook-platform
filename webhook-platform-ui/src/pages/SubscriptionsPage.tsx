@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered } from 'lucide-react';
+import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered, Power, PowerOff, ArrowRightLeft, FileJson2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { showSuccess } from '../lib/toast';
+import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
-import { SubscriptionResponse } from '../api/subscriptions.api';
-import { useProject, useSubscriptions, useEndpoints, usePatchSubscription, useDeleteSubscription, queryKeys } from '../api/queries';
+import { subscriptionsApi, SubscriptionResponse } from '../api/subscriptions.api';
+import { useProject, useSubscriptions, useEndpoints, useEventTypes, usePatchSubscription, useDeleteSubscription, queryKeys } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -27,9 +27,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '../components/ui/dialog';
 import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 export default function SubscriptionsPage() {
   const { t } = useTranslation();
@@ -38,9 +42,13 @@ export default function SubscriptionsPage() {
   const { data: project, isLoading: projectLoading } = useProject(projectId);
   const { data: subscriptions = [], isLoading: subsLoading } = useSubscriptions(projectId);
   const { data: endpoints = [], isLoading: endpointsLoading } = useEndpoints(projectId);
+  const { data: catalogTypes = [] } = useEventTypes(projectId);
   const patchMutation = usePatchSubscription(projectId!);
   const deleteMutation = useDeleteSubscription(projectId!);
   const qc = useQueryClient();
+
+  // Build a lookup: eventType name → catalog entry (for schema badges)
+  const schemaByName = new Map(catalogTypes.map(et => [et.name, et]));
 
   const loading = projectLoading || subsLoading || endpointsLoading;
 
@@ -51,6 +59,12 @@ export default function SubscriptionsPage() {
   const [eventTypeFilter, setEventTypeFilter] = useState('');
   const [endpointFilter, setEndpointFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  // Bulk operations
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [showRebindDialog, setShowRebindDialog] = useState(false);
+  const [rebindEndpointId, setRebindEndpointId] = useState('');
 
   const handleToggleEnabled = (subscription: SubscriptionResponse) => {
     patchMutation.mutate(
@@ -86,6 +100,63 @@ export default function SubscriptionsPage() {
   const getEndpointName = (endpointId: string) => {
     const endpoint = endpoints.find(e => e.id === endpointId);
     return endpoint ? (endpoint.url || t('subscriptions.unnamed')) : t('subscriptions.unknown');
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkEnable = async (enable: boolean) => {
+    if (!projectId) return;
+    setBulkProcessing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await Promise.all(ids.map(id => subscriptionsApi.patch(projectId, id, { enabled: enable })));
+      showSuccess(t('subscriptions.bulk.done', { count: ids.length }));
+      setSelectedIds(new Set());
+      qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) });
+    } catch (err: any) {
+      showApiError(err, 'toast.errors.server');
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkRebind = async () => {
+    if (!projectId || !rebindEndpointId) return;
+    setBulkProcessing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await Promise.all(ids.map(id => {
+        const sub = subscriptions.find(s => s.id === id);
+        if (!sub) return Promise.resolve();
+        return subscriptionsApi.update(projectId, id, {
+          endpointId: rebindEndpointId,
+          eventType: sub.eventType,
+          enabled: sub.enabled,
+          orderingEnabled: sub.orderingEnabled,
+          maxAttempts: sub.maxAttempts,
+          timeoutSeconds: sub.timeoutSeconds,
+          retryDelays: sub.retryDelays,
+          payloadTemplate: sub.payloadTemplate || undefined,
+          customHeaders: sub.customHeaders || undefined,
+          transformationId: sub.transformationId,
+        });
+      }));
+      showSuccess(t('subscriptions.bulk.rebound', { count: ids.length }));
+      setSelectedIds(new Set());
+      setShowRebindDialog(false);
+      setRebindEndpointId('');
+      qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) });
+    } catch (err: any) {
+      showApiError(err, 'toast.errors.server');
+    } finally {
+      setBulkProcessing(false);
+    }
   };
 
   const filteredSubscriptions = subscriptions.filter(sub => {
@@ -124,9 +195,11 @@ export default function SubscriptionsPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('subscriptions.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canManageSubscriptions}>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="h-4 w-4" /> {t('subscriptions.newSubscription')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4" /> {t('subscriptions.newSubscription')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
@@ -156,6 +229,40 @@ export default function SubscriptionsPage() {
         </CardContent>
       </Card>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && canManageSubscriptions && (
+        <Card className="mb-4 border-primary/30 bg-primary/5 animate-fade-in">
+          <CardContent className="p-3 flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium">
+              {t('subscriptions.bulk.selected', { count: selectedIds.size })}
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <VerificationGate>
+                <Button size="sm" variant="outline" onClick={() => handleBulkEnable(true)} disabled={bulkProcessing}>
+                  {bulkProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Power className="h-3.5 w-3.5" />}
+                  {t('subscriptions.bulk.enableAll')}
+                </Button>
+              </VerificationGate>
+              <VerificationGate>
+                <Button size="sm" variant="outline" onClick={() => handleBulkEnable(false)} disabled={bulkProcessing}>
+                  {bulkProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PowerOff className="h-3.5 w-3.5" />}
+                  {t('subscriptions.bulk.disableAll')}
+                </Button>
+              </VerificationGate>
+              <VerificationGate>
+                <Button size="sm" variant="outline" onClick={() => setShowRebindDialog(true)} disabled={bulkProcessing}>
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  {t('subscriptions.bulk.rebind')}
+                </Button>
+              </VerificationGate>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {filteredSubscriptions.length === 0 ? (
         <EmptyState
           icon={LinkIcon}
@@ -163,9 +270,11 @@ export default function SubscriptionsPage() {
           description={subscriptions.length === 0 ? t('subscriptions.noSubscriptionsDesc') : t('subscriptions.noMatchingDesc')}
           action={subscriptions.length === 0 ? (
             <PermissionGate allowed={canManageSubscriptions}>
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
-              </Button>
+              <VerificationGate>
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="h-4 w-4" /> {t('subscriptions.createFirst')}
+                </Button>
+              </VerificationGate>
             </PermissionGate>
           ) : undefined}
           docsLink="/docs#subscriptions-api"
@@ -175,6 +284,22 @@ export default function SubscriptionsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                {canManageSubscriptions && (
+                  <TableHead className="w-[40px]">
+                    <input
+                      type="checkbox"
+                      className="rounded border-muted-foreground/40 h-4 w-4 accent-primary cursor-pointer"
+                      checked={selectedIds.size === filteredSubscriptions.length && filteredSubscriptions.length > 0}
+                      onChange={() => {
+                        if (selectedIds.size === filteredSubscriptions.length) {
+                          setSelectedIds(new Set());
+                        } else {
+                          setSelectedIds(new Set(filteredSubscriptions.map(s => s.id)));
+                        }
+                      }}
+                    />
+                  </TableHead>
+                )}
                 <TableHead className="text-xs">{t('subscriptions.eventType')}</TableHead>
                 <TableHead className="text-xs">{t('subscriptions.endpoint')}</TableHead>
                 <TableHead className="text-xs">{t('subscriptions.status')}</TableHead>
@@ -185,9 +310,31 @@ export default function SubscriptionsPage() {
             </TableHeader>
             <TableBody>
               {filteredSubscriptions.map((subscription) => (
-                <TableRow key={subscription.id} className="hover:bg-muted/30">
+                <TableRow key={subscription.id} className={`hover:bg-muted/30 ${selectedIds.has(subscription.id) ? 'bg-primary/5' : ''}`}>
+                  {canManageSubscriptions && (
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        className="rounded border-muted-foreground/40 h-4 w-4 accent-primary cursor-pointer"
+                        checked={selectedIds.has(subscription.id)}
+                        onChange={() => toggleSelect(subscription.id)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
-                    <code className="text-[13px] font-mono font-medium">{subscription.eventType}</code>
+                    <div className="flex items-center gap-1.5">
+                      <code className="text-[13px] font-mono font-medium">{subscription.eventType}</code>
+                      {(() => {
+                        const schema = schemaByName.get(subscription.eventType);
+                        if (!schema) return null;
+                        return (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-primary" title={`Schema v${schema.latestVersion ?? '?'} — ${schema.activeVersionStatus ?? 'DRAFT'}`}>
+                            <FileJson2 className="h-3 w-3" />
+                            {schema.latestVersion != null && <span>v{schema.latestVersion}</span>}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span className="font-mono text-[13px] truncate max-w-[200px] block">{getEndpointName(subscription.endpointId)}</span>
@@ -254,6 +401,42 @@ export default function SubscriptionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk rebind endpoint dialog */}
+      <Dialog open={showRebindDialog} onOpenChange={(open) => { if (!open) { setShowRebindDialog(false); setRebindEndpointId(''); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('subscriptions.bulk.rebindTitle')}</DialogTitle>
+            <DialogDescription>
+              {t('subscriptions.bulk.rebindDesc', { count: selectedIds.size })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="rebindEndpoint" className="text-xs">{t('subscriptions.endpoint')}</Label>
+              <Select
+                id="rebindEndpoint"
+                value={rebindEndpointId}
+                onChange={(e) => setRebindEndpointId(e.target.value)}
+              >
+                <option value="">{t('subscriptions.bulk.selectEndpoint')}</option>
+                {endpoints.map(ep => (
+                  <option key={ep.id} value={ep.id}>{ep.url}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowRebindDialog(false); setRebindEndpointId(''); }} disabled={bulkProcessing}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleBulkRebind} disabled={bulkProcessing || !rebindEndpointId}>
+              {bulkProcessing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {t('subscriptions.bulk.rebindConfirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

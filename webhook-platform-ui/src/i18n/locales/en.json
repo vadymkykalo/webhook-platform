@@ -75,6 +75,7 @@
     "resources": "Resources",
     "dashboard": "Dashboard",
     "projects": "Projects",
+    "connectionSetup": "Connection Setup",
     "endpoints": "Endpoints",
     "events": "Events",
     "deliveries": "Deliveries",
@@ -211,7 +212,19 @@
       "resend": "Resend email",
       "resending": "Sending...",
       "sent": "Verification email sent!",
-      "failed": "Failed to resend"
+      "failed": "Failed to resend",
+      "gateTooltip": "Verify your email to unlock this action"
+    },
+    "intent": {
+      "title": "What brings you to Hookflow?",
+      "subtitle": "This helps us tailor your experience. You can always change later.",
+      "send": "I send webhooks",
+      "sendDesc": "Deliver events to your customers' endpoints with retries, monitoring, and delivery guarantees.",
+      "receive": "I receive webhooks",
+      "receiveDesc": "Ingest webhooks from providers like Stripe or GitHub, verify signatures, and forward to your services.",
+      "both": "Both",
+      "bothDesc": "Full bidirectional webhook infrastructure — send and receive.",
+      "continue": "Continue"
     }
   },
   "projects": {
@@ -231,7 +244,16 @@
       "descriptionLabel": "Description (optional)",
       "descriptionPlaceholder": "What is this project for?",
       "submit": "Create Project",
-      "submitting": "Creating..."
+      "submitting": "Creating...",
+      "templateLabel": "Start from a template",
+      "templateCustom": "Blank project",
+      "templateCustomDesc": "Empty project — configure everything yourself",
+      "templateStripe": "Stripe-like",
+      "templateStripeDesc": "Payment events: charge.succeeded, invoice.paid, refund.created",
+      "templateShopify": "Shopify-like",
+      "templateShopifyDesc": "E-commerce events: order.created, product.updated, checkout.completed",
+      "templateGithub": "GitHub-like",
+      "templateGithubDesc": "CI/CD events: push, pull_request.opened, workflow.completed"
     },
     "deleteDialog": {
       "title": "Are you sure?",
@@ -252,6 +274,16 @@
       "events": "Events",
       "keys": "Keys",
       "deliveries": "Deliveries"
+    },
+    "health": {
+      "endpoints": "{{count}} endpoints",
+      "noEndpoints": "No endpoints",
+      "successRate": "{{rate}}% success",
+      "noDeliveries": "No deliveries yet",
+      "lastEvent": "Last event {{time}}",
+      "noEvents": "No events yet",
+      "errors": "{{count}} errors",
+      "healthy": "Healthy"
     }
   },
   "dashboard": {
@@ -304,6 +336,7 @@
     "noEndpoints": "No endpoints yet",
     "noEndpointsDesc": "Create your first endpoint to start receiving webhook deliveries",
     "createFirst": "Create endpoint",
+    "guidedSetup": "Guided Setup",
     "projectNotFound": "Project not found",
     "url": "URL",
     "status": "Status",
@@ -432,6 +465,18 @@
       "fifoEnabled": "FIFO ordering enabled",
       "fifoDisabled": "FIFO ordering disabled",
       "deleted": "Subscription deleted successfully"
+    },
+    "bulk": {
+      "selected": "{{count}} selected",
+      "enableAll": "Enable",
+      "disableAll": "Disable",
+      "rebind": "Rebind endpoint",
+      "rebindTitle": "Rebind Endpoint",
+      "rebindDesc": "Move {{count}} subscription(s) to a different endpoint.",
+      "selectEndpoint": "Select target endpoint…",
+      "rebindConfirm": "Rebind",
+      "done": "{{count}} subscription(s) updated",
+      "rebound": "{{count}} subscription(s) rebound to new endpoint"
     }
   },
   "events": {
@@ -1915,13 +1960,22 @@
       "label": "Replay from specific attempt:",
       "step": "From #{{number}}"
     },
+    "trace": "Trace",
+    "requestId": "Request ID",
+    "compareAttempts": "Compare Attempts",
+    "compareHint": "Click two attempts to compare status, latency, errors, and response bodies",
+    "responseBodyDiff": "Response Body Diff",
+    "openIncidents": "Open Incidents",
+    "createIncident": "Create Incident",
     "toast": {
       "loadFailed": "Failed to load delivery details",
       "replaySuccess": "Delivery replay initiated successfully",
       "replayFailed": "Failed to replay delivery",
       "dryRunFailed": "Failed to run dry-run preview",
       "idCopied": "Delivery ID copied to clipboard",
-      "copied": "{{label}} copied to clipboard"
+      "copied": "{{label}} copied to clipboard",
+      "incidentCreated": "Incident created from delivery",
+      "incidentFailed": "Failed to create incident"
     },
     "troubleshooting": {
       "title": "Troubleshooting Tips",
@@ -2010,7 +2064,70 @@
     "usage": "Usage",
     "incidents": "Incidents",
     "transformations": "Transformations",
-    "transform-studio": "Transform Studio"
+    "transform-studio": "Transform Studio",
+    "connection-setup": "Connection Setup"
+  },
+  "connectionSetup": {
+    "title": "Connection Setup",
+    "subtitle": "Set up a new webhook connection for {{project}} step by step",
+    "next": "Continue",
+    "steps": {
+      "url": {
+        "title": "Endpoint URL",
+        "desc": "Where should we deliver webhook events?",
+        "urlLabel": "Endpoint URL",
+        "descLabel": "Description (optional)",
+        "descPlaceholder": "e.g. Production payment handler",
+        "create": "Create Endpoint"
+      },
+      "secret": {
+        "title": "Signing Secret",
+        "desc": "Copy the HMAC secret to verify webhook signatures on your server",
+        "pending": "Create an endpoint first to generate a signing secret.",
+        "warning": "Store this secret securely — it won't be shown again. Use it to verify the X-Webhook-Signature header."
+      },
+      "test": {
+        "title": "Test Ping",
+        "desc": "Send a test event to verify your endpoint is reachable",
+        "pending": "Create an endpoint first to run a test.",
+        "send": "Send Test Ping",
+        "passed": "Connection successful!",
+        "failed": "Connection failed",
+        "retryHint": "Check your endpoint URL and server, then try again."
+      },
+      "events": {
+        "title": "Event Types",
+        "desc": "Which events should this endpoint receive?",
+        "pending": "Create an endpoint first to subscribe to events.",
+        "add": "Add event type",
+        "create": "Create Subscriptions",
+        "done": "{{count}} event type(s) subscribed"
+      },
+      "retry": {
+        "title": "Retry Policy",
+        "desc": "Configure how failed deliveries are retried",
+        "maxAttempts": "Max attempts",
+        "timeout": "Timeout (seconds)",
+        "delays": "Retry delays (seconds, comma-separated)",
+        "delaysHint": "Comma-separated seconds between retries. Default: 1m, 5m, 15m, 1h, 6h, 24h",
+        "preview": "Schedule",
+        "save": "Confirm Retry Policy",
+        "done": "{{attempts}} attempts, {{timeout}}s timeout"
+      }
+    },
+    "toast": {
+      "endpointCreated": "Endpoint created",
+      "secretCopied": "Secret copied to clipboard",
+      "testPassed": "Test ping successful",
+      "subscriptionsCreated": "{{count}} subscription(s) created",
+      "retryConfigured": "Retry policy configured"
+    },
+    "complete": {
+      "title": "Connection Ready!",
+      "desc": "Your webhook endpoint is fully configured and ready to receive events.",
+      "viewEndpoints": "View Endpoints",
+      "sendEvent": "Send First Event"
+    }
   },
   "piiRules": {
     "title": "PII Masking Rules",

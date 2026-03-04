@@ -10,6 +10,7 @@ import { useAuth } from './auth.store';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import IntentPicker from '../components/IntentPicker';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -20,6 +21,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [showIntent, setShowIntent] = useState(false);
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -108,7 +110,9 @@ export default function RegisterPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-12 bg-background">
         <div className="w-full max-w-[420px] animate-fade-in-up">
 
-          {registered ? (
+          {registered && showIntent ? (
+            <IntentPicker onSelect={() => navigate('/admin/dashboard')} />
+          ) : registered ? (
             <div className="text-center space-y-6">
               <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <Mail className="h-8 w-8 text-primary" />
@@ -118,7 +122,7 @@ export default function RegisterPage() {
                 <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: t('auth.register.verificationSent', { email }) }} />
               </div>
               <div className="space-y-3">
-                <Button onClick={() => navigate('/admin/dashboard')} className="w-full">
+                <Button onClick={() => setShowIntent(true)} className="w-full">
                   {t('auth.register.continueToDashboard')}
                 </Button>
                 <Button

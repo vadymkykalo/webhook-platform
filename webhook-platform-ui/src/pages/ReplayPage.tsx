@@ -26,6 +26,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
 
 const STATUS_VARIANTS: Record<string, { variant: any; icon: any }> = {
   PENDING: { variant: 'secondary', icon: Clock },
@@ -256,10 +257,12 @@ export default function ReplayPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('replay.subtitle', { project: project.name }) }} />
         </div>
         <PermissionGate allowed={canReplayDeliveries}>
-          <Button onClick={() => setShowForm(!showForm)} size="sm">
-            {showForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-            {t('replay.newReplay')}
-          </Button>
+          <VerificationGate>
+            <Button onClick={() => setShowForm(!showForm)} size="sm">
+              {showForm ? <ChevronUp className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              {t('replay.newReplay')}
+            </Button>
+          </VerificationGate>
         </PermissionGate>
       </div>
 
