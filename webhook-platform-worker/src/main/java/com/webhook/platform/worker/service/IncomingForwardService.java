@@ -98,16 +98,19 @@ public class IncomingForwardService {
     public void processForward(IncomingForwardMessage message) {
         UUID eventId = message.getIncomingEventId();
         UUID destinationId = message.getDestinationId();
+        int attemptNumber = resolveAttemptNumber(message);
 
         Optional<IncomingEvent> eventOpt = eventRepository.findById(eventId);
         if (eventOpt.isEmpty()) {
             log.error("Incoming event not found: {}", eventId);
+            markAttemptFailedIfExists(eventId, destinationId, attemptNumber, "Incoming event not found");
             return;
         }
 
         Optional<IncomingDestination> destOpt = destinationRepository.findById(destinationId);
         if (destOpt.isEmpty()) {
             log.error("Incoming destination not found: {}", destinationId);
+            markAttemptFailedIfExists(eventId, destinationId, attemptNumber, "Incoming destination not found");
             return;
         }
 
@@ -116,6 +119,7 @@ public class IncomingForwardService {
 
         if (!destination.getEnabled()) {
             log.warn("Destination {} is disabled, skipping forward for event {}", destinationId, eventId);
+            markAttemptFailedIfExists(eventId, destinationId, attemptNumber, "Destination is disabled");
             return;
         }
 
@@ -139,7 +143,6 @@ public class IncomingForwardService {
         //   Retry (attemptCount > 0, replay == false): IncomingForwardRetryScheduler
         //     already claimed the existing row (set PROCESSING) and published
         //     attemptCount = attemptNumber.  No re-claim needed.
-        int attemptNumber;
         boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
         boolean isReplay = message.isReplay();
 
@@ -172,6 +175,41 @@ public class IncomingForwardService {
 
         int maxAttempts = destination.getMaxAttempts();
         attemptForward(event, destination, attemptNumber, maxAttempts);
+    }
+
+    private int resolveAttemptNumber(IncomingForwardMessage message) {
+        return message.getAttemptCount() != null && message.getAttemptCount() > 0
+                ? message.getAttemptCount()
+                : 1;
+    }
+
+    private void markAttemptFailedIfExists(UUID eventId, UUID destinationId, int attemptNumber,
+            String reason) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            List<IncomingForwardAttempt> attempts = attemptRepository
+                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
+
+            IncomingForwardAttempt attempt = attempts.stream()
+                    .filter(a -> a.getAttemptNumber() == attemptNumber)
+                    .findFirst()
+                    .orElseGet(() -> attempts.stream()
+                            .filter(a -> a.getStatus() == ForwardAttemptStatus.PENDING
+                                    || a.getStatus() == ForwardAttemptStatus.PROCESSING)
+                            .findFirst()
+                            .orElse(null));
+
+            if (attempt == null) {
+                log.warn("No attempt row found to mark failed: eventId={}, destId={}, attempt={}",
+                        eventId, destinationId, attemptNumber);
+                return;
+            }
+
+            attempt.setStatus(ForwardAttemptStatus.FAILED);
+            attempt.setFinishedAt(Instant.now());
+            attempt.setErrorMessage(reason);
+            attempt.setNextRetryAt(null);
+            attemptRepository.save(attempt);
+        });
     }
 
     private void attemptForward(IncomingEvent event, IncomingDestination destination,
