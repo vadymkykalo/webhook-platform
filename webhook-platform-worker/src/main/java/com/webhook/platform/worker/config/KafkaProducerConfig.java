@@ -54,7 +54,7 @@ public class KafkaProducerConfig {
     }
 
     @Bean(name = "deadLetterKafkaTemplate")
-    public KafkaOperations<Object, Object> deadLetterKafkaTemplate() {
+    public KafkaOperations<String, Object> deadLetterKafkaTemplate() {
         ProducerFactory<String, Object> producerFactory = new DefaultKafkaProducerFactory<>(commonProducerProps());
         return new KafkaTemplate<>(producerFactory);
     }
