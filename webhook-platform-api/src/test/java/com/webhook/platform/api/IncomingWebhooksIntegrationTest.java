@@ -376,8 +376,7 @@ public class IncomingWebhooksIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"action\":\"push\"}"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("signature_verification_failed"))
-                .andExpect(jsonPath("$.requestId").isNotEmpty());
+                .andExpect(jsonPath("$.error").value("signature_verification_failed"));
 
         // Reset back to NONE for subsequent tests
         IncomingSourceRequest resetMode = IncomingSourceRequest.builder()

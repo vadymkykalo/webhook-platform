@@ -19,7 +19,7 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 </div>
 
 <div align="center">
-  <img src="docs/screenshot.png" alt="Webhook Platform Dashboard" width="100%">
+  <img src="docs/img.png" alt="Webhook Platform Dashboard" width="100%">
 </div>
 
 ---
