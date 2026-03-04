@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import org.springframework.kafka.support.SendResult;
@@ -127,7 +128,7 @@ public class IncomingForwardRetryScheduler {
                 if (future == null) {
                     // Send was not initiated, revert to PENDING
                     attempt.setStatus(ForwardAttemptStatus.PENDING);
-                    attempt.setNextRetryAt(Instant.now().plusSeconds(30));
+                    attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     attempt.setStartedAt(null);
                     failed.add(attempt);
                     continue;
@@ -137,7 +138,7 @@ public class IncomingForwardRetryScheduler {
                     if (!future.isDone()) {
                         // Timed out, revert to PENDING
                         attempt.setStatus(ForwardAttemptStatus.PENDING);
-                        attempt.setNextRetryAt(Instant.now().plusSeconds(30));
+                        attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                         attempt.setStartedAt(null);
                         failed.add(attempt);
                         continue;
@@ -154,7 +155,7 @@ public class IncomingForwardRetryScheduler {
                     log.error("Failed to schedule incoming forward retry: attemptId={}: {}",
                             attempt.getId(), e.getMessage());
                     attempt.setStatus(ForwardAttemptStatus.PENDING);
-                    attempt.setNextRetryAt(Instant.now().plusSeconds(30));
+                    attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     attempt.setStartedAt(null);
                     failed.add(attempt);
                 }
@@ -176,5 +177,10 @@ public class IncomingForwardRetryScheduler {
         } catch (Exception e) {
             log.error("Error polling incoming forward retries: {}", e.getMessage(), e);
         }
+    }
+
+    private long rescheduleWithJitter(long baseSeconds) {
+        long jitter = ThreadLocalRandom.current().nextLong(0, Math.max(1, baseSeconds / 2) + 1);
+        return baseSeconds + jitter;
     }
 }

@@ -6,13 +6,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.util.backoff.FixedBackOff;
@@ -20,11 +23,18 @@ import org.springframework.util.backoff.FixedBackOff;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.kafka.common.TopicPartition;
 
 @Configuration
 @EnableKafka
 @Slf4j
 public class KafkaConsumerConfig {
+
+    private final KafkaOperations<Object, Object> deadLetterKafkaTemplate;
+
+    public KafkaConsumerConfig(@Qualifier("deadLetterKafkaTemplate") KafkaOperations<Object, Object> deadLetterKafkaTemplate) {
+        this.deadLetterKafkaTemplate = deadLetterKafkaTemplate;
+    }
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -103,18 +113,25 @@ public class KafkaConsumerConfig {
         factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.getContainerProperties().setShutdownTimeout(30_000L);
+
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
+                deadLetterKafkaTemplate,
+                (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition())
+        );
         
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
-            (consumerRecord, exception) -> {
-                log.error("Message processing failed after {} retries. Topic: {}, Partition: {}, Offset: {}, Key: {}. Error: {}", 
-                    maxRetries, 
-                    consumerRecord.topic(), 
-                    consumerRecord.partition(), 
-                    consumerRecord.offset(), 
-                    consumerRecord.key(),
-                    exception.getMessage());
-            },
+            recoverer,
             new FixedBackOff(retryIntervalMs, maxRetries)
+        );
+
+        errorHandler.setRetryListeners((record, ex, deliveryAttempt) ->
+                log.warn("Kafka retry attempt {} for topic={}, partition={}, offset={}, key={}, error={}",
+                        deliveryAttempt,
+                        record.topic(),
+                        record.partition(),
+                        record.offset(),
+                        record.key(),
+                        ex.getMessage())
         );
         
         factory.setCommonErrorHandler(errorHandler);

@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -185,7 +186,8 @@ public class RetrySchedulerService {
     }
 
     private void rescheduleDelivery(Delivery delivery, String reason) {
-        Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds);
+        long jitter = ThreadLocalRandom.current().nextLong(0, Math.max(1, rescheduleDelaySeconds / 2) + 1);
+        Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds + jitter);
         delivery.setNextRetryAt(rescheduleTime);
         delivery.setUpdatedAt(Instant.now());
 
