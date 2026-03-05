@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,9 +34,9 @@ public class IncomingForwardRetryScheduler {
     private final IncomingForwardAttemptRepository attemptRepository;
     private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
-    private final int batchSize;
     private final int maxPerDest;
     private final Counter retryScheduledCounter;
+    private final RetryGovernor governor;
 
     public IncomingForwardRetryScheduler(
             IncomingForwardAttemptRepository attemptRepository,
@@ -43,23 +44,33 @@ public class IncomingForwardRetryScheduler {
             TransactionTemplate transactionTemplate,
             MeterRegistry meterRegistry,
             @Value("${incoming-forward.retry.batch-size:50}") int batchSize,
-            @Value("${incoming-forward.retry.max-per-destination:10}") int maxPerDest) {
+            @Value("${incoming-forward.retry.max-per-destination:10}") int maxPerDest,
+            @Value("${incoming-forward.retry.high-watermark:3000}") long highWatermark) {
         this.attemptRepository = attemptRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
-        this.batchSize = batchSize;
         this.maxPerDest = maxPerDest;
         this.retryScheduledCounter = Counter.builder("incoming_forward_retries_scheduled_total")
                 .register(meterRegistry);
+        this.governor = new RetryGovernor(
+                "incoming-forward", batchSize, /* minBatch */ 3, /* increment */ 5,
+                highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
     }
 
     @Scheduled(fixedDelayString = "${incoming-forward.retry.poll-interval-ms:10000}")
     public void pollPendingRetries() {
         try {
+            // ── Governor: adaptive batch sizing ──
+            long pendingCount = countPendingRetries();
+            int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
+            if (effectiveBatch <= 0) {
+                return; // Governor cooldown — skip this poll
+            }
+
             // ── Phase 1: Short transaction — claim pending retries ──
             List<IncomingForwardAttempt> claimed = transactionTemplate.execute(tx -> {
                 List<UUID> candidateIds = attemptRepository
-                        .findPendingRetryIds(ForwardAttemptStatus.PENDING, Instant.now(), batchSize, maxPerDest);
+                        .findPendingRetryIds(ForwardAttemptStatus.PENDING, Instant.now(), effectiveBatch, maxPerDest);
 
                 if (candidateIds.isEmpty()) {
                     return List.<IncomingForwardAttempt>of();
@@ -171,11 +182,23 @@ public class IncomingForwardRetryScheduler {
                 }
             });
 
-            log.info("Incoming forward retry scheduling complete: {} dispatched, {} rescheduled",
-                    successful.size(), failed.size());
+            // ── Governor feedback ──
+            governor.recordResult(successful.size(), failed.size());
+
+            log.info("Incoming forward retry scheduling complete: {} dispatched, {} rescheduled (governor batch={})",
+                    successful.size(), failed.size(), effectiveBatch);
 
         } catch (Exception e) {
             log.error("Error polling incoming forward retries: {}", e.getMessage(), e);
+        }
+    }
+
+    private long countPendingRetries() {
+        try {
+            return attemptRepository.countPending(Instant.now().minus(30, ChronoUnit.DAYS));
+        } catch (Exception e) {
+            log.warn("Failed to count pending forward retries for governor: {}", e.getMessage());
+            return -1;
         }
     }
 

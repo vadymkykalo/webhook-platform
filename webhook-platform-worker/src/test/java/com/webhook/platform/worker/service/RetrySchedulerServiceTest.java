@@ -3,6 +3,7 @@ package com.webhook.platform.worker.service;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,13 +62,20 @@ class RetrySchedulerServiceTest {
                         return null;
                 }).when(transactionTemplate).executeWithoutResult(any());
 
+                // Governor needs countPending — stub it to return low count (no throttling)
+                lenient().when(deliveryRepository.countPending(any(Instant.class))).thenReturn(0L);
+
                 retrySchedulerService = new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
                                 transactionTemplate,
+                                new SimpleMeterRegistry(),
                                 batchSize,
+                                10,  // maxPerEndpoint
+                                30,  // maxPerProject
                                 sendTimeoutSeconds,
-                                rescheduleDelaySeconds);
+                                rescheduleDelaySeconds,
+                                5000L);  // highWatermark
         }
 
         @Test
@@ -79,6 +87,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetryIds(
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(dueDelivery.getId()));
                 when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(dueDelivery));
@@ -97,6 +106,7 @@ class RetrySchedulerServiceTest {
                                 eq(Delivery.DeliveryStatus.PENDING),
                                 any(Instant.class),
                                 limitCaptor.capture(),
+                                anyInt(),
                                 anyInt());
 
                 assertEquals(batchSize, limitCaptor.getValue());
@@ -115,6 +125,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt(),
                                 anyInt())).thenReturn(deliveries.stream().map(Delivery::getId).toList());
                 when(deliveryRepository.lockByIds(anyList())).thenReturn(deliveries);
@@ -141,6 +152,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
                 when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
@@ -169,6 +181,7 @@ class RetrySchedulerServiceTest {
                 any(Delivery.DeliveryStatus.class),
                 any(Instant.class),
                 anyInt(),
+                anyInt(),
                 anyInt()
         )).thenReturn(Collections.emptyList());
 
@@ -189,6 +202,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
                 when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
@@ -228,6 +242,7 @@ class RetrySchedulerServiceTest {
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
+                                anyInt(),
                                 anyInt()))
                                 .thenReturn(Collections.singletonList(delivery1.getId()))
                                 .thenReturn(Collections.singletonList(delivery2.getId()))
@@ -265,6 +280,7 @@ class RetrySchedulerServiceTest {
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
                                 anyInt(),
+                                anyInt(),
                                 anyInt()))
                                 .thenReturn(Arrays.asList(completedDelivery.getId(), incompleteDelivery.getId()));
                 when(deliveryRepository.lockByIds(anyList()))
@@ -301,6 +317,7 @@ class RetrySchedulerServiceTest {
                 when(deliveryRepository.findPendingRetryIds(
                                 any(Delivery.DeliveryStatus.class),
                                 any(Instant.class),
+                                anyInt(),
                                 anyInt(),
                                 anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
                 when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));

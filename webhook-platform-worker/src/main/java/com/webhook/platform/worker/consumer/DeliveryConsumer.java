@@ -2,6 +2,7 @@ package com.webhook.platform.worker.consumer;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.worker.service.AsyncDeliveryExecutor;
 import com.webhook.platform.worker.service.WebhookDeliveryService;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -21,9 +22,12 @@ public class DeliveryConsumer {
     private static final String CORRELATION_ID_KEY = "correlationId";
     
     private final WebhookDeliveryService webhookDeliveryService;
+    private final AsyncDeliveryExecutor asyncExecutor;
 
-    public DeliveryConsumer(WebhookDeliveryService webhookDeliveryService) {
+    public DeliveryConsumer(WebhookDeliveryService webhookDeliveryService,
+                            AsyncDeliveryExecutor asyncExecutor) {
         this.webhookDeliveryService = webhookDeliveryService;
+        this.asyncExecutor = asyncExecutor;
     }
 
     @KafkaListener(
@@ -40,17 +44,14 @@ public class DeliveryConsumer {
         
         String correlationId = extractCorrelationId(correlationIdBytes);
         MDC.put(CORRELATION_ID_KEY, correlationId);
-        
-        try {
-            log.info("Received delivery from {}: deliveryId={}, endpointId={}", 
-                    topic, message.getDeliveryId(), message.getEndpointId());
-            
-            webhookDeliveryService.processDelivery(message);
-            acknowledgment.acknowledge();
-            log.debug("Acknowledged message for delivery: {}", message.getDeliveryId());
-        } finally {
-            MDC.remove(CORRELATION_ID_KEY);
-        }
+
+        log.info("Received delivery from {}: deliveryId={}, endpointId={}",
+                topic, message.getDeliveryId(), message.getEndpointId());
+
+        asyncExecutor.submit(
+                () -> webhookDeliveryService.processDelivery(message),
+                acknowledgment,
+                message.getDeliveryId().toString());
     }
 
     @KafkaListener(
@@ -71,20 +72,17 @@ public class DeliveryConsumer {
             @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
             @Header(name = "X-Correlation-ID", required = false) byte[] correlationIdBytes,
             Acknowledgment acknowledgment) {
-        
+
         String correlationId = extractCorrelationId(correlationIdBytes);
         MDC.put(CORRELATION_ID_KEY, correlationId);
-        
-        try {
-            log.info("Received retry from {}: deliveryId={}, attempt={}", 
-                    topic, message.getDeliveryId(), message.getAttemptCount());
-            
-            webhookDeliveryService.processDelivery(message);
-            acknowledgment.acknowledge();
-            log.debug("Acknowledged retry message for delivery: {}", message.getDeliveryId());
-        } finally {
-            MDC.remove(CORRELATION_ID_KEY);
-        }
+
+        log.info("Received retry from {}: deliveryId={}, attempt={}",
+                topic, message.getDeliveryId(), message.getAttemptCount());
+
+        asyncExecutor.submit(
+                () -> webhookDeliveryService.processDelivery(message),
+                acknowledgment,
+                message.getDeliveryId().toString());
     }
 
     private String extractCorrelationId(byte[] correlationIdBytes) {

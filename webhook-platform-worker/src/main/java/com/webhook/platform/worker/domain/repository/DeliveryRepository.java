@@ -23,15 +23,21 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     
     @Query(value = """
             SELECT id FROM (
-                SELECT id, ROW_NUMBER() OVER (PARTITION BY endpoint_id ORDER BY next_retry_at ASC) AS rn
-                FROM deliveries WHERE status = :#{#status.name()} AND next_retry_at IS NOT NULL AND next_retry_at <= :now
-            ) sub WHERE rn <= :maxPerEndpoint ORDER BY rn ASC LIMIT :limit
+                SELECT d.id,
+                       ROW_NUMBER() OVER (PARTITION BY d.endpoint_id ORDER BY d.next_retry_at ASC) AS rn_ep,
+                       ROW_NUMBER() OVER (PARTITION BY e.project_id ORDER BY d.next_retry_at ASC) AS rn_proj
+                FROM deliveries d
+                JOIN endpoints e ON d.endpoint_id = e.id
+                WHERE d.status = :#{#status.name()} AND d.next_retry_at IS NOT NULL AND d.next_retry_at <= :now
+            ) sub WHERE rn_ep <= :maxPerEndpoint AND rn_proj <= :maxPerProject
+            ORDER BY rn_proj ASC, rn_ep ASC LIMIT :limit
             """, nativeQuery = true)
     List<UUID> findPendingRetryIds(
             @Param("status") Delivery.DeliveryStatus status,
             @Param("now") Instant now,
             @Param("limit") int limit,
-            @Param("maxPerEndpoint") int maxPerEndpoint
+            @Param("maxPerEndpoint") int maxPerEndpoint,
+            @Param("maxPerProject") int maxPerProject
     );
 
     @Query(value = """

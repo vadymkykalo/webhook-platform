@@ -52,6 +52,7 @@ public class WebhookDeliveryService {
     private final List<String> allowedHosts;
     private final RedisRateLimiterService rateLimiterService;
     private final RedisConcurrencyControlService concurrencyControlService;
+    private final ProjectRateLimiterService projectRateLimiterService;
     private final CircuitBreakerService circuitBreakerService;
     private final MeterRegistry meterRegistry;
     private final OrderingBufferService orderingBufferService;
@@ -85,6 +86,7 @@ public class WebhookDeliveryService {
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             RedisRateLimiterService rateLimiterService,
             RedisConcurrencyControlService concurrencyControlService,
+            ProjectRateLimiterService projectRateLimiterService,
             CircuitBreakerService circuitBreakerService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper,
@@ -110,6 +112,7 @@ public class WebhookDeliveryService {
         this.allowedHosts = allowedHosts;
         this.rateLimiterService = rateLimiterService;
         this.concurrencyControlService = concurrencyControlService;
+        this.projectRateLimiterService = projectRateLimiterService;
         this.circuitBreakerService = circuitBreakerService;
         this.meterRegistry = meterRegistry;
         this.orderingBufferService = orderingBufferService;
@@ -227,6 +230,15 @@ public class WebhookDeliveryService {
 
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
         long startTime = System.currentTimeMillis();
+
+        // Project-level rate limit — prevent noisy-neighbor
+        if (!projectRateLimiterService.tryAcquire(endpoint.getProjectId())) {
+            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 1, 30);
+            log.warn("Project rate limit exceeded for project {}, rescheduling delivery {} in {}s",
+                    endpoint.getProjectId(), delivery.getId(), delaySec);
+            rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
+            return;
+        }
 
         if (!circuitBreakerService.isCallPermitted(endpoint.getId())) {
             log.warn("CircuitBreaker OPEN for endpoint {}, rescheduling delivery {}", endpoint.getId(),
