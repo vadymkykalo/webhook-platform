@@ -54,4 +54,32 @@ public class DeliverySpecification {
             return cb.lessThanOrEqualTo(root.get("createdAt"), toDate);
         };
     }
+
+    public static Specification<Delivery> hasProjectId(UUID projectId) {
+        return (root, query, cb) -> {
+            if (projectId == null) {
+                return cb.conjunction();
+            }
+            return cb.equal(root.get("event").get("projectId"), projectId);
+        };
+    }
+
+    public static Specification<Delivery> hasEventTypeContaining(String eventType) {
+        return (root, query, cb) -> {
+            if (eventType == null || eventType.isBlank()) {
+                return cb.conjunction();
+            }
+            return cb.like(cb.lower(root.get("event").get("eventType")),
+                    "%" + eventType.toLowerCase() + "%");
+        };
+    }
+
+    public static Specification<Delivery> notStatus(DeliveryStatus status) {
+        return (root, query, cb) -> {
+            if (status == null) {
+                return cb.conjunction();
+            }
+            return cb.notEqual(root.get("status"), status);
+        };
+    }
 }

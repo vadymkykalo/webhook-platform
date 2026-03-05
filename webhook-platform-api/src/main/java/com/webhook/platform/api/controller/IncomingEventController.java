@@ -60,7 +60,7 @@ public class IncomingEventController {
     public ResponseEntity<IncomingEventResponse> getEvent(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        IncomingEventResponse response = eventService.getEvent(id, auth.organizationId());
+        IncomingEventResponse response = eventService.getEvent(id, auth);
         return ResponseEntity.ok(response);
     }
 
@@ -75,7 +75,7 @@ public class IncomingEventController {
             @PageableDefault(size = 20) Pageable pageable,
             AuthContext auth) {
         Page<IncomingForwardAttemptResponse> response = eventService.getEventAttempts(
-                id, auth.organizationId(), pageable);
+                id, auth, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -89,7 +89,7 @@ public class IncomingEventController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        int replayed = eventService.replayEvent(id, auth.organizationId());
+        int replayed = eventService.replayEvent(id, auth);
         return ResponseEntity.ok(ReplayEventResponse.builder()
                 .status("replayed")
                 .eventId(id)

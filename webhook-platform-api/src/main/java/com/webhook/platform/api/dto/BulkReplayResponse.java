@@ -13,5 +13,7 @@ public class BulkReplayResponse {
     private int totalRequested;
     private int replayed;
     private int skipped;
+    private long totalMatched;
+    private boolean hasMore;
     private String message;
 }

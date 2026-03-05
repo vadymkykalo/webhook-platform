@@ -668,6 +668,7 @@
     "filteringByEvent": "Showing deliveries for event",
     "clearEventFilter": "Show all",
     "bulkReplay": "Replay All {{status}}",
+    "bulkReplayHasMore": "Replayed {{replayed}} of {{total}} deliveries. Run again to process the rest.",
     "replaying": "Replaying...",
     "replayError": "Please select a status filter (FAILED or DLQ) before bulk replay",
     "justNow": "just now",

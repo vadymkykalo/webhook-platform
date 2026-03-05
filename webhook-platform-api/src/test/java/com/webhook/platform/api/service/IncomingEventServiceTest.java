@@ -16,6 +16,8 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -63,6 +65,7 @@ class IncomingEventServiceTest {
     private final UUID sourceId = UUID.randomUUID();
     private final UUID eventId = UUID.randomUUID();
     private final UUID destId = UUID.randomUUID();
+    private final AuthContext auth = new AuthContext(UUID.randomUUID(), orgId, MembershipRole.OWNER, null);
 
     private Project project;
     private IncomingSource source;
@@ -132,7 +135,7 @@ class IncomingEventServiceTest {
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
         stubAccess();
 
-        IncomingEventResponse response = service.getEvent(eventId, orgId);
+        IncomingEventResponse response = service.getEvent(eventId, auth);
 
         assertThat(response.getId()).isEqualTo(eventId);
         assertThat(response.getMethod()).isEqualTo("POST");
@@ -143,7 +146,7 @@ class IncomingEventServiceTest {
     void getEvent_notFound() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getEvent(eventId, orgId))
+        assertThatThrownBy(() -> service.getEvent(eventId, auth))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -161,7 +164,7 @@ class IncomingEventServiceTest {
         when(forwardAttemptRepository.findByIncomingEventId(eq(eventId), any()))
                 .thenReturn(new PageImpl<>(List.of(attempt)));
 
-        Page<IncomingForwardAttemptResponse> page = service.getEventAttempts(eventId, orgId, PageRequest.of(0, 20));
+        Page<IncomingForwardAttemptResponse> page = service.getEventAttempts(eventId, auth, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1);
         assertThat(page.getContent().get(0).getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
@@ -184,7 +187,7 @@ class IncomingEventServiceTest {
         when(forwardAttemptRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(outboxMessageRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        int replayed = service.replayEvent(eventId, orgId);
+        int replayed = service.replayEvent(eventId, auth);
 
         assertThat(replayed).isEqualTo(1);
         verify(forwardAttemptRepository).save(argThat(a ->
@@ -200,7 +203,7 @@ class IncomingEventServiceTest {
         stubAccess();
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.replayEvent(eventId, orgId))
+        assertThatThrownBy(() -> service.replayEvent(eventId, auth))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No enabled destinations");
     }
@@ -209,7 +212,7 @@ class IncomingEventServiceTest {
     void replayEvent_notFound() {
         when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.replayEvent(eventId, orgId))
+        assertThatThrownBy(() -> service.replayEvent(eventId, auth))
                 .isInstanceOf(NotFoundException.class);
     }
 }
