@@ -65,28 +65,28 @@ public class WebhookCaptureController {
                             .build());
         }
 
-        CapturedRequestResponse captured = testEndpointService.captureRequest(slug, request);
-
-        // Auto-respond to verification challenges
+        // Auto-respond to verification challenges BEFORE slug lookup
+        // so verification works even if the test endpoint expired or was deleted
         if (body != null && !body.isEmpty()) {
             try {
                 JsonNode json = objectMapper.readTree(body);
                 if (json.has("type") && "webhook.verification".equals(json.get("type").asText())) {
                     String challenge = json.has("challenge") ? json.get("challenge").asText() : null;
                     if (challenge != null) {
-                        log.info("Test endpoint {} responding to verification challenge", slug);
+                        log.info("Endpoint /hook/{} responding to verification challenge", slug);
                         return ResponseEntity.ok(WebhookCaptureResponse.builder()
                                 .success(true)
                                 .message("Verification challenge accepted")
                                 .challenge(challenge)
-                                .requestId(captured.getId())
                                 .build());
                     }
                 }
             } catch (Exception e) {
-                // Not JSON or parsing failed, continue with normal response
+                // Not JSON or parsing failed, continue with normal capture flow
             }
         }
+
+        CapturedRequestResponse captured = testEndpointService.captureRequest(slug, request);
 
         return ResponseEntity.ok(WebhookCaptureResponse.builder()
                 .success(true)
