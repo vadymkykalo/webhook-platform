@@ -78,7 +78,7 @@ public class ConditionTreeEvaluator {
             }
             case NOT -> {
                 // NOT applies to first child only
-                ConditionNode child = group.getChildren().getFirst();
+                ConditionNode child = group.getChildren().get(0);
                 yield !evaluateNode(child, eventJson, fieldCache);
             }
         };
