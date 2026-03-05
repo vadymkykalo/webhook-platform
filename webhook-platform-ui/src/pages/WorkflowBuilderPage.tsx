@@ -18,7 +18,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ArrowLeft, Save, ToggleLeft, ToggleRight, Loader2, Play, History, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Save, ToggleLeft, ToggleRight, Loader2, Play, History, CheckCircle2, XCircle, Clock, ChevronDown, ChevronUp, BarChart3, Activity } from 'lucide-react';
 import type { WorkflowExecutionResponse } from '../api/workflows.api';
 import { workflowsApi } from '../api/workflows.api';
 import { Button } from '../components/ui/button';
@@ -362,13 +362,63 @@ function WorkflowBuilderInner() {
 
       {/* Execution history drawer */}
       {showHistory && (
-        <div className="border-t bg-card max-h-64 overflow-y-auto">
+        <div className="border-t bg-card max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between px-4 py-2 border-b sticky top-0 bg-card z-10">
             <h3 className="text-xs font-semibold">{t('workflows.builder.executionHistory')}</h3>
             <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)}>
               <ChevronDown className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Stats summary */}
+          {(() => {
+            const total = workflow.totalExecutions ?? 0;
+            const success = workflow.successfulExecutions ?? 0;
+            const failed = workflow.failedExecutions ?? 0;
+            const rate = total > 0 ? Math.round((success / total) * 100) : 0;
+            const execs = executions?.content ?? [];
+            const avgMs = execs.length > 0 ? Math.round(execs.reduce((s, e) => s + (e.durationMs ?? 0), 0) / execs.length) : 0;
+            return (
+              <div className="px-4 py-2.5 border-b bg-muted/30 grid grid-cols-5 gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Activity className="h-3 w-3 text-blue-500" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Total</div>
+                    <div className="text-xs font-bold">{total}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Success</div>
+                    <div className="text-xs font-bold text-green-600">{success}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <XCircle className="h-3 w-3 text-red-500" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Failed</div>
+                    <div className="text-xs font-bold text-red-600">{failed}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <BarChart3 className="h-3 w-3 text-primary" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Rate</div>
+                    <div className="text-xs font-bold">{rate}%</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">Avg</div>
+                    <div className="text-xs font-bold">{avgMs}ms</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {!executions?.content?.length ? (
             <p className="text-xs text-muted-foreground p-4 text-center">{t('workflows.builder.noExecutions')}</p>
           ) : (
