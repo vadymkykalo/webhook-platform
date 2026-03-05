@@ -1370,8 +1370,10 @@
       "rulesFeature3": "18 condition operators",
       "rulesFeature4": "Hot-reload, zero downtime",
       "rulesIfLabel": "IF",
+      "rulesIfAll": "event matches all:",
       "rulesIfCondition": "event.type = order.completed AND payload.total > 500",
       "rulesThenLabel": "THEN",
+      "rulesThenAll": "execute actions:",
       "rulesThenAction": "→ Route to CRM endpoint + Apply transform + Tag: high-value",
       "extra": {
         "testConsole": "Test Console",

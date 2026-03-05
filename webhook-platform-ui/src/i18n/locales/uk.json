@@ -1370,8 +1370,10 @@
       "rulesFeature3": "18 операторів умов",
       "rulesFeature4": "Гаряче оновлення без простою",
       "rulesIfLabel": "ЯКЩО",
+      "rulesIfAll": "подія збігається з усіма:",
       "rulesIfCondition": "event.type = order.completed ТА payload.total > 500",
       "rulesThenLabel": "ТОДІ",
+      "rulesThenAll": "виконати дії:",
       "rulesThenAction": "→ Надіслати в CRM ендпоінт + Застосувати трансформацію + Тег: high-value",
       "extra": {
         "testConsole": "Тестова консоль",

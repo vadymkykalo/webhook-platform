@@ -801,7 +801,7 @@ function PlatformHighlights() {
                       {[
                         { label: t('landing.highlights.rulesFeature1', 'Compiled in-memory cache'), color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20' },
                         { label: t('landing.highlights.rulesFeature2', 'Wildcard event matching'), color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20' },
-                        { label: t('landing.highlights.rulesFeature3', '15 condition operators'), color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20' },
+                        { label: t('landing.highlights.rulesFeature3', '18 condition operators'), color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20' },
                         { label: t('landing.highlights.rulesFeature4', 'Hot-reload, zero downtime'), color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
                       ].map((f) => (
                         <span key={f.label} className={`px-2 py-1 rounded-md text-[10px] font-semibold border ${f.color}`}>{f.label}</span>
@@ -821,8 +821,8 @@ function PlatformHighlights() {
                     {/* Rule visualization */}
                     <div className="p-2.5 rounded-lg bg-card border">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[9px] font-bold">IF</span>
-                        <span className="text-[10px] text-muted-foreground">event matches all:</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[9px] font-bold">{t('landing.highlights.rulesIfLabel', 'IF')}</span>
+                        <span className="text-[10px] text-muted-foreground">{t('landing.highlights.rulesIfAll', 'event matches all:')}</span>
                       </div>
                       <div className="space-y-1 ml-4">
                         <div className="flex items-center gap-1.5 text-[10px]">
@@ -849,8 +849,8 @@ function PlatformHighlights() {
                     </div>
                     <div className="p-2.5 rounded-lg bg-card border">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[9px] font-bold">THEN</span>
-                        <span className="text-[10px] text-muted-foreground">execute actions:</span>
+                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[9px] font-bold">{t('landing.highlights.rulesThenLabel', 'THEN')}</span>
+                        <span className="text-[10px] text-muted-foreground">{t('landing.highlights.rulesThenAll', 'execute actions:')}</span>
                       </div>
                       <div className="space-y-1.5 ml-4">
                         <div className="flex items-center gap-1.5 text-[10px]">
