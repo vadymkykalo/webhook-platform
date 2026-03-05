@@ -103,6 +103,7 @@
     "incidents": "Incidents",
     "transformStudio": "Transform Studio",
     "transformations": "Transformations",
+    "rules": "Rules",
     "testConsole": "Test Console",
     "testEndpoints": "Test Endpoints",
     "devWorkspace": "Dev Console",
@@ -2243,6 +2244,7 @@
     "alerts": "Alerts",
     "usage": "Usage",
     "incidents": "Incidents",
+    "rules": "Rules",
     "transformations": "Transformations",
     "transform-studio": "Transform Studio",
     "connection-setup": "Connection Setup",
@@ -2835,6 +2837,68 @@
       "success": "Success",
       "failed": "Failed",
       "dlq": "DLQ"
+    }
+  },
+  "rules": {
+    "title": "Rules Engine",
+    "subtitle": "Define IF-THEN rules to route, transform, or drop events automatically.",
+    "createRule": "New Rule",
+    "editRule": "Edit Rule",
+    "dialogDescription": "Configure conditions to match events and actions to execute when matched.",
+    "search": "Search rules…",
+    "noResults": "No rules match your search.",
+    "conditions": "conditions",
+    "actions": "actions",
+    "conditionsLabel": "Conditions",
+    "actionsLabel": "Actions",
+    "createdAt": "Created",
+    "updatedAt": "Updated",
+    "created": "Rule created successfully",
+    "updated": "Rule updated successfully",
+    "deleted": "Rule deleted successfully",
+    "enabled": "Rule enabled",
+    "disabled": "Rule disabled",
+    "saveFailed": "Failed to save rule",
+    "deleteFailed": "Failed to delete rule",
+    "toggleFailed": "Failed to toggle rule",
+    "empty": {
+      "title": "No rules yet",
+      "description": "Create your first rule to automatically route, transform, or drop events based on conditions."
+    },
+    "infoBanner": {
+      "title": "How Rules differ from Subscriptions",
+      "body": "Subscriptions define static event→endpoint routing. Rules add dynamic logic on top — match events by payload conditions, then route to extra endpoints, apply transformations, or drop events entirely. Rules are evaluated after subscriptions, so they extend (not replace) your existing delivery setup."
+    },
+    "deleteConfirm": {
+      "title": "Delete Rule",
+      "description": "This will permanently delete the rule and all its actions. Events will no longer be processed by this rule."
+    },
+    "stats": {
+      "total": "Total Rules",
+      "active": "Active",
+      "executions": "Evaluations",
+      "matches": "Matches",
+      "matchRate": "Match Rate"
+    },
+    "form": {
+      "name": "Rule Name",
+      "description": "Description",
+      "descriptionPlaceholder": "What does this rule do?",
+      "eventTypePattern": "Event Type Pattern",
+      "patternHint": "Use * for single-level, ** for multi-level wildcard. Leave empty to match all.",
+      "priority": "Priority",
+      "priorityHint": "Higher priority rules are evaluated first.",
+      "enabled": "Enabled — rule is active",
+      "disabled": "Disabled — rule is paused",
+      "conditions": "Conditions",
+      "addCondition": "Add Condition",
+      "noConditions": "No conditions — rule matches all events of the specified type.",
+      "valuePlaceholder": "Value",
+      "actions": "Actions",
+      "selectEndpoint": "Select endpoint…",
+      "selectTransformation": "Select transformation…",
+      "tagPlaceholder": "Tag name, e.g. high-priority",
+      "dropHint": "Matching events will be silently dropped — no deliveries created."
     }
   },
   "transformations": {

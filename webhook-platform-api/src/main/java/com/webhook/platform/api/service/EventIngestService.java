@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
@@ -9,12 +10,16 @@ import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.rules.CompiledRule;
+import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.util.EventTypeMatcher;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -39,6 +44,7 @@ public class EventIngestService {
     private final SequenceGeneratorService sequenceGeneratorService;
     private final SchemaRegistryService schemaRegistryService;
     private final ProjectRepository projectRepository;
+    private final RuleEngineService ruleEngineService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
 
@@ -52,6 +58,7 @@ public class EventIngestService {
             SequenceGeneratorService sequenceGeneratorService,
             SchemaRegistryService schemaRegistryService,
             ProjectRepository projectRepository,
+            RuleEngineService ruleEngineService,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
         this.eventRepository = eventRepository;
@@ -63,6 +70,7 @@ public class EventIngestService {
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.schemaRegistryService = schemaRegistryService;
         this.projectRepository = projectRepository;
+        this.ruleEngineService = ruleEngineService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
     }
@@ -133,24 +141,90 @@ public class EventIngestService {
         Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
+        // ── Rules Engine evaluation ────────────────────────────────────
+        JsonNode eventJson = null;
+        List<RuleEngineService.RuleMatch> ruleMatches = List.of();
+        boolean dropEvent = false;
+        Set<UUID> ruleRouteEndpoints = new HashSet<>();
+        UUID ruleTransformationId = null;
+
+        try {
+            eventJson = objectMapper.readTree(event.getPayload());
+            ruleMatches = ruleEngineService.evaluate(projectId, request.getType(), eventJson, event.getId());
+
+            for (RuleEngineService.RuleMatch match : ruleMatches) {
+                if (match.hasDrop()) {
+                    dropEvent = true;
+                    log.info("Rule '{}' DROP action — skipping deliveries for event {}",
+                            match.rule().getName(), event.getId());
+                    Counter.builder("rules_drop_total").tag("project_id", projectId.toString()).register(meterRegistry).increment();
+                    break;
+                }
+                for (CompiledRule.CompiledAction action : match.getRouteActions()) {
+                    ruleRouteEndpoints.add(action.getEndpointId());
+                }
+                for (CompiledRule.CompiledAction action : match.getTransformActions()) {
+                    if (action.getTransformationId() != null) {
+                        ruleTransformationId = action.getTransformationId();
+                    }
+                }
+            }
+
+            if (!ruleMatches.isEmpty()) {
+                Counter.builder("rules_matched_total").tag("project_id", projectId.toString())
+                        .register(meterRegistry).increment(ruleMatches.size());
+            }
+        } catch (Exception e) {
+            log.warn("Rules engine evaluation failed for event {}: {} — proceeding without rules",
+                    event.getId(), e.getMessage());
+        }
+
+        if (dropEvent) {
+            return buildResponse(event, 0);
+        }
+
+        // ── Subscription-based deliveries ──────────────────────────────
         List<Subscription> subscriptions = subscriptionRepository
                 .findByProjectIdAndEnabledTrue(projectId).stream()
                 .filter(s -> EventTypeMatcher.matches(s.getEventType(), request.getType()))
                 .toList();
         log.info("Found {} matching subscriptions for event type: {}", subscriptions.size(), request.getType());
 
-        List<Delivery> deliveriesToSave = new ArrayList<>(subscriptions.size());
+        Set<UUID> deliveredEndpoints = new HashSet<>();
+        List<Delivery> deliveriesToSave = new ArrayList<>(subscriptions.size() + ruleRouteEndpoints.size());
+
         for (Subscription subscription : subscriptions) {
             Long sequenceNumber = null;
             boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
-            
+
             if (orderingEnabled) {
                 sequenceNumber = sequenceGeneratorService.nextSequence(subscription.getEndpointId());
                 log.debug("Generated sequence {} for endpoint {}", sequenceNumber, subscription.getEndpointId());
             }
-            
-            deliveriesToSave.add(createDelivery(event, subscription, sequenceNumber, orderingEnabled));
+
+            // Apply rule transformation override if present
+            UUID effectiveTransformId = ruleTransformationId != null
+                    ? ruleTransformationId
+                    : subscription.getTransformationId();
+
+            Delivery delivery = createDelivery(event, subscription, sequenceNumber, orderingEnabled);
+            if (effectiveTransformId != null) {
+                delivery.setTransformationId(effectiveTransformId);
+            }
+            deliveriesToSave.add(delivery);
+            deliveredEndpoints.add(subscription.getEndpointId());
         }
+
+        // ── Rule ROUTE actions — additional endpoints ──────────────────
+        for (UUID routeEndpointId : ruleRouteEndpoints) {
+            if (deliveredEndpoints.contains(routeEndpointId)) {
+                continue; // already delivered via subscription
+            }
+            deliveriesToSave.add(createRuleRouteDelivery(event, routeEndpointId, ruleTransformationId));
+            deliveredEndpoints.add(routeEndpointId);
+            log.debug("Rule ROUTE: added delivery to endpoint {} for event {}", routeEndpointId, event.getId());
+        }
+
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
 
         List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
@@ -162,7 +236,8 @@ public class EventIngestService {
         int deliveriesCreated = savedDeliveries.size();
         Counter.builder("deliveries_created_total").tag("project_id", projectId.toString()).register(meterRegistry).increment(deliveriesCreated);
 
-        log.info("Created {} deliveries for event: {}", deliveriesCreated, event.getId());
+        log.info("Created {} deliveries for event: {} (rules matched: {})",
+                deliveriesCreated, event.getId(), ruleMatches.size());
         return buildResponse(event, deliveriesCreated);
     }
 
@@ -209,6 +284,25 @@ public class EventIngestService {
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
                 .transformationId(subscription.getTransformationId())
+                .idempotencyKey(deliveryIdempotencyKey)
+                .build();
+    }
+
+    private Delivery createRuleRouteDelivery(Event event, UUID endpointId, UUID transformationId) {
+        String deliveryIdempotencyKey = event.getIdempotencyKey() != null
+                ? event.getIdempotencyKey() + "-rule-" + endpointId
+                : null;
+
+        return Delivery.builder()
+                .eventId(event.getId())
+                .endpointId(endpointId)
+                .status(DeliveryStatus.PENDING)
+                .attemptCount(0)
+                .maxAttempts(7)
+                .orderingEnabled(false)
+                .timeoutSeconds(30)
+                .retryDelays("60,300,900,3600,21600,86400")
+                .transformationId(transformationId)
                 .idempotencyKey(deliveryIdempotencyKey)
                 .build();
     }

@@ -41,6 +41,7 @@ const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const UsagePage = lazy(() => import('./pages/UsagePage'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
+const RulesPage = lazy(() => import('./pages/RulesPage'));
 const TransformationsPage = lazy(() => import('./pages/TransformationsPage'));
 const TransformStudioPage = lazy(() => import('./pages/TransformStudioPage'));
 const ConnectionSetupPage = lazy(() => import('./pages/ConnectionSetupPage'));
@@ -198,6 +199,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/incidents',
         element: <S><IncidentsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/rules',
+        element: <S><RulesPage /></S>,
       },
       {
         path: 'projects/:projectId/transformations',

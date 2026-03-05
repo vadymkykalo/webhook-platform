@@ -4,7 +4,7 @@ import {
   Menu, X, LogOut, FolderKanban, Webhook, Users, LayoutDashboard, Settings, Building2, CreditCard,
   BookOpen, ChevronRight, ChevronDown, Radio, Send, Key, BarChart3, AlertTriangle, TestTube,
   Bell, Search, ChevronsLeft, FileText, Mail, Loader2, Moon, Sun,
-  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play, Network
+  ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play, Network, GitBranch
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
@@ -59,6 +59,7 @@ const getProjectIncomingNav = (projectId: string): NavItem[] => [
 const getProjectPipelineNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.transformations', path: `/admin/projects/${projectId}/transformations`, icon: Repeat2 },
   { nameKey: 'nav.transformStudio', path: `/admin/projects/${projectId}/transform-studio`, icon: GitCompare },
+  { nameKey: 'nav.rules', path: `/admin/projects/${projectId}/rules`, icon: GitBranch },
   { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
 ];
 
@@ -183,6 +184,7 @@ const BREADCRUMB_SEGMENTS: Record<string, { key: string; icon: React.ElementType
   alerts: { key: 'breadcrumb.alerts', icon: Bell },
   usage: { key: 'breadcrumb.usage', icon: Activity },
   incidents: { key: 'breadcrumb.incidents', icon: AlertTriangle },
+  rules: { key: 'breadcrumb.rules', icon: GitBranch },
   transformations: { key: 'breadcrumb.transformations', icon: Repeat2 },
   'transform-studio': { key: 'breadcrumb.transform-studio', icon: GitCompare },
   'connection-setup': { key: 'breadcrumb.connection-setup', icon: Cable },
