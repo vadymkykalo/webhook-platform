@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.repository;
 
 import com.webhook.platform.worker.domain.entity.Delivery;
+import com.webhook.platform.worker.domain.entity.Endpoint;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,9 +58,27 @@ class DeliveryRepositoryTest {
     @Autowired
     private TestEntityManager entityManager;
 
+    private UUID sharedEndpointId;
+    private UUID sharedProjectId;
+
+    private void createSharedEndpoint() {
+        sharedProjectId = UUID.randomUUID();
+        sharedEndpointId = UUID.randomUUID();
+        Endpoint endpoint = Endpoint.builder()
+                .id(sharedEndpointId)
+                .projectId(sharedProjectId)
+                .url("https://example.com/hook")
+                .secretEncrypted("enc")
+                .secretIv("iv")
+                .enabled(true)
+                .build();
+        entityManager.persist(endpoint);
+    }
+
     @Test
     void findPendingRetryIds_shouldOnlySelectPendingStatus() {
         // Arrange
+        createSharedEndpoint();
         Instant now = Instant.now();
         Delivery pending = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(60));
         Delivery processing = createAndPersistDelivery(Delivery.DeliveryStatus.PROCESSING, now.minusSeconds(60));
@@ -70,7 +89,7 @@ class DeliveryRepositoryTest {
 
         // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
-                Delivery.DeliveryStatus.PENDING, now, 10, 100);
+                Delivery.DeliveryStatus.PENDING, now, 10, 100, 100);
         List<Delivery> result = deliveryRepository.lockByIds(ids);
 
         // Assert
@@ -81,6 +100,7 @@ class DeliveryRepositoryTest {
     @Test
     void findPendingRetryIds_shouldOnlySelectDueRetries() {
         // Arrange
+        createSharedEndpoint();
         Instant now = Instant.now();
         Delivery overdue = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(120));
         Delivery justDue = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(1));
@@ -92,7 +112,7 @@ class DeliveryRepositoryTest {
 
         // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
-                Delivery.DeliveryStatus.PENDING, now, 10, 100);
+                Delivery.DeliveryStatus.PENDING, now, 10, 100, 100);
         List<Delivery> result = deliveryRepository.lockByIds(ids);
 
         // Assert
@@ -104,6 +124,7 @@ class DeliveryRepositoryTest {
     @Test
     void lockByIds_shouldOrderByNextRetryAtAsc() {
         // Arrange
+        createSharedEndpoint();
         Instant now = Instant.now();
         Delivery third = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(10));
         Delivery first = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(300));
@@ -114,7 +135,7 @@ class DeliveryRepositoryTest {
 
         // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
-                Delivery.DeliveryStatus.PENDING, now, 10, 100);
+                Delivery.DeliveryStatus.PENDING, now, 10, 100, 100);
         List<Delivery> result = deliveryRepository.lockByIds(ids);
 
         // Assert
@@ -127,6 +148,7 @@ class DeliveryRepositoryTest {
     @Test
     void findPendingRetryIds_shouldRespectPageSize() {
         // Arrange
+        createSharedEndpoint();
         Instant now = Instant.now();
         for (int i = 0; i < 15; i++) {
             createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, now.minusSeconds(60 + i));
@@ -137,7 +159,7 @@ class DeliveryRepositoryTest {
 
         // Act
         List<UUID> ids = deliveryRepository.findPendingRetryIds(
-                Delivery.DeliveryStatus.PENDING, now, 5, 100);
+                Delivery.DeliveryStatus.PENDING, now, 5, 100, 100);
 
         // Assert
         assertEquals(5, ids.size());
@@ -147,7 +169,7 @@ class DeliveryRepositoryTest {
         Delivery delivery = Delivery.builder()
                 .id(UUID.randomUUID())
                 .eventId(UUID.randomUUID())
-                .endpointId(UUID.randomUUID())
+                .endpointId(sharedEndpointId)
                 .subscriptionId(UUID.randomUUID())
                 .status(status)
                 .attemptCount(1)

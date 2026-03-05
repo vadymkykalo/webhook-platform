@@ -1,16 +1,14 @@
-package com.webhook.platform.api.service.ingress;
+package com.webhook.platform.common.util;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
-
-import java.util.Enumeration;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-@Slf4j
+/**
+ * Utility for masking sensitive HTTP header values before storage.
+ * Works with plain Maps — no servlet dependencies.
+ */
 public final class HeaderSanitizer {
 
     private static final Set<String> SENSITIVE_HEADERS_EXACT = Set.of(
@@ -25,7 +23,11 @@ public final class HeaderSanitizer {
     private HeaderSanitizer() {
     }
 
+    /**
+     * Returns true if the header name matches known sensitive patterns.
+     */
     public static boolean isSensitiveHeader(String headerName) {
+        if (headerName == null) return false;
         String lower = headerName.toLowerCase();
         if (SENSITIVE_HEADERS_EXACT.contains(lower)) {
             return true;
@@ -38,11 +40,14 @@ public final class HeaderSanitizer {
         return false;
     }
 
+    /**
+     * Sanitizes a map of headers, masking values of sensitive headers.
+     */
     public static Map<String, String> sanitize(Map<String, String> headers) {
         if (headers == null || headers.isEmpty()) {
             return headers;
         }
-        Map<String, String> result = new HashMap<>();
+        Map<String, String> result = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : headers.entrySet()) {
             if (isSensitiveHeader(entry.getKey())) {
                 result.put(entry.getKey(), MASKED_VALUE);
@@ -53,28 +58,14 @@ public final class HeaderSanitizer {
         return result;
     }
 
+    /**
+     * Masks a signature value, keeping only the last 8 characters for debugging.
+     * Example: "v1=abc123...xyz789" → "sig_...xyz789**"
+     */
     public static String maskSignature(String signature) {
         if (signature == null || signature.length() <= 8) {
             return MASKED_VALUE;
         }
         return "sig_..." + signature.substring(signature.length() - 8);
-    }
-
-    public static String toJson(HttpServletRequest request, ObjectMapper objectMapper) {
-        try {
-            Map<String, String> headers = new HashMap<>();
-            Enumeration<String> headerNames = request.getHeaderNames();
-            while (headerNames.hasMoreElements()) {
-                String name = headerNames.nextElement();
-                String value = isSensitiveHeader(name)
-                        ? MASKED_VALUE
-                        : request.getHeader(name);
-                headers.put(name, value);
-            }
-            return objectMapper.writeValueAsString(headers);
-        } catch (Exception e) {
-            log.warn("Failed to serialize request headers: {}", e.getMessage());
-            return "{}";
-        }
     }
 }

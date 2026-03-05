@@ -3,6 +3,7 @@ package com.webhook.platform.worker.service;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.*;
 import com.webhook.platform.worker.domain.repository.*;
@@ -51,6 +52,7 @@ public class WebhookDeliveryService {
     private final List<String> allowedHosts;
     private final RedisRateLimiterService rateLimiterService;
     private final RedisConcurrencyControlService concurrencyControlService;
+    private final ProjectRateLimiterService projectRateLimiterService;
     private final CircuitBreakerService circuitBreakerService;
     private final MeterRegistry meterRegistry;
     private final OrderingBufferService orderingBufferService;
@@ -84,6 +86,7 @@ public class WebhookDeliveryService {
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             RedisRateLimiterService rateLimiterService,
             RedisConcurrencyControlService concurrencyControlService,
+            ProjectRateLimiterService projectRateLimiterService,
             CircuitBreakerService circuitBreakerService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper,
@@ -109,6 +112,7 @@ public class WebhookDeliveryService {
         this.allowedHosts = allowedHosts;
         this.rateLimiterService = rateLimiterService;
         this.concurrencyControlService = concurrencyControlService;
+        this.projectRateLimiterService = projectRateLimiterService;
         this.circuitBreakerService = circuitBreakerService;
         this.meterRegistry = meterRegistry;
         this.orderingBufferService = orderingBufferService;
@@ -226,6 +230,15 @@ public class WebhookDeliveryService {
 
     private void attemptDelivery(Delivery delivery, Endpoint endpoint, Event event) {
         long startTime = System.currentTimeMillis();
+
+        // Project-level rate limit — prevent noisy-neighbor
+        if (!projectRateLimiterService.tryAcquire(endpoint.getProjectId())) {
+            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 1, 30);
+            log.warn("Project rate limit exceeded for project {}, rescheduling delivery {} in {}s",
+                    endpoint.getProjectId(), delivery.getId(), delaySec);
+            rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
+            return;
+        }
 
         if (!circuitBreakerService.isCallPermitted(endpoint.getId())) {
             log.warn("CircuitBreaker OPEN for endpoint {}, rescheduling delivery {}", endpoint.getId(),
@@ -627,9 +640,10 @@ public class WebhookDeliveryService {
     }
 
     private String buildRequestHeadersJson(String signature, String eventId, String deliveryId, String timestamp) {
+        String maskedSignature = HeaderSanitizer.maskSignature(signature);
         return String.format(
                 "{\"Content-Type\":\"application/json\",\"X-Signature\":\"%s\",\"X-Event-Id\":\"%s\",\"X-Delivery-Id\":\"%s\",\"X-Timestamp\":\"%s\",\"User-Agent\":\"WebhookPlatform/1.0\"}",
-                signature, eventId, deliveryId, timestamp);
+                maskedSignature, eventId, deliveryId, timestamp);
     }
 
     private String buildResponseHeadersJson(HttpHeaders headers) {
@@ -640,7 +654,8 @@ public class WebhookDeliveryService {
                     headerMap.put(key, values.get(0));
                 }
             });
-            return objectMapper.writeValueAsString(headerMap);
+            Map<String, String> sanitized = HeaderSanitizer.sanitize(headerMap);
+            return objectMapper.writeValueAsString(sanitized);
         } catch (Exception e) {
             log.warn("Failed to serialize response headers: {}", e.getMessage());
             return "{}";

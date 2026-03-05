@@ -8,6 +8,7 @@ import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
@@ -21,7 +22,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -504,7 +504,8 @@ public class IncomingForwardService {
                     headerMap.put(key, values.get(0));
                 }
             });
-            return objectMapper.writeValueAsString(headerMap);
+            Map<String, String> sanitized = HeaderSanitizer.sanitize(headerMap);
+            return objectMapper.writeValueAsString(sanitized);
         } catch (Exception e) {
             return "{}";
         }

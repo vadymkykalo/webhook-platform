@@ -4,6 +4,7 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,33 +33,50 @@ public class RetrySchedulerService {
     private final DeliveryRepository deliveryRepository;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
-    private final int batchSize;
+    private final int maxPerEndpoint;
+    private final int maxPerProject;
     private final long sendTimeoutSeconds;
     private final long rescheduleDelaySeconds;
+    private final RetryGovernor governor;
 
     public RetrySchedulerService(
             DeliveryRepository deliveryRepository,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             TransactionTemplate transactionTemplate,
+            MeterRegistry meterRegistry,
             @Value("${retry.scheduler.batch-size:100}") int batchSize,
+            @Value("${retry.scheduler.max-per-endpoint:10}") int maxPerEndpoint,
+            @Value("${retry.scheduler.max-per-project:30}") int maxPerProject,
             @Value("${retry.scheduler.send-timeout-seconds:30}") long sendTimeoutSeconds,
-            @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds) {
+            @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
+            @Value("${retry.scheduler.high-watermark:5000}") long highWatermark) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
-        this.batchSize = batchSize;
+        this.maxPerEndpoint = maxPerEndpoint;
+        this.maxPerProject = maxPerProject;
         this.sendTimeoutSeconds = sendTimeoutSeconds;
         this.rescheduleDelaySeconds = rescheduleDelaySeconds;
+        this.governor = new RetryGovernor(
+                "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
+                highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
     }
 
     @Scheduled(fixedDelayString = "${retry.scheduler.poll-interval-ms:10000}")
     public void scheduleRetries() {
+        // ── Governor: adaptive batch sizing ──
+        long pendingCount = countPendingRetries();
+        int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
+        if (effectiveBatch <= 0) {
+            return; // Governor cooldown — skip this poll
+        }
+
         // ── Phase 1: Short transaction — claim candidates ──
         List<Delivery> claimed = transactionTemplate.execute(tx -> {
             Instant now = Instant.now();
 
             List<UUID> candidateIds = deliveryRepository.findPendingRetryIds(
-                    Delivery.DeliveryStatus.PENDING, now, batchSize, 10);
+                    Delivery.DeliveryStatus.PENDING, now, effectiveBatch, maxPerEndpoint, maxPerProject);
             if (candidateIds.isEmpty()) {
                 return List.<Delivery>of();
             }
@@ -174,8 +193,11 @@ public class RetrySchedulerService {
             }
         });
 
-        log.info("Retry scheduling complete: {} successful, {} failed/rescheduled",
-                successfulDeliveries.size(), failedDeliveries.size());
+        // ── Governor feedback ──
+        governor.recordResult(successfulDeliveries.size(), failedDeliveries.size());
+
+        log.info("Retry scheduling complete: {} successful, {} failed/rescheduled (governor batch={})",
+                successfulDeliveries.size(), failedDeliveries.size(), effectiveBatch);
     }
 
     private void rescheduleAll(List<Delivery> deliveries, String reason) {
@@ -193,6 +215,15 @@ public class RetrySchedulerService {
 
         log.warn("Rescheduling delivery {} to {} due to: {}",
                 delivery.getId(), rescheduleTime, reason);
+    }
+
+    private long countPendingRetries() {
+        try {
+            return deliveryRepository.countPending(Instant.now().minus(30, ChronoUnit.DAYS));
+        } catch (Exception e) {
+            log.warn("Failed to count pending retries for governor: {}", e.getMessage());
+            return -1; // Unknown — governor skips queue depth check
+        }
     }
 
     private String getRetryTopic(int attemptCount) {
