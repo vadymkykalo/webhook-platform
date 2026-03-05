@@ -265,10 +265,10 @@ export function useBulkReplayDeliveries() {
 
 // ─── Events ────────────────────────────────────────────────────────
 
-export function useEvents(projectId: string | undefined, page: number, size = 20, sort = 'createdAt,desc') {
+export function useEvents(projectId: string | undefined, page: number, size = 20, sort = 'createdAt,desc', eventType?: string) {
     return useQuery({
-        queryKey: queryKeys.events.list(projectId!, page, size, sort),
-        queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort }),
+        queryKey: [...queryKeys.events.list(projectId!, page, size, sort), eventType ?? ''],
+        queryFn: () => eventsApi.listByProject(projectId!, { page, size, sort, eventType }),
         enabled: !!projectId,
     });
 }

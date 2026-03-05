@@ -2863,6 +2863,8 @@
     "loadEvent": "Load Event",
     "recentEvents": "Recent Events",
     "noEvents": "No events found in this project",
+    "searchEvents": "Filter by event type...",
+    "loadMore": "Load more...",
     "dryRun": "Dry-run Delivery",
     "dryRunDesc": "Simulate a full delivery — see the transformed payload, computed HMAC signature, and all HTTP headers that your endpoint would receive. Nothing is sent.",
     "dryRunEndpoint": "Target Endpoint",

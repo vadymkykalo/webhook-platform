@@ -51,6 +51,8 @@ export default function TransformStudioPage() {
   const [success, setSuccess] = useState<boolean | null>(null);
   const [selectedTransformationId, setSelectedTransformationId] = useState('');
   const [showEventPicker, setShowEventPicker] = useState(false);
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventPageSize, setEventPageSize] = useState(10);
   const [dryRunEndpointId, setDryRunEndpointId] = useState('');
   const [dryRunEventType, setDryRunEventType] = useState('order.completed');
   const [dryRunResult, setDryRunResult] = useState<DeliveryDryRunResponse | null>(null);
@@ -60,8 +62,9 @@ export default function TransformStudioPage() {
   const dryRun = useDeliveryDryRun(projectId!);
   const { data: transformations = [] } = useTransformations(projectId!);
   const { data: endpoints = [] } = useEndpoints(projectId);
-  const { data: recentEventsData, isLoading: eventsLoading } = useEvents(projectId, 0, 10, 'createdAt,desc');
+  const { data: recentEventsData, isLoading: eventsLoading } = useEvents(projectId, 0, eventPageSize, 'createdAt,desc', eventSearch || undefined);
   const recentEvents = recentEventsData?.content ?? [];
+  const hasMoreEvents = recentEventsData ? !recentEventsData.last : false;
 
   const handleRun = async () => {
     setErrors([]);
@@ -200,12 +203,18 @@ export default function TransformStudioPage() {
                     <p className="text-xs font-medium">{t('transform.recentEvents', 'Recent Events')}</p>
                     <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => setShowEventPicker(false)}>✕</Button>
                   </div>
+                  <Input
+                    className="h-7 text-xs font-mono"
+                    placeholder={t('transform.searchEvents', 'Filter by event type...')}
+                    value={eventSearch}
+                    onChange={(e) => { setEventSearch(e.target.value); setEventPageSize(10); }}
+                  />
                   {eventsLoading ? (
                     <div className="flex items-center justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
                   ) : recentEvents.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2">{t('transform.noEvents', 'No events found in this project')}</p>
                   ) : (
-                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                    <div className="space-y-1 max-h-[240px] overflow-y-auto">
                       {recentEvents.map((evt) => (
                         <button
                           key={evt.id}
@@ -221,6 +230,16 @@ export default function TransformStudioPage() {
                           </p>
                         </button>
                       ))}
+                      {hasMoreEvents && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs h-7"
+                          onClick={() => setEventPageSize((s) => s + 10)}
+                        >
+                          {t('transform.loadMore', 'Load more...')}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

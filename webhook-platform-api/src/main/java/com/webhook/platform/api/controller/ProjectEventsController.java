@@ -45,10 +45,11 @@ public class ProjectEventsController {
     @GetMapping
     public ResponseEntity<Page<EventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
+            @RequestParam(value = "eventType", required = false) String eventType,
             Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        Page<EventResponse> response = eventService.listEvents(projectId, auth.organizationId(), pageable);
+        Page<EventResponse> response = eventService.listEvents(projectId, auth.organizationId(), eventType, pageable);
         return ResponseEntity.ok(response);
     }
 

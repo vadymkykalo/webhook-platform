@@ -19,6 +19,7 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     List<Event> findByProjectId(UUID projectId);
     List<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType);
     Page<Event> findByProjectId(UUID projectId, Pageable pageable);
+    Page<Event> findByProjectIdAndEventTypeContainingIgnoreCase(UUID projectId, String eventType, Pageable pageable);
     boolean existsByProjectId(UUID projectId);
 
     @Query("SELECT COUNT(e) FROM Event e WHERE e.projectId = :projectId AND e.createdAt BETWEEN :from AND :to")
