@@ -19,6 +19,7 @@ import { usageApi } from './usage.api';
 import { incidentsApi, type IncidentRequest, type TimelineEntryRequest } from './incidents.api';
 import { transformApi, type TransformPreviewRequest, type DeliveryDryRunRequest } from './transform.api';
 import { transformationsApi } from './transformations.api';
+import { rulesApi, type RuleRequest } from './rules.api';
 import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
 // ─── Query Keys ────────────────────────────────────────────────────
@@ -99,6 +100,10 @@ export const queryKeys = {
     transformations: {
         list: (projectId: string) => ['transformations', projectId] as const,
         detail: (projectId: string, id: string) => ['transformations', projectId, id] as const,
+    },
+    rules: {
+        list: (projectId: string) => ['rules', projectId] as const,
+        detail: (projectId: string, id: string) => ['rules', projectId, id] as const,
     },
 } as const;
 
@@ -876,5 +881,57 @@ export function useUpdateProject(projectId: string) {
         mutationFn: (data: { name: string; description?: string; schemaValidationEnabled?: boolean; schemaValidationPolicy?: string; idempotencyPolicy?: string }) =>
             projectsApi.update(projectId, data),
         onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) }); },
+    });
+}
+
+// ─── Rules ──────────────────────────────────────────────────────
+
+export function useRules(projectId: string) {
+    return useQuery({
+        queryKey: queryKeys.rules.list(projectId),
+        queryFn: () => rulesApi.list(projectId),
+        enabled: !!projectId,
+    });
+}
+
+export function useRule(projectId: string, id: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.rules.detail(projectId, id!),
+        queryFn: () => rulesApi.get(projectId, id!),
+        enabled: !!projectId && !!id,
+    });
+}
+
+export function useCreateRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (data: RuleRequest) => rulesApi.create(projectId, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.rules.list(projectId) }); },
+    });
+}
+
+export function useUpdateRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: RuleRequest }) =>
+            rulesApi.update(projectId, id, data),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.rules.list(projectId) }); },
+    });
+}
+
+export function useDeleteRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => rulesApi.delete(projectId, id),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.rules.list(projectId) }); },
+    });
+}
+
+export function useToggleRule(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+            rulesApi.toggle(projectId, id, enabled),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.rules.list(projectId) }); },
     });
 }

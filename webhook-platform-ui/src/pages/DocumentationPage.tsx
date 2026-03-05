@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -44,6 +44,7 @@ export default function DocumentationPage() {
             {activeSection === 'transformations-api' && <TransformationsAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'webhook-security' && <WebhookSecurity activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'incoming-webhooks' && <IncomingWebhooks activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'rules-engine' && <RulesEngineDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'deterministic-replay' && <DeterministicReplayDocs />}
             {activeSection === 'errors' && <Errors />}
@@ -68,6 +69,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'transformations-api', label: t('docsPage.sections.transformationsApi'), icon: Wand2 },
     { id: 'webhook-security', label: t('docsPage.sections.webhookSecurity'), icon: Shield },
     { id: 'incoming-webhooks', label: t('docsPage.sections.incomingWebhooks'), icon: ArrowDownToLine },
+    { id: 'rules-engine', label: t('docsPage.sections.rulesEngine', 'Rules Engine'), icon: GitBranch },
     { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
     { id: 'deterministic-replay', label: t('docsPage.sections.deterministicReplay'), icon: Fingerprint },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
@@ -2248,6 +2250,303 @@ dest = hookflow.incoming_sources.create_destination(
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function RulesEngineDocs({ activeLanguage: _activeLanguage, setActiveLanguage: _setActiveLanguage }: { activeLanguage: 'curl' | 'node' | 'python'; setActiveLanguage: (l: 'curl' | 'node' | 'python') => void }) {
+  const { t } = useTranslation();
+
+  const createRuleCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/rules \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Route high-value orders to fraud detection",
+    "description": "Orders over $1000 in USD/EUR get extra processing",
+    "enabled": true,
+    "priority": 10,
+    "eventTypePattern": "order.*",
+    "conditions": {
+      "type": "group",
+      "op": "AND",
+      "children": [
+        { "type": "predicate", "field": "data.amount", "operator": "GTE", "value": 1000, "valueType": "NUMBER" },
+        { "type": "predicate", "field": "data.currency", "operator": "IN", "value": ["USD", "EUR"], "valueType": "ARRAY_STRING" }
+      ]
+    },
+    "actions": [
+      { "type": "ROUTE", "endpointId": "ep_fraud_detection_uuid", "sortOrder": 0 },
+      { "type": "TRANSFORM", "transformationId": "tr_enrich_geo_uuid", "sortOrder": 1 },
+      { "type": "TAG", "config": { "tag": "high-value" }, "sortOrder": 2 }
+    ]
+  }'`;
+
+  const listRulesCode = `curl https://your-api.com/api/v1/projects/{projectId}/rules \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`;
+
+  const toggleRuleCode = `curl -X PATCH https://your-api.com/api/v1/projects/{projectId}/rules/{ruleId}/toggle \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "enabled": false }'`;
+
+  const dropRuleCode = `# Drop all test events in production
+curl -X POST https://your-api.com/api/v1/projects/{projectId}/rules \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Drop test events",
+    "enabled": true,
+    "priority": 100,
+    "eventTypePattern": "test.*",
+    "actions": [
+      { "type": "DROP", "sortOrder": 0 }
+    ]
+  }'`;
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+            <GitBranch className="h-5 w-5 text-cyan-500" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-foreground">{t('docsPage.rulesEngine.title', 'Rules Engine')}</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-600 border border-cyan-500/20 ml-1">NEW</span>
+          </div>
+        </div>
+        <p className="text-lg text-muted-foreground">
+          {t('docsPage.rulesEngine.subtitle', 'Define IF-THEN logic to dynamically route, transform, tag, or drop events based on payload conditions — designed for 100k+ events/sec.')}
+        </p>
+      </div>
+
+      {/* How it works */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.howItWorks', 'How It Works')}</h2>
+        <div className="rounded-xl border bg-muted/30 p-6">
+          <div className="flex flex-col md:flex-row items-center gap-4 text-sm">
+            {[
+              { step: '1', label: t('docsPage.rulesEngine.step1', 'Event arrives'), desc: t('docsPage.rulesEngine.step1Desc', 'POST /api/v1/events') },
+              { step: '2', label: t('docsPage.rulesEngine.step2', 'Subscriptions fire'), desc: t('docsPage.rulesEngine.step2Desc', 'Static event→endpoint routing') },
+              { step: '3', label: t('docsPage.rulesEngine.step3', 'Rules evaluate'), desc: t('docsPage.rulesEngine.step3Desc', 'In-memory compiled predicates') },
+              { step: '4', label: t('docsPage.rulesEngine.step4', 'Actions execute'), desc: t('docsPage.rulesEngine.step4Desc', 'Route / Transform / Tag / Drop') },
+            ].map((s, i) => (
+              <div key={s.step} className="flex items-center gap-3">
+                {i > 0 && <ArrowRight className="h-4 w-4 text-muted-foreground hidden md:block" />}
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-card min-w-[160px]">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">{s.step}</div>
+                  <div>
+                    <div className="font-semibold">{s.label}</div>
+                    <div className="text-xs text-muted-foreground">{s.desc}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-4 rounded-lg border-l-4 border-cyan-500 bg-cyan-50/50 dark:bg-cyan-950/20 text-sm">
+          <strong>{t('docsPage.rulesEngine.importantNote', 'Important:')}</strong>{' '}
+          {t('docsPage.rulesEngine.importantNoteBody', 'Rules extend subscriptions — they don\'t replace them. Subscriptions handle the core event→endpoint delivery. Rules add conditional logic on top: extra routing, payload transformations, tagging, or dropping events.')}
+        </div>
+      </div>
+
+      {/* Concepts */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.concepts', 'Core Concepts')}</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><GitBranch className="h-4 w-4 text-cyan-500" /> {t('docsPage.rulesEngine.conceptRule', 'Rule')}</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.rulesEngine.conceptRuleDesc', 'A named, prioritized container with an optional event type pattern, a list of conditions (AND/OR), and a list of actions. Rules are evaluated in priority order (highest first).')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><Zap className="h-4 w-4 text-emerald-500" /> {t('docsPage.rulesEngine.conceptCondition', 'Condition')}</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.rulesEngine.conceptConditionDesc', 'A field + operator + value triple. Fields use dot notation (e.g. data.order.amount). Supports 15 operators: equals, gt, gte, lt, lte, contains, starts_with, ends_with, in, not_in, regex, exists, and more.')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><Route className="h-4 w-4 text-blue-500" /> {t('docsPage.rulesEngine.conceptAction', 'Action')}</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.rulesEngine.conceptActionDesc', 'What happens when a rule matches. Four types: ROUTE (send to an endpoint), TRANSFORM (apply a transformation), TAG (label the event), DROP (silently discard — no deliveries created).')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><Shield className="h-4 w-4 text-violet-500" /> {t('docsPage.rulesEngine.conceptPattern', 'Event Type Pattern')}</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.rulesEngine.conceptPatternDesc', 'Optional pre-filter. Supports exact match (order.completed), single-level wildcard (order.*), multi-level wildcard (order.**), or omit to match all event types.')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Action types */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.actionTypes', 'Action Types')}</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-3 font-semibold">Type</th>
+                <th className="pb-3 font-semibold">Description</th>
+                <th className="pb-3 font-semibold">Required Fields</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-blue-500/10 text-blue-600 text-xs font-bold">ROUTE</span></td>
+                <td className="py-3 text-muted-foreground">Send event to an additional endpoint</td>
+                <td className="py-3 font-mono text-xs">endpointId</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-violet-500/10 text-violet-600 text-xs font-bold">TRANSFORM</span></td>
+                <td className="py-3 text-muted-foreground">Apply a payload transformation template</td>
+                <td className="py-3 font-mono text-xs">transformationId</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 text-xs font-bold">TAG</span></td>
+                <td className="py-3 text-muted-foreground">Attach a label to the event for filtering</td>
+                <td className="py-3 font-mono text-xs">config.tag</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-red-500/10 text-red-600 text-xs font-bold">DROP</span></td>
+                <td className="py-3 text-muted-foreground">Silently discard — no deliveries created</td>
+                <td className="py-3 text-muted-foreground italic">none</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Condition operators */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.operators', 'Condition Operators')}</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {[
+            { op: 'equals', desc: 'Exact match' },
+            { op: 'not_equals', desc: 'Not equal' },
+            { op: 'gt', desc: 'Greater than' },
+            { op: 'gte', desc: 'Greater or equal' },
+            { op: 'lt', desc: 'Less than' },
+            { op: 'lte', desc: 'Less or equal' },
+            { op: 'contains', desc: 'String contains' },
+            { op: 'not_contains', desc: 'Doesn\'t contain' },
+            { op: 'starts_with', desc: 'Starts with prefix' },
+            { op: 'ends_with', desc: 'Ends with suffix' },
+            { op: 'in', desc: 'Value in list' },
+            { op: 'not_in', desc: 'Not in list' },
+            { op: 'exists', desc: 'Field exists' },
+            { op: 'not_exists', desc: 'Field missing' },
+            { op: 'regex', desc: 'Regex match' },
+          ].map(({ op, desc }) => (
+            <div key={op} className="flex items-center gap-2 p-2 rounded-lg border bg-card text-xs">
+              <code className="font-mono font-bold text-primary">{op}</code>
+              <span className="text-muted-foreground">{desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* API Examples */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.apiExamples', 'API Examples')}</h2>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.rulesEngine.createRule', 'Create a Rule')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{t('docsPage.rulesEngine.createRuleDesc', 'This rule matches high-value orders and routes them to fraud detection, applies geo-enrichment, and tags them.')}</p>
+        <CodeBlock language="curl" setLanguage={() => {}}>{createRuleCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.rulesEngine.listRules', 'List Rules')}</h3>
+        <CodeBlock language="curl" setLanguage={() => {}}>{listRulesCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.rulesEngine.toggleRule', 'Toggle Rule (Enable/Disable)')}</h3>
+        <CodeBlock language="curl" setLanguage={() => {}}>{toggleRuleCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.rulesEngine.dropExample', 'Example: Drop Test Events')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{t('docsPage.rulesEngine.dropExampleDesc', 'Use priority 100 to ensure test events are dropped before any other rule processes them.')}</p>
+        <CodeBlock language="curl" setLanguage={() => {}}>{dropRuleCode}</CodeBlock>
+      </div>
+
+      {/* High-load architecture */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.architecture', 'High-Load Architecture')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.rulesEngine.architectureDesc', 'The rules engine is designed for throughput of 100,000+ events per second with sub-millisecond evaluation:')}</p>
+
+        <div className="space-y-3">
+          {[
+            {
+              title: t('docsPage.rulesEngine.arch1Title', 'Compiled In-Memory Cache'),
+              desc: t('docsPage.rulesEngine.arch1Desc', 'Rules are compiled from DB into in-memory predicates (Predicate<Map>) once, then evaluated without any DB access. Cache refreshes every 30s (configurable via RULES_CACHE_REFRESH_MS).'),
+              color: 'border-cyan-500',
+            },
+            {
+              title: t('docsPage.rulesEngine.arch2Title', 'Two-Stage Evaluation'),
+              desc: t('docsPage.rulesEngine.arch2Desc', 'Stage 1: Pre-filter by event type pattern (exact match → wildcard → catch-all). Stage 2: Evaluate conditions only for matching rules. This means rules with non-matching patterns are never evaluated.'),
+              color: 'border-blue-500',
+            },
+            {
+              title: t('docsPage.rulesEngine.arch3Title', 'JSON Path Memoization'),
+              desc: t('docsPage.rulesEngine.arch3Desc', 'Condition field paths (e.g. data.order.amount) are compiled once into efficient accessor functions. No JSON parsing or path resolution during evaluation.'),
+              color: 'border-violet-500',
+            },
+            {
+              title: t('docsPage.rulesEngine.arch4Title', 'Hot-Reload Without Downtime'),
+              desc: t('docsPage.rulesEngine.arch4Desc', 'When a rule is created, updated, or deleted via API, the cache for that project is invalidated immediately. Other projects\' caches are unaffected. Periodic refresh catches any edge cases.'),
+              color: 'border-emerald-500',
+            },
+            {
+              title: t('docsPage.rulesEngine.arch5Title', 'Execution Logging & Metrics'),
+              desc: t('docsPage.rulesEngine.arch5Desc', 'Every rule evaluation is logged with matched/not-matched status and execution time. Logs auto-cleanup after 7 days (configurable via RULES_EXECUTION_LOG_RETENTION_DAYS). Micrometer metrics expose rule evaluation counters and timing.'),
+              color: 'border-amber-500',
+            },
+          ].map((item) => (
+            <div key={item.title} className={`p-4 rounded-xl border-l-4 ${item.color} bg-card`}>
+              <h4 className="font-semibold mb-1">{item.title}</h4>
+              <p className="text-sm text-muted-foreground">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Configuration */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.config', 'Configuration')}</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-3 font-semibold">Variable</th>
+                <th className="pb-3 font-semibold">Default</th>
+                <th className="pb-3 font-semibold">Description</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              <tr>
+                <td className="py-3 font-mono text-xs text-primary">RULES_CACHE_REFRESH_MS</td>
+                <td className="py-3 font-mono text-xs">30000</td>
+                <td className="py-3 text-muted-foreground">How often compiled rules are refreshed from DB (ms)</td>
+              </tr>
+              <tr>
+                <td className="py-3 font-mono text-xs text-primary">RULES_EXECUTION_LOG_RETENTION_DAYS</td>
+                <td className="py-3 font-mono text-xs">7</td>
+                <td className="py-3 text-muted-foreground">Auto-cleanup rule execution logs older than N days</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Best practices */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.rulesEngine.bestPractices', 'Best Practices')}</h2>
+        <div className="space-y-2">
+          {[
+            t('docsPage.rulesEngine.bp1', 'Use event type patterns to pre-filter — rules with patterns are faster because they skip the condition evaluation stage entirely for non-matching events.'),
+            t('docsPage.rulesEngine.bp2', 'Assign priorities carefully — higher priority rules are evaluated first. Use DROP rules with high priority to filter out noise before other rules run.'),
+            t('docsPage.rulesEngine.bp3', 'Keep conditions simple — the engine is optimized for field-level comparisons. Avoid deeply nested paths when possible.'),
+            t('docsPage.rulesEngine.bp4', 'Use AND operator for strict matching, OR for flexible matching. Most production rules use AND.'),
+            t('docsPage.rulesEngine.bp5', 'Create Transformations first, then reference them in TRANSFORM actions. This keeps your pipeline modular and reusable.'),
+            t('docsPage.rulesEngine.bp6', 'Monitor the stats (evaluations, matches, match rate) in the UI to identify rules that never match — they may need updating.'),
+          ].map((tip, i) => (
+            <div key={i} className="flex gap-3 p-3 rounded-lg border bg-card">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground">{tip}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
