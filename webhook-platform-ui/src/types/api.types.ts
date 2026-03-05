@@ -279,6 +279,8 @@ export interface TransformationResponse {
   template: string;
   version: number;
   enabled: boolean;
+  subscriptionCount: number;
+  destinationCount: number;
   createdAt: string;
   updatedAt: string;
 }

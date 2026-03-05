@@ -20,6 +20,8 @@ public class TransformationResponse {
     private String template;
     private Integer version;
     private Boolean enabled;
+    private long subscriptionCount;
+    private long destinationCount;
     private Instant createdAt;
     private Instant updatedAt;
 }

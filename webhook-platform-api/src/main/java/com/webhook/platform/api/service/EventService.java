@@ -62,13 +62,19 @@ public class EventService {
     }
 
     public Page<EventResponse> listEvents(UUID projectId, UUID organizationId, Pageable pageable) {
+        return listEvents(projectId, organizationId, null, pageable);
+    }
+
+    public Page<EventResponse> listEvents(UUID projectId, UUID organizationId, String eventType, Pageable pageable) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
             throw new ForbiddenException("Access denied");
         }
         
-        Page<Event> events = eventRepository.findByProjectId(projectId, pageable);
+        Page<Event> events = (eventType != null && !eventType.isBlank())
+                ? eventRepository.findByProjectIdAndEventTypeContainingIgnoreCase(projectId, eventType.trim(), pageable)
+                : eventRepository.findByProjectId(projectId, pageable);
 
         List<UUID> eventIds = events.getContent().stream().map(Event::getId).toList();
         Map<UUID, Long> deliveryCounts = Map.of();

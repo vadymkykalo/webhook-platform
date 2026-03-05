@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, CheckCircle2, XCircle, ArrowRight, Info, ArrowDown } from 'lucide-react';
+import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, CheckCircle2, XCircle, ArrowRight, Info, ArrowDown, Link2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -20,7 +20,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
-import { Textarea } from '../components/ui/textarea';
+import JsonEditor from '../components/JsonEditor';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -265,6 +265,7 @@ export default function TransformationsPage() {
                 <TableHead className="text-xs">{t('transformations.description')}</TableHead>
                 <TableHead className="text-xs">{t('transformations.version')}</TableHead>
                 <TableHead className="text-xs">{t('transformations.status')}</TableHead>
+                <TableHead className="text-xs">{t('transformations.usedBy', 'Used by')}</TableHead>
                 <TableHead className="text-xs">{t('transformations.updated')}</TableHead>
                 {canManage && <TableHead className="w-[100px]"></TableHead>}
               </TableRow>
@@ -287,6 +288,20 @@ export default function TransformationsPage() {
                     <Badge variant={item.enabled ? 'success' : 'secondary'}>
                       {item.enabled ? t('common.enabled') : t('common.disabled')}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {(item.subscriptionCount > 0 || item.destinationCount > 0) ? (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Link2 className="h-3 w-3" />
+                        <span>
+                          {item.subscriptionCount > 0 && `${item.subscriptionCount} sub${item.subscriptionCount > 1 ? 's' : ''}`}
+                          {item.subscriptionCount > 0 && item.destinationCount > 0 && ', '}
+                          {item.destinationCount > 0 && `${item.destinationCount} dest${item.destinationCount > 1 ? 's' : ''}`}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="text-[13px] text-muted-foreground">{formatDate(item.updatedAt)}</span>
@@ -404,13 +419,13 @@ export default function TransformationsPage() {
                     )}
                   </div>
                 </div>
-                <Textarea
-                  id="tf-template"
+                <JsonEditor
                   value={formTemplate}
-                  onChange={(e) => setFormTemplate(e.target.value)}
+                  onChange={setFormTemplate}
                   placeholder='{\n  "event": "${$.type}",\n  "order_id": "${$.data.orderId}",\n  "amount": "${$.data.amount}"\n}'
-                  rows={12}
-                  className={`font-mono text-xs ${templateHasContent && !templateIsJson ? 'border-destructive' : templateHasContent && templateIsJson ? 'border-green-500/50' : ''}`}
+                  minHeight="220px"
+                  maxHeight="300px"
+                  className={templateHasContent && !templateIsJson ? 'ring-1 ring-destructive rounded-md' : templateHasContent && templateIsJson ? 'ring-1 ring-green-500/50 rounded-md' : ''}
                 />
                 <div className="flex items-center justify-between">
                   <div>
