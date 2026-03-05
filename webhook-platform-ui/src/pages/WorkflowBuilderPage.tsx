@@ -423,10 +423,30 @@ function WorkflowBuilderInner() {
 
 function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
   const [expanded, setExpanded] = useState(false);
+  const [expandedStep, setExpandedStep] = useState<string | null>(null);
+
   const statusIcon = exec.status === 'COMPLETED' ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
     : exec.status === 'FAILED' ? <XCircle className="h-3.5 w-3.5 text-red-500" />
     : exec.status === 'RUNNING' ? <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />
     : <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+
+  const stepStatusCls: Record<string, string> = {
+    SUCCESS: 'bg-green-500',
+    FAILED: 'bg-red-500',
+    SKIPPED: 'bg-gray-400',
+    RUNNING: 'bg-blue-500 animate-pulse',
+    PENDING: 'bg-gray-300',
+  };
+
+  const stepStatusBadge: Record<string, string> = {
+    SUCCESS: 'text-green-600 bg-green-500/10',
+    FAILED: 'text-red-600 bg-red-500/10',
+    SKIPPED: 'text-gray-500 bg-gray-500/10',
+    RUNNING: 'text-blue-600 bg-blue-500/10',
+    PENDING: 'text-gray-400 bg-gray-500/10',
+  };
+
+  const steps = exec.steps;
 
   return (
     <div>
@@ -441,23 +461,60 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
         {exec.errorMessage && <span className="text-red-500 truncate flex-1">{exec.errorMessage}</span>}
         {expanded ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
       </div>
-      {expanded && exec.steps && (
-        <div className="px-6 pb-2 space-y-1">
-          {exec.steps.map((step) => (
-            <div key={step.id} className="flex items-center gap-2 text-[10px]">
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                step.status === 'SUCCESS' ? 'bg-green-500'
-                : step.status === 'FAILED' ? 'bg-red-500'
-                : step.status === 'SKIPPED' ? 'bg-gray-400'
-                : 'bg-blue-500'
-              }`} />
-              <span className="font-mono">{step.nodeType}</span>
-              <span className="text-muted-foreground">{step.nodeId}</span>
-              <span className="text-muted-foreground">{step.status}</span>
-              {step.durationMs != null && <span className="text-muted-foreground">{step.durationMs}ms</span>}
-              {step.errorMessage && <span className="text-red-500 truncate">{step.errorMessage}</span>}
+      {expanded && (
+        <div className="px-4 pb-3 space-y-1">
+          {steps && steps.length > 0 ? (
+            <div className="space-y-0.5">
+              {steps.map((step, i) => (
+                <div key={step.id} className="rounded border bg-muted/20">
+                  <div
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-[10px] cursor-pointer hover:bg-muted/40 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); setExpandedStep(expandedStep === step.id ? null : step.id); }}
+                  >
+                    <span className="text-muted-foreground w-4 text-center font-mono">{i + 1}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stepStatusCls[step.status] || 'bg-gray-300'}`} />
+                    <span className="font-semibold">{step.nodeType}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${stepStatusBadge[step.status] || ''}`}>
+                      {step.status}
+                    </span>
+                    {step.durationMs != null && <span className="text-muted-foreground">{step.durationMs}ms</span>}
+                    {step.errorMessage && <span className="text-red-500 truncate flex-1">{step.errorMessage}</span>}
+                    <ChevronDown className={`h-2.5 w-2.5 ml-auto text-muted-foreground transition-transform ${expandedStep === step.id ? 'rotate-180' : ''}`} />
+                  </div>
+                  {expandedStep === step.id && (
+                    <div className="px-2.5 pb-2 space-y-1.5 border-t">
+                      {step.outputData != null && (
+                        <div className="pt-1.5">
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Output</span>
+                          <pre className="text-[9px] font-mono bg-background rounded p-1.5 mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all border">
+                            {typeof step.outputData === 'string' ? step.outputData : JSON.stringify(step.outputData, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {step.inputData != null && (
+                        <div>
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Input</span>
+                          <pre className="text-[9px] font-mono bg-background rounded p-1.5 mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all border">
+                            {typeof step.inputData === 'string' ? step.inputData : JSON.stringify(step.inputData, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {step.errorMessage && (
+                        <div>
+                          <span className="text-[9px] font-semibold uppercase text-red-500">Error</span>
+                          <pre className="text-[9px] font-mono bg-red-500/5 text-red-600 rounded p-1.5 mt-0.5 border border-red-500/20 break-all">
+                            {step.errorMessage}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <p className="text-[10px] text-muted-foreground italic px-2 py-1">No step data available</p>
+          )}
         </div>
       )}
     </div>
