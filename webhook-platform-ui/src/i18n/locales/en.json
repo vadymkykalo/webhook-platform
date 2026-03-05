@@ -1572,6 +1572,7 @@
       "transformationsApi": "Transformations",
       "webhookSecurity": "Webhook Security",
       "incomingWebhooks": "Incoming Webhooks",
+      "rulesEngine": "Rules Engine",
       "schemaRegistry": "Schema Registry",
       "deterministicReplay": "Deterministic Replay",
       "errors": "Errors & Rate Limits",

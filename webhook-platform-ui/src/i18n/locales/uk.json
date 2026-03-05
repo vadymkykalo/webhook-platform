@@ -1572,6 +1572,7 @@
       "transformationsApi": "Трансформації",
       "webhookSecurity": "Безпека вебхуків",
       "incomingWebhooks": "Вхідні вебхуки",
+      "rulesEngine": "Механізм правил",
       "schemaRegistry": "Реєстр схем",
       "deterministicReplay": "Детерміністичний реплей",
       "errors": "Помилки та ліміти",

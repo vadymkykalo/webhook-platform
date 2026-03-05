@@ -777,6 +777,106 @@ function PlatformHighlights() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
+          {/* 0. Rules Engine — full-width hero */}
+          <div className="md:col-span-2 group relative bg-card rounded-2xl border overflow-hidden hover:shadow-elevated transition-all duration-500 hover:border-cyan-500/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="p-6 relative">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                      <GitBranch className="h-5 w-5 text-cyan-500" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold">{t('landing.highlights.rulesEngine', 'Rules Engine')}</h3>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-600 border border-cyan-500/20">NEW</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{t('landing.highlights.rulesEngineDesc', 'IF-THEN logic for event routing at 100k+ events/sec')}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3 text-[13px]">
+                    <p className="text-muted-foreground leading-relaxed">{t('landing.highlights.rulesEngineBody', 'Define conditions based on event type, payload fields, headers, or metadata. Actions include routing to extra endpoints, applying transformations, tagging, or dropping events entirely.')}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: t('landing.highlights.rulesFeature1', 'Compiled in-memory cache'), color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20' },
+                        { label: t('landing.highlights.rulesFeature2', 'Wildcard event matching'), color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20' },
+                        { label: t('landing.highlights.rulesFeature3', '15 condition operators'), color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20' },
+                        { label: t('landing.highlights.rulesFeature4', 'Hot-reload, zero downtime'), color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
+                      ].map((f) => (
+                        <span key={f.label} className={`px-2 py-1 rounded-md text-[10px] font-semibold border ${f.color}`}>{f.label}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border bg-muted/30 overflow-hidden">
+                  <div className="bg-muted/50 border-b px-3 py-2 flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-red-400" />
+                    <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                    <div className="w-2 h-2 rounded-full bg-green-400" />
+                    <span className="ml-2 text-[9px] text-muted-foreground font-mono">rules-engine</span>
+                    <span className="ml-auto text-[9px] font-semibold text-cyan-600 flex items-center gap-1"><Zap className="h-2.5 w-2.5" /> live</span>
+                  </div>
+                  <div className="p-3 space-y-2.5">
+                    {/* Rule visualization */}
+                    <div className="p-2.5 rounded-lg bg-card border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 text-[9px] font-bold">IF</span>
+                        <span className="text-[10px] text-muted-foreground">event matches all:</span>
+                      </div>
+                      <div className="space-y-1 ml-4">
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <code className="text-primary font-mono">type</code>
+                          <span className="text-muted-foreground">=</span>
+                          <code className="font-mono text-foreground">order.*</code>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <code className="text-primary font-mono">data.amount</code>
+                          <span className="text-muted-foreground">≥</span>
+                          <code className="font-mono text-foreground">1000</code>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <code className="text-primary font-mono">data.currency</code>
+                          <span className="text-muted-foreground">∈</span>
+                          <code className="font-mono text-foreground">["USD","EUR"]</code>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-px flex-1 bg-border" />
+                      <ArrowRight className="h-3 w-3 text-cyan-500" />
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    <div className="p-2.5 rounded-lg bg-card border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[9px] font-bold">THEN</span>
+                        <span className="text-[10px] text-muted-foreground">execute actions:</span>
+                      </div>
+                      <div className="space-y-1.5 ml-4">
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="px-1 py-0.5 rounded bg-blue-500/10 text-blue-600 text-[8px] font-bold">ROUTE</span>
+                          <code className="font-mono text-foreground">→ fraud-detection.internal</code>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="px-1 py-0.5 rounded bg-violet-500/10 text-violet-600 text-[8px] font-bold">TRANSFORM</span>
+                          <code className="font-mono text-foreground">→ enrich-with-geo</code>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <span className="px-1 py-0.5 rounded bg-amber-500/10 text-amber-600 text-[8px] font-bold">TAG</span>
+                          <code className="font-mono text-foreground">→ high-value</code>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] text-muted-foreground pt-1">
+                      <span>P0 · enabled · order.*</span>
+                      <span className="text-cyan-600 font-semibold">~0.2ms eval time</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* 1. Transform Studio */}
           <div className="group relative bg-card rounded-2xl border overflow-hidden hover:shadow-elevated transition-all duration-500 hover:border-violet-500/30">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

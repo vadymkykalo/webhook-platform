@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
+import com.webhook.platform.api.service.rules.RuleEngineService;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -51,6 +52,8 @@ class EventIngestServiceTest {
     private ProjectRepository projectRepository;
     @Mock
     private PlatformTransactionManager transactionManager;
+    @Mock
+    private RuleEngineService ruleEngineService;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -65,7 +68,7 @@ class EventIngestServiceTest {
                 eventRepository, subscriptionRepository, deliveryRepository,
                 outboxMessageRepository, objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
-                transactionManager, 262144
+                ruleEngineService, transactionManager, 262144L
         );
     }
 
