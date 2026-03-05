@@ -1350,7 +1350,9 @@
       "alertRules": "Alert Rules",
       "alertRulesDesc": "Real-time alerts on failure rate spikes, latency degradation, and DLQ overflow.",
       "eventTimeMachine": "Event Time Machine",
-      "eventTimeMachineDesc": "Replay any range of historical events with cursor-based streaming and selective filtering."
+      "eventTimeMachineDesc": "Replay any range of historical events with cursor-based streaming and selective filtering.",
+      "workflowAutomation": "Workflow Automation",
+      "workflowAutomationDesc": "Visual DAG builder with drag-and-drop nodes. Filter, transform, branch, and call APIs — zero code."
     },
     "highlights": {
       "badge": "Beyond Delivery",
@@ -1389,6 +1391,39 @@
         "sharedDebug": "Shared Debug Links",
         "andMore": "…and 30+ more features"
       }
+    },
+    "workflowAutomation": {
+      "badge": "Visual Automation",
+      "title": "Automate anything with",
+      "titleHighlight": "visual workflows",
+      "subtitle": "Build event-driven pipelines by connecting nodes on a canvas. Filter, transform, branch, call APIs, send notifications — all without writing code.",
+      "feature1": "DAG execution engine",
+      "feature1Desc": "Topological ordering with parallel branch support",
+      "feature2": "6 built-in node types",
+      "feature2Desc": "Trigger, Filter, Transform, HTTP, Slack, Create Event",
+      "feature3": "Real-time execution log",
+      "feature3Desc": "Step-by-step trace with input/output for every run",
+      "feature4": "Event-driven triggers",
+      "feature4Desc": "Auto-fire on webhook events, manual, or schedule",
+      "canvasTitle": "workflow-builder",
+      "triggerNode": "Webhook Trigger",
+      "triggerNodeDesc": "order.completed",
+      "filterNode": "Filter",
+      "filterNodeDesc": "amount > 100",
+      "transformNode": "Transform",
+      "transformNodeDesc": "Reshape payload",
+      "httpNode": "HTTP Request",
+      "httpNodeDesc": "POST api.crm.io/sync",
+      "slackNode": "Slack Notify",
+      "slackNodeDesc": "#payments channel",
+      "createEventNode": "Create Event",
+      "createEventNodeDesc": "order.synced",
+      "executionLabel": "Last execution",
+      "executionTime": "320ms total",
+      "stepsCompleted": "5/5 steps completed",
+      "noCode": "Zero code",
+      "dragDrop": "Drag & drop",
+      "liveDebug": "Live debug"
     },
     "architecture": {
       "badge": "Transactional outbox pattern",
@@ -1591,6 +1626,7 @@
       "rulesEngine": "Rules Engine",
       "schemaRegistry": "Schema Registry",
       "deterministicReplay": "Deterministic Replay",
+      "workflowAutomation": "Workflow Automation",
       "errors": "Errors & Rate Limits",
       "sdks": "SDKs"
     },
