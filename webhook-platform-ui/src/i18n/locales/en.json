@@ -135,7 +135,9 @@
     "loggedOut": "Logged out successfully",
     "schemas": "Schemas",
     "piiRules": "PII Masking",
-    "eventDiff": "Event Diff"
+    "eventDiff": "Event Diff",
+    "automation": "Automation",
+    "workflows": "Workflows"
   },
   "auth": {
     "login": {
@@ -2262,6 +2264,7 @@
     "transformations": "Transformations",
     "transform-studio": "Transform Studio",
     "connection-setup": "Connection Setup",
+    "workflows": "Workflows",
     "test-console": "Test Console"
   },
   "testConsole": {
@@ -3037,6 +3040,161 @@
       "unsupportedVersion": "Unsupported config file version",
       "endpointSkipped": "Endpoint already exists: {{url}}",
       "subscriptionSkipped": "No endpoint found for subscription {{eventType}} → {{url}}"
+    }
+  },
+  "workflows": {
+    "title": "Workflows",
+    "subtitle": "Visual automation workflows triggered by webhook events",
+    "newWorkflow": "New Workflow",
+    "createWorkflow": "Create Workflow",
+    "namePlaceholder": "Workflow name",
+    "descriptionPlaceholder": "Description (optional)",
+    "create": "Create",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "noWorkflows": "No workflows yet",
+    "noWorkflowsHint": "Create your first workflow to automate webhook events",
+    "totalExecutions": "Total executions",
+    "successful": "Successful",
+    "failed": "Failed",
+    "disable": "Disable",
+    "enable": "Enable",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this workflow?",
+    "nodes": "nodes",
+    "toast": {
+      "created": "Workflow created",
+      "createFailed": "Failed to create workflow",
+      "deleted": "Workflow deleted",
+      "deleteFailed": "Failed to delete workflow",
+      "toggleFailed": "Failed to toggle workflow",
+      "saved": "Workflow saved",
+      "saveFailed": "Failed to save",
+      "toggleFailed2": "Failed to toggle",
+      "triggered": "Workflow executed",
+      "triggerFailed": "Failed to trigger workflow"
+    },
+    "builder": {
+      "notFound": "Workflow not found",
+      "unsaved": "Unsaved",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "save": "Save",
+      "dragToAdd": "Drag to add",
+      "configureNode": "Configure Node",
+      "nodesCount": "{{count}} nodes",
+      "edgesCount": "{{count}} edges",
+      "history": "History",
+      "testRun": "Test Run",
+      "testRunHint": "Provide a JSON payload to manually trigger this workflow",
+      "runNow": "Run Now",
+      "executionHistory": "Execution History",
+      "noExecutions": "No executions yet"
+    },
+    "nodeTypes": {
+      "webhookTrigger": {
+        "label": "Webhook Trigger",
+        "description": "Trigger on incoming webhook event"
+      },
+      "filter": {
+        "label": "Filter",
+        "description": "Filter events by conditions"
+      },
+      "transform": {
+        "label": "Transform",
+        "description": "Transform JSON payload"
+      },
+      "http": {
+        "label": "HTTP Request",
+        "description": "Make an outbound HTTP request"
+      },
+      "slack": {
+        "label": "Slack",
+        "description": "Send a Slack message"
+      },
+      "delivery": {
+        "label": "Deliver to Endpoint",
+        "description": "Deliver via platform endpoint"
+      },
+      "branch": {
+        "label": "Branch",
+        "description": "IF/ELSE conditional branching"
+      },
+      "delay": {
+        "label": "Delay",
+        "description": "Pause execution"
+      },
+      "createEvent": {
+        "label": "Create Event",
+        "description": "Emit event into platform pipeline"
+      }
+    },
+    "nodeConfig": {
+      "label": "Label",
+      "eventTypePattern": "Event Type Pattern",
+      "eventTypePatternHint": "e.g. payment.* or order.completed",
+      "conditions": "Conditions (JSON)",
+      "conditionsHint": "ConditionNode tree format",
+      "template": "Template (JSON)",
+      "templateHint": "Use {{field.path}} placeholders",
+      "method": "Method",
+      "url": "URL",
+      "headers": "Headers (JSON)",
+      "body": "Body (JSON)",
+      "bodyHint": "Leave empty to forward input",
+      "timeout": "Timeout (seconds)",
+      "webhookUrl": "Webhook URL",
+      "channel": "Channel",
+      "channelHint": "Optional, e.g. #payments",
+      "message": "Message",
+      "messageHint": "Use {{field}} placeholders",
+      "endpointId": "Endpoint ID",
+      "endpointIdHint": "UUID of the platform endpoint to deliver to",
+      "branchHint": "Conditions for TRUE branch, FALSE goes the other way",
+      "branchTrue": "True",
+      "branchFalse": "False",
+      "delaySeconds": "Delay (seconds)",
+      "delaySecondsHint": "1–300 seconds",
+      "eventType": "Event Type",
+      "eventTypeHint": "e.g. order.completed, payment.received",
+      "projectId": "Project ID",
+      "projectIdHint": "UUID of the target project (events + subscriptions + deliveries)",
+      "payloadTemplate": "Payload Template",
+      "payloadTemplateHint": "JSON template with {{field}} placeholders, or empty to forward input",
+      "selectEndpoint": "Select endpoint...",
+      "loadingEndpoints": "Loading endpoints...",
+      "createEndpoint": "+ Create new endpoint",
+      "newEndpoint": "New Endpoint",
+      "description": "Description",
+      "descriptionPlaceholder": "Optional description",
+      "endpointCreated": "Endpoint created",
+      "endpointCreateFailed": "Failed to create endpoint",
+      "create": "Create",
+      "useCurrentProject": "Current",
+      "apiKeys": "API Keys",
+      "apiKeysHint": "Events are sent using API keys via POST /api/v1/events",
+      "noApiKeys": "No active API keys — create one in Settings",
+      "more": "more",
+      "subscriptions": "Subscriptions",
+      "subscriptionsHint": "Events created by this node are routed via subscriptions to endpoints",
+      "noSubscriptions": "No active subscriptions — events won't be delivered",
+      "createSubscription": "+ Create subscription",
+      "subscriptionCreated": "Subscription created",
+      "subscriptionCreateFailed": "Failed to create subscription"
+    },
+    "validation": {
+      "required": "This field is required"
+    },
+    "nodeStatus": {
+      "allEvents": "All events",
+      "conditionsSet": "Conditions set",
+      "noConditions": "No conditions",
+      "templateConfigured": "Template configured",
+      "noTemplate": "No template",
+      "notConfigured": "Not configured",
+      "webhookConfigured": "Webhook configured",
+      "delaySeconds": "{{count}}s delay"
     }
   }
 }

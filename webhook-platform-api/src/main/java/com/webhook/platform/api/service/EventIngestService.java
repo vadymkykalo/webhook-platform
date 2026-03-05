@@ -12,6 +12,7 @@ import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.service.rules.CompiledRule;
 import com.webhook.platform.api.service.rules.RuleEngineService;
+import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.util.EventTypeMatcher;
 import com.webhook.platform.common.dto.DeliveryMessage;
@@ -45,6 +46,7 @@ public class EventIngestService {
     private final SchemaRegistryService schemaRegistryService;
     private final ProjectRepository projectRepository;
     private final RuleEngineService ruleEngineService;
+    private final WorkflowTriggerService workflowTriggerService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
 
@@ -59,6 +61,7 @@ public class EventIngestService {
             SchemaRegistryService schemaRegistryService,
             ProjectRepository projectRepository,
             RuleEngineService ruleEngineService,
+            WorkflowTriggerService workflowTriggerService,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
         this.eventRepository = eventRepository;
@@ -71,13 +74,18 @@ public class EventIngestService {
         this.schemaRegistryService = schemaRegistryService;
         this.projectRepository = projectRepository;
         this.ruleEngineService = ruleEngineService;
+        this.workflowTriggerService = workflowTriggerService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
     }
 
+    /** Carries event data out of the transaction for post-commit workflow triggering. */
+    private record IngestResult(EventIngestResponse response, UUID eventId, String eventType, String eventPayload) {}
+
     public EventIngestResponse ingestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
+        IngestResult result;
         try {
-            return transactionTemplate.execute(status -> doIngestEvent(projectId, request, idempotencyKey));
+            result = transactionTemplate.execute(status -> doIngestEvent(projectId, request, idempotencyKey));
         } catch (DataIntegrityViolationException e) {
             if (idempotencyKey != null) {
                 var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
@@ -89,9 +97,25 @@ public class EventIngestService {
             }
             throw e;
         }
+
+        // ── Workflow automation — AFTER transaction commit ────────────────
+        // DB connection is released. Even if workflow pool is overloaded and task
+        // is discarded, the event + deliveries are already safely committed.
+        if (result != null && result.eventId() != null) {
+            try {
+                int depth = WorkflowTriggerService.getCurrentDepth() + 1;
+                workflowTriggerService.triggerWorkflows(
+                        projectId, result.eventId(), result.eventType(), result.eventPayload(), depth);
+            } catch (Exception e) {
+                log.warn("Failed to trigger workflows for event {} (event is committed, workflows skipped): {}",
+                        result.eventId(), e.getMessage());
+            }
+        }
+
+        return result != null ? result.response() : null;
     }
 
-    private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
+    private IngestResult doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
         // Enforce idempotency policy
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.REQUIRED && idempotencyKey == null) {
@@ -109,7 +133,7 @@ public class EventIngestService {
                 Event event = existingEvent.get();
                 log.info("Duplicate event detected, returning existing event: {}", event.getId());
                 Counter.builder("events_duplicate_total").tag("event_type", request.getType()).register(meterRegistry).increment();
-                return buildResponse(event, 0);
+                return new IngestResult(buildResponse(event, 0), null, null, null);
             }
         }
 
@@ -180,7 +204,7 @@ public class EventIngestService {
         }
 
         if (dropEvent) {
-            return buildResponse(event, 0);
+            return new IngestResult(buildResponse(event, 0), null, null, null);
         }
 
         // ── Subscription-based deliveries ──────────────────────────────
@@ -238,7 +262,10 @@ public class EventIngestService {
 
         log.info("Created {} deliveries for event: {} (rules matched: {})",
                 deliveriesCreated, event.getId(), ruleMatches.size());
-        return buildResponse(event, deliveriesCreated);
+
+        return new IngestResult(
+                buildResponse(event, deliveriesCreated),
+                event.getId(), request.getType(), event.getPayload());
     }
 
     private Event createEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
