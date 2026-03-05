@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight, Cable } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
+import { showApiError, showError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -209,7 +209,7 @@ export default function EndpointsPage() {
       if (result.success) {
         showSuccess(t('endpoints.toast.testSuccess', { status: result.httpStatusCode, latency: result.latencyMs }));
       } else {
-        showApiError(new Error(result.message), 'endpoints.toast.testFailed');
+        showError(t('endpoints.toast.testFailed', { message: result.message }));
       }
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.testError');
@@ -234,7 +234,7 @@ export default function EndpointsPage() {
         showSuccess(t('endpoints.toast.verified'));
         loadData();
       } else {
-        showApiError(new Error(result.message), 'endpoints.toast.verifyFailed');
+        showError(t('endpoints.toast.verifyFailed', { message: result.message }));
         loadData();
       }
     } catch (err: any) {

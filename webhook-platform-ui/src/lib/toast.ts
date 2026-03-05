@@ -129,6 +129,15 @@ export function showInfo(messageOrKey: string, options?: ToastOptions) {
   });
 }
 
+/** Error toast for non-API errors (business logic failures, etc.) */
+export function showError(messageOrKey: string, options?: ToastOptions) {
+  const message = i18n.exists(messageOrKey) ? t(messageOrKey) : messageOrKey;
+  toast.error(message, {
+    id: options?.id ?? messageOrKey,
+    duration: options?.duration,
+  });
+}
+
 /**
  * Sticky error toast for critical/destructive action failures.
  * Stays visible until manually dismissed.
