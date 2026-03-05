@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { type Node } from '@xyflow/react';
-import { X, Loader2, Plus, Key, AlertCircle, Check } from 'lucide-react';
+import { X, Loader2, Plus, Key, AlertCircle, Check, Copy, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
@@ -10,6 +10,8 @@ import { subscriptionsApi } from '../../api/subscriptions.api';
 import { apiKeysApi } from '../../api/apiKeys.api';
 import { showSuccess, showApiError } from '../../lib/toast';
 import JsonEditor from '../JsonEditor';
+import ConditionTreeEditor, { mkGroup } from '../ConditionTreeEditor';
+import type { ConditionNode } from '../../api/rules.api';
 
 interface NodeConfigPanelProps {
   node: Node;
@@ -81,12 +83,11 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
         {/* ── Filter node ─────────────────────────────────────────── */}
         {nodeType === 'filter' && (
           <Field label={t('workflows.nodeConfig.conditions')} hint={t('workflows.nodeConfig.conditionsHint')}>
-            <JsonEditor
-              value={jsonStr(d.conditions) || '{\n  \n}'}
-              onChange={(v) => updateJsonField('conditions', v)}
-              placeholder='{"type":"group","op":"AND","children":[]}'
-              minHeight="120px"
-              maxHeight="250px"
+            <ConditionTreeEditor
+              node={(d.conditions as ConditionNode) || mkGroup('AND')}
+              onChange={(updated) => updateField('conditions', updated)}
+              onRemove={() => updateField('conditions', mkGroup('AND'))}
+              compact
             />
           </Field>
         )}
@@ -117,6 +118,7 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
               </select>
             </Field>
             <Field label={t('workflows.nodeConfig.url')} required error={!d.url ? t('workflows.validation.required') : undefined}>
+              <EndpointQuickFill onSelect={(url) => updateField('url', url)} />
               <input
                 value={String(d.url || '')}
                 onChange={(e) => updateField('url', e.target.value)}
@@ -198,12 +200,11 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
         {/* ── Branch node ─────────────────────────────────────────── */}
         {nodeType === 'branch' && (
           <Field label={t('workflows.nodeConfig.conditions')} hint={t('workflows.nodeConfig.branchHint')}>
-            <JsonEditor
-              value={jsonStr(d.conditions) || '{\n  \n}'}
-              onChange={(v) => updateJsonField('conditions', v)}
-              placeholder='{"type":"group","op":"AND","children":[]}'
-              minHeight="120px"
-              maxHeight="250px"
+            <ConditionTreeEditor
+              node={(d.conditions as ConditionNode) || mkGroup('AND')}
+              onChange={(updated) => updateField('conditions', updated)}
+              onRemove={() => updateField('conditions', mkGroup('AND'))}
+              compact
             />
           </Field>
         )}
@@ -365,17 +366,44 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
   );
 }
 
-// ── API Key info for trigger node ──────────────────────────────────────
+// ── API Key info + creation for trigger node ────────────────────────────
 
 function ApiKeyInfo() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const qc = useQueryClient();
+  const [showCreate, setShowCreate] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: keys, isLoading } = useQuery({
     queryKey: ['api-keys-list', projectId],
     queryFn: () => apiKeysApi.list(projectId!),
     enabled: !!projectId,
   });
+
+  const createMut = useMutation({
+    mutationFn: () => apiKeysApi.create(projectId!, { name: newKeyName || 'Workflow Key' }),
+    onSuccess: (resp) => {
+      showSuccess(t('workflows.nodeConfig.apiKeyCreated'));
+      qc.invalidateQueries({ queryKey: ['api-keys-list', projectId] });
+      if (resp.key) {
+        setCreatedKey(resp.key);
+      }
+      setShowCreate(false);
+      setNewKeyName('');
+    },
+    onError: (err) => showApiError(err, t('workflows.nodeConfig.apiKeyCreateFailed')),
+  });
+
+  const handleCopy = () => {
+    if (createdKey) {
+      navigator.clipboard.writeText(createdKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const activeKeys = keys?.filter(k => !k.revokedAt) || [];
 
@@ -387,6 +415,24 @@ function ApiKeyInfo() {
           {t('workflows.nodeConfig.apiKeys')}
         </span>
       </div>
+
+      {/* Created key banner — shown once */}
+      {createdKey && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-md p-2 space-y-1">
+          <p className="text-[10px] font-semibold text-green-700 dark:text-green-400">{t('workflows.nodeConfig.apiKeyCopyWarning')}</p>
+          <div className="flex items-center gap-1">
+            <code className="flex-1 text-[10px] font-mono bg-background rounded px-1.5 py-0.5 truncate select-all">{createdKey}</code>
+            <button onClick={handleCopy} className="p-1 rounded hover:bg-muted transition-colors shrink-0" title="Copy">
+              {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+            </button>
+          </div>
+          <Button variant="ghost" size="sm" className="w-full text-[10px] mt-1" onClick={() => setCreatedKey(null)}>
+            {t('workflows.nodeConfig.dismissKey')}
+          </Button>
+        </div>
+      )}
+
+      {/* Key list */}
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> ...</div>
       ) : activeKeys.length === 0 ? (
@@ -408,6 +454,40 @@ function ApiKeyInfo() {
           )}
         </div>
       )}
+
+      {/* Inline create */}
+      {!showCreate ? (
+        <Button variant="outline" size="sm" className="w-full gap-1.5 text-[10px]" onClick={() => setShowCreate(true)}>
+          <Plus className="h-3 w-3" />
+          {t('workflows.nodeConfig.createApiKey')}
+        </Button>
+      ) : (
+        <div className="space-y-2 pt-1 border-t">
+          <Field label={t('workflows.nodeConfig.apiKeyName')}>
+            <input
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="Workflow Key"
+              className={inputCls}
+            />
+          </Field>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" className="text-[10px] flex-1" onClick={() => setShowCreate(false)}>
+              {t('workflows.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              className="text-[10px] flex-1 gap-1"
+              disabled={createMut.isPending}
+              onClick={() => createMut.mutate()}
+            >
+              {createMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Key className="h-3 w-3" />}
+              {t('workflows.nodeConfig.create')}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <p className="text-[10px] text-muted-foreground">{t('workflows.nodeConfig.apiKeysHint')}</p>
     </div>
   );
@@ -518,6 +598,51 @@ function SubscriptionInfo() {
             </Button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Endpoint quick-fill for HTTP node ────────────────────────────────────
+
+function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
+  const { t } = useTranslation();
+  const { projectId } = useParams<{ projectId: string }>();
+  const [open, setOpen] = useState(false);
+
+  const { data: endpoints } = useQuery({
+    queryKey: ['endpoints-list', projectId],
+    queryFn: () => endpointsApi.list(projectId!),
+    enabled: !!projectId && open,
+  });
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="text-[10px] text-primary hover:underline flex items-center gap-1"
+      >
+        <ExternalLink className="h-3 w-3" />
+        {t('workflows.nodeConfig.pickFromEndpoints')}
+      </button>
+      {open && endpoints && endpoints.length > 0 && (
+        <div className="mt-1 border rounded-md bg-background max-h-28 overflow-y-auto">
+          {endpoints.map(ep => (
+            <button
+              key={ep.id}
+              type="button"
+              onClick={() => { onSelect(ep.url); setOpen(false); }}
+              className="w-full text-left px-2 py-1.5 text-[10px] hover:bg-muted transition-colors border-b last:border-b-0"
+            >
+              <span className="font-mono text-primary truncate block">{ep.url}</span>
+              {ep.description && <span className="text-muted-foreground truncate block">{ep.description}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && endpoints && endpoints.length === 0 && (
+        <p className="text-[10px] text-muted-foreground mt-1 italic">{t('workflows.nodeConfig.noEndpointsYet')}</p>
       )}
     </div>
   );
