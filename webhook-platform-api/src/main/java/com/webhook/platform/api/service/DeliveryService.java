@@ -16,6 +16,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.specification.DeliverySpecification;
+import com.webhook.platform.api.dto.BulkReplayResponse;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,8 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class DeliveryService {
+
+    private static final int BULK_REPLAY_MAX_LIMIT = 5000;
 
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
@@ -121,28 +125,14 @@ public class DeliveryService {
             throw new ForbiddenException("Access denied");
         }
 
-        List<UUID> eventIds;
+        Specification<Delivery> spec;
         if (eventId != null) {
-            eventIds = List.of(eventId);
-        } else if (eventType != null && !eventType.isBlank()) {
-            eventIds = eventRepository.findByProjectIdAndEventTypeContainingIgnoreCase(projectId, eventType)
-                    .stream()
-                    .map(Event::getId)
-                    .toList();
+            spec = Specification.where(DeliverySpecification.hasEventIds(List.of(eventId)));
         } else {
-            eventIds = eventRepository.findByProjectId(projectId)
-                    .stream()
-                    .map(Event::getId)
-                    .toList();
+            spec = Specification.where(DeliverySpecification.hasProjectId(projectId))
+                    .and(DeliverySpecification.hasEventTypeContaining(eventType));
         }
-
-        if (eventIds.isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
-        }
-
-        Specification<Delivery> spec = Specification
-                .where(DeliverySpecification.hasEventIds(eventIds))
-                .and(DeliverySpecification.hasStatus(status))
+        spec = spec.and(DeliverySpecification.hasStatus(status))
                 .and(DeliverySpecification.hasEndpointId(endpointId))
                 .and(DeliverySpecification.createdAfter(fromDate))
                 .and(DeliverySpecification.createdBefore(toDate));
@@ -212,98 +202,139 @@ public class DeliveryService {
     }
 
     @Transactional
-    public int bulkReplayDeliveries(List<UUID> deliveryIds, DeliveryStatus statusFilter, 
-                                     UUID endpointIdFilter, UUID projectIdFilter, AuthContext auth) {
-        List<Delivery> deliveriesToReplay;
-        
+    public BulkReplayResponse bulkReplayDeliveries(List<UUID> deliveryIds, DeliveryStatus statusFilter,
+                                                    UUID endpointIdFilter, UUID projectIdFilter,
+                                                    Integer requestedLimit, AuthContext auth) {
+        int limit = Math.min(
+                requestedLimit != null && requestedLimit > 0 ? requestedLimit : BULK_REPLAY_MAX_LIMIT,
+                BULK_REPLAY_MAX_LIMIT);
+
         if (deliveryIds != null && !deliveryIds.isEmpty()) {
-            List<Delivery> collected = new ArrayList<>();
-            for (UUID deliveryId : deliveryIds) {
-                try {
-                    Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
-                    if (delivery != null) {
-                        validateDeliveryAccess(delivery, auth);
-                        if (delivery.getStatus() != DeliveryStatus.SUCCESS) {
-                            collected.add(delivery);
-                        }
-                    }
-                } catch (Exception e) {
-                    log.warn("Skipping delivery {} - access denied or invalid", deliveryId);
-                }
-            }
-            deliveriesToReplay = collected;
+            return bulkReplayByIds(deliveryIds, limit, auth);
         } else if (projectIdFilter != null) {
-            Project project = projectRepository.findById(projectIdFilter)
-                    .orElseThrow(() -> new NotFoundException("Project not found"));
-            
-            if (!project.getOrganizationId().equals(auth.organizationId())) {
-                throw new ForbiddenException("Access denied");
-            }
-            auth.validateProjectAccess(project.getId());
-            
-            List<UUID> eventIds = eventRepository.findByProjectId(projectIdFilter)
-                    .stream()
-                    .map(Event::getId)
-                    .toList();
-            
-            if (!eventIds.isEmpty()) {
-                Specification<Delivery> spec = Specification
-                        .where(DeliverySpecification.hasEventIds(eventIds))
-                        .and(DeliverySpecification.hasStatus(statusFilter))
-                        .and(DeliverySpecification.hasEndpointId(endpointIdFilter));
-                
-                deliveriesToReplay = deliveryRepository.findAll(spec);
-            } else {
-                deliveriesToReplay = new ArrayList<>();
-            }
+            return bulkReplayByProject(projectIdFilter, statusFilter, endpointIdFilter, limit, auth);
         } else {
-            deliveriesToReplay = new ArrayList<>();
-        }
-        
-        int replayedCount = 0;
-        for (Delivery delivery : deliveriesToReplay) {
-            if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
-                continue;
-            }
-            
-            delivery.setStatus(DeliveryStatus.PENDING);
-            delivery.setAttemptCount(0);
-            delivery.setNextRetryAt(null);
-            delivery.setLastAttemptAt(null);
-            delivery.setFailedAt(null);
-            deliveryRepository.save(delivery);
-            
-            DeliveryMessage message = DeliveryMessage.builder()
-                    .deliveryId(delivery.getId())
-                    .eventId(delivery.getEventId())
-                    .endpointId(delivery.getEndpointId())
-                    .subscriptionId(delivery.getSubscriptionId())
-                    .status(delivery.getStatus().name())
-                    .attemptCount(delivery.getAttemptCount())
+            return BulkReplayResponse.builder()
+                    .totalRequested(0).replayed(0).skipped(0)
+                    .totalMatched(0).hasMore(false)
+                    .message("No deliveryIds or projectId provided")
                     .build();
-            
+        }
+    }
+
+    private BulkReplayResponse bulkReplayByIds(List<UUID> deliveryIds, int limit, AuthContext auth) {
+        int totalRequested = deliveryIds.size();
+        List<UUID> capped = deliveryIds.size() > limit ? deliveryIds.subList(0, limit) : deliveryIds;
+
+        int replayedCount = 0;
+        int skipped = 0;
+        for (UUID deliveryId : capped) {
             try {
-                String payload = objectMapper.writeValueAsString(message);
-                OutboxMessage outboxMessage = OutboxMessage.builder()
-                        .aggregateType("Delivery")
-                        .aggregateId(delivery.getId())
-                        .eventType("DeliveryBulkReplayed")
-                        .payload(payload)
-                        .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                        .kafkaKey(delivery.getEndpointId().toString())
-                        .status(OutboxStatus.PENDING)
-                        .retryCount(0)
-                        .build();
-                
-                outboxMessageRepository.save(outboxMessage);
-                replayedCount++;
+                Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
+                if (delivery == null || delivery.getStatus() == DeliveryStatus.SUCCESS) {
+                    skipped++;
+                    continue;
+                }
+                validateDeliveryAccess(delivery, auth);
+                if (enqueueReplay(delivery)) {
+                    replayedCount++;
+                } else {
+                    skipped++;
+                }
             } catch (Exception e) {
-                log.error("Failed to create bulk replay outbox message for delivery {}", delivery.getId(), e);
+                log.warn("Skipping delivery {} - access denied or invalid", deliveryId);
+                skipped++;
             }
         }
-        
-        log.info("Bulk replayed {} deliveries", replayedCount);
-        return replayedCount;
+
+        boolean hasMore = deliveryIds.size() > limit;
+        log.info("Bulk replayed {} of {} deliveries (by IDs)", replayedCount, totalRequested);
+        return BulkReplayResponse.builder()
+                .totalRequested(totalRequested)
+                .replayed(replayedCount)
+                .skipped(skipped)
+                .totalMatched(totalRequested)
+                .hasMore(hasMore)
+                .message("Bulk replay initiated for " + replayedCount + " deliveries")
+                .build();
+    }
+
+    private BulkReplayResponse bulkReplayByProject(UUID projectIdFilter, DeliveryStatus statusFilter,
+                                                     UUID endpointIdFilter, int limit, AuthContext auth) {
+        Project project = projectRepository.findById(projectIdFilter)
+                .orElseThrow(() -> new NotFoundException("Project not found"));
+
+        if (!project.getOrganizationId().equals(auth.organizationId())) {
+            throw new ForbiddenException("Access denied");
+        }
+        auth.validateProjectAccess(project.getId());
+
+        Specification<Delivery> spec = Specification
+                .where(DeliverySpecification.hasProjectId(projectIdFilter))
+                .and(DeliverySpecification.notStatus(DeliveryStatus.SUCCESS))
+                .and(DeliverySpecification.hasStatus(statusFilter))
+                .and(DeliverySpecification.hasEndpointId(endpointIdFilter));
+
+        long totalMatched = deliveryRepository.count(spec);
+        Page<Delivery> page = deliveryRepository.findAll(spec, PageRequest.of(0, limit));
+
+        int replayedCount = 0;
+        for (Delivery delivery : page.getContent()) {
+            if (enqueueReplay(delivery)) {
+                replayedCount++;
+            }
+        }
+
+        boolean hasMore = totalMatched > limit;
+        log.info("Bulk replayed {} of {} deliveries (by project {})", replayedCount, totalMatched, projectIdFilter);
+        return BulkReplayResponse.builder()
+                .totalRequested((int) Math.min(totalMatched, limit))
+                .replayed(replayedCount)
+                .skipped((int) Math.min(totalMatched, limit) - replayedCount)
+                .totalMatched(totalMatched)
+                .hasMore(hasMore)
+                .message(hasMore
+                        ? "Bulk replay initiated for " + replayedCount + " deliveries (" + totalMatched + " total matched, limit " + limit + ")"
+                        : "Bulk replay initiated for " + replayedCount + " deliveries")
+                .build();
+    }
+
+    private boolean enqueueReplay(Delivery delivery) {
+        delivery.setStatus(DeliveryStatus.PENDING);
+        delivery.setAttemptCount(0);
+        delivery.setNextRetryAt(null);
+        delivery.setLastAttemptAt(null);
+        delivery.setFailedAt(null);
+        deliveryRepository.save(delivery);
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(delivery.getId())
+                .eventId(delivery.getEventId())
+                .endpointId(delivery.getEndpointId())
+                .subscriptionId(delivery.getSubscriptionId())
+                .status(delivery.getStatus().name())
+                .attemptCount(delivery.getAttemptCount())
+                .build();
+
+        try {
+            String payload = objectMapper.writeValueAsString(message);
+            OutboxMessage outboxMessage = OutboxMessage.builder()
+                    .aggregateType("Delivery")
+                    .aggregateId(delivery.getId())
+                    .eventType("DeliveryBulkReplayed")
+                    .payload(payload)
+                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
+                    .kafkaKey(delivery.getEndpointId().toString())
+                    .status(OutboxStatus.PENDING)
+                    .retryCount(0)
+                    .build();
+
+            outboxMessageRepository.save(outboxMessage);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to create bulk replay outbox message for delivery {}", delivery.getId(), e);
+            return false;
+        }
     }
 
     private DeliveryAttemptResponse mapAttemptToResponse(DeliveryAttempt attempt) {

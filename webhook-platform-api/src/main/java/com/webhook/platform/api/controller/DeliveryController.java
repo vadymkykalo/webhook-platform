@@ -9,7 +9,6 @@ import com.webhook.platform.api.dto.DryRunReplayResponse;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.service.DeliveryService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -120,24 +119,15 @@ public class DeliveryController {
             AuthContext auth) {
         auth.requireWriteAccess();
         
-        int replayedCount = deliveryService.bulkReplayDeliveries(
+        BulkReplayResponse response = deliveryService.bulkReplayDeliveries(
                 request.getDeliveryIds(),
                 request.getStatus(),
                 request.getEndpointId(),
                 request.getProjectId(),
+                request.getLimit(),
                 auth
         );
         
-        int totalRequested = request.getDeliveryIds() != null ? request.getDeliveryIds().size() : 0;
-        int skipped = totalRequested > 0 ? totalRequested - replayedCount : 0;
-        
-        return ResponseEntity.accepted().body(
-                com.webhook.platform.api.dto.BulkReplayResponse.builder()
-                        .totalRequested(totalRequested)
-                        .replayed(replayedCount)
-                        .skipped(skipped)
-                        .message("Bulk replay initiated for " + replayedCount + " deliveries")
-                        .build()
-        );
+        return ResponseEntity.accepted().body(response);
     }
 }
