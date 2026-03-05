@@ -7,6 +7,7 @@ import { useAuth } from '../auth/auth.store';
 import { Button } from '../components/ui/button';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import NetworkBackground from '../components/NetworkBackground';
 
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
@@ -88,6 +89,7 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
       {/* Background gradient orbs */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl -translate-y-1/2" />
       <div className="absolute top-20 right-1/4 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl" />
+      <NetworkBackground className="opacity-70" />
 
       <div className="max-w-7xl mx-auto px-6 pt-20 pb-24 relative">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
