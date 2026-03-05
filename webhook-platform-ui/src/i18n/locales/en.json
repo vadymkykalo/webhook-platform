@@ -1195,6 +1195,7 @@
       "features": "Features",
       "architecture": "Architecture",
       "capabilities": "Capabilities",
+      "platform": "Platform",
       "howItWorks": "How it Works",
       "docs": "Docs",
       "quickstart": "Quickstart",
@@ -1313,7 +1314,7 @@
     "features": {
       "title": "Everything you need for",
       "titleHighlight": "production webhooks",
-      "subtitle": "12 battle-tested features. Zero compromises on reliability, security, or developer experience.",
+      "subtitle": "16+ battle-tested features. Zero compromises on reliability, security, or developer experience.",
       "retries": "Exponential retries",
       "retriesDesc": "6-tier backoff (1m → 24h). Never miss a delivery.",
       "hmac": "HMAC-SHA256 signatures",
@@ -1337,7 +1338,40 @@
       "auditLog": "Audit log",
       "auditLogDesc": "Track every action — who did what, when, and from where.",
       "rbac": "Role-based access",
-      "rbacDesc": "Owner, Developer, Viewer roles with granular permissions."
+      "rbacDesc": "Owner, Developer, Viewer roles with granular permissions.",
+      "transformStudio": "Transform Studio",
+      "transformStudioDesc": "Visual JSONPath editor with live preview, reusable templates, and dry-run simulation.",
+      "dryRunDelivery": "Dry-run Delivery",
+      "dryRunDeliveryDesc": "Preview the exact HTTP request your endpoint will receive — without sending anything.",
+      "alertRules": "Alert Rules",
+      "alertRulesDesc": "Real-time alerts on failure rate spikes, latency degradation, and DLQ overflow.",
+      "eventTimeMachine": "Event Time Machine",
+      "eventTimeMachineDesc": "Replay any range of historical events with cursor-based streaming and selective filtering."
+    },
+    "highlights": {
+      "badge": "Beyond Delivery",
+      "title": "A complete webhook ",
+      "titleHighlight": "operating system",
+      "subtitle": "Not just send-and-forget. Transform payloads, validate schemas, mask PII, dry-run deliveries, replay events, and debug — all from one platform.",
+      "transformStudio": "Transform Studio",
+      "transformStudioDesc": "Visual JSONPath editor with live preview and reusable templates",
+      "dryRun": "Dry-run Delivery",
+      "dryRunDesc": "Preview exactly what your endpoint receives — headers, signature, body — without sending",
+      "schemasPii": "Schema Registry & PII Masking",
+      "schemasPiiDesc": "Validate payloads against JSON schemas and auto-redact sensitive data",
+      "timeMachine": "Event Time Machine",
+      "timeMachineDesc": "Replay any range of historical events with cursor-based streaming",
+      "extra": {
+        "testConsole": "Test Console",
+        "alerts": "Real-time Alerts",
+        "eventDiff": "Event Diff",
+        "analytics": "Usage Analytics",
+        "devWorkspace": "Dev Workspace",
+        "configExport": "Config Export/Import",
+        "connections": "Pre-built Connections",
+        "sharedDebug": "Shared Debug Links",
+        "andMore": "…and 30+ more features"
+      }
     },
     "architecture": {
       "badge": "Transactional outbox pattern",

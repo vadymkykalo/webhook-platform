@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint, Wand2, Send, Timer, Bell } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -18,6 +18,7 @@ export default function LandingPage() {
       <LogoCloud />
       <FlowDiagram />
       <CapabilityShowcase />
+      <PlatformHighlights />
       <Features />
       <HowItWorks />
       <DeveloperConfidence />
@@ -52,6 +53,7 @@ function Navigation() {
           </Link>
           <div className="hidden md:flex items-center gap-6">
             <a href="#capabilities" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.capabilities')}</a>
+            <a href="#platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.platform', 'Platform')}</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.howItWorks')}</a>
             <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.docs')}</Link>
             <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.sdks')}</Link>
@@ -751,6 +753,257 @@ function CapabilityShowcase() {
   );
 }
 
+function PlatformHighlights() {
+  const { t } = useTranslation();
+
+  return (
+    <section id="platform" className="py-24 relative overflow-hidden">
+      <div className="absolute top-1/2 right-0 w-[600px] h-[600px] bg-violet-500/[0.04] rounded-full blur-[120px] translate-x-1/3 -translate-y-1/2 pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-600 text-xs font-semibold mb-6 border border-violet-500/20">
+            <Wand2 className="h-3 w-3" />
+            {t('landing.highlights.badge', 'Beyond Delivery')}
+          </div>
+          <h2 className="text-headline mb-4">
+            {t('landing.highlights.title', 'A complete webhook ')}<span className="gradient-text">{t('landing.highlights.titleHighlight', 'operating system')}</span>
+          </h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.highlights.subtitle', 'Not just send-and-forget. Transform payloads, validate schemas, mask PII, dry-run deliveries, replay events, and debug — all from one platform.')}
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* 1. Transform Studio */}
+          <div className="group relative bg-card rounded-2xl border overflow-hidden hover:shadow-elevated transition-all duration-500 hover:border-violet-500/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="p-6 relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                  <Wand2 className="h-5 w-5 text-violet-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">{t('landing.highlights.transformStudio', 'Transform Studio')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('landing.highlights.transformStudioDesc', 'Visual JSONPath editor with live preview and reusable templates')}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-muted/30 overflow-hidden">
+                <div className="bg-muted/50 border-b px-3 py-2 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-400" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <span className="ml-2 text-[9px] text-muted-foreground font-mono">transform-studio</span>
+                </div>
+                <div className="grid grid-cols-2 gap-px bg-border">
+                  <div className="bg-card p-3">
+                    <div className="text-[9px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">Input</div>
+                    <pre className="text-[10px] font-mono text-muted-foreground/80 leading-relaxed">{`{
+  "type": "order.done",
+  "data": {
+    "id": "ord_123",
+    "total": 99.99,
+    "buyer": "Jane Doe"
+  }
+}`}</pre>
+                  </div>
+                  <div className="bg-card p-3">
+                    <div className="text-[9px] font-semibold text-emerald-600 mb-1.5 uppercase tracking-wider flex items-center gap-1">
+                      <CheckCircle2 className="h-2.5 w-2.5" /> Output
+                    </div>
+                    <pre className="text-[10px] font-mono text-foreground leading-relaxed">{`{
+  "event": "order.done",
+  "orderId": "ord_123",
+  "amount": 99.99,
+  "customer": "Jane Doe"
+}`}</pre>
+                  </div>
+                </div>
+                <div className="bg-muted/30 border-t px-3 py-2 flex items-center gap-2">
+                  <code className="text-[9px] font-mono text-violet-600">{'${$.data.id}'} → orderId</code>
+                  <span className="text-[9px] text-muted-foreground">·</span>
+                  <code className="text-[9px] font-mono text-violet-600">{'${$.data.total}'} → amount</code>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Dry-run Delivery */}
+          <div className="group relative bg-card rounded-2xl border overflow-hidden hover:shadow-elevated transition-all duration-500 hover:border-blue-500/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="p-6 relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <Send className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">{t('landing.highlights.dryRun', 'Dry-run Delivery')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('landing.highlights.dryRunDesc', 'Preview exactly what your endpoint receives — headers, signature, body — without sending')}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-muted/30 overflow-hidden">
+                <div className="bg-muted/50 border-b px-3 py-2 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-400" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <span className="ml-2 text-[9px] text-muted-foreground font-mono">dry-run result</span>
+                  <span className="ml-auto text-[9px] font-semibold text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5" /> safe preview</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <Globe className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">POST</span>
+                    <code className="font-mono text-foreground">https://api.acme.com/webhooks</code>
+                  </div>
+                  <div className="bg-card rounded-lg border p-2 space-y-1">
+                    {[
+                      ['Content-Type', 'application/json'],
+                      ['X-Event-Type', 'order.completed'],
+                      ['X-Timestamp', '1709654400000'],
+                      ['X-Signature', 'v1,t=1709...,s1=a8f2c...e7b3'],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex gap-2 text-[10px] font-mono">
+                        <span className="text-primary font-medium shrink-0">{k}:</span>
+                        <span className="text-muted-foreground truncate">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <Shield className="h-3 w-3 text-emerald-500" />
+                    <span className="text-emerald-600 font-semibold">HMAC-SHA256 signature computed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Schema Registry + PII */}
+          <div className="group relative bg-card rounded-2xl border overflow-hidden hover:shadow-elevated transition-all duration-500 hover:border-amber-500/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="p-6 relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                  <FileCheck className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">{t('landing.highlights.schemasPii', 'Schema Registry & PII Masking')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('landing.highlights.schemasPiiDesc', 'Validate payloads against JSON schemas and auto-redact sensitive data')}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-muted/30 overflow-hidden">
+                <div className="bg-muted/50 border-b px-3 py-2 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-400" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <span className="ml-2 text-[9px] text-muted-foreground font-mono">validation + masking</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">Schema valid</span>
+                      <span className="ml-auto text-[9px] text-emerald-600/60 font-mono">order.completed v3</span>
+                    </div>
+                  </div>
+                  <div className="bg-card rounded-lg border p-2">
+                    <div className="text-[10px] font-mono leading-relaxed space-y-0.5">
+                      <div><span className="text-muted-foreground">{'{'}</span></div>
+                      <div>{'  '}<span className="text-primary">"email"</span>: <span className="text-amber-600">"j***@***.com"</span>,</div>
+                      <div>{'  '}<span className="text-primary">"phone"</span>: <span className="text-amber-600">"+1*****567"</span>,</div>
+                      <div>{'  '}<span className="text-primary">"name"</span>: <span className="text-foreground">"Jane Doe"</span>,</div>
+                      <div>{'  '}<span className="text-primary">"amount"</span>: <span className="text-foreground">99.99</span></div>
+                      <div><span className="text-muted-foreground">{'}'}</span></div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px]">
+                    <span className="flex items-center gap-1 text-amber-600"><Lock className="h-3 w-3" /> 2 fields masked</span>
+                    <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3 w-3" /> GDPR compliant</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Event Time Machine */}
+          <div className="group relative bg-card rounded-2xl border overflow-hidden hover:shadow-elevated transition-all duration-500 hover:border-emerald-500/30">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="p-6 relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <Timer className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">{t('landing.highlights.timeMachine', 'Event Time Machine')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('landing.highlights.timeMachineDesc', 'Replay any range of historical events with cursor-based streaming')}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-muted/30 overflow-hidden">
+                <div className="bg-muted/50 border-b px-3 py-2 flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-400" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <span className="ml-2 text-[9px] text-muted-foreground font-mono">event-replay</span>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Range:</span>
+                    <span className="font-mono font-medium">Mar 1 → Mar 5, 2024</span>
+                    <span className="ml-auto px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[9px] font-semibold">12,847 events</span>
+                  </div>
+                  <div className="bg-card rounded-lg border p-2 space-y-1.5">
+                    {[
+                      { type: 'order.completed', count: '8,420', status: 'replayed' },
+                      { type: 'payment.failed', count: '312', status: 'replaying' },
+                      { type: 'user.created', count: '4,115', status: 'queued' },
+                    ].map((row) => (
+                      <div key={row.type} className="flex items-center gap-2 text-[10px]">
+                        <span className="font-mono text-foreground flex-1">{row.type}</span>
+                        <span className="text-muted-foreground tabular-nums">{row.count}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-semibold ${
+                          row.status === 'replayed' ? 'bg-emerald-500/10 text-emerald-600' :
+                          row.status === 'replaying' ? 'bg-blue-500/10 text-blue-600 animate-pulse' :
+                          'bg-muted text-muted-foreground'
+                        }`}>{row.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full transition-all duration-1000" style={{ width: '65%' }} />
+                    </div>
+                    <span className="text-[9px] font-semibold text-emerald-600 tabular-nums">65%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional capabilities */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+          {[
+            { icon: Code2, label: t('landing.highlights.extra.testConsole', 'Test Console') },
+            { icon: Bell, label: t('landing.highlights.extra.alerts', 'Real-time Alerts') },
+            { icon: GitBranch, label: t('landing.highlights.extra.eventDiff', 'Event Diff') },
+            { icon: BarChart3, label: t('landing.highlights.extra.analytics', 'Usage Analytics') },
+            { icon: Activity, label: t('landing.highlights.extra.devWorkspace', 'Dev Workspace') },
+            { icon: ArrowDownToLine, label: t('landing.highlights.extra.configExport', 'Config Export/Import') },
+            { icon: Webhook, label: t('landing.highlights.extra.connections', 'Pre-built Connections') },
+            { icon: Fingerprint, label: t('landing.highlights.extra.sharedDebug', 'Shared Debug Links') },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/80 border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary/20 transition-colors">
+              <item.icon className="h-3 w-3 text-primary/70" />
+              {item.label}
+            </div>
+          ))}
+          <span className="text-xs text-muted-foreground font-medium">{t('landing.highlights.extra.andMore', '…and 30+ more features')}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Features() {
   const { t } = useTranslation();
   const features = [
@@ -766,6 +1019,10 @@ function Features() {
     { icon: Lock, title: t('landing.features.piiMasking'), desc: t('landing.features.piiMaskingDesc') },
     { icon: Activity, title: t('landing.features.auditLog'), desc: t('landing.features.auditLogDesc') },
     { icon: Webhook, title: t('landing.features.rbac'), desc: t('landing.features.rbacDesc') },
+    { icon: Wand2, title: t('landing.features.transformStudio', 'Transform Studio'), desc: t('landing.features.transformStudioDesc', 'Visual JSONPath editor with live preview, reusable templates, and dry-run simulation') },
+    { icon: Send, title: t('landing.features.dryRunDelivery', 'Dry-run Delivery'), desc: t('landing.features.dryRunDeliveryDesc', 'Preview the exact HTTP request your endpoint will receive — without sending anything') },
+    { icon: Bell, title: t('landing.features.alertRules', 'Alert Rules'), desc: t('landing.features.alertRulesDesc', 'Real-time alerts on failure rate spikes, latency degradation, and DLQ overflow') },
+    { icon: Timer, title: t('landing.features.eventTimeMachine', 'Event Time Machine'), desc: t('landing.features.eventTimeMachineDesc', 'Replay any range of historical events with cursor-based streaming and selective filtering') },
   ];
 
   return (
