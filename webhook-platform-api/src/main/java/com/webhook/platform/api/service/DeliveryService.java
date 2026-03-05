@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.AuthContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -66,33 +67,35 @@ public class DeliveryService {
         this.objectMapper = objectMapper;
     }
 
-    private void validateDeliveryAccess(Delivery delivery, UUID organizationId) {
+    private void validateDeliveryAccess(Delivery delivery, AuthContext auth) {
         Event event = eventRepository.findById(delivery.getEventId())
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         Project project = projectRepository.findById(event.getProjectId())
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
+        if (!project.getOrganizationId().equals(auth.organizationId())) {
             throw new ForbiddenException("Access denied");
         }
+        auth.validateProjectAccess(project.getId());
     }
 
-    public DeliveryResponse getDelivery(UUID id, UUID organizationId) {
+    public DeliveryResponse getDelivery(UUID id, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
-        validateDeliveryAccess(delivery, organizationId);
+        validateDeliveryAccess(delivery, auth);
         return mapToResponse(delivery);
     }
 
-    public Page<DeliveryResponse> listDeliveries(UUID eventId, UUID organizationId, Pageable pageable) {
+    public Page<DeliveryResponse> listDeliveries(UUID eventId, AuthContext auth, Pageable pageable) {
         Page<Delivery> deliveries;
         if (eventId != null) {
             Event event = eventRepository.findById(eventId)
                     .orElseThrow(() -> new NotFoundException("Event not found"));
             Project project = projectRepository.findById(event.getProjectId())
                     .orElseThrow(() -> new NotFoundException("Project not found"));
-            if (!project.getOrganizationId().equals(organizationId)) {
+            if (!project.getOrganizationId().equals(auth.organizationId())) {
                 throw new ForbiddenException("Access denied");
             }
+            auth.validateProjectAccess(project.getId());
             deliveries = deliveryRepository.findByEventId(eventId, pageable);
         } else {
             throw new IllegalArgumentException("eventId parameter is required");
@@ -150,10 +153,10 @@ public class DeliveryService {
     }
 
     @Transactional
-    public void replayDelivery(UUID deliveryId, UUID organizationId) {
+    public void replayDelivery(UUID deliveryId, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
-        validateDeliveryAccess(delivery, organizationId);
+        validateDeliveryAccess(delivery, auth);
         
         if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
             throw new IllegalArgumentException("Cannot replay successful delivery");
@@ -195,10 +198,10 @@ public class DeliveryService {
         }
     }
 
-    public List<DeliveryAttemptResponse> getDeliveryAttempts(UUID deliveryId, UUID organizationId) {
+    public List<DeliveryAttemptResponse> getDeliveryAttempts(UUID deliveryId, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
-        validateDeliveryAccess(delivery, organizationId);
+        validateDeliveryAccess(delivery, auth);
         
         List<DeliveryAttempt> attempts = deliveryAttemptRepository
                 .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
@@ -210,7 +213,7 @@ public class DeliveryService {
 
     @Transactional
     public int bulkReplayDeliveries(List<UUID> deliveryIds, DeliveryStatus statusFilter, 
-                                     UUID endpointIdFilter, UUID projectIdFilter, UUID organizationId) {
+                                     UUID endpointIdFilter, UUID projectIdFilter, AuthContext auth) {
         List<Delivery> deliveriesToReplay;
         
         if (deliveryIds != null && !deliveryIds.isEmpty()) {
@@ -219,7 +222,7 @@ public class DeliveryService {
                 try {
                     Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
                     if (delivery != null) {
-                        validateDeliveryAccess(delivery, organizationId);
+                        validateDeliveryAccess(delivery, auth);
                         if (delivery.getStatus() != DeliveryStatus.SUCCESS) {
                             collected.add(delivery);
                         }
@@ -233,9 +236,10 @@ public class DeliveryService {
             Project project = projectRepository.findById(projectIdFilter)
                     .orElseThrow(() -> new NotFoundException("Project not found"));
             
-            if (!project.getOrganizationId().equals(organizationId)) {
+            if (!project.getOrganizationId().equals(auth.organizationId())) {
                 throw new ForbiddenException("Access denied");
             }
+            auth.validateProjectAccess(project.getId());
             
             List<UUID> eventIds = eventRepository.findByProjectId(projectIdFilter)
                     .stream()
@@ -325,10 +329,10 @@ public class DeliveryService {
         return str.substring(0, maxLength) + "... (truncated at " + maxLength + " characters)";
     }
 
-    public DryRunReplayResponse dryRunReplay(UUID deliveryId, UUID organizationId) {
+    public DryRunReplayResponse dryRunReplay(UUID deliveryId, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
-        validateDeliveryAccess(delivery, organizationId);
+        validateDeliveryAccess(delivery, auth);
 
         Event event = eventRepository.findById(delivery.getEventId())
                 .orElseThrow(() -> new NotFoundException("Event not found"));
@@ -377,10 +381,10 @@ public class DeliveryService {
     }
 
     @Transactional
-    public void replayFromAttempt(UUID deliveryId, int fromAttempt, UUID organizationId) {
+    public void replayFromAttempt(UUID deliveryId, int fromAttempt, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
-        validateDeliveryAccess(delivery, organizationId);
+        validateDeliveryAccess(delivery, auth);
 
         if (delivery.getStatus() == DeliveryStatus.SUCCESS) {
             throw new IllegalArgumentException("Cannot replay successful delivery");

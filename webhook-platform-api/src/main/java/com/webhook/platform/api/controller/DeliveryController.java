@@ -1,6 +1,8 @@
 package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
+import com.webhook.platform.api.dto.BulkReplayRequest;
+import com.webhook.platform.api.dto.BulkReplayResponse;
 import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
@@ -43,7 +45,7 @@ public class DeliveryController {
     public ResponseEntity<DeliveryResponse> getDelivery(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        DeliveryResponse response = deliveryService.getDelivery(id, auth.organizationId());
+        DeliveryResponse response = deliveryService.getDelivery(id, auth);
         return ResponseEntity.ok(response);
     }
 
@@ -53,7 +55,7 @@ public class DeliveryController {
             @RequestParam(value = "eventId", required = false) UUID eventId,
             Pageable pageable,
             AuthContext auth) {
-        Page<DeliveryResponse> response = deliveryService.listDeliveries(eventId, auth.organizationId(), pageable);
+        Page<DeliveryResponse> response = deliveryService.listDeliveries(eventId, auth, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -89,14 +91,14 @@ public class DeliveryController {
         auth.requireWriteAccess();
 
         if (dryRun) {
-            DryRunReplayResponse response = deliveryService.dryRunReplay(id, auth.organizationId());
+            DryRunReplayResponse response = deliveryService.dryRunReplay(id, auth);
             return ResponseEntity.ok(response);
         }
 
         if (fromAttempt != null) {
-            deliveryService.replayFromAttempt(id, fromAttempt, auth.organizationId());
+            deliveryService.replayFromAttempt(id, fromAttempt, auth);
         } else {
-            deliveryService.replayDelivery(id, auth.organizationId());
+            deliveryService.replayDelivery(id, auth);
         }
         return ResponseEntity.accepted().build();
     }
@@ -106,15 +108,15 @@ public class DeliveryController {
     public ResponseEntity<List<DeliveryAttemptResponse>> getDeliveryAttempts(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, auth.organizationId());
+        List<DeliveryAttemptResponse> response = deliveryService.getDeliveryAttempts(id, auth);
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Bulk replay deliveries", description = "Re-sends multiple failed deliveries at once")
     @ApiResponse(responseCode = "202", description = "Bulk replay initiated")
     @PostMapping("/bulk-replay")
-    public ResponseEntity<com.webhook.platform.api.dto.BulkReplayResponse> bulkReplayDeliveries(
-            @Valid @RequestBody com.webhook.platform.api.dto.BulkReplayRequest request,
+    public ResponseEntity<BulkReplayResponse> bulkReplayDeliveries(
+            @Valid @RequestBody BulkReplayRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
         
@@ -123,7 +125,7 @@ public class DeliveryController {
                 request.getStatus(),
                 request.getEndpointId(),
                 request.getProjectId(),
-                auth.organizationId()
+                auth
         );
         
         int totalRequested = request.getDeliveryIds() != null ? request.getDeliveryIds().size() : 0;

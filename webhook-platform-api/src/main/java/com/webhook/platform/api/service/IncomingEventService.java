@@ -21,6 +21,7 @@ import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import lombok.extern.slf4j.Slf4j;
@@ -70,10 +71,11 @@ public class IncomingEventService {
         }
     }
 
-    private void validateEventAccess(IncomingEvent event, UUID organizationId) {
+    private void validateEventAccess(IncomingEvent event, AuthContext auth) {
         IncomingSource source = sourceRepository.findById(event.getIncomingSourceId())
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId(), organizationId);
+        validateProjectOwnership(source.getProjectId(), auth.organizationId());
+        auth.validateProjectAccess(source.getProjectId());
     }
 
     public Page<IncomingEventResponse> listEvents(UUID projectId, UUID organizationId, UUID sourceId, Pageable pageable) {
@@ -89,17 +91,17 @@ public class IncomingEventService {
         return events.map(this::mapToResponse);
     }
 
-    public IncomingEventResponse getEvent(UUID id, UUID organizationId) {
+    public IncomingEventResponse getEvent(UUID id, AuthContext auth) {
         IncomingEvent event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming event not found"));
-        validateEventAccess(event, organizationId);
+        validateEventAccess(event, auth);
         return mapToResponse(event);
     }
 
-    public Page<IncomingForwardAttemptResponse> getEventAttempts(UUID eventId, UUID organizationId, Pageable pageable) {
+    public Page<IncomingForwardAttemptResponse> getEventAttempts(UUID eventId, AuthContext auth, Pageable pageable) {
         IncomingEvent event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Incoming event not found"));
-        validateEventAccess(event, organizationId);
+        validateEventAccess(event, auth);
 
         return forwardAttemptRepository.findByIncomingEventId(eventId, pageable)
                 .map(attempt -> IncomingForwardAttemptResponse.builder()
@@ -120,10 +122,10 @@ public class IncomingEventService {
     }
 
     @Transactional
-    public int replayEvent(UUID eventId, UUID organizationId) {
+    public int replayEvent(UUID eventId, AuthContext auth) {
         IncomingEvent event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Incoming event not found"));
-        validateEventAccess(event, organizationId);
+        validateEventAccess(event, auth);
 
         List<IncomingDestination> destinations = destinationRepository
                 .findByIncomingSourceIdAndEnabledTrue(event.getIncomingSourceId());
