@@ -1350,7 +1350,9 @@
       "alertRules": "Правила сповіщень",
       "alertRulesDesc": "Сповіщення в реальному часі про збільшення збоїв, деградацію затримки та переповнення DLQ.",
       "eventTimeMachine": "Машина часу подій",
-      "eventTimeMachineDesc": "Повторюйте будь-який діапазон історичних подій з курсорним стримінгом та вибірковою фільтрацією."
+      "eventTimeMachineDesc": "Повторюйте будь-який діапазон історичних подій з курсорним стримінгом та вибірковою фільтрацією.",
+      "workflowAutomation": "Автоматизація воркфлоу",
+      "workflowAutomationDesc": "Візуальний DAG-конструктор з drag-and-drop нодами. Фільтруйте, трансформуйте, розгалужуйте та викликайте API — без коду."
     },
     "highlights": {
       "badge": "Більше ніж доставка",
@@ -1389,6 +1391,39 @@
         "sharedDebug": "Shared Debug посилання",
         "andMore": "…та ще 30+ можливостей"
       }
+    },
+    "workflowAutomation": {
+      "badge": "Візуальна автоматизація",
+      "title": "Автоматизуйте все за допомогою",
+      "titleHighlight": "візуальних воркфлоу",
+      "subtitle": "Будуйте event-driven пайплайни, з'єднуючи ноди на канвасі. Фільтруйте, трансформуйте, розгалужуйте, викликайте API, надсилайте сповіщення — без написання коду.",
+      "feature1": "DAG рушій виконання",
+      "feature1Desc": "Топологічне сортування з підтримкою паралельних гілок",
+      "feature2": "6 вбудованих типів нод",
+      "feature2Desc": "Тригер, Фільтр, Трансформація, HTTP, Slack, Створення події",
+      "feature3": "Лог виконання в реальному часі",
+      "feature3Desc": "Покроковий трейс з input/output для кожного запуску",
+      "feature4": "Event-driven тригери",
+      "feature4Desc": "Автозапуск на вебхук-подіях, вручну або за розкладом",
+      "canvasTitle": "конструктор воркфлоу",
+      "triggerNode": "Webhook тригер",
+      "triggerNodeDesc": "order.completed",
+      "filterNode": "Фільтр",
+      "filterNodeDesc": "amount > 100",
+      "transformNode": "Трансформація",
+      "transformNodeDesc": "Перетворити payload",
+      "httpNode": "HTTP запит",
+      "httpNodeDesc": "POST api.crm.io/sync",
+      "slackNode": "Slack сповіщення",
+      "slackNodeDesc": "#payments канал",
+      "createEventNode": "Створити подію",
+      "createEventNodeDesc": "order.synced",
+      "executionLabel": "Останнє виконання",
+      "executionTime": "320мс загалом",
+      "stepsCompleted": "5/5 кроків завершено",
+      "noCode": "Без коду",
+      "dragDrop": "Drag & drop",
+      "liveDebug": "Живий дебаг"
     },
     "architecture": {
       "badge": "Транзакційний outbox-патерн",
@@ -1591,6 +1626,7 @@
       "rulesEngine": "Механізм правил",
       "schemaRegistry": "Реєстр схем",
       "deterministicReplay": "Детерміністичний реплей",
+      "workflowAutomation": "Автоматизація воркфлоу",
       "errors": "Помилки та ліміти",
       "sdks": "SDK"
     },

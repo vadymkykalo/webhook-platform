@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route, Workflow } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -47,6 +47,7 @@ export default function DocumentationPage() {
             {activeSection === 'rules-engine' && <RulesEngineDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'deterministic-replay' && <DeterministicReplayDocs />}
+            {activeSection === 'workflow-automation' && <WorkflowAutomationDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'errors' && <Errors />}
             {activeSection === 'sdks' && <SDKs />}
           </div>
@@ -72,6 +73,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'rules-engine', label: t('docsPage.sections.rulesEngine', 'Rules Engine'), icon: GitBranch },
     { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
     { id: 'deterministic-replay', label: t('docsPage.sections.deterministicReplay'), icon: Fingerprint },
+    { id: 'workflow-automation', label: t('docsPage.sections.workflowAutomation', 'Workflow Automation'), icon: Workflow },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
     { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
@@ -1070,6 +1072,402 @@ Idempotency-Key: <event-id>-<endpoint-id>`}</ResponseBlock>
           <li className="flex items-start gap-2"><Shield className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" /> <strong>REQUIRED</strong> — {t('docsPage.deterministicReplay.policyRequired')}</li>
         </ul>
       </section>
+    </div>
+  );
+}
+
+function WorkflowAutomationDocs({ activeLanguage, setActiveLanguage }: { activeLanguage: 'curl' | 'node' | 'python'; setActiveLanguage: (l: 'curl' | 'node' | 'python') => void }) {
+  const { t } = useTranslation();
+
+  const createWorkflowCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/workflows \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Order Processing Pipeline",
+    "description": "Filter high-value orders, enrich payload, sync to CRM, notify team",
+    "enabled": true,
+    "triggerType": "WEBHOOK_EVENT",
+    "triggerConfig": { "eventType": "order.completed" },
+    "definition": {
+      "nodes": [
+        { "id": "trigger-1", "type": "webhookTrigger", "position": { "x": 0, "y": 200 },
+          "data": { "config": { "eventType": "order.completed" } } },
+        { "id": "filter-1", "type": "filter", "position": { "x": 300, "y": 200 },
+          "data": { "config": { "conditions": {
+            "type": "group", "op": "AND", "children": [
+              { "type": "predicate", "field": "data.amount", "operator": "GTE",
+                "value": 100, "valueType": "NUMBER" }
+            ]
+          } } } },
+        { "id": "transform-1", "type": "transform", "position": { "x": 600, "y": 200 },
+          "data": { "config": { "template": {
+            "orderId": "$.data.id", "total": "$.data.amount",
+            "customer": "$.data.customer_name"
+          } } } },
+        { "id": "http-1", "type": "http", "position": { "x": 900, "y": 100 },
+          "data": { "config": {
+            "url": "https://api.crm.io/sync", "method": "POST",
+            "headers": { "Authorization": "Bearer crm_token" }
+          } } },
+        { "id": "slack-1", "type": "slack", "position": { "x": 900, "y": 300 },
+          "data": { "config": {
+            "webhookUrl": "https://hooks.slack.com/services/T.../B.../xxx",
+            "message": "New order $\{$.data.amount} from $\{$.data.customer_name}"
+          } } }
+      ],
+      "edges": [
+        { "id": "e1", "source": "trigger-1", "target": "filter-1" },
+        { "id": "e2", "source": "filter-1", "target": "transform-1" },
+        { "id": "e3", "source": "transform-1", "target": "http-1" },
+        { "id": "e4", "source": "transform-1", "target": "slack-1" }
+      ]
+    }
+  }'`;
+
+  const triggerWorkflowCode = `curl -X POST https://your-api.com/api/v1/projects/{projectId}/workflows/{workflowId}/trigger \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "type": "order.completed",
+    "data": {
+      "id": "ord_12345",
+      "amount": 250.00,
+      "customer_name": "Jane Doe"
+    }
+  }'`;
+
+  const listExecutionsCode = `curl https://your-api.com/api/v1/projects/{projectId}/workflows/{workflowId}/executions?page=0&size=20 \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"`;
+
+  const getExecutionCode = `curl https://your-api.com/api/v1/projects/{projectId}/workflows/{workflowId}/executions/{executionId} \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Response:
+# {
+#   "id": "exec_uuid",
+#   "workflowId": "wf_uuid",
+#   "status": "COMPLETED",
+#   "durationMs": 320,
+#   "steps": [
+#     { "nodeId": "trigger-1", "nodeType": "webhookTrigger", "status": "SUCCESS", "durationMs": 2 },
+#     { "nodeId": "filter-1", "nodeType": "filter", "status": "SUCCESS", "durationMs": 1 },
+#     { "nodeId": "transform-1", "nodeType": "transform", "status": "SUCCESS", "durationMs": 5 },
+#     { "nodeId": "http-1", "nodeType": "http", "status": "SUCCESS", "durationMs": 210 },
+#     { "nodeId": "slack-1", "nodeType": "slack", "status": "SUCCESS", "durationMs": 102 }
+#   ]
+# }`;
+
+  const toggleWorkflowCode = `curl -X PATCH https://your-api.com/api/v1/projects/{projectId}/workflows/{workflowId}/toggle \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "enabled": false }'`;
+
+  return (
+    <div className="space-y-10">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+            <Workflow className="h-5 w-5 text-violet-500" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-foreground">{t('docsPage.workflowAutomation.title', 'Workflow Automation')}</h1>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-500/10 text-violet-600 border border-violet-500/20 ml-1">NEW</span>
+          </div>
+        </div>
+        <p className="text-lg text-muted-foreground">
+          {t('docsPage.workflowAutomation.subtitle', 'Build event-driven automation pipelines with a visual drag-and-drop builder. Connect nodes to filter, transform, call APIs, send notifications, and create new events — all without writing code.')}
+        </p>
+      </div>
+
+      {/* How it works */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.howItWorks', 'How It Works')}</h2>
+        <div className="rounded-xl border bg-muted/30 p-6">
+          <div className="flex flex-col md:flex-row items-center gap-4 text-sm">
+            {[
+              { step: '1', label: t('docsPage.workflowAutomation.step1', 'Event triggers workflow'), desc: t('docsPage.workflowAutomation.step1Desc', 'Webhook event, manual, or schedule') },
+              { step: '2', label: t('docsPage.workflowAutomation.step2', 'DAG engine resolves order'), desc: t('docsPage.workflowAutomation.step2Desc', 'Topological sort (Kahn\'s algorithm)') },
+              { step: '3', label: t('docsPage.workflowAutomation.step3', 'Nodes execute sequentially'), desc: t('docsPage.workflowAutomation.step3Desc', 'Each node receives previous output') },
+              { step: '4', label: t('docsPage.workflowAutomation.step4', 'Results logged per step'), desc: t('docsPage.workflowAutomation.step4Desc', 'Input, output, status, duration') },
+            ].map((s, i) => (
+              <div key={s.step} className="flex items-center gap-3">
+                {i > 0 && <ArrowRight className="h-4 w-4 text-muted-foreground hidden md:block" />}
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-card min-w-[160px]">
+                  <div className="h-8 w-8 rounded-full bg-violet-500/10 flex items-center justify-center text-violet-600 font-bold text-sm shrink-0">{s.step}</div>
+                  <div>
+                    <div className="font-semibold">{s.label}</div>
+                    <div className="text-xs text-muted-foreground">{s.desc}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-4 rounded-lg border-l-4 border-violet-500 bg-violet-50/50 dark:bg-violet-950/20 text-sm">
+          <strong>{t('docsPage.workflowAutomation.dagNote', 'DAG Execution:')}</strong>{' '}
+          {t('docsPage.workflowAutomation.dagNoteBody', 'Workflows are executed as directed acyclic graphs (DAGs). The engine automatically resolves execution order via topological sort. Parallel branches (e.g. HTTP + Slack after Transform) run independently. If a node fails, downstream nodes are skipped.')}
+        </div>
+      </div>
+
+      {/* Node Types */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.nodeTypes', 'Node Types')}</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-3 font-semibold">{t('docsPage.workflowAutomation.nodeTypeCol', 'Type')}</th>
+                <th className="pb-3 font-semibold">{t('docsPage.workflowAutomation.nodeDescCol', 'Description')}</th>
+                <th className="pb-3 font-semibold">{t('docsPage.workflowAutomation.nodeConfigCol', 'Key Config')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 text-xs font-bold">webhookTrigger</span></td>
+                <td className="py-3 text-muted-foreground">{t('docsPage.workflowAutomation.nodeTriggerDesc', 'Entry point — fires when a matching webhook event arrives. Every workflow starts with exactly one trigger node.')}</td>
+                <td className="py-3 font-mono text-xs">eventType</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-600 text-xs font-bold">filter</span></td>
+                <td className="py-3 text-muted-foreground">{t('docsPage.workflowAutomation.nodeFilterDesc', 'Evaluates conditions against the payload. If conditions match, passes data through. Otherwise, skips all downstream nodes.')}</td>
+                <td className="py-3 font-mono text-xs">conditions (AND/OR tree)</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-violet-500/10 text-violet-600 text-xs font-bold">transform</span></td>
+                <td className="py-3 text-muted-foreground">{t('docsPage.workflowAutomation.nodeTransformDesc', 'Reshapes the payload using a JSONPath template. Output replaces the working data for downstream nodes.')}</td>
+                <td className="py-3 font-mono text-xs">template (JSON object)</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-blue-500/10 text-blue-600 text-xs font-bold">http</span></td>
+                <td className="py-3 text-muted-foreground">{t('docsPage.workflowAutomation.nodeHttpDesc', 'Makes an HTTP request to any external URL. Supports GET/POST/PUT/PATCH/DELETE with custom headers and body. SSRF protection enforced.')}</td>
+                <td className="py-3 font-mono text-xs">url, method, headers, body</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-pink-500/10 text-pink-600 text-xs font-bold">slack</span></td>
+                <td className="py-3 text-muted-foreground">{t('docsPage.workflowAutomation.nodeSlackDesc', 'Sends a message to a Slack channel via incoming webhook URL. Supports template interpolation in the message body.')}</td>
+                <td className="py-3 font-mono text-xs">webhookUrl, message</td>
+              </tr>
+              <tr>
+                <td className="py-3"><span className="px-2 py-1 rounded bg-purple-500/10 text-purple-600 text-xs font-bold">createEvent</span></td>
+                <td className="py-3 text-muted-foreground">{t('docsPage.workflowAutomation.nodeCreateEventDesc', 'Emits a new event through the full Hookflow pipeline (EventIngestService). Creates deliveries for all matching subscriptions in the target project.')}</td>
+                <td className="py-3 font-mono text-xs">projectId, eventType, payloadTemplate</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Trigger Types */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.triggerTypes', 'Trigger Types')}</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" /> WEBHOOK_EVENT</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.workflowAutomation.triggerWebhookEvent', 'Auto-fires when a matching event is ingested via POST /api/v1/events. Configure the eventType in triggerConfig to match specific events (e.g. order.completed).')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><Code className="h-4 w-4 text-blue-500" /> MANUAL</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.workflowAutomation.triggerManual', 'Triggered via API call to POST /workflows/{id}/trigger with a test payload. Useful for testing, debugging, or ad-hoc automation.')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-2 flex items-center gap-2"><RefreshCw className="h-4 w-4 text-emerald-500" /> SCHEDULE</h3>
+            <p className="text-sm text-muted-foreground">{t('docsPage.workflowAutomation.triggerSchedule', 'Cron-based scheduled execution. Configure interval in triggerConfig. Ideal for periodic data sync, report generation, or health checks.')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Workflow Definition */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.definitionStructure', 'Workflow Definition Structure')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.workflowAutomation.definitionDesc', 'A workflow definition is a JSON object containing nodes and edges, compatible with React Flow. Each node has an id, type, position, and a data.config object specific to its type.')}</p>
+        <div className="rounded-xl border bg-muted/30 p-5 space-y-3">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-3 rounded-lg border bg-card">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><Code className="h-3.5 w-3.5 text-primary" /> {t('docsPage.workflowAutomation.nodeSchema', 'Node Schema')}</h4>
+              <pre className="text-[11px] font-mono text-muted-foreground leading-relaxed">{`{
+  "id": "unique-node-id",
+  "type": "filter|transform|http|...",
+  "position": { "x": 300, "y": 200 },
+  "data": {
+    "config": { /* type-specific */ }
+  }
+}`}</pre>
+            </div>
+            <div className="p-3 rounded-lg border bg-card">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><ArrowRight className="h-3.5 w-3.5 text-primary" /> {t('docsPage.workflowAutomation.edgeSchema', 'Edge Schema')}</h4>
+              <pre className="text-[11px] font-mono text-muted-foreground leading-relaxed">{`{
+  "id": "edge-unique-id",
+  "source": "trigger-1",
+  "target": "filter-1"
+}
+
+// Branching: multiple edges
+// from the same source node`}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* API Examples */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.apiExamples', 'API Reference')}</h2>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.workflowAutomation.createWorkflow', 'Create a Workflow')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{t('docsPage.workflowAutomation.createWorkflowDesc', 'Creates a new workflow with a full DAG definition. The workflow is auto-versioned — each update increments the version counter.')}</p>
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{createWorkflowCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.workflowAutomation.manualTrigger', 'Manual Trigger')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{t('docsPage.workflowAutomation.manualTriggerDesc', 'Execute a workflow with a custom test payload. Returns the full execution result with step-by-step details.')}</p>
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{triggerWorkflowCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.workflowAutomation.listExecutions', 'List Executions')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{t('docsPage.workflowAutomation.listExecutionsDesc', 'Paginated list of all executions for a workflow. Sorted by most recent first.')}</p>
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{listExecutionsCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.workflowAutomation.getExecution', 'Get Execution Details')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{t('docsPage.workflowAutomation.getExecutionDesc', 'Returns full execution with step-by-step trace: each node\'s input, output, status, error (if any), and duration.')}</p>
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{getExecutionCode}</CodeBlock>
+
+        <h3 className="text-lg font-semibold mt-6">{t('docsPage.workflowAutomation.toggleWorkflow', 'Toggle Enable/Disable')}</h3>
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>{toggleWorkflowCode}</CodeBlock>
+      </div>
+
+      {/* Execution Model */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.executionModel', 'Execution Model')}</h2>
+        <div className="space-y-3">
+          {[
+            {
+              title: t('docsPage.workflowAutomation.exec1Title', 'Topological Sort (Kahn\'s Algorithm)'),
+              desc: t('docsPage.workflowAutomation.exec1Desc', 'The DAG engine resolves node execution order using Kahn\'s algorithm for topological sorting. This ensures that a node only runs after all its upstream dependencies have completed successfully.'),
+              color: 'border-violet-500',
+            },
+            {
+              title: t('docsPage.workflowAutomation.exec2Title', 'Parallel Branch Support'),
+              desc: t('docsPage.workflowAutomation.exec2Desc', 'When a node has multiple outgoing edges, each target branch runs independently. For example, Transform → HTTP and Transform → Slack execute in parallel after the transform completes.'),
+              color: 'border-blue-500',
+            },
+            {
+              title: t('docsPage.workflowAutomation.exec3Title', 'Failure Propagation'),
+              desc: t('docsPage.workflowAutomation.exec3Desc', 'If a node fails, all downstream nodes in that branch are marked as SKIPPED. Other branches are unaffected. The overall execution status is FAILED if any node fails.'),
+              color: 'border-red-500',
+            },
+            {
+              title: t('docsPage.workflowAutomation.exec4Title', 'Filter Short-Circuit'),
+              desc: t('docsPage.workflowAutomation.exec4Desc', 'When a Filter node\'s conditions don\'t match, all downstream nodes are SKIPPED (not FAILED). The execution status is COMPLETED — the filter simply didn\'t pass.'),
+              color: 'border-emerald-500',
+            },
+            {
+              title: t('docsPage.workflowAutomation.exec5Title', 'Step-Level Tracing'),
+              desc: t('docsPage.workflowAutomation.exec5Desc', 'Every node execution is recorded with: inputData, outputData, status (PENDING → RUNNING → SUCCESS/FAILED/SKIPPED), errorMessage, attemptCount, durationMs, and timestamps.'),
+              color: 'border-amber-500',
+            },
+          ].map((item) => (
+            <div key={item.title} className={`p-4 rounded-xl border-l-4 ${item.color} bg-card`}>
+              <h4 className="font-semibold mb-1">{item.title}</h4>
+              <p className="text-sm text-muted-foreground">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Execution Statuses */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.statuses', 'Status Reference')}</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-3">{t('docsPage.workflowAutomation.executionStatuses', 'Execution Status')}</h3>
+            <div className="space-y-2">
+              {[
+                { status: 'RUNNING', desc: 'Currently executing nodes', color: 'bg-blue-500/10 text-blue-600' },
+                { status: 'COMPLETED', desc: 'All nodes finished successfully', color: 'bg-emerald-500/10 text-emerald-600' },
+                { status: 'FAILED', desc: 'One or more nodes failed', color: 'bg-red-500/10 text-red-600' },
+                { status: 'CANCELLED', desc: 'Execution was cancelled', color: 'bg-muted text-muted-foreground' },
+              ].map(s => (
+                <div key={s.status} className="flex items-center gap-2 text-sm">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${s.color}`}>{s.status}</span>
+                  <span className="text-muted-foreground">{s.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="font-semibold mb-3">{t('docsPage.workflowAutomation.stepStatuses', 'Step Status')}</h3>
+            <div className="space-y-2">
+              {[
+                { status: 'PENDING', desc: 'Waiting for upstream nodes', color: 'bg-muted text-muted-foreground' },
+                { status: 'RUNNING', desc: 'Currently executing', color: 'bg-blue-500/10 text-blue-600' },
+                { status: 'SUCCESS', desc: 'Completed successfully', color: 'bg-emerald-500/10 text-emerald-600' },
+                { status: 'FAILED', desc: 'Execution error occurred', color: 'bg-red-500/10 text-red-600' },
+                { status: 'SKIPPED', desc: 'Upstream failed or filter didn\'t match', color: 'bg-amber-500/10 text-amber-600' },
+              ].map(s => (
+                <div key={s.status} className="flex items-center gap-2 text-sm">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${s.color}`}>{s.status}</span>
+                  <span className="text-muted-foreground">{s.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Builder */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.visualBuilder', 'Visual Workflow Builder')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.workflowAutomation.visualBuilderDesc', 'The dashboard includes a full drag-and-drop canvas powered by React Flow. Build complex DAGs visually without touching JSON.')}</p>
+        <div className="grid md:grid-cols-2 gap-4">
+          {[
+            { title: t('docsPage.workflowAutomation.builderFeature1', 'Drag & Drop Sidebar'), desc: t('docsPage.workflowAutomation.builderFeature1Desc', 'Drag node types from the sidebar onto the canvas. Nodes auto-connect to the nearest compatible handle.') },
+            { title: t('docsPage.workflowAutomation.builderFeature2', 'Node Config Panel'), desc: t('docsPage.workflowAutomation.builderFeature2Desc', 'Click any node to open its configuration panel. Includes CodeMirror JSON editors, inline endpoint creation, and real-time validation.') },
+            { title: t('docsPage.workflowAutomation.builderFeature3', 'Keyboard Shortcuts'), desc: t('docsPage.workflowAutomation.builderFeature3Desc', 'Ctrl+S to save, Delete to remove selected nodes/edges, Ctrl+Z to undo. Full keyboard navigation support.') },
+            { title: t('docsPage.workflowAutomation.builderFeature4', 'Live Execution View'), desc: t('docsPage.workflowAutomation.builderFeature4Desc', 'View execution history with per-step input/output data, status badges, and timing. Click any execution to see the full trace.') },
+          ].map((f) => (
+            <div key={f.title} className="p-4 rounded-xl border bg-card">
+              <h4 className="font-semibold mb-1">{f.title}</h4>
+              <p className="text-sm text-muted-foreground">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Security */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.security', 'Security')}</h2>
+        <div className="space-y-2">
+          {[
+            t('docsPage.workflowAutomation.sec1', 'HTTP nodes enforce SSRF protection — private IPs, localhost, and internal networks are blocked via UrlValidator.'),
+            t('docsPage.workflowAutomation.sec2', 'Workflows are scoped to projects with full organization-level access control (RBAC). Only OWNER and DEVELOPER roles can create/edit workflows.'),
+            t('docsPage.workflowAutomation.sec3', 'CreateEvent nodes use the full EventIngestService pipeline — all signatures, subscriptions, and delivery rules apply to emitted events.'),
+            t('docsPage.workflowAutomation.sec4', 'Workflow trigger is @Async — it never blocks event ingestion. If a workflow fails, the original event delivery is unaffected.'),
+          ].map((tip, i) => (
+            <div key={i} className="flex gap-3 p-3 rounded-lg border bg-card">
+              <Shield className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground">{tip}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Best Practices */}
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold">{t('docsPage.workflowAutomation.bestPractices', 'Best Practices')}</h2>
+        <div className="space-y-2">
+          {[
+            t('docsPage.workflowAutomation.bp1', 'Start simple — use Trigger → Filter → HTTP for your first workflow. Add Transform and branching once the basic flow works.'),
+            t('docsPage.workflowAutomation.bp2', 'Use the Manual Trigger endpoint for testing before enabling WEBHOOK_EVENT triggers in production.'),
+            t('docsPage.workflowAutomation.bp3', 'Add Filter nodes early in the pipeline to skip unnecessary processing for non-matching events.'),
+            t('docsPage.workflowAutomation.bp4', 'Use Transform nodes to reshape payloads before HTTP/Slack nodes — external APIs usually expect a specific schema.'),
+            t('docsPage.workflowAutomation.bp5', 'Monitor execution history regularly. Failed steps show the exact error and input that caused the failure.'),
+            t('docsPage.workflowAutomation.bp6', 'Use CreateEvent nodes to chain workflows together — one workflow\'s output becomes another workflow\'s trigger.'),
+          ].map((tip, i) => (
+            <div key={i} className="flex gap-3 p-3 rounded-lg border bg-card">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground">{tip}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

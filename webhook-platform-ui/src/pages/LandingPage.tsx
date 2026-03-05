@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint, Wand2, Send, Timer, Bell } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint, Wand2, Send, Timer, Bell, Workflow, Play, MousePointerClick, Bug } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -20,6 +20,7 @@ export default function LandingPage() {
       <FlowDiagram />
       <CapabilityShowcase />
       <PlatformHighlights />
+      <WorkflowAutomation />
       <Features />
       <HowItWorks />
       <DeveloperConfidence />
@@ -1106,6 +1107,275 @@ function PlatformHighlights() {
   );
 }
 
+function WorkflowAutomation() {
+  const { t } = useTranslation();
+  const [activeStep, setActiveStep] = useState<number | null>(null);
+
+  const nodes = [
+    { id: 'trigger', icon: Zap, label: t('landing.workflowAutomation.triggerNode'), desc: t('landing.workflowAutomation.triggerNodeDesc'), color: '#F59E0B', bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-600', x: 0, y: 0 },
+    { id: 'filter', icon: GitBranch, label: t('landing.workflowAutomation.filterNode'), desc: t('landing.workflowAutomation.filterNodeDesc'), color: '#10B981', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-600', x: 1, y: 0 },
+    { id: 'transform', icon: Wand2, label: t('landing.workflowAutomation.transformNode'), desc: t('landing.workflowAutomation.transformNodeDesc'), color: '#8B5CF6', bg: 'bg-violet-500/10', border: 'border-violet-500/30', text: 'text-violet-600', x: 2, y: 0 },
+    { id: 'http', icon: Globe, label: t('landing.workflowAutomation.httpNode'), desc: t('landing.workflowAutomation.httpNodeDesc'), color: '#3B82F6', bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-600', x: 3, y: -1 },
+    { id: 'slack', icon: Bell, label: t('landing.workflowAutomation.slackNode'), desc: t('landing.workflowAutomation.slackNodeDesc'), color: '#EC4899', bg: 'bg-pink-500/10', border: 'border-pink-500/30', text: 'text-pink-600', x: 3, y: 1 },
+    { id: 'event', icon: Send, label: t('landing.workflowAutomation.createEventNode'), desc: t('landing.workflowAutomation.createEventNodeDesc'), color: '#7C3AED', bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-600', x: 4, y: -1 },
+  ];
+
+  useEffect(() => {
+    let step = 0;
+    const interval = setInterval(() => {
+      setActiveStep(step);
+      step = (step + 1) % nodes.length;
+    }, 1200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const features = [
+    { icon: Workflow, title: t('landing.workflowAutomation.feature1'), desc: t('landing.workflowAutomation.feature1Desc'), color: 'text-violet-500' },
+    { icon: MousePointerClick, title: t('landing.workflowAutomation.feature2'), desc: t('landing.workflowAutomation.feature2Desc'), color: 'text-blue-500' },
+    { icon: Bug, title: t('landing.workflowAutomation.feature3'), desc: t('landing.workflowAutomation.feature3Desc'), color: 'text-emerald-500' },
+    { icon: Play, title: t('landing.workflowAutomation.feature4'), desc: t('landing.workflowAutomation.feature4Desc'), color: 'text-amber-500' },
+  ];
+
+  return (
+    <section className="py-24 relative overflow-hidden">
+      <div className="absolute top-1/2 left-0 w-[600px] h-[600px] bg-violet-500/[0.04] rounded-full blur-[120px] -translate-x-1/3 -translate-y-1/2 pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-pink-500/[0.03] rounded-full blur-[100px] translate-x-1/3 pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-600 text-xs font-semibold mb-6 border border-violet-500/20">
+            <Workflow className="h-3 w-3" />
+            {t('landing.workflowAutomation.badge')}
+          </div>
+          <h2 className="text-headline mb-4">
+            {t('landing.workflowAutomation.title')} <span className="gradient-text">{t('landing.workflowAutomation.titleHighlight')}</span>
+          </h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.workflowAutomation.subtitle')}
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-[1fr_340px] gap-8 items-start">
+          {/* Left: Visual canvas */}
+          <div className="relative">
+            <div className="absolute -inset-4 bg-gradient-to-br from-violet-500/10 via-pink-500/5 to-transparent rounded-3xl blur-2xl pointer-events-none" />
+            <div className="relative bg-card rounded-2xl border shadow-elevated overflow-hidden">
+              {/* Terminal header */}
+              <div className="bg-muted/50 border-b px-4 py-2.5 flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+                <span className="ml-2 text-[10px] text-muted-foreground font-mono">{t('landing.workflowAutomation.canvasTitle')}</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-semibold">active</span>
+                </div>
+              </div>
+
+              {/* Canvas area */}
+              <div className="p-6 min-h-[380px] bg-[radial-gradient(circle_at_1px_1px,_theme(colors.border)_1px,_transparent_0)] bg-[size:24px_24px] relative">
+                {/* SVG Connections */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+                  {/* trigger → filter */}
+                  <line x1="18%" y1="50%" x2="30%" y2="50%" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3" />
+                  {/* filter → transform */}
+                  <line x1="42%" y1="50%" x2="54%" y2="50%" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3" />
+                  {/* transform → http (branch up) */}
+                  <path d="M 66%,50% Q 70%,50% 72%,30%" fill="none" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3"
+                    style={{ d: 'path("M 430 190 Q 470 190 475 120")' }} />
+                  {/* transform → slack (branch down) */}
+                  <path d="M 66%,50% Q 70%,50% 72%,70%" fill="none" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3"
+                    style={{ d: 'path("M 430 190 Q 470 190 475 260")' }} />
+                  {/* http → createEvent */}
+                  <line x1="84%" y1="30%" x2="88%" y2="30%" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3"
+                    style={{ display: 'none' }} />
+                </svg>
+
+                {/* Nodes */}
+                <div className="relative flex items-center gap-0" style={{ zIndex: 1 }}>
+                  {/* Row: trigger → filter → transform */}
+                  <div className="flex items-center gap-3 w-full">
+                    {/* Trigger */}
+                    <div className={`flex-shrink-0 w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 0 ? 'border-amber-400 shadow-lg shadow-amber-500/20 scale-105' : 'border-border bg-card'}`}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={`h-7 w-7 rounded-lg ${nodes[0].bg} flex items-center justify-center`}>
+                          <Zap className={`h-3.5 w-3.5 ${nodes[0].text}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-bold truncate">{nodes[0].label}</div>
+                        </div>
+                      </div>
+                      <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[0].desc}</div>
+                      {activeStep === 0 && <div className="mt-1.5 h-0.5 rounded-full bg-amber-400 animate-pulse" />}
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="flex-shrink-0">
+                      <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 1 ? 'text-emerald-500' : 'text-border'}`} />
+                    </div>
+
+                    {/* Filter */}
+                    <div className={`flex-shrink-0 w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 1 ? 'border-emerald-400 shadow-lg shadow-emerald-500/20 scale-105' : 'border-border bg-card'}`}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={`h-7 w-7 rounded-lg ${nodes[1].bg} flex items-center justify-center`}>
+                          <GitBranch className={`h-3.5 w-3.5 ${nodes[1].text}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-bold truncate">{nodes[1].label}</div>
+                        </div>
+                      </div>
+                      <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[1].desc}</div>
+                      {activeStep === 1 && <div className="mt-1.5 h-0.5 rounded-full bg-emerald-400 animate-pulse" />}
+                    </div>
+
+                    {/* Arrow */}
+                    <div className="flex-shrink-0">
+                      <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 2 ? 'text-violet-500' : 'text-border'}`} />
+                    </div>
+
+                    {/* Transform */}
+                    <div className={`flex-shrink-0 w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 2 ? 'border-violet-400 shadow-lg shadow-violet-500/20 scale-105' : 'border-border bg-card'}`}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className={`h-7 w-7 rounded-lg ${nodes[2].bg} flex items-center justify-center`}>
+                          <Wand2 className={`h-3.5 w-3.5 ${nodes[2].text}`} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-bold truncate">{nodes[2].label}</div>
+                        </div>
+                      </div>
+                      <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[2].desc}</div>
+                      {activeStep === 2 && <div className="mt-1.5 h-0.5 rounded-full bg-violet-400 animate-pulse" />}
+                    </div>
+
+                    {/* Branch arrows + targets */}
+                    <div className="flex-shrink-0 flex flex-col items-start gap-3">
+                      {/* HTTP branch */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-center">
+                          <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 3 ? 'text-blue-500' : 'text-border'}`} />
+                        </div>
+                        <div className={`w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 3 ? 'border-blue-400 shadow-lg shadow-blue-500/20 scale-105' : 'border-border bg-card'}`}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className={`h-7 w-7 rounded-lg ${nodes[3].bg} flex items-center justify-center`}>
+                              <Globe className={`h-3.5 w-3.5 ${nodes[3].text}`} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[10px] font-bold truncate">{nodes[3].label}</div>
+                            </div>
+                          </div>
+                          <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[3].desc}</div>
+                          {activeStep === 3 && <div className="mt-1.5 h-0.5 rounded-full bg-blue-400 animate-pulse" />}
+                        </div>
+                        {/* Create Event after HTTP */}
+                        <ArrowRight className={`h-4 w-4 flex-shrink-0 transition-colors duration-500 ${activeStep === 5 ? 'text-purple-500' : 'text-border'}`} />
+                        <div className={`w-[130px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 5 ? 'border-purple-400 shadow-lg shadow-purple-500/20 scale-105' : 'border-border bg-card'}`}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className={`h-7 w-7 rounded-lg ${nodes[5].bg} flex items-center justify-center`}>
+                              <Send className={`h-3.5 w-3.5 ${nodes[5].text}`} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[10px] font-bold truncate">{nodes[5].label}</div>
+                            </div>
+                          </div>
+                          <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[5].desc}</div>
+                          {activeStep === 5 && <div className="mt-1.5 h-0.5 rounded-full bg-purple-400 animate-pulse" />}
+                        </div>
+                      </div>
+                      {/* Slack branch */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-center">
+                          <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 4 ? 'text-pink-500' : 'text-border'}`} />
+                        </div>
+                        <div className={`w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 4 ? 'border-pink-400 shadow-lg shadow-pink-500/20 scale-105' : 'border-border bg-card'}`}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <div className={`h-7 w-7 rounded-lg ${nodes[4].bg} flex items-center justify-center`}>
+                              <Bell className={`h-3.5 w-3.5 ${nodes[4].text}`} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[10px] font-bold truncate">{nodes[4].label}</div>
+                            </div>
+                          </div>
+                          <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[4].desc}</div>
+                          {activeStep === 4 && <div className="mt-1.5 h-0.5 rounded-full bg-pink-400 animate-pulse" />}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Execution bar at bottom */}
+                <div className="mt-6 p-3 rounded-xl bg-card border">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Play className="h-3.5 w-3.5 text-emerald-500" />
+                      <span className="text-[11px] font-semibold">{t('landing.workflowAutomation.executionLabel')}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-600 font-semibold">{t('landing.workflowAutomation.executionTime')}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {nodes.map((node, i) => (
+                      <div key={node.id} className="flex items-center gap-1 flex-1">
+                        <div
+                          className={`h-2 flex-1 rounded-full transition-all duration-700 ${
+                            activeStep !== null && i <= activeStep
+                              ? 'opacity-100'
+                              : 'opacity-30'
+                          }`}
+                          style={{
+                            background: activeStep !== null && i <= activeStep ? node.color : undefined,
+                            backgroundColor: activeStep === null || i > (activeStep ?? -1) ? 'hsl(var(--muted))' : undefined,
+                          }}
+                        />
+                        {i < nodes.length - 1 && <div className="w-0.5" />}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[9px] text-muted-foreground">{t('landing.workflowAutomation.stepsCompleted')}</span>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      <span className="text-[9px] text-emerald-600 font-semibold">SUCCESS</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Feature list */}
+          <div className="space-y-4 lg:pt-4">
+            {features.map((f, i) => (
+              <div key={i} className="group flex items-start gap-3 p-4 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
+                <div className="h-9 w-9 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+                  <f.icon className={`h-4.5 w-4.5 ${f.color}`} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold mb-0.5">{f.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {[
+                { label: t('landing.workflowAutomation.noCode'), color: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/20' },
+                { label: t('landing.workflowAutomation.dragDrop'), color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20' },
+                { label: t('landing.workflowAutomation.liveDebug'), color: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
+              ].map((tag) => (
+                <span key={tag.label} className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border ${tag.color}`}>
+                  {tag.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Features() {
   const { t } = useTranslation();
   const features = [
@@ -1125,6 +1395,7 @@ function Features() {
     { icon: Send, title: t('landing.features.dryRunDelivery', 'Dry-run Delivery'), desc: t('landing.features.dryRunDeliveryDesc', 'Preview the exact HTTP request your endpoint will receive — without sending anything') },
     { icon: Bell, title: t('landing.features.alertRules', 'Alert Rules'), desc: t('landing.features.alertRulesDesc', 'Real-time alerts on failure rate spikes, latency degradation, and DLQ overflow') },
     { icon: Timer, title: t('landing.features.eventTimeMachine', 'Event Time Machine'), desc: t('landing.features.eventTimeMachineDesc', 'Replay any range of historical events with cursor-based streaming and selective filtering') },
+    { icon: Workflow, title: t('landing.features.workflowAutomation', 'Workflow Automation'), desc: t('landing.features.workflowAutomationDesc', 'Visual DAG builder with drag-and-drop nodes. Filter, transform, branch, and call APIs — zero code.') },
   ];
 
   return (
