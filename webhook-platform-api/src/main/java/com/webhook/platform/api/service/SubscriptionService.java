@@ -14,6 +14,7 @@ import com.webhook.platform.api.dto.SubscriptionResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
@@ -53,6 +54,11 @@ public class SubscriptionService {
     public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
         validatePayloadTemplate(request.getPayloadTemplate());
+
+        if (subscriptionRepository.existsByEndpointIdAndEventType(request.getEndpointId(), request.getEventType())) {
+            throw new ConflictException("Subscription for this endpoint and event type already exists");
+        }
+
         Subscription subscription = Subscription.builder()
                 .projectId(projectId)
                 .endpointId(request.getEndpointId())
