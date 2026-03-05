@@ -135,7 +135,9 @@
     "loggedOut": "Ви успішно вийшли",
     "schemas": "Схеми",
     "piiRules": "Маскування PII",
-    "eventDiff": "Порівняння подій"
+    "eventDiff": "Порівняння подій",
+    "automation": "Автоматизація",
+    "workflows": "Воркфлоу"
   },
   "auth": {
     "login": {
@@ -2262,6 +2264,7 @@
     "transformations": "Трансформації",
     "transform-studio": "Студія трансформацій",
     "connection-setup": "Налаштування з'єднання",
+    "workflows": "Воркфлоу",
     "test-console": "Тест-консоль"
   },
   "testConsole": {
@@ -3037,6 +3040,161 @@
       "unsupportedVersion": "Непідтримувана версія файлу конфігурації",
       "endpointSkipped": "Ендпоінт вже існує: {{url}}",
       "subscriptionSkipped": "Не знайдено ендпоінт для підписки {{eventType}} → {{url}}"
+    }
+  },
+  "workflows": {
+    "title": "Воркфлоу",
+    "subtitle": "Візуальні автоматизації, що запускаються подіями webhook",
+    "newWorkflow": "Новий воркфлоу",
+    "createWorkflow": "Створити воркфлоу",
+    "namePlaceholder": "Назва воркфлоу",
+    "descriptionPlaceholder": "Опис (необов'язково)",
+    "create": "Створити",
+    "cancel": "Скасувати",
+    "loading": "Завантаження...",
+    "noWorkflows": "Воркфлоу ще немає",
+    "noWorkflowsHint": "Створіть перший воркфлоу для автоматизації подій webhook",
+    "totalExecutions": "Всього виконань",
+    "successful": "Успішних",
+    "failed": "Помилок",
+    "disable": "Вимкнути",
+    "enable": "Увімкнути",
+    "edit": "Редагувати",
+    "delete": "Видалити",
+    "deleteConfirm": "Видалити цей воркфлоу?",
+    "nodes": "вузлів",
+    "toast": {
+      "created": "Воркфлоу створено",
+      "createFailed": "Не вдалося створити воркфлоу",
+      "deleted": "Воркфлоу видалено",
+      "deleteFailed": "Не вдалося видалити воркфлоу",
+      "toggleFailed": "Не вдалося переключити воркфлоу",
+      "saved": "Воркфлоу збережено",
+      "saveFailed": "Не вдалося зберегти",
+      "toggleFailed2": "Не вдалося переключити",
+      "triggered": "Воркфлоу виконано",
+      "triggerFailed": "Не вдалося запустити воркфлоу"
+    },
+    "builder": {
+      "notFound": "Воркфлоу не знайдено",
+      "unsaved": "Не збережено",
+      "enabled": "Увімкнено",
+      "disabled": "Вимкнено",
+      "save": "Зберегти",
+      "dragToAdd": "Перетягніть щоб додати",
+      "configureNode": "Налаштування вузла",
+      "nodesCount": "{{count}} вузлів",
+      "edgesCount": "{{count}} зв'язків",
+      "history": "Історія",
+      "testRun": "Тестовий запуск",
+      "testRunHint": "Вкажіть JSON payload для ручного запуску воркфлоу",
+      "runNow": "Запустити",
+      "executionHistory": "Історія виконань",
+      "noExecutions": "Виконань ще немає"
+    },
+    "nodeTypes": {
+      "webhookTrigger": {
+        "label": "Webhook тригер",
+        "description": "Запуск при вхідній webhook події"
+      },
+      "filter": {
+        "label": "Фільтр",
+        "description": "Фільтрація подій за умовами"
+      },
+      "transform": {
+        "label": "Трансформація",
+        "description": "Трансформація JSON payload"
+      },
+      "http": {
+        "label": "HTTP запит",
+        "description": "Виконати зовнішній HTTP запит"
+      },
+      "slack": {
+        "label": "Slack",
+        "description": "Надіслати повідомлення в Slack"
+      },
+      "delivery": {
+        "label": "Доставка на ендпоінт",
+        "description": "Доставити через ендпоінт платформи"
+      },
+      "branch": {
+        "label": "Гілка",
+        "description": "IF/ELSE умовне розгалуження"
+      },
+      "delay": {
+        "label": "Затримка",
+        "description": "Пауза виконання"
+      },
+      "createEvent": {
+        "label": "Створити подію",
+        "description": "Емітити подію в pipeline платформи"
+      }
+    },
+    "nodeConfig": {
+      "label": "Назва",
+      "eventTypePattern": "Шаблон типу події",
+      "eventTypePatternHint": "напр. payment.* або order.completed",
+      "conditions": "Умови (JSON)",
+      "conditionsHint": "Формат дерева ConditionNode",
+      "template": "Шаблон (JSON)",
+      "templateHint": "Використовуйте {{field.path}} плейсхолдери",
+      "method": "Метод",
+      "url": "URL",
+      "headers": "Заголовки (JSON)",
+      "body": "Тіло (JSON)",
+      "bodyHint": "Залиште порожнім для пересилання вхідних даних",
+      "timeout": "Таймаут (секунди)",
+      "webhookUrl": "Webhook URL",
+      "channel": "Канал",
+      "channelHint": "Необов'язково, напр. #payments",
+      "message": "Повідомлення",
+      "messageHint": "Використовуйте {{field}} плейсхолдери",
+      "endpointId": "ID ендпоінта",
+      "endpointIdHint": "UUID ендпоінта платформи для доставки",
+      "branchHint": "Умови для гілки TRUE, FALSE йде іншим шляхом",
+      "branchTrue": "Так",
+      "branchFalse": "Ні",
+      "delaySeconds": "Затримка (секунди)",
+      "delaySecondsHint": "1–300 секунд",
+      "eventType": "Тип події",
+      "eventTypeHint": "напр. order.completed, payment.received",
+      "projectId": "ID проєкту",
+      "projectIdHint": "UUID цільового проєкту (події + підписки + доставки)",
+      "payloadTemplate": "Шаблон payload",
+      "payloadTemplateHint": "JSON шаблон з {{field}} плейсхолдерами, або порожній для пересилки вхідних даних",
+      "selectEndpoint": "Оберіть ендпоінт...",
+      "loadingEndpoints": "Завантаження ендпоінтів...",
+      "createEndpoint": "+ Створити новий ендпоінт",
+      "newEndpoint": "Новий ендпоінт",
+      "description": "Опис",
+      "descriptionPlaceholder": "Необов'язковий опис",
+      "endpointCreated": "Ендпоінт створено",
+      "endpointCreateFailed": "Не вдалося створити ендпоінт",
+      "create": "Створити",
+      "useCurrentProject": "Поточний",
+      "apiKeys": "API ключі",
+      "apiKeysHint": "Події надсилаються через API ключі через POST /api/v1/events",
+      "noApiKeys": "Немає активних API ключів — створіть у Налаштуваннях",
+      "more": "ще",
+      "subscriptions": "Підписки",
+      "subscriptionsHint": "Події створені цією нодою маршрутизуються через підписки на ендпоінти",
+      "noSubscriptions": "Немає активних підписок — події не будуть доставлені",
+      "createSubscription": "+ Створити підписку",
+      "subscriptionCreated": "Підписку створено",
+      "subscriptionCreateFailed": "Не вдалося створити підписку"
+    },
+    "validation": {
+      "required": "Це поле обов'язкове"
+    },
+    "nodeStatus": {
+      "allEvents": "Всі події",
+      "conditionsSet": "Умови задано",
+      "noConditions": "Без умов",
+      "templateConfigured": "Шаблон налаштовано",
+      "noTemplate": "Без шаблону",
+      "notConfigured": "Не налаштовано",
+      "webhookConfigured": "Webhook налаштовано",
+      "delaySeconds": "{{count}}с затримка"
     }
   }
 }

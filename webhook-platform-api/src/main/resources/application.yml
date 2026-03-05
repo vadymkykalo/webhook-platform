@@ -136,6 +136,25 @@ test-endpoint:
   max-ttl-hours: ${TEST_ENDPOINT_MAX_TTL_HOURS:72}
   cleanup-interval-ms: ${TEST_ENDPOINT_CLEANUP_INTERVAL_MS:3600000}
 
+workflow:
+  pool:
+    core-size: ${WORKFLOW_POOL_CORE_SIZE:4}
+    max-size: ${WORKFLOW_POOL_MAX_SIZE:8}
+    queue-capacity: ${WORKFLOW_POOL_QUEUE_CAPACITY:50}
+  execution:
+    max-duration-seconds: ${WORKFLOW_MAX_DURATION_SECONDS:600}
+    max-recursion-depth: ${WORKFLOW_MAX_RECURSION_DEPTH:3}
+    stuck-threshold-minutes: ${WORKFLOW_STUCK_THRESHOLD_MINUTES:15}
+    recovery-interval-ms: ${WORKFLOW_RECOVERY_INTERVAL_MS:120000}
+  node-timeout:
+    default-seconds: ${WORKFLOW_NODE_TIMEOUT_DEFAULT_SECONDS:30}
+    http-seconds: ${WORKFLOW_NODE_TIMEOUT_HTTP_SECONDS:60}
+    slack-seconds: ${WORKFLOW_NODE_TIMEOUT_SLACK_SECONDS:60}
+    delay-seconds: ${WORKFLOW_NODE_TIMEOUT_DELAY_SECONDS:305}
+    create-event-seconds: ${WORKFLOW_NODE_TIMEOUT_CREATE_EVENT_SECONDS:30}
+  shutdown:
+    await-termination-seconds: ${WORKFLOW_SHUTDOWN_AWAIT_SECONDS:30}
+
 rules:
   cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
   execution-log-retention-days: ${RULES_EXECUTION_LOG_RETENTION_DAYS:7}

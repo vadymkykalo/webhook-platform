@@ -63,6 +63,10 @@ const getProjectPipelineNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.schemas', path: `/admin/projects/${projectId}/schemas`, icon: FileJson2 },
 ];
 
+const getProjectAutomationNav = (projectId: string): NavItem[] => [
+  { nameKey: 'nav.workflows', path: `/admin/projects/${projectId}/workflows`, icon: GitBranch },
+];
+
 const getProjectObservabilityNav = (projectId: string): NavItem[] => [
   { nameKey: 'nav.analytics', path: `/admin/projects/${projectId}/analytics`, icon: BarChart3 },
   { nameKey: 'nav.alerts', path: `/admin/projects/${projectId}/alerts`, icon: Bell },
@@ -387,6 +391,12 @@ export default function AppLayout() {
               ))}
             </SidebarSection>
 
+            <SidebarSection label={t('nav.automation')} collapsible storageKey="automation" defaultOpen>
+              {getProjectAutomationNav(projectId).map((item) => (
+                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+              ))}
+            </SidebarSection>
+
             {/* Observability + Recovery */}
             <SidebarSection label={t('nav.observability')} collapsible storageKey="observability" defaultOpen>
               {getProjectObservabilityNav(projectId).map((item) => (
@@ -422,6 +432,7 @@ export default function AppLayout() {
               ...getProjectOutgoingNav(projectId),
               ...getProjectIncomingNav(projectId),
               ...getProjectPipelineNav(projectId),
+              ...getProjectAutomationNav(projectId),
               ...getProjectObservabilityNav(projectId),
               ...getProjectRecoveryNav(projectId),
               ...getProjectSecurityNav(projectId),

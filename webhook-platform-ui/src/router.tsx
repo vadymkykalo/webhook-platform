@@ -46,6 +46,8 @@ const TransformationsPage = lazy(() => import('./pages/TransformationsPage'));
 const TransformStudioPage = lazy(() => import('./pages/TransformStudioPage'));
 const ConnectionSetupPage = lazy(() => import('./pages/ConnectionSetupPage'));
 const ConnectionsPage = lazy(() => import('./pages/ConnectionsPage'));
+const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
+const WorkflowBuilderPage = lazy(() => import('./pages/WorkflowBuilderPage'));
 const TestConsolePage = lazy(() => import('./pages/TestConsolePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -219,6 +221,14 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/connections',
         element: <S><ConnectionsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/workflows',
+        element: <S><WorkflowsPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/workflows/:workflowId',
+        element: <S><WorkflowBuilderPage /></S>,
       },
       {
         path: 'projects/:projectId/test-console',
