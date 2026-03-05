@@ -165,6 +165,8 @@ public class TransformationService {
                 .template(transformation.getTemplate())
                 .version(transformation.getVersion())
                 .enabled(transformation.getEnabled())
+                .subscriptionCount(subscriptionRepository.countByTransformationId(transformation.getId()))
+                .destinationCount(incomingDestinationRepository.countByTransformationId(transformation.getId()))
                 .createdAt(transformation.getCreatedAt())
                 .updatedAt(transformation.getUpdatedAt())
                 .build();

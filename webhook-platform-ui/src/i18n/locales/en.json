@@ -2802,6 +2802,7 @@
     "templateHint": "JSON template with ${$.jsonpath} expressions. Example: {\"event\": \"${$.type}\", \"amount\": \"${$.data.amount}\"}",
     "version": "Version",
     "status": "Status",
+    "usedBy": "Used by",
     "updated": "Updated",
     "duplicate": "Duplicate",
     "toast": {
@@ -2858,7 +2859,23 @@
       "headersMerge": "Custom headers are merged with system headers",
       "testBefore": "Use this to test before saving to a destination"
     },
-    "previewFailed": "Failed to run transform preview"
+    "previewFailed": "Failed to run transform preview",
+    "loadEvent": "Load Event",
+    "recentEvents": "Recent Events",
+    "noEvents": "No events found in this project",
+    "dryRun": "Dry-run Delivery",
+    "dryRunDesc": "Simulate a full delivery — see the transformed payload, computed HMAC signature, and all HTTP headers that your endpoint would receive. Nothing is sent.",
+    "dryRunEndpoint": "Target Endpoint",
+    "dryRunNoEndpoint": "— None (skip HMAC) —",
+    "dryRunEventType": "Event Type",
+    "dryRunBtn": "Simulate Delivery",
+    "dryRunRunning": "Simulating...",
+    "dryRunFailed": "Failed to simulate delivery",
+    "dryRunResult": "Delivery Dry-run Result",
+    "dryRunTransformation": "Transformation",
+    "dryRunSignature": "HMAC Signature",
+    "dryRunHeaders": "Request Headers",
+    "dryRunBody": "Request Body"
   },
   "configExport": {
     "title": "Config Export / Import",

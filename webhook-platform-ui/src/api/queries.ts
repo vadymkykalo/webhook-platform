@@ -17,7 +17,7 @@ import { schemasApi, type EventTypeCatalogRequest, type EventSchemaVersionReques
 import { alertsApi, type AlertRuleRequest } from './alerts.api';
 import { usageApi } from './usage.api';
 import { incidentsApi, type IncidentRequest, type TimelineEntryRequest } from './incidents.api';
-import { transformApi, type TransformPreviewRequest } from './transform.api';
+import { transformApi, type TransformPreviewRequest, type DeliveryDryRunRequest } from './transform.api';
 import { transformationsApi } from './transformations.api';
 import type { EndpointRequest, IncomingSourceRequest, IncomingDestinationRequest, IncomingBulkReplayRequest, TransformationRequest } from '../types/api.types';
 
@@ -859,6 +859,12 @@ export function useDeleteTransformation(projectId: string) {
 export function useTransformPreview(projectId: string) {
     return useMutation({
         mutationFn: (data: TransformPreviewRequest) => transformApi.preview(projectId, data),
+    });
+}
+
+export function useDeliveryDryRun(projectId: string) {
+    return useMutation({
+        mutationFn: (data: DeliveryDryRunRequest) => transformApi.deliveryDryRun(projectId, data),
     });
 }
 
