@@ -3,6 +3,7 @@ package com.webhook.platform.worker.service;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.*;
 import com.webhook.platform.worker.domain.repository.*;
@@ -627,9 +628,10 @@ public class WebhookDeliveryService {
     }
 
     private String buildRequestHeadersJson(String signature, String eventId, String deliveryId, String timestamp) {
+        String maskedSignature = HeaderSanitizer.maskSignature(signature);
         return String.format(
                 "{\"Content-Type\":\"application/json\",\"X-Signature\":\"%s\",\"X-Event-Id\":\"%s\",\"X-Delivery-Id\":\"%s\",\"X-Timestamp\":\"%s\",\"User-Agent\":\"WebhookPlatform/1.0\"}",
-                signature, eventId, deliveryId, timestamp);
+                maskedSignature, eventId, deliveryId, timestamp);
     }
 
     private String buildResponseHeadersJson(HttpHeaders headers) {
@@ -640,7 +642,8 @@ public class WebhookDeliveryService {
                     headerMap.put(key, values.get(0));
                 }
             });
-            return objectMapper.writeValueAsString(headerMap);
+            Map<String, String> sanitized = HeaderSanitizer.sanitize(headerMap);
+            return objectMapper.writeValueAsString(sanitized);
         } catch (Exception e) {
             log.warn("Failed to serialize response headers: {}", e.getMessage());
             return "{}";
