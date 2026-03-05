@@ -668,6 +668,7 @@
     "filteringByEvent": "Доставки для події",
     "clearEventFilter": "Показати всі",
     "bulkReplay": "Повторити всі {{status}}",
+    "bulkReplayHasMore": "Повторено {{replayed}} з {{total}} доставок. Запустіть ще раз для обробки решти.",
     "replaying": "Повторення...",
     "replayError": "Оберіть фільтр статусу (FAILED або DLQ) перед масовим повтором",
     "justNow": "щойно",

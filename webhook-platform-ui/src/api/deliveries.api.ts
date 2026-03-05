@@ -18,12 +18,15 @@ export interface BulkReplayRequest {
   status?: string;
   endpointId?: string;
   projectId?: string;
+  limit?: number;
 }
 
 export interface BulkReplayResponse {
   totalRequested: number;
   replayed: number;
   skipped: number;
+  totalMatched: number;
+  hasMore: boolean;
   message: string;
 }
 

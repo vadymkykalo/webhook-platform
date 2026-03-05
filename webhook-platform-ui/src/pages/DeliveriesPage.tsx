@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, Bell, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { showApiError, showSuccess } from '../lib/toast';
+import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
 import { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
@@ -221,7 +221,11 @@ export default function DeliveriesPage() {
         endpointId: endpointFilter || undefined,
       });
       
-      showSuccess(response.message);
+      if (response.hasMore) {
+        showWarning(t('deliveries.bulkReplayHasMore', { replayed: response.replayed, total: response.totalMatched }));
+      } else {
+        showSuccess(response.message);
+      }
       loadDeliveries();
     } catch (err: any) {
       showApiError(err, 'deliveries.toast.replayFailed');
