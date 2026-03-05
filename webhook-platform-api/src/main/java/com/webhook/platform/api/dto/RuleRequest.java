@@ -29,11 +29,8 @@ public class RuleRequest {
     /** Event type pattern (supports wildcards: *, **). NULL = catch-all */
     private String eventTypePattern;
 
-    /** Conditions to evaluate against event payload */
-    private List<RuleCondition> conditions;
-
-    /** Logical operator: AND (all conditions) / OR (any condition) */
-    private String conditionsOperator;
+    /** Condition tree (nested AND/OR/NOT groups + predicates). NULL = match all events. */
+    private ConditionNode conditions;
 
     /** Actions to execute when rule matches */
     @Valid

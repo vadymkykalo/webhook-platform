@@ -21,8 +21,7 @@ public class RuleResponse {
     private Boolean enabled;
     private Integer priority;
     private String eventTypePattern;
-    private List<RuleCondition> conditions;
-    private String conditionsOperator;
+    private ConditionNode conditions;
     private List<RuleActionResponse> actions;
     private Long totalExecutions;
     private Long totalMatches;

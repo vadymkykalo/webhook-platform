@@ -1,7 +1,7 @@
 package com.webhook.platform.api.service.rules;
 
 import com.webhook.platform.api.domain.entity.RuleAction.ActionType;
-import com.webhook.platform.api.dto.RuleCondition;
+import com.webhook.platform.api.dto.ConditionNode;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -24,9 +24,8 @@ public class CompiledRule {
     /** NULL = catch-all (matches every event type) */
     private final String eventTypePattern;
 
-    /** Pre-parsed conditions (avoids JSON parsing per event) */
-    private final List<RuleCondition> conditions;
-    private final String conditionsOperator;
+    /** Pre-parsed condition tree (avoids JSON parsing per event). NULL = match all. */
+    private final ConditionNode conditionTree;
 
     /** Pre-resolved actions */
     private final List<CompiledAction> actions;

@@ -2266,11 +2266,14 @@ function RulesEngineDocs({ activeLanguage: _activeLanguage, setActiveLanguage: _
     "enabled": true,
     "priority": 10,
     "eventTypePattern": "order.*",
-    "conditionsOperator": "AND",
-    "conditions": [
-      { "field": "data.amount", "operator": "gte", "value": 1000 },
-      { "field": "data.currency", "operator": "in", "value": ["USD", "EUR"] }
-    ],
+    "conditions": {
+      "type": "group",
+      "op": "AND",
+      "children": [
+        { "type": "predicate", "field": "data.amount", "operator": "GTE", "value": 1000, "valueType": "NUMBER" },
+        { "type": "predicate", "field": "data.currency", "operator": "IN", "value": ["USD", "EUR"], "valueType": "ARRAY_STRING" }
+      ]
+    },
     "actions": [
       { "type": "ROUTE", "endpointId": "ep_fraud_detection_uuid", "sortOrder": 0 },
       { "type": "TRANSFORM", "transformationId": "tr_enrich_geo_uuid", "sortOrder": 1 },

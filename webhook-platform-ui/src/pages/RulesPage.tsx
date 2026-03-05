@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import {
   GitBranch, Plus, Loader2, Trash2, Zap, Search,
   ChevronDown, ChevronUp, BarChart3, Filter, Route, Wand2, Ban,
-  Tag, X, PlusCircle, Pencil,
+  Tag, X, PlusCircle, Pencil, FolderPlus,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
@@ -14,7 +14,10 @@ import {
   useProject, useRules, useCreateRule, useUpdateRule, useDeleteRule, useToggleRule,
   useEndpoints, useTransformations,
 } from '../api/queries';
-import type { RuleResponse, RuleRequest, RuleCondition, RuleActionRequest, ActionType } from '../api/rules.api';
+import type {
+  RuleResponse, RuleRequest, RuleActionRequest, ActionType,
+  ConditionNode, ConditionGroup, ConditionPredicate, PredicateOperator, GroupOperator,
+} from '../api/rules.api';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -35,23 +38,51 @@ import VerificationGate from '../components/VerificationGate';
 
 // ─── Constants ──────────────────────────────────────────────────
 
-const OPERATORS = [
-  { value: 'equals', label: '= equals' },
-  { value: 'not_equals', label: '≠ not equals' },
-  { value: 'gt', label: '> greater than' },
-  { value: 'gte', label: '≥ greater or equal' },
-  { value: 'lt', label: '< less than' },
-  { value: 'lte', label: '≤ less or equal' },
-  { value: 'contains', label: '⊃ contains' },
-  { value: 'not_contains', label: '⊅ not contains' },
-  { value: 'starts_with', label: 'starts with' },
-  { value: 'ends_with', label: 'ends with' },
-  { value: 'in', label: '∈ in list' },
-  { value: 'not_in', label: '∉ not in list' },
-  { value: 'exists', label: '∃ exists' },
-  { value: 'not_exists', label: '∄ not exists' },
-  { value: 'regex', label: '~ regex' },
+const OPERATORS: { value: PredicateOperator; label: string; noValue?: boolean }[] = [
+  { value: 'EQ', label: '= equals' },
+  { value: 'NEQ', label: '≠ not equals' },
+  { value: 'GT', label: '> greater than' },
+  { value: 'GTE', label: '≥ greater or equal' },
+  { value: 'LT', label: '< less than' },
+  { value: 'LTE', label: '≤ less or equal' },
+  { value: 'BETWEEN', label: '↔ between' },
+  { value: 'CONTAINS', label: '⊃ contains' },
+  { value: 'NOT_CONTAINS', label: '⊅ not contains' },
+  { value: 'STARTS_WITH', label: 'starts with' },
+  { value: 'ENDS_WITH', label: 'ends with' },
+  { value: 'IN', label: '∈ in list' },
+  { value: 'NOT_IN', label: '∉ not in list' },
+  { value: 'REGEX', label: '~ regex' },
+  { value: 'EXISTS', label: '∃ exists', noValue: true },
+  { value: 'NOT_EXISTS', label: '∄ not exists', noValue: true },
+  { value: 'IS_NULL', label: 'is null', noValue: true },
+  { value: 'NOT_NULL', label: 'not null', noValue: true },
 ];
+
+const NO_VALUE_OPS: PredicateOperator[] = ['EXISTS', 'NOT_EXISTS', 'IS_NULL', 'NOT_NULL'];
+
+// ─── Condition tree helpers ─────────────────────────────────────
+
+function mkGroup(op: GroupOperator = 'AND'): ConditionGroup {
+  return { type: 'group', op, children: [] };
+}
+
+function mkPredicate(): ConditionPredicate {
+  return { type: 'predicate', field: '', operator: 'EQ', value: '', valueType: 'STRING' };
+}
+
+/** Count total predicates in tree (for display) */
+function countPredicates(node: ConditionNode | null): number {
+  if (!node) return 0;
+  if (node.type === 'predicate') return 1;
+  return node.children.reduce((s, c) => s + countPredicates(c), 0);
+}
+
+/** Deep-clone a condition node */
+function cloneNode(node: ConditionNode): ConditionNode {
+  return JSON.parse(JSON.stringify(node));
+}
+
 
 const ACTION_TYPE_META: Record<ActionType, { icon: React.ElementType; label: string; color: string; bg: string }> = {
   ROUTE: { icon: Route, label: 'Route to endpoint', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10' },
@@ -88,8 +119,7 @@ export default function RulesPage() {
   const [formEnabled, setFormEnabled] = useState(true);
   const [formPriority, setFormPriority] = useState(0);
   const [formEventTypePattern, setFormEventTypePattern] = useState('');
-  const [formConditions, setFormConditions] = useState<RuleCondition[]>([]);
-  const [formConditionsOperator, setFormConditionsOperator] = useState<'AND' | 'OR'>('AND');
+  const [formConditions, setFormConditions] = useState<ConditionNode | null>(null);
   const [formActions, setFormActions] = useState<RuleActionRequest[]>([]);
 
   const loading = projectLoading || rulesLoading;
@@ -112,8 +142,7 @@ export default function RulesPage() {
     setFormEnabled(true);
     setFormPriority(0);
     setFormEventTypePattern('');
-    setFormConditions([]);
-    setFormConditionsOperator('AND');
+    setFormConditions(null);
     setFormActions([]);
   };
 
@@ -130,8 +159,7 @@ export default function RulesPage() {
     setFormEnabled(rule.enabled);
     setFormPriority(rule.priority);
     setFormEventTypePattern(rule.eventTypePattern || '');
-    setFormConditions(rule.conditions.length > 0 ? [...rule.conditions] : []);
-    setFormConditionsOperator(rule.conditionsOperator);
+    setFormConditions(rule.conditions ? cloneNode(rule.conditions) : null);
     setFormActions(rule.actions.map(a => ({
       type: a.type,
       endpointId: a.endpointId || undefined,
@@ -149,8 +177,7 @@ export default function RulesPage() {
       enabled: formEnabled,
       priority: formPriority,
       eventTypePattern: formEventTypePattern || undefined,
-      conditions: formConditions.length > 0 ? formConditions : undefined,
-      conditionsOperator: formConditionsOperator,
+      conditions: formConditions,
       actions: formActions.length > 0 ? formActions : undefined,
     };
     try {
@@ -181,18 +208,26 @@ export default function RulesPage() {
     } catch (err) { showApiError(err, 'rules.toggleFailed'); }
   };
 
-  // ─── Condition builder ────────────────────────────────────────
+  // ─── Condition tree actions ──────────────────────────────────
 
-  const addCondition = () => {
-    setFormConditions([...formConditions, { field: '', operator: 'equals', value: '' }]);
+  const ensureRoot = (): ConditionNode => formConditions ?? mkGroup('AND');
+
+  const addPredicateToRoot = () => {
+    const root = ensureRoot();
+    if (root.type === 'group') {
+      setFormConditions({ ...root, children: [...root.children, mkPredicate()] });
+    } else {
+      setFormConditions({ type: 'group', op: 'AND', children: [root, mkPredicate()] });
+    }
   };
 
-  const updateCondition = (idx: number, patch: Partial<RuleCondition>) => {
-    setFormConditions(formConditions.map((c, i) => i === idx ? { ...c, ...patch } : c));
-  };
-
-  const removeCondition = (idx: number) => {
-    setFormConditions(formConditions.filter((_, i) => i !== idx));
+  const addGroupToRoot = () => {
+    const root = ensureRoot();
+    if (root.type === 'group') {
+      setFormConditions({ ...root, children: [...root.children, mkGroup('AND')] });
+    } else {
+      setFormConditions({ type: 'group', op: 'AND', children: [root, mkGroup('AND')] });
+    }
   };
 
   // ─── Action builder ───────────────────────────────────────────
@@ -334,7 +369,7 @@ export default function RulesPage() {
                         {rule.eventTypePattern && (
                           <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[11px]">{rule.eventTypePattern}</span>
                         )}
-                        <span>{rule.conditions.length} {t('rules.conditions')}</span>
+                        <span>{countPredicates(rule.conditions)} {t('rules.conditions')}</span>
                         <span>{rule.actions.length} {t('rules.actions')}</span>
                       </div>
                     </div>
@@ -385,26 +420,13 @@ export default function RulesPage() {
                       )}
 
                       {/* Conditions */}
-                      {rule.conditions.length > 0 && (
+                      {rule.conditions && countPredicates(rule.conditions) > 0 && (
                         <div>
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
                             <Filter className="h-3.5 w-3.5" />
-                            {t('rules.conditionsLabel')} ({rule.conditionsOperator})
+                            {t('rules.conditionsLabel')}
                           </div>
-                          <div className="space-y-1.5">
-                            {rule.conditions.map((c, i) => (
-                              <div key={i} className="flex items-center gap-2 text-sm bg-background rounded-lg px-3 py-2 border">
-                                <code className="text-primary font-mono text-xs">{c.field}</code>
-                                <Badge variant="outline" className="text-[10px] font-mono">{c.operator}</Badge>
-                                {!['exists', 'not_exists'].includes(c.operator) && (
-                                  <code className="text-xs font-mono text-muted-foreground">{JSON.stringify(c.value)}</code>
-                                )}
-                                {i < rule.conditions.length - 1 && (
-                                  <span className="text-[10px] font-bold text-muted-foreground ml-auto">{rule.conditionsOperator}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
+                          <ConditionTreeDisplay node={rule.conditions} depth={0} />
                         </div>
                       )}
 
@@ -518,61 +540,31 @@ export default function RulesPage() {
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
                   <Label className="text-sm font-semibold">{t('rules.form.conditions')}</Label>
-                  {formConditions.length > 1 && (
-                    <div className="flex items-center gap-1 ml-2">
-                      <button
-                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${formConditionsOperator === 'AND' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
-                        onClick={() => setFormConditionsOperator('AND')}
-                      >AND</button>
-                      <button
-                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${formConditionsOperator === 'OR' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
-                        onClick={() => setFormConditionsOperator('OR')}
-                      >OR</button>
-                    </div>
-                  )}
                 </div>
-                <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={addCondition}>
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  {t('rules.form.addCondition')}
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={addGroupToRoot}>
+                    <FolderPlus className="h-3.5 w-3.5" />
+                    {t('rules.form.addGroup')}
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={addPredicateToRoot}>
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    {t('rules.form.addCondition')}
+                  </Button>
+                </div>
               </div>
 
-              {formConditions.length === 0 ? (
+              {!formConditions || (formConditions.type === 'group' && formConditions.children.length === 0) ? (
                 <div className="border border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground">
                   {t('rules.form.noConditions')}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {formConditions.map((cond, idx) => (
-                    <div key={idx} className="flex items-start gap-2 bg-muted/40 rounded-lg p-3 border">
-                      <div className="flex-1 grid grid-cols-3 gap-2">
-                        <Input
-                          placeholder="data.amount"
-                          value={cond.field}
-                          onChange={(e) => updateCondition(idx, { field: e.target.value })}
-                          className="font-mono text-xs"
-                        />
-                        <Select value={cond.operator} onChange={(e) => updateCondition(idx, { operator: e.target.value })}>
-                          {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
-                        </Select>
-                        {!['exists', 'not_exists'].includes(cond.operator) && (
-                          <Input
-                            placeholder={t('rules.form.valuePlaceholder')}
-                            value={typeof cond.value === 'string' ? cond.value : JSON.stringify(cond.value)}
-                            onChange={(e) => updateCondition(idx, { value: e.target.value })}
-                            className="text-xs"
-                          />
-                        )}
-                      </div>
-                      <button onClick={() => removeCondition(idx)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                      {idx < formConditions.length - 1 && (
-                        <span className="absolute right-12 text-[10px] font-bold text-muted-foreground">{formConditionsOperator}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <ConditionTreeEditor
+                  node={formConditions}
+                  path={[]}
+                  onChange={(updated) => setFormConditions(updated)}
+                  onRemove={() => setFormConditions(null)}
+                  depth={0}
+                />
               )}
             </div>
 
@@ -680,6 +672,223 @@ export default function RulesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ─── Condition Tree Display (read-only, expanded card) ──────────
+
+function ConditionTreeDisplay({ node, depth }: { node: ConditionNode; depth: number }) {
+  if (node.type === 'predicate') {
+    return (
+      <div className="flex items-center gap-2 text-sm bg-background rounded-lg px-3 py-2 border">
+        <code className="text-primary font-mono text-xs">{node.field}</code>
+        <Badge variant="outline" className="text-[10px] font-mono">{node.operator}</Badge>
+        {!NO_VALUE_OPS.includes(node.operator) && (
+          <code className="text-xs font-mono text-muted-foreground">{JSON.stringify(node.value)}</code>
+        )}
+      </div>
+    );
+  }
+
+  // Group
+  const opColors: Record<string, string> = {
+    AND: 'border-blue-400/40 bg-blue-500/5',
+    OR: 'border-amber-400/40 bg-amber-500/5',
+    NOT: 'border-red-400/40 bg-red-500/5',
+  };
+
+  return (
+    <div className={`rounded-lg border-l-2 pl-3 py-1.5 space-y-1.5 ${opColors[node.op] || 'border-gray-300'}`}>
+      <Badge variant="outline" className="text-[10px] font-bold">{node.op}</Badge>
+      {node.children.map((child, i) => (
+        <ConditionTreeDisplay key={i} node={child} depth={depth + 1} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Condition Tree Editor (form dialog) ────────────────────────
+
+function ConditionTreeEditor({
+  node,
+  path,
+  onChange,
+  onRemove,
+  depth,
+}: {
+  node: ConditionNode;
+  path: number[];
+  onChange: (updated: ConditionNode) => void;
+  onRemove: () => void;
+  depth: number;
+}) {
+  if (node.type === 'predicate') {
+    return (
+      <PredicateEditor
+        node={node}
+        onChange={onChange}
+        onRemove={onRemove}
+      />
+    );
+  }
+
+  // Group editor
+  const opColors: Record<string, string> = {
+    AND: 'border-l-blue-400 bg-blue-500/5',
+    OR: 'border-l-amber-400 bg-amber-500/5',
+    NOT: 'border-l-red-400 bg-red-500/5',
+  };
+
+  const cycleOp = () => {
+    const ops: ConditionGroup['op'][] = ['AND', 'OR', 'NOT'];
+    const idx = ops.indexOf(node.op);
+    const next = ops[(idx + 1) % ops.length];
+    onChange({ ...node, op: next });
+  };
+
+  const addChild = (child: ConditionNode) => {
+    onChange({ ...node, children: [...node.children, child] });
+  };
+
+  const updateChild = (i: number, updated: ConditionNode) => {
+    onChange({ ...node, children: node.children.map((c, j) => j === i ? updated : c) });
+  };
+
+  const removeChild = (i: number) => {
+    const newChildren = node.children.filter((_, j) => j !== i);
+    if (newChildren.length === 0 && depth > 0) {
+      onRemove(); // remove empty group
+    } else {
+      onChange({ ...node, children: newChildren });
+    }
+  };
+
+  const opBtnColor: Record<string, string> = {
+    AND: 'bg-blue-600 hover:bg-blue-700',
+    OR: 'bg-amber-600 hover:bg-amber-700',
+    NOT: 'bg-red-600 hover:bg-red-700',
+  };
+
+  return (
+    <div className={`rounded-lg border-l-[3px] pl-3 py-2 space-y-2 ${opColors[node.op] || ''}`}>
+      {/* Group header */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={cycleOp}
+          className={`px-2.5 py-0.5 rounded text-[11px] font-bold text-white transition-colors ${opBtnColor[node.op] || 'bg-gray-600'}`}
+          title="Click to cycle: AND → OR → NOT"
+        >
+          {node.op}
+        </button>
+        <span className="text-[10px] text-muted-foreground">
+          {node.op === 'AND' ? 'All must match' : node.op === 'OR' ? 'Any must match' : 'Negate'}
+        </span>
+        <div className="flex-1" />
+        <button
+          onClick={() => addChild(mkPredicate())}
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Add condition"
+        >
+          <PlusCircle className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => addChild(mkGroup('AND'))}
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          title="Add nested group"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </button>
+        {depth > 0 && (
+          <button
+            onClick={onRemove}
+            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+            title="Remove group"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Children */}
+      {node.children.length === 0 ? (
+        <div className="text-[11px] text-muted-foreground italic pl-1">Empty group — add a condition</div>
+      ) : (
+        <div className="space-y-2">
+          {node.children.map((child, i) => (
+            <ConditionTreeEditor
+              key={i}
+              node={child}
+              path={[...path, i]}
+              onChange={(updated) => updateChild(i, updated)}
+              onRemove={() => removeChild(i)}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Predicate Editor (single condition row) ────────────────────
+
+function PredicateEditor({
+  node,
+  onChange,
+  onRemove,
+}: {
+  node: ConditionPredicate;
+  onChange: (updated: ConditionNode) => void;
+  onRemove: () => void;
+}) {
+  const needsValue = !NO_VALUE_OPS.includes(node.operator);
+
+  const handleValueChange = (raw: string) => {
+    // Try to parse as number
+    const num = Number(raw);
+    if (raw !== '' && !isNaN(num)) {
+      onChange({ ...node, value: num, valueType: 'NUMBER' });
+    } else if (raw === 'true' || raw === 'false') {
+      onChange({ ...node, value: raw === 'true', valueType: 'BOOLEAN' });
+    } else {
+      onChange({ ...node, value: raw, valueType: 'STRING' });
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-2 bg-muted/40 rounded-lg p-2.5 border">
+      <div className={`flex-1 grid gap-2 ${needsValue ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <Input
+          placeholder="payload.data.amount"
+          value={node.field}
+          onChange={(e) => onChange({ ...node, field: e.target.value })}
+          className="font-mono text-xs h-8"
+        />
+        <Select
+          value={node.operator}
+          onChange={(e) => onChange({ ...node, operator: e.target.value as PredicateOperator })}
+          className="h-8 text-xs"
+        >
+          {OPERATORS.map(op => (
+            <option key={op.value} value={op.value}>{op.label}</option>
+          ))}
+        </Select>
+        {needsValue && (
+          <Input
+            placeholder="value"
+            value={node.value === undefined || node.value === null ? '' : String(node.value)}
+            onChange={(e) => handleValueChange(e.target.value)}
+            className="text-xs h-8"
+          />
+        )}
+      </div>
+      <button
+        onClick={onRemove}
+        className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors mt-0.5"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

@@ -2893,6 +2893,7 @@
       "disabled": "Disabled — rule is paused",
       "conditions": "Conditions",
       "addCondition": "Add Condition",
+      "addGroup": "Add Group",
       "noConditions": "No conditions — rule matches all events of the specified type.",
       "valuePlaceholder": "Value",
       "actions": "Actions",

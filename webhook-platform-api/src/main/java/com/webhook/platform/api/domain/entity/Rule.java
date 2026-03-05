@@ -43,13 +43,9 @@ public class Rule {
     @Column(name = "event_type_pattern", length = 255)
     private String eventTypePattern;
 
-    @Column(nullable = false, columnDefinition = "JSONB")
-    @Builder.Default
-    private String conditions = "[]";
-
-    @Column(name = "conditions_operator", nullable = false, length = 3)
-    @Builder.Default
-    private String conditionsOperator = "AND";
+    /** Condition tree as JSONB. NULL = match all events (no conditions). */
+    @Column(columnDefinition = "JSONB")
+    private String conditions;
 
     @OneToMany(mappedBy = "rule", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sortOrder ASC")

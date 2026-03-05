@@ -2,11 +2,35 @@ import { http } from './http';
 
 export type ActionType = 'ROUTE' | 'TRANSFORM' | 'DROP' | 'TAG';
 
-export interface RuleCondition {
-  field: string;
-  operator: string;
-  value: unknown;
+// ─── Condition Tree DSL ─────────────────────────────────────────
+
+export type GroupOperator = 'AND' | 'OR' | 'NOT';
+
+export type PredicateOperator =
+  | 'EQ' | 'NEQ'
+  | 'GT' | 'GTE' | 'LT' | 'LTE' | 'BETWEEN'
+  | 'CONTAINS' | 'NOT_CONTAINS' | 'STARTS_WITH' | 'ENDS_WITH'
+  | 'IN' | 'NOT_IN' | 'REGEX'
+  | 'EXISTS' | 'NOT_EXISTS' | 'IS_NULL' | 'NOT_NULL';
+
+export type ValueType = 'STRING' | 'NUMBER' | 'BOOLEAN' | 'ARRAY_STRING' | 'ARRAY_NUMBER' | 'DATE_TIME';
+
+export interface ConditionGroup {
+  type: 'group';
+  op: GroupOperator;
+  children: ConditionNode[];
 }
+
+export interface ConditionPredicate {
+  type: 'predicate';
+  field: string;
+  operator: PredicateOperator;
+  value?: unknown;
+  valueType?: ValueType;
+  caseInsensitive?: boolean;
+}
+
+export type ConditionNode = ConditionGroup | ConditionPredicate;
 
 export interface RuleActionRequest {
   type: ActionType;
@@ -34,8 +58,7 @@ export interface RuleRequest {
   enabled?: boolean;
   priority?: number;
   eventTypePattern?: string | null;
-  conditions?: RuleCondition[];
-  conditionsOperator?: 'AND' | 'OR';
+  conditions?: ConditionNode | null;
   actions?: RuleActionRequest[];
 }
 
@@ -47,8 +70,7 @@ export interface RuleResponse {
   enabled: boolean;
   priority: number;
   eventTypePattern: string | null;
-  conditions: RuleCondition[];
-  conditionsOperator: 'AND' | 'OR';
+  conditions: ConditionNode | null;
   actions: RuleActionResponse[];
   totalExecutions: number;
   totalMatches: number;

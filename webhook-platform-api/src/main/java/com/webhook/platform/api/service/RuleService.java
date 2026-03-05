@@ -1,6 +1,5 @@
 package com.webhook.platform.api.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
@@ -72,7 +71,6 @@ public class RuleService {
                 .priority(request.getPriority() != null ? request.getPriority() : 0)
                 .eventTypePattern(request.getEventTypePattern())
                 .conditions(conditionsJson)
-                .conditionsOperator(request.getConditionsOperator() != null ? request.getConditionsOperator() : "AND")
                 .build();
 
         rule = ruleRepository.saveAndFlush(rule);
@@ -132,9 +130,6 @@ public class RuleService {
         }
         if (request.getConditions() != null) {
             rule.setConditions(serializeConditions(request.getConditions()));
-        }
-        if (request.getConditionsOperator() != null) {
-            rule.setConditionsOperator(request.getConditionsOperator());
         }
 
         rule = ruleRepository.saveAndFlush(rule);
@@ -221,9 +216,9 @@ public class RuleService {
         }
     }
 
-    private String serializeConditions(List<RuleCondition> conditions) {
-        if (conditions == null || conditions.isEmpty()) {
-            return "[]";
+    private String serializeConditions(ConditionNode conditions) {
+        if (conditions == null) {
+            return null;
         }
         try {
             return objectMapper.writeValueAsString(conditions);
@@ -233,11 +228,13 @@ public class RuleService {
     }
 
     private RuleResponse mapToResponse(Rule rule) {
-        List<RuleCondition> conditions;
-        try {
-            conditions = objectMapper.readValue(rule.getConditions(), new TypeReference<>() {});
-        } catch (Exception e) {
-            conditions = List.of();
+        ConditionNode conditions = null;
+        if (rule.getConditions() != null && !rule.getConditions().isBlank()) {
+            try {
+                conditions = objectMapper.readValue(rule.getConditions(), ConditionNode.class);
+            } catch (Exception e) {
+                log.warn("Failed to parse condition tree for rule {}: {}", rule.getId(), e.getMessage());
+            }
         }
 
         List<RuleAction> actionEntities = ruleActionRepository.findByRuleIdOrderBySortOrderAsc(rule.getId());
@@ -257,7 +254,6 @@ public class RuleService {
                 .priority(rule.getPriority())
                 .eventTypePattern(rule.getEventTypePattern())
                 .conditions(conditions)
-                .conditionsOperator(rule.getConditionsOperator())
                 .actions(actionResponses)
                 .totalExecutions(totalExec)
                 .totalMatches(totalMatches)

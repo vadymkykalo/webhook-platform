@@ -1,6 +1,5 @@
 package com.webhook.platform.api.service.rules;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Rule;
@@ -9,7 +8,7 @@ import com.webhook.platform.api.domain.entity.RuleAction.ActionType;
 import com.webhook.platform.api.domain.entity.RuleExecutionLog;
 import com.webhook.platform.api.domain.repository.RuleExecutionLogRepository;
 import com.webhook.platform.api.domain.repository.RuleRepository;
-import com.webhook.platform.api.dto.RuleCondition;
+import com.webhook.platform.api.dto.ConditionNode;
 import com.webhook.platform.common.util.EventTypeMatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -65,7 +64,7 @@ public class RuleEngineService {
             plan = loadPlan(projectId);
         }
 
-        Map<String, JsonNode> fieldCache = RuleConditionEvaluator.newFieldCache();
+        Map<String, JsonNode> fieldCache = ConditionTreeEvaluator.newFieldCache();
         List<RuleMatch> matches = new ArrayList<>();
 
         // Stage A: prefilter — get candidate rules
@@ -74,8 +73,8 @@ public class RuleEngineService {
         // Stage B: evaluate conditions
         for (CompiledRule rule : candidates) {
             long start = System.nanoTime();
-            boolean matched = RuleConditionEvaluator.evaluate(
-                    rule.getConditions(), rule.getConditionsOperator(), eventJson, fieldCache);
+            boolean matched = ConditionTreeEvaluator.evaluate(
+                    rule.getConditionTree(), eventJson, fieldCache);
             long elapsed = (System.nanoTime() - start) / 1_000_000;
 
             if (matched) {
@@ -142,13 +141,13 @@ public class RuleEngineService {
     // ─── Compilation ────────────────────────────────────────────────────
 
     private CompiledRule compile(Rule rule) {
-        List<RuleCondition> conditions;
-        try {
-            conditions = objectMapper.readValue(
-                    rule.getConditions(), new TypeReference<List<RuleCondition>>() {});
-        } catch (Exception e) {
-            log.warn("Failed to parse conditions for rule {}: {}", rule.getId(), e.getMessage());
-            conditions = List.of();
+        ConditionNode conditionTree = null;
+        if (rule.getConditions() != null && !rule.getConditions().isBlank()) {
+            try {
+                conditionTree = objectMapper.readValue(rule.getConditions(), ConditionNode.class);
+            } catch (Exception e) {
+                log.warn("Failed to parse condition tree for rule {}: {}", rule.getId(), e.getMessage());
+            }
         }
 
         List<CompiledRule.CompiledAction> actions = rule.getActions().stream()
@@ -169,8 +168,7 @@ public class RuleEngineService {
                 .name(rule.getName())
                 .priority(rule.getPriority())
                 .eventTypePattern(rule.getEventTypePattern())
-                .conditions(conditions)
-                .conditionsOperator(rule.getConditionsOperator())
+                .conditionTree(conditionTree)
                 .actions(actions)
                 .build();
     }
