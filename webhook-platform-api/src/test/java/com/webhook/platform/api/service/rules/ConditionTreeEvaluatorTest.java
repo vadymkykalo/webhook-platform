@@ -465,6 +465,71 @@ class ConditionTreeEvaluatorTest {
         assertThat(((Group) root.getChildren().get(0)).getOp()).isEqualTo(GroupOperator.NOT);
     }
 
+    // ─── Regression: ReDoS & compareNumeric fixes ───────────────────────
+
+    @Nested
+    class SecurityRegressionTests {
+
+        @Test
+        void regex_tooLong_rejected() throws Exception {
+            String longPattern = "a".repeat(300);
+            Predicate p = Predicate.builder()
+                    .field("name").operator(PredicateOperator.REGEX).value(longPattern).build();
+            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"name\":\"aaa\"}"), fieldCache)).isFalse();
+        }
+
+        @Test
+        void regex_catastrophicBacktracking_timesOut() throws Exception {
+            // Classic ReDoS pattern: (a+)+$ against "aaaaaaaaaaaaaaaaaa!"
+            Predicate p = Predicate.builder()
+                    .field("val").operator(PredicateOperator.REGEX).value("(a+)+$").build();
+            long start = System.currentTimeMillis();
+            boolean result = ConditionTreeEvaluator.evaluate(p,
+                    json("{\"val\":\"" + "a".repeat(30) + "!\"}"), fieldCache);
+            long elapsed = System.currentTimeMillis() - start;
+            assertThat(result).isFalse();
+            // Must complete within 1 second (timeout is 200ms + overhead)
+            assertThat(elapsed).isLessThan(1000);
+        }
+
+        @Test
+        void compareNumeric_nonNumericField_gteReturnsFalse() throws Exception {
+            // Before fix: "hello" GTE 42 returned true (NFE → 0, 0 >= 0 → true)
+            Predicate p = pred("name", PredicateOperator.GTE, 42);
+            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"name\":\"hello\"}"), fieldCache)).isFalse();
+        }
+
+        @Test
+        void compareNumeric_nonNumericField_lteReturnsFalse() throws Exception {
+            Predicate p = pred("name", PredicateOperator.LTE, 42);
+            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"name\":\"hello\"}"), fieldCache)).isFalse();
+        }
+
+        @Test
+        void compareNumeric_nonNumericField_gtReturnsFalse() throws Exception {
+            Predicate p = pred("name", PredicateOperator.GT, 42);
+            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"name\":\"hello\"}"), fieldCache)).isFalse();
+        }
+
+        @Test
+        void compareNumeric_nonNumericField_ltReturnsFalse() throws Exception {
+            Predicate p = pred("name", PredicateOperator.LT, 42);
+            assertThat(ConditionTreeEvaluator.evaluate(p, json("{\"name\":\"hello\"}"), fieldCache)).isFalse();
+        }
+
+        @Test
+        void compareNumeric_validNumeric_stillWorks() throws Exception {
+            JsonNode event = json("{\"amount\":50}");
+            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.GTE, 50), event, fieldCache)).isTrue();
+            fieldCache.clear();
+            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.LTE, 50), event, fieldCache)).isTrue();
+            fieldCache.clear();
+            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.GT, 49), event, fieldCache)).isTrue();
+            fieldCache.clear();
+            assertThat(ConditionTreeEvaluator.evaluate(pred("amount", PredicateOperator.LT, 51), event, fieldCache)).isTrue();
+        }
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────────
 
     private static Predicate pred(String field, PredicateOperator op, Object value) {

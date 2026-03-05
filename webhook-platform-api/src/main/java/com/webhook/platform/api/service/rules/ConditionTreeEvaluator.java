@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -24,6 +25,18 @@ import java.util.regex.PatternSyntaxException;
  */
 @Slf4j
 public class ConditionTreeEvaluator {
+
+    private static final int MAX_REGEX_LENGTH = 256;
+    private static final long REGEX_TIMEOUT_MS = 200;
+    private static final int REGEX_CACHE_MAX_SIZE = 256;
+
+    @SuppressWarnings("serial")
+    private static final Map<String, Pattern> REGEX_CACHE = new LinkedHashMap<>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Pattern> eldest) {
+            return size() > REGEX_CACHE_MAX_SIZE;
+        }
+    };
 
     private ConditionTreeEvaluator() {
     }
@@ -123,10 +136,10 @@ public class ConditionTreeEvaluator {
         return switch (op) {
             case EQ -> compareEquals(fieldNode, value, ci);
             case NEQ -> !compareEquals(fieldNode, value, ci);
-            case GT -> compareNumeric(fieldNode, value) > 0;
-            case GTE -> compareNumeric(fieldNode, value) >= 0;
-            case LT -> compareNumeric(fieldNode, value) < 0;
-            case LTE -> compareNumeric(fieldNode, value) <= 0;
+            case GT -> { int c = compareNumeric(fieldNode, value); yield c != COMPARE_ERROR && c > 0; }
+            case GTE -> { int c = compareNumeric(fieldNode, value); yield c != COMPARE_ERROR && c >= 0; }
+            case LT -> { int c = compareNumeric(fieldNode, value); yield c != COMPARE_ERROR && c < 0; }
+            case LTE -> { int c = compareNumeric(fieldNode, value); yield c != COMPARE_ERROR && c <= 0; }
             case BETWEEN -> evaluateBetween(fieldNode, value);
             case CONTAINS -> textOp(fieldNode, value, ci, String::contains);
             case NOT_CONTAINS -> textOp(fieldNode, value, ci, (a, b) -> !a.contains(b));
@@ -197,13 +210,15 @@ public class ConditionTreeEvaluator {
         return ci ? fieldText.equalsIgnoreCase(valueText) : fieldText.equals(valueText);
     }
 
+    private static final int COMPARE_ERROR = Integer.MIN_VALUE;
+
     private static int compareNumeric(JsonNode fieldNode, Object value) {
         try {
             BigDecimal fieldNum = new BigDecimal(asText(fieldNode));
             BigDecimal valueNum = new BigDecimal(String.valueOf(value));
             return fieldNum.compareTo(valueNum);
         } catch (NumberFormatException e) {
-            return 0;
+            return COMPARE_ERROR;
         }
     }
 
@@ -252,12 +267,66 @@ public class ConditionTreeEvaluator {
 
     private static boolean evaluateRegex(JsonNode fieldNode, Object value) {
         if (value == null) return false;
-        try {
-            Pattern pattern = Pattern.compile(String.valueOf(value));
-            return pattern.matcher(asText(fieldNode)).find();
-        } catch (PatternSyntaxException e) {
-            log.warn("Invalid regex pattern: {}", value);
+        String patternStr = String.valueOf(value);
+        if (patternStr.length() > MAX_REGEX_LENGTH) {
+            log.warn("Regex pattern too long ({} > {}), rejecting", patternStr.length(), MAX_REGEX_LENGTH);
             return false;
+        }
+        try {
+            Pattern pattern;
+            synchronized (REGEX_CACHE) {
+                pattern = REGEX_CACHE.computeIfAbsent(patternStr, Pattern::compile);
+            }
+            CharSequence input = new InterruptibleCharSequence(asText(fieldNode), REGEX_TIMEOUT_MS);
+            return pattern.matcher(input).find();
+        } catch (PatternSyntaxException e) {
+            log.warn("Invalid regex pattern: {}", patternStr);
+            return false;
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof InterruptedException || e.getMessage() != null && e.getMessage().contains("timed out")) {
+                log.warn("Regex evaluation timed out after {}ms for pattern: {}", REGEX_TIMEOUT_MS, patternStr);
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * CharSequence wrapper that aborts regex matching after a deadline.
+     * Each charAt() call checks elapsed time — if exceeded, throws to break
+     * catastrophic backtracking (ReDoS protection).
+     */
+    private static final class InterruptibleCharSequence implements CharSequence {
+        private final CharSequence inner;
+        private final long deadlineNanos;
+
+        InterruptibleCharSequence(CharSequence inner, long timeoutMs) {
+            this.inner = inner;
+            this.deadlineNanos = System.nanoTime() + timeoutMs * 1_000_000;
+        }
+
+        @Override
+        public int length() {
+            return inner.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (System.nanoTime() > deadlineNanos) {
+                throw new RuntimeException("Regex evaluation timed out");
+            }
+            return inner.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new InterruptibleCharSequence(inner.subSequence(start, end),
+                    Math.max(0, (deadlineNanos - System.nanoTime()) / 1_000_000));
+        }
+
+        @Override
+        public String toString() {
+            return inner.toString();
         }
     }
 
