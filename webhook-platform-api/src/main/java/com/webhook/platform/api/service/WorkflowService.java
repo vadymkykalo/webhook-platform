@@ -180,7 +180,12 @@ public class WorkflowService {
         validateProjectOwnership(workflow.getProjectId(), organizationId);
 
         return executionRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId, PageRequest.of(page, size))
-                .map(this::mapExecutionToResponse);
+                .map(exec -> {
+                    WorkflowExecutionResponse resp = mapExecutionToResponse(exec);
+                    List<WorkflowStepExecution> steps = stepExecutionRepository.findByExecutionIdOrderByCreatedAtAsc(exec.getId());
+                    resp.setSteps(steps.stream().map(this::mapStepToResponse).collect(Collectors.toList()));
+                    return resp;
+                });
     }
 
     public WorkflowExecutionResponse getExecution(UUID executionId, UUID organizationId) {
