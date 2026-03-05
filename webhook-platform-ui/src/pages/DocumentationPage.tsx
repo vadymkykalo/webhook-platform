@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -41,6 +41,7 @@ export default function DocumentationPage() {
             {activeSection === 'endpoints-api' && <EndpointsAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'subscriptions-api' && <SubscriptionsAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'deliveries-api' && <DeliveriesAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'transformations-api' && <TransformationsAPI activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'webhook-security' && <WebhookSecurity activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'incoming-webhooks' && <IncomingWebhooks activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
@@ -64,6 +65,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'endpoints-api', label: t('docsPage.sections.endpointsApi'), icon: Shield },
     { id: 'subscriptions-api', label: t('docsPage.sections.subscriptionsApi'), icon: RefreshCw },
     { id: 'deliveries-api', label: t('docsPage.sections.deliveriesApi'), icon: CheckCircle2 },
+    { id: 'transformations-api', label: t('docsPage.sections.transformationsApi'), icon: Wand2 },
     { id: 'webhook-security', label: t('docsPage.sections.webhookSecurity'), icon: Shield },
     { id: 'incoming-webhooks', label: t('docsPage.sections.incomingWebhooks'), icon: ArrowDownToLine },
     { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
@@ -808,6 +810,136 @@ function DeliveriesAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps)
   );
 }
 
+function TransformationsAPI({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-12">
+      <div>
+        <h1 className="text-4xl font-bold text-foreground mb-4">{t('docsPage.transformationsApi.title')}</h1>
+        <p className="text-xl text-muted-foreground">
+          {t('docsPage.transformationsApi.subtitle')}
+        </p>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.transformationsApi.jsonpathTitle')}</h2>
+        <p className="text-muted-foreground mb-6">{t('docsPage.transformationsApi.jsonpathDesc')}</p>
+
+        <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.transformationsApi.templateExample')}</h3>
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{t('docsPage.transformationsApi.inputPayload')}</div>
+            <ResponseBlock>
+{`{
+  "orderId": "ord_123",
+  "customer": {
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "amount": 99.99,
+  "currency": "USD"
+}`}
+            </ResponseBlock>
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{t('docsPage.transformationsApi.template')}</div>
+            <ResponseBlock>
+{`{
+  "id": "$.orderId",
+  "buyer": "$.customer.name",
+  "total": "$.amount",
+  "note": "Order $.orderId for $.customer.name"
+}`}
+            </ResponseBlock>
+          </div>
+        </div>
+
+        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{t('docsPage.transformationsApi.output')}</div>
+        <ResponseBlock>
+{`{
+  "id": "ord_123",
+  "buyer": "John Doe",
+  "total": 99.99,
+  "note": "Order ord_123 for John Doe"
+}`}
+        </ResponseBlock>
+
+        <div className="mt-6 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <Wand2 className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-blue-900 dark:text-blue-300 text-sm">{t('docsPage.transformationsApi.jsonpathNote')}</div>
+              <div className="text-blue-700 dark:text-blue-400 text-sm mt-1">
+                {t('docsPage.transformationsApi.jsonpathNoteDesc')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.transformationsApi.previewTitle')}</h2>
+        <p className="text-muted-foreground mb-6">{t('docsPage.transformationsApi.previewDesc')}</p>
+        <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/transform-preview" />
+        <ParamTable params={[
+          { name: 'inputPayload', type: 'string (JSON)', required: true, description: t('docsPage.transformationsApi.paramInput') },
+          { name: 'template', type: 'string (JSON)', required: true, description: t('docsPage.transformationsApi.paramTemplate') },
+        ]} />
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
+          {getCodeExample('transformPreview', activeLanguage)}
+        </CodeBlock>
+        <ResponseBlock>
+{`{
+  "output": "{\\"id\\":\\"ord_123\\",\\"total\\":99.99}",
+  "success": true,
+  "error": null
+}`}
+        </ResponseBlock>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">{t('docsPage.transformationsApi.dryRunTitle')}</h2>
+        <p className="text-muted-foreground mb-6">{t('docsPage.transformationsApi.dryRunDesc')}</p>
+        <HTTPMethod method="POST" path="/api/v1/projects/{projectId}/delivery-dry-run" />
+        <ParamTable params={[
+          { name: 'endpointId', type: 'uuid', required: true, description: t('docsPage.transformationsApi.paramEndpointId') },
+          { name: 'eventType', type: 'string', required: true, description: t('docsPage.transformationsApi.paramEventType') },
+          { name: 'payload', type: 'string (JSON)', required: true, description: t('docsPage.transformationsApi.paramPayload') },
+          { name: 'transformationId', type: 'uuid', required: false, description: t('docsPage.transformationsApi.paramTransformId') },
+        ]} />
+        <CodeBlock language={activeLanguage} setLanguage={setActiveLanguage}>
+          {getCodeExample('deliveryDryRun', activeLanguage)}
+        </CodeBlock>
+        <ResponseBlock>
+{`{
+  "endpointUrl": "https://api.customer.com/webhooks",
+  "headers": {
+    "Content-Type": "application/json",
+    "X-Signature": "t=1703790000000,v1=abc123...",
+    "X-Event-Type": "order.completed",
+    "X-Timestamp": "1703790000000"
+  },
+  "transformedPayload": "{\\"id\\":\\"ord_123\\"}",
+  "originalPayload": "{\\"orderId\\":\\"ord_123\\"}"
+}`}
+        </ResponseBlock>
+
+        <div className="mt-6 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-amber-900 dark:text-amber-300 text-sm">{t('docsPage.transformationsApi.dryRunNote')}</div>
+              <div className="text-amber-700 dark:text-amber-400 text-sm mt-1">
+                {t('docsPage.transformationsApi.dryRunNoteDesc')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProps) {
   const { t } = useTranslation();
   return (
@@ -1246,14 +1378,16 @@ response = requests.post(
 access_token = response.json()['accessToken']`,
     },
     createProject: {
-      curl: `curl -X POST http://localhost:8080/api/v1/projects \\
+      curl: `# Project creation requires JWT (dashboard operation)
+curl -X POST http://localhost:8080/api/v1/projects \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
     "name": "Production",
     "description": "Production webhooks"
   }'`,
-      node: `const response = await fetch('http://localhost:8080/api/v1/projects', {
+      node: `// Project creation requires JWT (dashboard operation)
+const response = await fetch('http://localhost:8080/api/v1/projects', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_JWT_TOKEN',
@@ -1265,7 +1399,8 @@ access_token = response.json()['accessToken']`,
   })
 });
 const project = await response.json();`,
-      python: `import requests
+      python: `# Project creation requires JWT (dashboard operation)
+import requests
 
 response = requests.post(
     'http://localhost:8080/api/v1/projects',
@@ -1275,13 +1410,15 @@ response = requests.post(
 project = response.json()`,
     },
     createApiKey: {
-      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/api-keys \\
+      curl: `# API key creation requires JWT (dashboard operation)
+curl -X POST http://localhost:8080/api/v1/projects/{projectId}/api-keys \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
     "name": "Production API Key"
   }'`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/api-keys\`, {
+      node: `// API key creation requires JWT (dashboard operation)
+const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/api-keys\`, {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_JWT_TOKEN',
@@ -1290,7 +1427,8 @@ project = response.json()`,
   body: JSON.stringify({ name: 'Production API Key' })
 });
 const apiKey = await response.json();`,
-      python: `import requests
+      python: `# API key creation requires JWT (dashboard operation)
+import requests
 
 response = requests.post(
     f'http://localhost:8080/api/v1/projects/{project_id}/api-keys',
@@ -1301,73 +1439,63 @@ api_key = response.json()`,
     },
     createEndpoint: {
       curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "url": "https://api.customer.com/webhooks",
     "description": "Production webhooks",
     "enabled": true
   }'`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints\`, {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_JWT_TOKEN',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    url: 'https://api.customer.com/webhooks',
-    description: 'Production webhooks',
-    enabled: true
-  })
-});
-const endpoint = await response.json();`,
-      python: `import requests
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    json={
-        'url': 'https://api.customer.com/webhooks',
-        'description': 'Production webhooks',
-        'enabled': True
-    }
-)
-endpoint = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const endpoint = await hookflow.endpoints.create(projectId, {
+  url: 'https://api.customer.com/webhooks',
+  description: 'Production webhooks',
+  enabled: true
+});`,
+      python: `from hookflow import Hookflow, EndpointCreateParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+endpoint = hookflow.endpoints.create(
+    project_id,
+    EndpointCreateParams(
+        url='https://api.customer.com/webhooks',
+        description='Production webhooks'
+    )
+)`,
     },
     createSubscription: {
       curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "endpointId": "endpoint-uuid",
     "eventType": "order.completed",
     "enabled": true
   }'`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions\`, {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_JWT_TOKEN',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    endpointId: 'endpoint-uuid',
-    eventType: 'order.completed',
-    enabled: true
-  })
-});
-const subscription = await response.json();`,
-      python: `import requests
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    json={
-        'endpointId': 'endpoint-uuid',
-        'eventType': 'order.completed',
-        'enabled': True
-    }
-)
-subscription = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const subscription = await hookflow.subscriptions.create(projectId, {
+  endpointId: 'endpoint-uuid',
+  eventType: 'order.completed',
+  enabled: true
+});`,
+      python: `from hookflow import Hookflow, SubscriptionCreateParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+subscription = hookflow.subscriptions.create(
+    project_id,
+    SubscriptionCreateParams(
+        endpoint_id='endpoint-uuid',
+        event_type='order.completed'
+    )
+)`,
     },
     sendEvent: {
       curl: `curl -X POST http://localhost:8080/api/v1/events \\
@@ -1382,348 +1510,527 @@ subscription = response.json()`,
       "currency": "USD"
     }
   }'`,
-      node: `const response = await fetch('http://localhost:8080/api/v1/events', {
-  method: 'POST',
-  headers: {
-    'X-API-Key': 'wh_live_YOUR_API_KEY',
-    'Content-Type': 'application/json',
-    'Idempotency-Key': 'unique-request-id'
-  },
-  body: JSON.stringify({
-    type: 'order.completed',
-    data: {
-      orderId: 'ord_12345',
-      amount: 99.99,
-      currency: 'USD'
-    }
-  })
-});
-const event = await response.json();`,
-      python: `import requests
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    'http://localhost:8080/api/v1/events',
-    headers={
-        'X-API-Key': 'wh_live_YOUR_API_KEY',
-        'Idempotency-Key': 'unique-request-id'
-    },
-    json={
-        'type': 'order.completed',
-        'data': {
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const event = await hookflow.events.send({
+  type: 'order.completed',
+  data: {
+    orderId: 'ord_12345',
+    amount: 99.99,
+    currency: 'USD'
+  }
+}, 'unique-request-id');  // optional idempotency key`,
+      python: `from hookflow import Hookflow, Event
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+event = hookflow.events.send(
+    Event(
+        type='order.completed',
+        data={
             'orderId': 'ord_12345',
             'amount': 99.99,
             'currency': 'USD'
         }
-    }
-)
-event = response.json()`,
+    ),
+    idempotency_key='unique-request-id'  # optional
+)`,
     },
     verifySignature: {
-      curl: `# Signature verification is done server-side`,
-      node: `const crypto = require('crypto');
+      curl: `# Signature verification is done on your server when
+# receiving webhook deliveries from Hookflow`,
+      node: `import { verifySignature } from '@webhook-platform/node';
 
-function verifyWebhookSignature(req) {
+app.post('/webhooks', (req, res) => {
   const signature = req.headers['x-signature'];
   const timestamp = req.headers['x-timestamp'];
   const body = JSON.stringify(req.body);
-  
-  const [, sig] = signature.split('v1=');
   const secret = process.env.WEBHOOK_SECRET;
-  
-  const payload = \`\${timestamp}.\${body}\`;
-  const expectedSig = crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-  
-  return crypto.timingSafeEqual(
-    Buffer.from(sig),
-    Buffer.from(expectedSig)
-  );
-}`,
-      python: `import hmac
-import hashlib
 
-def verify_webhook_signature(request):
+  if (!verifySignature(body, signature, timestamp, secret)) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Process the webhook
+  console.log('Verified webhook:', req.body);
+  res.status(200).send('OK');
+});`,
+      python: `from hookflow import verify_signature
+
+@app.post("/webhooks")
+def handle_webhook():
     signature = request.headers.get('X-Signature')
     timestamp = request.headers.get('X-Timestamp')
     body = request.get_data(as_text=True)
-    
-    sig = signature.split('v1=')[1]
     secret = os.environ['WEBHOOK_SECRET']
-    
-    payload = f"{timestamp}.{body}"
-    expected_sig = hmac.new(
-        secret.encode(),
-        payload.encode(),
-        hashlib.sha256
-    ).hexdigest()
-    
-    return hmac.compare_digest(sig, expected_sig)`,
+
+    if not verify_signature(body, signature, timestamp, secret):
+        return {"error": "Invalid signature"}, 401
+
+    # Process the webhook
+    print("Verified webhook:", request.json)
+    return {"status": "ok"}`,
     },
     listEndpoints: {
       curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/endpoints \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const endpoints = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-endpoints = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const endpoints = await hookflow.endpoints.list(projectId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+endpoints = hookflow.endpoints.list(project_id)`,
     },
     rotateSecret: {
       curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id}/rotate-secret \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}/rotate-secret\`, {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const endpoint = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}/rotate-secret',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-endpoint = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const endpoint = await hookflow.endpoints.rotateSecret(projectId, endpointId);
+console.log('New secret:', endpoint.secret);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+endpoint = hookflow.endpoints.rotate_secret(project_id, endpoint_id)
+print('New secret:', endpoint.secret)`,
     },
     listDeliveries: {
       curl: `curl -X GET "http://localhost:8080/api/v1/deliveries/projects/{projectId}?status=FAILED&page=0&size=20" \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/deliveries/projects/\${projectId}?status=FAILED&page=0&size=20\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const deliveries = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/deliveries/projects/{project_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    params={'status': 'FAILED', 'page': 0, 'size': 20}
-)
-deliveries = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const deliveries = await hookflow.deliveries.list(projectId, {
+  status: 'FAILED',
+  page: 0,
+  size: 20
+});`,
+      python: `from hookflow import Hookflow, DeliveryListParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+deliveries = hookflow.deliveries.list(
+    project_id,
+    DeliveryListParams(status='FAILED', page=0, size=20)
+)`,
     },
     getAttempts: {
       curl: `curl -X GET http://localhost:8080/api/v1/deliveries/{deliveryId}/attempts \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/deliveries/\${deliveryId}/attempts\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const attempts = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/deliveries/{delivery_id}/attempts',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-attempts = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const attempts = await hookflow.deliveries.getAttempts(deliveryId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+attempts = hookflow.deliveries.get_attempts(delivery_id)`,
     },
     replayDelivery: {
       curl: `curl -X POST http://localhost:8080/api/v1/deliveries/{deliveryId}/replay \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/deliveries/\${deliveryId}/replay\`, {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    f'http://localhost:8080/api/v1/deliveries/{delivery_id}/replay',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+await hookflow.deliveries.replay(deliveryId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+hookflow.deliveries.replay(delivery_id)`,
     },
     getEndpoint: {
       curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const endpoint = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-endpoint = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const endpoint = await hookflow.endpoints.get(projectId, endpointId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+endpoint = hookflow.endpoints.get(project_id, endpoint_id)`,
     },
     updateEndpoint: {
       curl: `curl -X PUT http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"url": "https://api.customer.com/webhooks/v2", "enabled": true}'`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}\`, {
-  method: 'PUT',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ url: 'https://api.customer.com/webhooks/v2', enabled: true })
-});`,
-      python: `import requests
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.put(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    json={'url': 'https://api.customer.com/webhooks/v2', 'enabled': True}
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const endpoint = await hookflow.endpoints.update(projectId, endpointId, {
+  url: 'https://api.customer.com/webhooks/v2',
+  enabled: true
+});`,
+      python: `from hookflow import Hookflow, EndpointUpdateParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+endpoint = hookflow.endpoints.update(
+    project_id, endpoint_id,
+    EndpointUpdateParams(url='https://api.customer.com/webhooks/v2', enabled=True)
 )`,
     },
     deleteEndpoint: {
       curl: `curl -X DELETE http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}\`, {
-  method: 'DELETE',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.delete(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+await hookflow.endpoints.delete(projectId, endpointId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+hookflow.endpoints.delete(project_id, endpoint_id)`,
     },
     testEndpoint: {
       curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id}/test \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/endpoints/\${endpointId}/test\`, {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const result = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    f'http://localhost:8080/api/v1/projects/{project_id}/endpoints/{endpoint_id}/test',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-result = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const result = await hookflow.endpoints.test(projectId, endpointId);
+console.log('Success:', result.success, 'Latency:', result.latencyMs, 'ms');`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+result = hookflow.endpoints.test(project_id, endpoint_id)
+print(f"Success: {result.success}, Latency: {result.latency_ms}ms")`,
     },
     listSubscriptions: {
       curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const subscriptions = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-subscriptions = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const subscriptions = await hookflow.subscriptions.list(projectId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+subscriptions = hookflow.subscriptions.list(project_id)`,
     },
     getSubscription: {
       curl: `curl -X GET http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const subscription = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-subscription = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const subscription = await hookflow.subscriptions.get(projectId, subscriptionId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+subscription = hookflow.subscriptions.get(project_id, subscription_id)`,
     },
     updateSubscription: {
       curl: `curl -X PUT http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"eventType": "order.completed", "enabled": true}'`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
-  method: 'PUT',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ eventType: 'order.completed', enabled: true })
-});`,
-      python: `import requests
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.put(
-    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    json={'eventType': 'order.completed', 'enabled': True}
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const subscription = await hookflow.subscriptions.update(
+  projectId, subscriptionId,
+  { eventType: 'order.completed', enabled: true }
+);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+subscription = hookflow.subscriptions.update(
+    project_id, subscription_id,
+    {'eventType': 'order.completed', 'enabled': True}
 )`,
     },
     deleteSubscription: {
       curl: `curl -X DELETE http://localhost:8080/api/v1/projects/{projectId}/subscriptions/{id} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `await fetch(\`http://localhost:8080/api/v1/projects/\${projectId}/subscriptions/\${subscriptionId}\`, {
-  method: 'DELETE',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.delete(
-    f'http://localhost:8080/api/v1/projects/{project_id}/subscriptions/{subscription_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+await hookflow.subscriptions.delete(projectId, subscriptionId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+hookflow.subscriptions.delete(project_id, subscription_id)`,
     },
     getDelivery: {
       curl: `curl -X GET http://localhost:8080/api/v1/deliveries/{deliveryId} \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"`,
-      node: `const response = await fetch(\`http://localhost:8080/api/v1/deliveries/\${deliveryId}\`, {
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN' }
-});
-const delivery = await response.json();`,
-      python: `import requests
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.get(
-    f'http://localhost:8080/api/v1/deliveries/{delivery_id}',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'}
-)
-delivery = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const delivery = await hookflow.deliveries.get(deliveryId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+delivery = hookflow.deliveries.get(delivery_id)`,
     },
     bulkReplay: {
       curl: `curl -X POST http://localhost:8080/api/v1/deliveries/bulk-replay \\
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"projectId": "project-uuid", "status": "FAILED"}'`,
-      node: `const response = await fetch('http://localhost:8080/api/v1/deliveries/bulk-replay', {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer YOUR_JWT_TOKEN', 'Content-Type': 'application/json' },
-  body: JSON.stringify({ projectId: 'project-uuid', status: 'FAILED' })
-});
-const result = await response.json();`,
-      python: `import requests
+      node: `import { Hookflow } from '@webhook-platform/node';
 
-response = requests.post(
-    'http://localhost:8080/api/v1/deliveries/bulk-replay',
-    headers={'Authorization': 'Bearer YOUR_JWT_TOKEN'},
-    json={'projectId': 'project-uuid', 'status': 'FAILED'}
-)
-result = response.json()`,
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const result = await hookflow.post('/api/v1/deliveries/bulk-replay', {
+  projectId: 'project-uuid',
+  status: 'FAILED'
+});`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+result = hookflow.post(
+    '/api/v1/deliveries/bulk-replay',
+    {'projectId': 'project-uuid', 'status': 'FAILED'}
+)`,
     },
     endpointVerification: {
       curl: `# Your endpoint receives:
 # POST with {"type": "webhook.verification", "challenge": "whc_..."}
 # You must return the challenge value in response`,
-      node: `app.post('/webhooks', (req, res) => {
+      node: `import { verifySignature, constructEvent } from '@webhook-platform/node';
+
+app.post('/webhooks', (req, res) => {
   // Handle verification challenge
   if (req.body.type === 'webhook.verification') {
     return res.json({ challenge: req.body.challenge });
   }
-  
-  // Process normal webhooks
-  console.log('Received:', req.body);
+
+  // Verify signature and process webhook
+  const secret = process.env.WEBHOOK_SECRET;
+  const event = constructEvent(req.body, req.headers, secret);
+  console.log('Received:', event);
   res.status(200).send('OK');
 });`,
-      python: `from flask import Flask, request, jsonify
+      python: `from hookflow import verify_signature
 
 @app.post("/webhooks")
 def handle_webhook():
     data = request.json
-    
+
     # Handle verification challenge
     if data.get("type") == "webhook.verification":
         return jsonify({"challenge": data["challenge"]})
-    
-    # Process normal webhooks
+
+    # Verify signature and process webhook
+    secret = os.environ['WEBHOOK_SECRET']
+    verify_signature(request.get_data(as_text=True),
+                     request.headers.get('X-Signature'),
+                     request.headers.get('X-Timestamp'),
+                     secret)
     print("Received:", data)
     return {"status": "ok"}`,
+    },
+    transformPreview: {
+      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/transform-preview \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "inputPayload": "{\\"orderId\\": \\"ord_123\\", \\"amount\\": 99.99}",
+    "template": "{\\"id\\": \\"$.orderId\\", \\"total\\": \\"$.amount\\"}"
+  }'`,
+      node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const result = await hookflow.post(
+  \`/api/v1/projects/\${projectId}/transform-preview\`,
+  {
+    inputPayload: JSON.stringify({ orderId: 'ord_123', amount: 99.99 }),
+    template: JSON.stringify({ id: '$.orderId', total: '$.amount' })
+  }
+);
+console.log('Transformed:', result.output);`,
+      python: `from hookflow import Hookflow
+import json
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+result = hookflow.post(
+    f'/api/v1/projects/{project_id}/transform-preview',
+    {
+        'inputPayload': json.dumps({'orderId': 'ord_123', 'amount': 99.99}),
+        'template': json.dumps({'id': '$.orderId', 'total': '$.amount'})
+    }
+)
+print('Transformed:', result['output'])`,
+    },
+    deliveryDryRun: {
+      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/delivery-dry-run \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "endpointId": "endpoint-uuid",
+    "eventType": "order.completed",
+    "payload": "{\\"orderId\\": \\"ord_123\\"}",
+    "transformationId": "transform-uuid"
+  }'`,
+      node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const dryRun = await hookflow.post(
+  \`/api/v1/projects/\${projectId}/delivery-dry-run\`,
+  {
+    endpointId: 'endpoint-uuid',
+    eventType: 'order.completed',
+    payload: JSON.stringify({ orderId: 'ord_123' }),
+    transformationId: 'transform-uuid'
+  }
+);
+console.log('URL:', dryRun.endpointUrl);
+console.log('Headers:', dryRun.headers);
+console.log('Body:', dryRun.transformedPayload);`,
+      python: `from hookflow import Hookflow
+import json
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+dry_run = hookflow.post(
+    f'/api/v1/projects/{project_id}/delivery-dry-run',
+    {
+        'endpointId': 'endpoint-uuid',
+        'eventType': 'order.completed',
+        'payload': json.dumps({'orderId': 'ord_123'}),
+        'transformationId': 'transform-uuid'
+    }
+)
+print('URL:', dry_run['endpointUrl'])
+print('Headers:', dry_run['headers'])
+print('Body:', dry_run['transformedPayload'])`,
+    },
+    createIncomingSource: {
+      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Stripe Webhooks",
+    "slug": "stripe",
+    "verificationMethod": "HMAC_SHA256",
+    "secret": "whsec_stripe_secret"
+  }'`,
+      node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const source = await hookflow.incomingSources.create(projectId, {
+  name: 'Stripe Webhooks',
+  slug: 'stripe',
+  verificationMethod: 'HMAC_SHA256',
+  secret: 'whsec_stripe_secret'
+});
+console.log('Ingress URL:', source.ingressUrl);`,
+      python: `from hookflow import Hookflow, IncomingSourceCreateParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+source = hookflow.incoming_sources.create(
+    project_id,
+    IncomingSourceCreateParams(
+        name='Stripe Webhooks',
+        slug='stripe',
+        verification_method='HMAC_SHA256',
+        secret='whsec_stripe_secret'
+    )
+)
+print('Ingress URL:', source.ingress_url)`,
+    },
+    createIncomingDestination: {
+      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "url": "https://your-api.com/stripe-handler",
+    "enabled": true
+  }'`,
+      node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const destination = await hookflow.incomingSources.createDestination(
+  projectId, sourceId,
+  { url: 'https://your-api.com/stripe-handler', enabled: true }
+);`,
+      python: `from hookflow import Hookflow, IncomingDestinationCreateParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+destination = hookflow.incoming_sources.create_destination(
+    project_id, source_id,
+    IncomingDestinationCreateParams(
+        url='https://your-api.com/stripe-handler',
+        enabled=True
+    )
+)`,
+    },
+    listIncomingEvents: {
+      curl: `curl -X GET "http://localhost:8080/api/v1/projects/{projectId}/incoming-events?sourceId={sourceId}&page=0&size=20" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const events = await hookflow.incomingEvents.list(projectId, {
+  sourceId: sourceId,
+  page: 0,
+  size: 20
+});`,
+      python: `from hookflow import Hookflow, IncomingEventListParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+events = hookflow.incoming_events.list(
+    project_id,
+    IncomingEventListParams(source_id=source_id, page=0, size=20)
+)`,
+    },
+    replayIncomingEvent: {
+      curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-events/{eventId}/replay \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY"`,
+      node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const result = await hookflow.incomingEvents.replay(projectId, eventId);`,
+      python: `from hookflow import Hookflow
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+result = hookflow.incoming_events.replay(project_id, event_id)`,
     },
   };
 
@@ -1768,8 +2075,8 @@ function IncomingWebhooks({ activeLanguage, setActiveLanguage }: { activeLanguag
   const { t } = useTranslation();
 
   const createSourceCode = {
-    curl: `curl -X POST https://your-api.com/api/v1/projects/{projectId}/incoming-sources \\
-  -H "Authorization: Bearer <token>" \\
+    curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "name": "Stripe Webhooks",
@@ -1779,32 +2086,36 @@ function IncomingWebhooks({ activeLanguage, setActiveLanguage }: { activeLanguag
     "hmacSecret": "whsec_...",
     "hmacHeaderName": "Stripe-Signature"
   }'`,
-    node: `const source = await client.incomingSources.create(projectId, {
+    node: `import { Hookflow } from '@webhook-platform/node';
+
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const source = await hookflow.incomingSources.create(projectId, {
   name: 'Stripe Webhooks',
   slug: 'stripe',
-  providerType: 'STRIPE',
-  verificationMode: 'HMAC_GENERIC',
-  hmacSecret: 'whsec_...',
-  hmacHeaderName: 'Stripe-Signature'
-});`,
-    python: `from hookflow.types import IncomingSourceCreateParams
+  verificationMethod: 'HMAC_SHA256',
+  secret: 'whsec_...'
+});
+console.log('Ingress URL:', source.ingressUrl);`,
+    python: `from hookflow import Hookflow, IncomingSourceCreateParams
 
-source = client.incoming_sources.create(
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+source = hookflow.incoming_sources.create(
     project_id,
     IncomingSourceCreateParams(
-        name="Stripe Webhooks",
-        slug="stripe",
-        provider_type="STRIPE",
-        verification_mode="HMAC_GENERIC",
-        hmac_secret="whsec_...",
-        hmac_header_name="Stripe-Signature"
+        name='Stripe Webhooks',
+        slug='stripe',
+        verification_method='HMAC_SHA256',
+        secret='whsec_...'
     )
-)`
+)
+print('Ingress URL:', source.ingress_url)`
   };
 
   const createDestCode = {
-    curl: `curl -X POST https://your-api.com/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations \\
-  -H "Authorization: Bearer <token>" \\
+    curl: `curl -X POST http://localhost:8080/api/v1/projects/{projectId}/incoming-sources/{sourceId}/destinations \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "url": "https://your-api.com/webhooks/stripe",
@@ -1812,22 +2123,24 @@ source = client.incoming_sources.create(
     "maxAttempts": 5,
     "timeoutSeconds": 30
   }'`,
-    node: `const dest = await client.incomingSources.createDestination(projectId, sourceId, {
-  url: 'https://your-api.com/webhooks/stripe',
-  enabled: true,
-  maxAttempts: 5,
-  timeoutSeconds: 30
-});`,
-    python: `from hookflow.types import IncomingDestinationCreateParams
+    node: `import { Hookflow } from '@webhook-platform/node';
 
-dest = client.incoming_sources.create_destination(
+const hookflow = new Hookflow({ apiKey: 'wh_live_YOUR_API_KEY' });
+
+const dest = await hookflow.incomingSources.createDestination(projectId, sourceId, {
+  url: 'https://your-api.com/webhooks/stripe',
+  enabled: true
+});`,
+    python: `from hookflow import Hookflow, IncomingDestinationCreateParams
+
+hookflow = Hookflow(api_key='wh_live_YOUR_API_KEY')
+
+dest = hookflow.incoming_sources.create_destination(
     project_id,
     source_id,
     IncomingDestinationCreateParams(
-        url="https://your-api.com/webhooks/stripe",
-        enabled=True,
-        max_attempts=5,
-        timeout_seconds=30
+        url='https://your-api.com/webhooks/stripe',
+        enabled=True
     )
 )`
   };
@@ -2175,7 +2488,7 @@ echo "Event created: {$event['eventId']}\\n";
 echo "Deliveries created: {$event['deliveriesCreated']}\\n";` },
       curl: { label: 'bash', code: `# Send an event
 curl -X POST http://localhost:8080/api/v1/events \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "type": "order.completed",
@@ -2207,7 +2520,7 @@ $event = $client->events->send(
 );` },
       curl: { label: 'bash', code: `# Send event with idempotency key
 curl -X POST http://localhost:8080/api/v1/events \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -H "Idempotency-Key: unique-key" \\
   -d '{"type":"order.completed","data":{"orderId":"123"}}'` },
@@ -2297,17 +2610,17 @@ $status = $result['success'] ? 'passed' : 'failed';
 echo "Test {$status}: {$result['latencyMs']}ms\\n";` },
       curl: { label: 'bash', code: `# Create endpoint
 curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"url":"https://api.example.com/webhooks","description":"Production","enabled":true}'
 
 # List endpoints
 curl http://localhost:8080/api/v1/projects/{projectId}/endpoints \\
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "X-API-Key: wh_live_YOUR_API_KEY"
 
 # Rotate secret
 curl -X POST http://localhost:8080/api/v1/projects/{projectId}/endpoints/{id}/rotate-secret \\
-  -H "Authorization: Bearer YOUR_API_KEY"` },
+  -H "X-API-Key: wh_live_YOUR_API_KEY"` },
     },
     subscriptions: {
       node: { label: 'typescript', code: `// Subscribe endpoint to event type
@@ -2371,13 +2684,13 @@ $client->subscriptions->update($projectId, $subscriptionId, [
 $client->subscriptions->delete($projectId, $subscriptionId);` },
       curl: { label: 'bash', code: `# Create subscription
 curl -X POST http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"endpointId":"endpoint-uuid","eventType":"order.completed","enabled":true}'
 
 # List subscriptions
 curl http://localhost:8080/api/v1/projects/{projectId}/subscriptions \\
-  -H "Authorization: Bearer YOUR_API_KEY"` },
+  -H "X-API-Key: wh_live_YOUR_API_KEY"` },
     },
     deliveries: {
       node: { label: 'typescript', code: `// List deliveries with filters
@@ -2432,16 +2745,16 @@ foreach ($attempts as $attempt) {
 // Replay failed delivery
 $client->deliveries->replay($deliveryId);` },
       curl: { label: 'bash', code: `# List failed deliveries
-curl "http://localhost:8080/api/v1/projects/{projectId}/deliveries?status=FAILED&page=0&size=20" \\
-  -H "Authorization: Bearer YOUR_API_KEY"
+curl "http://localhost:8080/api/v1/deliveries/projects/{projectId}?status=FAILED&page=0&size=20" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY"
 
 # Get delivery attempts
 curl http://localhost:8080/api/v1/deliveries/{deliveryId}/attempts \\
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "X-API-Key: wh_live_YOUR_API_KEY"
 
 # Replay a delivery
 curl -X POST http://localhost:8080/api/v1/deliveries/{deliveryId}/replay \\
-  -H "Authorization: Bearer YOUR_API_KEY"` },
+  -H "X-API-Key: wh_live_YOUR_API_KEY"` },
     },
     verify: {
       node: { label: 'typescript', code: `import { verifySignature, constructEvent } from '@webhook-platform/node';
@@ -2617,7 +2930,7 @@ try {
 # Example: check for rate limit
 RESPONSE=$(curl -s -w "\\n%{http_code}" -X POST \\
   http://localhost:8080/api/v1/events \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-API-Key: wh_live_YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"type":"test","data":{}}')
 
