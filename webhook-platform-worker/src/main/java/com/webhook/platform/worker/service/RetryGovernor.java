@@ -40,6 +40,7 @@ public class RetryGovernor {
     private final AtomicInteger consecutiveFailures = new AtomicInteger(0);
     private final AtomicInteger cooldownRemaining = new AtomicInteger(0);
     private final AtomicLong lastPendingCount = new AtomicLong(0);
+    private final AtomicLong recommendedPollIntervalMs = new AtomicLong(10_000);
 
     /**
      * @param name            identifier for logging/metrics (e.g. "outgoing", "incoming-forward")
@@ -67,6 +68,8 @@ public class RetryGovernor {
         Gauge.builder("retry_governor_cooldown_remaining", cooldownRemaining, AtomicInteger::doubleValue)
                 .tag("scheduler", name).register(meterRegistry);
         Gauge.builder("retry_governor_pending_count", lastPendingCount, AtomicLong::doubleValue)
+                .tag("scheduler", name).register(meterRegistry);
+        Gauge.builder("retry_governor_recommended_poll_interval_ms", recommendedPollIntervalMs, AtomicLong::doubleValue)
                 .tag("scheduler", name).register(meterRegistry);
     }
 
@@ -166,5 +169,29 @@ public class RetryGovernor {
     /** Current cooldown remaining (for testing). */
     public int getCooldownRemaining() {
         return cooldownRemaining.get();
+    }
+
+    /**
+     * Recommends poll interval in milliseconds based on pending queue depth.
+     * Allows aggressive polling when backlog is high, backs off when queue is empty.
+     *
+     * @param pendingCount current pending retries count
+     * @return recommended poll interval in milliseconds
+     */
+    public long getRecommendedPollIntervalMs(long pendingCount) {
+        long interval;
+        if (pendingCount < 0) {
+            interval = 10_000; // Unknown queue depth, use default
+        } else if (pendingCount == 0) {
+            interval = 30_000; // Empty queue, back off to 30s
+        } else if (pendingCount < 100) {
+            interval = 10_000; // Light load, 10s
+        } else if (pendingCount < 1000) {
+            interval = 5_000; // Medium load, 5s
+        } else {
+            interval = 2_000; // Heavy backlog, aggressive 2s polling
+        }
+        recommendedPollIntervalMs.set(interval);
+        return interval;
     }
 }

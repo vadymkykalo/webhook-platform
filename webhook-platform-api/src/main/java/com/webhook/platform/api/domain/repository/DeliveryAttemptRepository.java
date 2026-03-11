@@ -46,6 +46,21 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
     @Modifying(clearAutomatically = true)
     @Query(value = """
         WITH rows_to_delete AS (
+            SELECT id 
+            FROM delivery_attempts 
+            WHERE created_at < :cutoffTime 
+            AND http_status_code >= 200 AND http_status_code < 300
+            ORDER BY created_at ASC 
+            LIMIT :limit
+        )
+        DELETE FROM delivery_attempts 
+        WHERE id IN (SELECT id FROM rows_to_delete)
+        """, nativeQuery = true)
+    int deleteOldSuccessfulAttempts(@Param("cutoffTime") Instant cutoffTime, @Param("limit") int limit);
+    
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        WITH rows_to_delete AS (
             SELECT id FROM (
                 SELECT id, 
                        ROW_NUMBER() OVER (PARTITION BY delivery_id ORDER BY attempt_number DESC) as rn

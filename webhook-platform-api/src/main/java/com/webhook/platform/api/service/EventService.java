@@ -240,7 +240,7 @@ public class EventService {
                 .id(event.getId())
                 .projectId(event.getProjectId())
                 .eventType(event.getEventType())
-                .payload(event.getPayload())
+                .payload(event.getDecompressedPayload())
                 .createdAt(event.getCreatedAt())
                 .build();
     }
@@ -250,7 +250,7 @@ public class EventService {
                 .id(event.getId())
                 .projectId(event.getProjectId())
                 .eventType(event.getEventType())
-                .payload(event.getPayload())
+                .payload(event.getDecompressedPayload())
                 .createdAt(event.getCreatedAt())
                 .deliveriesCreated(deliveriesCreated)
                 .build();

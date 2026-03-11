@@ -26,6 +26,7 @@ public class DataRetentionService {
     private final MeterRegistry meterRegistry;
     private final int outboxRetentionDays;
     private final int deliveryAttemptsRetentionDays;
+    private final int successfulAttemptsRetentionDays;
     private final int incomingEventsRetentionDays;
     private final int maxAttemptsPerDelivery;
     private final int batchSize;
@@ -38,6 +39,7 @@ public class DataRetentionService {
             MeterRegistry meterRegistry,
             @Value("${data-retention.outbox-retention-days:7}") int outboxRetentionDays,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
+            @Value("${data-retention.successful-attempts-retention-days:14}") int successfulAttemptsRetentionDays,
             @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
             @Value("${data-retention.max-attempts-per-delivery:10}") int maxAttemptsPerDelivery,
             @Value("${data-retention.batch-size:1000}") int batchSize) {
@@ -47,6 +49,7 @@ public class DataRetentionService {
         this.meterRegistry = meterRegistry;
         this.outboxRetentionDays = outboxRetentionDays;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
+        this.successfulAttemptsRetentionDays = successfulAttemptsRetentionDays;
         this.incomingEventsRetentionDays = incomingEventsRetentionDays;
         this.maxAttemptsPerDelivery = maxAttemptsPerDelivery;
         this.batchSize = batchSize;
@@ -55,8 +58,8 @@ public class DataRetentionService {
                 .description("Total number of delivery attempts in storage")
                 .register(meterRegistry);
         
-        log.info("Data retention configured: outbox={}d, attempts={}d, incoming={}d, maxPerDelivery={}, batchSize={}", 
-                outboxRetentionDays, deliveryAttemptsRetentionDays, incomingEventsRetentionDays, maxAttemptsPerDelivery, batchSize);
+        log.info("Data retention configured: outbox={}d, attempts={}d (success={}d), incoming={}d, maxPerDelivery={}, batchSize={}", 
+                outboxRetentionDays, deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, maxAttemptsPerDelivery, batchSize);
     }
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
@@ -100,12 +103,45 @@ public class DataRetentionService {
     }
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
+    @SchedulerLock(name = "cleanupOldSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
+    @Transactional
+    public void cleanupOldSuccessfulAttempts() {
+        Instant cutoffTime = Instant.now().minusSeconds(successfulAttemptsRetentionDays * 86400L);
+        
+        log.info("Starting successful delivery attempts cleanup (2xx status) for attempts older than {}", cutoffTime);
+        
+        int totalDeleted = 0;
+        int deletedInBatch;
+        
+        do {
+            deletedInBatch = deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize);
+            totalDeleted += deletedInBatch;
+            
+            if (deletedInBatch > 0) {
+                log.debug("Deleted {} successful attempts in batch", deletedInBatch);
+            }
+        } while (deletedInBatch >= batchSize);
+        
+        if (totalDeleted > 0) {
+            Counter.builder("delivery_attempts_cleanup_total")
+                    .tag("type", "success_age_based")
+                    .register(meterRegistry)
+                    .increment(totalDeleted);
+            log.info("Successful attempts cleanup: deleted {} attempts (older than {}d)", totalDeleted, successfulAttemptsRetentionDays);
+        } else {
+            log.debug("Successful attempts cleanup: no old attempts to delete");
+        }
+        
+        updateMetrics();
+    }
+    
+    @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldDeliveryAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     @Transactional
     public void cleanupOldDeliveryAttempts() {
         Instant cutoffTime = Instant.now().minusSeconds(deliveryAttemptsRetentionDays * 86400L);
         
-        log.info("Starting delivery attempts cleanup for attempts older than {}", cutoffTime);
+        log.info("Starting ALL delivery attempts cleanup (errors + edge cases) for attempts older than {}", cutoffTime);
         
         int totalDeleted = 0;
         int deletedInBatch;
@@ -124,7 +160,7 @@ public class DataRetentionService {
                     .tag("type", "age_based")
                     .register(meterRegistry)
                     .increment(totalDeleted);
-            log.info("Age-based cleanup: deleted {} delivery attempts", totalDeleted);
+            log.info("Age-based cleanup: deleted {} delivery attempts (older than {}d)", totalDeleted, deliveryAttemptsRetentionDays);
         } else {
             log.debug("Delivery attempts cleanup: no old attempts to delete");
         }

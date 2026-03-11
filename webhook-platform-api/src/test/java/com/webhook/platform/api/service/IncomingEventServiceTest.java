@@ -65,7 +65,7 @@ class IncomingEventServiceTest {
     private final UUID sourceId = UUID.randomUUID();
     private final UUID eventId = UUID.randomUUID();
     private final UUID destId = UUID.randomUUID();
-    private final AuthContext auth = new AuthContext(UUID.randomUUID(), orgId, MembershipRole.OWNER, null);
+    private final AuthContext auth = new AuthContext(UUID.randomUUID(), orgId, MembershipRole.OWNER, null, null);
 
     private Project project;
     private IncomingSource source;

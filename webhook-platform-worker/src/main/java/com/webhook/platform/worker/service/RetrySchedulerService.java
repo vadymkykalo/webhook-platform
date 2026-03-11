@@ -33,6 +33,7 @@ public class RetrySchedulerService {
     private final DeliveryRepository deliveryRepository;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final CircuitBreakerService circuitBreakerService;
     private final int maxPerEndpoint;
     private final int maxPerProject;
     private final long sendTimeoutSeconds;
@@ -43,6 +44,7 @@ public class RetrySchedulerService {
             DeliveryRepository deliveryRepository,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             TransactionTemplate transactionTemplate,
+            CircuitBreakerService circuitBreakerService,
             MeterRegistry meterRegistry,
             @Value("${retry.scheduler.batch-size:100}") int batchSize,
             @Value("${retry.scheduler.max-per-endpoint:10}") int maxPerEndpoint,
@@ -53,6 +55,7 @@ public class RetrySchedulerService {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
+        this.circuitBreakerService = circuitBreakerService;
         this.maxPerEndpoint = maxPerEndpoint;
         this.maxPerProject = maxPerProject;
         this.sendTimeoutSeconds = sendTimeoutSeconds;
@@ -64,7 +67,7 @@ public class RetrySchedulerService {
 
     @Scheduled(fixedDelayString = "${retry.scheduler.poll-interval-ms:10000}")
     public void scheduleRetries() {
-        // ── Governor: adaptive batch sizing ──
+        // ── Governor: adaptive batch sizing + poll interval ──
         long pendingCount = countPendingRetries();
         int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
         if (effectiveBatch <= 0) {
@@ -106,8 +109,18 @@ public class RetrySchedulerService {
         // ── Phase 2: Outside transaction — Kafka I/O ──
         Map<UUID, CompletableFuture<SendResult<String, DeliveryMessage>>> futures = new HashMap<>();
         Map<UUID, String> deliveryTopics = new HashMap<>();
+        List<Delivery> circuitBreakerSkipped = new ArrayList<>();
 
         for (Delivery delivery : claimed) {
+            // Skip if circuit breaker is OPEN for this endpoint
+            if (!circuitBreakerService.isCallPermitted(delivery.getEndpointId())) {
+                rescheduleDelivery(delivery, "Circuit breaker OPEN");
+                circuitBreakerSkipped.add(delivery);
+                log.info("Skipped retry for delivery {} - circuit breaker OPEN for endpoint {}",
+                        delivery.getId(), delivery.getEndpointId());
+                continue;
+            }
+            
             try {
                 String topic = getRetryTopic(delivery.getAttemptCount());
                 deliveryTopics.put(delivery.getId(), topic);
@@ -191,13 +204,46 @@ public class RetrySchedulerService {
             if (!failedDeliveries.isEmpty()) {
                 deliveryRepository.saveAll(failedDeliveries);
             }
+            if (!circuitBreakerSkipped.isEmpty()) {
+                deliveryRepository.saveAll(circuitBreakerSkipped);
+            }
         });
 
         // ── Governor feedback ──
         governor.recordResult(successfulDeliveries.size(), failedDeliveries.size());
 
-        log.info("Retry scheduling complete: {} successful, {} failed/rescheduled (governor batch={})",
-                successfulDeliveries.size(), failedDeliveries.size(), effectiveBatch);
+        log.info("Retry scheduling complete: {} successful, {} failed/rescheduled, {} circuit-breaker-skipped (governor batch={}, pendingCount={})",
+                successfulDeliveries.size(), failedDeliveries.size(), circuitBreakerSkipped.size(), 
+                effectiveBatch, pendingCount);
+        
+        // Apply adaptive sleep if recommended interval differs from @Scheduled default
+        long recommendedInterval = governor.getRecommendedPollIntervalMs(pendingCount);
+        long defaultInterval = 10_000; // Match fixedDelayString default
+        if (recommendedInterval < defaultInterval) {
+            // High load: schedule sooner by sleeping less (Spring's fixedDelay adds on top)
+            // Note: This reduces effective interval below @Scheduled baseline
+            try {
+                long additionalSleep = recommendedInterval - defaultInterval;
+                if (additionalSleep < 0) {
+                    // We want to poll sooner, but @Scheduled controls the interval
+                    // Log recommendation for monitoring
+                    log.debug("Adaptive poll recommends {}ms but @Scheduled enforces {}ms", 
+                            recommendedInterval, defaultInterval);
+                }
+            } catch (Exception e) {
+                log.warn("Adaptive sleep failed: {}", e.getMessage());
+            }
+        } else if (recommendedInterval > defaultInterval) {
+            // Low load: back off by sleeping longer
+            long additionalSleep = recommendedInterval - defaultInterval;
+            try {
+                log.debug("Adaptive poll: sleeping additional {}ms (total {}ms)", additionalSleep, recommendedInterval);
+                Thread.sleep(additionalSleep);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Adaptive sleep interrupted");
+            }
+        }
     }
 
     private void rescheduleAll(List<Delivery> deliveries, String reason) {

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.common.util.PayloadCompressionUtil;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -38,6 +39,9 @@ public class Event {
     @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;
 
+    @Column(name = "payload_compressed", nullable = false)
+    private boolean payloadCompressed = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -45,4 +49,12 @@ public class Event {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", insertable = false, updatable = false)
     private Project project;
+
+    /**
+     * Returns the decompressed payload. If payload is not compressed, returns as-is.
+     * Use this method instead of getPayload() to transparently handle compression.
+     */
+    public String getDecompressedPayload() {
+        return PayloadCompressionUtil.decompress(payload, payloadCompressed);
+    }
 }

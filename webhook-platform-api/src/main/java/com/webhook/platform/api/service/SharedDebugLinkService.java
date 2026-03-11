@@ -120,7 +120,7 @@ public class SharedDebugLinkService {
         Project project = projectRepository.findById(link.getProjectId())
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        String sanitizedPayload = piiMaskingService.sanitizePayload(link.getProjectId(), event.getPayload());
+        String sanitizedPayload = piiMaskingService.sanitizePayload(link.getProjectId(), event.getDecompressedPayload());
 
         return SharedDebugLinkPublicResponse.builder()
                 .eventType(event.getEventType())

@@ -43,8 +43,8 @@ public class EventDiffService {
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Right event not found"));
 
-        String leftPayload = leftEvent.getPayload();
-        String rightPayload = rightEvent.getPayload();
+        String leftPayload = leftEvent.getDecompressedPayload();
+        String rightPayload = rightEvent.getDecompressedPayload();
 
         if (sanitize) {
             leftPayload = piiMaskingService.sanitizePayload(projectId, leftPayload);

@@ -40,6 +40,7 @@ public class AuthContextArgumentResolver implements HandlerMethodArgumentResolve
                     jwt.getUserId(),
                     jwt.getOrganizationId(),
                     jwt.getRole(),
+                    null,
                     null
             );
         }
@@ -52,7 +53,8 @@ public class AuthContextArgumentResolver implements HandlerMethodArgumentResolve
                     null,
                     project.getOrganizationId(),
                     MembershipRole.API_KEY,
-                    apiKey.getProjectId()
+                    apiKey.getProjectId(),
+                    apiKey.getScope()
             );
         }
 

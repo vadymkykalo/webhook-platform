@@ -90,6 +90,7 @@ outbox:
 data-retention:
   outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
   delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
+  successful-attempts-retention-days: ${DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS:14}
   incoming-events-retention-days: ${DATA_RETENTION_INCOMING_EVENTS_DAYS:30}
   max-attempts-per-delivery: ${DATA_RETENTION_MAX_ATTEMPTS_PER_DELIVERY:10}
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
@@ -119,6 +120,7 @@ webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
   encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
   max-payload-size-bytes: ${WEBHOOK_MAX_PAYLOAD_SIZE_BYTES:262144}
+  payload-compression-threshold-bytes: ${WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES:1024}
   url-validation:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
