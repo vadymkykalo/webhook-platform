@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
 import com.webhook.platform.api.dto.OnboardingStatusResponse;
@@ -28,6 +29,7 @@ public class DashboardService {
     private final ApiKeyRepository apiKeyRepository;
     private final IncomingSourceRepository incomingSourceRepository;
     private final IncomingDestinationRepository incomingDestinationRepository;
+    private final MaterializedViewRepository materializedViewRepository;
     
     public DashboardService(
             ProjectRepository projectRepository,
@@ -37,7 +39,8 @@ public class DashboardService {
             SubscriptionRepository subscriptionRepository,
             ApiKeyRepository apiKeyRepository,
             IncomingSourceRepository incomingSourceRepository,
-            IncomingDestinationRepository incomingDestinationRepository) {
+            IncomingDestinationRepository incomingDestinationRepository,
+            MaterializedViewRepository materializedViewRepository) {
         this.projectRepository = projectRepository;
         this.eventRepository = eventRepository;
         this.deliveryRepository = deliveryRepository;
@@ -46,6 +49,7 @@ public class DashboardService {
         this.apiKeyRepository = apiKeyRepository;
         this.incomingSourceRepository = incomingSourceRepository;
         this.incomingDestinationRepository = incomingDestinationRepository;
+        this.materializedViewRepository = materializedViewRepository;
     }
     
     public OnboardingStatusResponse getOnboardingStatus(UUID projectId, UUID organizationId) {
@@ -88,20 +92,14 @@ public class DashboardService {
     }
     
     private DashboardStatsResponse.DeliveryStats calculateDeliveryStats(UUID projectId, Instant since) {
-        List<Object[]> statusCounts = deliveryRepository.countByProjectIdGroupByStatus(projectId, since);
+        // Use materialized view instead of runtime GROUP BY (refreshed every 5 min)
+        Map<String, Long> statusCounts = materializedViewRepository.getDeliveryStatsByProject(projectId);
         
-        long total = 0, successful = 0, failed = 0, dlq = 0, pending = 0;
-        for (Object[] row : statusCounts) {
-            String status = (String) row[0];
-            long count = ((Number) row[1]).longValue();
-            total += count;
-            switch (status) {
-                case "SUCCESS": successful = count; break;
-                case "FAILED": failed = count; break;
-                case "DLQ": dlq = count; break;
-                case "PENDING": case "PROCESSING": pending += count; break;
-            }
-        }
+        long successful = statusCounts.getOrDefault(DeliveryStatus.SUCCESS.name(), 0L);
+        long failed = statusCounts.getOrDefault(DeliveryStatus.FAILED.name(), 0L);
+        long dlq = statusCounts.getOrDefault(DeliveryStatus.DLQ.name(), 0L);
+        long pending = statusCounts.getOrDefault(DeliveryStatus.PENDING.name(), 0L) + statusCounts.getOrDefault(DeliveryStatus.PROCESSING.name(), 0L);
+        long total = successful + failed + dlq + pending;
         
         double successRate = total > 0 ? (successful * 100.0 / total) : 0.0;
         

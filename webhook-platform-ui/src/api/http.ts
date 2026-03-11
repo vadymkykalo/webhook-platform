@@ -19,6 +19,7 @@ class HttpClient {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true, // Send cookies with requests
     });
 
     this.client.interceptors.request.use((config) => {
@@ -53,16 +54,11 @@ class HttpClient {
           this.isRefreshing = true;
 
           try {
-            const response = await this.client.post('/api/v1/auth/refresh', {
-              refreshToken: this.refreshToken,
-            });
+            const response = await this.client.post('/api/v1/auth/refresh', {});
 
-            const { accessToken, refreshToken: newRefreshToken } = response.data;
+            const { accessToken } = response.data;
 
             this.token = accessToken;
-            this.refreshToken = newRefreshToken;
-            localStorage.setItem('auth_token', accessToken);
-            localStorage.setItem('refresh_token', newRefreshToken);
 
             this.refreshSubscribers.forEach((cb) => cb(accessToken));
             this.refreshSubscribers = [];
@@ -73,9 +69,7 @@ class HttpClient {
             this.refreshSubscribers = [];
             this.token = null;
             this.refreshToken = null;
-            localStorage.removeItem('auth_token');
             localStorage.removeItem('auth_user');
-            localStorage.removeItem('refresh_token');
             if (this.onLogout) {
               this.onLogout();
             }

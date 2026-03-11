@@ -32,4 +32,16 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
     @Query("SELECT MAX(a.attemptNumber) FROM IncomingForwardAttempt a " +
             "WHERE a.incomingEventId = :eventId AND a.destinationId = :destinationId")
     Integer findMaxAttemptNumber(@Param("eventId") UUID eventId, @Param("destinationId") UUID destinationId);
+
+    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a " +
+            "JOIN IncomingEvent e ON a.incomingEventId = e.id " +
+            "JOIN IncomingSource s ON e.incomingSourceId = s.id " +
+            "WHERE s.projectId = :projectId AND a.status = 'SUCCESS' AND a.finishedAt BETWEEN :from AND :to")
+    long countSuccessfulByProjectAndDateRange(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a " +
+            "JOIN IncomingEvent e ON a.incomingEventId = e.id " +
+            "JOIN IncomingSource s ON e.incomingSourceId = s.id " +
+            "WHERE s.projectId = :projectId AND a.status = 'SUCCESS' AND a.finishedAt >= :since")
+    long countSuccessfulByProjectSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
 }

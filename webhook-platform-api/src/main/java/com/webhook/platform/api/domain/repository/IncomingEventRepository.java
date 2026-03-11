@@ -45,4 +45,12 @@ public interface IncomingEventRepository extends JpaRepository<IncomingEvent, UU
             @Param("to") Instant to,
             @Param("verified") Boolean verified,
             Pageable pageable);
+
+    @Query("SELECT COUNT(e) FROM IncomingEvent e JOIN IncomingSource s ON e.incomingSourceId = s.id " +
+            "WHERE s.projectId = :projectId AND e.receivedAt BETWEEN :from AND :to")
+    long countByProjectAndDateRange(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("SELECT COUNT(e) FROM IncomingEvent e JOIN IncomingSource s ON e.incomingSourceId = s.id " +
+            "WHERE s.projectId = :projectId AND e.receivedAt >= :since")
+    long countByProjectSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
 }

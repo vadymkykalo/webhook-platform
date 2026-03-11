@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.UsageStatsResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,9 @@ public class UsageService {
     private final IncomingSourceRepository incomingSourceRepository;
     private final AlertRuleRepository alertRuleRepository;
     private final UsageDailyRepository usageDailyRepository;
+    private final IncomingEventRepository incomingEventRepository;
+    private final IncomingForwardAttemptRepository incomingForwardAttemptRepository;
+    private final MaterializedViewRepository materializedViewRepository;
 
     @Transactional(readOnly = true)
     public UsageStatsResponse getUsage(UUID projectId, UUID organizationId, int historyDays) {
@@ -37,28 +41,23 @@ public class UsageService {
 
         historyDays = Math.min(historyDays, 90);
 
-        // Live counts use status-grouped query (bounded by time window, uses partial indexes)
+        // Use materialized view for delivery stats (refreshed every 5 min)
         Instant since30d = Instant.now().minus(30, ChronoUnit.DAYS);
-        List<Object[]> statusCounts = deliveryRepository.countByProjectIdGroupByStatus(projectId, since30d);
+        Map<String, Long> statusCounts = materializedViewRepository.getDeliveryStatsByProject(projectId);
 
-        long totalDeliveries = 0, successDeliveries = 0, failedDeliveries = 0, dlqDeliveries = 0, pendingDeliveries = 0;
-        for (Object[] row : statusCounts) {
-            String status = (String) row[0];
-            long count = ((Number) row[1]).longValue();
-            totalDeliveries += count;
-            switch (status) {
-                case "SUCCESS" -> successDeliveries = count;
-                case "FAILED" -> failedDeliveries = count;
-                case "DLQ" -> dlqDeliveries = count;
-                case "PENDING", "PROCESSING" -> pendingDeliveries += count;
-            }
-        }
+        long successDeliveries = statusCounts.getOrDefault(DeliveryStatus.SUCCESS.name(), 0L);
+        long failedDeliveries = statusCounts.getOrDefault(DeliveryStatus.FAILED.name(), 0L);
+        long dlqDeliveries = statusCounts.getOrDefault(DeliveryStatus.DLQ.name(), 0L);
+        long pendingDeliveries = statusCounts.getOrDefault(DeliveryStatus.PENDING.name(), 0L) + statusCounts.getOrDefault(DeliveryStatus.PROCESSING.name(), 0L);
+        long totalDeliveries = successDeliveries + failedDeliveries + dlqDeliveries + pendingDeliveries;
 
         Instant since30dEvents = Instant.now().minus(30, ChronoUnit.DAYS);
         long totalEvents = eventRepository.countByProjectIdAndCreatedAtBetween(projectId, since30dEvents, Instant.now());
         long activeEndpoints = endpointRepository.countByProjectIdAndDeletedAtIsNull(projectId);
         long activeSources = incomingSourceRepository.countByProjectId(projectId);
         long activeAlertRules = alertRuleRepository.countByProjectId(projectId);
+        long totalIncomingEvents = incomingEventRepository.countByProjectSince(projectId, since30dEvents);
+        long totalIncomingForwards = incomingForwardAttemptRepository.countSuccessfulByProjectSince(projectId, since30dEvents);
 
         UsageStatsResponse.LiveUsage live = UsageStatsResponse.LiveUsage.builder()
                 .totalEvents(totalEvents)
@@ -67,8 +66,8 @@ public class UsageService {
                 .failedDeliveries(failedDeliveries)
                 .dlqDeliveries(dlqDeliveries)
                 .pendingDeliveries(pendingDeliveries)
-                .totalIncomingEvents(0)
-                .totalIncomingForwards(0)
+                .totalIncomingEvents(totalIncomingEvents)
+                .totalIncomingForwards(totalIncomingForwards)
                 .activeEndpoints(activeEndpoints)
                 .activeIncomingSources(activeSources)
                 .activeAlertRules(activeAlertRules)
