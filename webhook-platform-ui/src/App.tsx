@@ -33,28 +33,29 @@ export default function App() {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore auth state on mount
+  // Restore auth state on mount via silent refresh (cookie-based)
   useEffect(() => {
-    const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
-
-    const storedRefreshToken = localStorage.getItem('refresh_token');
-    if (storedToken && storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setToken(storedToken);
-        setRefreshToken(storedRefreshToken);
-        setUser(parsedUser);
-        http.setToken(storedToken);
-        http.setRefreshToken(storedRefreshToken);
-      } catch (err) {
-        console.error('Failed to restore auth state:', err);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('refresh_token');
-      }
+    
+    if (storedUser) {
+      // Try silent refresh to get new access token from httpOnly cookie
+      authApi.refresh()
+        .then((response) => {
+          const parsedUser = JSON.parse(storedUser);
+          setToken(response.accessToken);
+          setUser(parsedUser);
+          http.setToken(response.accessToken);
+        })
+        .catch(() => {
+          // Refresh failed, clear stored user
+          localStorage.removeItem('auth_user');
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -63,8 +64,12 @@ export default function App() {
     }
   }, [token]);
 
+  // refreshToken no longer used (httpOnly cookie handles it)
   useEffect(() => {
-    http.setRefreshToken(refreshToken);
+    if (refreshToken) {
+      // Legacy cleanup
+      setRefreshToken(null);
+    }
   }, [refreshToken]);
 
   useEffect(() => {
@@ -81,26 +86,21 @@ export default function App() {
     token,
     refreshToken,
     isAuthenticated: !!user && !!token,
-    login: (newToken: string, newRefreshToken: string, newUser: CurrentUserResponse) => {
+    login: (newToken: string, _newRefreshToken: string, newUser: CurrentUserResponse) => {
       setToken(newToken);
-      setRefreshToken(newRefreshToken);
       setUser(newUser);
       http.setToken(newToken);
-      http.setRefreshToken(newRefreshToken);
-      localStorage.setItem('auth_token', newToken);
-      localStorage.setItem('refresh_token', newRefreshToken);
+      // refreshToken in httpOnly cookie, not stored in JS
       localStorage.setItem('auth_user', JSON.stringify(newUser));
     },
     logout: () => {
-      authApi.logout(refreshToken || '').catch(() => { });
+      authApi.logout('').catch(() => { });
       setToken(null);
       setRefreshToken(null);
       setUser(null);
       http.setToken(null);
       http.setRefreshToken(null);
-      localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
-      localStorage.removeItem('refresh_token');
     },
     updateUser: (newUser: CurrentUserResponse) => {
       setUser(newUser);

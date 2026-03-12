@@ -1,0 +1,99 @@
+# Production overrides for Hookflow Helm chart
+# Usage: helm install hookflow ./hookflow -f values-production.yaml
+
+api:
+  replicaCount: 3
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 768Mi
+    limits:
+      cpu: 2000m
+      memory: 1536Mi
+  
+  env:
+    APP_ENV: production
+    LOG_LEVEL: WARN
+    EMAIL_ENABLED: "true"
+  
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 70
+  
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+worker:
+  replicaCount: 3
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 4000m
+      memory: 2Gi
+  
+  env:
+    APP_ENV: production
+    LOG_LEVEL: WARN
+    KAFKA_DELIVERY_CONCURRENCY: "12"
+  
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 60
+  
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+ui:
+  replicaCount: 2
+  
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+# Use external managed services in production
+postgresql:
+  enabled: false
+
+kafka:
+  enabled: false
+
+redis:
+  enabled: true
+  master:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+    persistence:
+      size: 5Gi
+
+# Enable network policies for security
+networkPolicy:
+  enabled: true
+
+# Pod anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - hookflow
+          topologyKey: kubernetes.io/hostname

@@ -1,0 +1,30 @@
+apiVersion: v2
+name: hookflow
+description: Self-hosted webhook infrastructure platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - webhooks
+  - event-delivery
+  - api
+  - automation
+home: https://github.com/vadymkykalo/webhook-platform
+sources:
+  - https://github.com/vadymkykalo/webhook-platform
+maintainers:
+  - name: Hookflow Team
+    email: info@hookflow.dev
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: kafka
+    version: "26.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: kafka.enabled

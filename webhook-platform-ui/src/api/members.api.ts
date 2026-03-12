@@ -9,7 +9,6 @@ export interface MemberResponse {
   role: MembershipRole;
   status: MembershipStatus;
   createdAt: string;
-  inviteToken?: string;
 }
 
 export interface AddMemberRequest {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Copy, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { membersApi, MembershipRole } from '../api/members.api';
@@ -34,15 +34,10 @@ export default function AddMemberModal({
   const [role, setRole] = useState<MembershipRole>('DEVELOPER');
   const [adding, setAdding] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
   const handleClose = () => {
     setEmail('');
     setRole('DEVELOPER');
     setErrors({});
-    setInviteLink(null);
-    setCopied(false);
     onClose();
   };
 
@@ -59,14 +54,6 @@ export default function AddMemberModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleCopy = () => {
-    if (!inviteLink) return;
-    navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    showSuccess(t('members.toast.linkCopied'));
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -81,15 +68,14 @@ export default function AddMemberModal({
         role,
       });
       
-      if (response.status === 'INVITED' && response.inviteToken) {
-        const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(response.inviteToken)}&orgId=${encodeURIComponent(orgId)}`;
-        setInviteLink(link);
+      // Invite token is sent via email only (not returned in API response for security)
+      if (response.status === 'INVITED') {
         showSuccess(t('members.toast.invited'));
       } else {
         showSuccess(t('members.toast.added'));
-        handleClose();
       }
       
+      handleClose();
       onSuccess();
     } catch (err: any) {
       showApiError(err, 'members.toast.addFailed');
@@ -108,37 +94,7 @@ export default function AddMemberModal({
           </DialogDescription>
         </DialogHeader>
 
-        {inviteLink ? (
-          <div className="space-y-4 py-4">
-            <div className="flex items-center gap-2 text-green-600 mb-2">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="text-sm font-medium">{t('members.addModal.inviteSent')}</span>
-            </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5">
-                <LinkIcon className="h-3.5 w-3.5" />
-                {t('members.addModal.inviteLink')}
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  value={inviteLink}
-                  readOnly
-                  className="font-mono text-xs"
-                />
-                <Button variant="outline" size="icon" onClick={handleCopy} title={t('members.addModal.copyLink')}>
-                  {copied ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t('members.addModal.inviteLinkHint')}
-              </p>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleClose}>{t('common.done')}</Button>
-            </DialogFooter>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="email">
@@ -197,8 +153,7 @@ export default function AddMemberModal({
                 {adding ? t('members.addModal.adding') : t('members.addModal.submit')}
               </Button>
             </DialogFooter>
-          </form>
-        )}
+        </form>
       </DialogContent>
     </Dialog>
   );

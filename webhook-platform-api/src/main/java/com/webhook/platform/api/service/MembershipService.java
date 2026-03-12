@@ -122,7 +122,6 @@ public class MembershipService {
                 .role(membership.getRole())
                 .status(membership.getStatus())
                 .createdAt(membership.getCreatedAt())
-                .inviteToken(membership.getInviteToken())
                 .build();
     }
 

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.security;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.ForbiddenException;
 
@@ -11,20 +12,21 @@ import java.util.UUID;
  * automatically via {@link AuthContextArgumentResolver}.
  *
  * <ul>
- *   <li>JWT auth → userId + organizationId + role from token, apiKeyProjectId = null</li>
+ *   <li>JWT auth → userId + organizationId + role from token, apiKeyProjectId = null, apiKeyScope = null</li>
  *   <li>API Key auth → userId = null, organizationId from project lookup, role = API_KEY,
- *       apiKeyProjectId = key's project</li>
+ *       apiKeyProjectId = key's project, apiKeyScope = key's scope</li>
  * </ul>
  */
 public record AuthContext(
         UUID userId,
         UUID organizationId,
         MembershipRole role,
-        UUID apiKeyProjectId
+        UUID apiKeyProjectId,
+        ApiKeyScope apiKeyScope
 ) {
 
     public void requireWriteAccess() {
-        RbacUtil.requireWriteAccess(role);
+        RbacUtil.requireWriteAccess(role, apiKeyScope);
     }
 
     public void requireOwnerAccess() {

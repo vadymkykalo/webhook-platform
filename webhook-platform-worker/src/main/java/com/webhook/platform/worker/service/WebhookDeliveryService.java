@@ -618,14 +618,20 @@ public class WebhookDeliveryService {
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody,
             String responseHeaders, String requestHeaders, String requestBody,
             String errorMessage, int durationMs) {
+        // Differential truncation: 2KB for success, 10KB for errors
+        // Rationale: success responses are less interesting, errors need full context for debugging
+        boolean isSuccess = statusCode != null && statusCode >= 200 && statusCode < 300;
+        int responseBodyLimit = isSuccess ? 2048 : 10240; // 2KB vs 10KB
+        int requestBodyLimit = 10240; // Always keep 10KB of request for debugging
+        
         DeliveryAttempt attempt = DeliveryAttempt.builder()
                 .deliveryId(delivery.getId())
                 .attemptNumber(delivery.getAttemptCount())
                 .requestHeaders(requestHeaders)
-                .requestBody(truncate(requestBody, 100000)) // 100KB limit
+                .requestBody(truncate(requestBody, requestBodyLimit))
                 .httpStatusCode(statusCode)
                 .responseHeaders(responseHeaders)
-                .responseBody(truncate(responseBody, 100000)) // 100KB limit
+                .responseBody(truncate(responseBody, responseBodyLimit))
                 .errorMessage(errorMessage)
                 .durationMs(durationMs)
                 .build();

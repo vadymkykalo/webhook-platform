@@ -42,6 +42,9 @@ class RetrySchedulerServiceTest {
         @Mock
         private TransactionTemplate transactionTemplate;
 
+        @Mock
+        private CircuitBreakerService circuitBreakerService;
+
         private RetrySchedulerService retrySchedulerService;
 
         private final int batchSize = 100;
@@ -65,10 +68,14 @@ class RetrySchedulerServiceTest {
                 // Governor needs countPending — stub it to return low count (no throttling)
                 lenient().when(deliveryRepository.countPending(any(Instant.class))).thenReturn(0L);
 
+                // Circuit breaker should allow all calls by default in tests
+                lenient().when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
+
                 retrySchedulerService = new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
                                 transactionTemplate,
+                                circuitBreakerService,
                                 new SimpleMeterRegistry(),
                                 batchSize,
                                 10,  // maxPerEndpoint

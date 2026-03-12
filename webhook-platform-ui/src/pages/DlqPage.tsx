@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square, Search, X, Calendar } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
@@ -32,6 +32,9 @@ export default function DlqPage() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [endpointFilter, setEndpointFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [retrying, setRetrying] = useState(false);
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
@@ -41,7 +44,7 @@ export default function DlqPage() {
     if (projectId) {
       loadData();
     }
-  }, [projectId, page, endpointFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, page, endpointFilter, searchQuery, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     if (!projectId) return;
@@ -50,7 +53,12 @@ export default function DlqPage() {
       setLoading(true);
       const [projectData, dlqData, statsData, endpointsData] = await Promise.all([
         projectsApi.get(projectId),
-        dlqApi.list(projectId, page, 20, endpointFilter || undefined),
+        dlqApi.list(projectId, page, 20, {
+          endpointId: endpointFilter || undefined,
+          search: searchQuery || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        }),
         dlqApi.getStats(projectId),
         endpointsApi.list(projectId),
       ]);
@@ -193,17 +201,82 @@ export default function DlqPage() {
 
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex items-end gap-3">
-            <div className="space-y-1.5 flex-1">
-              <Label htmlFor="endpointFilter" className="text-xs">{t('dlq.filterEndpoint')}</Label>
-              <Select id="endpointFilter" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
-                <option value="">{t('dlq.allEndpoints')}</option>
-                {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
-              </Select>
+          <div className="space-y-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder={t('dlq.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+                className="w-full pl-9 pr-9 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => { setSearchQuery(''); setPage(0); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
-            <Button variant="outline" size="icon-sm" onClick={loadData} title={t('analytics.refresh')}>
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
+
+            {/* Filters */}
+            <div className="flex items-end gap-3 flex-wrap">
+              <div className="space-y-1.5 flex-1 min-w-[200px]">
+                <Label htmlFor="endpointFilter" className="text-xs">{t('dlq.filterEndpoint')}</Label>
+                <Select id="endpointFilter" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
+                  <option value="">{t('dlq.allEndpoints')}</option>
+                  {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="dateFrom" className="text-xs flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {t('dlq.filterFrom')}
+                </Label>
+                <input
+                  type="date"
+                  id="dateFrom"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
+                  className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="dateTo" className="text-xs flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {t('dlq.filterTo')}
+                </Label>
+                <input
+                  type="date"
+                  id="dateTo"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
+                  className="px-3 py-2 text-sm border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <Button variant="outline" size="icon-sm" onClick={loadData} title={t('analytics.refresh')}>
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            {/* Active filters indicator */}
+            {(searchQuery || endpointFilter || dateFrom || dateTo) && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{t('dlq.activeFilters')}:</span>
+                {searchQuery && <span className="px-2 py-1 bg-primary/10 text-primary rounded">{t('dlq.searchActive')}</span>}
+                {endpointFilter && <span className="px-2 py-1 bg-primary/10 text-primary rounded">{t('dlq.endpointFiltered')}</span>}
+                {(dateFrom || dateTo) && <span className="px-2 py-1 bg-primary/10 text-primary rounded">{t('dlq.dateFiltered')}</span>}
+                <button onClick={() => { setSearchQuery(''); setEndpointFilter(''); setDateFrom(''); setDateTo(''); setPage(0); }} className="text-primary hover:underline">
+                  {t('dlq.clearFilters')}
+                </button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

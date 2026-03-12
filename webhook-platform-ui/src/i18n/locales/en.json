@@ -137,7 +137,9 @@
     "piiRules": "PII Masking",
     "eventDiff": "Event Diff",
     "automation": "Automation",
-    "workflows": "Workflows"
+    "workflows": "Workflows",
+    "showAdvanced": "Show Advanced Features",
+    "hideAdvanced": "Hide Advanced Features"
   },
   "auth": {
     "login": {
@@ -1091,6 +1093,14 @@
     "last7d": "Last 7 Days",
     "filterEndpoint": "Filter by Endpoint",
     "allEndpoints": "All endpoints",
+    "searchPlaceholder": "Search by event type or ID...",
+    "filterFrom": "From Date",
+    "filterTo": "To Date",
+    "activeFilters": "Active filters",
+    "searchActive": "Search",
+    "endpointFiltered": "Endpoint",
+    "dateFiltered": "Date range",
+    "clearFilters": "Clear all",
     "columns": {
       "eventType": "Event Type",
       "endpoint": "Endpoint",
@@ -2137,6 +2147,8 @@
     "pleaseWait": "Please wait a moment.",
     "success": "Email Verified!",
     "successDesc": "Your email has been successfully verified. You can now use all features.",
+    "successAutoLogin": "Your email has been verified! Logging you in automatically...",
+    "redirecting": "Redirecting to dashboard...",
     "goToDashboard": "Go to Dashboard",
     "errorTitle": "Verification Failed",
     "goToLogin": "Go to Login",

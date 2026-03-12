@@ -1,0 +1,293 @@
+# Default values for Hookflow self-hosted deployment
+# This is a YAML-formatted file.
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# API service configuration
+api:
+  replicaCount: 2
+  image:
+    repository: hookflow/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8080
+  
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  env:
+    APP_ENV: production
+    LOG_LEVEL: INFO
+    WEBHOOK_ALLOW_PRIVATE_IPS: "false"
+    SWAGGER_ENABLED: "false"
+    DB_POOL_MAX_SIZE: "20"
+    DB_POOL_MIN_IDLE: "15"
+  
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  
+  pdb:
+    enabled: false
+    minAvailable: 1
+
+# Worker service configuration
+worker:
+  replicaCount: 2
+  image:
+    repository: hookflow/worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 1536Mi
+  
+  env:
+    APP_ENV: production
+    LOG_LEVEL: INFO
+    KAFKA_DELIVERY_CONCURRENCY: "8"
+    DB_POOL_MAX_SIZE: "30"
+    DB_POOL_MIN_IDLE: "20"
+  
+  livenessProbe:
+    httpGet:
+      path: /actuator/health/liveness
+      port: 8081
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /actuator/health/readiness
+      port: 8081
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+  
+  pdb:
+    enabled: false
+    minAvailable: 1
+
+# UI service configuration
+ui:
+  replicaCount: 2
+  image:
+    repository: hookflow/ui
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 80
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    hosts:
+      - host: app.hookflow.dev
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: hookflow-ui-tls
+        hosts:
+          - app.hookflow.dev
+
+# PostgreSQL configuration (embedded or external)
+postgresql:
+  enabled: false  # Set to true to deploy PostgreSQL subchart
+  auth:
+    username: webhook_user
+    password: ""  # Use existingSecret instead
+    database: hookflow
+    existingSecret: hookflow-postgresql-secret
+  primary:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 20Gi
+  
+  # External PostgreSQL configuration
+  external:
+    host: ""  # e.g., postgres.example.com
+    port: 5432
+    database: hookflow
+    username: webhook_user
+    existingSecret: hookflow-postgresql-secret
+    existingSecretPasswordKey: password
+
+# Kafka configuration (embedded or external)
+kafka:
+  enabled: false  # Set to true to deploy Kafka subchart
+  replicaCount: 1
+  kraft:
+    enabled: true
+  listeners:
+    client:
+      protocol: PLAINTEXT
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  # Topic configuration
+  topicPartitions: 12  # Number of partitions for delivery topics
+  
+  # External Kafka configuration
+  external:
+    bootstrapServers: ""  # e.g., kafka-1:9092,kafka-2:9092,kafka-3:9092
+
+# Redis configuration (embedded or external)
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    existingSecret: hookflow-redis-secret
+    existingSecretPasswordKey: password
+  master:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    persistence:
+      enabled: true
+      size: 2Gi
+  
+  # External Redis configuration
+  external:
+    host: ""  # e.g., redis.example.com
+    port: 6379
+    existingSecret: hookflow-redis-secret
+    existingSecretPasswordKey: password
+
+# Secrets configuration
+secrets:
+  # Encryption key for webhook secrets (32 characters)
+  encryptionKey:
+    existingSecret: hookflow-secrets
+    key: encryption-key
+  
+  # JWT secret for authentication
+  jwtSecret:
+    existingSecret: hookflow-secrets
+    key: jwt-secret
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

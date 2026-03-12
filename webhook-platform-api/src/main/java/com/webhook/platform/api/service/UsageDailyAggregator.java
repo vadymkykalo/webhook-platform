@@ -26,6 +26,8 @@ public class UsageDailyAggregator {
     private final EventRepository eventRepository;
     private final DeliveryRepository deliveryRepository;
     private final UsageDailyRepository usageDailyRepository;
+    private final IncomingEventRepository incomingEventRepository;
+    private final IncomingForwardAttemptRepository incomingForwardAttemptRepository;
 
     @Scheduled(cron = "0 5 0 * * *")
     @SchedulerLock(name = "usage-daily-aggregator", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
@@ -62,6 +64,8 @@ public class UsageDailyAggregator {
         long successCount = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(projectId, DeliveryStatus.SUCCESS, dayStart, dayEnd);
         long failedCount = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(projectId, DeliveryStatus.FAILED, dayStart, dayEnd);
         long dlqCount = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(projectId, DeliveryStatus.DLQ, dayStart, dayEnd);
+        long incomingEventsCount = incomingEventRepository.countByProjectAndDateRange(projectId, dayStart, dayEnd);
+        long incomingForwardsCount = incomingForwardAttemptRepository.countSuccessfulByProjectAndDateRange(projectId, dayStart, dayEnd);
 
         UsageDaily usage = UsageDaily.builder()
                 .projectId(projectId)
@@ -71,8 +75,8 @@ public class UsageDailyAggregator {
                 .successfulDeliveries(successCount)
                 .failedDeliveries(failedCount)
                 .dlqCount(dlqCount)
-                .incomingEventsCount(0L)
-                .incomingForwardsCount(0L)
+                .incomingEventsCount(incomingEventsCount)
+                .incomingForwardsCount(incomingForwardsCount)
                 .build();
 
         usageDailyRepository.save(usage);

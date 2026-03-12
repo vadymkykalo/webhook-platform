@@ -14,8 +14,8 @@ export const authApi = {
     return http.get<CurrentUserResponse>('/api/v1/auth/me');
   },
 
-  refresh: (refreshToken: string): Promise<AuthResponse> => {
-    return http.post<AuthResponse>('/api/v1/auth/refresh', { refreshToken });
+  refresh: (): Promise<AuthResponse> => {
+    return http.post<AuthResponse>('/api/v1/auth/refresh', {});
   },
 
   verifyEmail: (token: string): Promise<void> => {

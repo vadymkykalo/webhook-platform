@@ -15,6 +15,7 @@ import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.util.EventTypeMatcher;
+import com.webhook.platform.common.util.PayloadCompressionUtil;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -49,6 +50,7 @@ public class EventIngestService {
     private final WorkflowTriggerService workflowTriggerService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
+    private final int compressionThresholdBytes;
 
     public EventIngestService(
             EventRepository eventRepository,
@@ -63,7 +65,8 @@ public class EventIngestService {
             RuleEngineService ruleEngineService,
             WorkflowTriggerService workflowTriggerService,
             PlatformTransactionManager transactionManager,
-            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes) {
+            @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
+            @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
@@ -77,6 +80,7 @@ public class EventIngestService {
         this.workflowTriggerService = workflowTriggerService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
+        this.compressionThresholdBytes = compressionThresholdBytes;
     }
 
     /** Carries event data out of the transaction for post-commit workflow triggering. */
@@ -173,7 +177,7 @@ public class EventIngestService {
         UUID ruleTransformationId = null;
 
         try {
-            eventJson = objectMapper.readTree(event.getPayload());
+            eventJson = objectMapper.readTree(event.getDecompressedPayload());
             ruleMatches = ruleEngineService.evaluate(projectId, request.getType(), eventJson, event.getId());
 
             for (RuleEngineService.RuleMatch match : ruleMatches) {
@@ -265,7 +269,7 @@ public class EventIngestService {
 
         return new IngestResult(
                 buildResponse(event, deliveriesCreated),
-                event.getId(), request.getType(), event.getPayload());
+                event.getId(), request.getType(), event.getDecompressedPayload());
     }
 
     private Event createEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
@@ -279,11 +283,16 @@ public class EventIngestService {
                                 + maxPayloadSizeBytes + " bytes)");
             }
 
+            // Compress large payloads to reduce DB storage
+            PayloadCompressionUtil.CompressionResult compression = 
+                    PayloadCompressionUtil.compress(payload, compressionThresholdBytes);
+            
             return Event.builder()
                     .projectId(projectId)
                     .eventType(request.getType())
                     .idempotencyKey(idempotencyKey)
-                    .payload(payload)
+                    .payload(compression.payload())
+                    .payloadCompressed(compression.compressed())
                     .build();
         } catch (IllegalArgumentException e) {
             throw e;

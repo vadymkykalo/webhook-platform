@@ -395,7 +395,7 @@ public class DeliveryService {
                 .endpointUrl(endpoint.getUrl())
                 .eventType(event.getEventType())
                 .idempotencyKey(idempotencyKey)
-                .payload(event.getPayload())
+                .payload(event.getDecompressedPayload())
                 .previousAttemptCount(delivery.getAttemptCount())
                 .maxAttempts(delivery.getMaxAttempts())
                 .currentStatus(delivery.getStatus().name())
