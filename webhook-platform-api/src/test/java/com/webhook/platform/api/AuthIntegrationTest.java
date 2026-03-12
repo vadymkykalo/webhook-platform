@@ -39,8 +39,9 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken").exists())
-                .andExpect(jsonPath("$.refreshToken").exists())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(jsonPath("$.emailVerified").value(false))
+                .andExpect(cookie().exists("refresh_token"))
                 .andReturn();
 
         AuthResponse authResponse = objectMapper.readValue(
@@ -78,8 +79,9 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
-                .andExpect(jsonPath("$.refreshToken").exists())
-                .andExpect(jsonPath("$.emailVerified").value(true));
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.emailVerified").value(true))
+                .andExpect(cookie().exists("refresh_token"));
     }
 
     @Test
