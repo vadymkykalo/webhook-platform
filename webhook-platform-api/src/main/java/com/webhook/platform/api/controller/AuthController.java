@@ -104,7 +104,7 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refreshToken(@CookieValue(value = "refresh_token", required = false) String cookieRefreshToken,
-            @Valid @RequestBody(required = false) RefreshTokenRequest request,
+            @RequestBody(required = false) RefreshTokenRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), null)) {

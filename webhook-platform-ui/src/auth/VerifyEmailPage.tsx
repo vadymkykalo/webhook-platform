@@ -4,11 +4,13 @@ import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
+import { useAuth } from './auth.store';
 
 export default function VerifyEmailPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const token = searchParams.get('token');
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -22,7 +24,9 @@ export default function VerifyEmailPage() {
     }
 
     authApi.verifyEmail(token)
-      .then(() => setStatus('success'))
+      .then(() => {
+        setStatus('success');
+      })
       .catch((err: any) => {
         setStatus('error');
         setErrorMessage(err.response?.data?.message || t('verifyEmail.failed'));
@@ -44,11 +48,9 @@ export default function VerifyEmailPage() {
           <>
             <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
             <h2 className="text-xl font-semibold text-green-700">{t('verifyEmail.success')}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t('verifyEmail.successDesc')}
-            </p>
-            <Button onClick={() => navigate('/admin/dashboard')} className="mt-4">
-              {t('verifyEmail.goToDashboard')}
+            <p className="text-sm text-muted-foreground">{t('verifyEmail.successDesc')}</p>
+            <Button onClick={() => navigate(isAuthenticated ? '/admin/dashboard' : '/login')} className="mt-4">
+              {isAuthenticated ? t('verifyEmail.goToDashboard') : t('verifyEmail.goToLogin')}
             </Button>
           </>
         )}

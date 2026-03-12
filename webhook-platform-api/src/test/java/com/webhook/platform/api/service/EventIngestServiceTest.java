@@ -71,7 +71,7 @@ class EventIngestServiceTest {
                 eventRepository, subscriptionRepository, deliveryRepository,
                 outboxMessageRepository, objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
-                ruleEngineService, workflowTriggerService, transactionManager, 262144L
+                ruleEngineService, workflowTriggerService, transactionManager, 262144L, 1024
         );
     }
 

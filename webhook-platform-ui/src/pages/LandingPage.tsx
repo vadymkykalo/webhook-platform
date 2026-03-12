@@ -1127,7 +1127,7 @@ function WorkflowAutomation() {
       step = (step + 1) % nodes.length;
     }, 1200);
     return () => clearInterval(interval);
-  }, []);
+  }, [nodes.length]);
 
   const features = [
     { icon: Workflow, title: t('landing.workflowAutomation.feature1'), desc: t('landing.workflowAutomation.feature1Desc'), color: 'text-violet-500' },

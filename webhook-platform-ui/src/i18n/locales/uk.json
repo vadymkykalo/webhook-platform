@@ -137,7 +137,9 @@
     "piiRules": "Маскування PII",
     "eventDiff": "Порівняння подій",
     "automation": "Автоматизація",
-    "workflows": "Воркфлоу"
+    "workflows": "Воркфлоу",
+    "showAdvanced": "Показати розширені функції",
+    "hideAdvanced": "Приховати розширені функції"
   },
   "auth": {
     "login": {
@@ -1091,6 +1093,14 @@
     "last7d": "Останні 7 днів",
     "filterEndpoint": "Фільтр за ендпоінтом",
     "allEndpoints": "Всі ендпоінти",
+    "searchPlaceholder": "Пошук за типом події або ID...",
+    "filterFrom": "Від дати",
+    "filterTo": "До дати",
+    "activeFilters": "Активні фільтри",
+    "searchActive": "Пошук",
+    "endpointFiltered": "Ендпоінт",
+    "dateFiltered": "Діапазон дат",
+    "clearFilters": "Очистити всі",
     "columns": {
       "eventType": "Тип події",
       "endpoint": "Ендпоінт",
@@ -2137,6 +2147,8 @@
     "pleaseWait": "Будь ласка, зачекайте.",
     "success": "Email підтверджено!",
     "successDesc": "Вашу електронну пошту успішно підтверджено. Тепер ви можете використовувати всі функції.",
+    "successAutoLogin": "Email підтверджено! Виконуємо автоматичний вхід...",
+    "redirecting": "Перенаправлення до панелі...",
     "goToDashboard": "До панелі",
     "errorTitle": "Помилка верифікації",
     "goToLogin": "До входу",

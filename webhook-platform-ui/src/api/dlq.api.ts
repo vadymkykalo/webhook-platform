@@ -29,9 +29,17 @@ export interface PageResponse<T> {
 }
 
 export const dlqApi = {
-  list: (projectId: string, page = 0, size = 20, endpointId?: string): Promise<PageResponse<DlqItemResponse>> => {
+  list: (projectId: string, page = 0, size = 20, filters?: {
+    endpointId?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<PageResponse<DlqItemResponse>> => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
-    if (endpointId) params.append('endpointId', endpointId);
+    if (filters?.endpointId) params.append('endpointId', filters.endpointId);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
     return http.get<PageResponse<DlqItemResponse>>(`/api/v1/projects/${projectId}/dlq?${params}`);
   },
 

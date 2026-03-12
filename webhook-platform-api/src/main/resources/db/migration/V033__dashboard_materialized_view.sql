@@ -2,13 +2,14 @@
 
 CREATE MATERIALIZED VIEW mv_delivery_stats AS
 SELECT 
-    project_id,
-    status::text,
+    e.project_id,
+    d.status::text,
     COUNT(*) as cnt,
-    DATE_TRUNC('day', created_at) as day
-FROM deliveries
-WHERE created_at > NOW() - INTERVAL '30 days'
-GROUP BY project_id, status, DATE_TRUNC('day', created_at);
+    DATE_TRUNC('day', d.created_at) as day
+FROM deliveries d
+JOIN events e ON d.event_id = e.id
+WHERE d.created_at > NOW() - INTERVAL '30 days'
+GROUP BY e.project_id, d.status, DATE_TRUNC('day', d.created_at);
 
 CREATE UNIQUE INDEX idx_mv_delivery_stats ON mv_delivery_stats(project_id, status, day);
 CREATE INDEX idx_mv_delivery_stats_day ON mv_delivery_stats(day DESC);

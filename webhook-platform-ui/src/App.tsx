@@ -86,7 +86,7 @@ export default function App() {
     token,
     refreshToken,
     isAuthenticated: !!user && !!token,
-    login: (newToken: string, newRefreshToken: string, newUser: CurrentUserResponse) => {
+    login: (newToken: string, _newRefreshToken: string, newUser: CurrentUserResponse) => {
       setToken(newToken);
       setUser(newUser);
       http.setToken(newToken);

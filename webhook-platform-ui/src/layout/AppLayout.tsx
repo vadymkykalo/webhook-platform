@@ -288,6 +288,10 @@ export default function AppLayout() {
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    const stored = localStorage.getItem('sidebar-show-advanced');
+    return stored === '1';
+  });
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
@@ -378,24 +382,29 @@ export default function AppLayout() {
               ))}
             </SidebarSection>
 
-            <SidebarSection label={t('nav.incoming')} collapsible storageKey="incoming" defaultOpen>
-              {getProjectIncomingNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
-              ))}
-            </SidebarSection>
+            {/* Advanced features - hidden by default */}
+            {showAdvanced && (
+              <>
+                <SidebarSection label={t('nav.incoming')} collapsible storageKey="incoming" defaultOpen>
+                  {getProjectIncomingNav(projectId).map((item) => (
+                    <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                  ))}
+                </SidebarSection>
 
-            {/* Pipeline & processing */}
-            <SidebarSection label={t('nav.pipeline')} collapsible storageKey="pipeline" defaultOpen>
-              {getProjectPipelineNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
-              ))}
-            </SidebarSection>
+                {/* Pipeline & processing */}
+                <SidebarSection label={t('nav.pipeline')} collapsible storageKey="pipeline" defaultOpen>
+                  {getProjectPipelineNav(projectId).map((item) => (
+                    <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                  ))}
+                </SidebarSection>
 
-            <SidebarSection label={t('nav.automation')} collapsible storageKey="automation" defaultOpen>
-              {getProjectAutomationNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
-              ))}
-            </SidebarSection>
+                <SidebarSection label={t('nav.automation')} collapsible storageKey="automation" defaultOpen>
+                  {getProjectAutomationNav(projectId).map((item) => (
+                    <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                  ))}
+                </SidebarSection>
+              </>
+            )}
 
             {/* Observability + Recovery */}
             <SidebarSection label={t('nav.observability')} collapsible storageKey="observability" defaultOpen>
@@ -417,11 +426,32 @@ export default function AppLayout() {
               ))}
             </SidebarSection>
 
-            <SidebarSection label={t('nav.devTools')} collapsible storageKey="devtools" defaultOpen={false}>
-              {getProjectDevToolsNav(projectId).map((item) => (
-                <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
-              ))}
-            </SidebarSection>
+            {showAdvanced && (
+              <SidebarSection label={t('nav.devTools')} collapsible storageKey="devtools" defaultOpen={false}>
+                {getProjectDevToolsNav(projectId).map((item) => (
+                  <NavLink key={item.path} item={item} onClick={isMobile ? () => setSidebarOpen(false) : undefined} />
+                ))}
+              </SidebarSection>
+            )}
+
+            {/* Advanced Toggle Button */}
+            <div className="px-3 pb-2">
+              <button
+                onClick={() => {
+                  const next = !showAdvanced;
+                  setShowAdvanced(next);
+                  localStorage.setItem('sidebar-show-advanced', next ? '1' : '0');
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/50 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                <span className="flex-1 text-left">{showAdvanced ? t('nav.hideAdvanced') : t('nav.showAdvanced')}</span>
+                <ChevronDown className={cn(
+                  "h-3 w-3 transition-transform duration-200",
+                  !showAdvanced && "-rotate-90"
+                )} />
+              </button>
+            </div>
           </>
         )}
 

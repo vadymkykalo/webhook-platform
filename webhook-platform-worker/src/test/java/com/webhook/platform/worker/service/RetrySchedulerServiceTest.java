@@ -42,6 +42,9 @@ class RetrySchedulerServiceTest {
         @Mock
         private TransactionTemplate transactionTemplate;
 
+        @Mock
+        private CircuitBreakerService circuitBreakerService;
+
         private RetrySchedulerService retrySchedulerService;
 
         private final int batchSize = 100;
@@ -69,6 +72,7 @@ class RetrySchedulerServiceTest {
                                 deliveryRepository,
                                 kafkaTemplate,
                                 transactionTemplate,
+                                circuitBreakerService,
                                 new SimpleMeterRegistry(),
                                 batchSize,
                                 10,  // maxPerEndpoint
