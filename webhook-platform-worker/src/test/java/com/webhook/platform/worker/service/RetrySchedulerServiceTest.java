@@ -68,6 +68,9 @@ class RetrySchedulerServiceTest {
                 // Governor needs countPending — stub it to return low count (no throttling)
                 lenient().when(deliveryRepository.countPending(any(Instant.class))).thenReturn(0L);
 
+                // Circuit breaker should allow all calls by default in tests
+                lenient().when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
+
                 retrySchedulerService = new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
