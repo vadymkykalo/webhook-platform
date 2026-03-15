@@ -66,6 +66,15 @@ postgresql:
 
 kafka:
   enabled: false
+  topicReplicationFactor: 3  # Production: 3-way replication across brokers
+  topicPartitions: 24        # Higher partition count for parallel consumers
+
+# Automated PostgreSQL backups
+backup:
+  enabled: true
+  schedule: "0 2 * * *"       # Daily at 2 AM UTC
+  retainCount: 14             # Keep 2 weeks of backups
+  storageSize: 50Gi
 
 redis:
   enabled: true

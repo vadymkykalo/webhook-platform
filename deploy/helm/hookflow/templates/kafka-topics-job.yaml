@@ -27,17 +27,18 @@ spec:
               set -e
               KAFKA_SERVER="{{ include "hookflow.kafka.bootstrapServers" . }}"
               PARTITIONS={{ .Values.kafka.topicPartitions | default 12 }}
+              RF={{ .Values.kafka.topicReplicationFactor | default 1 }}
               
-              echo "Creating Kafka topics with $PARTITIONS partitions..."
+              echo "Creating Kafka topics with $PARTITIONS partitions, RF=$RF..."
               
-              for topic in deliveries.dispatch deliveries.retry.1m deliveries.retry.5m deliveries.retry.15m deliveries.retry.1h deliveries.retry.6h deliveries.retry.24h deliveries.dlq; do
+              for topic in deliveries.dispatch deliveries.retry.1m deliveries.retry.5m deliveries.retry.15m deliveries.retry.1h deliveries.retry.6h deliveries.retry.24h deliveries.dlq incoming.forward.dispatch incoming.forward.retry; do
                 /opt/kafka/bin/kafka-topics.sh \
                   --bootstrap-server $KAFKA_SERVER \
                   --create \
                   --if-not-exists \
                   --topic $topic \
                   --partitions $PARTITIONS \
-                  --replication-factor 1 || true
+                  --replication-factor $RF || true
                 echo "  ✓ $topic"
               done
               
