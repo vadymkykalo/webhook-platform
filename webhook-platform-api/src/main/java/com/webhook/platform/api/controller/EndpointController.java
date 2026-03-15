@@ -1,10 +1,15 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.EndpointService;
+import com.webhook.platform.api.service.billing.QuotaType;
+import com.webhook.platform.api.service.billing.RequireFeature;
+import com.webhook.platform.api.service.billing.RequireQuota;
 import com.webhook.platform.api.service.EndpointVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -39,6 +44,8 @@ public class EndpointController {
 
     @Operation(summary = "Create endpoint", description = "Creates a new webhook endpoint for the project")
     @ApiResponse(responseCode = "201", description = "Endpoint created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireQuota(QuotaType.ENDPOINTS_PER_PROJECT)
     @PostMapping
     public ResponseEntity<EndpointResponse> createEndpoint(
             @PathVariable("projectId") UUID projectId,
@@ -76,6 +83,7 @@ public class EndpointController {
     }
 
     @Operation(summary = "Update endpoint", description = "Updates endpoint configuration")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
             @PathVariable("id") UUID id,
@@ -88,6 +96,7 @@ public class EndpointController {
 
     @Operation(summary = "Delete endpoint", description = "Deletes an endpoint")
     @ApiResponse(responseCode = "204", description = "Endpoint deleted")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEndpoint(
             @PathVariable("id") UUID id,
@@ -98,6 +107,7 @@ public class EndpointController {
     }
 
     @Operation(summary = "Rotate secret", description = "Generates a new webhook signing secret")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{id}/rotate-secret")
     public ResponseEntity<EndpointResponse> rotateSecret(
             @PathVariable("id") UUID id,
@@ -119,6 +129,8 @@ public class EndpointController {
     }
 
     @Operation(summary = "Configure mTLS", description = "Configures mutual TLS for the endpoint")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireFeature("mTLS")
     @PostMapping("/{id}/mtls")
     public ResponseEntity<EndpointResponse> configureMtls(
             @PathVariable("projectId") UUID projectId,
@@ -133,6 +145,8 @@ public class EndpointController {
     }
 
     @Operation(summary = "Disable mTLS", description = "Disables mutual TLS for the endpoint")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireFeature("mTLS")
     @DeleteMapping("/{id}/mtls")
     public ResponseEntity<EndpointResponse> disableMtls(
             @PathVariable("projectId") UUID projectId,
@@ -146,6 +160,7 @@ public class EndpointController {
     }
 
     @Operation(summary = "Verify endpoint", description = "Sends a verification challenge to the endpoint")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{id}/verify")
     public ResponseEntity<VerificationResponse> verifyEndpoint(
             @PathVariable("projectId") UUID projectId,
@@ -163,6 +178,7 @@ public class EndpointController {
     }
 
     @Operation(summary = "Skip verification", description = "Skips verification for trusted endpoints (admin only)")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{id}/skip-verification")
     public ResponseEntity<EndpointResponse> skipVerification(
             @PathVariable("projectId") UUID projectId,

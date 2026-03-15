@@ -1,18 +1,19 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import {
   RefreshCw, TrendingUp, Activity,
-  Clock, CheckCircle2, XCircle, AlertTriangle, Zap, Server
+  Clock, CheckCircle2, XCircle, AlertTriangle, Zap, Server, Radio
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics, queryKeys } from '../api/queries';
 import { formatTime, formatNumber } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
+import { Button } from '../components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 
 const CHART_COLORS = {
@@ -27,6 +28,7 @@ const PIE_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4
 export default function AnalyticsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<'24h' | '7d' | '30d'>('24h');
   const { data: analytics, isLoading: loading } = useAnalytics(projectId, period);
   const qc = useQueryClient();
@@ -47,7 +49,18 @@ export default function AnalyticsPage() {
   if (!analytics) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <EmptyState icon={AlertTriangle} title={t('analytics.noData')} description={t('analytics.noDataDesc')} docsLink="/docs#getting-started" />
+        <EmptyState
+          icon={AlertTriangle}
+          title={t('analytics.noData')}
+          description={t('analytics.noDataDesc')}
+          action={
+            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
+              <Radio className="h-3.5 w-3.5 mr-1.5" />
+              {t('events.sendTest', 'Send Test Event')}
+            </Button>
+          }
+          docsLink="/docs#getting-started"
+        />
       </div>
     );
   }

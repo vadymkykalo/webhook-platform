@@ -8,7 +8,6 @@ type OnLogoutCallback = () => void;
 class HttpClient {
   private client: AxiosInstance;
   private token: string | null = null;
-  private refreshToken: string | null = null;
   private isRefreshing = false;
   private refreshSubscribers: OnRefreshedCallback[] = [];
   private onLogout: OnLogoutCallback | null = null;
@@ -37,7 +36,6 @@ class HttpClient {
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          this.refreshToken &&
           !originalRequest.url?.includes('/api/v1/auth/refresh') &&
           !originalRequest.url?.includes('/api/v1/auth/login')
         ) {
@@ -68,7 +66,6 @@ class HttpClient {
           } catch (refreshError) {
             this.refreshSubscribers = [];
             this.token = null;
-            this.refreshToken = null;
             localStorage.removeItem('auth_user');
             if (this.onLogout) {
               this.onLogout();
@@ -90,14 +87,6 @@ class HttpClient {
 
   getToken(): string | null {
     return this.token;
-  }
-
-  setRefreshToken(refreshToken: string | null) {
-    this.refreshToken = refreshToken;
-  }
-
-  getRefreshToken(): string | null {
-    return this.refreshToken;
   }
 
   setOnLogout(callback: OnLogoutCallback | null) {

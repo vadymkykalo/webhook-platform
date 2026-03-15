@@ -1,10 +1,13 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.ReplayEstimateResponse;
 import com.webhook.platform.api.dto.ReplayRequest;
 import com.webhook.platform.api.dto.ReplaySessionResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.ReplayService;
+import com.webhook.platform.api.service.billing.RequireFeature;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -37,6 +40,7 @@ public class ReplayController {
     private final ReplayService replayService;
 
     @Operation(summary = "Estimate replay", description = "Dry-run: count matching events and estimate deliveries without executing")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/estimate")
     public ResponseEntity<ReplayEstimateResponse> estimate(
             @PathVariable("projectId") UUID projectId,
@@ -49,6 +53,8 @@ public class ReplayController {
 
     @Operation(summary = "Create replay session", description = "Start async replay of events matching the criteria")
     @ApiResponse(responseCode = "201", description = "Replay session created and processing started")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireFeature("replay")
     @PostMapping
     public ResponseEntity<ReplaySessionResponse> create(
             @PathVariable("projectId") UUID projectId,
@@ -85,6 +91,7 @@ public class ReplayController {
     }
 
     @Operation(summary = "Cancel replay session", description = "Requests cancellation of a running replay session")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{sessionId}/cancel")
     public ResponseEntity<ReplaySessionResponse> cancel(
             @PathVariable("projectId") UUID projectId,

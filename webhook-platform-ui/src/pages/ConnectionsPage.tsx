@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Webhook, Radio, Bell, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Webhook, Radio, Bell, ArrowRight, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useEndpoints, useSubscriptions, useProject } from '../api/queries';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 
 interface ConnectionNode {
@@ -97,6 +98,12 @@ export default function ConnectionsPage() {
           icon={Bell}
           title={t('connections.empty')}
           description={t('connections.emptyDesc')}
+          action={
+            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/endpoints`)}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              {t('endpoints.createFirst', 'Create endpoint')}
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-4">

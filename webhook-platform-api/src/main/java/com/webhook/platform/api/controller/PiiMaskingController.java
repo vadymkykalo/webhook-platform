@@ -1,8 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.PiiMaskingRuleRequest;
 import com.webhook.platform.api.dto.PiiMaskingRuleResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.PiiMaskingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,6 +40,7 @@ public class PiiMaskingController {
 
     @Operation(summary = "Create PII masking rule", description = "Creates a new masking rule for the project")
     @ApiResponse(responseCode = "201", description = "Rule created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
     public ResponseEntity<PiiMaskingRuleResponse> createRule(
             @PathVariable("projectId") UUID projectId,
@@ -50,6 +53,7 @@ public class PiiMaskingController {
     }
 
     @Operation(summary = "Update PII masking rule", description = "Updates an existing masking rule")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{ruleId}")
     public ResponseEntity<PiiMaskingRuleResponse> updateRule(
             @PathVariable("projectId") UUID projectId,
@@ -63,6 +67,7 @@ public class PiiMaskingController {
 
     @Operation(summary = "Delete PII masking rule", description = "Deletes a masking rule")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{ruleId}")
     public ResponseEntity<Void> deleteRule(
             @PathVariable("projectId") UUID projectId,
@@ -76,6 +81,7 @@ public class PiiMaskingController {
 
     @Operation(summary = "Seed default rules", description = "Creates default built-in PII masking rules (email, phone, card)")
     @ApiResponse(responseCode = "200", description = "Default rules seeded")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/seed-defaults")
     public ResponseEntity<List<PiiMaskingRuleResponse>> seedDefaults(
             @PathVariable("projectId") UUID projectId,

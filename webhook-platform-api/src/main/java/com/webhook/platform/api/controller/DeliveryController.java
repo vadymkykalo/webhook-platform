@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.dto.BulkReplayRequest;
 import com.webhook.platform.api.dto.BulkReplayResponse;
@@ -7,6 +8,7 @@ import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.DeliveryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -81,6 +83,7 @@ public class DeliveryController {
 
     @Operation(summary = "Replay delivery", description = "Re-sends a failed delivery. Use dryRun=true to preview without sending. Use fromAttempt=N to continue from a specific attempt.")
     @ApiResponse(responseCode = "202", description = "Replay initiated")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{id}/replay")
     public ResponseEntity<?> replayDelivery(
             @PathVariable("id") UUID id,
@@ -113,6 +116,7 @@ public class DeliveryController {
 
     @Operation(summary = "Bulk replay deliveries", description = "Re-sends multiple failed deliveries at once")
     @ApiResponse(responseCode = "202", description = "Bulk replay initiated")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/bulk-replay")
     public ResponseEntity<BulkReplayResponse> bulkReplayDeliveries(
             @Valid @RequestBody BulkReplayRequest request,

@@ -6,6 +6,8 @@ import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.RequireOrgAccess;
 import com.webhook.platform.api.service.MembershipService;
+import com.webhook.platform.api.service.billing.QuotaType;
+import com.webhook.platform.api.service.billing.RequireQuota;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -46,6 +48,7 @@ public class MemberController {
     @Operation(summary = "Add member", description = "Invites a user to the organization")
     @ApiResponse(responseCode = "201", description = "Member added")
     @RequireOrgAccess
+    @RequireQuota(QuotaType.MEMBERS)
     @PostMapping
     public ResponseEntity<MemberResponse> addMember(
             @PathVariable("orgId") UUID orgId,

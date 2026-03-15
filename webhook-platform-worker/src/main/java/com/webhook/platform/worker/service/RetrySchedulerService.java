@@ -5,10 +5,11 @@ import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -20,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +41,10 @@ public class RetrySchedulerService {
     private final int maxPerProject;
     private final long sendTimeoutSeconds;
     private final long rescheduleDelaySeconds;
+    private final long defaultPollIntervalMs;
     private final RetryGovernor governor;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
+            r -> { Thread t = new Thread(r, "retry-scheduler"); t.setDaemon(true); return t; });
 
     public RetrySchedulerService(
             DeliveryRepository deliveryRepository,
@@ -51,7 +57,8 @@ public class RetrySchedulerService {
             @Value("${retry.scheduler.max-per-project:30}") int maxPerProject,
             @Value("${retry.scheduler.send-timeout-seconds:30}") long sendTimeoutSeconds,
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
-            @Value("${retry.scheduler.high-watermark:5000}") long highWatermark) {
+            @Value("${retry.scheduler.high-watermark:5000}") long highWatermark,
+            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
@@ -60,15 +67,49 @@ public class RetrySchedulerService {
         this.maxPerProject = maxPerProject;
         this.sendTimeoutSeconds = sendTimeoutSeconds;
         this.rescheduleDelaySeconds = rescheduleDelaySeconds;
+        this.defaultPollIntervalMs = defaultPollIntervalMs;
         this.governor = new RetryGovernor(
                 "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
     }
 
-    @Scheduled(fixedDelayString = "${retry.scheduler.poll-interval-ms:10000}")
-    public void scheduleRetries() {
-        // ── Governor: adaptive batch sizing + poll interval ──
-        long pendingCount = countPendingRetries();
+    @PostConstruct
+    void startScheduler() {
+        // Anti-thundering-herd: random jitter 0-5s on startup so pods don't poll simultaneously
+        long startupJitter = ThreadLocalRandom.current().nextLong(0, 5000);
+        log.info("Retry scheduler starting with {}ms jitter, default poll interval {}ms",
+                startupJitter, defaultPollIntervalMs);
+        scheduler.schedule(this::pollAndReschedule, startupJitter, TimeUnit.MILLISECONDS);
+    }
+
+    @PreDestroy
+    void stopScheduler() {
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void pollAndReschedule() {
+        long nextDelay = defaultPollIntervalMs;
+        try {
+            long pendingCount = countPendingRetries();
+            scheduleRetries(pendingCount);
+            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount);
+        } catch (Exception e) {
+            log.error("Retry scheduler poll failed: {}", e.getMessage(), e);
+        } finally {
+            scheduler.schedule(this::pollAndReschedule, nextDelay, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    void scheduleRetries(long pendingCount) {
+        // ── Governor: adaptive batch sizing ──
         int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
         if (effectiveBatch <= 0) {
             return; // Governor cooldown — skip this poll
@@ -215,35 +256,6 @@ public class RetrySchedulerService {
         log.info("Retry scheduling complete: {} successful, {} failed/rescheduled, {} circuit-breaker-skipped (governor batch={}, pendingCount={})",
                 successfulDeliveries.size(), failedDeliveries.size(), circuitBreakerSkipped.size(), 
                 effectiveBatch, pendingCount);
-        
-        // Apply adaptive sleep if recommended interval differs from @Scheduled default
-        long recommendedInterval = governor.getRecommendedPollIntervalMs(pendingCount);
-        long defaultInterval = 10_000; // Match fixedDelayString default
-        if (recommendedInterval < defaultInterval) {
-            // High load: schedule sooner by sleeping less (Spring's fixedDelay adds on top)
-            // Note: This reduces effective interval below @Scheduled baseline
-            try {
-                long additionalSleep = recommendedInterval - defaultInterval;
-                if (additionalSleep < 0) {
-                    // We want to poll sooner, but @Scheduled controls the interval
-                    // Log recommendation for monitoring
-                    log.debug("Adaptive poll recommends {}ms but @Scheduled enforces {}ms", 
-                            recommendedInterval, defaultInterval);
-                }
-            } catch (Exception e) {
-                log.warn("Adaptive sleep failed: {}", e.getMessage());
-            }
-        } else if (recommendedInterval > defaultInterval) {
-            // Low load: back off by sleeping longer
-            long additionalSleep = recommendedInterval - defaultInterval;
-            try {
-                log.debug("Adaptive poll: sleeping additional {}ms (total {}ms)", additionalSleep, recommendedInterval);
-                Thread.sleep(additionalSleep);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Adaptive sleep interrupted");
-            }
-        }
     }
 
     private void rescheduleAll(List<Delivery> deliveries, String reason) {

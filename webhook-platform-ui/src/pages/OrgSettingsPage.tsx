@@ -3,7 +3,7 @@ import { useAuth } from '../auth/auth.store';
 import { organizationsApi } from '../api/organizations.api';
 import { membersApi } from '../api/members.api';
 import { useProjects } from '../api/queries';
-import { Building2, Users, Loader2, Pencil, Calendar, Hash, Shield } from 'lucide-react';
+import { Building2, Users, Loader2, Pencil, Calendar, Hash, Shield, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -247,7 +247,83 @@ export default function OrgSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Danger Zone — OWNER only */}
+        {user?.role === 'OWNER' && (
+          <DangerZone orgId={orgId} orgName={orgName} />
+        )}
       </div>
     </div>
+  );
+}
+
+function DangerZone({ orgId, orgName }: { orgId: string; orgName: string }) {
+  const { t } = useTranslation();
+  const { logout } = useAuth();
+  const [confirmName, setConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const handleDelete = async () => {
+    if (confirmName !== orgName) return;
+    setDeleting(true);
+    try {
+      await organizationsApi.delete(orgId);
+      showSuccess(t('orgSettings.deleteOrgSuccess'));
+      logout();
+    } catch (err: any) {
+      showApiError(err, 'orgSettings.deleteOrgFailed');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Card className="border-destructive/50">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-destructive" />
+          <CardTitle className="text-destructive">{t('orgSettings.dangerZone')}</CardTitle>
+        </div>
+        <CardDescription>{t('orgSettings.dangerZoneDesc')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <h4 className="text-sm font-medium">{t('orgSettings.deleteOrg')}</h4>
+          <p className="text-xs text-muted-foreground mt-1">{t('orgSettings.deleteOrgDesc')}</p>
+        </div>
+        {!expanded ? (
+          <Button variant="destructive" size="sm" onClick={() => setExpanded(true)}>
+            {t('orgSettings.deleteOrg')}
+          </Button>
+        ) : (
+          <div className="space-y-3 p-4 border border-destructive/30 rounded-lg bg-destructive/5">
+            <Label className="text-sm">
+              {t('orgSettings.deleteOrgConfirm')} <strong>{orgName}</strong>
+            </Label>
+            <Input
+              value={confirmName}
+              onChange={(e) => setConfirmName(e.target.value)}
+              placeholder={orgName}
+              className="max-w-md"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={confirmName !== orgName || deleting}
+                onClick={handleDelete}
+              >
+                {deleting && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                {t('orgSettings.deleteOrgButton')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => { setExpanded(false); setConfirmName(''); }}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

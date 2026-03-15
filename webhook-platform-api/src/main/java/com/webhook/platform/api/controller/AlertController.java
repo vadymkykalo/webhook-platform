@@ -1,9 +1,11 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.dto.AlertRuleResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.AlertService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -43,6 +45,7 @@ public class AlertController {
 
     @Operation(summary = "Create alert rule")
     @ApiResponse(responseCode = "201", description = "Rule created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/rules")
     public ResponseEntity<AlertRuleResponse> createRule(
             @PathVariable("projectId") UUID projectId,
@@ -55,6 +58,7 @@ public class AlertController {
     }
 
     @Operation(summary = "Update alert rule")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/rules/{ruleId}")
     public ResponseEntity<AlertRuleResponse> updateRule(
             @PathVariable("projectId") UUID projectId,
@@ -68,6 +72,7 @@ public class AlertController {
 
     @Operation(summary = "Delete alert rule")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/rules/{ruleId}")
     public ResponseEntity<Void> deleteRule(
             @PathVariable("projectId") UUID projectId,
@@ -103,6 +108,7 @@ public class AlertController {
     }
 
     @Operation(summary = "Resolve a single alert event")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/events/{eventId}/resolve")
     public ResponseEntity<Void> resolveEvent(
             @PathVariable("projectId") UUID projectId,
@@ -115,6 +121,7 @@ public class AlertController {
     }
 
     @Operation(summary = "Resolve all unresolved alert events")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/events/resolve-all")
     public ResponseEntity<Map<String, Integer>> resolveAll(
             @PathVariable("projectId") UUID projectId,

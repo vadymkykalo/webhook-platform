@@ -1,10 +1,12 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.DlqActionResponse;
 import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.dto.DlqRetryRequest;
 import com.webhook.platform.api.dto.DlqStatsResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.DlqService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -72,6 +74,7 @@ public class DlqController {
 
     @Operation(summary = "Retry single DLQ item", description = "Retries a single failed delivery")
     @ApiResponse(responseCode = "200", description = "Delivery queued for retry")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{deliveryId}/retry")
     public ResponseEntity<DlqActionResponse> retrySingle(
             @PathVariable("projectId") UUID projectId,
@@ -86,6 +89,7 @@ public class DlqController {
 
     @Operation(summary = "Bulk retry DLQ items", description = "Retries multiple failed deliveries")
     @ApiResponse(responseCode = "200", description = "Deliveries queued for retry")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/retry")
     public ResponseEntity<DlqActionResponse> retryBulk(
             @PathVariable("projectId") UUID projectId,
@@ -103,6 +107,7 @@ public class DlqController {
 
     @Operation(summary = "Purge all DLQ items", description = "Permanently deletes all items in DLQ for the project")
     @ApiResponse(responseCode = "200", description = "DLQ purged")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping
     public ResponseEntity<DlqActionResponse> purgeAll(
             @PathVariable("projectId") UUID projectId,

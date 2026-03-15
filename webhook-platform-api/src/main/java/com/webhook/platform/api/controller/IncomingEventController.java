@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.IncomingBulkReplayRequest;
 import com.webhook.platform.api.dto.IncomingBulkReplayResponse;
 import com.webhook.platform.api.dto.IncomingEventResponse;
@@ -7,6 +8,7 @@ import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.dto.ReplayEventResponse;
 import jakarta.validation.Valid;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.IncomingEventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -84,6 +86,7 @@ public class IncomingEventController {
             @ApiResponse(responseCode = "200", description = "Event replayed"),
             @ApiResponse(responseCode = "404", description = "Event not found")
     })
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{id}/replay")
     public ResponseEntity<ReplayEventResponse> replayEvent(
             @PathVariable("id") UUID id,
@@ -104,6 +107,7 @@ public class IncomingEventController {
             @ApiResponse(responseCode = "200", description = "Bulk replay completed"),
             @ApiResponse(responseCode = "404", description = "Source not found")
     })
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/bulk-replay")
     public ResponseEntity<IncomingBulkReplayResponse> bulkReplay(
             @PathVariable("projectId") UUID projectId,

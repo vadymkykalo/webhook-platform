@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.billing.QuotaCounterService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +58,8 @@ class EventIngestServiceTest {
     private RuleEngineService ruleEngineService;
     @Mock
     private WorkflowTriggerService workflowTriggerService;
+    @Mock
+    private QuotaCounterService quotaCounterService;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -71,7 +74,8 @@ class EventIngestServiceTest {
                 eventRepository, subscriptionRepository, deliveryRepository,
                 outboxMessageRepository, objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
-                ruleEngineService, workflowTriggerService, transactionManager, 262144L, 1024
+                ruleEngineService, workflowTriggerService, quotaCounterService,
+                transactionManager, 262144L, 1024, 5
         );
     }
 

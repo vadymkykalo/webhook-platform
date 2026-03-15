@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { BarChart3, Activity, CheckCircle2, XCircle, AlertTriangle, Clock, Webhook, ArrowDownToLine, Bell, TrendingUp } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { BarChart3, Activity, CheckCircle2, XCircle, AlertTriangle, Clock, Webhook, ArrowDownToLine, Bell, TrendingUp, Radio } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useUsageStats } from '../api/queries';
 import { projectsApi } from '../api/projects.api';
@@ -9,6 +9,7 @@ import PageSkeleton from '../components/PageSkeleton';
 import EmptyState from '../components/EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
+import { Button } from '../components/ui/button';
 
 function StatCard({ title, value, icon: Icon, color, subtitle }: {
   title: string; value: string | number; icon: React.ElementType; color: string; subtitle?: string;
@@ -41,6 +42,7 @@ function MiniBar({ value, max, color }: { value: number; max: number; color: str
 export default function UsagePage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [days, setDays] = useState(30);
 
   const { data: project } = useQuery({
@@ -83,7 +85,17 @@ export default function UsagePage() {
       </div>
 
       {!current ? (
-        <EmptyState icon={BarChart3} title={t('usage.noData', 'No usage data')} description={t('usage.noDataDesc', 'Start sending events to see usage metrics')} />
+        <EmptyState
+          icon={BarChart3}
+          title={t('usage.noData', 'No usage data')}
+          description={t('usage.noDataDesc', 'Start sending events to see usage metrics')}
+          action={
+            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
+              <Radio className="h-3.5 w-3.5 mr-1.5" />
+              {t('events.sendTest', 'Send Test Event')}
+            </Button>
+          }
+        />
       ) : (
         <>
           {/* Live stats */}

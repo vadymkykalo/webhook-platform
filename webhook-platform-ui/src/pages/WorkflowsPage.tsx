@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Pencil, Play, GitBranch, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { workflowsApi, type WorkflowResponse, type WorkflowRequest } from '../api/workflows.api';
 import { Button } from '../components/ui/button';
+import EmptyState from '../components/EmptyState';
 import { showApiError, showSuccess } from '../lib/toast';
 
 export default function WorkflowsPage() {
@@ -115,11 +116,16 @@ export default function WorkflowsPage() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">{t('workflows.loading')}</div>
       ) : workflows.length === 0 ? (
-        <div className="text-center py-16 space-y-3">
-          <GitBranch className="h-12 w-12 text-muted-foreground/30 mx-auto" />
-          <p className="text-muted-foreground">{t('workflows.noWorkflows')}</p>
-          <p className="text-sm text-muted-foreground/70">{t('workflows.noWorkflowsHint')}</p>
-        </div>
+        <EmptyState
+          icon={GitBranch}
+          title={t('workflows.noWorkflows')}
+          description={t('workflows.noWorkflowsHint')}
+          action={
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" /> {t('workflows.create')}
+            </Button>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {workflows.map((wf: WorkflowResponse) => (

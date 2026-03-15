@@ -123,6 +123,7 @@ webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
   encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
   max-payload-size-bytes: ${WEBHOOK_MAX_PAYLOAD_SIZE_BYTES:262144}
+  max-fanout-per-event: ${WEBHOOK_MAX_FANOUT_PER_EVENT:100}
   payload-compression-threshold-bytes: ${WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES:1024}
   url-validation:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
@@ -191,6 +192,20 @@ springdoc:
   api-docs:
     enabled: ${SWAGGER_ENABLED:true}
     path: /v3/api-docs
+
+billing:
+  enabled: ${BILLING_ENABLED:false}
+  default-provider: ${BILLING_DEFAULT_PROVIDER:noop}
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    price-map: ${STRIPE_PRICE_MAP:}
+  wayforpay:
+    merchant-account: ${WAYFORPAY_MERCHANT_ACCOUNT:}
+    merchant-secret: ${WAYFORPAY_MERCHANT_SECRET:}
+    merchant-domain: ${WAYFORPAY_MERCHANT_DOMAIN:}
+    service-url: ${WAYFORPAY_SERVICE_URL:}
+    plan-prices: ${WAYFORPAY_PLAN_PRICES:}
 
 logging:
   level:

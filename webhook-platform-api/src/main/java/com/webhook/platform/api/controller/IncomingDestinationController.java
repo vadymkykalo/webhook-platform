@@ -1,8 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.IncomingDestinationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,6 +38,7 @@ public class IncomingDestinationController {
 
     @Operation(summary = "Create destination", description = "Creates a new forwarding destination for the incoming source")
     @ApiResponse(responseCode = "201", description = "Destination created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
     public ResponseEntity<IncomingDestinationResponse> createDestination(
             @PathVariable("sourceId") UUID sourceId,
@@ -74,6 +77,7 @@ public class IncomingDestinationController {
             @ApiResponse(responseCode = "200", description = "Destination updated"),
             @ApiResponse(responseCode = "404", description = "Destination not found")
     })
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{id}")
     public ResponseEntity<IncomingDestinationResponse> updateDestination(
             @PathVariable("id") UUID id,
@@ -86,6 +90,7 @@ public class IncomingDestinationController {
 
     @Operation(summary = "Delete destination", description = "Permanently deletes the forwarding destination")
     @ApiResponse(responseCode = "204", description = "Destination deleted")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteDestination(
             @PathVariable("id") UUID id,

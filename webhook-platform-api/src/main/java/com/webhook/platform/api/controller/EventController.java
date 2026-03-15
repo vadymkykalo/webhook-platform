@@ -1,11 +1,16 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.dto.RateLimitInfo;
 import com.webhook.platform.api.dto.RateLimitResult;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.EventIngestService;
+import com.webhook.platform.api.service.billing.EntitlementService;
+import com.webhook.platform.api.service.billing.QuotaType;
+import com.webhook.platform.api.service.billing.RequireQuota;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,12 +35,15 @@ public class EventController {
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     private final EventIngestService eventIngestService;
     private final RedisRateLimiterService rateLimiterService;
+    private final EntitlementService entitlementService;
 
     public EventController(
             EventIngestService eventIngestService,
-            RedisRateLimiterService rateLimiterService) {
+            RedisRateLimiterService rateLimiterService,
+            EntitlementService entitlementService) {
         this.eventIngestService = eventIngestService;
         this.rateLimiterService = rateLimiterService;
+        this.entitlementService = entitlementService;
     }
 
     @Operation(
@@ -48,6 +56,8 @@ public class EventController {
             @ApiResponse(responseCode = "401", description = "Invalid or missing API key"),
             @ApiResponse(responseCode = "429", description = "Rate limit exceeded")
     })
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireQuota(QuotaType.EVENTS_PER_MONTH)
     @PostMapping
     public ResponseEntity<?> ingestEvent(
             @Valid @RequestBody EventIngestRequest request,
@@ -60,8 +70,9 @@ public class EventController {
         }
 
         ApiKeyAuthenticationToken apiKeyAuth = (ApiKeyAuthenticationToken) authentication;
-        
-        RateLimitResult rateLimitResult = rateLimiterService.tryAcquireWithInfo(apiKeyAuth.getProjectId());
+
+        int rateLimit = entitlementService.getRateLimitForProject(apiKeyAuth.getProjectId());
+        RateLimitResult rateLimitResult = rateLimiterService.tryAcquireWithInfo(apiKeyAuth.getProjectId(), rateLimit);
         RateLimitInfo info = rateLimitResult.getInfo();
         
         if (!rateLimitResult.isAcquired()) {

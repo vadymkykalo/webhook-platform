@@ -26,6 +26,13 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     long countByProjectIdAndCreatedAtBetween(@Param("projectId") UUID projectId, @Param("from") Instant from, @Param("to") Instant to);
 
     @Query(value = """
+        SELECT COUNT(*) FROM events e
+        JOIN projects p ON p.id = e.project_id
+        WHERE p.organization_id = :orgId AND e.created_at >= :from AND e.created_at < :to
+        """, nativeQuery = true)
+    long countByOrganizationIdAndCreatedAtBetween(@Param("orgId") UUID organizationId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query(value = """
         SELECT 
             CAST(e.id AS text),
             e.event_type,

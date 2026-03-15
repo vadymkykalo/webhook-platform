@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
+import com.webhook.platform.common.util.CryptoUtils;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -97,6 +98,7 @@ public class MembershipService {
         }
 
         String inviteToken = generateInviteToken();
+        String inviteTokenHash = CryptoUtils.hashApiKey(inviteToken);
         Instant expiresAt = Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS);
 
         Membership membership = Membership.builder()
@@ -104,7 +106,7 @@ public class MembershipService {
                 .organizationId(organizationId)
                 .role(request.getRole())
                 .status(isNewUser ? MembershipStatus.INVITED : MembershipStatus.ACTIVE)
-                .inviteToken(isNewUser ? inviteToken : null)
+                .inviteTokenHash(isNewUser ? inviteTokenHash : null)
                 .inviteExpiresAt(isNewUser ? expiresAt : null)
                 .build();
         membershipRepository.save(membership);
@@ -128,7 +130,8 @@ public class MembershipService {
     @Auditable(action = AuditAction.INVITE_ACCEPTED, resourceType = "Member")
     @Transactional
     public MemberResponse acceptInvite(String inviteToken, UUID organizationId, UUID authenticatedUserId) {
-        Membership membership = membershipRepository.findByInviteToken(inviteToken)
+        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        Membership membership = membershipRepository.findByInviteTokenHash(tokenHash)
                 .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
 
         // Security: validate the invite belongs to the specified organization AND the authenticated user.
@@ -153,7 +156,7 @@ public class MembershipService {
         }
 
         membership.setStatus(MembershipStatus.ACTIVE);
-        membership.setInviteToken(null);
+        membership.setInviteTokenHash(null);
         membership.setInviteExpiresAt(null);
         membershipRepository.save(membership);
 

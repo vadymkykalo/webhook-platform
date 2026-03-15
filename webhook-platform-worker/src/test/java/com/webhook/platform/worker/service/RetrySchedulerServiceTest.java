@@ -82,7 +82,8 @@ class RetrySchedulerServiceTest {
                                 30,  // maxPerProject
                                 sendTimeoutSeconds,
                                 rescheduleDelaySeconds,
-                                5000L);  // highWatermark
+                                5000L,   // highWatermark
+                                10000L); // defaultPollIntervalMs
         }
 
         @Test
@@ -105,7 +106,7 @@ class RetrySchedulerServiceTest {
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
                 // Act
-                retrySchedulerService.scheduleRetries();
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert
                 ArgumentCaptor<Integer> limitCaptor = ArgumentCaptor.forClass(Integer.class);
@@ -143,7 +144,7 @@ class RetrySchedulerServiceTest {
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
                 // Act
-                retrySchedulerService.scheduleRetries();
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert
                 verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any(DeliveryMessage.class));
@@ -170,7 +171,7 @@ class RetrySchedulerServiceTest {
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
 
                 // Act
-                retrySchedulerService.scheduleRetries();
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert — Phase 1 nullifies nextRetryAt, Phase 3 keeps it null for successful sends
                 @SuppressWarnings("unchecked")
@@ -193,7 +194,7 @@ class RetrySchedulerServiceTest {
         )).thenReturn(Collections.emptyList());
 
         // Act
-        retrySchedulerService.scheduleRetries();
+        retrySchedulerService.scheduleRetries(0);
 
         // Assert
         verify(kafkaTemplate, never()).send(anyString(), anyString(), any(DeliveryMessage.class));
@@ -219,7 +220,7 @@ class RetrySchedulerServiceTest {
                 when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(failedFuture);
 
                 // Act & Assert - should not throw exception, delivery should be rescheduled
-                assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries());
+                assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
 
                 // Verify failed delivery is saved with new nextRetryAt (Phase 3)
                 @SuppressWarnings("unchecked")
@@ -262,9 +263,9 @@ class RetrySchedulerServiceTest {
                                 .thenReturn(Collections.singletonList(delivery6));
 
                 // Act
-                retrySchedulerService.scheduleRetries();
-                retrySchedulerService.scheduleRetries();
-                retrySchedulerService.scheduleRetries();
+                retrySchedulerService.scheduleRetries(0);
+                retrySchedulerService.scheduleRetries(0);
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert
                 ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
@@ -307,7 +308,7 @@ class RetrySchedulerServiceTest {
                                 .thenReturn(incompleteFuture);
 
                 // Act
-                retrySchedulerService.scheduleRetries();
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert — completed delivery has nextRetryAt nullified (success)
                 assertNull(completedDelivery.getNextRetryAt());
@@ -335,7 +336,7 @@ class RetrySchedulerServiceTest {
                                 .thenReturn(exceptionalFuture);
 
                 // Act — should not throw
-                assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries());
+                assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
 
                 // Assert — delivery is rescheduled with nextRetryAt set
                 assertNotNull(delivery.getNextRetryAt());

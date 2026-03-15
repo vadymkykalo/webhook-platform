@@ -30,7 +30,6 @@ const queryClient = new QueryClient({
 export default function App() {
   const [user, setUser] = useState<CurrentUserResponse | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Restore auth state on mount via silent refresh (cookie-based)
@@ -64,18 +63,9 @@ export default function App() {
     }
   }, [token]);
 
-  // refreshToken no longer used (httpOnly cookie handles it)
-  useEffect(() => {
-    if (refreshToken) {
-      // Legacy cleanup
-      setRefreshToken(null);
-    }
-  }, [refreshToken]);
-
   useEffect(() => {
     http.setOnLogout(() => {
       setToken(null);
-      setRefreshToken(null);
       setUser(null);
     });
     return () => http.setOnLogout(null);
@@ -84,22 +74,18 @@ export default function App() {
   const authState: AuthState = {
     user,
     token,
-    refreshToken,
     isAuthenticated: !!user && !!token,
-    login: (newToken: string, _newRefreshToken: string, newUser: CurrentUserResponse) => {
+    login: (newToken: string, newUser: CurrentUserResponse) => {
       setToken(newToken);
       setUser(newUser);
       http.setToken(newToken);
-      // refreshToken in httpOnly cookie, not stored in JS
       localStorage.setItem('auth_user', JSON.stringify(newUser));
     },
     logout: () => {
-      authApi.logout('').catch(() => { });
+      authApi.logout().catch(() => { });
       setToken(null);
-      setRefreshToken(null);
       setUser(null);
       http.setToken(null);
-      http.setRefreshToken(null);
       localStorage.removeItem('auth_user');
     },
     updateUser: (newUser: CurrentUserResponse) => {

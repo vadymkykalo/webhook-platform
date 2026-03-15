@@ -133,15 +133,19 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestBody(required = false) LogoutRequest request,
-            HttpServletRequest httpRequest) {
+    public ResponseEntity<Void> logout(@CookieValue(value = "refresh_token", required = false) String cookieRefreshToken,
+            @RequestBody(required = false) LogoutRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         String authHeader = httpRequest.getHeader("Authorization");
         String accessToken = (authHeader != null && authHeader.startsWith("Bearer "))
                 ? authHeader.substring(7)
                 : null;
-        String refreshToken = (request != null) ? request.getRefreshToken() : null;
+        String refreshToken = cookieRefreshToken != null ? cookieRefreshToken
+                : (request != null ? request.getRefreshToken() : null);
 
         authService.logout(accessToken, refreshToken);
+        clearRefreshTokenCookie(httpResponse);
         return ResponseEntity.noContent().build();
     }
 
@@ -264,6 +268,16 @@ public class AuthController {
         cookie.setPath("/api/v1/auth");
         cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
         cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax"); // Lax for dev cross-origin
+        response.addCookie(cookie);
+    }
+
+    private void clearRefreshTokenCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie("refresh_token", "");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(isProduction);
+        cookie.setPath("/api/v1/auth");
+        cookie.setMaxAge(0); // Expire immediately
+        cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax");
         response.addCookie(cookie);
     }
 }

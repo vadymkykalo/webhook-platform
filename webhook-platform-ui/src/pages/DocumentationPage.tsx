@@ -253,9 +253,9 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           </CodeBlock>
           <ResponseBlock>
 {`{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}`}
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+// refresh token is set via HttpOnly cookie (Set-Cookie: refresh_token=...)`}
           </ResponseBlock>
         </div>
 
@@ -267,9 +267,9 @@ function Authentication({ activeLanguage, setActiveLanguage }: LanguageTabsProps
           </CodeBlock>
           <ResponseBlock>
 {`{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}`}
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+// refresh token is set via HttpOnly cookie (Set-Cookie: refresh_token=...)`}
           </ResponseBlock>
         </div>
 

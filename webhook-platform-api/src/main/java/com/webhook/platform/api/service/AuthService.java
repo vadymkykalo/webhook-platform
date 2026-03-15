@@ -4,15 +4,18 @@ import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.Organization;
+import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
+import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.security.JwtUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,10 +35,12 @@ public class AuthService {
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final MembershipRepository membershipRepository;
+    private final PlanRepository planRepository;
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder;
     private final TokenBlacklistService tokenBlacklistService;
     private final EmailService emailService;
+    private final boolean billingEnabled;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int TOKEN_EXPIRY_HOURS = 24;
@@ -44,16 +49,20 @@ public class AuthService {
             UserRepository userRepository,
             OrganizationRepository organizationRepository,
             MembershipRepository membershipRepository,
+            PlanRepository planRepository,
             JwtUtil jwtUtil,
             TokenBlacklistService tokenBlacklistService,
-            EmailService emailService) {
+            EmailService emailService,
+            @Value("${billing.enabled:false}") boolean billingEnabled) {
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
+        this.planRepository = planRepository;
         this.jwtUtil = jwtUtil;
         this.passwordEncoder = new BCryptPasswordEncoder();
         this.tokenBlacklistService = tokenBlacklistService;
         this.emailService = emailService;
+        this.billingEnabled = billingEnabled;
     }
 
     @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")
@@ -76,8 +85,14 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
 
+        String defaultPlanName = billingEnabled ? "free" : "self_hosted";
+        Plan defaultPlan = planRepository.findByName(defaultPlanName)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Default plan '" + defaultPlanName + "' not found. Run database migrations."));
+
         Organization organization = Organization.builder()
                 .name(request.getOrganizationName())
+                .plan(defaultPlan)
                 .build();
         organization = organizationRepository.save(organization);
 

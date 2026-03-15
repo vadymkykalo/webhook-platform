@@ -67,11 +67,13 @@ export default {
         'body-lg': ['1.125rem', { lineHeight: '1.6' }],
       },
       boxShadow: {
-        'glow': '0 0 20px -5px hsl(238 76% 60% / 0.3)',
-        'glow-lg': '0 0 40px -10px hsl(238 76% 60% / 0.4)',
+        'glow': '0 0 20px -5px hsl(238 76% 60% / 0.35), 0 0 40px -10px hsl(280 76% 55% / 0.15)',
+        'glow-lg': '0 0 40px -10px hsl(238 76% 60% / 0.45), 0 0 80px -20px hsl(280 76% 55% / 0.2)',
+        'glow-xl': '0 0 60px -10px hsl(238 76% 60% / 0.35), 0 0 120px -30px hsl(280 76% 55% / 0.15)',
         'card': '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
-        'card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.06)',
-        'elevated': '0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04)',
+        'card-hover': '0 10px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04)',
+        'elevated': '0 20px 40px -8px rgb(0 0 0 / 0.1), 0 8px 16px -6px rgb(0 0 0 / 0.06)',
+        'elevated-lg': '0 25px 50px -12px rgb(0 0 0 / 0.15), 0 12px 24px -8px rgb(0 0 0 / 0.08)',
       },
       spacing: {
         '18': '4.5rem',
