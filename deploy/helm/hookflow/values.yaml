@@ -213,6 +213,7 @@ kafka:
   
   # Topic configuration
   topicPartitions: 12  # Number of partitions for delivery topics
+  topicReplicationFactor: 1  # Set to 3 for production multi-broker clusters
   
   # External Kafka configuration
   external:
@@ -243,6 +244,19 @@ redis:
     port: 6379
     existingSecret: hookflow-redis-secret
     existingSecretPasswordKey: password
+
+# Database backup configuration
+backup:
+  enabled: false  # Enable to create a CronJob for PostgreSQL backups
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  image: postgres:16-alpine
+  retainCount: 7  # Keep last N backup files
+  storageSize: 10Gi
+  storageClass: ""  # Use default StorageClass if empty
+  existingClaim: ""  # Use existing PVC instead of creating one
+  activeDeadlineSeconds: 3600  # Max 1 hour for backup job
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
 
 # Secrets configuration
 secrets:

@@ -123,6 +123,38 @@ See `values-production.yaml` for production-ready defaults:
 helm install hookflow ./hookflow -f values-production.yaml
 ```
 
+## Database Migrations
+
+Flyway migrations run automatically via an **init container** before the API pod starts.
+This ensures:
+- Migrations complete before the app accepts traffic
+- Only one pod runs migrations at a time (Flyway's built-in locking)
+- Worker pods wait for API migration to finish before starting
+
+## Automated Backups
+
+Enable the PostgreSQL backup CronJob:
+
+```yaml
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  retainCount: 14          # Keep 2 weeks
+  storageSize: 50Gi
+```
+
+Backups are stored as `pg_dump` custom format files on a PVC. Old backups are automatically pruned.
+
+## Kafka Topic Configuration
+
+```yaml
+kafka:
+  topicPartitions: 12        # Partitions per topic (default: 12)
+  topicReplicationFactor: 3  # Set to 3 for production multi-broker clusters
+```
+
+Topics are created automatically via a post-install/post-upgrade Helm hook job.
+
 ## Upgrading
 
 ```bash
@@ -130,7 +162,8 @@ helm install hookflow ./hookflow -f values-production.yaml
 helm upgrade hookflow ./hookflow
 
 # Zero-downtime rollout
-# API migrations run automatically on startup via Flyway
+# Flyway migrations run in init container before API starts
+# Worker HPA scales based on Kafka consumer lag
 ```
 
 ## Monitoring
@@ -149,6 +182,12 @@ helm uninstall hookflow
 # Clean up persistent volumes (WARNING: data loss)
 kubectl delete pvc -l app.kubernetes.io/instance=hookflow
 ```
+
+## Further Reading
+
+- **[Self-Hosted Guide](../../../docs/SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, TLS, monitoring
+- **[Operations Guide](../../../docs/OPERATIONS.md)** — quick start, scaling, common issues
+- **[Runbooks](../../../docs/runbooks/)** — SLOs, Kafka lag, DB issues, DR, secret rotation
 
 ## Support
 

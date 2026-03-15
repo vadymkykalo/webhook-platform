@@ -121,6 +121,16 @@ Key settings:
 - `DB_POOL_MAX_SIZE=20` (API), `30` (Worker)
 - `KAFKA_DELIVERY_CONCURRENCY=8` - parallel deliveries per worker
 
+## Detailed Documentation
+
+- **[Self-Hosted Deployment Guide](./SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, Helm install, TLS, monitoring
+- **[SLOs & Error Budgets](./runbooks/SLOs.md)** — service level objectives, PromQL queries, dashboard panels
+- **[High Kafka Lag](./runbooks/high-kafka-lag.md)** — diagnosis, worker scaling, Kafka broker issues
+- **[Database Issues](./runbooks/database-issues.md)** — connection pools, slow queries, disk, locks, replication
+- **[Failed Deliveries Spike](./runbooks/failed-deliveries-spike.md)** — triage, per-endpoint vs platform-wide, mass retry
+- **[Disaster Recovery](./runbooks/disaster-recovery.md)** — PG restore, Kafka rebuild, full cluster recovery, RTO/RPO
+- **[Secret Rotation](./runbooks/secret-rotation.md)** — JWT, encryption keys, DB/Redis passwords, Stripe keys
+
 ## Support
 
 - Docs: https://github.com/vadymkykalo/webhook-platform
