@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
     List<Project> findByOrganizationIdAndDeletedAtIsNull(UUID organizationId);
+
+    long countByOrganizationIdAndDeletedAtIsNull(UUID organizationId);
 }

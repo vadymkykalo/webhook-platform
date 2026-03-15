@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
+import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +24,15 @@ public class OrganizationService {
 
     private final OrganizationRepository organizationRepository;
     private final MembershipRepository membershipRepository;
+    private final EntityManager entityManager;
 
     public OrganizationService(
             OrganizationRepository organizationRepository,
-            MembershipRepository membershipRepository) {
+            MembershipRepository membershipRepository,
+            EntityManager entityManager) {
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
+        this.entityManager = entityManager;
     }
 
     public List<OrganizationResponse> getUserOrganizations(UUID userId) {
@@ -60,6 +64,24 @@ public class OrganizationService {
                 .name(organization.getName())
                 .createdAt(organization.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * GDPR Article 17 — permanently deletes organization and all associated data.
+     * Relies on ON DELETE CASCADE constraints in the schema:
+     * organizations → projects → (api_keys, events, endpoints, subscriptions, deliveries, ...)
+     * organizations → memberships
+     * organizations → audit_logs
+     */
+    @Transactional
+    public void deleteOrganization(UUID orgId) {
+        Organization organization = organizationRepository.findById(orgId)
+                .orElseThrow(() -> new NotFoundException("Organization not found"));
+
+        log.warn("GDPR DELETE: permanently deleting organization {} ('{}')", orgId, organization.getName());
+        organizationRepository.delete(organization);
+        entityManager.flush();
+        log.info("GDPR DELETE: organization {} deleted successfully", orgId);
     }
 
     @Transactional

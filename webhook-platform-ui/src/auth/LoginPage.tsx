@@ -30,9 +30,8 @@ export default function LoginPage() {
     try {
       const authResponse = await authApi.login({ email, password });
       http.setToken(authResponse.accessToken);
-      http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
-      login(authResponse.accessToken, authResponse.refreshToken, user);
+      login(authResponse.accessToken, user);
       showSuccess(t('auth.login.welcomeBack'));
       navigate(redirectTo);
     } catch (err: any) {

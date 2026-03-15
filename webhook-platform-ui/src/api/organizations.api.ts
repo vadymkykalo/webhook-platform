@@ -14,4 +14,8 @@ export const organizationsApi = {
   update: (orgId: string, data: { name: string }): Promise<OrganizationResponse> => {
     return http.put<OrganizationResponse>(`/api/v1/orgs/${orgId}`, data);
   },
+
+  delete: (orgId: string): Promise<void> => {
+    return http.delete<void>(`/api/v1/orgs/${orgId}`);
+  },
 };

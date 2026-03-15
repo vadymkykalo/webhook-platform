@@ -638,11 +638,13 @@ public class WebhookDeliveryService {
         deliveryAttemptRepository.save(attempt);
     }
 
+    private static final String TRUNCATION_MARKER = "\n...[truncated]";
+
     private String truncate(String str, int maxLength) {
         if (str == null || str.length() <= maxLength) {
             return str;
         }
-        return str.substring(0, maxLength);
+        return str.substring(0, maxLength) + TRUNCATION_MARKER;
     }
 
     private String buildRequestHeadersJson(String signature, String eventId, String deliveryId, String timestamp) {

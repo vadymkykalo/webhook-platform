@@ -1,9 +1,11 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.SharedDebugLinkPublicResponse;
 import com.webhook.platform.api.dto.SharedDebugLinkRequest;
 import com.webhook.platform.api.dto.SharedDebugLinkResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.SharedDebugLinkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,6 +31,7 @@ public class SharedDebugLinkController {
     @ApiResponse(responseCode = "201", description = "Link created")
     @SecurityRequirement(name = "bearerAuth")
     @SecurityRequirement(name = "apiKey")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/api/v1/projects/{projectId}/events/{eventId}/debug-links")
     public ResponseEntity<SharedDebugLinkResponse> createLink(
             @PathVariable("projectId") UUID projectId,
@@ -58,6 +61,7 @@ public class SharedDebugLinkController {
     @ApiResponse(responseCode = "204", description = "Link deleted")
     @SecurityRequirement(name = "bearerAuth")
     @SecurityRequirement(name = "apiKey")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/api/v1/projects/{projectId}/debug-links/{linkId}")
     public ResponseEntity<Void> deleteLink(
             @PathVariable("projectId") UUID projectId,

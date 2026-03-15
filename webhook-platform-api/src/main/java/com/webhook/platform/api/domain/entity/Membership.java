@@ -38,8 +38,8 @@ public class Membership {
     @Builder.Default
     private MembershipStatus status = MembershipStatus.ACTIVE;
 
-    @Column(name = "invite_token", length = 64)
-    private String inviteToken;
+    @Column(name = "invite_token_hash", length = 64)
+    private String inviteTokenHash;
 
     @Column(name = "invite_expires_at")
     private Instant inviteExpiresAt;

@@ -22,7 +22,6 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   accessToken: string;
-  refreshToken: string;
   tokenType: string;
   expiresIn: number;
   emailVerified?: boolean;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, Bell, Info } from 'lucide-react';
+import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, Bell, Info, Radio } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
@@ -326,7 +326,18 @@ export default function DeliveriesPage() {
             </div>
           </div>
         ) : (
-          <EmptyState icon={Send} title={t('deliveries.noDeliveries')} description={t('deliveries.noDeliveriesDesc')} docsLink="/docs#deliveries-api" />
+          <EmptyState
+            icon={Send}
+            title={t('deliveries.noDeliveries')}
+            description={t('deliveries.noDeliveriesDesc')}
+            action={
+              <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
+                <Radio className="h-3.5 w-3.5 mr-1.5" />
+                {t('deliveries.goToEvents', 'View Events')}
+              </Button>
+            }
+            docsLink="/docs#deliveries-api"
+          />
         )
       ) : (
         <div className="animate-fade-in">

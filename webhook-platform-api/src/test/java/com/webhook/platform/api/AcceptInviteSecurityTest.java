@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.webhook.platform.common.util.CryptoUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -71,16 +72,18 @@ public class AcceptInviteSecurityTest extends AbstractIntegrationTest {
     }
 
     /**
-     * Create an INVITED membership directly in DB with a known invite token.
+     * Create an INVITED membership directly in DB with a known invite token hash.
+     * Returns the plaintext token (what the user receives via email).
      */
     private String createInvitedMembership(UUID userId, UUID orgId) {
         String inviteToken = "test-invite-" + UUID.randomUUID();
+        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
         Membership membership = Membership.builder()
                 .userId(userId)
                 .organizationId(orgId)
                 .role(MembershipRole.DEVELOPER)
                 .status(MembershipStatus.INVITED)
-                .inviteToken(inviteToken)
+                .inviteTokenHash(tokenHash)
                 .inviteExpiresAt(Instant.now().plus(48, ChronoUnit.HOURS))
                 .build();
         membershipRepository.saveAndFlush(membership);
@@ -109,7 +112,8 @@ public class AcceptInviteSecurityTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // Verify not compromised
-        Membership m = membershipRepository.findByInviteToken(inviteToken).orElseThrow();
+        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        Membership m = membershipRepository.findByInviteTokenHash(tokenHash).orElseThrow();
         assertEquals(MembershipStatus.INVITED, m.getStatus());
     }
 
@@ -134,7 +138,8 @@ public class AcceptInviteSecurityTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
 
         // Verify not compromised
-        Membership m = membershipRepository.findByInviteToken(inviteToken).orElseThrow();
+        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        Membership m = membershipRepository.findByInviteTokenHash(tokenHash).orElseThrow();
         assertEquals(MembershipStatus.INVITED, m.getStatus());
     }
 
@@ -173,8 +178,9 @@ public class AcceptInviteSecurityTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.role").value("DEVELOPER"));
 
-        // Token should be cleared after acceptance
-        assertFalse(membershipRepository.findByInviteToken(inviteToken).isPresent(),
-                "Invite token should be cleared after acceptance");
+        // Token hash should be cleared after acceptance
+        String tokenHash = CryptoUtils.hashApiKey(inviteToken);
+        assertFalse(membershipRepository.findByInviteTokenHash(tokenHash).isPresent(),
+                "Invite token hash should be cleared after acceptance");
     }
 }

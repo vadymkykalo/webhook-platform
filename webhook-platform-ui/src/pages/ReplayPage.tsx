@@ -394,7 +394,22 @@ export default function ReplayPage() {
       </div>
 
       {sessions.length === 0 ? (
-        <EmptyState icon={History} title={t('replay.noSessions')} description={t('replay.noSessionsDesc')} docsLink="/docs#deterministic-replay" />
+        <EmptyState
+          icon={History}
+          title={t('replay.noSessions')}
+          description={t('replay.noSessionsDesc')}
+          action={
+            <PermissionGate allowed={canReplayDeliveries}>
+              <VerificationGate>
+                <Button onClick={() => setShowForm(true)} size="sm">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  {t('replay.newReplay')}
+                </Button>
+              </VerificationGate>
+            </PermissionGate>
+          }
+          docsLink="/docs#deterministic-replay"
+        />
       ) : (
         <div className="space-y-3 animate-fade-in">
           {sessions.map((session) => (

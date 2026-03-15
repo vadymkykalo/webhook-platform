@@ -1,9 +1,11 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.IncidentRequest;
 import com.webhook.platform.api.dto.IncidentResponse;
 import com.webhook.platform.api.dto.TimelineEntryRequest;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.IncidentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -53,6 +55,7 @@ public class IncidentController {
 
     @Operation(summary = "Create incident")
     @ApiResponse(responseCode = "201", description = "Incident created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
     public ResponseEntity<IncidentResponse> create(
             @PathVariable("projectId") UUID projectId,
@@ -65,6 +68,7 @@ public class IncidentController {
     }
 
     @Operation(summary = "Update incident (status, RCA notes, severity)")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{incidentId}")
     public ResponseEntity<IncidentResponse> update(
             @PathVariable("projectId") UUID projectId,
@@ -77,6 +81,7 @@ public class IncidentController {
     }
 
     @Operation(summary = "Add timeline entry to incident")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{incidentId}/timeline")
     public ResponseEntity<IncidentResponse> addTimeline(
             @PathVariable("projectId") UUID projectId,

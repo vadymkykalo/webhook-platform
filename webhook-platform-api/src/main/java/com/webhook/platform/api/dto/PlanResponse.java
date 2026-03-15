@@ -1,0 +1,28 @@
+package com.webhook.platform.api.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class PlanResponse {
+    private UUID id;
+    private String name;
+    private String displayName;
+    private long maxEventsPerMonth;
+    private int maxEndpointsPerProject;
+    private int maxProjects;
+    private int maxMembers;
+    private int rateLimitPerSecond;
+    private int maxRetentionDays;
+    private JsonNode features;
+    private int priceMonthlyCents;
+    private int priceYearlyCents;
+}

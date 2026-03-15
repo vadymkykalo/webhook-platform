@@ -1,8 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.IncomingSourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,6 +38,7 @@ public class IncomingSourceController {
 
     @Operation(summary = "Create incoming source", description = "Creates a new incoming webhook source for the project")
     @ApiResponse(responseCode = "201", description = "Source created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
     public ResponseEntity<IncomingSourceResponse> createSource(
             @PathVariable("projectId") UUID projectId,
@@ -76,6 +79,7 @@ public class IncomingSourceController {
             @ApiResponse(responseCode = "200", description = "Source updated"),
             @ApiResponse(responseCode = "404", description = "Source not found")
     })
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{id}")
     public ResponseEntity<IncomingSourceResponse> updateSource(
             @PathVariable("id") UUID id,
@@ -88,6 +92,7 @@ public class IncomingSourceController {
 
     @Operation(summary = "Delete incoming source", description = "Disables the incoming source (soft delete)")
     @ApiResponse(responseCode = "204", description = "Source disabled")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSource(
             @PathVariable("id") UUID id,

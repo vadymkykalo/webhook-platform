@@ -26,6 +26,7 @@ export default function LandingPage() {
       <DeveloperConfidence />
       <Integrations />
       <TrustGrid />
+      <Pricing />
       <FAQ />
       <FinalCTA />
     </div>
@@ -58,6 +59,7 @@ function Navigation() {
             <a href="#platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.platform', 'Platform')}</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.howItWorks')}</a>
             <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.docs')}</Link>
+            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
             <Link to="/docs#sdks" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.sdks')}</Link>
           </div>
         </div>
@@ -1176,133 +1178,85 @@ function WorkflowAutomation() {
               </div>
 
               {/* Canvas area */}
-              <div className="p-6 min-h-[380px] bg-[radial-gradient(circle_at_1px_1px,_theme(colors.border)_1px,_transparent_0)] bg-[size:24px_24px] relative">
-                {/* SVG Connections */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-                  {/* trigger → filter */}
-                  <line x1="18%" y1="50%" x2="30%" y2="50%" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3" />
-                  {/* filter → transform */}
-                  <line x1="42%" y1="50%" x2="54%" y2="50%" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3" />
-                  {/* transform → http (branch up) */}
-                  <path d="M 66%,50% Q 70%,50% 72%,30%" fill="none" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3"
-                    style={{ d: 'path("M 430 190 Q 470 190 475 120")' }} />
-                  {/* transform → slack (branch down) */}
-                  <path d="M 66%,50% Q 70%,50% 72%,70%" fill="none" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3"
-                    style={{ d: 'path("M 430 190 Q 470 190 475 260")' }} />
-                  {/* http → createEvent */}
-                  <line x1="84%" y1="30%" x2="88%" y2="30%" stroke="currentColor" strokeWidth="2" className="text-border" strokeDasharray="6 3"
-                    style={{ display: 'none' }} />
-                </svg>
-
-                {/* Nodes */}
-                <div className="relative flex items-center gap-0" style={{ zIndex: 1 }}>
-                  {/* Row: trigger → filter → transform */}
-                  <div className="flex items-center gap-3 w-full">
-                    {/* Trigger */}
-                    <div className={`flex-shrink-0 w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 0 ? 'border-amber-400 shadow-lg shadow-amber-500/20 scale-105' : 'border-border bg-card'}`}>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div className={`h-7 w-7 rounded-lg ${nodes[0].bg} flex items-center justify-center`}>
-                          <Zap className={`h-3.5 w-3.5 ${nodes[0].text}`} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[10px] font-bold truncate">{nodes[0].label}</div>
-                        </div>
-                      </div>
-                      <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[0].desc}</div>
-                      {activeStep === 0 && <div className="mt-1.5 h-0.5 rounded-full bg-amber-400 animate-pulse" />}
-                    </div>
-
-                    {/* Arrow */}
-                    <div className="flex-shrink-0">
-                      <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 1 ? 'text-emerald-500' : 'text-border'}`} />
-                    </div>
-
-                    {/* Filter */}
-                    <div className={`flex-shrink-0 w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 1 ? 'border-emerald-400 shadow-lg shadow-emerald-500/20 scale-105' : 'border-border bg-card'}`}>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div className={`h-7 w-7 rounded-lg ${nodes[1].bg} flex items-center justify-center`}>
-                          <GitBranch className={`h-3.5 w-3.5 ${nodes[1].text}`} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[10px] font-bold truncate">{nodes[1].label}</div>
-                        </div>
-                      </div>
-                      <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[1].desc}</div>
-                      {activeStep === 1 && <div className="mt-1.5 h-0.5 rounded-full bg-emerald-400 animate-pulse" />}
-                    </div>
-
-                    {/* Arrow */}
-                    <div className="flex-shrink-0">
-                      <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 2 ? 'text-violet-500' : 'text-border'}`} />
-                    </div>
-
-                    {/* Transform */}
-                    <div className={`flex-shrink-0 w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 2 ? 'border-violet-400 shadow-lg shadow-violet-500/20 scale-105' : 'border-border bg-card'}`}>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div className={`h-7 w-7 rounded-lg ${nodes[2].bg} flex items-center justify-center`}>
-                          <Wand2 className={`h-3.5 w-3.5 ${nodes[2].text}`} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[10px] font-bold truncate">{nodes[2].label}</div>
-                        </div>
-                      </div>
-                      <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[2].desc}</div>
-                      {activeStep === 2 && <div className="mt-1.5 h-0.5 rounded-full bg-violet-400 animate-pulse" />}
-                    </div>
-
-                    {/* Branch arrows + targets */}
-                    <div className="flex-shrink-0 flex flex-col items-start gap-3">
-                      {/* HTTP branch */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex flex-col items-center">
-                          <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 3 ? 'text-blue-500' : 'text-border'}`} />
-                        </div>
-                        <div className={`w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 3 ? 'border-blue-400 shadow-lg shadow-blue-500/20 scale-105' : 'border-border bg-card'}`}>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className={`h-7 w-7 rounded-lg ${nodes[3].bg} flex items-center justify-center`}>
-                              <Globe className={`h-3.5 w-3.5 ${nodes[3].text}`} />
+              <div className="p-6 min-h-[380px] bg-[radial-gradient(circle_at_1px_1px,_theme(colors.border)_1px,_transparent_0)] bg-[size:24px_24px]">
+                {/* Row 1: Trigger → Filter → Transform */}
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  {[0, 1, 2].map((i) => {
+                    const n = nodes[i];
+                    const Icon = n.icon;
+                    const colors: Record<number, string> = { 0: 'border-amber-400 shadow-amber-500/20', 1: 'border-emerald-400 shadow-emerald-500/20', 2: 'border-violet-400 shadow-violet-500/20' };
+                    const pulseColors: Record<number, string> = { 0: 'bg-amber-400', 1: 'bg-emerald-400', 2: 'bg-violet-400' };
+                    const arrowColors: Record<number, string> = { 1: 'text-emerald-500', 2: 'text-violet-500' };
+                    return (
+                      <div key={n.id} className="flex items-center gap-3">
+                        {i > 0 && <ArrowRight className={`h-4 w-4 flex-shrink-0 transition-colors duration-500 ${activeStep === i ? arrowColors[i] : 'text-border'}`} />}
+                        <div className={`w-[150px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === i ? `${colors[i]} shadow-lg scale-105` : 'border-border bg-card'}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className={`h-7 w-7 rounded-lg ${n.bg} flex items-center justify-center flex-shrink-0`}>
+                              <Icon className={`h-3.5 w-3.5 ${n.text}`} />
                             </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] font-bold truncate">{nodes[3].label}</div>
-                            </div>
+                            <span className="text-[11px] font-bold leading-tight">{n.label}</span>
                           </div>
-                          <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[3].desc}</div>
-                          {activeStep === 3 && <div className="mt-1.5 h-0.5 rounded-full bg-blue-400 animate-pulse" />}
-                        </div>
-                        {/* Create Event after HTTP */}
-                        <ArrowRight className={`h-4 w-4 flex-shrink-0 transition-colors duration-500 ${activeStep === 5 ? 'text-purple-500' : 'text-border'}`} />
-                        <div className={`w-[130px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 5 ? 'border-purple-400 shadow-lg shadow-purple-500/20 scale-105' : 'border-border bg-card'}`}>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className={`h-7 w-7 rounded-lg ${nodes[5].bg} flex items-center justify-center`}>
-                              <Send className={`h-3.5 w-3.5 ${nodes[5].text}`} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] font-bold truncate">{nodes[5].label}</div>
-                            </div>
-                          </div>
-                          <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[5].desc}</div>
-                          {activeStep === 5 && <div className="mt-1.5 h-0.5 rounded-full bg-purple-400 animate-pulse" />}
+                          <div className="text-[9px] font-mono text-muted-foreground">{n.desc}</div>
+                          {activeStep === i && <div className={`mt-1.5 h-0.5 rounded-full ${pulseColors[i]} animate-pulse`} />}
                         </div>
                       </div>
-                      {/* Slack branch */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex flex-col items-center">
-                          <ArrowRight className={`h-4 w-4 transition-colors duration-500 ${activeStep === 4 ? 'text-pink-500' : 'text-border'}`} />
-                        </div>
-                        <div className={`w-[140px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 4 ? 'border-pink-400 shadow-lg shadow-pink-500/20 scale-105' : 'border-border bg-card'}`}>
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className={`h-7 w-7 rounded-lg ${nodes[4].bg} flex items-center justify-center`}>
-                              <Bell className={`h-3.5 w-3.5 ${nodes[4].text}`} />
+                    );
+                  })}
+                </div>
+
+                {/* Branch connector from Transform */}
+                <div className="flex justify-center mb-1">
+                  <div className="ml-[150px] flex items-start">
+                    <div className="w-px h-10 bg-border ml-[75px]" />
+                  </div>
+                </div>
+
+                {/* Row 2: Branches */}
+                <div className="flex justify-center gap-6">
+                  {/* Branch A: HTTP → Create Event */}
+                  <div className="flex items-center gap-3">
+                    {[3, 5].map((i, idx) => {
+                      const n = nodes[i];
+                      const Icon = n.icon;
+                      const colors: Record<number, string> = { 3: 'border-blue-400 shadow-blue-500/20', 5: 'border-purple-400 shadow-purple-500/20' };
+                      const pulseColors: Record<number, string> = { 3: 'bg-blue-400', 5: 'bg-purple-400' };
+                      return (
+                        <div key={n.id} className="flex items-center gap-3">
+                          {idx > 0 && <ArrowRight className={`h-4 w-4 flex-shrink-0 transition-colors duration-500 ${activeStep === i ? 'text-purple-500' : 'text-border'}`} />}
+                          <div className={`w-[150px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === i ? `${colors[i]} shadow-lg scale-105` : 'border-border bg-card'}`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`h-7 w-7 rounded-lg ${n.bg} flex items-center justify-center flex-shrink-0`}>
+                                <Icon className={`h-3.5 w-3.5 ${n.text}`} />
+                              </div>
+                              <span className="text-[11px] font-bold leading-tight">{n.label}</span>
                             </div>
-                            <div className="min-w-0">
-                              <div className="text-[10px] font-bold truncate">{nodes[4].label}</div>
-                            </div>
+                            <div className="text-[9px] font-mono text-muted-foreground">{n.desc}</div>
+                            {activeStep === i && <div className={`mt-1.5 h-0.5 rounded-full ${pulseColors[i]} animate-pulse`} />}
                           </div>
-                          <div className="text-[9px] font-mono text-muted-foreground truncate">{nodes[4].desc}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Branch B: Slack Notify */}
+                  <div className="flex items-center">
+                    {(() => {
+                      const n = nodes[4];
+                      const Icon = n.icon;
+                      return (
+                        <div className={`w-[150px] rounded-xl border-2 p-3 transition-all duration-500 ${activeStep === 4 ? 'border-pink-400 shadow-lg shadow-pink-500/20 scale-105' : 'border-border bg-card'}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className={`h-7 w-7 rounded-lg ${n.bg} flex items-center justify-center flex-shrink-0`}>
+                              <Icon className={`h-3.5 w-3.5 ${n.text}`} />
+                            </div>
+                            <span className="text-[11px] font-bold leading-tight">{n.label}</span>
+                          </div>
+                          <div className="text-[9px] font-mono text-muted-foreground">{n.desc}</div>
                           {activeStep === 4 && <div className="mt-1.5 h-0.5 rounded-full bg-pink-400 animate-pulse" />}
                         </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1991,6 +1945,268 @@ function TrustGrid() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Pricing() {
+  const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
+  const [annual, setAnnual] = useState(false);
+
+  const plans = [
+    {
+      key: 'free',
+      name: t('landing.pricing.free'),
+      desc: t('landing.pricing.freeDesc'),
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      events: '10K',
+      projects: '3',
+      endpoints: '5',
+      members: '5',
+      rps: '10',
+      retention: '7',
+      workflows: false,
+      rules: false,
+      replay: false,
+      mtls: false,
+      cta: 'getStarted',
+      highlight: false,
+    },
+    {
+      key: 'starter',
+      name: t('landing.pricing.starter'),
+      desc: t('landing.pricing.starterDesc'),
+      monthlyPrice: 29,
+      yearlyPrice: 290,
+      events: '100K',
+      projects: '10',
+      endpoints: '20',
+      members: '10',
+      rps: '50',
+      retention: '30',
+      workflows: true,
+      rules: true,
+      replay: true,
+      mtls: false,
+      cta: 'upgrade',
+      highlight: false,
+    },
+    {
+      key: 'pro',
+      name: t('landing.pricing.pro'),
+      desc: t('landing.pricing.proDesc'),
+      monthlyPrice: 99,
+      yearlyPrice: 990,
+      events: '1M',
+      projects: '50',
+      endpoints: '100',
+      members: '50',
+      rps: '200',
+      retention: '90',
+      workflows: true,
+      rules: true,
+      replay: true,
+      mtls: true,
+      cta: 'upgrade',
+      highlight: true,
+    },
+    {
+      key: 'enterprise',
+      name: t('landing.pricing.enterprise'),
+      desc: t('landing.pricing.enterpriseDesc'),
+      monthlyPrice: -1,
+      yearlyPrice: -1,
+      events: t('landing.pricing.unlimited'),
+      projects: t('landing.pricing.unlimited'),
+      endpoints: t('landing.pricing.unlimited'),
+      members: t('landing.pricing.unlimited'),
+      rps: '1000',
+      retention: '365',
+      workflows: true,
+      rules: true,
+      replay: true,
+      mtls: true,
+      cta: 'contactSales',
+      highlight: false,
+    },
+  ];
+
+  return (
+    <section id="pricing" className="py-24 relative overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/[0.03] rounded-full blur-[120px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6 border border-primary/20">
+            <BarChart3 className="h-3 w-3" />
+            {t('landing.pricing.badge')}
+          </div>
+          <h2 className="text-headline mb-4">
+            {t('landing.pricing.title')}
+            <span className="gradient-text">{t('landing.pricing.titleHighlight')}</span>
+          </h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.pricing.subtitle')}
+          </p>
+        </div>
+
+        {/* Monthly / Yearly toggle */}
+        <div className="flex justify-center mb-12">
+          <div className="inline-flex items-center gap-3 p-1.5 rounded-xl border bg-muted/50">
+            <button
+              onClick={() => setAnnual(false)}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${!annual ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {t('landing.pricing.monthly')}
+            </button>
+            <button
+              onClick={() => setAnnual(true)}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${annual ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {t('landing.pricing.yearly')}
+              <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-bold border border-green-500/20">
+                {t('landing.pricing.yearlySave')}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Plan cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {plans.map((plan, i) => {
+            const price = annual ? plan.yearlyPrice : plan.monthlyPrice;
+            const suffix = annual ? t('landing.pricing.yr') : t('landing.pricing.mo');
+            const isCustom = price === -1;
+
+            return (
+              <div
+                key={plan.key}
+                className={`relative flex flex-col rounded-2xl border p-6 transition-all duration-500 animate-[fadeInUp_0.5s_ease-out_both] ${
+                  plan.highlight
+                    ? 'bg-card border-primary/40 shadow-lg ring-1 ring-primary/20 scale-[1.02] z-10'
+                    : 'bg-card border-border hover:border-primary/20 hover:shadow-card-hover'
+                }`}
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                {plan.highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="px-3 py-1 rounded-full bg-primary text-primary-foreground text-[11px] font-bold shadow-md">
+                      {t('landing.pricing.popular')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Header */}
+                <div className="mb-5">
+                  <h3 className="text-lg font-bold mb-1">{plan.name}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{plan.desc}</p>
+                </div>
+
+                {/* Price */}
+                <div className="mb-6">
+                  {isCustom ? (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold">{t('landing.pricing.custom')}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold">${price}</span>
+                      <span className="text-sm text-muted-foreground">{suffix}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* CTA */}
+                <div className="mb-6">
+                  {plan.cta === 'contactSales' ? (
+                    <a href="mailto:vadymkykalo@gmail.com" className="block">
+                      <Button variant="outline" className="w-full" size="sm">
+                        <Mail className="h-3.5 w-3.5" /> {t('landing.pricing.contactSales')}
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link to={isAuthenticated ? '/admin/projects' : '/register'}>
+                      <Button
+                        className={`w-full ${plan.highlight ? 'shadow-glow' : ''}`}
+                        variant={plan.highlight ? 'default' : 'outline'}
+                        size="sm"
+                      >
+                        {t(`landing.pricing.${plan.cta}`)} <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+
+                {/* Divider */}
+                <div className="h-px bg-border mb-5" />
+
+                {/* Quotas */}
+                <div className="space-y-2.5 text-sm flex-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span><strong>{plan.events}</strong> {t('landing.pricing.eventsPerMonth')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span><strong>{plan.projects}</strong> {t('landing.pricing.projects')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span><strong>{plan.endpoints}</strong> {t('landing.pricing.endpointsPerProject')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span><strong>{plan.members}</strong> {t('landing.pricing.teamMembers')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span><strong>{plan.rps}</strong> {t('landing.pricing.rps')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span><strong>{plan.retention}</strong> {t('landing.pricing.retentionDays')}</span>
+                  </div>
+
+                  {/* Feature flags */}
+                  <div className="pt-2 space-y-2">
+                    {[
+                      { label: t('landing.pricing.workflows'), enabled: plan.workflows },
+                      { label: t('landing.pricing.rules'), enabled: plan.rules },
+                      { label: t('landing.pricing.replay'), enabled: plan.replay },
+                      { label: t('landing.pricing.mtls'), enabled: plan.mtls },
+                    ].map((feat) => (
+                      <div key={feat.label} className="flex items-center gap-2">
+                        {feat.enabled ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        ) : (
+                          <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/20 flex-shrink-0" />
+                        )}
+                        <span className={feat.enabled ? '' : 'text-muted-foreground'}>{feat.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Enterprise extras */}
+                  {plan.key === 'enterprise' && (
+                    <div className="pt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <span>{t('landing.pricing.prioritySupport')}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <span>{t('landing.pricing.customIntegrations')}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

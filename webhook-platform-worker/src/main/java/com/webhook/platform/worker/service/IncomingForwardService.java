@@ -556,6 +556,6 @@ public class IncomingForwardService {
         if (str == null || str.length() <= maxLength) {
             return str;
         }
-        return str.substring(0, maxLength);
+        return str.substring(0, maxLength) + "\n...[truncated]";
     }
 }

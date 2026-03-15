@@ -1,8 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.TransformationRequest;
 import com.webhook.platform.api.dto.TransformationResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.TransformationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,6 +31,7 @@ public class TransformationController {
 
     @Operation(summary = "Create transformation", description = "Creates a reusable payload transformation template")
     @ApiResponse(responseCode = "201", description = "Transformation created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
     public ResponseEntity<TransformationResponse> create(
             @PathVariable("projectId") UUID projectId,
@@ -60,6 +63,7 @@ public class TransformationController {
     }
 
     @Operation(summary = "Update transformation", description = "Updates transformation (auto-increments version when template changes)")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{id}")
     public ResponseEntity<TransformationResponse> update(
             @PathVariable("projectId") UUID projectId,
@@ -73,6 +77,7 @@ public class TransformationController {
 
     @Operation(summary = "Delete transformation", description = "Removes a transformation (subscriptions/destinations referencing it will have transformation_id set to NULL)")
     @ApiResponse(responseCode = "204", description = "Transformation deleted")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,

@@ -21,9 +21,11 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     boolean existsByUserIdAndOrganizationId(UUID userId, UUID organizationId);
 
-    Optional<Membership> findByInviteToken(String inviteToken);
+    Optional<Membership> findByInviteTokenHash(String inviteTokenHash);
 
     long countByOrganizationIdAndRole(UUID organizationId, MembershipRole role);
+
+    long countByOrganizationId(UUID organizationId);
 
     @Query("SELECT m, u FROM Membership m JOIN User u ON m.userId = u.id WHERE m.organizationId = :orgId")
     List<Object[]> findMembersWithUsers(@Param("orgId") UUID organizationId);

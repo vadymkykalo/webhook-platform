@@ -1,8 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.dto.TestEndpointResponse;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.TestEndpointService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +25,7 @@ public class TestEndpointController {
 
     private final TestEndpointService testEndpointService;
 
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
     @Operation(summary = "Create a test endpoint", description = "Creates a temporary endpoint to capture webhook requests")
     public ResponseEntity<TestEndpointResponse> create(
@@ -48,6 +51,7 @@ public class TestEndpointController {
         return ResponseEntity.ok(testEndpointService.get(projectId, id));
     }
 
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete test endpoint", description = "Deletes a test endpoint and all captured requests")
     public ResponseEntity<Void> delete(
@@ -66,6 +70,7 @@ public class TestEndpointController {
         return ResponseEntity.ok(testEndpointService.getRequests(projectId, id, pageable));
     }
 
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}/requests")
     @Operation(summary = "Clear captured requests", description = "Deletes all requests captured by a test endpoint")
     public ResponseEntity<Void> clearRequests(

@@ -1,10 +1,13 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.WorkflowExecutionResponse;
 import com.webhook.platform.api.dto.WorkflowRequest;
 import com.webhook.platform.api.dto.WorkflowResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.WorkflowService;
+import com.webhook.platform.api.service.billing.RequireFeature;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,6 +35,8 @@ public class WorkflowController {
 
     @Operation(summary = "Create workflow")
     @ApiResponse(responseCode = "201", description = "Workflow created")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireFeature("workflows")
     @PostMapping
     public ResponseEntity<WorkflowResponse> create(
             @PathVariable("projectId") UUID projectId,
@@ -63,6 +68,8 @@ public class WorkflowController {
     }
 
     @Operation(summary = "Update workflow")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireFeature("workflows")
     @PutMapping("/{id}")
     public ResponseEntity<WorkflowResponse> update(
             @PathVariable("projectId") UUID projectId,
@@ -76,6 +83,7 @@ public class WorkflowController {
 
     @Operation(summary = "Delete workflow")
     @ApiResponse(responseCode = "204", description = "Workflow deleted")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,
@@ -88,6 +96,7 @@ public class WorkflowController {
     }
 
     @Operation(summary = "Toggle workflow enabled/disabled")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<WorkflowResponse> toggle(
             @PathVariable("projectId") UUID projectId,
@@ -102,6 +111,8 @@ public class WorkflowController {
 
     @Operation(summary = "Manually trigger workflow with test payload")
     @ApiResponse(responseCode = "200", description = "Workflow executed")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireFeature("workflows")
     @PostMapping("/{id}/trigger")
     public ResponseEntity<WorkflowExecutionResponse> trigger(
             @PathVariable("projectId") UUID projectId,

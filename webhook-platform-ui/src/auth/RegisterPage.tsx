@@ -40,9 +40,8 @@ export default function RegisterPage() {
         organizationName,
       });
       http.setToken(authResponse.accessToken);
-      http.setRefreshToken(authResponse.refreshToken);
       const user = await authApi.getCurrentUser();
-      login(authResponse.accessToken, authResponse.refreshToken, user);
+      login(authResponse.accessToken, user);
       showSuccess(t('auth.register.success'));
       setRegistered(true);
     } catch (err: any) {

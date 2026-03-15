@@ -98,6 +98,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
+    @ExceptionHandler(QuotaExceededException.class)
+    public ResponseEntity<ErrorResponse> handleQuotaExceededException(
+            QuotaExceededException ex, WebRequest request) {
+        log.warn("Quota exceeded: {} (plan={})", ex.getQuotaName(), ex.getPlanName());
+        Map<String, String> details = new LinkedHashMap<>();
+        details.put("quota", ex.getQuotaName());
+        details.put("current", String.valueOf(ex.getCurrentUsage()));
+        details.put("limit", String.valueOf(ex.getLimit()));
+        details.put("plan", ex.getPlanName());
+        ErrorResponse error = ErrorResponse.builder()
+                .error("quota_exceeded")
+                .message(ex.getMessage())
+                .status(HttpStatus.PAYMENT_REQUIRED.value())
+                .fieldErrors(details)
+                .build();
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(error);
+    }
+
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflictException(
             ConflictException ex, WebRequest request) {

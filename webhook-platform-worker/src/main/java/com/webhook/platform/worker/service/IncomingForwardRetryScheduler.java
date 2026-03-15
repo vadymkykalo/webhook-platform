@@ -7,10 +7,11 @@ import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -22,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -36,7 +39,10 @@ public class IncomingForwardRetryScheduler {
     private final TransactionTemplate transactionTemplate;
     private final int maxPerDest;
     private final Counter retryScheduledCounter;
+    private final long defaultPollIntervalMs;
     private final RetryGovernor governor;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
+            r -> { Thread t = new Thread(r, "incoming-forward-retry-scheduler"); t.setDaemon(true); return t; });
 
     public IncomingForwardRetryScheduler(
             IncomingForwardAttemptRepository attemptRepository,
@@ -45,11 +51,13 @@ public class IncomingForwardRetryScheduler {
             MeterRegistry meterRegistry,
             @Value("${incoming-forward.retry.batch-size:50}") int batchSize,
             @Value("${incoming-forward.retry.max-per-destination:10}") int maxPerDest,
-            @Value("${incoming-forward.retry.high-watermark:3000}") long highWatermark) {
+            @Value("${incoming-forward.retry.high-watermark:3000}") long highWatermark,
+            @Value("${incoming-forward.retry.poll-interval-ms:10000}") long defaultPollIntervalMs) {
         this.attemptRepository = attemptRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
         this.maxPerDest = maxPerDest;
+        this.defaultPollIntervalMs = defaultPollIntervalMs;
         this.retryScheduledCounter = Counter.builder("incoming_forward_retries_scheduled_total")
                 .register(meterRegistry);
         this.governor = new RetryGovernor(
@@ -57,11 +65,43 @@ public class IncomingForwardRetryScheduler {
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
     }
 
-    @Scheduled(fixedDelayString = "${incoming-forward.retry.poll-interval-ms:10000}")
-    public void pollPendingRetries() {
+    @PostConstruct
+    void startScheduler() {
+        long startupJitter = ThreadLocalRandom.current().nextLong(0, 5000);
+        log.info("Incoming forward retry scheduler starting with {}ms jitter, default poll interval {}ms",
+                startupJitter, defaultPollIntervalMs);
+        scheduler.schedule(this::pollAndReschedule, startupJitter, TimeUnit.MILLISECONDS);
+    }
+
+    @PreDestroy
+    void stopScheduler() {
+        scheduler.shutdown();
+        try {
+            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
+                scheduler.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            scheduler.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void pollAndReschedule() {
+        long nextDelay = defaultPollIntervalMs;
+        try {
+            long pendingCount = countPendingRetries();
+            pollPendingRetries(pendingCount);
+            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount);
+        } catch (Exception e) {
+            log.error("Incoming forward retry scheduler poll failed: {}", e.getMessage(), e);
+        } finally {
+            scheduler.schedule(this::pollAndReschedule, nextDelay, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    void pollPendingRetries(long pendingCount) {
         try {
             // ── Governor: adaptive batch sizing ──
-            long pendingCount = countPendingRetries();
             int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
             if (effectiveBatch <= 0) {
                 return; // Governor cooldown — skip this poll
