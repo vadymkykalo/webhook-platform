@@ -12,23 +12,31 @@ import NetworkBackground from '../components/NetworkBackground';
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      {/* Living aurora blobs — fixed behind all content */}
+      <div className="page-aurora"><span /></div>
+      <div className="relative z-10">
       <Navigation />
       <Hero isAuthenticated={isAuthenticated} />
       <QuickWins />
       <LogoCloud />
+      <div className="section-divider" />
       <FlowDiagram />
       <CapabilityShowcase />
+      <div className="section-divider" />
       <PlatformHighlights />
+      <div className="section-divider" />
       <WorkflowAutomation />
       <Features />
       <HowItWorks />
       <DeveloperConfidence />
+      <div className="section-divider" />
       <Integrations />
       <TrustGrid />
       <Pricing />
       <FAQ />
       <FinalCTA />
+      </div>
     </div>
   );
 }
@@ -45,7 +53,7 @@ function Navigation() {
   }, []);
 
   return (
-    <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'glass border-b border-border/50 shadow-sm' : 'bg-transparent'}`}>
+    <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled ? 'glass border-b border-border/50 shadow-md' : 'bg-transparent'}`}>
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2.5">
@@ -89,9 +97,12 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
   const { t } = useTranslation();
   return (
     <section className="relative overflow-hidden">
-      {/* Background gradient orbs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl -translate-y-1/2" />
-      <div className="absolute top-20 right-1/4 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl" />
+      {/* Mesh gradient background */}
+      <div className="absolute inset-0 hero-mesh" />
+      {/* Dot grid */}
+      <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06]" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+      {/* Top-edge glow accent */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
       <NetworkBackground className="opacity-70" />
 
       <div className="max-w-7xl mx-auto px-6 pt-20 pb-24 relative">
@@ -117,7 +128,7 @@ function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
             </p>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <Link to={isAuthenticated ? '/admin/dashboard' : '/register'}>
-                <Button size="lg" className="shadow-glow">
+                <Button size="lg" className="shadow-glow btn-shimmer">
                   {isAuthenticated ? t('landing.nav.goToDashboard') : t('landing.hero.startFree')} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -163,7 +174,7 @@ function DashboardMockup() {
 
   return (
     <div className="relative">
-      <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-purple-500/20 rounded-2xl blur-2xl" />
+      <div className="absolute -inset-4 bg-gradient-to-r from-primary/25 via-purple-500/20 to-pink-500/15 rounded-2xl blur-2xl" />
       <div className="relative bg-card rounded-xl border shadow-elevated overflow-hidden">
         <div className="bg-muted/50 border-b px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -230,7 +241,7 @@ function QuickWins() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {cards.map((card, i) => (
-            <div key={i} className="group p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300 hover:-translate-y-0.5">
+            <div key={i} className="group p-5 rounded-xl border bg-card card-glow hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5">
               <div className={`h-9 w-9 rounded-lg ${card.bg} flex items-center justify-center mb-3`}>
                 <card.icon className={`h-4.5 w-4.5 ${card.color}`} />
               </div>
@@ -556,7 +567,7 @@ function CapabilityShowcase() {
   const { t } = useTranslation();
 
   return (
-    <section id="capabilities" className="py-24 bg-muted/30 relative overflow-hidden">
+    <section id="capabilities" className="py-24 bg-muted/30 noise relative overflow-hidden">
       <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="max-w-7xl mx-auto px-6 relative">
         <div className="text-center mb-16">
@@ -1365,7 +1376,7 @@ function Features() {
           {features.map((f, i) => (
             <div
               key={i}
-              className="group relative bg-card rounded-xl border p-5 hover:shadow-card-hover hover:border-primary/20 transition-all duration-300 hover:-translate-y-0.5"
+              className="group relative bg-card rounded-xl border p-5 card-glow hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
             >
               <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/15 transition-colors">
                 <f.icon className="h-4.5 w-4.5 text-primary" />
@@ -1387,7 +1398,7 @@ function Features() {
 function DeveloperConfidence() {
   const { t } = useTranslation();
   return (
-    <section className="py-24 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 relative overflow-hidden">
+    <section className="py-24 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 noise relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
       <div className="max-w-7xl mx-auto px-6 relative">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -1492,7 +1503,7 @@ function HowItWorks() {
   ];
 
   return (
-    <section id="how-it-works" className="py-24 bg-muted/30 relative overflow-hidden">
+    <section id="how-it-works" className="py-24 bg-muted/30 noise relative overflow-hidden">
       <div className="absolute top-1/2 left-0 w-[600px] h-[600px] bg-primary/[0.03] rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
       <div className="absolute top-1/2 right-0 w-[400px] h-[400px] bg-purple-500/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
@@ -1919,7 +1930,7 @@ function TrustGrid() {
   ];
 
   return (
-    <section className="py-24 bg-muted/30 relative overflow-hidden">
+    <section className="py-24 bg-muted/30 noise relative overflow-hidden">
       <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
       <div className="max-w-7xl mx-auto px-6 relative">
         <div className="text-center mb-16">
@@ -1935,7 +1946,7 @@ function TrustGrid() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((item, i) => (
-            <div key={i} className="group flex items-start gap-4 p-5 rounded-xl border bg-card hover:shadow-card-hover hover:border-primary/20 transition-all duration-300">
+            <div key={i} className="group flex items-start gap-4 p-5 rounded-xl border bg-card card-glow hover:shadow-card-hover transition-all duration-300">
               <div className={`h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors`}>
                 <item.icon className={`h-5 w-5 ${item.color}`} />
               </div>
@@ -2087,8 +2098,8 @@ function Pricing() {
                 key={plan.key}
                 className={`relative flex flex-col rounded-2xl border p-6 transition-all duration-500 animate-[fadeInUp_0.5s_ease-out_both] ${
                   plan.highlight
-                    ? 'bg-card border-primary/40 shadow-lg ring-1 ring-primary/20 scale-[1.02] z-10'
-                    : 'bg-card border-border hover:border-primary/20 hover:shadow-card-hover'
+                    ? 'bg-card gradient-border shadow-glow-lg scale-[1.02] z-10'
+                    : 'bg-card border-border card-glow hover:shadow-card-hover'
                 }`}
                 style={{ animationDelay: `${i * 100}ms` }}
               >
@@ -2227,8 +2238,8 @@ function FAQ() {
   ];
 
   return (
-    <section className="py-24 bg-muted/30">
-      <div className="max-w-3xl mx-auto px-6">
+    <section className="py-24 bg-muted/30 noise relative overflow-hidden">
+      <div className="max-w-3xl mx-auto px-6 relative">
         <div className="text-center mb-16">
           <h2 className="text-headline mb-4">{t('landing.faq.title')}<span className="gradient-text">{t('landing.faq.titleHighlight')}</span></h2>
         </div>
@@ -2259,7 +2270,7 @@ function FinalCTA() {
   return (
     <section className="py-24">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="relative bg-gradient-to-br from-primary via-primary/95 to-purple-700 rounded-2xl p-12 lg:p-16 text-center overflow-hidden">
+        <div className="relative bg-gradient-to-br from-primary via-primary/95 to-purple-700 rounded-2xl p-12 lg:p-16 text-center overflow-hidden shadow-glow-xl">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="relative z-10">
@@ -2276,7 +2287,7 @@ function FinalCTA() {
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link to="/register">
-                <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-xl">
+                <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-xl btn-shimmer">
                   {t('landing.cta.getStartedFree')} <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
