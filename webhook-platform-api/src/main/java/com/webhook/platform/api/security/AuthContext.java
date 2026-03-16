@@ -57,4 +57,15 @@ public record AuthContext(
         }
         return userId;
     }
+
+    /**
+     * Ensures the request is authenticated via JWT (not an API key).
+     * Use on org-level endpoints that should never be accessible by project-scoped API keys
+     * (e.g. billing, audit log, member management).
+     */
+    public void requireJwt() {
+        if (isApiKey()) {
+            throw new ForbiddenException("This endpoint requires user authentication (JWT). API keys are not permitted.");
+        }
+    }
 }

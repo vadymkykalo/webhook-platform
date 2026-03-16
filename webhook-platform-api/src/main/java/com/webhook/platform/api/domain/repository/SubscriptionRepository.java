@@ -2,6 +2,8 @@ package com.webhook.platform.api.domain.repository;
 
 import com.webhook.platform.api.domain.entity.Subscription;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -15,4 +17,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     boolean existsByProjectId(UUID projectId);
     long countByTransformationId(UUID transformationId);
     boolean existsByEndpointIdAndEventType(UUID endpointId, String eventType);
+
+    @Query("SELECT s FROM Subscription s WHERE s.projectId = :projectId AND s.enabled = true " +
+           "AND s.eventType LIKE '%*%'")
+    List<Subscription> findWildcardSubscriptions(@Param("projectId") UUID projectId);
 }

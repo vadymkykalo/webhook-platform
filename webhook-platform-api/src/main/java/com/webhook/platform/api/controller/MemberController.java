@@ -41,6 +41,7 @@ public class MemberController {
     public ResponseEntity<List<MemberResponse>> getMembers(
             @PathVariable("orgId") UUID orgId,
             AuthContext auth) {
+        auth.requireJwt();
         List<MemberResponse> response = membershipService.getOrganizationMembers(orgId);
         return ResponseEntity.ok(response);
     }
@@ -54,6 +55,7 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             @Valid @RequestBody AddMemberRequest request,
             AuthContext auth) {
+        auth.requireJwt();
         MemberResponse response = membershipService.addMember(
                 orgId,
                 request,
@@ -69,6 +71,7 @@ public class MemberController {
             @PathVariable("userId") UUID userId,
             @Valid @RequestBody ChangeMemberRoleRequest request,
             AuthContext auth) {
+        auth.requireJwt();
         MemberResponse response = membershipService.changeMemberRole(
                 orgId,
                 userId,
@@ -85,6 +88,7 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             @PathVariable("userId") UUID userId,
             AuthContext auth) {
+        auth.requireJwt();
         membershipService.removeMember(orgId, userId, auth.role());
         return ResponseEntity.noContent().build();
     }

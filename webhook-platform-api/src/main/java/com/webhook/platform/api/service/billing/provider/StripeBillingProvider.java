@@ -208,6 +208,39 @@ public class StripeBillingProvider implements BillingProvider {
         }
     }
 
+    // ── Reconciliation ─────────────────────────────────────────────
+
+    @Override
+    public ExternalSubscriptionState fetchSubscriptionStatus(String externalSubscriptionId) {
+        try {
+            Subscription sub = Subscription.retrieve(externalSubscriptionId);
+            String priceId = (sub.getItems() != null && !sub.getItems().getData().isEmpty())
+                    ? sub.getItems().getData().get(0).getPrice().getId()
+                    : null;
+            String planName = planToPriceId.entrySet().stream()
+                    .filter(e -> e.getValue().equals(priceId))
+                    .map(Map.Entry::getKey)
+                    .findFirst().orElse(null);
+
+            Instant periodStart = sub.getCurrentPeriodStart() != null
+                    ? Instant.ofEpochSecond(sub.getCurrentPeriodStart()) : null;
+            Instant periodEnd = sub.getCurrentPeriodEnd() != null
+                    ? Instant.ofEpochSecond(sub.getCurrentPeriodEnd()) : null;
+
+            return new ExternalSubscriptionState(
+                    sub.getId(),
+                    sub.getStatus(),
+                    planName,
+                    periodStart,
+                    periodEnd,
+                    Boolean.TRUE.equals(sub.getCancelAtPeriodEnd())
+            );
+        } catch (StripeException e) {
+            log.error("Stripe: failed to fetch subscription {}: {}", externalSubscriptionId, e.getMessage());
+            return null;
+        }
+    }
+
     // ── Webhooks ────────────────────────────────────────────────────
 
     @Override

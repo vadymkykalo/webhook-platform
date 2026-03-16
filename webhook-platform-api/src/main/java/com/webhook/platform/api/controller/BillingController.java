@@ -61,6 +61,7 @@ public class BillingController {
     @Operation(summary = "Get organization billing info", description = "Returns current plan, billing status, and usage snapshot")
     @GetMapping("/organization")
     public ResponseEntity<OrganizationBillingResponse> getOrganizationBilling(AuthContext auth) {
+        auth.requireJwt();
         UUID orgId = auth.organizationId();
         Organization org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
@@ -117,6 +118,7 @@ public class BillingController {
     @Operation(summary = "Get detailed usage", description = "Returns current resource usage vs plan limits for all quota types")
     @GetMapping("/usage")
     public ResponseEntity<UsageResponse> getUsage(AuthContext auth) {
+        auth.requireJwt();
         UUID orgId = auth.organizationId();
         Plan plan = entitlementService.getPlan(orgId);
 
@@ -148,6 +150,7 @@ public class BillingController {
             "Empty when billing is disabled (self-hosted).")
     @GetMapping("/invoices")
     public ResponseEntity<List<InvoiceResponse>> listInvoices(AuthContext auth) {
+        auth.requireJwt();
         // Invoices come from billing provider — delegated via BillingService
         List<InvoiceResponse> invoices = billingService.listInvoices(auth.organizationId());
         return ResponseEntity.ok(invoices);

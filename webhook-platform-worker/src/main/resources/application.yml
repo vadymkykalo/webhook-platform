@@ -117,6 +117,8 @@ circuit-breaker:
   minimum-calls: ${CIRCUIT_BREAKER_MINIMUM_CALLS:5}
   wait-duration-seconds: ${CIRCUIT_BREAKER_WAIT_DURATION_SECONDS:30}
   window-ttl-seconds: ${CIRCUIT_BREAKER_WINDOW_TTL_SECONDS:120}
+  slow-call-threshold-ms: ${CIRCUIT_BREAKER_SLOW_CALL_THRESHOLD_MS:10000}
+  slow-call-rate-threshold: ${CIRCUIT_BREAKER_SLOW_CALL_RATE_THRESHOLD:80}
 
 queue-depth:
   metrics:
@@ -130,6 +132,12 @@ stuck-delivery:
 stuck-forward:
   threshold-minutes: ${STUCK_FORWARD_THRESHOLD_MINUTES:5}
   check-interval-ms: ${STUCK_FORWARD_CHECK_INTERVAL_MS:60000}
+
+delivery:
+  escalation:
+    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:48}
+    batch-size: ${DELIVERY_ESCALATION_BATCH_SIZE:100}
+    interval-ms: ${DELIVERY_ESCALATION_INTERVAL_MS:300000}
 
 incoming-forward:
   retry:

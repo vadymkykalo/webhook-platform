@@ -99,6 +99,8 @@ data-retention:
   batch-size: ${DATA_RETENTION_BATCH_SIZE:1000}
   cleanup-cron: ${DATA_RETENTION_CRON:0 0 2 * * *}
   limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
+  burst-cleanup-cron: ${DATA_RETENTION_BURST_CLEANUP_CRON:0 0 */4 * * *}
+  table-metrics-interval-ms: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:900000}
 
 replay:
   batch-size: ${REPLAY_BATCH_SIZE:200}
@@ -198,6 +200,8 @@ springdoc:
 billing:
   enabled: ${BILLING_ENABLED:false}
   default-provider: ${BILLING_DEFAULT_PROVIDER:noop}
+  reconciliation:
+    cron: ${BILLING_RECONCILIATION_CRON:0 0 */6 * * *}
   stripe:
     secret-key: ${STRIPE_SECRET_KEY:}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:}

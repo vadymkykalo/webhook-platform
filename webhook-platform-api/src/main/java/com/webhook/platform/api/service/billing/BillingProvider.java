@@ -77,6 +77,15 @@ public interface BillingProvider {
 
     default void reportUsage(String externalSubscriptionId, String metricName, long quantity) {}
 
+    // ── Reconciliation (MANAGED_SUBSCRIPTIONS only) ────────────────
+
+    /**
+     * Fetch current subscription state from external provider.
+     * Only meaningful for providers with {@link BillingCapability#MANAGED_SUBSCRIPTIONS}.
+     * Returns null if the subscription cannot be found or the provider doesn't support this.
+     */
+    default ExternalSubscriptionState fetchSubscriptionStatus(String externalSubscriptionId) { return null; }
+
     // ── Webhooks ────────────────────────────────────────────────────
 
     /** Parse and verify incoming webhook. Returns null if signature is invalid. */
@@ -129,6 +138,15 @@ public interface BillingProvider {
             Instant paidAt,
             String hostedUrl,
             String pdfUrl
+    ) {}
+
+    record ExternalSubscriptionState(
+            String externalSubscriptionId,
+            String status,
+            String planName,
+            Instant periodStart,
+            Instant periodEnd,
+            boolean cancelAtPeriodEnd
     ) {}
 
     record BillingWebhookEvent(
