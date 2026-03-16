@@ -7,9 +7,11 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.worker.domain.repository.IncomingEventRepository;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,8 @@ class IncomingForwardServiceTest {
     @Mock
     private WebClient.Builder webClientBuilder;
     @Mock
+    private EncryptionKeyRegistry encryptionKeyRegistry;
+    @Mock
     private TransactionTemplate transactionTemplate;
 
     private IncomingForwardService service;
@@ -92,13 +96,14 @@ class IncomingForwardServiceTest {
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(mockWebClient);
 
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
         service = new IncomingForwardService(
                 eventRepository, destinationRepository, attemptRepository,
                 transformationCacheService, payloadTransformService,
                 webClientBuilder, new ObjectMapper(),
-                "test_encryption_key_32_chars_pad", "test_salt",
+                encryptionKeyRegistry,
                 true, List.of(),
-                new SimpleMeterRegistry(), transactionTemplate,
+                meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection()
         );
     }
@@ -197,13 +202,14 @@ class IncomingForwardServiceTest {
                 .thenReturn(List.of(existingAttempt));
 
         // Re-create service with allowPrivateIps=false for SSRF to trigger
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
         IncomingForwardService ssrfService = new IncomingForwardService(
                 eventRepository, destinationRepository, attemptRepository,
                 transformationCacheService, payloadTransformService,
                 webClientBuilder, new ObjectMapper(),
-                "test_encryption_key_32_chars_pad", "test_salt",
+                encryptionKeyRegistry,
                 false, List.of(),
-                new SimpleMeterRegistry(), transactionTemplate,
+                meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection()
         );
 
