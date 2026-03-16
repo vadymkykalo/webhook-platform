@@ -1,6 +1,6 @@
 <div align="center">
 
-# Webhook Platform
+# Hookflow
 
 **Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
 
@@ -19,7 +19,7 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 </div>
 
 <div align="center">
-  <img src="docs/img.png" alt="Webhook Platform Dashboard" width="100%">
+  <img src="docs/img.png" alt="Hookflow Dashboard" width="100%">
 </div>
 
 ---
@@ -95,7 +95,7 @@ graph TB
         Svc2[Internal Service B]
     end
     
-    subgraph "Webhook Platform"
+    subgraph "Hookflow"
         UI[Dashboard<br/>React + Vite]
         API[API Service<br/>Spring Boot]
         DB[(PostgreSQL<br/>Events · Deliveries · Outbox<br/>Incoming Events · Forward Attempts)]
@@ -287,9 +287,12 @@ make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
 ### CLI Commands
 
 ```bash
-# Build CLI
-mvn clean package -pl webhook-platform-cli -am -DskipTests
-alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+# Install CLI (auto-installs Java 17 if missing)
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+
+# Or build from source (optional)
+# mvn clean package -pl webhook-platform-cli -am -DskipTests
+# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
 
 # Auth
 hookflow login                             # Device code flow (browser approve)
