@@ -31,6 +31,8 @@ public class DataRetentionService {
     private final int maxAttemptsPerDelivery;
     private final int batchSize;
     private final AtomicLong totalAttemptsCount = new AtomicLong(0);
+    private final AtomicLong deliveryAttemptsEstimatedRows = new AtomicLong(0);
+    private final AtomicLong incomingEventsEstimatedRows = new AtomicLong(0);
 
     public DataRetentionService(
             OutboxMessageRepository outboxMessageRepository,
@@ -56,6 +58,12 @@ public class DataRetentionService {
         
         Gauge.builder("delivery_attempts_total", totalAttemptsCount, AtomicLong::get)
                 .description("Total number of delivery attempts in storage")
+                .register(meterRegistry);
+        Gauge.builder("delivery_attempts_table_rows", deliveryAttemptsEstimatedRows, AtomicLong::get)
+                .description("Estimated row count in delivery_attempts table")
+                .register(meterRegistry);
+        Gauge.builder("incoming_events_table_rows", incomingEventsEstimatedRows, AtomicLong::get)
+                .description("Estimated row count in incoming_events table")
                 .register(meterRegistry);
         
         log.info("Data retention configured: outbox={}d, attempts={}d (success={}d), incoming={}d, maxPerDelivery={}, batchSize={}", 
@@ -228,6 +236,41 @@ public class DataRetentionService {
         } else {
             log.debug("Incoming events cleanup: no old events to delete");
         }
+    }
+
+    @Scheduled(fixedDelayString = "${data-retention.table-metrics-interval-ms:900000}")
+    public void refreshTableSizeMetrics() {
+        try {
+            long attemptsRows = deliveryAttemptRepository.estimatedRowCount();
+            deliveryAttemptsEstimatedRows.set(attemptsRows);
+            long incomingRows = incomingEventRepository.estimatedRowCount();
+            incomingEventsEstimatedRows.set(incomingRows);
+            log.debug("Table size metrics refreshed: delivery_attempts≈{}, incoming_events≈{}", attemptsRows, incomingRows);
+        } catch (Exception e) {
+            log.warn("Failed to refresh table size metrics: {}", e.getMessage());
+        }
+    }
+
+    @Scheduled(cron = "${data-retention.burst-cleanup-cron:0 0 */4 * * *}")
+    @SchedulerLock(name = "burstCleanupSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
+    @Transactional
+    public void burstCleanupSuccessfulAttempts() {
+        Instant cutoffTime = Instant.now().minusSeconds(successfulAttemptsRetentionDays * 86400L);
+        int totalDeleted = 0;
+        int deletedInBatch;
+        do {
+            deletedInBatch = deliveryAttemptRepository.deleteOldSuccessfulAttempts(cutoffTime, batchSize);
+            totalDeleted += deletedInBatch;
+        } while (deletedInBatch >= batchSize);
+
+        if (totalDeleted > 0) {
+            Counter.builder("delivery_attempts_cleanup_total")
+                    .tag("type", "burst_success")
+                    .register(meterRegistry)
+                    .increment(totalDeleted);
+            log.info("Burst cleanup: deleted {} successful attempts (older than {}d)", totalDeleted, successfulAttemptsRetentionDays);
+        }
+        updateMetrics();
     }
 
     private void updateMetrics() {

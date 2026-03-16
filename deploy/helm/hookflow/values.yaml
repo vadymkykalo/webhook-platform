@@ -297,6 +297,20 @@ securityContext:
       - ALL
   readOnlyRootFilesystem: false
 
+# Monitoring (Prometheus Operator + Grafana)
+monitoring:
+  serviceMonitor:
+    enabled: false  # Enable if using kube-prometheus-stack
+    interval: 15s
+    scrapeTimeout: 10s
+    labels: {}  # e.g., release: prometheus
+  prometheusRule:
+    enabled: false  # Enable to deploy alert rules as PrometheusRule CRD
+    labels: {}  # e.g., release: prometheus
+  grafanaDashboards:
+    enabled: false  # Enable to create ConfigMap with Grafana dashboards
+    labels: {}  # e.g., grafana_dashboard: "1"
+
 # Node selector
 nodeSelector: {}
 

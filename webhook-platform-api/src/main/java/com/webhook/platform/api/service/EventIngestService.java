@@ -222,12 +222,19 @@ public class EventIngestService {
             return new IngestResult(buildResponse(event, 0), null, null, null);
         }
 
-        // ── Subscription-based deliveries ──────────────────────────────
-        List<Subscription> subscriptions = subscriptionRepository
-                .findByProjectIdAndEnabledTrue(projectId).stream()
+        // ── Subscription-based deliveries (two-phase: SQL exact + in-memory wildcard) ──
+        List<Subscription> exactMatches = subscriptionRepository
+                .findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getType());
+        List<Subscription> wildcardMatches = subscriptionRepository
+                .findWildcardSubscriptions(projectId).stream()
                 .filter(s -> EventTypeMatcher.matches(s.getEventType(), request.getType()))
                 .toList();
-        log.info("Found {} matching subscriptions for event type: {}", subscriptions.size(), request.getType());
+
+        List<Subscription> subscriptions = new ArrayList<>(exactMatches.size() + wildcardMatches.size());
+        subscriptions.addAll(exactMatches);
+        subscriptions.addAll(wildcardMatches);
+        log.info("Found {} matching subscriptions for event type: {} (exact={}, wildcard={})",
+                subscriptions.size(), request.getType(), exactMatches.size(), wildcardMatches.size());
 
         // ── Fanout limit — prevent queue flood from 1 event → N deliveries ─
         int totalFanout = subscriptions.size() + ruleRouteEndpoints.size();

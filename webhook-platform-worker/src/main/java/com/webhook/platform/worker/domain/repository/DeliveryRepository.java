@@ -71,4 +71,24 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.createdAt > :since")
     long countDlq(@Param("since") Instant since);
+
+    /**
+     * Finds the oldest pending delivery's createdAt timestamp (globally).
+     * Used by StaleDeliveryEscalationService to compute the oldest pending age metric.
+     */
+    @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.status = 'PENDING'")
+    Instant findOldestPendingCreatedAtGlobal();
+
+    /**
+     * Finds IDs of deliveries that have been in PENDING status since before the given cutoff.
+     * Used by StaleDeliveryEscalationService to hard-cap escalate stale deliveries to DLQ.
+     */
+    @Query(value = """
+            SELECT d.id FROM deliveries d
+            WHERE d.status = 'PENDING' AND d.created_at < :cutoff
+            ORDER BY d.created_at ASC
+            LIMIT :limit
+            FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<UUID> findStaleDeliveryIds(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
 }

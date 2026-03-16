@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -44,10 +46,15 @@ public class WebhookCaptureController {
 
     public WebhookCaptureController(TestEndpointService testEndpointService,
                                     TestEndpointRepository testEndpointRepository,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    MeterRegistry meterRegistry) {
         this.testEndpointService = testEndpointService;
         this.testEndpointRepository = testEndpointRepository;
         this.objectMapper = objectMapper;
+
+        Gauge.builder("webhook_capture_slug_buckets_size", slugBuckets, Cache::estimatedSize)
+                .description("Number of per-slug rate limiter buckets in cache")
+                .register(meterRegistry);
     }
 
     @RequestMapping(value = "/{slug}", method = { RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,

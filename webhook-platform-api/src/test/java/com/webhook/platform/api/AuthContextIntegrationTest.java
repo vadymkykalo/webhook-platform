@@ -259,21 +259,71 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    // ── API Key auth: org-scoped MemberController with @RequireOrgAccess ──
+    // ── API Key restrictions: org-level endpoints return 403 ──
 
     @Test
-    public void apiKey_listMembers() throws Exception {
+    public void apiKey_listMembers_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/orgs/" + organizationId + "/members")
                         .header("X-API-Key", apiKey))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    public void apiKey_listMembers_wrongOrg_forbidden() throws Exception {
-        mockMvc.perform(get("/api/v1/orgs/" + UUID.randomUUID() + "/members")
+    public void apiKey_billingOrganization_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/billing/organization")
                         .header("X-API-Key", apiKey))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void apiKey_billingUsage_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/billing/usage")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void apiKey_billingInvoices_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/billing/invoices")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void apiKey_auditLog_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/audit-log")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void apiKey_auditLogExport_forbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/audit-log/export")
+                        .header("X-API-Key", apiKey))
+                .andExpect(status().isForbidden());
+    }
+
+    // ── JWT auth: org-level endpoints should still work ──
+
+    @Test
+    public void jwt_billingOrganization() throws Exception {
+        mockMvc.perform(get("/api/v1/billing/organization")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void jwt_billingUsage() throws Exception {
+        mockMvc.perform(get("/api/v1/billing/usage")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void jwt_auditLog() throws Exception {
+        mockMvc.perform(get("/api/v1/audit-log")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk());
     }
 
     // ── No auth → 401 ──
@@ -300,5 +350,31 @@ public class AuthContextIntegrationTest extends AbstractIntegrationTest {
     public void noAuth_organizations_unauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/orgs"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ── Billing webhook: must NOT return 401 (provider callback, no auth) ──
+
+    @Test
+    public void noAuth_billingWebhook_stripe_notUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/billing/webhook/stripe")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"invoice.paid\"}"))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    assert status != 401 : "Billing webhook must not return 401 (got " + status
+                            + "). SecurityConfig permitAll() for /api/v1/billing/webhook/** may be broken.";
+                });
+    }
+
+    @Test
+    public void noAuth_billingWebhook_wayforpay_notUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/billing/webhook/wayforpay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"transactionStatus\":\"Approved\"}"))
+                .andExpect(result -> {
+                    int status = result.getResponse().getStatus();
+                    assert status != 401 : "Billing webhook must not return 401 (got " + status
+                            + "). SecurityConfig permitAll() for /api/v1/billing/webhook/** may be broken.";
+                });
     }
 }

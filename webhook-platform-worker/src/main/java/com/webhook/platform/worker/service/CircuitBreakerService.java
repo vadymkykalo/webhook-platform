@@ -38,6 +38,9 @@ public class CircuitBreakerService {
     private final int minimumNumberOfCalls;
     private final int waitDurationSeconds;
     private final int windowTtlSeconds;
+    private final long slowCallThresholdMs;
+    private final int slowCallRateThreshold;
+    private final Counter slowTripCounter;
 
     public CircuitBreakerService(
             RedissonClient redissonClient,
@@ -45,12 +48,16 @@ public class CircuitBreakerService {
             @Value("${circuit-breaker.failure-rate-threshold:50}") int failureRateThreshold,
             @Value("${circuit-breaker.minimum-calls:5}") int minimumNumberOfCalls,
             @Value("${circuit-breaker.wait-duration-seconds:30}") int waitDurationSeconds,
-            @Value("${circuit-breaker.window-ttl-seconds:120}") int windowTtlSeconds) {
+            @Value("${circuit-breaker.window-ttl-seconds:120}") int windowTtlSeconds,
+            @Value("${circuit-breaker.slow-call-threshold-ms:10000}") long slowCallThresholdMs,
+            @Value("${circuit-breaker.slow-call-rate-threshold:80}") int slowCallRateThreshold) {
         this.redissonClient = redissonClient;
         this.failureRateThreshold = failureRateThreshold;
         this.minimumNumberOfCalls = minimumNumberOfCalls;
         this.waitDurationSeconds = waitDurationSeconds;
         this.windowTtlSeconds = windowTtlSeconds;
+        this.slowCallThresholdMs = slowCallThresholdMs;
+        this.slowCallRateThreshold = slowCallRateThreshold;
 
         this.stateTransitionCounter = Counter.builder("circuit_breaker_state_transitions_total")
                 .description("Circuit breaker state transitions")
@@ -58,9 +65,12 @@ public class CircuitBreakerService {
         this.rejectedCounter = Counter.builder("circuit_breaker_rejected_total")
                 .description("Calls rejected by open circuit breaker")
                 .register(meterRegistry);
+        this.slowTripCounter = Counter.builder("circuit_breaker_slow_trips_total")
+                .description("Circuit breaker trips due to slow call rate")
+                .register(meterRegistry);
 
-        log.info("Redis circuit breaker initialized: failureRate={}%, minCalls={}, waitDuration={}s, windowTTL={}s",
-                failureRateThreshold, minimumNumberOfCalls, waitDurationSeconds, windowTtlSeconds);
+        log.info("Redis circuit breaker initialized: failureRate={}%, minCalls={}, waitDuration={}s, windowTTL={}s, slowThreshold={}ms, slowRate={}%",
+                failureRateThreshold, minimumNumberOfCalls, waitDurationSeconds, windowTtlSeconds, slowCallThresholdMs, slowCallRateThreshold);
     }
 
     public boolean isCallPermitted(UUID endpointId) {
@@ -82,8 +92,24 @@ public class CircuitBreakerService {
     public void recordSuccess(UUID endpointId, long durationMs) {
         try {
             RAtomicLong calls = redissonClient.getAtomicLong(callsKey(endpointId));
-            calls.incrementAndGet();
+            long callCount = calls.incrementAndGet();
             calls.expire(Duration.ofSeconds(windowTtlSeconds));
+
+            if (durationMs >= slowCallThresholdMs) {
+                RAtomicLong slows = redissonClient.getAtomicLong(slowKey(endpointId));
+                long slowCount = slows.incrementAndGet();
+                slows.expire(Duration.ofSeconds(windowTtlSeconds));
+
+                if (callCount >= minimumNumberOfCalls) {
+                    long slowRate = (slowCount * 100) / callCount;
+                    if (slowRate >= slowCallRateThreshold) {
+                        log.warn("Endpoint {} slow call rate {}% >= {}% ({}ms threshold), tripping circuit",
+                                endpointId, slowRate, slowCallRateThreshold, slowCallThresholdMs);
+                        slowTripCounter.increment();
+                        tripCircuit(endpointId, slowRate);
+                    }
+                }
+            }
         } catch (Exception e) {
             log.debug("Redis unavailable for circuit breaker success recording: {}", e.getMessage());
         }
@@ -115,7 +141,8 @@ public class CircuitBreakerService {
             redissonClient.getKeys().delete(
                     openKey(endpointId),
                     failsKey(endpointId),
-                    callsKey(endpointId));
+                    callsKey(endpointId),
+                    slowKey(endpointId));
             log.info("Reset circuit breaker for endpoint: {}", endpointId);
         } catch (Exception e) {
             log.warn("Failed to reset circuit breaker for endpoint {}: {}", endpointId, e.getMessage());
@@ -126,7 +153,7 @@ public class CircuitBreakerService {
         RBucket<String> openBucket = redissonClient.getBucket(openKey(endpointId));
         openBucket.set("1", Duration.ofSeconds(waitDurationSeconds));
         // Reset counters so the next evaluation window starts fresh after circuit reopens
-        redissonClient.getKeys().delete(failsKey(endpointId), callsKey(endpointId));
+        redissonClient.getKeys().delete(failsKey(endpointId), callsKey(endpointId), slowKey(endpointId));
         log.warn("CircuitBreaker OPENED for endpoint {} (failure rate: {}%, wait: {}s)",
                 endpointId, failureRate, waitDurationSeconds);
         stateTransitionCounter.increment();
@@ -142,5 +169,9 @@ public class CircuitBreakerService {
 
     private String callsKey(UUID endpointId) {
         return KEY_PREFIX + endpointId + ":calls";
+    }
+
+    private String slowKey(UUID endpointId) {
+        return KEY_PREFIX + endpointId + ":slow";
     }
 }

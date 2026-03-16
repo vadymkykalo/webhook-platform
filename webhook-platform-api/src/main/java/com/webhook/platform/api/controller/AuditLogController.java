@@ -46,6 +46,7 @@ public class AuditLogController {
             @RequestParam(required = false) String resourceType,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
+        auth.requireJwt();
         size = Math.min(size, 100);
 
         Specification<AuditLog> spec = AuditLogSpecification.filter(
@@ -68,6 +69,7 @@ public class AuditLogController {
             @RequestParam(required = false) String resourceType,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) throws Exception {
+        auth.requireJwt();
 
         response.setContentType("text/csv");
         response.setHeader("Content-Disposition",

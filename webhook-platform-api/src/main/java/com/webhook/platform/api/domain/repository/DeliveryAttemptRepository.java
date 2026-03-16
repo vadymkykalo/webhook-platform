@@ -77,6 +77,9 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
     @Query(value = "SELECT COUNT(*) FROM delivery_attempts", nativeQuery = true)
     long countAllAttempts();
 
+    @Query(value = "SELECT COALESCE(n_live_tup, 0) FROM pg_stat_user_tables WHERE relname = 'delivery_attempts'", nativeQuery = true)
+    long estimatedRowCount();
+
     @Query(value = """
         SELECT AVG(da.duration_ms) FROM delivery_attempts da
         JOIN deliveries d ON da.delivery_id = d.id

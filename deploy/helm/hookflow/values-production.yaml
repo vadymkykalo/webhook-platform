@@ -89,6 +89,21 @@ redis:
     persistence:
       size: 5Gi
 
+# Monitoring — enable for kube-prometheus-stack
+monitoring:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus  # Match your Prometheus Operator's label selector
+  prometheusRule:
+    enabled: true
+    labels:
+      release: prometheus
+  grafanaDashboards:
+    enabled: true
+    labels:
+      grafana_dashboard: "1"
+
 # Enable network policies for security
 networkPolicy:
   enabled: true

@@ -53,4 +53,7 @@ public interface IncomingEventRepository extends JpaRepository<IncomingEvent, UU
     @Query("SELECT COUNT(e) FROM IncomingEvent e JOIN IncomingSource s ON e.incomingSourceId = s.id " +
             "WHERE s.projectId = :projectId AND e.receivedAt >= :since")
     long countByProjectSince(@Param("projectId") UUID projectId, @Param("since") Instant since);
+
+    @Query(value = "SELECT COALESCE(n_live_tup, 0) FROM pg_stat_user_tables WHERE relname = 'incoming_events'", nativeQuery = true)
+    long estimatedRowCount();
 }

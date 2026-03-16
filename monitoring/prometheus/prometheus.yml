@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  # ── Hookflow API (Spring Boot Actuator / Micrometer) ──────────
+  - job_name: hookflow-api
+    metrics_path: /actuator/prometheus
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["api:8080"]
+        labels:
+          service: api
+          component: hookflow
+
+  # ── Hookflow Worker (separate management port) ────────────────
+  - job_name: hookflow-worker
+    metrics_path: /actuator/prometheus
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["worker:8081"]
+        labels:
+          service: worker
+          component: hookflow
+
+  # ── Prometheus self-monitoring ────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

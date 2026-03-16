@@ -36,4 +36,9 @@ public interface BillingSubscriptionRepository extends JpaRepository<BillingSubs
 
     @Query("SELECT s FROM BillingSubscription s WHERE s.status = 'GRACE_PERIOD' AND s.currentPeriodEnd < :graceCutoff")
     List<BillingSubscription> findGracePeriodExpired(@Param("graceCutoff") Instant graceCutoff);
+
+    @Query("SELECT s FROM BillingSubscription s WHERE s.providerCode = :providerCode " +
+           "AND s.externalSubscriptionId IS NOT NULL " +
+           "AND s.status IN ('ACTIVE', 'PAST_DUE', 'GRACE_PERIOD')")
+    List<BillingSubscription> findReconcilable(@Param("providerCode") String providerCode);
 }
