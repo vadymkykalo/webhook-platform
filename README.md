@@ -244,6 +244,22 @@ make health          # Verify services
 
 All env vars documented in [`.env.dist`](./.env.dist). Run `make doctor` before production.
 
+### Monitoring
+
+```bash
+make monitoring-up        # Start Prometheus + Grafana
+make monitoring-down      # Stop monitoring
+make monitoring-logs      # Follow monitoring logs
+make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
+```
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **Grafana** | http://localhost:3001 | `hookflow` / `hookflow_monitor_2024` |
+| **Prometheus** | http://localhost:9090 | — |
+
+4 dashboards auto-provisioned: **Overview**, **Worker & Circuit Breaker**, **JVM / Micrometer**, **Kafka**.
+
 ### Key Commands
 
 ```bash
@@ -255,12 +271,36 @@ make dev-api              # Quick rebuild API + tail logs
 make verify-link          # Email verification link (dev)
 make reset-link           # Password reset link (dev)
 make invite-link          # Member invite link (dev)
-make nuke CONFIRM=YES     # Destroy everything
+make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
 ```
 
 ---
 
-## Troubleshooting
+## Troubleshooting & Configuration
+
+### Quick Reference
+
+| What | How | Default |
+|------|-----|---------|
+| **Swagger UI** | http://localhost:8080/swagger-ui.html | Enabled in dev |
+| **Dashboard** | http://localhost:5173 | — |
+| **Grafana** | http://localhost:3001 | `hookflow` / `hookflow_monitor_2024` |
+| **Prometheus** | http://localhost:9090 | — |
+| **API Health** | http://localhost:8080/actuator/health | — |
+| **Worker Health** | http://localhost:8081/actuator/health | — |
+| **Metrics** | http://localhost:8080/actuator/prometheus | — |
+
+### Common Issues
+
+<details>
+<summary><b>API won't start — "WEBHOOK_ENCRYPTION_KEY must be at least 32 characters"</b></summary>
+
+Your `.env` key is too short. Fix:
+```bash
+cp .env.dist .env   # Fresh copy with valid defaults
+make up
+```
+</details>
 
 <details>
 <summary><b>Email/password/invite links in dev mode</b></summary>
@@ -272,6 +312,16 @@ make verify-link   # Email verification
 make reset-link    # Password reset (expires in 1h)
 make invite-link   # Member invite (expires in 48h)
 ```
+</details>
+
+<details>
+<summary><b>Enable Swagger UI</b></summary>
+
+Swagger is disabled by default. To enable, add to `.env`:
+```env
+SWAGGER_ENABLED=true
+```
+Then restart: `make dev-api` or `make up`. Open http://localhost:8080/swagger-ui.html
 </details>
 
 <details>
@@ -289,6 +339,53 @@ make up  # Auto-creates topics
 docker exec webhook-kafka kafka-topics --create --topic deliveries.dispatch --partitions 12 --bootstrap-server localhost:9092
 ```
 </details>
+
+<details>
+<summary><b>Monitoring: Grafana shows "No data"</b></summary>
+
+1. Make sure the main platform is running first: `make up && make wait-healthy`
+2. Then start monitoring: `make monitoring-up`
+3. Wait ~30s for first scrape. Check Prometheus targets: http://localhost:9090/targets
+</details>
+
+### SMTP / Email Setup
+
+```env
+EMAIL_ENABLED=true
+EMAIL_FROM=noreply@yourdomain.com
+SMTP_HOST=smtp.gmail.com        # or your SMTP provider
+SMTP_PORT=587
+SMTP_USERNAME=your@email.com
+SMTP_PASSWORD=app_password
+SMTP_AUTH=true
+SMTP_STARTTLS=true
+```
+
+### Production Checklist
+
+> **Before going live**, override these in your `.env`:
+
+| Variable | Dev Default | Production Value |
+|----------|-------------|------------------|
+| `APP_ENV` | `development` | `production` |
+| `WEBHOOK_ENCRYPTION_KEY` | `dev_encryption_key_...` | **Random 32+ char string** |
+| `WEBHOOK_ENCRYPTION_SALT` | `dev_encryption_salt_...` | **Random 16+ char string** |
+| `JWT_SECRET` | `dev_jwt_secret_...` | **Random 32+ char string** |
+| `POSTGRES_PASSWORD` | `webhook_secret` | **Strong unique password** |
+| `REDIS_PASSWORD` | `redis_secret` | **Strong unique password** |
+| `SWAGGER_ENABLED` | `true` | `false` |
+| `WEBHOOK_ALLOW_PRIVATE_IPS` | `true` | `false` |
+| `EMAIL_ENABLED` | `false` | `true` + SMTP config |
+| `CORS_ALLOWED_ORIGINS` | `*` | `https://yourdomain.com` |
+| `DB_SSL_MODE` | `disable` | `require` or `verify-full` |
+| `LOG_LEVEL` | `INFO` | `WARN` |
+
+```bash
+# Generate secure secrets
+openssl rand -base64 32   # For encryption key
+openssl rand -base64 24   # For JWT secret
+openssl rand -base64 18   # For DB/Redis passwords
+```
 
 ---
 

@@ -447,33 +447,90 @@ curl http://worker:8081/actuator/health
 curl http://api:8080/actuator/health | jq .
 ```
 
+### Monitoring Stack (Docker Compose — Self-Hosted)
+
+A full Prometheus + Grafana stack ships in the `monitoring/` directory, **decoupled** from the main platform:
+
+```bash
+# Start the platform first
+make up
+
+# Start monitoring (Prometheus + Grafana)
+make monitoring-up
+
+# Open Grafana
+#   http://localhost:3001
+#   Login: hookflow / hookflow_monitor_2024
+```
+
+Four pre-built dashboards are auto-provisioned on first boot:
+
+| Dashboard | What It Shows |
+|-----------|---------------|
+| **Hookflow — Overview** | API health, request rate, 5xx rate, p95 latency, delivery pipeline, queue depth, DLQ, table sizes, billing reconciliation, circuit breaker |
+| **Hookflow — Worker & CB** | Circuit breaker trips/rejects/slow-trips, retry governor pending/batch/failures, queue depths, async thread pool |
+| **Hookflow — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP status codes & latency percentiles, HikariCP pool, CPU, file descriptors |
+| **Hookflow — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer send rate, queue time |
+
+```bash
+# Stop monitoring
+make monitoring-down
+
+# Override Grafana password
+GF_ADMIN_PASSWORD=my_secret make monitoring-up
+```
+
+### Monitoring (Kubernetes — Production)
+
+For Kubernetes with `kube-prometheus-stack`, enable in your Helm values:
+
+```yaml
+monitoring:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus   # must match your Prometheus Operator selector
+  prometheusRule:
+    enabled: true
+    labels:
+      release: prometheus
+  grafanaDashboards:
+    enabled: true
+    labels:
+      grafana_dashboard: "1"
+```
+
+This deploys:
+- **ServiceMonitor** for API (`:8080`) and Worker (`:8081`) — auto-discovered by Prometheus Operator
+- **PrometheusRule** with all alert rules (backlog, DLQ, circuit breaker, retry governor, API errors, staleness)
+- **ConfigMap** with all 4 Grafana dashboard JSONs (auto-imported via Grafana sidecar)
+
 ### Prometheus Metrics
 
 Both API and Worker expose Prometheus metrics:
 
-```yaml
-# Kubernetes annotations for Prometheus scraping
-annotations:
-  prometheus.io/scrape: "true"
-  prometheus.io/port: "8080"   # API
-  prometheus.io/port: "8081"   # Worker
-  prometheus.io/path: "/actuator/prometheus"
+```
+API:    http://api:8080/actuator/prometheus
+Worker: http://worker:8081/actuator/prometheus
 ```
 
 ### Key Metrics to Monitor
 
 | Metric | Component | Alert Threshold |
 |--------|-----------|-----------------|
-| `http_server_requests_seconds_count{status=~"5.."}` | API | > 1% of total |
+| `http_server_requests_seconds_count{status=~"5.."}` | API | > 0.5% of total |
 | `hikaricp_connections_pending` | API/Worker | > 0 for 1 min |
 | `kafka_consumer_fetch_manager_records_lag_max` | Worker | > 1000 for 5 min |
-| `retry_governor_pending_count` | Worker | > 5000 for 10 min |
-| `delivery_status_total{status="DLQ"}` | Worker | > 1% of total/24h |
-| `circuit_breaker_state{state="OPEN"}` | Worker | Any (informational) |
+| `delivery_queue_depth{status="pending"}` | Worker | > 5000 for 10 min |
+| `delivery_oldest_pending_age_seconds` | Worker | > 3600s |
+| `circuit_breaker_state_transitions_total` | Worker | > 1/s for 5 min |
+| `retry_governor_consecutive_failures` | Worker | > 5 |
+| `billing_reconciliation_errors_total` | API | any increase |
+| `delivery_attempts_table_rows` | API | > 10M (cleanup lag) |
 
 ### Recommended Dashboards
 
-See [SLOs.md](./runbooks/SLOs.md) for Grafana dashboard panel recommendations.
+See [SLOs.md](./runbooks/SLOs.md) for PromQL queries and error budget policy.
 
 ---
 

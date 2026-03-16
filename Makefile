@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker test-ui
+.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker test-ui monitoring-up monitoring-down monitoring-logs
 
 # Default target
 .DEFAULT_GOAL := help
@@ -340,6 +340,27 @@ doctor: ## Run pre-flight checks
 	fi
 	@echo "$(GREEN)All checks passed$(NC)"
 
+##@ Monitoring (Prometheus + Grafana)
+MONITORING_COMPOSE := $(DOCKER_COMPOSE) -f monitoring/docker-compose.yml
+
+monitoring-up: ## Start monitoring stack (Prometheus + Grafana)
+	@echo "$(GREEN)Starting monitoring stack...$(NC)"
+	@$(MONITORING_COMPOSE) up -d
+	@echo ""
+	@echo "$(GREEN)Monitoring started:$(NC)"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana:    http://localhost:$${GRAFANA_PORT:-3001}"
+	@echo "  Login:      hookflow / hookflow_monitor_2024"
+	@echo ""
+
+monitoring-down: ## Stop monitoring stack
+	@echo "$(YELLOW)Stopping monitoring stack...$(NC)"
+	@$(MONITORING_COMPOSE) down
+	@echo "$(GREEN)Monitoring stopped$(NC)"
+
+monitoring-logs: ## Follow monitoring stack logs
+	@$(MONITORING_COMPOSE) logs -f
+
 ##@ Danger Zone
 nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 	@if [ "$(CONFIRM)" != "YES" ]; then \
@@ -362,7 +383,10 @@ nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 		exit 1; \
 	fi
 	@echo "$(RED)Destroying everything...$(NC)"
+	@echo "$(RED)Stopping monitoring stack...$(NC)"
+	@$(MONITORING_COMPOSE) down -v --remove-orphans 2>/dev/null || true
+	@echo "$(RED)Stopping main platform...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down -v --remove-orphans --rmi local 2>/dev/null || true
 	@docker volume rm webhook_pgdata kafka_data redis_data minio_data 2>/dev/null || true
 	@docker network rm webhook-platform_webhook-network 2>/dev/null || true
-	@echo "$(GREEN)Nuclear option complete$(NC)"
+	@echo "$(GREEN)Nuclear option complete — platform + monitoring destroyed$(NC)"
