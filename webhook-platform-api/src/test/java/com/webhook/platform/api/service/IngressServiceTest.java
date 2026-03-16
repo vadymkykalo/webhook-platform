@@ -107,7 +107,9 @@ class IngressServiceTest {
         setField(registry, "multiKeys", "");
         setField(registry, "configuredActiveVersion", 0);
         setField(registry, "salt", salt);
-        registry.getClass().getDeclaredMethod("init").invoke(registry);
+        var init = registry.getClass().getDeclaredMethod("init");
+        init.setAccessible(true);
+        init.invoke(registry);
         return registry;
     }
 

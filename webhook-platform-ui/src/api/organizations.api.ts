@@ -18,4 +18,8 @@ export const organizationsApi = {
   delete: (orgId: string): Promise<void> => {
     return http.delete<void>(`/api/v1/orgs/${orgId}`);
   },
+
+  exportData: (orgId: string): Promise<Blob> => {
+    return http.getBlob(`/api/v1/orgs/${orgId}/export`);
+  },
 };

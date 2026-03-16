@@ -3,7 +3,7 @@ import { useAuth } from '../auth/auth.store';
 import { organizationsApi } from '../api/organizations.api';
 import { membersApi } from '../api/members.api';
 import { useProjects } from '../api/queries';
-import { Building2, Users, Loader2, Pencil, Calendar, Hash, Shield, AlertTriangle } from 'lucide-react';
+import { Building2, Users, Loader2, Pencil, Calendar, Hash, Shield, AlertTriangle, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -248,12 +248,68 @@ export default function OrgSettingsPage() {
           </CardContent>
         </Card>
 
+        {/* GDPR Data Export — OWNER only */}
+        {user?.role === 'OWNER' && (
+          <GdprExportCard orgId={orgId} />
+        )}
+
         {/* Danger Zone — OWNER only */}
         {user?.role === 'OWNER' && (
           <DangerZone orgId={orgId} orgName={orgName} />
         )}
       </div>
     </div>
+  );
+}
+
+function GdprExportCard({ orgId }: { orgId: string }) {
+  const { t } = useTranslation();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await organizationsApi.exportData(orgId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `org-${orgId}-export.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+      showSuccess(t('orgSettings.exportSuccess'));
+    } catch (err: any) {
+      showApiError(err, 'orgSettings.exportFailed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Download className="h-5 w-5 text-primary" />
+          <CardTitle>{t('orgSettings.gdprExport')}</CardTitle>
+        </div>
+        <CardDescription>{t('orgSettings.gdprExportDesc')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          {t('orgSettings.gdprExportInfo')}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+          {exporting ? t('orgSettings.exporting') : t('orgSettings.exportButton')}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
