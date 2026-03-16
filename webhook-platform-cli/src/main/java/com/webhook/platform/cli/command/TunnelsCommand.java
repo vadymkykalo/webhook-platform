@@ -13,7 +13,7 @@ import java.util.concurrent.Callable;
         name = "tunnels",
         description = "List active tunnel sessions",
         mixinStandardHelpOptions = true,
-        subcommands = { TunnelsCommand.ListSubcommand.class, TunnelsCommand.CloseSubcommand.class }
+        subcommands = { TunnelsCommand.ListSubcommand.class, TunnelsCommand.CloseSubcommand.class, TunnelsCommand.StatusSubcommand.class }
 )
 public class TunnelsCommand implements Callable<Integer> {
 
@@ -90,6 +90,58 @@ public class TunnelsCommand implements Callable<Integer> {
             client.delete("/api/v1/tunnels/" + sessionId, Void.class);
             out.println("✓ Tunnel " + sessionId + " closed");
             return 0;
+        }
+    }
+
+    @Command(name = "status", description = "Show tunnel registry stats and bandwidth usage", mixinStandardHelpOptions = true)
+    public static class StatusSubcommand implements Callable<Integer> {
+
+        private final PrintStream out = System.out;
+        private final PrintStream err = System.err;
+
+        @Override
+        public Integer call() throws Exception {
+            CliConfigService configService = new CliConfigService();
+            CliConfig config = configService.load();
+
+            if (!config.isAuthenticated()) {
+                err.println("✗ Not authenticated. Run 'hookflow login' first.");
+                return 1;
+            }
+
+            HttpApiClient client = new HttpApiClient(configService);
+            JsonNode status = client.get("/api/v1/tunnels/status", JsonNode.class);
+
+            out.println("Tunnel Status");
+            out.println("══════════════════════════════════════");
+            out.println("  Active tunnels:    " + status.path("activeTunnels").asInt(0));
+            out.println("  Pending requests:  " + status.path("pendingRequests").asInt(0));
+
+            long bw = status.path("bandwidthBytesThisMonth").asLong(0);
+            out.println("  Bandwidth (month): " + formatBytes(bw));
+            out.println();
+
+            JsonNode myTunnels = status.path("myTunnels");
+            if (myTunnels.isArray() && myTunnels.size() > 0) {
+                out.println("  My Tunnels:");
+                for (JsonNode t : myTunnels) {
+                    out.printf("    • %s → :%d  %s%n",
+                            t.path("publicUrl").asText("?"),
+                            t.path("localPort").asInt(0),
+                            t.path("status").asText("?"));
+                }
+            } else {
+                out.println("  No active tunnels for your user.");
+            }
+
+            return 0;
+        }
+
+        private String formatBytes(long bytes) {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+            if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
+            return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
         }
     }
 }

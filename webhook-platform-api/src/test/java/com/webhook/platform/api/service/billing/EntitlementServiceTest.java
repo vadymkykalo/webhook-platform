@@ -36,6 +36,8 @@ class EntitlementServiceTest {
     @Mock
     private MembershipRepository membershipRepository;
     @Mock
+    private TunnelSessionRepository tunnelSessionRepository;
+    @Mock
     private QuotaCounterService quotaCounterService;
 
     private static final UUID ORG_ID = UUID.randomUUID();
@@ -58,6 +60,7 @@ class EntitlementServiceTest {
                 .maxEndpointsPerProject(10)
                 .maxProjects(3)
                 .maxMembers(5)
+                .maxActiveTunnels(3)
                 .rateLimitPerSecond(50)
                 .maxRetentionDays(30)
                 .features(features)
@@ -177,6 +180,39 @@ class EntitlementServiceTest {
                 .hasMessageContaining("members");
     }
 
+    // ── Tunnel limit ─────────────────────────────────────────────────
+
+    @Test
+    void checkTunnelLimit_passesWhenUnderLimit() {
+        plan.getFeatures().toString(); // ensure features loaded
+        ((com.fasterxml.jackson.databind.node.ObjectNode) plan.getFeatures()).put("tunnels", true);
+        EntitlementService svc = createService(true);
+        when(tunnelSessionRepository.countByOrganizationIdAndStatus(ORG_ID, com.webhook.platform.api.domain.enums.TunnelStatus.ACTIVE)).thenReturn(1L);
+
+        assertThatCode(() -> svc.checkTunnelLimit(ORG_ID)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void checkTunnelLimit_throwsWhenAtLimit() {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) plan.getFeatures()).put("tunnels", true);
+        EntitlementService svc = createService(true);
+        when(tunnelSessionRepository.countByOrganizationIdAndStatus(ORG_ID, com.webhook.platform.api.domain.enums.TunnelStatus.ACTIVE)).thenReturn(3L);
+
+        assertThatThrownBy(() -> svc.checkTunnelLimit(ORG_ID))
+                .isInstanceOf(QuotaExceededException.class)
+                .hasMessageContaining("active_tunnels");
+    }
+
+    @Test
+    void checkTunnelLimit_throwsWhenFeatureDisabled() {
+        ((com.fasterxml.jackson.databind.node.ObjectNode) plan.getFeatures()).put("tunnels", false);
+        EntitlementService svc = createService(true);
+
+        assertThatThrownBy(() -> svc.checkTunnelLimit(ORG_ID))
+                .isInstanceOf(QuotaExceededException.class)
+                .hasMessageContaining("tunnels");
+    }
+
     // ── Feature flags ───────────────────────────────────────────────
 
     @Test
@@ -257,6 +293,6 @@ class EntitlementServiceTest {
         return new EntitlementService(
                 billingEnabled, organizationRepository, projectRepository,
                 endpointRepository, eventRepository, membershipRepository,
-                quotaCounterService);
+                tunnelSessionRepository, quotaCounterService);
     }
 }

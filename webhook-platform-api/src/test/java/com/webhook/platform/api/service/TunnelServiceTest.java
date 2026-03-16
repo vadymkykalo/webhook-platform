@@ -1,7 +1,9 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,9 @@ class TunnelServiceTest {
     @Mock
     private TunnelSessionRepository tunnelSessionRepository;
 
+    @Mock
+    private ProjectRepository projectRepository;
+
     @InjectMocks
     private TunnelService tunnelService;
 
@@ -43,6 +48,10 @@ class TunnelServiceTest {
         UUID userId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
+
+        // Mock project belongs to the same org
+        Project project = Project.builder().id(projectId).organizationId(orgId).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
                 .thenAnswer(inv -> {

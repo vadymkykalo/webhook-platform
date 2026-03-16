@@ -29,9 +29,13 @@ public class WebSocketTunnelClient {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketTunnelClient.class);
     private static final int HEARTBEAT_INTERVAL_SECONDS = 30;
-    private static final int RECONNECT_DELAY_SECONDS = 5;
-    private static final int MAX_RECONNECT_ATTEMPTS = 20;
     private static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB
+
+    // Exponential backoff config
+    private static final long BASE_DELAY_MS = 1_000;      // 1s initial
+    private static final long MAX_DELAY_MS  = 120_000;     // 2min cap
+    private static final int  MAX_RECONNECT_ATTEMPTS = 50; // generous limit with exp backoff
+    private static final double JITTER_FACTOR = 0.5;       // ±50% randomization
 
     private final String wsUrl;
     private final String tunnelToken;
@@ -40,11 +44,14 @@ public class WebSocketTunnelClient {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean connected = new AtomicBoolean(false);
+    private final ThreadLocalRandom random = ThreadLocalRandom.current();
 
     private Session wsSession;
+    private ScheduledFuture<?> heartbeatFuture;
     private Consumer<TunnelRequestMessage> requestHandler;
     private Consumer<String> onRegistered;
     private Runnable onDisconnected;
+    private Consumer<String> onReconnecting;
     private int reconnectAttempts = 0;
 
     public WebSocketTunnelClient(String wsUrl, String tunnelToken, int localPort) {
@@ -71,6 +78,10 @@ public class WebSocketTunnelClient {
 
     public void onDisconnected(Runnable handler) {
         this.onDisconnected = handler;
+    }
+
+    public void onReconnecting(Consumer<String> handler) {
+        this.onReconnecting = handler;
     }
 
     public void connect() {
@@ -118,19 +129,28 @@ public class WebSocketTunnelClient {
                     log.debug("WebSocket connected");
 
                     session.addMessageHandler(String.class, WebSocketTunnelClient.this::handleMessage);
-
-                    // Start heartbeat
-                    scheduler.scheduleAtFixedRate(
-                            WebSocketTunnelClient.this::sendHeartbeat,
-                            HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
+                    startHeartbeat();
                 }
 
                 @Override
                 public void onClose(Session session, CloseReason closeReason) {
                     connected.set(false);
+                    stopHeartbeat();
                     log.info("WebSocket closed: {}", closeReason);
                     if (onDisconnected != null) onDisconnected.run();
-                    if (running.get()) scheduleReconnect();
+
+                    if (running.get()) {
+                        // Don't retry on auth/policy failures
+                        int code = closeReason.getCloseCode().getCode();
+                        if (code == CloseReason.CloseCodes.VIOLATED_POLICY.getCode()
+                                || code == CloseReason.CloseCodes.CANNOT_ACCEPT.getCode()) {
+                            log.error("Server rejected connection (code {}): {}. Not retrying.",
+                                    code, closeReason.getReasonPhrase());
+                            running.set(false);
+                            return;
+                        }
+                        scheduleReconnect();
+                    }
                 }
 
                 @Override
@@ -191,6 +211,20 @@ public class WebSocketTunnelClient {
         }
     }
 
+    private void startHeartbeat() {
+        stopHeartbeat();
+        heartbeatFuture = scheduler.scheduleAtFixedRate(
+                this::sendHeartbeat,
+                HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private void stopHeartbeat() {
+        if (heartbeatFuture != null) {
+            heartbeatFuture.cancel(false);
+            heartbeatFuture = null;
+        }
+    }
+
     private void scheduleReconnect() {
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             log.error("Max reconnect attempts ({}) reached. Giving up.", MAX_RECONNECT_ATTEMPTS);
@@ -199,10 +233,25 @@ public class WebSocketTunnelClient {
         }
 
         reconnectAttempts++;
-        int delay = Math.min(RECONNECT_DELAY_SECONDS * reconnectAttempts, 60);
-        log.info("Reconnecting in {}s (attempt {}/{})", delay, reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
+        long delayMs = computeBackoffMs(reconnectAttempts);
+        long delaySec = delayMs / 1000;
 
-        scheduler.schedule(this::doConnect, delay, TimeUnit.SECONDS);
+        String msg = String.format("Reconnecting in %ds (attempt %d/%d)",
+                delaySec, reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
+        log.info(msg);
+        if (onReconnecting != null) onReconnecting.accept(msg);
+
+        scheduler.schedule(this::doConnect, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Exponential backoff with jitter: base * 2^(attempt-1), capped, then randomized ±50%.
+     */
+    long computeBackoffMs(int attempt) {
+        long exponential = BASE_DELAY_MS * (1L << Math.min(attempt - 1, 20));
+        long capped = Math.min(exponential, MAX_DELAY_MS);
+        double jitter = 1.0 - JITTER_FACTOR + (random.nextDouble() * JITTER_FACTOR * 2);
+        return (long) (capped * jitter);
     }
 
     private void closeSession() {

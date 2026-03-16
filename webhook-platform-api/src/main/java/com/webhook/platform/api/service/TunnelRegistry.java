@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.tunnel.TunnelMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
@@ -22,7 +23,6 @@ import java.util.concurrent.*;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TunnelRegistry {
 
     private final ObjectMapper objectMapper;
@@ -35,6 +35,16 @@ public class TunnelRegistry {
 
     private static final int REQUEST_TIMEOUT_SECONDS = 30;
     private static final int MAX_PENDING_REQUESTS = 1000;
+
+    public TunnelRegistry(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
+        this.objectMapper = objectMapper;
+        Gauge.builder("tunnel_active_connections", activeTunnels, ConcurrentHashMap::size)
+                .description("Number of active tunnel WebSocket connections on this instance")
+                .register(meterRegistry);
+        Gauge.builder("tunnel_pending_requests", pendingRequests, ConcurrentHashMap::size)
+                .description("Number of pending tunnel forwarding requests on this instance")
+                .register(meterRegistry);
+    }
 
     public void register(String slug, WebSocketSession session) {
         activeTunnels.put(slug, session);

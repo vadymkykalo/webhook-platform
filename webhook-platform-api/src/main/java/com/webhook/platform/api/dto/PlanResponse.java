@@ -20,6 +20,7 @@ public class PlanResponse {
     private int maxEndpointsPerProject;
     private int maxProjects;
     private int maxMembers;
+    private int maxActiveTunnels;
     private int rateLimitPerSecond;
     private int maxRetentionDays;
     private JsonNode features;

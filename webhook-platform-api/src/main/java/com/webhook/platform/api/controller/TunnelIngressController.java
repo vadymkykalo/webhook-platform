@@ -1,20 +1,31 @@
 package com.webhook.platform.api.controller;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.webhook.platform.api.domain.entity.TunnelRequestLog;
 import com.webhook.platform.api.domain.entity.TunnelSession;
+import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
+import com.webhook.platform.api.service.RedisTunnelCoordinator;
+import com.webhook.platform.api.service.TunnelBandwidthService;
 import com.webhook.platform.api.service.TunnelRegistry;
 import com.webhook.platform.api.service.TunnelService;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.*;
 
 /**
@@ -26,13 +37,43 @@ import java.util.*;
 @RestController
 @RequestMapping("/tunnel")
 @Tag(name = "Tunnel Ingress", description = "Public tunnel ingress endpoints")
-@RequiredArgsConstructor
 public class TunnelIngressController {
 
     private final TunnelService tunnelService;
     private final TunnelRegistry tunnelRegistry;
+    private final RedisTunnelCoordinator redisTunnelCoordinator;
+    private final TunnelRequestLogRepository requestLogRepository;
+    private final TunnelBandwidthService bandwidthService;
+    private final MeterRegistry meterRegistry;
 
     private static final int MAX_BODY_SIZE = 512 * 1024; // 512KB
+    private static final int RATE_LIMIT_PER_SECOND = 10;
+    private static final int MAX_BUCKETS = 10_000;
+    private static final Duration BUCKET_EXPIRE = Duration.ofMinutes(5);
+
+    /** Per-slug in-memory rate limiters — bounded + expiring to prevent memory DoS */
+    private final Cache<String, Bucket> slugBuckets = Caffeine.newBuilder()
+            .maximumSize(MAX_BUCKETS)
+            .expireAfterAccess(BUCKET_EXPIRE)
+            .build();
+
+    public TunnelIngressController(TunnelService tunnelService,
+                                   TunnelRegistry tunnelRegistry,
+                                   RedisTunnelCoordinator redisTunnelCoordinator,
+                                   TunnelRequestLogRepository requestLogRepository,
+                                   TunnelBandwidthService bandwidthService,
+                                   MeterRegistry meterRegistry) {
+        this.tunnelService = tunnelService;
+        this.tunnelRegistry = tunnelRegistry;
+        this.redisTunnelCoordinator = redisTunnelCoordinator;
+        this.requestLogRepository = requestLogRepository;
+        this.bandwidthService = bandwidthService;
+        this.meterRegistry = meterRegistry;
+
+        Gauge.builder("tunnel_ingress_slug_buckets_size", slugBuckets, Cache::estimatedSize)
+                .description("Number of per-slug rate limiter buckets in tunnel ingress cache")
+                .register(meterRegistry);
+    }
 
     @RequestMapping(value = "/{slug}", method = {RequestMethod.GET, RequestMethod.POST,
             RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.HEAD, RequestMethod.OPTIONS})
@@ -42,9 +83,25 @@ public class TunnelIngressController {
             @RequestBody(required = false) String body,
             HttpServletRequest request) {
 
-        if (!tunnelRegistry.isActive(slug)) {
+        if (!redisTunnelCoordinator.isActiveInCluster(slug)) {
+            ingressCounter("offline").increment();
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body("{\"error\":\"tunnel_offline\",\"message\":\"Tunnel is not connected\"}");
+        }
+
+        // Rate limit per slug (10 req/s) — bounded cache prevents memory DoS
+        Bucket bucket = slugBuckets.get(slug, k -> Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(RATE_LIMIT_PER_SECOND)
+                        .refillGreedy(RATE_LIMIT_PER_SECOND, Duration.ofSeconds(1))
+                        .build())
+                .build());
+
+        if (!bucket.tryConsume(1)) {
+            log.warn("Rate limit exceeded for tunnel slug: {}", slug);
+            ingressCounter("rate_limited").increment();
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body("{\"error\":\"rate_limit_exceeded\",\"message\":\"Too many requests to this tunnel\"}");
         }
 
         if (body != null && body.length() > MAX_BODY_SIZE) {
@@ -66,17 +123,30 @@ public class TunnelIngressController {
                 .timestampMs(System.currentTimeMillis())
                 .build();
 
-        TunnelResponseMessage tunnelResponse = tunnelRegistry.forwardRequest(slug, tunnelRequest);
+        long startMs = System.currentTimeMillis();
+        TunnelResponseMessage tunnelResponse = redisTunnelCoordinator.forwardRequest(slug, tunnelRequest);
+        int durationMs = (int) (System.currentTimeMillis() - startMs);
+
+        // Async metering + logging — best-effort, never block the response path
+        int reqSize = body != null ? body.length() : 0;
+        int respSize = tunnelResponse != null && tunnelResponse.getBody() != null ? tunnelResponse.getBody().length() : 0;
+        logAndMeterAsync(slug, requestId, request.getMethod(), tunnelRequest.getPath(),
+                tunnelRequest.getQueryString(), headers,
+                reqSize, respSize, tunnelResponse, durationMs);
 
         if (tunnelResponse == null) {
+            ingressCounter("timeout").increment();
             return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
                     .body("{\"error\":\"tunnel_timeout\",\"message\":\"Tunnel request timed out or tunnel disconnected\"}");
         }
 
         if (tunnelResponse.getError() != null) {
+            ingressCounter("error").increment();
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body("{\"error\":\"tunnel_error\",\"message\":\"" + tunnelResponse.getError() + "\"}");
         }
+
+        ingressCounter("success").increment();
 
         HttpHeaders responseHeaders = new HttpHeaders();
         if (tunnelResponse.getHeaders() != null) {
@@ -104,6 +174,47 @@ public class TunnelIngressController {
             }
         }
         return headers;
+    }
+
+    private void logAndMeterAsync(String slug, String requestId, String method, String path,
+                                    String queryString, Map<String, String> reqHeaders,
+                                    int requestBodySize, int responseBodySize,
+                                    TunnelResponseMessage response, int durationMs) {
+        Thread.startVirtualThread(() -> {
+            try {
+                TunnelSession session = tunnelService.getActiveBySlug(slug);
+
+                // Bandwidth metering — single Redis increment
+                bandwidthService.recordBytes(session.getOrganizationId(), requestBodySize + responseBodySize);
+
+                // Request log
+                TunnelRequestLog logEntry = TunnelRequestLog.builder()
+                        .tunnelSessionId(session.getId())
+                        .organizationId(session.getOrganizationId())
+                        .slug(slug)
+                        .requestId(requestId)
+                        .method(method)
+                        .path(path)
+                        .queryString(queryString)
+                        .requestHeaders(reqHeaders)
+                        .requestBodySize(requestBodySize)
+                        .responseStatus(response != null ? response.getStatusCode() : null)
+                        .responseHeaders(response != null ? response.getHeaders() : null)
+                        .responseBodySize(responseBodySize)
+                        .durationMs(durationMs)
+                        .error(response != null ? response.getError() : "timeout")
+                        .build();
+                requestLogRepository.save(logEntry);
+            } catch (Exception e) {
+                log.debug("Failed to log/meter tunnel request: slug={}, error={}", slug, e.getMessage());
+            }
+        });
+    }
+
+    private Counter ingressCounter(String outcome) {
+        return Counter.builder("tunnel_ingress_total")
+                .tag("outcome", outcome)
+                .register(meterRegistry);
     }
 
     private boolean isHopByHopHeader(String name) {

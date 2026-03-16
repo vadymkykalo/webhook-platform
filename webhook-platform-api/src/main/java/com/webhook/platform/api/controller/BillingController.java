@@ -225,6 +225,7 @@ public class BillingController {
                 .maxEndpointsPerProject(plan.getMaxEndpointsPerProject())
                 .maxProjects(plan.getMaxProjects())
                 .maxMembers(plan.getMaxMembers())
+                .maxActiveTunnels(plan.getMaxActiveTunnels())
                 .rateLimitPerSecond(plan.getRateLimitPerSecond())
                 .maxRetentionDays(plan.getMaxRetentionDays())
                 .features(plan.getFeatures())

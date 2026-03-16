@@ -94,9 +94,11 @@ public class ListenCommand implements Callable<Integer> {
 
         wsClient.onDisconnected(() -> {
             if (!wsClient.isConnected()) {
-                out.println("  [disconnected — reconnecting...]");
+                out.println("  [disconnected]");
             }
         });
+
+        wsClient.onReconnecting(msg -> out.println("  [" + msg + "]"));
 
         // Shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

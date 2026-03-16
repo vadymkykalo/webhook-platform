@@ -1980,6 +1980,7 @@ function Pricing() {
       members: '5',
       rps: '10',
       retention: '7',
+      tunnels: 0,
       workflows: false,
       rules: false,
       replay: false,
@@ -1999,6 +2000,7 @@ function Pricing() {
       members: '10',
       rps: '50',
       retention: '30',
+      tunnels: 3,
       workflows: true,
       rules: true,
       replay: true,
@@ -2018,6 +2020,7 @@ function Pricing() {
       members: '50',
       rps: '200',
       retention: '90',
+      tunnels: 10,
       workflows: true,
       rules: true,
       replay: true,
@@ -2037,6 +2040,7 @@ function Pricing() {
       members: t('landing.pricing.unlimited'),
       rps: '1000',
       retention: '365',
+      tunnels: -1,
       workflows: true,
       rules: true,
       replay: true,
@@ -2185,6 +2189,7 @@ function Pricing() {
                   {/* Feature flags */}
                   <div className="pt-2 space-y-2">
                     {[
+                      { label: t('landing.pricing.cliTunnels') + (plan.tunnels > 0 ? ` (${plan.tunnels})` : plan.tunnels === -1 ? ` (${t('landing.pricing.unlimited')})` : ''), enabled: plan.tunnels !== 0 },
                       { label: t('landing.pricing.workflows'), enabled: plan.workflows },
                       { label: t('landing.pricing.rules'), enabled: plan.rules },
                       { label: t('landing.pricing.replay'), enabled: plan.replay },

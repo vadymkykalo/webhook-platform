@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -23,11 +24,13 @@ public class DataRetentionService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final IncomingEventRepository incomingEventRepository;
+    private final TunnelRequestLogRepository tunnelRequestLogRepository;
     private final MeterRegistry meterRegistry;
     private final int outboxRetentionDays;
     private final int deliveryAttemptsRetentionDays;
     private final int successfulAttemptsRetentionDays;
     private final int incomingEventsRetentionDays;
+    private final int tunnelRequestLogRetentionDays;
     private final int maxAttemptsPerDelivery;
     private final int batchSize;
     private final AtomicLong totalAttemptsCount = new AtomicLong(0);
@@ -38,21 +41,25 @@ public class DataRetentionService {
             OutboxMessageRepository outboxMessageRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
             IncomingEventRepository incomingEventRepository,
+            TunnelRequestLogRepository tunnelRequestLogRepository,
             MeterRegistry meterRegistry,
             @Value("${data-retention.outbox-retention-days:7}") int outboxRetentionDays,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
             @Value("${data-retention.successful-attempts-retention-days:14}") int successfulAttemptsRetentionDays,
             @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
+            @Value("${data-retention.tunnel-request-log-retention-days:7}") int tunnelRequestLogRetentionDays,
             @Value("${data-retention.max-attempts-per-delivery:10}") int maxAttemptsPerDelivery,
             @Value("${data-retention.batch-size:1000}") int batchSize) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.incomingEventRepository = incomingEventRepository;
+        this.tunnelRequestLogRepository = tunnelRequestLogRepository;
         this.meterRegistry = meterRegistry;
         this.outboxRetentionDays = outboxRetentionDays;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
         this.successfulAttemptsRetentionDays = successfulAttemptsRetentionDays;
         this.incomingEventsRetentionDays = incomingEventsRetentionDays;
+        this.tunnelRequestLogRetentionDays = tunnelRequestLogRetentionDays;
         this.maxAttemptsPerDelivery = maxAttemptsPerDelivery;
         this.batchSize = batchSize;
         
@@ -271,6 +278,20 @@ public class DataRetentionService {
             log.info("Burst cleanup: deleted {} successful attempts (older than {}d)", totalDeleted, successfulAttemptsRetentionDays);
         }
         updateMetrics();
+    }
+
+    @Scheduled(cron = "${data-retention.tunnel-log-cleanup-cron:0 30 2 * * *}")
+    @SchedulerLock(name = "cleanupTunnelRequestLog", lockAtMostFor = "9m", lockAtLeastFor = "1m")
+    @Transactional
+    public void cleanupTunnelRequestLog() {
+        Instant cutoff = Instant.now().minusSeconds(tunnelRequestLogRetentionDays * 86400L);
+        int deleted = tunnelRequestLogRepository.deleteByCreatedAtBefore(cutoff);
+        if (deleted > 0) {
+            Counter.builder("tunnel_request_log_cleanup_total")
+                    .register(meterRegistry)
+                    .increment(deleted);
+            log.info("Tunnel request log cleanup: deleted {} entries older than {}d", deleted, tunnelRequestLogRetentionDays);
+        }
     }
 
     private void updateMetrics() {

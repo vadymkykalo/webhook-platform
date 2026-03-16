@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class TunnelService {
 
     private final TunnelSessionRepository tunnelSessionRepository;
+    private final ProjectRepository projectRepository;
 
     @Value("${webhook.ingress-base-url:http://localhost:8080}")
     private String ingressBaseUrl;
@@ -38,6 +40,13 @@ public class TunnelService {
     @Transactional
     public TunnelSession createSession(UUID userId, UUID organizationId, UUID projectId,
                                        int localPort, String clientInfo) {
+        if (projectId != null) {
+            projectRepository.findById(projectId)
+                    .filter(p -> p.getOrganizationId().equals(organizationId))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Project does not belong to your organization"));
+        }
+
         String tunnelToken = generateSecureToken();
         String publicSlug = generateSlug();
 
@@ -80,6 +89,16 @@ public class TunnelService {
     }
 
     @Transactional
+    public void closeSession(UUID sessionId, UUID organizationId) {
+        TunnelSession session = tunnelSessionRepository.findByIdAndOrganizationId(sessionId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
+        session.setStatus(TunnelStatus.CLOSED);
+        session.setClosedAt(Instant.now());
+        tunnelSessionRepository.save(session);
+        log.info("Tunnel session closed: id={}, slug={}, org={}", session.getId(), session.getPublicSlug(), organizationId);
+    }
+
+    @Transactional
     public void heartbeat(String tunnelToken) {
         tunnelSessionRepository.findByTunnelToken(tunnelToken).ifPresent(session -> {
             session.setLastHeartbeat(Instant.now());
@@ -96,6 +115,11 @@ public class TunnelService {
         return session;
     }
 
+    public TunnelSession getBySessionAndOrg(UUID sessionId, UUID organizationId) {
+        return tunnelSessionRepository.findByIdAndOrganizationId(sessionId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
+    }
+
     public TunnelSession getByToken(String tunnelToken) {
         return tunnelSessionRepository.findByTunnelToken(tunnelToken)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
@@ -103,6 +127,13 @@ public class TunnelService {
 
     public List<TunnelSessionResponse> listActive(UUID organizationId) {
         return tunnelSessionRepository.findByOrganizationIdAndStatus(organizationId, TunnelStatus.ACTIVE)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<TunnelSessionResponse> listActiveByProject(UUID organizationId, UUID projectId) {
+        return tunnelSessionRepository.findByOrganizationIdAndProjectIdAndStatus(organizationId, projectId, TunnelStatus.ACTIVE)
                 .stream()
                 .map(this::toResponse)
                 .toList();

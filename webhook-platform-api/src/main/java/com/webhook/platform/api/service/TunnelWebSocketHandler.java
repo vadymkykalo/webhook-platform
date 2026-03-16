@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
 import com.webhook.platform.common.dto.tunnel.TunnelMessage;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -16,12 +17,38 @@ import java.net.URI;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TunnelWebSocketHandler extends TextWebSocketHandler {
 
     private final TunnelService tunnelService;
     private final TunnelRegistry tunnelRegistry;
+    private final RedisTunnelCoordinator redisTunnelCoordinator;
     private final ObjectMapper objectMapper;
+    private final Counter wsConnectCounter;
+    private final Counter wsDisconnectCounter;
+    private final Counter wsAuthFailureCounter;
+
+    public TunnelWebSocketHandler(TunnelService tunnelService,
+                                  TunnelRegistry tunnelRegistry,
+                                  RedisTunnelCoordinator redisTunnelCoordinator,
+                                  ObjectMapper objectMapper,
+                                  MeterRegistry meterRegistry) {
+        this.tunnelService = tunnelService;
+        this.tunnelRegistry = tunnelRegistry;
+        this.redisTunnelCoordinator = redisTunnelCoordinator;
+        this.objectMapper = objectMapper;
+        this.wsConnectCounter = Counter.builder("tunnel_ws_connections_total")
+                .tag("event", "connect")
+                .description("Tunnel WebSocket connection events")
+                .register(meterRegistry);
+        this.wsDisconnectCounter = Counter.builder("tunnel_ws_connections_total")
+                .tag("event", "disconnect")
+                .description("Tunnel WebSocket disconnection events")
+                .register(meterRegistry);
+        this.wsAuthFailureCounter = Counter.builder("tunnel_ws_connections_total")
+                .tag("event", "auth_failure")
+                .description("Tunnel WebSocket auth failure events")
+                .register(meterRegistry);
+    }
 
     private static final String ATTR_TUNNEL_TOKEN = "tunnelToken";
     private static final String ATTR_SLUG = "slug";
@@ -34,6 +61,7 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
         String tunnelToken = extractQueryParam(session, "token");
         if (tunnelToken == null || tunnelToken.isBlank()) {
             log.warn("WebSocket connection without tunnel token, closing");
+            wsAuthFailureCounter.increment();
             session.close(CloseStatus.POLICY_VIOLATION.withReason("Missing tunnel token"));
             return;
         }
@@ -43,12 +71,14 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
             tunnelSession = tunnelService.getByToken(tunnelToken);
         } catch (Exception e) {
             log.warn("Invalid tunnel token on WS connect: {}", e.getMessage());
+            wsAuthFailureCounter.increment();
             session.close(CloseStatus.POLICY_VIOLATION.withReason("Invalid tunnel token"));
             return;
         }
 
         if (tunnelSession.getStatus() != TunnelStatus.ACTIVE) {
             log.warn("Tunnel session not active: {}", tunnelSession.getId());
+            wsAuthFailureCounter.increment();
             session.close(CloseStatus.POLICY_VIOLATION.withReason("Tunnel session not active"));
             return;
         }
@@ -58,12 +88,14 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
         session.getAttributes().put(ATTR_SLUG, slug);
 
         tunnelRegistry.register(slug, session);
+        redisTunnelCoordinator.registerSlug(slug);
         tunnelService.heartbeat(tunnelToken);
 
         String tunnelUrl = tunnelService.buildPublicUrl(slug);
         TunnelMessage registered = TunnelMessage.registered(tunnelSession.getId().toString(), tunnelUrl);
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(registered)));
 
+        wsConnectCounter.increment();
         log.info("Tunnel WS connected: slug={}, sessionId={}", slug, session.getId());
     }
 
@@ -88,6 +120,7 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
         switch (tunnelMessage.getType()) {
             case TunnelMessage.TYPE_HEARTBEAT:
                 tunnelService.heartbeat(tunnelToken);
+                redisTunnelCoordinator.refreshSlug(slug);
                 session.sendMessage(new TextMessage(
                         objectMapper.writeValueAsString(TunnelMessage.heartbeat())));
                 break;
@@ -112,11 +145,13 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
 
         if (slug != null) {
             tunnelRegistry.unregister(slug);
+            redisTunnelCoordinator.unregisterSlug(slug);
         }
         if (tunnelToken != null) {
             tunnelService.closeSession(tunnelToken);
         }
 
+        wsDisconnectCounter.increment();
         log.info("Tunnel WS disconnected: slug={}, status={}", slug, status);
     }
 

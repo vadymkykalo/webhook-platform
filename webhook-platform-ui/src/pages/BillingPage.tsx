@@ -309,6 +309,7 @@ export default function BillingPage() {
                       <li>{p.maxProjects > 0 ? p.maxProjects : t('billing.unlimited')} {t('billing.projects').toLowerCase()}</li>
                       <li>{p.maxEndpointsPerProject > 0 ? p.maxEndpointsPerProject : t('billing.unlimited')} {t('billing.endpoints').toLowerCase()}</li>
                       <li>{p.rateLimitPerSecond > 0 ? t('billing.perSecond', { count: p.rateLimitPerSecond }) : t('billing.unlimited')}</li>
+                      <li>{p.maxActiveTunnels === 0 ? t('billing.tunnelsDisabled') : p.maxActiveTunnels < 0 ? `${t('billing.unlimited')} ${t('billing.tunnels').toLowerCase()}` : `${p.maxActiveTunnels} ${t('billing.tunnels').toLowerCase()}`}</li>
                     </ul>
                     {!isCurrent && !isCustom && (
                       <Button size="sm" variant={isPaid ? 'default' : 'outline'} className="w-full"

@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -24,7 +25,7 @@ class TunnelRegistryTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        tunnelRegistry = new TunnelRegistry(objectMapper);
+        tunnelRegistry = new TunnelRegistry(objectMapper, new SimpleMeterRegistry());
     }
 
     @Test

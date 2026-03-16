@@ -41,6 +41,9 @@ public class Plan {
     @Column(name = "max_members", nullable = false)
     private int maxMembers;
 
+    @Column(name = "max_active_tunnels", nullable = false)
+    private int maxActiveTunnels;
+
     @Column(name = "rate_limit_per_second", nullable = false)
     private int rateLimitPerSecond;
 

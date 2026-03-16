@@ -23,6 +23,12 @@ public interface TunnelSessionRepository extends JpaRepository<TunnelSession, UU
 
     List<TunnelSession> findByUserIdAndStatus(UUID userId, TunnelStatus status);
 
+    List<TunnelSession> findByOrganizationIdAndProjectIdAndStatus(UUID organizationId, UUID projectId, TunnelStatus status);
+
+    Optional<TunnelSession> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+    long countByOrganizationIdAndStatus(UUID organizationId, TunnelStatus status);
+
     @Modifying
     @Query("UPDATE TunnelSession t SET t.status = 'EXPIRED', t.closedAt = :now " +
            "WHERE t.status = 'ACTIVE' AND t.lastHeartbeat < :threshold")

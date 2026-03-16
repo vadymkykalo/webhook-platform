@@ -101,6 +101,8 @@ data-retention:
   limit-enforcement-cron: ${DATA_RETENTION_LIMIT_CRON:0 */30 * * * *}
   burst-cleanup-cron: ${DATA_RETENTION_BURST_CLEANUP_CRON:0 0 */4 * * *}
   table-metrics-interval-ms: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:900000}
+  tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
+  tunnel-log-cleanup-cron: ${TUNNEL_LOG_CLEANUP_CRON:0 30 2 * * *}
 
 replay:
   batch-size: ${REPLAY_BATCH_SIZE:200}

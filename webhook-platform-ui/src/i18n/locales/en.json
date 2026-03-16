@@ -109,6 +109,7 @@
     "devWorkspace": "Dev Console",
     "incomingSources": "Sources",
     "incomingEvents": "Received",
+    "tunnels": "Tunnels",
     "members": "Members",
     "auditLog": "Audit Log",
     "connections": "Connections",
@@ -248,6 +249,27 @@
       "both": "Both",
       "bothDesc": "Full bidirectional webhook infrastructure — send and receive.",
       "continue": "Continue"
+    },
+    "device": {
+      "title": "Authorize Device",
+      "subtitle": "Enter the code shown in your CLI terminal to authorize this device.",
+      "codeLabel": "Device code",
+      "continue": "Continue",
+      "confirmTitle": "Confirm Authorization",
+      "confirmDesc": "You are about to authorize a CLI session with this code:",
+      "confirmWarning": "Only approve if you initiated this request from the Hookflow CLI.",
+      "approve": "Approve",
+      "approving": "Approving...",
+      "approved": "Device authorized successfully!",
+      "successTitle": "Device Authorized",
+      "successDesc": "The CLI session has been authorized. You can return to your terminal.",
+      "successHint": "You can close this page now.",
+      "errorTitle": "Authorization Failed",
+      "failed": "Failed to authorize device. The code may be invalid or expired.",
+      "tryAgain": "Try again",
+      "loginRequired": "Sign in required",
+      "loginRequiredDesc": "You need to be signed in to authorize a device.",
+      "goToLogin": "Sign in"
     }
   },
   "projects": {
@@ -807,6 +829,8 @@
     "retention": "Retention",
     "perSecond": "{{count}}/sec",
     "days": "{{count}} days",
+    "tunnels": "CLI tunnels",
+    "tunnelsDisabled": "CLI tunnels not available",
     "unlimited": "Unlimited",
     "of": "of {{limit}}",
     "used": "{{percent}}% used",
@@ -970,6 +994,33 @@
     "toast": {
       "passwordChanged": "Password changed successfully",
       "profileUpdated": "Profile updated successfully"
+    }
+  },
+  "tunnels": {
+    "title": "Tunnels",
+    "subtitle": "Active CLI tunnel sessions in your organization",
+    "refresh": "Refresh",
+    "active": "Active",
+    "noTunnels": "No active tunnels",
+    "noTunnelsDesc": "Start a tunnel from the CLI with `hookflow listen --port 3000` to forward requests to your local machine.",
+    "copyUrl": "Copy public URL",
+    "created": "Created",
+    "lastHeartbeat": "Last heartbeat",
+    "close": "Close tunnel",
+    "closing": "Closing...",
+    "stats": {
+      "active": "Active tunnels",
+      "pending": "Pending requests",
+      "mine": "My tunnels"
+    },
+    "closeDialog": {
+      "title": "Close tunnel?",
+      "description": "This will immediately disconnect the CLI client and stop forwarding requests. The tunnel URL will no longer work."
+    },
+    "toast": {
+      "loadFailed": "Failed to load tunnels",
+      "closed": "Tunnel closed",
+      "closeFailed": "Failed to close tunnel"
     }
   },
   "auditLog": {
@@ -1609,6 +1660,9 @@
       "mtls": "mTLS",
       "included": "Included",
       "notIncluded": "Not included",
+      "cliTunnels": "CLI Tunnels",
+      "tunnelsCount": "active tunnels",
+      "tunnelsDisabled": "CLI Tunnels not available",
       "prioritySupport": "Priority support",
       "customIntegrations": "Custom integrations"
     },
@@ -2794,6 +2848,7 @@
     "openProjectEndpoints": "Open project endpoints",
     "dashboard": "Dashboard",
     "projects": "Projects",
+    "tunnels": "Tunnels",
     "members": "Members",
     "auditLog": "Audit Log",
     "settings": "Settings",
