@@ -220,15 +220,35 @@ sequenceDiagram
     end
 ```
 
-### Signature Verification
+### CLI Tunnel Flow
 
-| Provider | Header | Algorithm |
-|----------|--------|-----------|
-| **GitHub / GitLab** | `X-Hub-Signature-256` | HMAC-SHA256 |
-| **Stripe** | `Stripe-Signature` | HMAC-SHA256 (timestamp + payload) |
-| **Shopify** | `X-Shopify-Hmac-SHA256` | HMAC-SHA256 (Base64) |
-| **Slack** | `X-Slack-Signature` | HMAC-SHA256 (v0:timestamp:body) |
-| **Any provider** | Configurable | HMAC with configurable header/prefix |
+```mermaid
+sequenceDiagram
+    participant Dev as Developer (localhost)
+    participant CLI as Hookflow CLI
+    participant API as API Service
+    participant WS as WebSocket Hub
+    participant Provider as Third-Party Provider
+
+    Dev->>CLI: hookflow listen 3000
+    CLI->>API: POST /api/v1/tunnels (JWT auth)
+    API-->>CLI: 201 {slug, wsUrl}
+    CLI->>WS: Connect WSS /ws/tunnel (slug in handshake)
+    WS-->>CLI: Connected ✓
+
+    Note over CLI,WS: Tunnel active — public URL ready
+
+    Provider->>API: POST /tunnel/{slug} (webhook payload)
+    API->>WS: Forward request via WebSocket
+    WS->>CLI: TunnelRequestMessage (headers, body)
+    CLI->>Dev: POST http://localhost:3000 (forwarded)
+    Dev-->>CLI: 200 OK + response body
+    CLI->>WS: TunnelResponseMessage
+    WS->>API: Response back
+    API-->>Provider: 200 OK
+
+    Note over CLI: Auto-reconnect on disconnect<br/>Exponential backoff up to 2min
+```
 
 ---
 
