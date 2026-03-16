@@ -1,6 +1,6 @@
 <div align="center">
 
-# Webhook Platform
+# Hookflow
 
 **Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
 
@@ -19,7 +19,7 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 </div>
 
 <div align="center">
-  <img src="docs/img.png" alt="Webhook Platform Dashboard" width="100%">
+  <img src="docs/img.png" alt="Hookflow Dashboard" width="100%">
 </div>
 
 ---
@@ -95,7 +95,7 @@ graph TB
         Svc2[Internal Service B]
     end
     
-    subgraph "Webhook Platform"
+    subgraph "Hookflow"
         UI[Dashboard<br/>React + Vite]
         API[API Service<br/>Spring Boot]
         DB[(PostgreSQL<br/>Events · Deliveries · Outbox<br/>Incoming Events · Forward Attempts)]
@@ -220,15 +220,35 @@ sequenceDiagram
     end
 ```
 
-### Signature Verification
+### CLI Tunnel Flow
 
-| Provider | Header | Algorithm |
-|----------|--------|-----------|
-| **GitHub / GitLab** | `X-Hub-Signature-256` | HMAC-SHA256 |
-| **Stripe** | `Stripe-Signature` | HMAC-SHA256 (timestamp + payload) |
-| **Shopify** | `X-Shopify-Hmac-SHA256` | HMAC-SHA256 (Base64) |
-| **Slack** | `X-Slack-Signature` | HMAC-SHA256 (v0:timestamp:body) |
-| **Any provider** | Configurable | HMAC with configurable header/prefix |
+```mermaid
+sequenceDiagram
+    participant Dev as Developer (localhost)
+    participant CLI as Hookflow CLI
+    participant API as API Service
+    participant WS as WebSocket Hub
+    participant Provider as Third-Party Provider
+
+    Dev->>CLI: hookflow listen 3000
+    CLI->>API: POST /api/v1/tunnels (JWT auth)
+    API-->>CLI: 201 {slug, wsUrl}
+    CLI->>WS: Connect WSS /ws/tunnel (slug in handshake)
+    WS-->>CLI: Connected ✓
+
+    Note over CLI,WS: Tunnel active — public URL ready
+
+    Provider->>API: POST /tunnel/{slug} (webhook payload)
+    API->>WS: Forward request via WebSocket
+    WS->>CLI: TunnelRequestMessage (headers, body)
+    CLI->>Dev: POST http://localhost:3000 (forwarded)
+    Dev-->>CLI: 200 OK + response body
+    CLI->>WS: TunnelResponseMessage
+    WS->>API: Response back
+    API-->>Provider: 200 OK
+
+    Note over CLI: Auto-reconnect on disconnect<br/>Exponential backoff up to 2min
+```
 
 ---
 
@@ -287,9 +307,12 @@ make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
 ### CLI Commands
 
 ```bash
-# Build CLI
-mvn clean package -pl webhook-platform-cli -am -DskipTests
-alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+# Install CLI (auto-installs Java 17 if missing)
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+
+# Or build from source (optional)
+# mvn clean package -pl webhook-platform-cli -am -DskipTests
+# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
 
 # Auth
 hookflow login                             # Device code flow (browser approve)
