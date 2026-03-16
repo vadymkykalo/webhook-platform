@@ -8,6 +8,7 @@ export interface PlanResponse {
   maxEndpointsPerProject: number;
   maxProjects: number;
   maxMembers: number;
+  maxActiveTunnels: number;
   rateLimitPerSecond: number;
   maxRetentionDays: number;
   features: Record<string, boolean>;

@@ -37,6 +37,13 @@ jobs:
       - name: Package artifacts
         run: mvn package -DskipTests -B
 
+      - name: Upload CLI JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: hookflow-cli
+          path: webhook-platform-cli/target/webhook-platform-cli-*.jar
+          retention-days: 30
+
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest

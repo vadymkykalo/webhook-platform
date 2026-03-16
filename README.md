@@ -59,6 +59,16 @@ curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
 - **Multi-destination forwarding** with auth (Bearer / Basic / custom header)
 - **Payload transformation** — JSONPath · **Per-source rate limiting** · **Full audit trail**
 
+### CLI & Local Tunnel
+- **`hookflow listen 3000`** — receive webhooks on localhost during development, no deploy needed
+- **WebSocket tunnel** — public URL → backend → WS → CLI → `localhost:PORT` → response back
+- **Device code login** — secure auth without typing passwords in terminal (like `gh auth login`)
+- **Event replay** — re-deliver past events for debugging · **Event tail** — follow events in real-time
+- **Tunnel management** — list, close, status · **Auto-reconnect** with exponential backoff
+- **Plan-based tunnel limits** — FREE tier = disabled, paid plans get per-org active tunnel caps
+- **Bandwidth metering** — per-org monthly tunnel traffic tracked in Redis
+- **Config profiles** — switch between staging/production servers without re-login
+
 ### Platform
 - **Schema Registry** — JSON Schema per event type, breaking change detection, WARN/BLOCK policies
 - **Wildcard subscriptions** — `order.*`, `order.**`, `**`
@@ -272,6 +282,43 @@ make verify-link          # Email verification link (dev)
 make reset-link           # Password reset link (dev)
 make invite-link          # Member invite link (dev)
 make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
+```
+
+### CLI Commands
+
+```bash
+# Build CLI
+mvn clean package -pl webhook-platform-cli -am -DskipTests
+alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+
+# Auth
+hookflow login                             # Device code flow (browser approve)
+hookflow login --email u@x.com --password  # Direct login
+
+# Local tunnel
+hookflow listen 3000                       # Forward webhooks to localhost:3000
+hookflow listen 3000 --project <id>        # Associate with project
+
+# Tunnel management
+hookflow tunnels list                      # List active tunnels
+hookflow tunnels close <sessionId>         # Close tunnel
+hookflow tunnels status                    # Active tunnels, bandwidth, pending requests
+
+# Events
+hookflow events <projectId>               # Recent events
+hookflow events <projectId> --follow      # Tail in real-time
+hookflow replay <projectId> --dry-run     # Estimate replay
+hookflow replay <projectId>               # Replay last 24h
+
+# Diagnostics
+hookflow status                            # Auth, health, active tunnels
+hookflow config show                       # Current config
+hookflow config set backend-url <url>      # Change backend
+hookflow config profile list               # List all profiles
+hookflow config profile create staging --url https://staging.example.com
+hookflow config profile use staging         # Switch to staging
+hookflow config profile use default         # Switch back
+hookflow config profile delete staging      # Remove profile
 ```
 
 ---

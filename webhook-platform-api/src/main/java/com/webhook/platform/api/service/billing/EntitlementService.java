@@ -5,11 +5,13 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.Project;
+import com.webhook.platform.api.domain.enums.TunnelStatus;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
+import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.exception.QuotaExceededException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +37,7 @@ public class EntitlementService {
     private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
     private final MembershipRepository membershipRepository;
+    private final TunnelSessionRepository tunnelSessionRepository;
     private final QuotaCounterService quotaCounterService;
 
     /** Plan cache: orgId → Plan. Avoids DB hit on every request. */
@@ -47,6 +50,7 @@ public class EntitlementService {
             EndpointRepository endpointRepository,
             EventRepository eventRepository,
             MembershipRepository membershipRepository,
+            TunnelSessionRepository tunnelSessionRepository,
             QuotaCounterService quotaCounterService) {
         this.billingEnabled = billingEnabled;
         this.organizationRepository = organizationRepository;
@@ -54,6 +58,7 @@ public class EntitlementService {
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.membershipRepository = membershipRepository;
+        this.tunnelSessionRepository = tunnelSessionRepository;
         this.quotaCounterService = quotaCounterService;
         this.planCache = Caffeine.newBuilder()
                 .maximumSize(5_000)
@@ -108,6 +113,22 @@ public class EntitlementService {
         if (count >= plan.getMaxMembers()) {
             throw new QuotaExceededException("members",
                     count, plan.getMaxMembers(), plan.getDisplayName());
+        }
+    }
+
+    public void checkTunnelLimit(UUID organizationId) {
+        if (!billingEnabled) return;
+        Plan plan = getPlan(organizationId);
+        if (!plan.hasFeature("tunnels")) {
+            throw new QuotaExceededException("tunnels",
+                    0, 0, plan.getDisplayName());
+        }
+        if (plan.isUnlimited(plan.getMaxActiveTunnels())) return;
+
+        long count = tunnelSessionRepository.countByOrganizationIdAndStatus(organizationId, TunnelStatus.ACTIVE);
+        if (count >= plan.getMaxActiveTunnels()) {
+            throw new QuotaExceededException("active_tunnels",
+                    count, plan.getMaxActiveTunnels(), plan.getDisplayName());
         }
     }
 

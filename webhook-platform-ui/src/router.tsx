@@ -13,6 +13,7 @@ const VerifyEmailPage = lazy(() => import('./auth/VerifyEmailPage'));
 const ForgotPasswordPage = lazy(() => import('./auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
+const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
 const DocumentationPage = lazy(() => import('./pages/DocumentationPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
@@ -48,6 +49,7 @@ const ConnectionSetupPage = lazy(() => import('./pages/ConnectionSetupPage'));
 const ConnectionsPage = lazy(() => import('./pages/ConnectionsPage'));
 const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'));
 const WorkflowBuilderPage = lazy(() => import('./pages/WorkflowBuilderPage'));
+const TunnelsPage = lazy(() => import('./pages/TunnelsPage'));
 const TestConsolePage = lazy(() => import('./pages/TestConsolePage'));
 const SharedDebugPage = lazy(() => import('./pages/SharedDebugPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -99,7 +101,15 @@ export const router = createBrowserRouter([
     element: <S><AcceptInvitePage /></S>,
   },
   {
+    path: '/device',
+    element: <S><DeviceApprovePage /></S>,
+  },
+  {
     path: '/docs',
+    element: <S><DocumentationPage /></S>,
+  },
+  {
+    path: '/docs/cli',
     element: <S><DocumentationPage /></S>,
   },
   {
@@ -233,6 +243,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/test-console',
         element: <S><TestConsolePage /></S>,
+      },
+      {
+        path: 'tunnels',
+        element: <S><TunnelsPage /></S>,
       },
       {
         path: 'members',

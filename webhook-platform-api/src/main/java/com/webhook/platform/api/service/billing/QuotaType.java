@@ -16,5 +16,8 @@ public enum QuotaType {
     PROJECTS,
 
     /** Max members per organization (org-scoped). */
-    MEMBERS
+    MEMBERS,
+
+    /** Max active tunnels per organization (org-scoped, includes feature gate). */
+    TUNNELS
 }

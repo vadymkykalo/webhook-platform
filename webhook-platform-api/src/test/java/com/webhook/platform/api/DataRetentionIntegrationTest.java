@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.service.DataRetentionService;
+import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +65,9 @@ public class DataRetentionIntegrationTest {
 
     @MockBean
     private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private RedisTunnelCoordinator redisTunnelCoordinator;
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")

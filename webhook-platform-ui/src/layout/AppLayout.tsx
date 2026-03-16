@@ -35,6 +35,7 @@ const mainNav: NavItem[] = [
 ];
 
 const orgNav: NavItem[] = [
+  { nameKey: 'nav.tunnels', path: '/admin/tunnels', icon: Cable },
   { nameKey: 'nav.members', path: '/admin/members', icon: Users, requiredRole: 'OWNER' },
   { nameKey: 'nav.auditLog', path: '/admin/audit-log', icon: FileText },
   { nameKey: 'nav.orgSettings', path: '/admin/org-settings', icon: Building2, requiredRole: 'OWNER' },

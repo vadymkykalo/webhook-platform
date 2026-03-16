@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route, Workflow } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route, Workflow, Terminal, Cable, Settings, Repeat, Download } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -10,14 +10,16 @@ export default function DocumentationPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState(() => {
+    if (window.location.pathname === '/docs/cli') return 'cli';
     const hash = window.location.hash.replace('#', '');
     return hash || 'overview';
   });
 
   useEffect(() => {
+    if (location.pathname === '/docs/cli') { setActiveSection('cli'); return; }
     const hash = location.hash.replace('#', '');
     if (hash) setActiveSection(hash);
-  }, [location.hash]);
+  }, [location.hash, location.pathname]);
   const [activeLanguage, setActiveLanguage] = useState<'curl' | 'node' | 'python'>('curl');
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -48,6 +50,7 @@ export default function DocumentationPage() {
             {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'deterministic-replay' && <DeterministicReplayDocs />}
             {activeSection === 'workflow-automation' && <WorkflowAutomationDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'cli' && <CliDocs />}
             {activeSection === 'errors' && <Errors />}
             {activeSection === 'sdks' && <SDKs />}
           </div>
@@ -74,6 +77,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
     { id: 'deterministic-replay', label: t('docsPage.sections.deterministicReplay'), icon: Fingerprint },
     { id: 'workflow-automation', label: t('docsPage.sections.workflowAutomation', 'Workflow Automation'), icon: Workflow },
+    { id: 'cli', label: t('docsPage.sections.cli', 'CLI'), icon: Terminal },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
     { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
@@ -1468,6 +1472,339 @@ function WorkflowAutomationDocs({ activeLanguage, setActiveLanguage }: { activeL
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CliDocs() {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState('');
+  const copy = (text: string, id: string) => { navigator.clipboard.writeText(text); setCopied(id); setTimeout(() => setCopied(''), 2000); };
+
+  const CodeBlock = ({ id, title, code }: { id: string; title: string; code: string }) => (
+    <div className="relative bg-slate-950 rounded-xl border border-white/10 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-slate-900">
+        <span className="text-xs text-white/40 font-mono">{title}</span>
+        <button onClick={() => copy(code, id)} className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1">
+          {copied === id ? <><CheckCircle2 className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+        </button>
+      </div>
+      <pre className="p-4 text-[13px] text-white/85 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-all"><code>{code}</code></pre>
+    </div>
+  );
+
+  const cmdRef: [string, string][] = [
+    ['hookflow login', t('docsPage.cli.cmdLogin', 'Authenticate (device code or email/password)')],
+    ['hookflow login --server <url>', t('docsPage.cli.cmdLoginServer', 'Login to a specific server')],
+    ['hookflow status', t('docsPage.cli.cmdStatus', 'Show auth status, health, active tunnels')],
+    ['hookflow listen <port>', t('docsPage.cli.cmdListen', 'Start local tunnel forwarding to localhost:port')],
+    ['hookflow listen <port> --project <id>', t('docsPage.cli.cmdListenProject', 'Tunnel scoped to a project')],
+    ['hookflow tunnels list', t('docsPage.cli.cmdTunnelsList', 'List active tunnel sessions')],
+    ['hookflow tunnels status', t('docsPage.cli.cmdTunnelsStatus', 'Show tunnel stats and bandwidth')],
+    ['hookflow tunnels close <id>', t('docsPage.cli.cmdTunnelsClose', 'Close a tunnel session')],
+    ['hookflow events <projectId>', t('docsPage.cli.cmdEvents', 'List recent events')],
+    ['hookflow events <projectId> --follow', t('docsPage.cli.cmdEventsFollow', 'Tail events in real-time')],
+    ['hookflow replay <projectId>', t('docsPage.cli.cmdReplay', 'Replay events from last 24h')],
+    ['hookflow replay <projectId> --dry-run', t('docsPage.cli.cmdReplayDry', 'Estimate replay without sending')],
+    ['hookflow config show', t('docsPage.cli.cmdConfigShow', 'Show current configuration')],
+    ['hookflow config set <key> <value>', t('docsPage.cli.cmdConfigSet', 'Set a config value')],
+    ['hookflow config clear', t('docsPage.cli.cmdConfigClear', 'Clear config and logout')],
+    ['hookflow config profile list', t('docsPage.cli.cmdProfileList', 'List all profiles')],
+    ['hookflow config profile create <name> --url <url>', t('docsPage.cli.cmdProfileCreate', 'Create a new profile')],
+    ['hookflow config profile use <name>', t('docsPage.cli.cmdProfileUse', 'Switch to a profile')],
+    ['hookflow config profile delete <name>', t('docsPage.cli.cmdProfileDelete', 'Delete a profile')],
+  ];
+
+  return (
+    <div className="space-y-12">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+            <Terminal className="h-5 w-5 text-cyan-500" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{t('docsPage.cli.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('docsPage.cli.subtitle')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Installation */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Download className="h-5 w-5 text-cyan-500" /> {t('docsPage.cli.installTitle')}</h2>
+
+        <div className="p-4 rounded-xl border bg-card space-y-4">
+          <div>
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.installOpt1Title')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.installOpt1Desc')}</p>
+            <CodeBlock id="install-curl" title="bash" code={`curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash`} />
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.installOpt2Title')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.installOpt2Desc')}</p>
+            <CodeBlock id="install-build" title="bash" code={`git clone https://github.com/vadymkykalo/webhook-platform.git
+cd webhook-platform
+mvn clean package -pl webhook-platform-cli -am -DskipTests
+
+# Create alias
+alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+
+# Or add to ~/.bashrc / ~/.zshrc for persistence
+echo "alias hookflow='java -jar $(pwd)/webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'" >> ~/.bashrc`} />
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.installOpt3Title')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.installOpt3Desc')}</p>
+            <CodeBlock id="install-docker" title="bash" code={`docker run --rm -it -v ~/.config/hookflow:/root/.config/hookflow \\
+  ghcr.io/vadymkykalo/hookflow-cli:latest listen 3000`} />
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+          <p className="text-xs text-blue-600 dark:text-blue-400">{t('docsPage.cli.installReq')}</p>
+        </div>
+      </section>
+
+      {/* Authentication */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Key className="h-5 w-5 text-violet-500" /> {t('docsPage.cli.authTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.cli.authSubtitle')}</p>
+
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> {t('docsPage.cli.authDeviceTitle')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.authDeviceDesc')}</p>
+            <CodeBlock id="auth-device" title="bash" code={`hookflow login
+
+# Output:
+# ▸ Open: http://localhost:5173/device?code=ABCD-1234
+# ▸ Code: ABCD-1234
+# ▸ Waiting for approval...
+# ✓ Logged in as vadym@hookflow.dev`} />
+          </div>
+
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Key className="h-4 w-4 text-amber-500" /> {t('docsPage.cli.authDirectTitle')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.authDirectDesc')}</p>
+            <CodeBlock id="auth-direct" title="bash" code={`hookflow login --email user@company.com --password
+
+# With custom server:
+hookflow login --server https://hooks.company.com \\
+  --email user@company.com --password`} />
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+          <p className="text-xs text-blue-600 dark:text-blue-400">{t('docsPage.cli.authTokens')}</p>
+        </div>
+      </section>
+
+      {/* Local Tunnels */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Cable className="h-5 w-5 text-cyan-500" /> {t('docsPage.cli.tunnelsTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.cli.tunnelsSubtitle')}</p>
+
+        <CodeBlock id="tunnel-basic" title="bash" code={`# Start tunnel — webhooks forwarded to localhost:3000
+hookflow listen 3000
+
+# Associate with a specific project
+hookflow listen 3000 --project 550e8400-e29b-41d4-a716-446655440000
+
+# Output:
+# ╔══════════════════════════════════════════════════════╗
+# ║  Hookflow CLI — Tunnel Active                        ║
+# ╚══════════════════════════════════════════════════════╝
+#
+#   Public URL:  https://tun-x4k9.hookflow.dev/t/tun-x4k9
+#   Forwarding:  → http://localhost:3000
+#   Tunnel ID:   550e8400-...
+#
+#   Press Ctrl+C to stop`} />
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="p-4 rounded-xl border bg-card">
+            <h4 className="text-xs font-bold mb-1">{t('docsPage.cli.tunnelsAutoReconnect')}</h4>
+            <p className="text-xs text-muted-foreground">{t('docsPage.cli.tunnelsAutoReconnectDesc')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h4 className="text-xs font-bold mb-1">{t('docsPage.cli.tunnelsLogging')}</h4>
+            <p className="text-xs text-muted-foreground">{t('docsPage.cli.tunnelsLoggingDesc')}</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h4 className="text-xs font-bold mb-1">{t('docsPage.cli.tunnelsPlanLimits')}</h4>
+            <p className="text-xs text-muted-foreground">{t('docsPage.cli.tunnelsPlanLimitsDesc')}</p>
+          </div>
+        </div>
+
+        <CodeBlock id="tunnel-manage" title="bash" code={`# List active tunnels
+hookflow tunnels list
+
+# Show tunnel stats and bandwidth usage
+hookflow tunnels status
+
+# Close a specific tunnel
+hookflow tunnels close <sessionId>`} />
+      </section>
+
+      {/* Config & Profiles */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Settings className="h-5 w-5 text-amber-500" /> {t('docsPage.cli.configTitle')}</h2>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">{t('docsPage.cli.configFileTitle')}</h3>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.configFileDesc')}</p>
+          <CodeBlock id="config-path" title="path" code={`~/.config/hookflow/config.json
+
+# Override with environment variable:
+export HOOKFLOW_CONFIG=/custom/path/config.json`} />
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.configFileDetails')}</p>
+        </div>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">{t('docsPage.cli.configProfilesTitle')}</h3>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.configProfilesDesc')}</p>
+          <CodeBlock id="config-profiles" title="bash" code={`# Create a profile for staging
+hookflow config profile create staging --url https://staging-hooks.company.com
+
+# Create a profile for production
+hookflow config profile create production --url https://hooks.company.com
+
+# Switch to staging (saves current state, loads staging tokens)
+hookflow config profile use staging
+
+# Login on the staging server
+hookflow login
+
+# Switch back to default (local dev)
+hookflow config profile use default
+
+# List all profiles
+hookflow config profile list
+# Output:
+#   * default   → http://localhost:8080
+#     staging   → https://staging-hooks.company.com
+#     production → https://hooks.company.com
+
+# Delete a profile
+hookflow config profile delete staging`} />
+        </div>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">{t('docsPage.cli.configCmdsTitle')}</h3>
+          <CodeBlock id="config-cmds" title="bash" code={`# Show current configuration
+hookflow config show
+
+# Set a config value
+hookflow config set backend-url https://hooks.company.com
+hookflow config set project-id 550e8400-e29b-41d4-a716-446655440000
+
+# Clear all config (logout)
+hookflow config clear`} />
+        </div>
+      </section>
+
+      {/* Events & Replay */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Repeat className="h-5 w-5 text-emerald-500" /> {t('docsPage.cli.eventsTitle')}</h2>
+
+        <CodeBlock id="events" title="bash" code={`# List recent events for a project
+hookflow events <projectId>
+
+# Follow events in real-time (like tail -f)
+hookflow events <projectId> --follow
+
+# Replay events (re-deliver last 24h)
+hookflow replay <projectId>
+
+# Dry-run replay (estimate without sending)
+hookflow replay <projectId> --dry-run`} />
+      </section>
+
+      {/* Self-hosted & Production */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Shield className="h-5 w-5 text-violet-500" /> {t('docsPage.cli.selfHostedTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.cli.selfHostedSubtitle')}</p>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.selfHostedLocal')}</h3>
+            <CodeBlock id="prod-local" title="bash" code={`# Default: connects to localhost:8080
+hookflow login
+hookflow listen 3000`} />
+          </div>
+
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.selfHostedServer')}</h3>
+            <CodeBlock id="prod-selfhosted" title="bash" code={`# Point CLI to your self-hosted instance
+hookflow login --server https://hooks.internal.company.com
+hookflow listen 3000`} />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">{t('docsPage.cli.selfHostedProfiles')}</h3>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.selfHostedProfilesDesc')}</p>
+          <CodeBlock id="prod-profiles" title="bash" code={`# One-time setup
+hookflow config profile create staging --url https://staging.company.com
+hookflow config profile create prod --url https://hooks.company.com
+
+# Login to each profile
+hookflow config profile use staging && hookflow login
+hookflow config profile use prod && hookflow login
+
+# Daily usage — just switch
+hookflow config profile use staging
+hookflow listen 3000    # tunnels go through staging
+
+hookflow config profile use prod
+hookflow tunnels status # check production tunnels`} />
+        </div>
+      </section>
+
+      {/* Full command reference */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Code className="h-5 w-5 text-primary" /> {t('docsPage.cli.cmdRefTitle')}</h2>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 font-semibold">{t('docsPage.cli.cmdRefCommand')}</th>
+                <th className="text-left py-2 px-3 font-semibold">{t('docsPage.cli.cmdRefDescription')}</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted-foreground">
+              {cmdRef.map(([cmd, desc]) => (
+                <tr key={cmd} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <td className="py-2 px-3 font-mono text-xs text-foreground">{cmd}</td>
+                  <td className="py-2 px-3 text-xs">{desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Troubleshooting */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold">{t('docsPage.cli.troubleshootTitle')}</h2>
+
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((n) => {
+            const colors = ['border-red-500/40 bg-red-500/5', 'border-amber-500/40 bg-amber-500/5', 'border-blue-500/40 bg-blue-500/5', 'border-orange-500/40 bg-orange-500/5', 'border-violet-500/40 bg-violet-500/5'];
+            const textColors = ['text-red-600 dark:text-red-400', 'text-amber-600 dark:text-amber-400', 'text-blue-600 dark:text-blue-400', 'text-orange-600 dark:text-orange-400', 'text-violet-600 dark:text-violet-400'];
+            return (
+              <div key={n} className={`p-4 rounded-lg border-l-4 ${colors[n - 1]}`}>
+                <p className={`text-sm font-semibold mb-1 ${textColors[n - 1]}`}>{t(`docsPage.cli.troubleshoot${n}q`)}</p>
+                <p className="text-xs text-muted-foreground">{t(`docsPage.cli.troubleshoot${n}a`)}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

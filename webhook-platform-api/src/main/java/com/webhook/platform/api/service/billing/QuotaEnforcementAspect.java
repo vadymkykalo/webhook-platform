@@ -70,6 +70,7 @@ public class QuotaEnforcementAspect {
             }
             case PROJECTS -> entitlementService.checkProjectLimit(orgId);
             case MEMBERS -> entitlementService.checkMemberLimit(orgId);
+            case TUNNELS -> entitlementService.checkTunnelLimit(orgId);
         }
     }
 

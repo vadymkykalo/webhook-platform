@@ -2,6 +2,7 @@ package com.webhook.platform.api;
 
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.OutboxPublisherService;
+import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
@@ -53,6 +54,9 @@ public abstract class AbstractIntegrationTest {
 
     @MockBean
     protected TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    protected RedisTunnelCoordinator redisTunnelCoordinator;
 
     @BeforeEach
     void setupMocks() {
