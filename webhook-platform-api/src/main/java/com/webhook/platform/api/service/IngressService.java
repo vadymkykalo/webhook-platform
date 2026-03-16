@@ -27,6 +27,7 @@ import com.webhook.platform.api.service.ingress.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -60,8 +61,7 @@ public class IngressService {
     private final RedisRateLimiterService rateLimiterService;
     private final ClientIpResolver clientIpResolver;
     private final TransactionTemplate transactionTemplate;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final long maxPayloadSizeBytes;
 
     public IngressService(
@@ -76,8 +76,7 @@ public class IngressService {
             RedisRateLimiterService rateLimiterService,
             ClientIpResolver clientIpResolver,
             PlatformTransactionManager transactionManager,
-            @Value("${webhook.encryption-key}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes) {
         this.sourceRepository = sourceRepository;
         this.eventRepository = eventRepository;
@@ -89,8 +88,7 @@ public class IngressService {
         this.verifierFactory = verifierFactory;
         this.rateLimiterService = rateLimiterService;
         this.clientIpResolver = clientIpResolver;
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
 
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -286,11 +284,10 @@ public class IngressService {
         if (source.getHmacSecretEncrypted() == null || source.getHmacSecretIv() == null) {
             throw new IllegalStateException("HMAC secret not configured for source " + source.getId());
         }
-        return CryptoUtils.decryptSecret(
+        return encryptionKeyRegistry.decryptWithFallback(
                 source.getHmacSecretEncrypted(),
                 source.getHmacSecretIv(),
-                encryptionKey,
-                encryptionSalt
+                source.getEncryptionKeyVersion()
         );
     }
 

@@ -58,6 +58,10 @@ public class IncomingDestination {
     @Builder.Default
     private String retryDelays = "60,300,900,3600,21600";
 
+    @Column(name = "encryption_key_version", nullable = false)
+    @Builder.Default
+    private Integer encryptionKeyVersion = 1;
+
     @Column(name = "payload_transform", columnDefinition = "TEXT")
     private String payloadTransform;
 

@@ -891,6 +891,13 @@
     "deleteOrgButton": "Delete Organization Permanently",
     "deleteOrgSuccess": "Organization deleted",
     "deleteOrgFailed": "Failed to delete organization",
+    "gdprExport": "Data Export (GDPR)",
+    "gdprExportDesc": "Export all your organization data in machine-readable format",
+    "gdprExportInfo": "Download a JSON file containing all organization data: members, projects, endpoints, subscriptions, incoming sources, API keys (metadata only), and audit logs. No decrypted secrets are included.",
+    "exportButton": "Export Organization Data",
+    "exporting": "Exporting…",
+    "exportSuccess": "Data export downloaded",
+    "exportFailed": "Failed to export data",
     "toast": {
       "updated": "Organization updated",
       "updateFailed": "Failed to update organization"

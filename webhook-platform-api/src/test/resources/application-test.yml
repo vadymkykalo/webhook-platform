@@ -18,6 +18,9 @@ jwt:
 
 webhook:
   encryption-key: test_encryption_key_32_chars_12
+  encryption-keys: ""
+  encryption-key-active-version: 0
+  encryption-salt: test_salt_for_encryption_16ch
   url-validation:
     allow-private-ips: true
     allowed-hosts: []

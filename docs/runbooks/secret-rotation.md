@@ -47,46 +47,121 @@ curl -s http://api:8080/actuator/health | jq .status
 
 ---
 
-## 2. Encryption Key Rotation
+## 2. Encryption Key Rotation (Zero-Downtime)
 
-**Impact:** **Critical** — endpoint webhook secrets are encrypted with this key. Changing it without re-encryption breaks all signature verification.
+**Impact:** All endpoint secrets, incoming source HMAC secrets, and incoming destination auth configs are encrypted with this key. Rotation is **zero-downtime** thanks to key versioning — old and new keys coexist during migration.
 
-**Current limitation:** Hookflow does not support key versioning. Rotation requires re-encryption of all stored secrets.
+**Overview:**
+1. Add new key to config alongside old key
+2. Deploy (new data encrypted with new key, old data still decrypts with old key)
+3. Call rotation API to re-encrypt all existing data
+4. Verify, then remove old key from config
 
-**Procedure:**
+### Step 1: Generate new key
 
 ```bash
-# 1. Generate new key (exactly 32 characters for AES-256)
 NEW_KEY=$(openssl rand -hex 16)
-NEW_SALT=$(openssl rand -hex 16)
-
-# 2. BEFORE changing the key — re-encrypt all secrets
-# This requires a custom migration script:
-psql -c "
-  -- Export current encrypted values (for rollback)
-  COPY (SELECT id, signing_secret FROM endpoints WHERE signing_secret IS NOT NULL)
-  TO '/tmp/endpoints_secrets_backup.csv' CSV;
-"
-
-# 3. Run re-encryption (application-level — needs both old and new keys)
-# This is a TODO: implement a CLI command like:
-# java -jar app.jar --hookflow.reencrypt --old-key=$OLD_KEY --new-key=$NEW_KEY
-
-# 4. Update secret and restart
-kubectl create secret generic hookflow-secrets \
-  --from-literal=encryption-key=$NEW_KEY \
-  --from-literal=encryption-salt=$NEW_SALT \
-  --from-literal=jwt-secret=$EXISTING_JWT_SECRET \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl rollout restart deployment hookflow-api
-kubectl rollout restart deployment hookflow-worker
+echo "New encryption key: $NEW_KEY"
 ```
 
-**TODO:** Implement key versioning in `CryptoUtils` to support zero-downtime rotation:
-- Store key version prefix in encrypted data
-- Support decrypting with old key + encrypting with new key
-- Lazy re-encryption on read
+### Step 2: Add new key to environment (keep old key)
+
+```bash
+# Format: "version:key,version:key"
+# Old key was version 1 (implicit when using single-key mode)
+export WEBHOOK_ENCRYPTION_KEYS="1:${OLD_KEY},2:${NEW_KEY}"
+export WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION=2
+# WEBHOOK_ENCRYPTION_SALT stays the same — it is shared across versions
+```
+
+Or in Kubernetes:
+
+```bash
+kubectl create secret generic hookflow-secrets \
+  --from-literal=encryption-keys="1:${OLD_KEY},2:${NEW_KEY}" \
+  --from-literal=encryption-key-active-version=2 \
+  --from-literal=encryption-salt=$EXISTING_SALT \
+  --from-literal=jwt-secret=$EXISTING_JWT_SECRET \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+### Step 3: Deploy API + Worker
+
+```bash
+kubectl rollout restart deployment hookflow-api
+kubectl rollout restart deployment hookflow-worker
+kubectl rollout status deployment hookflow-api
+kubectl rollout status deployment hookflow-worker
+```
+
+At this point: new secrets are encrypted with version 2, old secrets still decrypt with version 1. **No downtime.**
+
+### Step 4: Check encryption status
+
+```bash
+curl -s -X GET http://api:8080/api/v1/admin/encryption/status \
+  -H "Authorization: Bearer $OWNER_JWT" | jq .
+```
+
+Expected:
+```json
+{
+  "activeKeyVersion": 2,
+  "availableVersions": [1, 2]
+}
+```
+
+### Step 5: Trigger re-encryption of all existing data
+
+```bash
+curl -s -X POST http://api:8080/api/v1/admin/encryption/rotate \
+  -H "Authorization: Bearer $OWNER_JWT" | jq .
+```
+
+Expected:
+```json
+{
+  "status": "completed",
+  "targetVersion": 2,
+  "endpointsRotated": 150,
+  "sourcesRotated": 30,
+  "destinationsRotated": 45,
+  "errors": 0
+}
+```
+
+If `errors > 0`, check API logs and re-run — the operation is idempotent (skips already-rotated rows).
+
+### Step 6: Remove old key from config
+
+Once all rows are on version 2, remove version 1:
+
+```bash
+export WEBHOOK_ENCRYPTION_KEYS="2:${NEW_KEY}"
+export WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION=2
+```
+
+Redeploy. Done.
+
+### Rollback
+
+If something goes wrong before step 5, simply revert to single-key mode:
+
+```bash
+export WEBHOOK_ENCRYPTION_KEY=${OLD_KEY}
+# Remove multi-key vars
+unset WEBHOOK_ENCRYPTION_KEYS
+unset WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION
+```
+
+### Getting an OWNER JWT for the API call
+
+```bash
+# Login as an OWNER user
+OWNER_JWT=$(curl -s -X POST http://api:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"..."}' | jq -r .accessToken)
+```
 
 ---
 
@@ -197,7 +272,7 @@ API keys are hashed (SHA-256) in the database — the plaintext is only shown on
 | Secret | Rotation Frequency | Automation |
 |--------|-------------------|------------|
 | JWT Secret | Every 90 days | Manual (session invalidation) |
-| Encryption Key | Only when compromised | Manual (requires re-encryption) |
+| Encryption Key | Every 180 days or when compromised | Zero-downtime via `POST /api/v1/admin/encryption/rotate` |
 | DB Password | Every 90 days | Scriptable |
 | Redis Password | Every 90 days | Scriptable |
 | Stripe Keys | Yearly or when compromised | Semi-automated (Stripe rolling keys) |

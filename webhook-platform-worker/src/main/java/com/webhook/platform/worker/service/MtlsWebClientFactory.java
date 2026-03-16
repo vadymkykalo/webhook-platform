@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import io.netty.handler.ssl.SslContext;
@@ -34,8 +35,7 @@ import java.util.UUID;
 @Service
 public class MtlsWebClientFactory {
 
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final WebClient.Builder webClientBuilder;
     private final ConnectionProvider connectionProvider;
@@ -47,13 +47,11 @@ public class MtlsWebClientFactory {
     private record CachedClient(WebClient webClient, Instant updatedAt) {}
 
     public MtlsWebClientFactory(
-            @Value("${webhook.encryption-key}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             WebClient.Builder webClientBuilder,
             ConnectionProvider webhookConnectionProvider) {
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.webClientBuilder = webClientBuilder;
         this.connectionProvider = webhookConnectionProvider;
@@ -96,17 +94,15 @@ public class MtlsWebClientFactory {
     }
 
     private WebClient createMtlsWebClient(Endpoint endpoint) throws Exception {
-        String clientCert = CryptoUtils.decryptSecret(
+        String clientCert = encryptionKeyRegistry.decryptWithFallback(
                 endpoint.getClientCertEncrypted(),
                 endpoint.getClientCertIv(),
-                encryptionKey,
-                encryptionSalt
+                endpoint.getEncryptionKeyVersion()
         );
-        String clientKey = CryptoUtils.decryptSecret(
+        String clientKey = encryptionKeyRegistry.decryptWithFallback(
                 endpoint.getClientKeyEncrypted(),
                 endpoint.getClientKeyIv(),
-                encryptionKey,
-                encryptionSalt
+                endpoint.getEncryptionKeyVersion()
         );
 
         X509Certificate certificate = loadCertificate(clientCert);

@@ -23,6 +23,7 @@ import com.webhook.platform.api.service.ingress.SignatureVerificationFailedExcep
 import com.webhook.platform.api.service.ingress.SourceDisabledException;
 import com.webhook.platform.api.service.ingress.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -39,6 +40,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -76,16 +78,18 @@ class IngressServiceTest {
     private final WebhookVerifierFactory verifierFactory = new WebhookVerifierFactory();
     private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String encryptionKey = "test_encryption_key_32_chars_pad";
-    private final String encryptionSalt = "test_salt";
+    private static final String ENCRYPTION_KEY = "test_encryption_key_32_chars_pad";
+    private static final String ENCRYPTION_SALT = "test_salt";
+    private EncryptionKeyRegistry encryptionKeyRegistry;
 
     private final UUID sourceId = UUID.randomUUID();
     private final UUID eventId = UUID.randomUUID();
     private final UUID destId = UUID.randomUUID();
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
         ClientIpResolver clientIpResolver = new ClientIpResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
@@ -93,8 +97,26 @@ class IngressServiceTest {
                 forwardAttemptRepository, outboxMessageRepository,
                 objectMapper, meterRegistry, verifierFactory, rateLimiterService,
                 clientIpResolver, transactionManager,
-                encryptionKey, encryptionSalt, 524288
+                encryptionKeyRegistry, 524288
         );
+    }
+
+    private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {
+        EncryptionKeyRegistry registry = new EncryptionKeyRegistry();
+        setField(registry, "singleKey", key);
+        setField(registry, "multiKeys", "");
+        setField(registry, "configuredActiveVersion", 0);
+        setField(registry, "salt", salt);
+        var init = registry.getClass().getDeclaredMethod("init");
+        init.setAccessible(true);
+        init.invoke(registry);
+        return registry;
+    }
+
+    private static void setField(Object obj, String fieldName, Object value) throws Exception {
+        Field f = obj.getClass().getDeclaredField(fieldName);
+        f.setAccessible(true);
+        f.set(obj, value);
     }
 
     private IncomingSource buildActiveSource() {
@@ -218,7 +240,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_hmacVerification_success() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -250,7 +272,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_hmacVerification_mismatch_throwsAndBlocksForwarding() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -282,7 +304,7 @@ class IngressServiceTest {
     @Test
     void receiveWebhook_hmacVerification_mismatch_withDestinations_blocksForwarding() {
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);
@@ -323,7 +345,7 @@ class IngressServiceTest {
         // Attacker sends webhook with known providerEventId but invalid signature.
         // The legitimate webhook with the same providerEventId must still be accepted.
         String secret = "my-hmac-secret";
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
 
         IncomingSource source = buildActiveSource();
         source.setVerificationMode(VerificationMode.HMAC_GENERIC);

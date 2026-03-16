@@ -1,8 +1,10 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.dto.GdprExportDto;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.service.GdprExportService;
 import com.webhook.platform.api.service.OrganizationService;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +12,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,9 +29,12 @@ import java.util.UUID;
 public class OrganizationController {
 
     private final OrganizationService organizationService;
+    private final GdprExportService gdprExportService;
 
-    public OrganizationController(OrganizationService organizationService) {
+    public OrganizationController(OrganizationService organizationService,
+                                  GdprExportService gdprExportService) {
         this.organizationService = organizationService;
+        this.gdprExportService = gdprExportService;
     }
 
     @Operation(summary = "List user organizations", description = "Returns all organizations the user belongs to")
@@ -55,6 +62,29 @@ public class OrganizationController {
         auth.requireOwnerAccess();
         OrganizationResponse response = organizationService.updateOrganization(orgId, auth.organizationId(), request);
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Export organization data (GDPR Article 20)",
+            description = "Exports all organization data in machine-readable JSON format. "
+                    + "Includes organization info, members, projects, endpoints, subscriptions, "
+                    + "incoming sources/destinations, API keys (metadata only), and audit logs. "
+                    + "No decrypted secrets are included. Owner only.")
+    @ApiResponse(responseCode = "200", description = "Data export as JSON")
+    @ApiResponse(responseCode = "403", description = "Forbidden — requires OWNER role")
+    @GetMapping("/{orgId}/export")
+    public ResponseEntity<GdprExportDto> exportOrganizationData(
+            @PathVariable("orgId") UUID orgId,
+            AuthContext auth) {
+        auth.requireOwnerAccess();
+        if (!orgId.equals(auth.organizationId())) {
+            throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
+        }
+        GdprExportDto export = gdprExportService.exportOrganizationData(orgId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"org-" + orgId + "-export.json\"")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(export);
     }
 
     @Operation(summary = "Delete organization (GDPR)",

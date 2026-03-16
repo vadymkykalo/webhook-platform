@@ -65,6 +65,10 @@ public class IncomingSource {
     @Builder.Default
     private String hmacSignaturePrefix = "";
 
+    @Column(name = "encryption_key_version", nullable = false)
+    @Builder.Default
+    private Integer encryptionKeyVersion = 1;
+
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
 

@@ -121,6 +121,8 @@ event:
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
+  encryption-keys: ${WEBHOOK_ENCRYPTION_KEYS:}
+  encryption-key-active-version: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:0}
   encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
   max-payload-size-bytes: ${WEBHOOK_MAX_PAYLOAD_SIZE_BYTES:262144}
   max-fanout-per-event: ${WEBHOOK_MAX_FANOUT_PER_EVENT:100}

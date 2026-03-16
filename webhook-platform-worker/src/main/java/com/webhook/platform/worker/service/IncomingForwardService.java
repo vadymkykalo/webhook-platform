@@ -6,6 +6,7 @@ import com.jayway.jsonpath.PathNotFoundException;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.HeaderSanitizer;
@@ -48,8 +49,7 @@ public class IncomingForwardService {
     private final PayloadTransformService payloadTransformService;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
     private final MeterRegistry meterRegistry;
@@ -68,8 +68,7 @@ public class IncomingForwardService {
             PayloadTransformService payloadTransformService,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper,
-            @Value("${webhook.encryption-key}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             MeterRegistry meterRegistry,
@@ -86,8 +85,7 @@ public class IncomingForwardService {
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-IncomingForward")
                 .build();
         this.objectMapper = objectMapper;
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
         this.meterRegistry = meterRegistry;
@@ -439,10 +437,10 @@ public class IncomingForwardService {
             return;
         }
         try {
-            String authConfig = CryptoUtils.decryptSecret(
+            String authConfig = encryptionKeyRegistry.decryptWithFallback(
                     destination.getAuthConfigEncrypted(),
                     destination.getAuthConfigIv(),
-                    encryptionKey, encryptionSalt);
+                    destination.getEncryptionKeyVersion());
 
             Map<String, String> config = objectMapper.readValue(authConfig, Map.class);
 

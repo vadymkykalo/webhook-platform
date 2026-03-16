@@ -1,8 +1,8 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.UrlValidator;
-import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.*;
@@ -46,8 +46,7 @@ public class WebhookDeliveryService {
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final WebClient defaultWebClient;
     private final MtlsWebClientFactory mtlsWebClientFactory;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
     private final RedisRateLimiterService rateLimiterService;
@@ -80,8 +79,7 @@ public class WebhookDeliveryService {
             DeliveryAttemptRepository deliveryAttemptRepository,
             WebClient.Builder webClientBuilder,
             MtlsWebClientFactory mtlsWebClientFactory,
-            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             RedisRateLimiterService rateLimiterService,
@@ -106,8 +104,7 @@ public class WebhookDeliveryService {
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0")
                 .build();
         this.mtlsWebClientFactory = mtlsWebClientFactory;
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
         this.rateLimiterService = rateLimiterService;
@@ -672,11 +669,10 @@ public class WebhookDeliveryService {
 
     private String decryptSecret(Endpoint endpoint) {
         try {
-            return CryptoUtils.decryptSecret(
+            return encryptionKeyRegistry.decryptWithFallback(
                     endpoint.getSecretEncrypted(),
                     endpoint.getSecretIv(),
-                    encryptionKey,
-                    encryptionSalt);
+                    endpoint.getEncryptionKeyVersion());
         } catch (Exception e) {
             throw new RuntimeException("Failed to decrypt secret for endpoint " + endpoint.getId() +
                     ". Check WEBHOOK_ENCRYPTION_KEY configuration.", e);

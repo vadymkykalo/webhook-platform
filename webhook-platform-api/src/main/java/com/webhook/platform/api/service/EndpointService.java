@@ -10,6 +10,7 @@ import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.common.security.UrlValidator;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -37,8 +38,7 @@ public class EndpointService {
     private final EndpointRepository endpointRepository;
     private final ProjectRepository projectRepository;
     private final WebClient webClient;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
 
@@ -46,8 +46,7 @@ public class EndpointService {
             EndpointRepository endpointRepository,
             ProjectRepository projectRepository,
             WebClient.Builder webClientBuilder,
-            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.endpointRepository = endpointRepository;
@@ -55,8 +54,7 @@ public class EndpointService {
         this.webClient = webClientBuilder
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-Test")
                 .build();
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
     }
@@ -80,7 +78,7 @@ public class EndpointService {
         if (secret == null || secret.isBlank()) {
             secret = CryptoUtils.generateSecureToken(32);
         }
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(secret);
         
         Endpoint endpoint = Endpoint.builder()
                 .projectId(projectId)
@@ -88,6 +86,7 @@ public class EndpointService {
                 .description(request.getDescription())
                 .secretEncrypted(encrypted.getCiphertext())
                 .secretIv(encrypted.getIv())
+                .encryptionKeyVersion(encrypted.getKeyVersion())
                 .rateLimitPerSecond(request.getRateLimitPerSecond())
                 .allowedSourceIps(request.getAllowedSourceIps())
                 .build();
@@ -134,9 +133,10 @@ public class EndpointService {
         endpoint.setDescription(request.getDescription());
         
         if (request.getSecret() != null && !request.getSecret().isEmpty()) {
-            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(request.getSecret(), encryptionKey, encryptionSalt);
+            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getSecret());
             endpoint.setSecretEncrypted(encrypted.getCiphertext());
             endpoint.setSecretIv(encrypted.getIv());
+            endpoint.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
         
         if (request.getEnabled() != null) {
@@ -173,10 +173,11 @@ public class EndpointService {
         validateProjectOwnership(endpoint.getProjectId(), organizationId);
         
         String newSecret = CryptoUtils.generateSecureToken(32);
-        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(newSecret, encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(newSecret);
         
         endpoint.setSecretEncrypted(encrypted.getCiphertext());
         endpoint.setSecretIv(encrypted.getIv());
+        endpoint.setEncryptionKeyVersion(encrypted.getKeyVersion());
         endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponseWithSecret(endpoint, newSecret);
@@ -204,12 +205,10 @@ public class EndpointService {
                     .build();
         }
         
-        String secret = CryptoUtils.decryptSecret(
+        String secret = encryptionKeyRegistry.decryptWithFallback(
                 endpoint.getSecretEncrypted(),
                 endpoint.getSecretIv(),
-                encryptionKey,
-                encryptionSalt
-        );
+                endpoint.getEncryptionKeyVersion());
         
         String testPayload = "{\"test\":true,\"message\":\"This is a test webhook\",\"timestamp\":\"" 
                 + Instant.now().toString() + "\"}";
@@ -304,8 +303,8 @@ public class EndpointService {
             throw new NotFoundException("Endpoint not found in project");
         }
 
-        CryptoUtils.EncryptedData encryptedCert = CryptoUtils.encryptSecret(request.getClientCert(), encryptionKey, encryptionSalt);
-        CryptoUtils.EncryptedData encryptedKey = CryptoUtils.encryptSecret(request.getClientKey(), encryptionKey, encryptionSalt);
+        CryptoUtils.EncryptedData encryptedCert = encryptionKeyRegistry.encrypt(request.getClientCert());
+        CryptoUtils.EncryptedData encryptedKey = encryptionKeyRegistry.encrypt(request.getClientKey());
 
         endpoint.setMtlsEnabled(true);
         endpoint.setClientCertEncrypted(encryptedCert.getCiphertext());
@@ -313,6 +312,7 @@ public class EndpointService {
         endpoint.setClientKeyEncrypted(encryptedKey.getCiphertext());
         endpoint.setClientKeyIv(encryptedKey.getIv());
         endpoint.setCaCert(request.getCaCert());
+        endpoint.setEncryptionKeyVersion(encryptedCert.getKeyVersion());
 
         endpoint = endpointRepository.saveAndFlush(endpoint);
         log.info("Configured mTLS for endpoint {}", endpointId);

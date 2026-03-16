@@ -50,6 +50,10 @@ public class IncomingDestination {
     @Column(name = "retry_delays", nullable = false, columnDefinition = "TEXT")
     private String retryDelays;
 
+    @Column(name = "encryption_key_version", nullable = false)
+    @Builder.Default
+    private Integer encryptionKeyVersion = 1;
+
     @Column(name = "payload_transform", columnDefinition = "TEXT")
     private String payloadTransform;
 
