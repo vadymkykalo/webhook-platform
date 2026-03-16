@@ -57,6 +57,8 @@ public class SecurityConfig {
                                                         .requestMatchers("/actuator/**").authenticated()
                                                         .requestMatchers("/hook/**").permitAll()
                                                         .requestMatchers("/ingress/**").permitAll()
+                                                        .requestMatchers("/tunnel/**").permitAll()
+                                                        .requestMatchers("/ws/tunnel").permitAll()
                                                         .requestMatchers("/api/v1/public/**").permitAll()
                                                         .requestMatchers("/api/v1/billing/plans").permitAll()
                                                         .requestMatchers("/api/v1/billing/webhook/**").permitAll()
@@ -65,7 +67,9 @@ public class SecurityConfig {
                                                                         "/api/v1/auth/verify-email",
                                                                         "/api/v1/auth/resend-verification",
                                                                         "/api/v1/auth/forgot-password",
-                                                                        "/api/v1/auth/reset-password")
+                                                                        "/api/v1/auth/reset-password",
+                                                                        "/api/v1/auth/device/code",
+                                                                        "/api/v1/auth/device/token")
                                                         .permitAll()
                                                         .requestMatchers("/api/v1/auth/**").authenticated()
                                                         .requestMatchers("/api/v1/orgs/**").authenticated()
