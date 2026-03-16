@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * cross-organization access on the Members API.
  */
 @AutoConfigureMockMvc
-public class OrgAccessAspectTest extends AbstractIntegrationTest {
+public class OrgAccessAspectIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;

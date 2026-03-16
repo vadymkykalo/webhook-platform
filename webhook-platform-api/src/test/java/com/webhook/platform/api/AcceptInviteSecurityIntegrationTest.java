@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * exact invite token, orgId, and userId.
  */
 @AutoConfigureMockMvc
-public class AcceptInviteSecurityTest extends AbstractIntegrationTest {
+public class AcceptInviteSecurityIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
