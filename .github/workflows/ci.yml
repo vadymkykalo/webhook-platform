@@ -290,38 +290,24 @@ jobs:
       - name: Build UI image for scan
         run: docker build -f webhook-platform-ui/Dockerfile -t webhook-platform-ui:test .
       
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin
+          trivy --version
+      
+      - name: Download Trivy DBs
+        run: |
+          trivy image --download-db-only --db-repository public.ecr.aws/aquasecurity/trivy-db:2
+          trivy image --download-java-db-only --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db:1
+      
       - name: Run Trivy on API image
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          image-ref: 'webhook-platform-api:test'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-        env:
-          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
-          TRIVY_JAVA_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-java-db:1'
+        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-api:test
       
       - name: Run Trivy on Worker image
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          image-ref: 'webhook-platform-worker:test'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-        env:
-          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
-          TRIVY_JAVA_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-java-db:1'
+        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-worker:test
       
       - name: Run Trivy on UI image
-        uses: aquasecurity/trivy-action@0.34.1
-        with:
-          image-ref: 'webhook-platform-ui:test'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0'
-        env:
-          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
-          TRIVY_JAVA_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-java-db:1'
+        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-ui:test
       
       - name: Container Scan Summary
         if: always()
