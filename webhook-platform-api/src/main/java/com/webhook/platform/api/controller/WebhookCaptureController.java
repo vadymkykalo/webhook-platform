@@ -1,5 +1,8 @@
 package com.webhook.platform.api.controller;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.WebhookCaptureResponse;
 import com.webhook.platform.api.service.TestEndpointService;
@@ -17,8 +20,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Slf4j
 @RestController
@@ -28,14 +29,24 @@ public class WebhookCaptureController {
 
     private static final int RATE_LIMIT_PER_SECOND = 10;
 
+    private static final int MAX_BUCKETS = 10_000;
+    private static final Duration BUCKET_EXPIRE = Duration.ofMinutes(5);
+
     private final TestEndpointService testEndpointService;
+    private final TestEndpointRepository testEndpointRepository;
     private final ObjectMapper objectMapper;
 
-    /** Per-slug in-memory rate limiters to protect public /hook/{slug} endpoint */
-    private final ConcurrentMap<String, Bucket> slugBuckets = new ConcurrentHashMap<>();
+    /** Per-slug in-memory rate limiters — bounded + expiring to prevent memory DoS */
+    private final Cache<String, Bucket> slugBuckets = Caffeine.newBuilder()
+            .maximumSize(MAX_BUCKETS)
+            .expireAfterAccess(BUCKET_EXPIRE)
+            .build();
 
-    public WebhookCaptureController(TestEndpointService testEndpointService, ObjectMapper objectMapper) {
+    public WebhookCaptureController(TestEndpointService testEndpointService,
+                                    TestEndpointRepository testEndpointRepository,
+                                    ObjectMapper objectMapper) {
         this.testEndpointService = testEndpointService;
+        this.testEndpointRepository = testEndpointRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -47,8 +58,18 @@ public class WebhookCaptureController {
             @RequestBody(required = false) String body,
             HttpServletRequest request) {
 
-        // Rate limit per slug (10 req/s)
-        Bucket bucket = slugBuckets.computeIfAbsent(slug, k -> Bucket.builder()
+        // Early check: reject unknown slugs before allocating a rate-limit bucket
+        if (!testEndpointRepository.existsBySlug(slug)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(WebhookCaptureResponse.builder()
+                            .success(false)
+                            .error("not_found")
+                            .message("Test endpoint not found")
+                            .build());
+        }
+
+        // Rate limit per slug (10 req/s) — bounded cache prevents memory DoS
+        Bucket bucket = slugBuckets.get(slug, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(RATE_LIMIT_PER_SECOND)
                         .refillGreedy(RATE_LIMIT_PER_SECOND, Duration.ofSeconds(1))

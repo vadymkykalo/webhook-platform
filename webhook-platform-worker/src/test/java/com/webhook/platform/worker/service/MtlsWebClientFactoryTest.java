@@ -84,7 +84,9 @@ class MtlsWebClientFactoryTest {
         setField(registry, "multiKeys", "");
         setField(registry, "configuredActiveVersion", 0);
         setField(registry, "salt", salt);
-        registry.getClass().getDeclaredMethod("init").invoke(registry);
+        var initMethod = registry.getClass().getDeclaredMethod("init");
+        initMethod.setAccessible(true);
+        initMethod.invoke(registry);
         return registry;
     }
 
