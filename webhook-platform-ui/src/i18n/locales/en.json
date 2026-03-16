@@ -1829,7 +1829,7 @@
       "installOpt2Desc": "Clone the repo and build with Maven. Produces a fat JAR with all dependencies.",
       "installOpt3Title": "Option 3: Docker",
       "installOpt3Desc": "Run inside Docker if you don't want to install Java locally.",
-      "installReq": "Requirement: Java 17+ (OpenJDK recommended). Install with sudo apt install openjdk-17-jre-headless on Ubuntu or brew install openjdk@17 on macOS.",
+      "installReq": "Note: Java 17+ is required to run the CLI. The install script (Option 1) detects your OS and auto-installs Java if missing — no manual setup needed.",
       "authTitle": "Authentication",
       "authSubtitle": "The CLI supports two login methods:",
       "authDeviceTitle": "Device code flow (recommended)",

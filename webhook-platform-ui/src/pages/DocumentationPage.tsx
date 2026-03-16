@@ -1489,7 +1489,7 @@ function CliDocs() {
           {copied === id ? <><CheckCircle2 className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
         </button>
       </div>
-      <pre className="p-4 text-[13px] text-white/85 font-mono leading-relaxed overflow-x-auto"><code>{code}</code></pre>
+      <pre className="p-4 text-[13px] text-white/85 font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-all"><code>{code}</code></pre>
     </div>
   );
 
@@ -1563,8 +1563,8 @@ echo "alias hookflow='java -jar $(pwd)/webhook-platform-cli/target/webhook-platf
           </div>
         </div>
 
-        <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-          <p className="text-xs text-amber-600 dark:text-amber-400"><strong>{t('docsPage.cli.installReq')}</strong></p>
+        <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+          <p className="text-xs text-blue-600 dark:text-blue-400">{t('docsPage.cli.installReq')}</p>
         </div>
       </section>
 
@@ -1573,7 +1573,7 @@ echo "alias hookflow='java -jar $(pwd)/webhook-platform-cli/target/webhook-platf
         <h2 className="text-xl font-bold flex items-center gap-2"><Key className="h-5 w-5 text-violet-500" /> {t('docsPage.cli.authTitle')}</h2>
         <p className="text-sm text-muted-foreground">{t('docsPage.cli.authSubtitle')}</p>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">
           <div className="p-4 rounded-xl border bg-card">
             <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> {t('docsPage.cli.authDeviceTitle')}</h3>
             <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.authDeviceDesc')}</p>
@@ -1793,12 +1793,16 @@ hookflow tunnels status # check production tunnels`} />
         <h2 className="text-xl font-bold">{t('docsPage.cli.troubleshootTitle')}</h2>
 
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <div key={n} className="p-3 rounded-lg border">
-              <p className="text-sm font-semibold mb-1">{t(`docsPage.cli.troubleshoot${n}q`)}</p>
-              <p className="text-xs text-muted-foreground">{t(`docsPage.cli.troubleshoot${n}a`)}</p>
-            </div>
-          ))}
+          {[1, 2, 3, 4, 5].map((n) => {
+            const colors = ['border-red-500/40 bg-red-500/5', 'border-amber-500/40 bg-amber-500/5', 'border-blue-500/40 bg-blue-500/5', 'border-orange-500/40 bg-orange-500/5', 'border-violet-500/40 bg-violet-500/5'];
+            const textColors = ['text-red-600 dark:text-red-400', 'text-amber-600 dark:text-amber-400', 'text-blue-600 dark:text-blue-400', 'text-orange-600 dark:text-orange-400', 'text-violet-600 dark:text-violet-400'];
+            return (
+              <div key={n} className={`p-4 rounded-lg border-l-4 ${colors[n - 1]}`}>
+                <p className={`text-sm font-semibold mb-1 ${textColors[n - 1]}`}>{t(`docsPage.cli.troubleshoot${n}q`)}</p>
+                <p className="text-xs text-muted-foreground">{t(`docsPage.cli.troubleshoot${n}a`)}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

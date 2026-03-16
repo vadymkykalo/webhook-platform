@@ -1829,7 +1829,7 @@
       "installOpt2Desc": "Клонуйте репозиторій та зберіть за допомогою Maven. Створює fat JAR з усіма залежностями.",
       "installOpt3Title": "Варіант 3: Docker",
       "installOpt3Desc": "Запуск у Docker якщо не хочете встановлювати Java локально.",
-      "installReq": "Вимога: Java 17+ (рекомендовано OpenJDK). Встановіть через sudo apt install openjdk-17-jre-headless на Ubuntu або brew install openjdk@17 на macOS.",
+      "installReq": "Примітка: для роботи CLI потрібна Java 17+. Скрипт встановлення (Варіант 1) визначає вашу ОС та автоматично встановлює Java якщо її немає — ручне налаштування не потрібне.",
       "authTitle": "Автентифікація",
       "authSubtitle": "CLI підтримує два способи входу:",
       "authDeviceTitle": "Device code flow (рекомендовано)",
