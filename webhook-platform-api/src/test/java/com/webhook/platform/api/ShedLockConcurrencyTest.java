@@ -33,6 +33,7 @@ import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
+import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import com.webhook.platform.api.service.TokenBlacklistService;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -68,6 +69,9 @@ public class ShedLockConcurrencyTest {
 
     @MockBean
     private TokenBlacklistService tokenBlacklistService;
+
+    @MockBean
+    private RedisTunnelCoordinator redisTunnelCoordinator;
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
