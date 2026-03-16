@@ -180,7 +180,7 @@ public class TunnelIngressController {
                                     String queryString, Map<String, String> reqHeaders,
                                     int requestBodySize, int responseBodySize,
                                     TunnelResponseMessage response, int durationMs) {
-        Thread.startVirtualThread(() -> {
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
                 TunnelSession session = tunnelService.getActiveBySlug(slug);
 

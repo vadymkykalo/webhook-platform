@@ -1326,6 +1326,7 @@
       "features": "Features",
       "architecture": "Architecture",
       "capabilities": "Capabilities",
+      "cli": "CLI",
       "platform": "Platform",
       "howItWorks": "How it Works",
       "docs": "Docs",
@@ -1441,6 +1442,22 @@
         "forward": "Multi-destination forwarding",
         "forwardDesc": "Route to one or more internal endpoints with retries"
       }
+    },
+    "cli": {
+      "badge": "Developer CLI",
+      "title": "Your webhooks, ",
+      "titleHighlight": "in your terminal",
+      "subtitle": "Install the Hookflow CLI and receive webhooks on localhost, manage tunnels, switch environments, and replay events — all without leaving your terminal.",
+      "install": "One-line install",
+      "installDesc": "curl one-liner or local build — works on Linux, macOS, and CI pipelines",
+      "tunnel": "Local tunnels",
+      "tunnelDesc": "Receive production webhooks on localhost during development. No ngrok needed.",
+      "profiles": "Config profiles",
+      "profilesDesc": "Switch between staging, production, and self-hosted servers in one command",
+      "replay": "Event replay",
+      "replayDesc": "Re-deliver past events for debugging. Tail events in real-time with --follow",
+      "readDocs": "CLI Documentation",
+      "download": "Download"
     },
     "features": {
       "title": "Everything you need for",

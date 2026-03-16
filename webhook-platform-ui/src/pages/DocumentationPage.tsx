@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route, Workflow } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw, Menu, X, ExternalLink, Package, ArrowDownToLine, FileCheck, GitBranch, Fingerprint, Wand2, Route, Workflow, Terminal, Cable, Settings, Repeat, Download } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -10,14 +10,16 @@ export default function DocumentationPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const [activeSection, setActiveSection] = useState(() => {
+    if (window.location.pathname === '/docs/cli') return 'cli';
     const hash = window.location.hash.replace('#', '');
     return hash || 'overview';
   });
 
   useEffect(() => {
+    if (location.pathname === '/docs/cli') { setActiveSection('cli'); return; }
     const hash = location.hash.replace('#', '');
     if (hash) setActiveSection(hash);
-  }, [location.hash]);
+  }, [location.hash, location.pathname]);
   const [activeLanguage, setActiveLanguage] = useState<'curl' | 'node' | 'python'>('curl');
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -48,6 +50,7 @@ export default function DocumentationPage() {
             {activeSection === 'schema-registry' && <SchemaRegistryDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
             {activeSection === 'deterministic-replay' && <DeterministicReplayDocs />}
             {activeSection === 'workflow-automation' && <WorkflowAutomationDocs activeLanguage={activeLanguage} setActiveLanguage={setActiveLanguage} />}
+            {activeSection === 'cli' && <CliDocs />}
             {activeSection === 'errors' && <Errors />}
             {activeSection === 'sdks' && <SDKs />}
           </div>
@@ -74,6 +77,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
     { id: 'schema-registry', label: t('docsPage.sections.schemaRegistry'), icon: FileCheck },
     { id: 'deterministic-replay', label: t('docsPage.sections.deterministicReplay'), icon: Fingerprint },
     { id: 'workflow-automation', label: t('docsPage.sections.workflowAutomation', 'Workflow Automation'), icon: Workflow },
+    { id: 'cli', label: t('docsPage.sections.cli', 'CLI'), icon: Terminal },
     { id: 'errors', label: t('docsPage.sections.errors'), icon: Code },
     { id: 'sdks', label: t('docsPage.sections.sdks'), icon: Package },
   ];
@@ -1468,6 +1472,338 @@ function WorkflowAutomationDocs({ activeLanguage, setActiveLanguage }: { activeL
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CliDocs() {
+  const [copied, setCopied] = useState('');
+  const copy = (text: string, id: string) => { navigator.clipboard.writeText(text); setCopied(id); setTimeout(() => setCopied(''), 2000); };
+
+  const CodeBlock = ({ id, title, code }: { id: string; title: string; code: string }) => (
+    <div className="relative bg-slate-950 rounded-xl border border-white/10 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-slate-900">
+        <span className="text-xs text-white/40 font-mono">{title}</span>
+        <button onClick={() => copy(code, id)} className="text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1">
+          {copied === id ? <><CheckCircle2 className="h-3 w-3" /> Copied</> : <><Copy className="h-3 w-3" /> Copy</>}
+        </button>
+      </div>
+      <pre className="p-4 text-[13px] text-white/85 font-mono leading-relaxed overflow-x-auto"><code>{code}</code></pre>
+    </div>
+  );
+
+  return (
+    <div className="space-y-12">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+            <Terminal className="h-5 w-5 text-cyan-500" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Hookflow CLI</h1>
+            <p className="text-sm text-muted-foreground">Command-line tool for local development, tunnels, and event management</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Installation */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Download className="h-5 w-5 text-cyan-500" /> Installation</h2>
+
+        <div className="p-4 rounded-xl border bg-card space-y-4">
+          <div>
+            <h3 className="text-sm font-bold mb-2">Option 1: Install script (recommended)</h3>
+            <p className="text-xs text-muted-foreground mb-3">Downloads the JAR and creates a <code className="px-1 py-0.5 rounded bg-muted text-foreground">hookflow</code> wrapper in <code className="px-1 py-0.5 rounded bg-muted text-foreground">~/.local/bin</code>. Requires Java 17+.</p>
+            <CodeBlock id="install-curl" title="bash" code={`curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash`} />
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-bold mb-2">Option 2: Build from source</h3>
+            <p className="text-xs text-muted-foreground mb-3">Clone the repo and build with Maven. Produces a fat JAR with all dependencies.</p>
+            <CodeBlock id="install-build" title="bash" code={`git clone https://github.com/vadymkykalo/webhook-platform.git
+cd webhook-platform
+mvn clean package -pl webhook-platform-cli -am -DskipTests
+
+# Create alias
+alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+
+# Or add to ~/.bashrc / ~/.zshrc for persistence
+echo "alias hookflow='java -jar $(pwd)/webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'" >> ~/.bashrc`} />
+          </div>
+
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-bold mb-2">Option 3: Docker</h3>
+            <p className="text-xs text-muted-foreground mb-3">Run inside Docker if you don't want to install Java locally.</p>
+            <CodeBlock id="install-docker" title="bash" code={`docker run --rm -it -v ~/.config/hookflow:/root/.config/hookflow \\
+  ghcr.io/vadymkykalo/hookflow-cli:latest listen 3000`} />
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+          <p className="text-xs text-amber-600 dark:text-amber-400"><strong>Requirement:</strong> Java 17+ (OpenJDK recommended). Install with <code className="px-1 py-0.5 rounded bg-amber-500/10">sudo apt install openjdk-17-jre-headless</code> on Ubuntu or <code className="px-1 py-0.5 rounded bg-amber-500/10">brew install openjdk@17</code> on macOS.</p>
+        </div>
+      </section>
+
+      {/* Authentication */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Key className="h-5 w-5 text-violet-500" /> Authentication</h2>
+        <p className="text-sm text-muted-foreground">The CLI supports two login methods:</p>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> Device code flow (recommended)</h3>
+            <p className="text-xs text-muted-foreground mb-3">Opens browser for approval, like <code className="px-1 py-0.5 rounded bg-muted">gh auth login</code>. Secure — no password in terminal.</p>
+            <CodeBlock id="auth-device" title="bash" code={`hookflow login
+
+# Output:
+# ▸ Open: http://localhost:5173/device?code=ABCD-1234
+# ▸ Code: ABCD-1234
+# ▸ Waiting for approval...
+# ✓ Logged in as vadym@hookflow.dev`} />
+          </div>
+
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Key className="h-4 w-4 text-amber-500" /> Direct login</h3>
+            <p className="text-xs text-muted-foreground mb-3">For CI/CD or headless environments. Password prompt appears (not echoed).</p>
+            <CodeBlock id="auth-direct" title="bash" code={`hookflow login --email user@company.com --password
+
+# With custom server:
+hookflow login --server https://hooks.company.com \\
+  --email user@company.com --password`} />
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+          <p className="text-xs text-blue-600 dark:text-blue-400"><strong>Tokens:</strong> The CLI stores JWT access + refresh tokens in <code className="px-1 py-0.5 rounded bg-blue-500/10">~/.config/hookflow/config.json</code>. Tokens auto-refresh on expiry. Run <code className="px-1 py-0.5 rounded bg-blue-500/10">hookflow config clear</code> to logout.</p>
+        </div>
+      </section>
+
+      {/* Local Tunnels */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Cable className="h-5 w-5 text-cyan-500" /> Local Tunnels</h2>
+        <p className="text-sm text-muted-foreground">Forward production webhooks to your local machine during development. The CLI creates a WebSocket tunnel through the Hookflow server and forwards HTTP requests to <code className="px-1 py-0.5 rounded bg-muted">localhost:PORT</code>.</p>
+
+        <CodeBlock id="tunnel-basic" title="bash" code={`# Start tunnel — webhooks forwarded to localhost:3000
+hookflow listen 3000
+
+# Associate with a specific project
+hookflow listen 3000 --project 550e8400-e29b-41d4-a716-446655440000
+
+# Output:
+# ╔══════════════════════════════════════════════════════╗
+# ║  Hookflow CLI — Tunnel Active                        ║
+# ╚══════════════════════════════════════════════════════╝
+#
+#   Public URL:  https://tun-x4k9.hookflow.dev/t/tun-x4k9
+#   Forwarding:  → http://localhost:3000
+#   Tunnel ID:   550e8400-...
+#
+#   Press Ctrl+C to stop`} />
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="p-4 rounded-xl border bg-card">
+            <h4 className="text-xs font-bold mb-1">Auto-reconnect</h4>
+            <p className="text-xs text-muted-foreground">Exponential backoff (up to 2min) with 50 max attempts. Transparent reconnection on network drops.</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h4 className="text-xs font-bold mb-1">Request logging</h4>
+            <p className="text-xs text-muted-foreground">Every request through the tunnel is logged with headers, body size, response status, and latency.</p>
+          </div>
+          <div className="p-4 rounded-xl border bg-card">
+            <h4 className="text-xs font-bold mb-1">Plan limits</h4>
+            <p className="text-xs text-muted-foreground">Free: disabled. Starter: 3 tunnels. Pro: 10 tunnels. Enterprise: unlimited.</p>
+          </div>
+        </div>
+
+        <CodeBlock id="tunnel-manage" title="bash" code={`# List active tunnels
+hookflow tunnels list
+
+# Show tunnel stats and bandwidth usage
+hookflow tunnels status
+
+# Close a specific tunnel
+hookflow tunnels close <sessionId>`} />
+      </section>
+
+      {/* Config & Profiles */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Settings className="h-5 w-5 text-amber-500" /> Configuration & Profiles</h2>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">Config file</h3>
+          <p className="text-xs text-muted-foreground">All CLI state is stored in a single JSON file:</p>
+          <CodeBlock id="config-path" title="path" code={`~/.config/hookflow/config.json
+
+# Override with environment variable:
+export HOOKFLOW_CONFIG=/custom/path/config.json`} />
+          <p className="text-xs text-muted-foreground">The file stores: backend URL, JWT tokens, organization ID, user ID, active project, and profile data. File permissions are set to <code className="px-1 py-0.5 rounded bg-muted">600</code> (owner-only read/write).</p>
+        </div>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">Config profiles</h3>
+          <p className="text-xs text-muted-foreground">Switch between different Hookflow servers (staging, production, self-hosted) without re-authenticating each time.</p>
+          <CodeBlock id="config-profiles" title="bash" code={`# Create a profile for staging
+hookflow config profile create staging --url https://staging-hooks.company.com
+
+# Create a profile for production
+hookflow config profile create production --url https://hooks.company.com
+
+# Switch to staging (saves current state, loads staging tokens)
+hookflow config profile use staging
+
+# Login on the staging server
+hookflow login
+
+# Switch back to default (local dev)
+hookflow config profile use default
+
+# List all profiles
+hookflow config profile list
+# Output:
+#   * default   → http://localhost:8080
+#     staging   → https://staging-hooks.company.com
+#     production → https://hooks.company.com
+
+# Delete a profile
+hookflow config profile delete staging`} />
+        </div>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">Config commands</h3>
+          <CodeBlock id="config-cmds" title="bash" code={`# Show current configuration
+hookflow config show
+
+# Set a config value
+hookflow config set backend-url https://hooks.company.com
+hookflow config set project-id 550e8400-e29b-41d4-a716-446655440000
+
+# Clear all config (logout)
+hookflow config clear`} />
+        </div>
+      </section>
+
+      {/* Events & Replay */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Repeat className="h-5 w-5 text-emerald-500" /> Events & Replay</h2>
+
+        <CodeBlock id="events" title="bash" code={`# List recent events for a project
+hookflow events <projectId>
+
+# Follow events in real-time (like tail -f)
+hookflow events <projectId> --follow
+
+# Replay events (re-deliver last 24h)
+hookflow replay <projectId>
+
+# Dry-run replay (estimate without sending)
+hookflow replay <projectId> --dry-run`} />
+      </section>
+
+      {/* Self-hosted & Production */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Shield className="h-5 w-5 text-violet-500" /> Self-hosted & Production</h2>
+        <p className="text-sm text-muted-foreground">The CLI works with any Hookflow server — cloud, self-hosted, or local dev.</p>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2">Local development</h3>
+            <CodeBlock id="prod-local" title="bash" code={`# Default: connects to localhost:8080
+hookflow login
+hookflow listen 3000`} />
+          </div>
+
+          <div className="p-4 rounded-xl border bg-card">
+            <h3 className="text-sm font-bold mb-2">Self-hosted server</h3>
+            <CodeBlock id="prod-selfhosted" title="bash" code={`# Point CLI to your self-hosted instance
+hookflow login --server https://hooks.internal.company.com
+hookflow listen 3000`} />
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl border bg-card space-y-3">
+          <h3 className="text-sm font-bold">Multiple environments with profiles</h3>
+          <p className="text-xs text-muted-foreground">Set up profiles once, then switch with one command:</p>
+          <CodeBlock id="prod-profiles" title="bash" code={`# One-time setup
+hookflow config profile create staging --url https://staging.company.com
+hookflow config profile create prod --url https://hooks.company.com
+
+# Login to each profile
+hookflow config profile use staging && hookflow login
+hookflow config profile use prod && hookflow login
+
+# Daily usage — just switch
+hookflow config profile use staging
+hookflow listen 3000    # tunnels go through staging
+
+hookflow config profile use prod
+hookflow tunnels status # check production tunnels`} />
+        </div>
+      </section>
+
+      {/* Full command reference */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2"><Code className="h-5 w-5 text-primary" /> Command Reference</h2>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2 px-3 font-semibold">Command</th>
+                <th className="text-left py-2 px-3 font-semibold">Description</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted-foreground">
+              {[
+                ['hookflow login', 'Authenticate (device code or email/password)'],
+                ['hookflow login --server <url>', 'Login to a specific server'],
+                ['hookflow status', 'Show auth status, health, active tunnels'],
+                ['hookflow listen <port>', 'Start local tunnel forwarding to localhost:port'],
+                ['hookflow listen <port> --project <id>', 'Tunnel scoped to a project'],
+                ['hookflow tunnels list', 'List active tunnel sessions'],
+                ['hookflow tunnels status', 'Show tunnel stats and bandwidth'],
+                ['hookflow tunnels close <id>', 'Close a tunnel session'],
+                ['hookflow events <projectId>', 'List recent events'],
+                ['hookflow events <projectId> --follow', 'Tail events in real-time'],
+                ['hookflow replay <projectId>', 'Replay events from last 24h'],
+                ['hookflow replay <projectId> --dry-run', 'Estimate replay without sending'],
+                ['hookflow config show', 'Show current configuration'],
+                ['hookflow config set <key> <value>', 'Set a config value'],
+                ['hookflow config clear', 'Clear config and logout'],
+                ['hookflow config profile list', 'List all profiles'],
+                ['hookflow config profile create <name> --url <url>', 'Create a new profile'],
+                ['hookflow config profile use <name>', 'Switch to a profile'],
+                ['hookflow config profile delete <name>', 'Delete a profile'],
+              ].map(([cmd, desc]) => (
+                <tr key={cmd} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <td className="py-2 px-3 font-mono text-xs text-foreground">{cmd}</td>
+                  <td className="py-2 px-3 text-xs">{desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Troubleshooting */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold">Troubleshooting</h2>
+
+        <div className="space-y-3">
+          {[
+            { q: '"Java not found" error', a: 'Install Java 17+: sudo apt install openjdk-17-jre-headless (Ubuntu) or brew install openjdk@17 (macOS)' },
+            { q: '"Connection refused" when tunneling', a: 'Make sure your local app is running on the specified port. The CLI forwards requests to localhost:PORT.' },
+            { q: 'Token expired / 401 errors', a: 'Tokens auto-refresh. If it persists, run hookflow login again.' },
+            { q: 'Tunnel disconnects frequently', a: 'The CLI auto-reconnects with exponential backoff. Check your network connection. If the server closes with code 1008, your plan may not support tunnels.' },
+            { q: 'Config file location', a: '~/.config/hookflow/config.json by default. Override with HOOKFLOW_CONFIG env variable.' },
+          ].map((item) => (
+            <div key={item.q} className="p-3 rounded-lg border">
+              <p className="text-sm font-semibold mb-1">{item.q}</p>
+              <p className="text-xs text-muted-foreground">{item.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

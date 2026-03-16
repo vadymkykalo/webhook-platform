@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint, Wand2, Send, Timer, Bell, Workflow, Play, MousePointerClick, Bug } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Code2, Eye, RefreshCw, Zap, Clock, Activity, AlertCircle, Shield, Webhook, BarChart3, Lock, ChevronDown, Mail, ArrowDownToLine, Globe, FileCheck, GitBranch, Fingerprint, Wand2, Send, Timer, Bell, Workflow, Play, MousePointerClick, Bug, Terminal, Cable, Download, Settings, Repeat } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -23,6 +23,8 @@ export default function LandingPage() {
       <div className="section-divider" />
       <FlowDiagram />
       <CapabilityShowcase />
+      <div className="section-divider" />
+      <CliShowcase />
       <div className="section-divider" />
       <PlatformHighlights />
       <div className="section-divider" />
@@ -63,7 +65,7 @@ function Navigation() {
             <span className="text-lg font-bold tracking-tight">Hookflow</span>
           </Link>
           <div className="hidden md:flex items-center gap-6">
-            <a href="#capabilities" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.capabilities')}</a>
+            <Link to="/docs/cli" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.cli')}</Link>
             <a href="#platform" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.platform', 'Platform')}</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.howItWorks')}</a>
             <Link to="/docs" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.nav.docs')}</Link>
@@ -762,6 +764,174 @@ function CapabilityShowcase() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CliShowcase() {
+  const { t } = useTranslation();
+  const [typedLines, setTypedLines] = useState(0);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          let line = 0;
+          const interval = setInterval(() => {
+            line++;
+            setTypedLines(line);
+            if (line >= 12) clearInterval(interval);
+          }, 300);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    const el = document.getElementById('cli-terminal');
+    if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const terminalLines = [
+    { prompt: true,  text: 'hookflow login' },
+    { prompt: false, text: '✓ Logged in as vadym@hookflow.dev' },
+    { prompt: false, text: '' },
+    { prompt: true,  text: 'hookflow listen 3000 --project my-api' },
+    { prompt: false, text: '╔══════════════════════════════════════════╗' },
+    { prompt: false, text: '║  Hookflow CLI — Tunnel Active            ║' },
+    { prompt: false, text: '╚══════════════════════════════════════════╝' },
+    { prompt: false, text: '' },
+    { prompt: false, text: '  Public URL:  https://tun-x4k9.hookflow.dev' },
+    { prompt: false, text: '  Forwarding:  → http://localhost:3000' },
+    { prompt: false, text: '' },
+    { prompt: false, text: '  POST /webhooks/stripe   → 200  12ms' },
+  ];
+
+  const features = [
+    { icon: Download,  color: 'cyan',    title: t('landing.cli.install', 'One-line install'), desc: t('landing.cli.installDesc', 'curl, brew, apt, or Docker — works on Linux, macOS, and CI pipelines') },
+    { icon: Cable,     color: 'violet',  title: t('landing.cli.tunnel', 'Local tunnels'), desc: t('landing.cli.tunnelDesc', 'Receive production webhooks on localhost during development. No ngrok needed.') },
+    { icon: Settings,  color: 'amber',   title: t('landing.cli.profiles', 'Config profiles'), desc: t('landing.cli.profilesDesc', 'Switch between staging, production, and self-hosted servers in one command') },
+    { icon: Repeat,    color: 'emerald', title: t('landing.cli.replay', 'Event replay'), desc: t('landing.cli.replayDesc', 'Re-deliver past events for debugging. Tail events in real-time with --follow') },
+  ];
+
+  const iconBgMap: Record<string, string> = {
+    cyan: 'bg-cyan-500/10',
+    violet: 'bg-violet-500/10',
+    amber: 'bg-amber-500/10',
+    emerald: 'bg-emerald-500/10',
+  };
+
+  const iconColorMap: Record<string, string> = {
+    cyan: 'text-cyan-500',
+    violet: 'text-violet-500',
+    amber: 'text-amber-500',
+    emerald: 'text-emerald-500',
+  };
+
+  return (
+    <section id="cli" className="py-24 relative overflow-hidden">
+      <div className="absolute top-1/3 left-0 w-[600px] h-[600px] bg-cyan-500/[0.04] rounded-full blur-[120px] -translate-x-1/3 pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-violet-500/[0.04] rounded-full blur-[120px] translate-x-1/3 pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-6 relative">
+        <div className="text-center mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-600 text-xs font-semibold mb-6 border border-cyan-500/20">
+            <Terminal className="h-3 w-3" />
+            {t('landing.cli.badge', 'Developer CLI')}
+          </div>
+          <h2 className="text-headline mb-4">
+            {t('landing.cli.title', 'Your webhooks, ')}<span className="gradient-text">{t('landing.cli.titleHighlight', 'in your terminal')}</span>
+          </h2>
+          <p className="text-body-lg text-muted-foreground max-w-2xl mx-auto">
+            {t('landing.cli.subtitle', 'Install the Hookflow CLI and receive webhooks on localhost, manage tunnels, switch environments, and replay events — all without leaving your terminal.')}
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-10 items-start">
+          {/* Animated terminal */}
+          <div className="relative" id="cli-terminal">
+            <div className="absolute -inset-4 bg-gradient-to-br from-cyan-500/10 via-violet-500/10 to-emerald-500/10 rounded-2xl blur-2xl" />
+            <div className="relative bg-[#0d1117] rounded-xl border border-white/10 shadow-2xl overflow-hidden">
+              <div className="bg-[#161b22] border-b border-white/10 px-4 py-3 flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-400/80" />
+                <div className="w-3 h-3 rounded-full bg-yellow-400/80" />
+                <div className="w-3 h-3 rounded-full bg-green-400/80" />
+                <span className="ml-auto text-[10px] text-white/30 font-mono">hookflow — bash</span>
+              </div>
+              <div className="p-5 font-mono text-[13px] leading-6 min-h-[340px]">
+                {terminalLines.map((line, i) => (
+                  <div
+                    key={i}
+                    className={`transition-all duration-300 ${i < typedLines ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}
+                  >
+                    {line.text === '' ? (
+                      <br />
+                    ) : line.prompt ? (
+                      <span>
+                        <span className="text-emerald-400">❯ </span>
+                        <span className="text-white">{line.text}</span>
+                        {i < typedLines && i === typedLines - 1 && <span className="inline-block w-2 h-4 bg-white/70 ml-0.5 animate-pulse" />}
+                      </span>
+                    ) : (
+                      <span className={
+                        line.text.includes('✓') ? 'text-emerald-400' :
+                        line.text.includes('╔') || line.text.includes('║') || line.text.includes('╚') ? 'text-cyan-400' :
+                        line.text.includes('→ 200') ? 'text-emerald-300' :
+                        line.text.includes('Public URL') ? 'text-violet-300' :
+                        line.text.includes('Forwarding') ? 'text-white/80' :
+                        'text-white/50'
+                      }>{line.text}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Feature cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {features.map((feat, i) => {
+              const Icon = feat.icon;
+              return (
+                <div
+                  key={i}
+                  className="group relative bg-card rounded-xl border p-5 transition-all duration-500 hover:shadow-elevated hover:border-primary/20 animate-[fadeInUp_0.5s_ease-out_both]"
+                  style={{ animationDelay: `${i * 100 + 200}ms` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl" />
+                  <div className="relative">
+                    <div className={`h-9 w-9 rounded-lg ${iconBgMap[feat.color]} flex items-center justify-center mb-3`}>
+                      <Icon className={`h-4.5 w-4.5 ${iconColorMap[feat.color]}`} />
+                    </div>
+                    <h4 className="text-sm font-bold mb-1.5">{feat.title}</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{feat.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Install one-liner + CTA */}
+        <div className="mt-12 text-center">
+          <div className="inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-[#0d1117] border border-white/10 font-mono text-sm mb-6">
+            <span className="text-emerald-400">$</span>
+            <span className="text-white/80">curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash</span>
+          </div>
+          <div className="flex justify-center gap-3">
+            <Link to="/docs/cli">
+              <Button size="lg" className="shadow-glow">
+                {t('landing.cli.readDocs', 'CLI Documentation')} <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <a href="https://github.com/vadymkykalo/webhook-platform/releases" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="lg">
+                <Download className="h-4 w-4" /> {t('landing.cli.download', 'Download')}
+              </Button>
+            </a>
           </div>
         </div>
       </div>

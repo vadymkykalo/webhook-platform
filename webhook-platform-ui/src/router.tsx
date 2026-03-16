@@ -109,6 +109,10 @@ export const router = createBrowserRouter([
     element: <S><DocumentationPage /></S>,
   },
   {
+    path: '/docs/cli',
+    element: <S><DocumentationPage /></S>,
+  },
+  {
     path: '/admin',
     element: (
       <ProtectedRoute>
