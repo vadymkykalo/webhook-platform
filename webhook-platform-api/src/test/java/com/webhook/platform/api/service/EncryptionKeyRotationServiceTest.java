@@ -24,7 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.support.TransactionCallbackWithoutResult;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.lang.reflect.Field;
@@ -59,8 +59,7 @@ class EncryptionKeyRotationServiceTest {
         // TransactionTemplate that just executes the callback directly
         TransactionTemplate txTemplate = mock(TransactionTemplate.class);
         lenient().doAnswer(inv -> {
-            inv.getArgument(0, TransactionCallbackWithoutResult.class)
-                    .doInTransaction(null);
+            inv.<java.util.function.Consumer<TransactionStatus>>getArgument(0).accept(null);
             return null;
         }).when(txTemplate).executeWithoutResult(any());
 
