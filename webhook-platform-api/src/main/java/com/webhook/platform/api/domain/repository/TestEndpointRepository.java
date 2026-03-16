@@ -17,6 +17,8 @@ public interface TestEndpointRepository extends JpaRepository<TestEndpoint, UUID
 
     Optional<TestEndpoint> findBySlug(String slug);
 
+    boolean existsBySlug(String slug);
+
     List<TestEndpoint> findByProjectIdOrderByCreatedAtDesc(UUID projectId);
 
     @Modifying
