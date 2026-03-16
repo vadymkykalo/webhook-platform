@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.resources.ConnectionProvider;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -18,6 +20,7 @@ class MtlsWebClientFactoryTest {
 
     private static final String ENCRYPTION_KEY = "test-encryption-key-for-mtls-32c";
     private static final String ENCRYPTION_SALT = "test-salt-value";
+    private EncryptionKeyRegistry encryptionKeyRegistry;
 
     // Pre-generated self-signed RSA 2048 cert + PKCS8 key (via keytool+openssl)
     private static final String TEST_CERT_PEM = "-----BEGIN CERTIFICATE-----\n" +
@@ -70,8 +73,25 @@ class MtlsWebClientFactoryTest {
     private MtlsWebClientFactory factory;
 
     @BeforeEach
-    void setUp() {
-        factory = new MtlsWebClientFactory(ENCRYPTION_KEY, ENCRYPTION_SALT, true, WebClient.builder(), ConnectionProvider.newConnection());
+    void setUp() throws Exception {
+        encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
+        factory = new MtlsWebClientFactory(encryptionKeyRegistry, true, WebClient.builder(), ConnectionProvider.newConnection());
+    }
+
+    private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {
+        EncryptionKeyRegistry registry = new EncryptionKeyRegistry();
+        setField(registry, "singleKey", key);
+        setField(registry, "multiKeys", "");
+        setField(registry, "configuredActiveVersion", 0);
+        setField(registry, "salt", salt);
+        registry.getClass().getDeclaredMethod("init").invoke(registry);
+        return registry;
+    }
+
+    private static void setField(Object obj, String fieldName, Object value) throws Exception {
+        Field f = obj.getClass().getDeclaredField(fieldName);
+        f.setAccessible(true);
+        f.set(obj, value);
     }
 
     // -----------------------------------------------------------------------

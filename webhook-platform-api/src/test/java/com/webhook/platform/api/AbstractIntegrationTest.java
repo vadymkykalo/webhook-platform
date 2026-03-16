@@ -74,6 +74,8 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("webhook.encryption-key", () -> "test_encryption_key_32_chars_pad_extra");
+        registry.add("webhook.encryption-keys", () -> "");
+        registry.add("webhook.encryption-key-active-version", () -> "0");
         registry.add("webhook.encryption-salt", () -> "test_salt_for_integration_tests");
         registry.add("jwt.secret", () -> "test_jwt_secret_key_minimum_32_chars_required_here");
         registry.add("jwt.expiration-ms", () -> "3600000");

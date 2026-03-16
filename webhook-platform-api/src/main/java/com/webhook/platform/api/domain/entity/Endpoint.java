@@ -78,6 +78,10 @@ public class Endpoint {
     @Column(name = "ca_cert", columnDefinition = "TEXT")
     private String caCert;
 
+    @Column(name = "encryption_key_version", nullable = false)
+    @Builder.Default
+    private Integer encryptionKeyVersion = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 32)
     @Builder.Default

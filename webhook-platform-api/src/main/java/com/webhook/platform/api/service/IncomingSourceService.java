@@ -13,6 +13,7 @@ import com.webhook.platform.api.dto.IncomingSourceRequest;
 import com.webhook.platform.api.dto.IncomingSourceResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,20 +30,17 @@ public class IncomingSourceService {
 
     private final IncomingSourceRepository sourceRepository;
     private final ProjectRepository projectRepository;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final String ingressBaseUrl;
 
     public IncomingSourceService(
             IncomingSourceRepository sourceRepository,
             ProjectRepository projectRepository,
-            @Value("${webhook.encryption-key}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.ingress-base-url:}") String ingressBaseUrl) {
         this.sourceRepository = sourceRepository;
         this.projectRepository = projectRepository;
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.ingressBaseUrl = ingressBaseUrl;
     }
 
@@ -86,10 +84,10 @@ public class IncomingSourceService {
 
         // Encrypt HMAC secret if provided
         if (request.getHmacSecret() != null && !request.getHmacSecret().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(
-                    request.getHmacSecret(), encryptionKey, encryptionSalt);
+            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
             source.setHmacSecretEncrypted(encrypted.getCiphertext());
             source.setHmacSecretIv(encrypted.getIv());
+            source.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
 
         if (request.getHmacHeaderName() != null) {
@@ -145,10 +143,10 @@ public class IncomingSourceService {
         }
 
         if (request.getHmacSecret() != null && !request.getHmacSecret().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(
-                    request.getHmacSecret(), encryptionKey, encryptionSalt);
+            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getHmacSecret());
             source.setHmacSecretEncrypted(encrypted.getCiphertext());
             source.setHmacSecretIv(encrypted.getIv());
+            source.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
 
         if (request.getHmacHeaderName() != null) {

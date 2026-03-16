@@ -78,6 +78,8 @@ management:
 
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
+  encryption-keys: ${WEBHOOK_ENCRYPTION_KEYS:}
+  encryption-key-active-version: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:0}
   encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
   url-validation:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}

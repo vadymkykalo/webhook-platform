@@ -15,6 +15,7 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -57,11 +59,13 @@ class IncomingDestinationServiceTest {
     private IncomingSource source;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        EncryptionKeyRegistry registry = createTestRegistry(
+                "test_encryption_key_32_chars_pad", "test_salt");
         service = new IncomingDestinationService(
                 destinationRepository, sourceRepository, projectRepository,
                 transformationRepository,
-                "test_encryption_key_32_chars_pad", "test_salt",
+                registry,
                 true, List.of()
         );
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
@@ -219,5 +223,23 @@ class IncomingDestinationServiceTest {
         service.deleteDestination(destId, orgId);
 
         verify(destinationRepository).delete(dest);
+    }
+
+    private static EncryptionKeyRegistry createTestRegistry(String key, String salt) throws Exception {
+        EncryptionKeyRegistry registry = new EncryptionKeyRegistry();
+        setField(registry, "singleKey", key);
+        setField(registry, "multiKeys", "");
+        setField(registry, "configuredActiveVersion", 0);
+        setField(registry, "salt", salt);
+        var init = registry.getClass().getDeclaredMethod("init");
+        init.setAccessible(true);
+        init.invoke(registry);
+        return registry;
+    }
+
+    private static void setField(Object obj, String fieldName, Object value) throws Exception {
+        Field f = obj.getClass().getDeclaredField(fieldName);
+        f.setAccessible(true);
+        f.set(obj, value);
     }
 }

@@ -58,6 +58,10 @@ public class Endpoint {
     @Column(name = "ca_cert", columnDefinition = "TEXT")
     private String caCert;
 
+    @Column(name = "encryption_key_version", nullable = false)
+    @Builder.Default
+    private Integer encryptionKeyVersion = 1;
+
     @Column(name = "updated_at")
     private Instant updatedAt;
 

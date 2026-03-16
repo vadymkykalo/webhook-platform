@@ -32,6 +32,10 @@ public class CryptoUtils {
     }
 
     public static EncryptedData encryptSecret(String plaintext, String masterKey, String salt) {
+        return encryptSecret(plaintext, masterKey, salt, 1);
+    }
+
+    public static EncryptedData encryptSecret(String plaintext, String masterKey, String salt, int keyVersion) {
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             SecureRandom random = new SecureRandom();
@@ -46,7 +50,8 @@ public class CryptoUtils {
 
             return new EncryptedData(
                     Base64.getEncoder().encodeToString(ciphertext),
-                    Base64.getEncoder().encodeToString(iv)
+                    Base64.getEncoder().encodeToString(iv),
+                    keyVersion
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to encrypt secret", e);
@@ -87,10 +92,16 @@ public class CryptoUtils {
     public static class EncryptedData {
         private final String ciphertext;
         private final String iv;
+        private final int keyVersion;
 
         public EncryptedData(String ciphertext, String iv) {
+            this(ciphertext, iv, 1);
+        }
+
+        public EncryptedData(String ciphertext, String iv, int keyVersion) {
             this.ciphertext = ciphertext;
             this.iv = iv;
+            this.keyVersion = keyVersion;
         }
 
         public String getCiphertext() {
@@ -99,6 +110,10 @@ public class CryptoUtils {
 
         public String getIv() {
             return iv;
+        }
+
+        public int getKeyVersion() {
+            return keyVersion;
         }
     }
 }

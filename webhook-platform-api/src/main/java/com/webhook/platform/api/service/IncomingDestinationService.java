@@ -15,6 +15,7 @@ import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -35,8 +36,7 @@ public class IncomingDestinationService {
     private final IncomingSourceRepository sourceRepository;
     private final ProjectRepository projectRepository;
     private final TransformationRepository transformationRepository;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
 
@@ -45,16 +45,14 @@ public class IncomingDestinationService {
             IncomingSourceRepository sourceRepository,
             ProjectRepository projectRepository,
             TransformationRepository transformationRepository,
-            @Value("${webhook.encryption-key}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt,
+            EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
         this.destinationRepository = destinationRepository;
         this.sourceRepository = sourceRepository;
         this.projectRepository = projectRepository;
         this.transformationRepository = transformationRepository;
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
     }
@@ -90,10 +88,10 @@ public class IncomingDestinationService {
 
         // Encrypt auth config if provided
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(
-                    request.getAuthConfig(), encryptionKey, encryptionSalt);
+            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
             destination.setAuthConfigIv(encrypted.getIv());
+            destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
 
         destination = destinationRepository.saveAndFlush(destination);
@@ -129,10 +127,10 @@ public class IncomingDestinationService {
             destination.setAuthType(request.getAuthType());
         }
         if (request.getAuthConfig() != null && !request.getAuthConfig().isBlank()) {
-            CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(
-                    request.getAuthConfig(), encryptionKey, encryptionSalt);
+            CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getAuthConfig());
             destination.setAuthConfigEncrypted(encrypted.getCiphertext());
             destination.setAuthConfigIv(encrypted.getIv());
+            destination.setEncryptionKeyVersion(encrypted.getKeyVersion());
         }
         if (request.getCustomHeadersJson() != null) {
             destination.setCustomHeadersJson(request.getCustomHeadersJson());
