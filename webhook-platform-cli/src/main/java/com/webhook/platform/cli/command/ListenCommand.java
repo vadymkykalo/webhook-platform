@@ -6,6 +6,7 @@ import com.webhook.platform.cli.config.CliConfigService;
 import com.webhook.platform.cli.transport.HttpApiClient;
 import com.webhook.platform.cli.transport.WebSocketTunnelClient;
 import com.webhook.platform.cli.tunnel.LocalForwarder;
+import java.util.concurrent.CompletableFuture;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -86,7 +87,7 @@ public class ListenCommand implements Callable<Integer> {
 
         wsClient.onRequest(request -> {
             // Forward to local app in a separate thread
-            Thread.startVirtualThread(() -> {
+            CompletableFuture.runAsync(() -> {
                 var response = forwarder.forward(request);
                 wsClient.sendResponse(response);
             });

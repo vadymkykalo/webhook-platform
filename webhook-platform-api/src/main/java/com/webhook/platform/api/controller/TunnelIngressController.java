@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -180,7 +181,7 @@ public class TunnelIngressController {
                                     String queryString, Map<String, String> reqHeaders,
                                     int requestBodySize, int responseBodySize,
                                     TunnelResponseMessage response, int durationMs) {
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        CompletableFuture.runAsync(() -> {
             try {
                 TunnelSession session = tunnelService.getActiveBySlug(slug);
 

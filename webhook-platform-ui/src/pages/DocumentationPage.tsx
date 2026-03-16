@@ -1477,6 +1477,7 @@ function WorkflowAutomationDocs({ activeLanguage, setActiveLanguage }: { activeL
 }
 
 function CliDocs() {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState('');
   const copy = (text: string, id: string) => { navigator.clipboard.writeText(text); setCopied(id); setTimeout(() => setCopied(''), 2000); };
 
@@ -1492,6 +1493,28 @@ function CliDocs() {
     </div>
   );
 
+  const cmdRef: [string, string][] = [
+    ['hookflow login', t('docsPage.cli.cmdLogin', 'Authenticate (device code or email/password)')],
+    ['hookflow login --server <url>', t('docsPage.cli.cmdLoginServer', 'Login to a specific server')],
+    ['hookflow status', t('docsPage.cli.cmdStatus', 'Show auth status, health, active tunnels')],
+    ['hookflow listen <port>', t('docsPage.cli.cmdListen', 'Start local tunnel forwarding to localhost:port')],
+    ['hookflow listen <port> --project <id>', t('docsPage.cli.cmdListenProject', 'Tunnel scoped to a project')],
+    ['hookflow tunnels list', t('docsPage.cli.cmdTunnelsList', 'List active tunnel sessions')],
+    ['hookflow tunnels status', t('docsPage.cli.cmdTunnelsStatus', 'Show tunnel stats and bandwidth')],
+    ['hookflow tunnels close <id>', t('docsPage.cli.cmdTunnelsClose', 'Close a tunnel session')],
+    ['hookflow events <projectId>', t('docsPage.cli.cmdEvents', 'List recent events')],
+    ['hookflow events <projectId> --follow', t('docsPage.cli.cmdEventsFollow', 'Tail events in real-time')],
+    ['hookflow replay <projectId>', t('docsPage.cli.cmdReplay', 'Replay events from last 24h')],
+    ['hookflow replay <projectId> --dry-run', t('docsPage.cli.cmdReplayDry', 'Estimate replay without sending')],
+    ['hookflow config show', t('docsPage.cli.cmdConfigShow', 'Show current configuration')],
+    ['hookflow config set <key> <value>', t('docsPage.cli.cmdConfigSet', 'Set a config value')],
+    ['hookflow config clear', t('docsPage.cli.cmdConfigClear', 'Clear config and logout')],
+    ['hookflow config profile list', t('docsPage.cli.cmdProfileList', 'List all profiles')],
+    ['hookflow config profile create <name> --url <url>', t('docsPage.cli.cmdProfileCreate', 'Create a new profile')],
+    ['hookflow config profile use <name>', t('docsPage.cli.cmdProfileUse', 'Switch to a profile')],
+    ['hookflow config profile delete <name>', t('docsPage.cli.cmdProfileDelete', 'Delete a profile')],
+  ];
+
   return (
     <div className="space-y-12">
       {/* Header */}
@@ -1501,26 +1524,26 @@ function CliDocs() {
             <Terminal className="h-5 w-5 text-cyan-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Hookflow CLI</h1>
-            <p className="text-sm text-muted-foreground">Command-line tool for local development, tunnels, and event management</p>
+            <h1 className="text-2xl font-bold">{t('docsPage.cli.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('docsPage.cli.subtitle')}</p>
           </div>
         </div>
       </div>
 
       {/* Installation */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Download className="h-5 w-5 text-cyan-500" /> Installation</h2>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Download className="h-5 w-5 text-cyan-500" /> {t('docsPage.cli.installTitle')}</h2>
 
         <div className="p-4 rounded-xl border bg-card space-y-4">
           <div>
-            <h3 className="text-sm font-bold mb-2">Option 1: Install script (recommended)</h3>
-            <p className="text-xs text-muted-foreground mb-3">Downloads the JAR and creates a <code className="px-1 py-0.5 rounded bg-muted text-foreground">hookflow</code> wrapper in <code className="px-1 py-0.5 rounded bg-muted text-foreground">~/.local/bin</code>. Requires Java 17+.</p>
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.installOpt1Title')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.installOpt1Desc')}</p>
             <CodeBlock id="install-curl" title="bash" code={`curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash`} />
           </div>
 
           <div className="border-t pt-4">
-            <h3 className="text-sm font-bold mb-2">Option 2: Build from source</h3>
-            <p className="text-xs text-muted-foreground mb-3">Clone the repo and build with Maven. Produces a fat JAR with all dependencies.</p>
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.installOpt2Title')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.installOpt2Desc')}</p>
             <CodeBlock id="install-build" title="bash" code={`git clone https://github.com/vadymkykalo/webhook-platform.git
 cd webhook-platform
 mvn clean package -pl webhook-platform-cli -am -DskipTests
@@ -1533,27 +1556,27 @@ echo "alias hookflow='java -jar $(pwd)/webhook-platform-cli/target/webhook-platf
           </div>
 
           <div className="border-t pt-4">
-            <h3 className="text-sm font-bold mb-2">Option 3: Docker</h3>
-            <p className="text-xs text-muted-foreground mb-3">Run inside Docker if you don't want to install Java locally.</p>
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.installOpt3Title')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.installOpt3Desc')}</p>
             <CodeBlock id="install-docker" title="bash" code={`docker run --rm -it -v ~/.config/hookflow:/root/.config/hookflow \\
   ghcr.io/vadymkykalo/hookflow-cli:latest listen 3000`} />
           </div>
         </div>
 
         <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-          <p className="text-xs text-amber-600 dark:text-amber-400"><strong>Requirement:</strong> Java 17+ (OpenJDK recommended). Install with <code className="px-1 py-0.5 rounded bg-amber-500/10">sudo apt install openjdk-17-jre-headless</code> on Ubuntu or <code className="px-1 py-0.5 rounded bg-amber-500/10">brew install openjdk@17</code> on macOS.</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400"><strong>{t('docsPage.cli.installReq')}</strong></p>
         </div>
       </section>
 
       {/* Authentication */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Key className="h-5 w-5 text-violet-500" /> Authentication</h2>
-        <p className="text-sm text-muted-foreground">The CLI supports two login methods:</p>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Key className="h-5 w-5 text-violet-500" /> {t('docsPage.cli.authTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.cli.authSubtitle')}</p>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="p-4 rounded-xl border bg-card">
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> Device code flow (recommended)</h3>
-            <p className="text-xs text-muted-foreground mb-3">Opens browser for approval, like <code className="px-1 py-0.5 rounded bg-muted">gh auth login</code>. Secure — no password in terminal.</p>
+            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Shield className="h-4 w-4 text-emerald-500" /> {t('docsPage.cli.authDeviceTitle')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.authDeviceDesc')}</p>
             <CodeBlock id="auth-device" title="bash" code={`hookflow login
 
 # Output:
@@ -1564,8 +1587,8 @@ echo "alias hookflow='java -jar $(pwd)/webhook-platform-cli/target/webhook-platf
           </div>
 
           <div className="p-4 rounded-xl border bg-card">
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Key className="h-4 w-4 text-amber-500" /> Direct login</h3>
-            <p className="text-xs text-muted-foreground mb-3">For CI/CD or headless environments. Password prompt appears (not echoed).</p>
+            <h3 className="text-sm font-bold mb-2 flex items-center gap-2"><Key className="h-4 w-4 text-amber-500" /> {t('docsPage.cli.authDirectTitle')}</h3>
+            <p className="text-xs text-muted-foreground mb-3">{t('docsPage.cli.authDirectDesc')}</p>
             <CodeBlock id="auth-direct" title="bash" code={`hookflow login --email user@company.com --password
 
 # With custom server:
@@ -1575,14 +1598,14 @@ hookflow login --server https://hooks.company.com \\
         </div>
 
         <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
-          <p className="text-xs text-blue-600 dark:text-blue-400"><strong>Tokens:</strong> The CLI stores JWT access + refresh tokens in <code className="px-1 py-0.5 rounded bg-blue-500/10">~/.config/hookflow/config.json</code>. Tokens auto-refresh on expiry. Run <code className="px-1 py-0.5 rounded bg-blue-500/10">hookflow config clear</code> to logout.</p>
+          <p className="text-xs text-blue-600 dark:text-blue-400">{t('docsPage.cli.authTokens')}</p>
         </div>
       </section>
 
       {/* Local Tunnels */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Cable className="h-5 w-5 text-cyan-500" /> Local Tunnels</h2>
-        <p className="text-sm text-muted-foreground">Forward production webhooks to your local machine during development. The CLI creates a WebSocket tunnel through the Hookflow server and forwards HTTP requests to <code className="px-1 py-0.5 rounded bg-muted">localhost:PORT</code>.</p>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Cable className="h-5 w-5 text-cyan-500" /> {t('docsPage.cli.tunnelsTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.cli.tunnelsSubtitle')}</p>
 
         <CodeBlock id="tunnel-basic" title="bash" code={`# Start tunnel — webhooks forwarded to localhost:3000
 hookflow listen 3000
@@ -1603,16 +1626,16 @@ hookflow listen 3000 --project 550e8400-e29b-41d4-a716-446655440000
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="p-4 rounded-xl border bg-card">
-            <h4 className="text-xs font-bold mb-1">Auto-reconnect</h4>
-            <p className="text-xs text-muted-foreground">Exponential backoff (up to 2min) with 50 max attempts. Transparent reconnection on network drops.</p>
+            <h4 className="text-xs font-bold mb-1">{t('docsPage.cli.tunnelsAutoReconnect')}</h4>
+            <p className="text-xs text-muted-foreground">{t('docsPage.cli.tunnelsAutoReconnectDesc')}</p>
           </div>
           <div className="p-4 rounded-xl border bg-card">
-            <h4 className="text-xs font-bold mb-1">Request logging</h4>
-            <p className="text-xs text-muted-foreground">Every request through the tunnel is logged with headers, body size, response status, and latency.</p>
+            <h4 className="text-xs font-bold mb-1">{t('docsPage.cli.tunnelsLogging')}</h4>
+            <p className="text-xs text-muted-foreground">{t('docsPage.cli.tunnelsLoggingDesc')}</p>
           </div>
           <div className="p-4 rounded-xl border bg-card">
-            <h4 className="text-xs font-bold mb-1">Plan limits</h4>
-            <p className="text-xs text-muted-foreground">Free: disabled. Starter: 3 tunnels. Pro: 10 tunnels. Enterprise: unlimited.</p>
+            <h4 className="text-xs font-bold mb-1">{t('docsPage.cli.tunnelsPlanLimits')}</h4>
+            <p className="text-xs text-muted-foreground">{t('docsPage.cli.tunnelsPlanLimitsDesc')}</p>
           </div>
         </div>
 
@@ -1628,21 +1651,21 @@ hookflow tunnels close <sessionId>`} />
 
       {/* Config & Profiles */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Settings className="h-5 w-5 text-amber-500" /> Configuration & Profiles</h2>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Settings className="h-5 w-5 text-amber-500" /> {t('docsPage.cli.configTitle')}</h2>
 
         <div className="p-4 rounded-xl border bg-card space-y-3">
-          <h3 className="text-sm font-bold">Config file</h3>
-          <p className="text-xs text-muted-foreground">All CLI state is stored in a single JSON file:</p>
+          <h3 className="text-sm font-bold">{t('docsPage.cli.configFileTitle')}</h3>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.configFileDesc')}</p>
           <CodeBlock id="config-path" title="path" code={`~/.config/hookflow/config.json
 
 # Override with environment variable:
 export HOOKFLOW_CONFIG=/custom/path/config.json`} />
-          <p className="text-xs text-muted-foreground">The file stores: backend URL, JWT tokens, organization ID, user ID, active project, and profile data. File permissions are set to <code className="px-1 py-0.5 rounded bg-muted">600</code> (owner-only read/write).</p>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.configFileDetails')}</p>
         </div>
 
         <div className="p-4 rounded-xl border bg-card space-y-3">
-          <h3 className="text-sm font-bold">Config profiles</h3>
-          <p className="text-xs text-muted-foreground">Switch between different Hookflow servers (staging, production, self-hosted) without re-authenticating each time.</p>
+          <h3 className="text-sm font-bold">{t('docsPage.cli.configProfilesTitle')}</h3>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.configProfilesDesc')}</p>
           <CodeBlock id="config-profiles" title="bash" code={`# Create a profile for staging
 hookflow config profile create staging --url https://staging-hooks.company.com
 
@@ -1670,7 +1693,7 @@ hookflow config profile delete staging`} />
         </div>
 
         <div className="p-4 rounded-xl border bg-card space-y-3">
-          <h3 className="text-sm font-bold">Config commands</h3>
+          <h3 className="text-sm font-bold">{t('docsPage.cli.configCmdsTitle')}</h3>
           <CodeBlock id="config-cmds" title="bash" code={`# Show current configuration
 hookflow config show
 
@@ -1685,7 +1708,7 @@ hookflow config clear`} />
 
       {/* Events & Replay */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Repeat className="h-5 w-5 text-emerald-500" /> Events & Replay</h2>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Repeat className="h-5 w-5 text-emerald-500" /> {t('docsPage.cli.eventsTitle')}</h2>
 
         <CodeBlock id="events" title="bash" code={`# List recent events for a project
 hookflow events <projectId>
@@ -1702,19 +1725,19 @@ hookflow replay <projectId> --dry-run`} />
 
       {/* Self-hosted & Production */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Shield className="h-5 w-5 text-violet-500" /> Self-hosted & Production</h2>
-        <p className="text-sm text-muted-foreground">The CLI works with any Hookflow server — cloud, self-hosted, or local dev.</p>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Shield className="h-5 w-5 text-violet-500" /> {t('docsPage.cli.selfHostedTitle')}</h2>
+        <p className="text-sm text-muted-foreground">{t('docsPage.cli.selfHostedSubtitle')}</p>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="p-4 rounded-xl border bg-card">
-            <h3 className="text-sm font-bold mb-2">Local development</h3>
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.selfHostedLocal')}</h3>
             <CodeBlock id="prod-local" title="bash" code={`# Default: connects to localhost:8080
 hookflow login
 hookflow listen 3000`} />
           </div>
 
           <div className="p-4 rounded-xl border bg-card">
-            <h3 className="text-sm font-bold mb-2">Self-hosted server</h3>
+            <h3 className="text-sm font-bold mb-2">{t('docsPage.cli.selfHostedServer')}</h3>
             <CodeBlock id="prod-selfhosted" title="bash" code={`# Point CLI to your self-hosted instance
 hookflow login --server https://hooks.internal.company.com
 hookflow listen 3000`} />
@@ -1722,8 +1745,8 @@ hookflow listen 3000`} />
         </div>
 
         <div className="p-4 rounded-xl border bg-card space-y-3">
-          <h3 className="text-sm font-bold">Multiple environments with profiles</h3>
-          <p className="text-xs text-muted-foreground">Set up profiles once, then switch with one command:</p>
+          <h3 className="text-sm font-bold">{t('docsPage.cli.selfHostedProfiles')}</h3>
+          <p className="text-xs text-muted-foreground">{t('docsPage.cli.selfHostedProfilesDesc')}</p>
           <CodeBlock id="prod-profiles" title="bash" code={`# One-time setup
 hookflow config profile create staging --url https://staging.company.com
 hookflow config profile create prod --url https://hooks.company.com
@@ -1743,38 +1766,18 @@ hookflow tunnels status # check production tunnels`} />
 
       {/* Full command reference */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold flex items-center gap-2"><Code className="h-5 w-5 text-primary" /> Command Reference</h2>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Code className="h-5 w-5 text-primary" /> {t('docsPage.cli.cmdRefTitle')}</h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 px-3 font-semibold">Command</th>
-                <th className="text-left py-2 px-3 font-semibold">Description</th>
+                <th className="text-left py-2 px-3 font-semibold">{t('docsPage.cli.cmdRefCommand')}</th>
+                <th className="text-left py-2 px-3 font-semibold">{t('docsPage.cli.cmdRefDescription')}</th>
               </tr>
             </thead>
             <tbody className="text-muted-foreground">
-              {[
-                ['hookflow login', 'Authenticate (device code or email/password)'],
-                ['hookflow login --server <url>', 'Login to a specific server'],
-                ['hookflow status', 'Show auth status, health, active tunnels'],
-                ['hookflow listen <port>', 'Start local tunnel forwarding to localhost:port'],
-                ['hookflow listen <port> --project <id>', 'Tunnel scoped to a project'],
-                ['hookflow tunnels list', 'List active tunnel sessions'],
-                ['hookflow tunnels status', 'Show tunnel stats and bandwidth'],
-                ['hookflow tunnels close <id>', 'Close a tunnel session'],
-                ['hookflow events <projectId>', 'List recent events'],
-                ['hookflow events <projectId> --follow', 'Tail events in real-time'],
-                ['hookflow replay <projectId>', 'Replay events from last 24h'],
-                ['hookflow replay <projectId> --dry-run', 'Estimate replay without sending'],
-                ['hookflow config show', 'Show current configuration'],
-                ['hookflow config set <key> <value>', 'Set a config value'],
-                ['hookflow config clear', 'Clear config and logout'],
-                ['hookflow config profile list', 'List all profiles'],
-                ['hookflow config profile create <name> --url <url>', 'Create a new profile'],
-                ['hookflow config profile use <name>', 'Switch to a profile'],
-                ['hookflow config profile delete <name>', 'Delete a profile'],
-              ].map(([cmd, desc]) => (
+              {cmdRef.map(([cmd, desc]) => (
                 <tr key={cmd} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                   <td className="py-2 px-3 font-mono text-xs text-foreground">{cmd}</td>
                   <td className="py-2 px-3 text-xs">{desc}</td>
@@ -1787,19 +1790,13 @@ hookflow tunnels status # check production tunnels`} />
 
       {/* Troubleshooting */}
       <section className="space-y-4">
-        <h2 className="text-xl font-bold">Troubleshooting</h2>
+        <h2 className="text-xl font-bold">{t('docsPage.cli.troubleshootTitle')}</h2>
 
         <div className="space-y-3">
-          {[
-            { q: '"Java not found" error', a: 'Install Java 17+: sudo apt install openjdk-17-jre-headless (Ubuntu) or brew install openjdk@17 (macOS)' },
-            { q: '"Connection refused" when tunneling', a: 'Make sure your local app is running on the specified port. The CLI forwards requests to localhost:PORT.' },
-            { q: 'Token expired / 401 errors', a: 'Tokens auto-refresh. If it persists, run hookflow login again.' },
-            { q: 'Tunnel disconnects frequently', a: 'The CLI auto-reconnects with exponential backoff. Check your network connection. If the server closes with code 1008, your plan may not support tunnels.' },
-            { q: 'Config file location', a: '~/.config/hookflow/config.json by default. Override with HOOKFLOW_CONFIG env variable.' },
-          ].map((item) => (
-            <div key={item.q} className="p-3 rounded-lg border">
-              <p className="text-sm font-semibold mb-1">{item.q}</p>
-              <p className="text-xs text-muted-foreground">{item.a}</p>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <div key={n} className="p-3 rounded-lg border">
+              <p className="text-sm font-semibold mb-1">{t(`docsPage.cli.troubleshoot${n}q`)}</p>
+              <p className="text-xs text-muted-foreground">{t(`docsPage.cli.troubleshoot${n}a`)}</p>
             </div>
           ))}
         </div>

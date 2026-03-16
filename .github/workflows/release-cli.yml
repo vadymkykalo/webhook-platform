@@ -1,0 +1,57 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release-cli:
+    name: Build & Publish CLI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build CLI JAR
+        run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
+
+      - name: Prepare release assets
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp webhook-platform-cli/target/webhook-platform-cli-*.jar hookflow-cli.jar
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Hookflow ${{ github.ref_name }}"
+          body: |
+            ## Hookflow CLI ${{ env.VERSION }}
+
+            ### Install
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+            ```
+
+            Or download `hookflow-cli.jar` and run:
+            ```bash
+            java -jar hookflow-cli.jar --help
+            ```
+
+            ### Requirements
+            - Java 17+ (auto-installed by the install script)
+          files: |
+            hookflow-cli.jar
+          draft: false
+          prerelease: false
