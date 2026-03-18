@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -271,6 +272,7 @@ class TunnelFlowIntegrationTest {
         WebSocketSession wsSession = mock(WebSocketSession.class);
         when(wsSession.getUri()).thenReturn(new URI("ws://localhost:8080/ws/tunnel"));
         when(wsSession.getAttributes()).thenReturn(new ConcurrentHashMap<>());
+        when(wsSession.getHandshakeHeaders()).thenReturn(new HttpHeaders());
 
         webSocketHandler.afterConnectionEstablished(wsSession);
 
@@ -432,6 +434,7 @@ class TunnelFlowIntegrationTest {
         when(session.getId()).thenReturn("ws-session-" + UUID.randomUUID());
         when(session.isOpen()).thenReturn(true);
         when(session.getAttributes()).thenReturn(new ConcurrentHashMap<>());
+        when(session.getHandshakeHeaders()).thenReturn(new HttpHeaders());
         return session;
     }
 

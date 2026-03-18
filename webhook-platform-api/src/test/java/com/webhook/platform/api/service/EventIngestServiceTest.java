@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.webhook.platform.api.service.rules.RuleEngineService;
-import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -57,9 +56,9 @@ class EventIngestServiceTest {
     @Mock
     private RuleEngineService ruleEngineService;
     @Mock
-    private WorkflowTriggerService workflowTriggerService;
-    @Mock
     private QuotaCounterService quotaCounterService;
+    @Mock
+    private WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -72,9 +71,10 @@ class EventIngestServiceTest {
     void setUp() {
         service = new EventIngestService(
                 eventRepository, subscriptionRepository, deliveryRepository,
-                outboxMessageRepository, objectMapper, meterRegistry,
+                outboxMessageRepository, workflowTriggerOutboxRepository,
+                objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
-                ruleEngineService, workflowTriggerService, quotaCounterService,
+                ruleEngineService, quotaCounterService,
                 transactionManager, 262144L, 1024, 5
         );
     }

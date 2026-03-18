@@ -2,11 +2,16 @@ package com.webhook.platform.worker.consumer;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
-import com.webhook.platform.worker.service.AsyncDeliveryExecutor;
+import com.webhook.platform.worker.service.BoundedAsyncExecutor;
 import com.webhook.platform.worker.service.WebhookDeliveryService;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -20,17 +25,31 @@ import java.util.UUID;
 public class DeliveryConsumer {
 
     private static final String CORRELATION_ID_KEY = "correlationId";
-    
+    private static final String DISPATCH_LISTENER_ID = "deliveryDispatch";
+    private static final String RETRY_LISTENER_ID = "deliveryRetry";
+
     private final WebhookDeliveryService webhookDeliveryService;
-    private final AsyncDeliveryExecutor asyncExecutor;
+    private final BoundedAsyncExecutor asyncExecutor;
+    private final KafkaListenerEndpointRegistry registry;
 
     public DeliveryConsumer(WebhookDeliveryService webhookDeliveryService,
-                            AsyncDeliveryExecutor asyncExecutor) {
+                            @Qualifier("outgoingDeliveryExecutor") BoundedAsyncExecutor asyncExecutor,
+                            KafkaListenerEndpointRegistry registry) {
         this.webhookDeliveryService = webhookDeliveryService;
         this.asyncExecutor = asyncExecutor;
+        this.registry = registry;
+    }
+
+    @EventListener(ApplicationStartedEvent.class)
+    void registerContainers() {
+        MessageListenerContainer dispatch = registry.getListenerContainer(DISPATCH_LISTENER_ID);
+        if (dispatch != null) asyncExecutor.registerContainer(dispatch);
+        MessageListenerContainer retry = registry.getListenerContainer(RETRY_LISTENER_ID);
+        if (retry != null) asyncExecutor.registerContainer(retry);
     }
 
     @KafkaListener(
+            id = DISPATCH_LISTENER_ID,
             topics = KafkaTopics.DELIVERIES_DISPATCH,
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
@@ -48,13 +67,18 @@ public class DeliveryConsumer {
         log.info("Received delivery from {}: deliveryId={}, endpointId={}",
                 topic, message.getDeliveryId(), message.getEndpointId());
 
-        asyncExecutor.submit(
+        if (!asyncExecutor.trySubmit(
                 () -> webhookDeliveryService.processDelivery(message),
                 acknowledgment,
-                message.getDeliveryId().toString());
+                message.getDeliveryId().toString())) {
+            // Executor full — containers paused automatically, don't ack.
+            // Message will be re-polled when containers resume.
+            log.debug("Outgoing executor full, not acking deliveryId={}", message.getDeliveryId());
+        }
     }
 
     @KafkaListener(
+            id = RETRY_LISTENER_ID,
             topics = {
                     KafkaTopics.DELIVERIES_RETRY_1M,
                     KafkaTopics.DELIVERIES_RETRY_5M,
@@ -79,10 +103,12 @@ public class DeliveryConsumer {
         log.info("Received retry from {}: deliveryId={}, attempt={}",
                 topic, message.getDeliveryId(), message.getAttemptCount());
 
-        asyncExecutor.submit(
+        if (!asyncExecutor.trySubmit(
                 () -> webhookDeliveryService.processDelivery(message),
                 acknowledgment,
-                message.getDeliveryId().toString());
+                message.getDeliveryId().toString())) {
+            log.debug("Outgoing executor full, not acking retry deliveryId={}", message.getDeliveryId());
+        }
     }
 
     private String extractCorrelationId(byte[] correlationIdBytes) {

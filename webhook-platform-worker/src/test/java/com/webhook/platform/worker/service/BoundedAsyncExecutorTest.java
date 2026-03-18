@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.util.concurrent.CountDownLatch;
@@ -14,13 +15,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class AsyncDeliveryExecutorTest {
+class BoundedAsyncExecutorTest {
 
-    private AsyncDeliveryExecutor executor;
+    private BoundedAsyncExecutor executor;
 
     @BeforeEach
     void setUp() {
-        executor = new AsyncDeliveryExecutor(new SimpleMeterRegistry(), 4, 5);
+        executor = new BoundedAsyncExecutor("test", 4, 5, new SimpleMeterRegistry());
     }
 
     @AfterEach
@@ -29,46 +30,46 @@ class AsyncDeliveryExecutorTest {
     }
 
     @Test
-    void submit_shouldRunTaskAndAck() throws Exception {
+    void trySubmit_shouldRunTaskAndAck() throws Exception {
         Acknowledgment ack = mock(Acknowledgment.class);
         CountDownLatch latch = new CountDownLatch(1);
 
-        executor.submit(() -> latch.countDown(), ack, "test-1");
+        boolean accepted = executor.trySubmit(latch::countDown, ack, "test-1");
 
+        assertTrue(accepted);
         assertTrue(latch.await(5, TimeUnit.SECONDS));
-        // Give a moment for ack to be called after task completes
         Thread.sleep(100);
         verify(ack).acknowledge();
     }
 
     @Test
-    void submit_shouldNotAckOnFailure() throws Exception {
+    void trySubmit_shouldNotAckOnFailure() throws Exception {
         Acknowledgment ack = mock(Acknowledgment.class);
         CountDownLatch latch = new CountDownLatch(1);
 
-        executor.submit(() -> {
+        boolean accepted = executor.trySubmit(() -> {
             latch.countDown();
             throw new RuntimeException("boom");
         }, ack, "test-fail");
 
+        assertTrue(accepted);
         assertTrue(latch.await(5, TimeUnit.SECONDS));
         Thread.sleep(100);
         verify(ack, never()).acknowledge();
     }
 
     @Test
-    void submit_shouldTrackInFlightCount() throws Exception {
+    void trySubmit_shouldTrackInFlightCount() throws Exception {
         CountDownLatch blockLatch = new CountDownLatch(1);
         CountDownLatch startedLatch = new CountDownLatch(2);
         Acknowledgment ack = mock(Acknowledgment.class);
 
-        // Submit 2 tasks that block
-        executor.submit(() -> {
+        executor.trySubmit(() -> {
             startedLatch.countDown();
             try { blockLatch.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }, ack, "t1");
 
-        executor.submit(() -> {
+        executor.trySubmit(() -> {
             startedLatch.countDown();
             try { blockLatch.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }, ack, "t2");
@@ -76,54 +77,85 @@ class AsyncDeliveryExecutorTest {
         assertTrue(startedLatch.await(5, TimeUnit.SECONDS));
         assertEquals(2, executor.getInFlightCount());
 
-        // Release
         blockLatch.countDown();
         Thread.sleep(200);
         assertEquals(0, executor.getInFlightCount());
     }
 
     @Test
-    void submit_shouldApplyBackpressure() throws Exception {
-        // Pool size = 4, so 5th submission should block until one completes
+    void trySubmit_shouldReturnFalseWhenFull() throws Exception {
+        // Pool size = 4, so 5th submission should be rejected (non-blocking)
         CountDownLatch blockLatch = new CountDownLatch(1);
         CountDownLatch allStarted = new CountDownLatch(4);
         Acknowledgment ack = mock(Acknowledgment.class);
 
         // Fill the pool
         for (int i = 0; i < 4; i++) {
-            executor.submit(() -> {
+            assertTrue(executor.trySubmit(() -> {
                 allStarted.countDown();
                 try { blockLatch.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-            }, ack, "fill-" + i);
+            }, ack, "fill-" + i));
         }
 
         assertTrue(allStarted.await(5, TimeUnit.SECONDS));
 
-        // 5th submission should block (semaphore exhausted)
-        AtomicBoolean fifthStarted = new AtomicBoolean(false);
-        Thread submitter = new Thread(() -> {
-            executor.submit(() -> fifthStarted.set(true), ack, "fifth");
-        });
-        submitter.start();
-
-        Thread.sleep(300);
-        assertFalse(fifthStarted.get(), "5th task should be blocked by semaphore");
+        // 5th submission should return false immediately (non-blocking!)
+        Acknowledgment fifthAck = mock(Acknowledgment.class);
+        boolean accepted = executor.trySubmit(() -> {}, fifthAck, "fifth");
+        assertFalse(accepted, "5th task should be rejected (executor full)");
 
         // Release pool
         blockLatch.countDown();
-        submitter.join(5000);
         Thread.sleep(200);
-        assertTrue(fifthStarted.get(), "5th task should eventually run");
+
+        // Now should accept again
+        CountDownLatch sixthDone = new CountDownLatch(1);
+        assertTrue(executor.trySubmit(sixthDone::countDown, ack, "sixth"));
+        assertTrue(sixthDone.await(5, TimeUnit.SECONDS));
     }
 
     @Test
-    void submit_shouldPreserveMdcContext() throws Exception {
+    void trySubmit_shouldPauseContainersWhenFull() throws Exception {
+        MessageListenerContainer container = mock(MessageListenerContainer.class);
+        when(container.isRunning()).thenReturn(true);
+        when(container.isContainerPaused()).thenReturn(false);
+        executor.registerContainer(container);
+
+        CountDownLatch blockLatch = new CountDownLatch(1);
+        CountDownLatch allStarted = new CountDownLatch(4);
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        // Fill the pool
+        for (int i = 0; i < 4; i++) {
+            executor.trySubmit(() -> {
+                allStarted.countDown();
+                try { blockLatch.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }, ack, "fill-" + i);
+        }
+        assertTrue(allStarted.await(5, TimeUnit.SECONDS));
+
+        // 5th submission should fail and pause containers
+        assertFalse(executor.trySubmit(() -> {}, ack, "overflow"));
+        verify(container).pause();
+        assertTrue(executor.isContainersPaused());
+
+        // Release tasks — should resume containers
+        when(container.isContainerPaused()).thenReturn(true);
+        blockLatch.countDown();
+        Thread.sleep(300);
+
+        verify(container, atLeastOnce()).resume();
+        assertFalse(executor.isContainersPaused());
+    }
+
+    @Test
+    void trySubmit_shouldPreserveMdcContext() throws Exception {
         Acknowledgment ack = mock(Acknowledgment.class);
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean mdcOk = new AtomicBoolean(false);
 
         org.slf4j.MDC.put("testKey", "testValue");
-        executor.submit(() -> {
+        executor.trySubmit(() -> {
             mdcOk.set("testValue".equals(org.slf4j.MDC.get("testKey")));
             latch.countDown();
         }, ack, "mdc-test");
@@ -141,10 +173,13 @@ class AsyncDeliveryExecutorTest {
 
         for (int i = 0; i < count; i++) {
             Acknowledgment ack = mock(Acknowledgment.class);
-            executor.submit(() -> {
+            // Some may be rejected (pool size 4), retry until accepted
+            while (!executor.trySubmit(() -> {
                 completed.incrementAndGet();
                 latch.countDown();
-            }, ack, "concurrent-" + i);
+            }, ack, "concurrent-" + i)) {
+                Thread.sleep(10); // Brief pause before retry
+            }
         }
 
         assertTrue(latch.await(30, TimeUnit.SECONDS));
