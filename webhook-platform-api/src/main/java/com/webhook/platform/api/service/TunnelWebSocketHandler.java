@@ -14,10 +14,13 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.net.URI;
+import java.util.List;
 
 @Slf4j
 @Component
 public class TunnelWebSocketHandler extends TextWebSocketHandler {
+
+    private static final String SUBPROTOCOL_PREFIX = "tunnel-token.";
 
     private final TunnelService tunnelService;
     private final TunnelRegistry tunnelRegistry;
@@ -58,7 +61,10 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(MAX_MESSAGE_SIZE);
 
-        String tunnelToken = extractQueryParam(session, "token");
+        String tunnelToken = extractTokenFromSubprotocol(session);
+        if (tunnelToken == null) {
+            tunnelToken = extractQueryParam(session, "token");
+        }
         if (tunnelToken == null || tunnelToken.isBlank()) {
             log.warn("WebSocket connection without tunnel token, closing");
             wsAuthFailureCounter.increment();
@@ -159,6 +165,25 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         String slug = (String) session.getAttributes().get(ATTR_SLUG);
         log.error("Tunnel WS transport error: slug={}", slug, exception);
+    }
+
+    /**
+     * Extract token from Sec-WebSocket-Protocol header.
+     * Client sends: Sec-WebSocket-Protocol: tunnel-token.{TOKEN}
+     * Server echoes the subprotocol to complete the handshake.
+     */
+    private String extractTokenFromSubprotocol(WebSocketSession session) {
+        List<String> protocols = session.getHandshakeHeaders().get("Sec-WebSocket-Protocol");
+        if (protocols == null) return null;
+        for (String protocol : protocols) {
+            for (String part : protocol.split(",")) {
+                String trimmed = part.trim();
+                if (trimmed.startsWith(SUBPROTOCOL_PREFIX)) {
+                    return trimmed.substring(SUBPROTOCOL_PREFIX.length());
+                }
+            }
+        }
+        return null;
     }
 
     private String extractQueryParam(WebSocketSession session, String paramName) {

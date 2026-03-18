@@ -46,4 +46,20 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     @Modifying
     @Query(value = "UPDATE outbox_messages SET status = 'PENDING' WHERE status = 'SENDING' AND updated_at < :cutoff", nativeQuery = true)
     int recoverStuckSendingMessages(@Param("cutoff") Instant cutoff);
+
+    @Modifying
+    @Query(value = "UPDATE outbox_messages SET status = 'PUBLISHED', published_at = :now, updated_at = :now WHERE id IN :ids", nativeQuery = true)
+    int batchMarkPublished(@Param("ids") List<UUID> ids, @Param("now") Instant now);
+
+    @Modifying
+    @Query(value = "UPDATE outbox_messages SET status = 'FAILED', retry_count = retry_count + 1, error_message = :error, last_attempt_at = :now, updated_at = :now WHERE id IN :ids", nativeQuery = true)
+    int batchMarkFailed(@Param("ids") List<UUID> ids, @Param("error") String error, @Param("now") Instant now);
+
+    @Modifying
+    @Query(value = "UPDATE outbox_messages SET status = 'DEAD', retry_count = retry_count + 1, error_message = :error, last_attempt_at = :now, updated_at = :now WHERE id IN :ids", nativeQuery = true)
+    int batchMarkDead(@Param("ids") List<UUID> ids, @Param("error") String error, @Param("now") Instant now);
+
+    @Modifying
+    @Query(value = "UPDATE outbox_messages SET status = 'DEAD', updated_at = NOW() WHERE status = 'FAILED' AND retry_count >= :maxRetries", nativeQuery = true)
+    int promoteExhaustedToDead(@Param("maxRetries") int maxRetries);
 }

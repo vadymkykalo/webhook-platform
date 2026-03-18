@@ -14,6 +14,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.util.EventTypeMatcher;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -319,14 +320,35 @@ public class ReplayService {
     private BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId) {
         int errors = 0;
 
+        // Pre-partition subscriptions: exact index O(1) + wildcard list O(W)
+        // instead of scanning all M subscriptions per event O(N×M)
+        Map<String, List<Subscription>> exactIndex = new HashMap<>();
+        List<Subscription> wildcardSubs = new ArrayList<>();
+        for (Subscription sub : subscriptions) {
+            if (EventTypeMatcher.isWildcard(sub.getEventType())) {
+                wildcardSubs.add(sub);
+            } else {
+                exactIndex.computeIfAbsent(sub.getEventType(), k -> new ArrayList<>()).add(sub);
+            }
+        }
+
         List<Delivery> deliveriesToSave = new ArrayList<>();
 
         for (Event event : events) {
-            for (Subscription subscription : subscriptions) {
-                // Match event type to subscription (wildcard or exact)
-                if (!matchesEventType(event.getEventType(), subscription.getEventType())) {
-                    continue;
+            // O(1) exact matches
+            List<Subscription> matched = new ArrayList<>();
+            List<Subscription> exact = exactIndex.get(event.getEventType());
+            if (exact != null) {
+                matched.addAll(exact);
+            }
+            // O(W) wildcard matches (W << M typically)
+            for (Subscription wsub : wildcardSubs) {
+                if (EventTypeMatcher.matches(wsub.getEventType(), event.getEventType())) {
+                    matched.add(wsub);
                 }
+            }
+
+            for (Subscription subscription : matched) {
 
                 try {
                     Long sequenceNumber = null;
@@ -409,17 +431,6 @@ public class ReplayService {
             return subscriptionRepository.findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getEventType());
         }
         return subscriptionRepository.findByProjectIdAndEnabledTrue(projectId);
-    }
-
-    private boolean matchesEventType(String eventType, String pattern) {
-        if ("*".equals(pattern) || pattern.equals(eventType)) {
-            return true;
-        }
-        if (pattern.endsWith(".*")) {
-            String prefix = pattern.substring(0, pattern.length() - 2);
-            return eventType.startsWith(prefix + ".") || eventType.equals(prefix);
-        }
-        return false;
     }
 
     private OutboxMessage createOutboxMessage(Delivery delivery) {

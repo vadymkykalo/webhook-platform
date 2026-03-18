@@ -1,32 +1,28 @@
 package com.webhook.platform.api.controller;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.webhook.platform.api.domain.entity.TunnelRequestLog;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
 import com.webhook.platform.api.service.RedisTunnelCoordinator;
+import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.TunnelBandwidthService;
 import com.webhook.platform.api.service.TunnelRegistry;
 import com.webhook.platform.api.service.TunnelService;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Duration;
 import java.util.*;
 
 /**
@@ -43,37 +39,31 @@ public class TunnelIngressController {
     private final TunnelService tunnelService;
     private final TunnelRegistry tunnelRegistry;
     private final RedisTunnelCoordinator redisTunnelCoordinator;
+    private final RedisRateLimiterService rateLimiterService;
     private final TunnelRequestLogRepository requestLogRepository;
     private final TunnelBandwidthService bandwidthService;
     private final MeterRegistry meterRegistry;
+    private final Executor tunnelMeteringExecutor;
 
     private static final int MAX_BODY_SIZE = 512 * 1024; // 512KB
     private static final int RATE_LIMIT_PER_SECOND = 10;
-    private static final int MAX_BUCKETS = 10_000;
-    private static final Duration BUCKET_EXPIRE = Duration.ofMinutes(5);
-
-    /** Per-slug in-memory rate limiters — bounded + expiring to prevent memory DoS */
-    private final Cache<String, Bucket> slugBuckets = Caffeine.newBuilder()
-            .maximumSize(MAX_BUCKETS)
-            .expireAfterAccess(BUCKET_EXPIRE)
-            .build();
 
     public TunnelIngressController(TunnelService tunnelService,
                                    TunnelRegistry tunnelRegistry,
                                    RedisTunnelCoordinator redisTunnelCoordinator,
+                                   RedisRateLimiterService rateLimiterService,
                                    TunnelRequestLogRepository requestLogRepository,
                                    TunnelBandwidthService bandwidthService,
-                                   MeterRegistry meterRegistry) {
+                                   MeterRegistry meterRegistry,
+                                   @Qualifier("tunnelMeteringExecutor") Executor tunnelMeteringExecutor) {
         this.tunnelService = tunnelService;
         this.tunnelRegistry = tunnelRegistry;
         this.redisTunnelCoordinator = redisTunnelCoordinator;
+        this.rateLimiterService = rateLimiterService;
         this.requestLogRepository = requestLogRepository;
         this.bandwidthService = bandwidthService;
         this.meterRegistry = meterRegistry;
-
-        Gauge.builder("tunnel_ingress_slug_buckets_size", slugBuckets, Cache::estimatedSize)
-                .description("Number of per-slug rate limiter buckets in tunnel ingress cache")
-                .register(meterRegistry);
+        this.tunnelMeteringExecutor = tunnelMeteringExecutor;
     }
 
     @RequestMapping(value = "/{slug}", method = {RequestMethod.GET, RequestMethod.POST,
@@ -90,15 +80,8 @@ public class TunnelIngressController {
                     .body("{\"error\":\"tunnel_offline\",\"message\":\"Tunnel is not connected\"}");
         }
 
-        // Rate limit per slug (10 req/s) — bounded cache prevents memory DoS
-        Bucket bucket = slugBuckets.get(slug, k -> Bucket.builder()
-                .addLimit(Bandwidth.builder()
-                        .capacity(RATE_LIMIT_PER_SECOND)
-                        .refillGreedy(RATE_LIMIT_PER_SECOND, Duration.ofSeconds(1))
-                        .build())
-                .build());
-
-        if (!bucket.tryConsume(1)) {
+        // Rate limit per slug (10 req/s) — Redis-backed for multi-instance consistency
+        if (!rateLimiterService.tryAcquireForSlug(slug, RATE_LIMIT_PER_SECOND)) {
             log.warn("Rate limit exceeded for tunnel slug: {}", slug);
             ingressCounter("rate_limited").increment();
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -181,7 +164,7 @@ public class TunnelIngressController {
                                     String queryString, Map<String, String> reqHeaders,
                                     int requestBodySize, int responseBodySize,
                                     TunnelResponseMessage response, int durationMs) {
-        CompletableFuture.runAsync(() -> {
+        tunnelMeteringExecutor.execute(() -> {
             try {
                 TunnelSession session = tunnelService.getActiveBySlug(slug);
 

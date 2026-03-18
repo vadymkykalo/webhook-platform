@@ -130,9 +130,9 @@ public class IngressService {
             throw new SourceDisabledException("Source is disabled");
         }
 
-        // Per-source rate limiting
+        // Per-source rate limiting (fail-closed: reject if Redis is down)
         if (source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0) {
-            if (!rateLimiterService.tryAcquireForSource(source.getId(), source.getRateLimitPerSecond())) {
+            if (!rateLimiterService.tryAcquireForSourceFailClosed(source.getId(), source.getRateLimitPerSecond())) {
                 throw new RateLimitExceededException("Rate limit exceeded for source " + source.getId());
             }
         }

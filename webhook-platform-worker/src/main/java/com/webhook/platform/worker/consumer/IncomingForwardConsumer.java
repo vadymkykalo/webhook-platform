@@ -2,12 +2,17 @@ package com.webhook.platform.worker.consumer;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
-import com.webhook.platform.worker.service.AsyncDeliveryExecutor;
+import com.webhook.platform.worker.service.BoundedAsyncExecutor;
 import com.webhook.platform.worker.service.IncomingForwardService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
@@ -17,16 +22,28 @@ import java.util.UUID;
 @Slf4j
 public class IncomingForwardConsumer {
 
+    private static final String LISTENER_ID = "incomingForward";
+
     private final IncomingForwardService forwardService;
-    private final AsyncDeliveryExecutor asyncExecutor;
+    private final BoundedAsyncExecutor asyncExecutor;
+    private final KafkaListenerEndpointRegistry registry;
 
     public IncomingForwardConsumer(IncomingForwardService forwardService,
-                                   AsyncDeliveryExecutor asyncExecutor) {
+                                   @Qualifier("incomingForwardExecutor") BoundedAsyncExecutor asyncExecutor,
+                                   KafkaListenerEndpointRegistry registry) {
         this.forwardService = forwardService;
         this.asyncExecutor = asyncExecutor;
+        this.registry = registry;
+    }
+
+    @EventListener(ApplicationStartedEvent.class)
+    void registerContainers() {
+        MessageListenerContainer container = registry.getListenerContainer(LISTENER_ID);
+        if (container != null) asyncExecutor.registerContainer(container);
     }
 
     @KafkaListener(
+            id = LISTENER_ID,
             topics = {KafkaTopics.INCOMING_FORWARD_DISPATCH, KafkaTopics.INCOMING_FORWARD_RETRY},
             groupId = "${spring.kafka.consumer.incoming-group-id:incoming-forward-worker}",
             containerFactory = "incomingForwardListenerContainerFactory"
@@ -43,10 +60,12 @@ public class IncomingForwardConsumer {
                 message.getIncomingEventId(), message.getDestinationId(),
                 record.topic(), message.isReplay());
 
-        asyncExecutor.submit(
+        if (!asyncExecutor.trySubmit(
                 () -> forwardService.processForward(message),
                 ack,
-                message.getIncomingEventId().toString());
+                message.getIncomingEventId().toString())) {
+            log.debug("Incoming executor full, not acking eventId={}", message.getIncomingEventId());
+        }
     }
 
     private String extractCorrelationId(ConsumerRecord<String, IncomingForwardMessage> record) {

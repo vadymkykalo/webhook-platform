@@ -10,6 +10,7 @@ import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.rules.CompiledRule;
 import com.webhook.platform.api.service.rules.RuleEngineService;
@@ -42,61 +43,58 @@ public class EventIngestService {
     private final SubscriptionRepository subscriptionRepository;
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
+    private final WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final SchemaRegistryService schemaRegistryService;
     private final ProjectRepository projectRepository;
     private final RuleEngineService ruleEngineService;
-    private final WorkflowTriggerService workflowTriggerService;
     private final QuotaCounterService quotaCounterService;
+    private final EntitlementService entitlementService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
     private final int compressionThresholdBytes;
-    private final int maxFanoutPerEvent;
 
     public EventIngestService(
             EventRepository eventRepository,
             SubscriptionRepository subscriptionRepository,
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
+            WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
             SchemaRegistryService schemaRegistryService,
             ProjectRepository projectRepository,
             RuleEngineService ruleEngineService,
-            WorkflowTriggerService workflowTriggerService,
             QuotaCounterService quotaCounterService,
+            EntitlementService entitlementService,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
-            @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes,
-            @Value("${webhook.max-fanout-per-event:100}") int maxFanoutPerEvent) {
+            @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
+        this.workflowTriggerOutboxRepository = workflowTriggerOutboxRepository;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.schemaRegistryService = schemaRegistryService;
         this.projectRepository = projectRepository;
         this.ruleEngineService = ruleEngineService;
-        this.workflowTriggerService = workflowTriggerService;
         this.quotaCounterService = quotaCounterService;
+        this.entitlementService = entitlementService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.compressionThresholdBytes = compressionThresholdBytes;
-        this.maxFanoutPerEvent = maxFanoutPerEvent;
     }
 
-    /** Carries event data out of the transaction for post-commit workflow triggering. */
-    private record IngestResult(EventIngestResponse response, UUID eventId, String eventType, String eventPayload) {}
-
     public EventIngestResponse ingestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
-        IngestResult result;
+        EventIngestResponse response;
         try {
-            result = transactionTemplate.execute(status -> doIngestEvent(projectId, request, idempotencyKey));
+            response = transactionTemplate.execute(status -> doIngestEvent(projectId, request, idempotencyKey));
         } catch (DataIntegrityViolationException e) {
             if (idempotencyKey != null) {
                 var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
@@ -108,25 +106,10 @@ public class EventIngestService {
             }
             throw e;
         }
-
-        // ── Workflow automation — AFTER transaction commit ────────────────
-        // DB connection is released. Even if workflow pool is overloaded and task
-        // is discarded, the event + deliveries are already safely committed.
-        if (result != null && result.eventId() != null) {
-            try {
-                int depth = WorkflowTriggerService.getCurrentDepth() + 1;
-                workflowTriggerService.triggerWorkflows(
-                        projectId, result.eventId(), result.eventType(), result.eventPayload(), depth);
-            } catch (Exception e) {
-                log.warn("Failed to trigger workflows for event {} (event is committed, workflows skipped): {}",
-                        result.eventId(), e.getMessage());
-            }
-        }
-
-        return result != null ? result.response() : null;
+        return response;
     }
 
-    private IngestResult doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
+    private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
         // Enforce idempotency policy
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.REQUIRED && idempotencyKey == null) {
@@ -144,7 +127,7 @@ public class EventIngestService {
                 Event event = existingEvent.get();
                 log.info("Duplicate event detected, returning existing event: {}", event.getId());
                 Counter.builder("events_duplicate_total").tag("event_type", request.getType()).register(meterRegistry).increment();
-                return new IngestResult(buildResponse(event, 0), null, null, null);
+                return buildResponse(event, 0);
             }
         }
 
@@ -219,7 +202,7 @@ public class EventIngestService {
         }
 
         if (dropEvent) {
-            return new IngestResult(buildResponse(event, 0), null, null, null);
+            return buildResponse(event, 0);
         }
 
         // ── Subscription-based deliveries (two-phase: SQL exact + in-memory wildcard) ──
@@ -238,14 +221,15 @@ public class EventIngestService {
 
         // ── Fanout limit — prevent queue flood from 1 event → N deliveries ─
         int totalFanout = subscriptions.size() + ruleRouteEndpoints.size();
-        if (totalFanout > maxFanoutPerEvent) {
+        int maxFanout = entitlementService.getMaxFanoutForProject(projectId);
+        if (totalFanout > maxFanout) {
             log.warn("Fanout limit exceeded for event type '{}' in project {}: {} targets > max {}",
-                    request.getType(), projectId, totalFanout, maxFanoutPerEvent);
+                    request.getType(), projectId, totalFanout, maxFanout);
             Counter.builder("events_fanout_limited_total").tag("project_id", projectId.toString())
                     .register(meterRegistry).increment();
             throw new IllegalArgumentException(
                     "Fanout limit exceeded: event would create " + totalFanout +
-                    " deliveries (max " + maxFanoutPerEvent + "). Reduce subscriptions or contact support.");
+                    " deliveries (max " + maxFanout + "). Reduce subscriptions or contact support.");
         }
 
         Set<UUID> deliveredEndpoints = new HashSet<>();
@@ -297,9 +281,17 @@ public class EventIngestService {
         log.info("Created {} deliveries for event: {} (rules matched: {})",
                 deliveriesCreated, event.getId(), ruleMatches.size());
 
-        return new IngestResult(
-                buildResponse(event, deliveriesCreated),
-                event.getId(), request.getType(), event.getDecompressedPayload());
+        // ── Workflow trigger outbox — durable, same TX as event + deliveries ──
+        int depth = WorkflowTriggerService.getCurrentDepth() + 1;
+        workflowTriggerOutboxRepository.save(WorkflowTriggerOutbox.builder()
+                .projectId(projectId)
+                .eventId(event.getId())
+                .eventType(request.getType())
+                .eventPayload(event.getDecompressedPayload())
+                .depth(depth)
+                .build());
+
+        return buildResponse(event, deliveriesCreated);
     }
 
     private Event createEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {

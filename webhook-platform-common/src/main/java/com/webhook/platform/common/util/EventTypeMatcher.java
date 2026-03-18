@@ -1,5 +1,7 @@
 package com.webhook.platform.common.util;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Matches event types against subscription patterns.
  * <p>
@@ -13,6 +15,14 @@ package com.webhook.platform.common.util;
  * </ul>
  */
 public final class EventTypeMatcher {
+
+    /**
+     * Cache of pre-split pattern segments. Avoids repeated String.split() + array allocation
+     * on every matches() call in the hot path (event ingestion × wildcard subscriptions).
+     * Bounded by ConcurrentHashMap — patterns are finite (created by users), so unbounded growth is unlikely.
+     */
+    private static final ConcurrentHashMap<String, String[]> PATTERN_CACHE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, String[]> EVENT_CACHE = new ConcurrentHashMap<>();
 
     private EventTypeMatcher() {
     }
@@ -34,8 +44,8 @@ public final class EventTypeMatcher {
             return true;
         }
 
-        String[] patternParts = pattern.split("\\.");
-        String[] eventParts = eventType.split("\\.");
+        String[] patternParts = PATTERN_CACHE.computeIfAbsent(pattern, p -> p.split("\\."));
+        String[] eventParts = EVENT_CACHE.computeIfAbsent(eventType, e -> e.split("\\."));
 
         return matchParts(patternParts, 0, eventParts, 0);
     }

@@ -62,4 +62,25 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * Bounded executor for tunnel ingress metering + request logging.
+     * Best-effort: if queue is full, silently discard (metering is non-critical).
+     */
+    @Bean(name = "tunnelMeteringExecutor")
+    public Executor tunnelMeteringExecutor(MeterRegistry meterRegistry) {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("tunnel-meter-");
+        executor.setRejectedExecutionHandler((runnable, pool) -> {
+            Counter.builder("tunnel_metering_rejected_total").register(meterRegistry).increment();
+            log.debug("Tunnel metering task rejected (queue full) — dropping silently");
+        });
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(10);
+        executor.initialize();
+        return executor;
+    }
 }

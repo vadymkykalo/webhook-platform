@@ -157,6 +157,15 @@ public class EntitlementService {
         return getRateLimit(project.getOrganizationId());
     }
 
+    // ── Fanout limit ────────────────────────────────────────────
+
+    public int getMaxFanoutForProject(UUID projectId) {
+        if (!billingEnabled) return Integer.MAX_VALUE;
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project == null) return 100;
+        return getPlan(project.getOrganizationId()).getMaxFanoutPerEvent();
+    }
+
     // ── Retention ─────────────────────────────────────────────────
 
     public int getRetentionDays(UUID organizationId) {

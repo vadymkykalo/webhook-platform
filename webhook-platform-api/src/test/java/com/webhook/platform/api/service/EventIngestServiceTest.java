@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -20,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.webhook.platform.api.service.rules.RuleEngineService;
-import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -57,9 +57,11 @@ class EventIngestServiceTest {
     @Mock
     private RuleEngineService ruleEngineService;
     @Mock
-    private WorkflowTriggerService workflowTriggerService;
-    @Mock
     private QuotaCounterService quotaCounterService;
+    @Mock
+    private WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
+    @Mock
+    private EntitlementService entitlementService;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -70,12 +72,15 @@ class EventIngestServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(entitlementService.getMaxFanoutForProject(any())).thenReturn(5);
+
         service = new EventIngestService(
                 eventRepository, subscriptionRepository, deliveryRepository,
-                outboxMessageRepository, objectMapper, meterRegistry,
+                outboxMessageRepository, workflowTriggerOutboxRepository,
+                objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
-                ruleEngineService, workflowTriggerService, quotaCounterService,
-                transactionManager, 262144L, 1024, 5
+                ruleEngineService, quotaCounterService, entitlementService,
+                transactionManager, 262144L, 1024
         );
     }
 

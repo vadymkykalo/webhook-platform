@@ -16,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -115,11 +116,17 @@ public class WebSocketTunnelClient {
 
     private void doConnect() {
         try {
-            String fullUrl = wsUrl + "/ws/tunnel?token=" + tunnelToken;
-            log.debug("Connecting to {}", wsUrl + "/ws/tunnel?token=***");
+            String fullUrl = wsUrl + "/ws/tunnel";
+            log.debug("Connecting to {}", fullUrl);
 
             WebSocketContainer container = ContainerProvider.getWebSocketContainer();
             container.setDefaultMaxTextMessageBufferSize(MAX_MESSAGE_SIZE);
+
+            // Pass token via Sec-WebSocket-Protocol header (not query param)
+            // to avoid leaking it in server access logs and proxy logs
+            ClientEndpointConfig endpointConfig = ClientEndpointConfig.Builder.create()
+                    .preferredSubprotocols(List.of("tunnel-token." + tunnelToken))
+                    .build();
 
             wsSession = container.connectToServer(new Endpoint() {
                 @Override
@@ -158,7 +165,7 @@ public class WebSocketTunnelClient {
                     connected.set(false);
                     log.error("WebSocket error: {}", error.getMessage());
                 }
-            }, ClientEndpointConfig.Builder.create().build(), URI.create(fullUrl));
+            }, endpointConfig, URI.create(fullUrl));
 
         } catch (Exception e) {
             connected.set(false);

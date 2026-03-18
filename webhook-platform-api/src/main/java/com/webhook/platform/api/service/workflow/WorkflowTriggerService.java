@@ -18,11 +18,13 @@ import java.util.UUID;
 
 /**
  * Triggers matching workflows when a webhook event is ingested.
- * Called from EventIngestService after deliveries are created.
- * Runs async on a bounded thread pool so it never blocks event ingestion
- * and cannot exhaust system resources.
+ *
+ * <p>Primary path: {@link #triggerWorkflowsSync} called by {@code WorkflowTriggerOutboxService}
+ * after the outbox poller claims a row. This guarantees at-least-once execution
+ * even if the API crashes between event commit and workflow trigger.</p>
  *
  * Reliability features:
+ * - Durable outbox: trigger intent persisted in same TX as event
  * - Bounded thread pool (workflowTaskExecutor): configurable concurrent workflows
  * - Recursion depth guard: configurable max chained hops
  * - Idempotency: unique index (workflow_id, trigger_event_id) prevents duplicate runs
@@ -75,73 +77,83 @@ public class WorkflowTriggerService {
     }
 
     /**
-     * Find and trigger all matching enabled workflows for a project+event.
-     * Runs on bounded "workflowTaskExecutor" thread pool.
-     *
-     * @param depth recursion depth — 0 for external events, incremented for workflow-created events
+     * Synchronous workflow trigger — called by {@code WorkflowTriggerOutboxService}.
+     * Runs on the outbox poller thread (bounded by workflowTaskExecutor).
+     * Throws on failure so the outbox can retry.
      */
+    public void triggerWorkflowsSync(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
+        doTriggerWorkflows(projectId, eventId, eventType, eventPayload, depth);
+    }
+
+    /**
+     * @deprecated Use durable outbox path via {@link #triggerWorkflowsSync} instead.
+     * Kept for backward compatibility during transition.
+     */
+    @Deprecated
     @Async("workflowTaskExecutor")
     public void triggerWorkflows(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
+        doTriggerWorkflows(projectId, eventId, eventType, eventPayload, depth);
+    }
+
+    private void doTriggerWorkflows(UUID projectId, UUID eventId, String eventType, String eventPayload, int depth) {
+        // ── Recursion guard ──────────────────────────────────────
+        if (depth > maxRecursionDepth) {
+            log.warn("Workflow recursion depth {} exceeds max {} for event {} — skipping",
+                    depth, maxRecursionDepth, eventId);
+            return;
+        }
+
+        List<Workflow> workflows = workflowRepository.findEnabledWebhookWorkflows(projectId);
+        if (workflows.isEmpty()) return;
+
+        JsonNode eventJson;
         try {
-            // ── Recursion guard ──────────────────────────────────────
-            if (depth > maxRecursionDepth) {
-                log.warn("Workflow recursion depth {} exceeds max {} for event {} — skipping",
-                        depth, maxRecursionDepth, eventId);
-                return;
-            }
-
-            List<Workflow> workflows = workflowRepository.findEnabledWebhookWorkflows(projectId);
-            if (workflows.isEmpty()) return;
-
-            JsonNode eventJson = objectMapper.readTree(eventPayload);
-
-            for (Workflow workflow : workflows) {
-                try {
-                    if (!matchesTrigger(workflow, eventType)) continue;
-
-                    // ── Idempotency guard ────────────────────────────
-                    if (eventId != null && executionRepository.existsByWorkflowIdAndTriggerEventId(
-                            workflow.getId(), eventId)) {
-                        log.debug("Skipping duplicate: workflow {} already triggered for event {}",
-                                workflow.getId(), eventId);
-                        continue;
-                    }
-
-                    // ── Create execution with depth tracking ─────────
-                    WorkflowExecution execution;
-                    try {
-                        execution = executionRepository.save(WorkflowExecution.builder()
-                                .workflowId(workflow.getId())
-                                .triggerEventId(eventId)
-                                .triggerData(eventPayload)
-                                .depth(depth)
-                                .build());
-                    } catch (DataIntegrityViolationException e) {
-                        // Unique constraint violation — concurrent duplicate, skip
-                        log.debug("Concurrent duplicate prevented: workflow {} event {}", workflow.getId(), eventId);
-                        continue;
-                    }
-
-                    log.info("Triggering workflow '{}' (id={}) for event {} (type={}) depth={}",
-                            workflow.getName(), workflow.getId(), eventId, eventType, depth);
-
-                    // ── Set depth ThreadLocal before engine execution ─
-                    // This allows CreateEventNodeExecutor → EventIngestService → triggerWorkflows
-                    // to know the current depth and increment it
-                    try {
-                        setCurrentDepth(depth);
-                        workflowEngine.execute(execution.getId(), workflow.getDefinition(), eventJson);
-                    } finally {
-                        clearCurrentDepth();
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to trigger workflow '{}' for event {}: {}",
-                            workflow.getName(), eventId, e.getMessage(), e);
-                }
-            }
+            eventJson = objectMapper.readTree(eventPayload);
         } catch (Exception e) {
-            log.error("WorkflowTriggerService failed for project {} event {}: {}",
-                    projectId, eventId, e.getMessage(), e);
+            log.error("Failed to parse event payload for workflow trigger: eventId={}", eventId, e);
+            return;
+        }
+
+        for (Workflow workflow : workflows) {
+            try {
+                if (!matchesTrigger(workflow, eventType)) continue;
+
+                // ── Idempotency guard ────────────────────────────
+                if (eventId != null && executionRepository.existsByWorkflowIdAndTriggerEventId(
+                        workflow.getId(), eventId)) {
+                    log.debug("Skipping duplicate: workflow {} already triggered for event {}",
+                            workflow.getId(), eventId);
+                    continue;
+                }
+
+                // ── Create execution with depth tracking ─────────
+                WorkflowExecution execution;
+                try {
+                    execution = executionRepository.save(WorkflowExecution.builder()
+                            .workflowId(workflow.getId())
+                            .triggerEventId(eventId)
+                            .triggerData(eventPayload)
+                            .depth(depth)
+                            .build());
+                } catch (DataIntegrityViolationException e) {
+                    log.debug("Concurrent duplicate prevented: workflow {} event {}", workflow.getId(), eventId);
+                    continue;
+                }
+
+                log.info("Triggering workflow '{}' (id={}) for event {} (type={}) depth={}",
+                        workflow.getName(), workflow.getId(), eventId, eventType, depth);
+
+                // ── Set depth ThreadLocal before engine execution ─
+                try {
+                    setCurrentDepth(depth);
+                    workflowEngine.execute(execution.getId(), workflow.getDefinition(), eventJson);
+                } finally {
+                    clearCurrentDepth();
+                }
+            } catch (Exception e) {
+                log.error("Failed to trigger workflow '{}' for event {}: {}",
+                        workflow.getName(), eventId, e.getMessage(), e);
+            }
         }
     }
 
