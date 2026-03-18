@@ -10,6 +10,7 @@ import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.rules.CompiledRule;
 import com.webhook.platform.api.service.rules.RuleEngineService;
@@ -50,10 +51,10 @@ public class EventIngestService {
     private final ProjectRepository projectRepository;
     private final RuleEngineService ruleEngineService;
     private final QuotaCounterService quotaCounterService;
+    private final EntitlementService entitlementService;
     private final TransactionTemplate transactionTemplate;
     private final long maxPayloadSizeBytes;
     private final int compressionThresholdBytes;
-    private final int maxFanoutPerEvent;
 
     public EventIngestService(
             EventRepository eventRepository,
@@ -68,10 +69,10 @@ public class EventIngestService {
             ProjectRepository projectRepository,
             RuleEngineService ruleEngineService,
             QuotaCounterService quotaCounterService,
+            EntitlementService entitlementService,
             PlatformTransactionManager transactionManager,
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
-            @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes,
-            @Value("${webhook.max-fanout-per-event:100}") int maxFanoutPerEvent) {
+            @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
         this.eventRepository = eventRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
@@ -84,10 +85,10 @@ public class EventIngestService {
         this.projectRepository = projectRepository;
         this.ruleEngineService = ruleEngineService;
         this.quotaCounterService = quotaCounterService;
+        this.entitlementService = entitlementService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
         this.compressionThresholdBytes = compressionThresholdBytes;
-        this.maxFanoutPerEvent = maxFanoutPerEvent;
     }
 
     public EventIngestResponse ingestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
@@ -220,14 +221,15 @@ public class EventIngestService {
 
         // ── Fanout limit — prevent queue flood from 1 event → N deliveries ─
         int totalFanout = subscriptions.size() + ruleRouteEndpoints.size();
-        if (totalFanout > maxFanoutPerEvent) {
+        int maxFanout = entitlementService.getMaxFanoutForProject(projectId);
+        if (totalFanout > maxFanout) {
             log.warn("Fanout limit exceeded for event type '{}' in project {}: {} targets > max {}",
-                    request.getType(), projectId, totalFanout, maxFanoutPerEvent);
+                    request.getType(), projectId, totalFanout, maxFanout);
             Counter.builder("events_fanout_limited_total").tag("project_id", projectId.toString())
                     .register(meterRegistry).increment();
             throw new IllegalArgumentException(
                     "Fanout limit exceeded: event would create " + totalFanout +
-                    " deliveries (max " + maxFanoutPerEvent + "). Reduce subscriptions or contact support.");
+                    " deliveries (max " + maxFanout + "). Reduce subscriptions or contact support.");
         }
 
         Set<UUID> deliveredEndpoints = new HashSet<>();

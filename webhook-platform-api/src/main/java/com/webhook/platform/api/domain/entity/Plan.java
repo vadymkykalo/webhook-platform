@@ -44,6 +44,9 @@ public class Plan {
     @Column(name = "max_active_tunnels", nullable = false)
     private int maxActiveTunnels;
 
+    @Column(name = "max_fanout_per_event", nullable = false)
+    private int maxFanoutPerEvent;
+
     @Column(name = "rate_limit_per_second", nullable = false)
     private int rateLimitPerSecond;
 

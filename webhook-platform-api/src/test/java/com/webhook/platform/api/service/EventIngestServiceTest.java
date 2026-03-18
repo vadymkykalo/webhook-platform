@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
+import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -59,6 +60,8 @@ class EventIngestServiceTest {
     private QuotaCounterService quotaCounterService;
     @Mock
     private WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
+    @Mock
+    private EntitlementService entitlementService;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -69,13 +72,15 @@ class EventIngestServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(entitlementService.getMaxFanoutForProject(any())).thenReturn(5);
+
         service = new EventIngestService(
                 eventRepository, subscriptionRepository, deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
                 objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
-                ruleEngineService, quotaCounterService,
-                transactionManager, 262144L, 1024, 5
+                ruleEngineService, quotaCounterService, entitlementService,
+                transactionManager, 262144L, 1024
         );
     }
 

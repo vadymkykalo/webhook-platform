@@ -34,6 +34,7 @@ public class RedisRateLimiterService {
     private final Counter rateLimitHits;
     private final Counter rateLimitExceeded;
     private final Counter rateLimitFallback;
+    private final Counter rateLimitFailClosed;
 
     /**
      * Local in-memory fallback rate limiters (Bucket4j) used when Redis is
@@ -63,6 +64,9 @@ public class RedisRateLimiterService {
                 .register(meterRegistry);
         this.rateLimitFallback = Counter.builder("api_rate_limit_fallback_total")
                 .description("Number of requests rate-limited via local fallback (Redis unavailable)")
+                .register(meterRegistry);
+        this.rateLimitFailClosed = Counter.builder("api_rate_limit_fail_closed_total")
+                .description("Number of requests rejected due to Redis outage in fail-closed mode")
                 .register(meterRegistry);
         Gauge.builder("api_rate_limit_fallback_cache_size", localFallbackBuckets, Cache::estimatedSize)
                 .description("Number of entries in the local fallback rate limiter cache")
@@ -131,6 +135,78 @@ public class RedisRateLimiterService {
 
     public boolean tryAcquireForSource(UUID sourceId, int ratePerSecond) {
         return doTryAcquire(SOURCE_KEY_PREFIX + sourceId, sourceId, ratePerSecond);
+    }
+
+    /**
+     * Fail-closed variant for public ingress endpoints.
+     * Rejects requests when Redis is unavailable instead of falling back to local limiter.
+     * This prevents unbounded traffic from hitting the DB during a Redis outage.
+     */
+    public boolean tryAcquireForSourceFailClosed(UUID sourceId, int ratePerSecond) {
+        try {
+            String key = SOURCE_KEY_PREFIX + sourceId;
+            RRateLimiter limiter = redissonClient.getRateLimiter(key);
+            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
+            limiter.expire(KEY_TTL);
+
+            boolean acquired = limiter.tryAcquire(1);
+            if (acquired) {
+                rateLimitHits.increment();
+            } else {
+                rateLimitExceeded.increment();
+                log.warn("Rate limit exceeded for source: {} (limit: {}/sec)", sourceId, ratePerSecond);
+            }
+            return acquired;
+        } catch (Exception e) {
+            log.error("Redis unavailable — fail-closed rejecting ingress for source {}: {}",
+                    sourceId, e.getMessage());
+            rateLimitFailClosed.increment();
+            return false;
+        }
+    }
+
+    private static final String SLUG_KEY_PREFIX = "rate_limiter:slug:";
+
+    /**
+     * Rate limit for tunnel/capture slugs. Redis-backed for multi-instance consistency,
+     * falls back to local Bucket4j when Redis is unavailable.
+     */
+    public boolean tryAcquireForSlug(String slug, int ratePerSecond) {
+        try {
+            String key = SLUG_KEY_PREFIX + slug;
+            RRateLimiter limiter = redissonClient.getRateLimiter(key);
+            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
+            limiter.expire(Duration.ofMinutes(10));
+
+            boolean acquired = limiter.tryAcquire(1);
+            if (acquired) {
+                rateLimitHits.increment();
+            } else {
+                rateLimitExceeded.increment();
+                log.warn("Rate limit exceeded for slug: {} (limit: {}/sec)", slug, ratePerSecond);
+            }
+            return acquired;
+        } catch (Exception e) {
+            log.warn("Redis rate limiter unavailable, using local fallback for slug {}: {}",
+                    slug, e.getMessage());
+            rateLimitFallback.increment();
+            return tryLocalSlugFallback(slug, ratePerSecond);
+        }
+    }
+
+    private final Cache<String, Bucket> localSlugFallbackBuckets = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterAccess(Duration.ofMinutes(5))
+            .build();
+
+    private boolean tryLocalSlugFallback(String slug, int ratePerSecond) {
+        Bucket bucket = localSlugFallbackBuckets.get(slug, k -> Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(ratePerSecond)
+                        .refillGreedy(ratePerSecond, Duration.ofSeconds(1))
+                        .build())
+                .build());
+        return bucket.tryConsume(1);
     }
 
     private boolean doTryAcquire(String key, UUID id, int ratePerSecond) {

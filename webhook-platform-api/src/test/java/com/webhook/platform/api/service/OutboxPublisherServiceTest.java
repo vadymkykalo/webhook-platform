@@ -105,10 +105,8 @@ class OutboxPublisherServiceTest {
             return !msgs.isEmpty();
         }));
 
-        // Phase 2: message marked PUBLISHED after Kafka ack
-        verify(outboxMessageRepository).save(argThat(msg ->
-            msg.getStatus() == OutboxStatus.PUBLISHED && msg.getPublishedAt() != null
-        ));
+        // Phase 2: batch-marked PUBLISHED after Kafka ack
+        verify(outboxMessageRepository).batchMarkPublished(anyList(), any(Instant.class));
     }
 
     @Test
@@ -123,11 +121,8 @@ class OutboxPublisherServiceTest {
 
         service.publishPendingMessages();
 
-        verify(outboxMessageRepository).save(argThat(msg ->
-            msg.getStatus() == OutboxStatus.FAILED &&
-            msg.getRetryCount() == 1 &&
-            msg.getErrorMessage() != null
-        ));
+        // Batch-marked FAILED via bulk query
+        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
     }
 
     @Test
@@ -150,12 +145,8 @@ class OutboxPublisherServiceTest {
 
         service.publishPendingMessages();
 
-        // handle() callback should mark FAILED based on actual Kafka error
-        verify(outboxMessageRepository).save(argThat(msg ->
-            msg.getStatus() == OutboxStatus.FAILED &&
-            msg.getErrorMessage() != null &&
-            msg.getErrorMessage().contains("Broker unavailable")
-        ));
+        // Batch-marked FAILED via bulk query after Kafka error
+        verify(outboxMessageRepository).batchMarkFailed(anyList(), anyString(), any(Instant.class));
     }
 
     @Test
@@ -180,14 +171,10 @@ class OutboxPublisherServiceTest {
 
         service.publishPendingMessages();
 
-        // Message must NOT be marked FAILED — it stays SENDING.
-        // cleanupOldMessages() will recover it back to PENDING after 120s.
-        verify(outboxMessageRepository, never()).save(argThat(msg ->
-            msg.getStatus() == OutboxStatus.FAILED
-        ));
-        verify(outboxMessageRepository, never()).save(argThat(msg ->
-            msg.getStatus() == OutboxStatus.PUBLISHED
-        ));
+        // No batch updates should happen — messages still in-flight stay SENDING.
+        // cleanupOldMessages() recovers them back to PENDING after sendingRecoverySeconds.
+        verify(outboxMessageRepository, never()).batchMarkPublished(anyList(), any(Instant.class));
+        verify(outboxMessageRepository, never()).batchMarkFailed(anyList(), anyString(), any(Instant.class));
         // Message remains SENDING (set during claim phase)
         assertThat(message.getStatus()).isEqualTo(OutboxStatus.SENDING);
     }
