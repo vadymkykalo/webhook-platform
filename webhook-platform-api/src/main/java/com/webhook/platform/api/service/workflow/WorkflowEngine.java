@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -35,12 +37,8 @@ public class WorkflowEngine implements DisposableBean {
     private final long defaultNodeTimeoutMs;
     private final int shutdownAwaitSeconds;
 
-    /** Cached thread pool for per-node timeout enforcement. */
-    private final ExecutorService nodeTimeoutExecutor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "wf-node-timeout");
-        t.setDaemon(true);
-        return t;
-    });
+    /** Bounded thread pool for per-node timeout enforcement. */
+    private final ExecutorService nodeTimeoutExecutor;
 
     private final Map<String, NodeExecutor> executors;
     private final WorkflowExecutionPersistence persistence;
@@ -56,6 +54,7 @@ public class WorkflowEngine implements DisposableBean {
             @Value("${workflow.node-timeout.slack-seconds:60}") int slackTimeoutSeconds,
             @Value("${workflow.node-timeout.delay-seconds:305}") int delayTimeoutSeconds,
             @Value("${workflow.node-timeout.create-event-seconds:30}") int createEventTimeoutSeconds,
+            @Value("${workflow.node-timeout.pool-size:16}") int nodeTimeoutPoolSize,
             @Value("${workflow.shutdown.await-termination-seconds:30}") int shutdownAwaitSeconds) {
         this.executors = nodeExecutors.stream()
                 .collect(Collectors.toMap(NodeExecutor::getType, Function.identity()));
@@ -64,6 +63,19 @@ public class WorkflowEngine implements DisposableBean {
         this.maxExecutionMs = maxDurationSeconds * 1000L;
         this.defaultNodeTimeoutMs = defaultTimeoutSeconds * 1000L;
         this.shutdownAwaitSeconds = shutdownAwaitSeconds;
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(
+                nodeTimeoutPoolSize, nodeTimeoutPoolSize,
+                60L, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(nodeTimeoutPoolSize * 4),
+                r -> {
+                    Thread t = new Thread(r, "wf-node-timeout");
+                    t.setDaemon(true);
+                    return t;
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        pool.allowCoreThreadTimeOut(true);
+        this.nodeTimeoutExecutor = pool;
         this.nodeTimeouts = Map.of(
                 "http", httpTimeoutSeconds * 1000L,
                 "slack", slackTimeoutSeconds * 1000L,

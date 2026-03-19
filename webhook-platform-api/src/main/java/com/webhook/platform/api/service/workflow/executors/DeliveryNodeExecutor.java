@@ -104,6 +104,7 @@ public class DeliveryNodeExecutor implements NodeExecutor {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(endpointId.toString())
+                    .projectId(endpoint.getProjectId())
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build());

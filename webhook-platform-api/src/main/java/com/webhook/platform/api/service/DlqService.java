@@ -128,7 +128,7 @@ public class DlqService {
             deliveryRepository.save(delivery);
             
             // Create outbox message for redelivery
-            createOutboxMessage(delivery);
+            createOutboxMessage(delivery, projectId);
             
             log.info("Retrying DLQ delivery: {}", delivery.getId());
             retried++;
@@ -176,7 +176,7 @@ public class DlqService {
                 .build();
     }
 
-    private void createOutboxMessage(Delivery delivery) {
+    private void createOutboxMessage(Delivery delivery, UUID projectId) {
         try {
             DeliveryMessage deliveryMessage = DeliveryMessage.builder()
                     .deliveryId(delivery.getId())
@@ -197,6 +197,7 @@ public class DlqService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(projectId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();

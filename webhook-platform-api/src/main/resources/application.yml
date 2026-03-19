@@ -89,6 +89,7 @@ outbox:
     dead-retention-days: ${OUTBOX_DEAD_RETENTION_DAYS:90}
     sending-recovery-seconds: ${OUTBOX_SENDING_RECOVERY_SECONDS:300}
     batch-send-timeout-seconds: ${OUTBOX_BATCH_SEND_TIMEOUT_SECONDS:30}
+    max-per-project: ${OUTBOX_MAX_PER_PROJECT:30}
 
 data-retention:
   outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
@@ -164,12 +165,15 @@ workflow:
     slack-seconds: ${WORKFLOW_NODE_TIMEOUT_SLACK_SECONDS:60}
     delay-seconds: ${WORKFLOW_NODE_TIMEOUT_DELAY_SECONDS:305}
     create-event-seconds: ${WORKFLOW_NODE_TIMEOUT_CREATE_EVENT_SECONDS:30}
+    pool-size: ${WORKFLOW_NODE_TIMEOUT_POOL_SIZE:16}
   shutdown:
     await-termination-seconds: ${WORKFLOW_SHUTDOWN_AWAIT_SECONDS:30}
   trigger-outbox:
     poll-interval-ms: ${WORKFLOW_TRIGGER_OUTBOX_POLL_INTERVAL_MS:2000}
     batch-size: ${WORKFLOW_TRIGGER_OUTBOX_BATCH_SIZE:50}
     max-attempts: ${WORKFLOW_TRIGGER_OUTBOX_MAX_ATTEMPTS:3}
+    max-per-project: ${WORKFLOW_TRIGGER_OUTBOX_MAX_PER_PROJECT:5}
+    max-concurrent-per-project: ${WORKFLOW_TRIGGER_OUTBOX_MAX_CONCURRENT_PER_PROJECT:3}
 
 rules:
   cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
@@ -202,6 +206,11 @@ springdoc:
   api-docs:
     enabled: ${SWAGGER_ENABLED:true}
     path: /v3/api-docs
+
+entitlement:
+  defaults:
+    rate-limit-per-second: ${ENTITLEMENT_DEFAULT_RATE_LIMIT:100}
+    max-fanout-per-event: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:100}
 
 billing:
   enabled: ${BILLING_ENABLED:false}

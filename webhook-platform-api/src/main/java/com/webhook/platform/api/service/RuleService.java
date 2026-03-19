@@ -76,7 +76,7 @@ public class RuleService {
         rule = ruleRepository.saveAndFlush(rule);
 
         if (request.getActions() != null && !request.getActions().isEmpty()) {
-            saveActions(rule.getId(), request.getActions());
+            saveActions(rule.getId(), projectId, request.getActions());
         }
 
         ruleEngineService.invalidate(projectId);
@@ -137,7 +137,7 @@ public class RuleService {
         if (request.getActions() != null) {
             ruleActionRepository.deleteByRuleId(id);
             ruleActionRepository.flush();
-            saveActions(id, request.getActions());
+            saveActions(id, rule.getProjectId(), request.getActions());
         }
 
         ruleEngineService.invalidate(rule.getProjectId());
@@ -172,28 +172,34 @@ public class RuleService {
 
     // ─── Helpers ────────────────────────────────────────────────────────
 
-    private void saveActions(UUID ruleId, List<RuleActionRequest> actions) {
+    private void saveActions(UUID ruleId, UUID projectId, List<RuleActionRequest> actions) {
         for (int i = 0; i < actions.size(); i++) {
             RuleActionRequest actionReq = actions.get(i);
 
             ActionType actionType = actionReq.getType();
 
-            // Validate endpoint exists for ROUTE
+            // Validate endpoint exists AND belongs to same project for ROUTE
             if (actionType == ActionType.ROUTE) {
                 if (actionReq.getEndpointId() == null) {
                     throw new IllegalArgumentException("ROUTE action requires endpointId");
                 }
-                endpointRepository.findById(actionReq.getEndpointId())
+                Endpoint endpoint = endpointRepository.findById(actionReq.getEndpointId())
                         .orElseThrow(() -> new NotFoundException("Endpoint not found for ROUTE action"));
+                if (!endpoint.getProjectId().equals(projectId)) {
+                    throw new ForbiddenException("Endpoint does not belong to this project");
+                }
             }
 
-            // Validate transformation exists for TRANSFORM
+            // Validate transformation exists AND belongs to same project for TRANSFORM
             if (actionType == ActionType.TRANSFORM) {
                 if (actionReq.getTransformationId() == null) {
                     throw new IllegalArgumentException("TRANSFORM action requires transformationId");
                 }
-                transformationRepository.findById(actionReq.getTransformationId())
+                Transformation transformation = transformationRepository.findById(actionReq.getTransformationId())
                         .orElseThrow(() -> new NotFoundException("Transformation not found for TRANSFORM action"));
+                if (!transformation.getProjectId().equals(projectId)) {
+                    throw new ForbiddenException("Transformation does not belong to this project");
+                }
             }
 
             String configJson;

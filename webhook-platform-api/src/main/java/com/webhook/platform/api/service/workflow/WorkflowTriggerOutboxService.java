@@ -7,7 +7,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Polls {@code workflow_trigger_outbox} and executes workflow triggers durably.
@@ -29,33 +35,74 @@ public class WorkflowTriggerOutboxService {
 
     private final WorkflowTriggerOutboxRepository outboxRepository;
     private final WorkflowTriggerService triggerService;
+    private final Executor workflowTaskExecutor;
     private final MeterRegistry meterRegistry;
     private final int batchSize;
     private final int maxAttempts;
+    private final int maxPerProject;
+    private final int maxConcurrentPerProject;
+
+    /** Per-project in-flight workflow counter. Prevents one project from consuming all executor threads. */
+    private final ConcurrentHashMap<UUID, AtomicInteger> projectInFlight = new ConcurrentHashMap<>();
 
     public WorkflowTriggerOutboxService(
             WorkflowTriggerOutboxRepository outboxRepository,
             WorkflowTriggerService triggerService,
+            @Qualifier("workflowTaskExecutor") Executor workflowTaskExecutor,
             MeterRegistry meterRegistry,
             @Value("${workflow.trigger-outbox.batch-size:50}") int batchSize,
-            @Value("${workflow.trigger-outbox.max-attempts:3}") int maxAttempts) {
+            @Value("${workflow.trigger-outbox.max-attempts:3}") int maxAttempts,
+            @Value("${workflow.trigger-outbox.max-per-project:5}") int maxPerProject,
+            @Value("${workflow.trigger-outbox.max-concurrent-per-project:3}") int maxConcurrentPerProject) {
         this.outboxRepository = outboxRepository;
         this.triggerService = triggerService;
+        this.workflowTaskExecutor = workflowTaskExecutor;
         this.meterRegistry = meterRegistry;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
+        this.maxPerProject = maxPerProject;
+        this.maxConcurrentPerProject = maxConcurrentPerProject;
     }
 
     @Scheduled(fixedDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}")
     @SchedulerLock(name = "workflowTriggerOutboxPoll", lockAtMostFor = "PT30S", lockAtLeastFor = "PT1S")
     public void poll() {
-        List<WorkflowTriggerOutbox> batch = outboxRepository.claimBatch(batchSize);
+        List<WorkflowTriggerOutbox> batch = outboxRepository.claimBatch(batchSize, maxPerProject);
         if (batch.isEmpty()) return;
 
         log.debug("Claimed {} workflow trigger outbox rows", batch.size());
 
         for (WorkflowTriggerOutbox row : batch) {
-            processRow(row);
+            UUID projectId = row.getProjectId();
+            AtomicInteger inFlight = projectInFlight.computeIfAbsent(projectId, k -> new AtomicInteger(0));
+
+            if (inFlight.get() >= maxConcurrentPerProject) {
+                // Project already at max concurrent workflows — defer to next poll
+                log.debug("Project {} at max concurrent workflows ({}), deferring outbox row: id={}",
+                        projectId, maxConcurrentPerProject, row.getId());
+                row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
+                outboxRepository.save(row);
+                continue;
+            }
+
+            inFlight.incrementAndGet();
+            try {
+                workflowTaskExecutor.execute(() -> {
+                    try {
+                        processRow(row);
+                    } finally {
+                        projectInFlight.computeIfPresent(projectId, (k, v) ->
+                                v.decrementAndGet() <= 0 ? null : v);
+                    }
+                });
+            } catch (TaskRejectedException e) {
+                projectInFlight.computeIfPresent(projectId, (k, v) ->
+                        v.decrementAndGet() <= 0 ? null : v);
+                log.warn("Workflow executor full, deferring outbox row: id={}, eventId={}",
+                        row.getId(), row.getEventId());
+                row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
+                outboxRepository.save(row);
+            }
         }
     }
 

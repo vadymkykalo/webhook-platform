@@ -40,11 +40,16 @@ public class EntitlementService {
     private final TunnelSessionRepository tunnelSessionRepository;
     private final QuotaCounterService quotaCounterService;
 
+    private final int defaultRateLimitPerSecond;
+    private final int defaultMaxFanoutPerEvent;
+
     /** Plan cache: orgId → Plan. Avoids DB hit on every request. */
     private final Cache<UUID, Plan> planCache;
 
     public EntitlementService(
             @Value("${billing.enabled:false}") boolean billingEnabled,
+            @Value("${entitlement.defaults.rate-limit-per-second:100}") int defaultRateLimitPerSecond,
+            @Value("${entitlement.defaults.max-fanout-per-event:100}") int defaultMaxFanoutPerEvent,
             OrganizationRepository organizationRepository,
             ProjectRepository projectRepository,
             EndpointRepository endpointRepository,
@@ -53,6 +58,8 @@ public class EntitlementService {
             TunnelSessionRepository tunnelSessionRepository,
             QuotaCounterService quotaCounterService) {
         this.billingEnabled = billingEnabled;
+        this.defaultRateLimitPerSecond = defaultRateLimitPerSecond;
+        this.defaultMaxFanoutPerEvent = defaultMaxFanoutPerEvent;
         this.organizationRepository = organizationRepository;
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
@@ -142,7 +149,7 @@ public class EntitlementService {
     // ── Rate limit ────────────────────────────────────────────────
 
     public int getRateLimit(UUID organizationId) {
-        if (!billingEnabled) return Integer.MAX_VALUE;
+        if (!billingEnabled) return defaultRateLimitPerSecond;
         return getPlan(organizationId).getRateLimitPerSecond();
     }
 
@@ -151,18 +158,18 @@ public class EntitlementService {
      * Used by EventController where only projectId is available (API key auth).
      */
     public int getRateLimitForProject(UUID projectId) {
-        if (!billingEnabled) return Integer.MAX_VALUE;
+        if (!billingEnabled) return defaultRateLimitPerSecond;
         Project project = projectRepository.findById(projectId).orElse(null);
-        if (project == null) return Integer.MAX_VALUE;
+        if (project == null) return defaultRateLimitPerSecond;
         return getRateLimit(project.getOrganizationId());
     }
 
     // ── Fanout limit ────────────────────────────────────────────
 
     public int getMaxFanoutForProject(UUID projectId) {
-        if (!billingEnabled) return Integer.MAX_VALUE;
+        if (!billingEnabled) return defaultMaxFanoutPerEvent;
         Project project = projectRepository.findById(projectId).orElse(null);
-        if (project == null) return 100;
+        if (project == null) return defaultMaxFanoutPerEvent;
         return getPlan(project.getOrganizationId()).getMaxFanoutPerEvent();
     }
 

@@ -43,6 +43,9 @@ public class OutboxMessage {
     @Column(name = "kafka_key", nullable = false)
     private String kafkaKey;
 
+    @Column(name = "project_id")
+    private UUID projectId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

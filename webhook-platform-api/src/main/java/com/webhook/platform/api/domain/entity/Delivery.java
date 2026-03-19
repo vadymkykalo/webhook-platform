@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,8 +29,13 @@ public class Delivery {
     @Column(name = "endpoint_id", nullable = false)
     private UUID endpointId;
 
-    @Column(name = "subscription_id", nullable = false)
+    @Column(name = "subscription_id")
     private UUID subscriptionId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_origin", nullable = false)
+    @Builder.Default
+    private DeliveryOrigin deliveryOrigin = DeliveryOrigin.SUBSCRIPTION;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

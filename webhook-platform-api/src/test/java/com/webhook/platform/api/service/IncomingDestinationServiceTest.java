@@ -214,6 +214,77 @@ class IncomingDestinationServiceTest {
         assertThat(response.getMaxAttempts()).isEqualTo(10);
     }
 
+    // ── P0-8: Transformation project ownership ──
+
+    @Test
+    void createDestination_foreignTransformation_throwsForbidden() {
+        stubOwnership();
+
+        UUID foreignProjectId = UUID.randomUUID();
+        UUID transformId = UUID.randomUUID();
+        com.webhook.platform.api.domain.entity.Transformation foreignTransformation =
+                com.webhook.platform.api.domain.entity.Transformation.builder()
+                        .id(transformId).projectId(foreignProjectId).name("foreign").template("{}").build();
+        when(transformationRepository.findById(transformId)).thenReturn(Optional.of(foreignTransformation));
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .transformationId(transformId)
+                .build();
+
+        assertThatThrownBy(() -> service.createDestination(sourceId, request, orgId))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Transformation does not belong to this project");
+    }
+
+    @Test
+    void createDestination_sameProjectTransformation_succeeds() {
+        stubOwnership();
+        UUID transformId = UUID.randomUUID();
+        com.webhook.platform.api.domain.entity.Transformation sameTransformation =
+                com.webhook.platform.api.domain.entity.Transformation.builder()
+                        .id(transformId).projectId(projectId).name("same").template("{}").build();
+        when(transformationRepository.findById(transformId)).thenReturn(Optional.of(sameTransformation));
+        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> {
+            IncomingDestination d = inv.getArgument(0);
+            d.setId(destId);
+            d.setCreatedAt(Instant.now());
+            d.setUpdatedAt(Instant.now());
+            return d;
+        });
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .transformationId(transformId)
+                .build();
+
+        IncomingDestinationResponse response = service.createDestination(sourceId, request, orgId);
+        assertThat(response.getTransformationId()).isEqualTo(transformId);
+    }
+
+    @Test
+    void updateDestination_foreignTransformation_throwsForbidden() {
+        IncomingDestination dest = buildDest();
+        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        stubOwnership();
+
+        UUID foreignProjectId = UUID.randomUUID();
+        UUID transformId = UUID.randomUUID();
+        com.webhook.platform.api.domain.entity.Transformation foreignTransformation =
+                com.webhook.platform.api.domain.entity.Transformation.builder()
+                        .id(transformId).projectId(foreignProjectId).name("foreign").template("{}").build();
+        when(transformationRepository.findById(transformId)).thenReturn(Optional.of(foreignTransformation));
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .transformationId(transformId)
+                .build();
+
+        assertThatThrownBy(() -> service.updateDestination(destId, request, orgId))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Transformation does not belong to this project");
+    }
+
     @Test
     void deleteDestination_success() {
         IncomingDestination dest = buildDest();

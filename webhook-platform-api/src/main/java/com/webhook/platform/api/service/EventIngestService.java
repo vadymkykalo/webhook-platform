@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
+import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
@@ -271,7 +272,7 @@ public class EventIngestService {
 
         List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
         for (Delivery delivery : savedDeliveries) {
-            outboxMessages.add(createOutboxMessage(delivery));
+            outboxMessages.add(createOutboxMessage(delivery, projectId));
         }
         outboxMessageRepository.saveAll(outboxMessages);
 
@@ -354,6 +355,7 @@ public class EventIngestService {
         return Delivery.builder()
                 .eventId(event.getId())
                 .endpointId(endpointId)
+                .deliveryOrigin(DeliveryOrigin.RULE)
                 .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
                 .maxAttempts(7)
@@ -365,7 +367,7 @@ public class EventIngestService {
                 .build();
     }
 
-    private OutboxMessage createOutboxMessage(Delivery delivery) {
+    private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
         try {
             DeliveryMessage deliveryMessage = DeliveryMessage.builder()
                     .deliveryId(delivery.getId())
@@ -386,6 +388,7 @@ public class EventIngestService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(projectId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();

@@ -15,18 +15,26 @@ import java.util.UUID;
 public interface WorkflowTriggerOutboxRepository extends JpaRepository<WorkflowTriggerOutbox, UUID> {
 
     @Query(value = """
-        UPDATE workflow_trigger_outbox
-        SET status = 'PROCESSING', attempts = attempts + 1
-        WHERE id IN (
-            SELECT id FROM workflow_trigger_outbox
-            WHERE status = 'PENDING'
-            ORDER BY created_at
+        WITH fair_batch AS (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at ASC) AS rn
+                FROM workflow_trigger_outbox
+                WHERE status = 'PENDING'
+            ) sub WHERE rn <= :maxPerProject
+            ORDER BY rn ASC
             LIMIT :batchSize
+        ),
+        locked AS (
+            SELECT id FROM workflow_trigger_outbox
+            WHERE id IN (SELECT id FROM fair_batch)
             FOR UPDATE SKIP LOCKED
         )
+        UPDATE workflow_trigger_outbox
+        SET status = 'PROCESSING', attempts = attempts + 1
+        WHERE id IN (SELECT id FROM locked)
         RETURNING *
         """, nativeQuery = true)
-    List<WorkflowTriggerOutbox> claimBatch(@Param("batchSize") int batchSize);
+    List<WorkflowTriggerOutbox> claimBatch(@Param("batchSize") int batchSize, @Param("maxPerProject") int maxPerProject);
 
     @Modifying
     @Query("DELETE FROM WorkflowTriggerOutbox w WHERE w.status = :status AND w.processedAt < :before")

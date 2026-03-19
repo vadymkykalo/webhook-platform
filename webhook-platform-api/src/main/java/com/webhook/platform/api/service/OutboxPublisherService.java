@@ -42,6 +42,7 @@ public class OutboxPublisherService {
     private final int deadRetentionDays;
     private final long sendingRecoverySeconds;
     private final long batchSendTimeoutSeconds;
+    private final int maxPerProject;
     private final Timer publishLatency;
     private final TransactionTemplate txTemplate;
 
@@ -55,7 +56,8 @@ public class OutboxPublisherService {
             @Value("${outbox.publisher.max-retries:5}") int maxRetries,
             @Value("${outbox.publisher.dead-retention-days:90}") int deadRetentionDays,
             @Value("${outbox.publisher.sending-recovery-seconds:300}") long sendingRecoverySeconds,
-            @Value("${outbox.publisher.batch-send-timeout-seconds:30}") long batchSendTimeoutSeconds) {
+            @Value("${outbox.publisher.batch-send-timeout-seconds:30}") long batchSendTimeoutSeconds,
+            @Value("${outbox.publisher.max-per-project:30}") int maxPerProject) {
         this.outboxMessageRepository = outboxMessageRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
@@ -64,6 +66,7 @@ public class OutboxPublisherService {
         this.deadRetentionDays = deadRetentionDays;
         this.sendingRecoverySeconds = sendingRecoverySeconds;
         this.batchSendTimeoutSeconds = batchSendTimeoutSeconds;
+        this.maxPerProject = maxPerProject;
         this.txTemplate = new TransactionTemplate(txManager);
 
         this.publishLatency = Timer.builder("outbox_publish_latency")
@@ -102,7 +105,7 @@ public class OutboxPublisherService {
         // Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> claimed = txTemplate.execute(status -> {
             List<OutboxMessage> batch = outboxMessageRepository
-                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, 10);
+                    .findPendingBatchForUpdate(OutboxStatus.PENDING.name(), batchSize, 10, maxPerProject);
             for (OutboxMessage msg : batch) {
                 msg.setStatus(OutboxStatus.SENDING);
             }
@@ -124,7 +127,7 @@ public class OutboxPublisherService {
         // Phase 1: claim inside short transaction — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> messagesToRetry = txTemplate.execute(status -> {
             List<OutboxMessage> failedMessages = outboxMessageRepository
-                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10);
+                    .findFailedMessagesForRetry(OutboxStatus.FAILED.name(), maxRetries, batchSize, 10, maxPerProject);
 
             if (failedMessages.isEmpty()) {
                 return List.<OutboxMessage>of();
