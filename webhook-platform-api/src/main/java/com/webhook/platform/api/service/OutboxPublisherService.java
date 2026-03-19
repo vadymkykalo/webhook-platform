@@ -164,30 +164,33 @@ public class OutboxPublisherService {
 
     @Scheduled(fixedDelayString = "${outbox.publisher.cleanup-interval-ms:3600000}")
     @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
-    @Transactional
     public void cleanupOldMessages() {
         // Recover stuck SENDING messages (claimed but app crashed before publish).
         // Default 300s provides margin over Kafka's delivery.timeout.ms (default 120s).
         Instant sendingCutoff = Instant.now().minusSeconds(sendingRecoverySeconds);
-        int recovered = outboxMessageRepository.recoverStuckSendingMessages(sendingCutoff);
-        if (recovered > 0) {
+        Integer recovered = txTemplate.execute(status ->
+                outboxMessageRepository.recoverStuckSendingMessages(sendingCutoff));
+        if (recovered != null && recovered > 0) {
             log.warn("Recovered {} stuck SENDING outbox messages back to PENDING", recovered);
         }
 
         Instant publishedCutoff = Instant.now().minus(Duration.ofDays(3));
-        int deletedPublished = outboxMessageRepository.deleteOldPublishedMessages(
-                OutboxStatus.PUBLISHED.name(), publishedCutoff, 5000);
+        Integer deletedPublished = txTemplate.execute(status ->
+                outboxMessageRepository.deleteOldPublishedMessages(
+                        OutboxStatus.PUBLISHED.name(), publishedCutoff, 5000));
 
         Instant deadCutoff = Instant.now().minus(Duration.ofDays(deadRetentionDays));
-        int deletedDead = outboxMessageRepository.deleteOldPublishedMessages(
-                OutboxStatus.DEAD.name(), deadCutoff, 1000);
+        Integer deletedDead = txTemplate.execute(status ->
+                outboxMessageRepository.deleteOldPublishedMessages(
+                        OutboxStatus.DEAD.name(), deadCutoff, 1000));
 
-        if (deletedPublished > 0 || deletedDead > 0) {
+        if ((deletedPublished != null && deletedPublished > 0) || (deletedDead != null && deletedDead > 0)) {
             log.info("Outbox cleanup: deleted {} published, {} dead messages", deletedPublished, deletedDead);
         }
 
-        long deadCount = outboxMessageRepository.countByStatus(OutboxStatus.DEAD);
-        if (deadCount > 0) {
+        Long deadCount = txTemplate.execute(status ->
+                outboxMessageRepository.countByStatus(OutboxStatus.DEAD));
+        if (deadCount != null && deadCount > 0) {
             log.warn("Outbox has {} DEAD messages (exceeded max retries) awaiting purge", deadCount);
         }
     }
@@ -286,15 +289,20 @@ public class OutboxPublisherService {
             // Since retry_count is incremented server-side (retry_count + 1), we need to check
             // which messages will exceed maxRetries. We use a simple heuristic:
             // on retry path, do individual save for DEAD candidates; batch the rest.
-            List<UUID> failedIds = new ArrayList<>(failedMap.keySet());
-            String firstError = failedMap.values().iterator().next();
-            try {
-                txTemplate.executeWithoutResult(status ->
-                        outboxMessageRepository.batchMarkFailed(failedIds, firstError, now));
-                log.debug("Batch-marked {} outbox messages as FAILED", failedIds.size());
-            } catch (Exception e) {
-                log.error("Failed to batch-mark {} messages as FAILED: {}", failedIds.size(), e.getMessage());
+            // Note: We iterate individually to preserve each message's specific error for debugging.
+            int successCount = 0;
+            for (Map.Entry<UUID, String> entry : failedMap.entrySet()) {
+                UUID messageId = entry.getKey();
+                String error = entry.getValue();
+                try {
+                    txTemplate.executeWithoutResult(status ->
+                            outboxMessageRepository.batchMarkFailed(List.of(messageId), error, now));
+                    successCount++;
+                } catch (Exception e) {
+                    log.error("Failed to mark message {} as FAILED: {}", messageId, e.getMessage());
+                }
             }
+            log.debug("Marked {}/{} outbox messages as FAILED with individual errors", successCount, failedMap.size());
         }
     }
 

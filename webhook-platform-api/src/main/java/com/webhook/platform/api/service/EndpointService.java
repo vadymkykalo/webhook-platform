@@ -21,6 +21,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import reactor.netty.http.client.HttpClient;
 
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
@@ -52,6 +54,9 @@ public class EndpointService {
         this.endpointRepository = endpointRepository;
         this.projectRepository = projectRepository;
         this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(
+                        SsrfProtectionCustomizer.apply(
+                                HttpClient.create(), allowPrivateIps)))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-Test")
                 .build();
         this.encryptionKeyRegistry = encryptionKeyRegistry;

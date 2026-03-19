@@ -5,7 +5,10 @@ import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RAtomicLong;
 import org.redisson.api.RBucket;
+import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.LongCodec;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +44,8 @@ public class CircuitBreakerService {
     private final long slowCallThresholdMs;
     private final int slowCallRateThreshold;
     private final Counter slowTripCounter;
+    private final String recordSuccessScript;
+    private final String recordFailureScript;
 
     public CircuitBreakerService(
             RedissonClient redissonClient,
@@ -69,6 +74,9 @@ public class CircuitBreakerService {
                 .description("Circuit breaker trips due to slow call rate")
                 .register(meterRegistry);
 
+        this.recordSuccessScript = loadLuaScript("lua/circuit_breaker_record_success.lua");
+        this.recordFailureScript = loadLuaScript("lua/circuit_breaker_record_failure.lua");
+
         log.info("Redis circuit breaker initialized: failureRate={}%, minCalls={}, waitDuration={}s, windowTTL={}s, slowThreshold={}ms, slowRate={}%",
                 failureRateThreshold, minimumNumberOfCalls, waitDurationSeconds, windowTtlSeconds, slowCallThresholdMs, slowCallRateThreshold);
     }
@@ -91,24 +99,25 @@ public class CircuitBreakerService {
 
     public void recordSuccess(UUID endpointId, long durationMs) {
         try {
-            RAtomicLong calls = redissonClient.getAtomicLong(callsKey(endpointId));
-            long callCount = calls.incrementAndGet();
-            calls.expire(Duration.ofSeconds(windowTtlSeconds));
+            RScript script = redissonClient.getScript(LongCodec.INSTANCE);
+            java.util.List<Object> result = script.eval(
+                    RScript.Mode.READ_WRITE,
+                    recordSuccessScript,
+                    RScript.ReturnType.MULTI,
+                    java.util.Arrays.asList(callsKey(endpointId), slowKey(endpointId)),
+                    windowTtlSeconds, durationMs, slowCallThresholdMs, minimumNumberOfCalls, slowCallRateThreshold
+            );
 
-            if (durationMs >= slowCallThresholdMs) {
-                RAtomicLong slows = redissonClient.getAtomicLong(slowKey(endpointId));
-                long slowCount = slows.incrementAndGet();
-                slows.expire(Duration.ofSeconds(windowTtlSeconds));
+            long callCount = ((Number) result.get(0)).longValue();
+            long slowCount = ((Number) result.get(1)).longValue();
+            long shouldTrip = ((Number) result.get(2)).longValue();
 
-                if (callCount >= minimumNumberOfCalls) {
-                    long slowRate = (slowCount * 100) / callCount;
-                    if (slowRate >= slowCallRateThreshold) {
-                        log.warn("Endpoint {} slow call rate {}% >= {}% ({}ms threshold), tripping circuit",
-                                endpointId, slowRate, slowCallRateThreshold, slowCallThresholdMs);
-                        slowTripCounter.increment();
-                        tripCircuit(endpointId, slowRate);
-                    }
-                }
+            if (shouldTrip == 1) {
+                long slowRate = (slowCount * 100) / callCount;
+                log.warn("Endpoint {} slow call rate {}% >= {}% ({}ms threshold), tripping circuit",
+                        endpointId, slowRate, slowCallRateThreshold, slowCallThresholdMs);
+                slowTripCounter.increment();
+                tripCircuit(endpointId, slowRate);
             }
         } catch (Exception e) {
             log.debug("Redis unavailable for circuit breaker success recording: {}", e.getMessage());
@@ -117,19 +126,22 @@ public class CircuitBreakerService {
 
     public void recordFailure(UUID endpointId, Throwable throwable) {
         try {
-            RAtomicLong fails = redissonClient.getAtomicLong(failsKey(endpointId));
-            long failCount = fails.incrementAndGet();
-            fails.expire(Duration.ofSeconds(windowTtlSeconds));
+            RScript script = redissonClient.getScript(LongCodec.INSTANCE);
+            java.util.List<Object> result = script.eval(
+                    RScript.Mode.READ_WRITE,
+                    recordFailureScript,
+                    RScript.ReturnType.MULTI,
+                    java.util.Arrays.asList(failsKey(endpointId), callsKey(endpointId)),
+                    windowTtlSeconds, minimumNumberOfCalls, failureRateThreshold
+            );
 
-            RAtomicLong calls = redissonClient.getAtomicLong(callsKey(endpointId));
-            long callCount = calls.incrementAndGet();
-            calls.expire(Duration.ofSeconds(windowTtlSeconds));
+            long failCount = ((Number) result.get(0)).longValue();
+            long callCount = ((Number) result.get(1)).longValue();
+            long shouldTrip = ((Number) result.get(2)).longValue();
+            long failureRate = ((Number) result.get(3)).longValue();
 
-            if (callCount >= minimumNumberOfCalls) {
-                long failureRate = (failCount * 100) / callCount;
-                if (failureRate >= failureRateThreshold) {
-                    tripCircuit(endpointId, failureRate);
-                }
+            if (shouldTrip == 1) {
+                tripCircuit(endpointId, failureRate);
             }
         } catch (Exception e) {
             log.debug("Redis unavailable for circuit breaker failure recording: {}", e.getMessage());
@@ -173,5 +185,14 @@ public class CircuitBreakerService {
 
     private String slowKey(UUID endpointId) {
         return KEY_PREFIX + endpointId + ":slow";
+    }
+
+    private String loadLuaScript(String path) {
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            return new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load Lua script: " + path, e);
+        }
     }
 }

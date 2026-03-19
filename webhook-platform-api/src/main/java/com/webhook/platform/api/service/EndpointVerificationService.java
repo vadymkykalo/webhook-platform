@@ -11,6 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.beans.factory.annotation.Value;
+import reactor.netty.http.client.HttpClient;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -21,13 +24,22 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class EndpointVerificationService {
 
     private final EndpointRepository endpointRepository;
     private final WebClient.Builder webClientBuilder;
+    private final boolean allowPrivateIps;
 
     private static final int VERIFICATION_TIMEOUT_SECONDS = 10;
+
+    public EndpointVerificationService(
+            EndpointRepository endpointRepository,
+            WebClient.Builder webClientBuilder,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
+        this.endpointRepository = endpointRepository;
+        this.webClientBuilder = webClientBuilder;
+        this.allowPrivateIps = allowPrivateIps;
+    }
 
     public String generateVerificationToken() {
         byte[] bytes = new byte[32];
@@ -61,6 +73,9 @@ public class EndpointVerificationService {
 
         try {
             WebClient webClient = webClientBuilder
+                    .clientConnector(new ReactorClientHttpConnector(
+                            SsrfProtectionCustomizer.apply(
+                                    HttpClient.create(), allowPrivateIps)))
                     .defaultHeader("User-Agent", "WebhookPlatform/1.0 Verification")
                     .build();
 
