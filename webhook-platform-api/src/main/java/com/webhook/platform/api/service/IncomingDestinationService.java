@@ -67,11 +67,28 @@ public class IncomingDestinationService {
         }
     }
 
+    private UUID resolveProjectIdForSource(UUID sourceId) {
+        IncomingSource source = sourceRepository.findById(sourceId)
+                .orElseThrow(() -> new NotFoundException("Incoming source not found"));
+        return source.getProjectId();
+    }
+
+    private void validateTransformationBelongsToProject(UUID transformationId, UUID projectId) {
+        Transformation transformation = transformationRepository.findById(transformationId)
+                .orElseThrow(() -> new NotFoundException("Transformation not found"));
+        if (!transformation.getProjectId().equals(projectId)) {
+            throw new ForbiddenException("Transformation does not belong to this project");
+        }
+    }
+
     @Auditable(action = AuditAction.CREATE, resourceType = "IncomingDestination")
     @Transactional
     public IncomingDestinationResponse createDestination(UUID sourceId, IncomingDestinationRequest request, UUID organizationId) {
         validateSourceOwnership(sourceId, organizationId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
+        if (request.getTransformationId() != null) {
+            validateTransformationBelongsToProject(request.getTransformationId(), resolveProjectIdForSource(sourceId));
+        }
 
         IncomingDestination destination = IncomingDestination.builder()
                 .incomingSourceId(sourceId)
@@ -151,6 +168,8 @@ public class IncomingDestinationService {
             destination.setPayloadTransform(request.getPayloadTransform().isBlank() ? null : request.getPayloadTransform());
         }
         if (request.getTransformationId() != null) {
+            validateTransformationBelongsToProject(request.getTransformationId(),
+                    resolveProjectIdForSource(destination.getIncomingSourceId()));
             destination.setTransformationId(request.getTransformationId());
         }
 

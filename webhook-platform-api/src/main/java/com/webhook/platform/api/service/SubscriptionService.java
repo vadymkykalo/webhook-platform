@@ -3,9 +3,11 @@ package com.webhook.platform.api.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
+import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.entity.Transformation;
+import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
@@ -27,16 +29,19 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final ProjectRepository projectRepository;
+    private final EndpointRepository endpointRepository;
     private final TransformationRepository transformationRepository;
     private final ObjectMapper objectMapper;
 
     public SubscriptionService(
             SubscriptionRepository subscriptionRepository,
             ProjectRepository projectRepository,
+            EndpointRepository endpointRepository,
             TransformationRepository transformationRepository,
             ObjectMapper objectMapper) {
         this.subscriptionRepository = subscriptionRepository;
         this.projectRepository = projectRepository;
+        this.endpointRepository = endpointRepository;
         this.transformationRepository = transformationRepository;
         this.objectMapper = objectMapper;
     }
@@ -49,11 +54,31 @@ public class SubscriptionService {
         }
     }
 
+    private void validateEndpointBelongsToProject(UUID endpointId, UUID projectId) {
+        Endpoint endpoint = endpointRepository.findById(endpointId)
+                .orElseThrow(() -> new NotFoundException("Endpoint not found"));
+        if (!endpoint.getProjectId().equals(projectId)) {
+            throw new ForbiddenException("Endpoint does not belong to this project");
+        }
+    }
+
+    private void validateTransformationBelongsToProject(UUID transformationId, UUID projectId) {
+        Transformation transformation = transformationRepository.findById(transformationId)
+                .orElseThrow(() -> new NotFoundException("Transformation not found"));
+        if (!transformation.getProjectId().equals(projectId)) {
+            throw new ForbiddenException("Transformation does not belong to this project");
+        }
+    }
+
     @Auditable(action = AuditAction.CREATE, resourceType = "Subscription")
     @Transactional
     public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
         validatePayloadTemplate(request.getPayloadTemplate());
+        validateEndpointBelongsToProject(request.getEndpointId(), projectId);
+        if (request.getTransformationId() != null) {
+            validateTransformationBelongsToProject(request.getTransformationId(), projectId);
+        }
 
         if (subscriptionRepository.existsByEndpointIdAndEventType(request.getEndpointId(), request.getEventType())) {
             throw new ConflictException("Subscription for this endpoint and event type already exists");
@@ -99,6 +124,7 @@ public class SubscriptionService {
         validateProjectOwnership(subscription.getProjectId(), organizationId);
         
         if (request.getEndpointId() != null) {
+            validateEndpointBelongsToProject(request.getEndpointId(), subscription.getProjectId());
             subscription.setEndpointId(request.getEndpointId());
         }
         if (request.getEventType() != null) {
@@ -128,6 +154,7 @@ public class SubscriptionService {
         }
         // transformationId: explicit null clears the link, non-null sets it
         if (request.getTransformationId() != null) {
+            validateTransformationBelongsToProject(request.getTransformationId(), subscription.getProjectId());
             subscription.setTransformationId(request.getTransformationId());
         }
         

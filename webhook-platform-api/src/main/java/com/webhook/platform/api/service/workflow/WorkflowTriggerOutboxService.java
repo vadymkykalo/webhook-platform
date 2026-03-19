@@ -7,7 +7,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * Polls {@code workflow_trigger_outbox} and executes workflow triggers durably.
@@ -29,6 +32,7 @@ public class WorkflowTriggerOutboxService {
 
     private final WorkflowTriggerOutboxRepository outboxRepository;
     private final WorkflowTriggerService triggerService;
+    private final Executor workflowTaskExecutor;
     private final MeterRegistry meterRegistry;
     private final int batchSize;
     private final int maxAttempts;
@@ -36,11 +40,13 @@ public class WorkflowTriggerOutboxService {
     public WorkflowTriggerOutboxService(
             WorkflowTriggerOutboxRepository outboxRepository,
             WorkflowTriggerService triggerService,
+            @Qualifier("workflowTaskExecutor") Executor workflowTaskExecutor,
             MeterRegistry meterRegistry,
             @Value("${workflow.trigger-outbox.batch-size:50}") int batchSize,
             @Value("${workflow.trigger-outbox.max-attempts:3}") int maxAttempts) {
         this.outboxRepository = outboxRepository;
         this.triggerService = triggerService;
+        this.workflowTaskExecutor = workflowTaskExecutor;
         this.meterRegistry = meterRegistry;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
@@ -55,7 +61,15 @@ public class WorkflowTriggerOutboxService {
         log.debug("Claimed {} workflow trigger outbox rows", batch.size());
 
         for (WorkflowTriggerOutbox row : batch) {
-            processRow(row);
+            try {
+                workflowTaskExecutor.execute(() -> processRow(row));
+            } catch (TaskRejectedException e) {
+                // Executor full — put row back to PENDING for next poll cycle
+                log.warn("Workflow executor full, deferring outbox row: id={}, eventId={}",
+                        row.getId(), row.getEventId());
+                row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
+                outboxRepository.save(row);
+            }
         }
     }
 

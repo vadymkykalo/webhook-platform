@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
+import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
@@ -354,6 +355,7 @@ public class EventIngestService {
         return Delivery.builder()
                 .eventId(event.getId())
                 .endpointId(endpointId)
+                .deliveryOrigin(DeliveryOrigin.RULE)
                 .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
                 .maxAttempts(7)

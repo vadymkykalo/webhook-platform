@@ -24,8 +24,13 @@ public class Delivery {
     @Column(name = "endpoint_id", nullable = false)
     private UUID endpointId;
 
-    @Column(name = "subscription_id", nullable = false)
+    @Column(name = "subscription_id")
     private UUID subscriptionId;
+
+    @Column(name = "delivery_origin", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private DeliveryOrigin deliveryOrigin = DeliveryOrigin.SUBSCRIPTION;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -88,5 +93,9 @@ public class Delivery {
 
     public enum DeliveryStatus {
         PENDING, PROCESSING, SUCCESS, FAILED, DLQ
+    }
+
+    public enum DeliveryOrigin {
+        SUBSCRIPTION, RULE
     }
 }
