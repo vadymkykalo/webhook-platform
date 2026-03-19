@@ -52,7 +52,7 @@ public class SecurityConfig {
                                 .authorizeHttpRequests(auth -> {
                                         auth
                                                         .requestMatchers("/actuator/health", "/actuator/health/**",
-                                                                        "/actuator/info", "/actuator/prometheus")
+                                                                        "/actuator/info")
                                                         .permitAll()
                                                         .requestMatchers("/actuator/**").authenticated()
                                                         .requestMatchers("/hook/**").permitAll()

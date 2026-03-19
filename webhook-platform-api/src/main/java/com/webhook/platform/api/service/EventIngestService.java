@@ -101,7 +101,7 @@ public class EventIngestService {
                 var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
                 if (existingEvent.isPresent()) {
                     log.info("Idempotency race resolved, returning existing event: {}", existingEvent.get().getId());
-                    Counter.builder("events_duplicate_total").tag("event_type", request.getType()).register(meterRegistry).increment();
+                    Counter.builder("events_duplicate_total").register(meterRegistry).increment();
                     return buildResponse(existingEvent.get(), 0);
                 }
             }
@@ -127,7 +127,7 @@ public class EventIngestService {
             if (existingEvent.isPresent()) {
                 Event event = existingEvent.get();
                 log.info("Duplicate event detected, returning existing event: {}", event.getId());
-                Counter.builder("events_duplicate_total").tag("event_type", request.getType()).register(meterRegistry).increment();
+                Counter.builder("events_duplicate_total").register(meterRegistry).increment();
                 return buildResponse(event, 0);
             }
         }
@@ -157,7 +157,7 @@ public class EventIngestService {
 
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);
-        Counter.builder("events_ingested_total").tag("event_type", request.getType()).register(meterRegistry).increment();
+        Counter.builder("events_ingested_total").register(meterRegistry).increment();
         // Increment Redis quota counter (fire-and-forget, approximate is OK)
         if (project != null) {
             quotaCounterService.increment(project.getOrganizationId());
@@ -180,7 +180,7 @@ public class EventIngestService {
                     dropEvent = true;
                     log.info("Rule '{}' DROP action — skipping deliveries for event {}",
                             match.rule().getName(), event.getId());
-                    Counter.builder("rules_drop_total").tag("project_id", projectId.toString()).register(meterRegistry).increment();
+                    Counter.builder("rules_drop_total").register(meterRegistry).increment();
                     break;
                 }
                 for (CompiledRule.CompiledAction action : match.getRouteActions()) {
@@ -194,7 +194,7 @@ public class EventIngestService {
             }
 
             if (!ruleMatches.isEmpty()) {
-                Counter.builder("rules_matched_total").tag("project_id", projectId.toString())
+                Counter.builder("rules_matched_total")
                         .register(meterRegistry).increment(ruleMatches.size());
             }
         } catch (Exception e) {
@@ -226,7 +226,7 @@ public class EventIngestService {
         if (totalFanout > maxFanout) {
             log.warn("Fanout limit exceeded for event type '{}' in project {}: {} targets > max {}",
                     request.getType(), projectId, totalFanout, maxFanout);
-            Counter.builder("events_fanout_limited_total").tag("project_id", projectId.toString())
+            Counter.builder("events_fanout_limited_total")
                     .register(meterRegistry).increment();
             throw new IllegalArgumentException(
                     "Fanout limit exceeded: event would create " + totalFanout +
@@ -277,7 +277,7 @@ public class EventIngestService {
         outboxMessageRepository.saveAll(outboxMessages);
 
         int deliveriesCreated = savedDeliveries.size();
-        Counter.builder("deliveries_created_total").tag("project_id", projectId.toString()).register(meterRegistry).increment(deliveriesCreated);
+        Counter.builder("deliveries_created_total").register(meterRegistry).increment(deliveriesCreated);
 
         log.info("Created {} deliveries for event: {} (rules matched: {})",
                 deliveriesCreated, event.getId(), ruleMatches.size());
@@ -381,6 +381,8 @@ public class EventIngestService {
                     .build();
             
             String payload = objectMapper.writeValueAsString(deliveryMessage);
+            String correlationId = org.slf4j.MDC.get("correlationId");
+            
             return OutboxMessage.builder()
                     .aggregateType("Delivery")
                     .aggregateId(delivery.getId())
@@ -389,6 +391,7 @@ public class EventIngestService {
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
                     .projectId(projectId)
+                    .correlationId(correlationId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();

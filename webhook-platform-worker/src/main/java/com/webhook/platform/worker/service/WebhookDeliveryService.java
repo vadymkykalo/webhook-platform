@@ -155,19 +155,11 @@ public class WebhookDeliveryService {
     }
 
     private void doProcessDelivery(DeliveryMessage message) {
-        // Atomic claim inside explicit transaction (no @Transactional on caller)
-        Integer claimed = transactionTemplate
-                .execute(tx -> deliveryRepository.claimForProcessing(message.getDeliveryId()));
-        if (claimed == null || claimed == 0) {
-            log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
-            return;
-        }
-
-        // Re-read with fresh version after atomic claim
+        // Atomic claim + read in single transaction (UPDATE ... RETURNING *)
         Delivery delivery = transactionTemplate
-                .execute(tx -> deliveryRepository.findById(message.getDeliveryId()).orElse(null));
+                .execute(tx -> deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId()));
         if (delivery == null) {
-            log.error("Delivery not found after claim: {}", message.getDeliveryId());
+            log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
             return;
         }
 
@@ -566,26 +558,27 @@ public class WebhookDeliveryService {
      */
     private void triggerBufferedDeliveries(UUID endpointId) {
         List<UUID> readyDeliveries = orderingBufferService.getReadyDeliveries(endpointId);
+        if (readyDeliveries.isEmpty()) {
+            return;
+        }
 
-        for (UUID deliveryId : readyDeliveries) {
-            Optional<Delivery> deliveryOpt = deliveryRepository.findById(deliveryId);
-            if (deliveryOpt.isPresent()) {
-                Delivery delivery = deliveryOpt.get();
-                DeliveryMessage message = DeliveryMessage.builder()
-                        .deliveryId(delivery.getId())
-                        .eventId(delivery.getEventId())
-                        .endpointId(delivery.getEndpointId())
-                        .subscriptionId(delivery.getSubscriptionId())
-                        .status(delivery.getStatus().name())
-                        .attemptCount(delivery.getAttemptCount())
-                        .sequenceNumber(delivery.getSequenceNumber())
-                        .orderingEnabled(delivery.getOrderingEnabled())
-                        .build();
+        List<Delivery> deliveries = deliveryRepository.findAllById(readyDeliveries);
+        
+        for (Delivery delivery : deliveries) {
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(delivery.getId())
+                    .eventId(delivery.getEventId())
+                    .endpointId(delivery.getEndpointId())
+                    .subscriptionId(delivery.getSubscriptionId())
+                    .status(delivery.getStatus().name())
+                    .attemptCount(delivery.getAttemptCount())
+                    .sequenceNumber(delivery.getSequenceNumber())
+                    .orderingEnabled(delivery.getOrderingEnabled())
+                    .build();
 
-                kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(), message);
-                log.info("Triggered buffered delivery {} (seq={}) for endpoint {}",
-                        deliveryId, delivery.getSequenceNumber(), endpointId);
-            }
+            kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(), message);
+            log.info("Triggered buffered delivery {} (seq={}) for endpoint {}",
+                    delivery.getId(), delivery.getSequenceNumber(), endpointId);
         }
     }
 

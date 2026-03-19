@@ -113,8 +113,7 @@ public class IngressService {
                 if (existing.isPresent()) {
                     log.info("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
                             source.get().getId(), providerEventId, existing.get().getId());
-                    meterRegistry.counter("incoming_events_deduplicated_total",
-                            "source_id", source.get().getId().toString()).increment();
+                    meterRegistry.counter("incoming_events_deduplicated_total").increment();
                     return existing.get();
                 }
             }
@@ -177,7 +176,6 @@ public class IngressService {
         // Block immediately when signature verification is configured and not verified
         if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verified)) {
             meterRegistry.counter("incoming_events_rejected_total",
-                    "source_id", source.getId().toString(),
                     "reason", "signature_verification_failed").increment();
             String reason = verificationError != null ? verificationError : "Verification not completed";
             log.warn("Rejecting incoming webhook due to failed signature verification: sourceId={}, error={}",
@@ -194,8 +192,7 @@ public class IngressService {
             if (existing.isPresent()) {
                 log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
                         source.getId(), providerEventId, existing.get().getId());
-                meterRegistry.counter("incoming_events_deduplicated_total",
-                        "source_id", source.getId().toString()).increment();
+                meterRegistry.counter("incoming_events_deduplicated_total").increment();
                 return existing.get();
             }
         }
@@ -222,7 +219,6 @@ public class IngressService {
         event = eventRepository.save(event);
 
         meterRegistry.counter("incoming_events_received_total",
-                "source_id", source.getId().toString(),
                 "provider_type", source.getProviderType().name()).increment();
 
         log.info("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",

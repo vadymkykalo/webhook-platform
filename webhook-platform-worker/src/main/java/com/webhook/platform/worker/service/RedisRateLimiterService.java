@@ -34,6 +34,11 @@ public class RedisRateLimiterService {
             .expireAfterAccess(Duration.ofMinutes(5))
             .build();
 
+    private final Cache<String, Boolean> initializedLimiters = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterWrite(Duration.ofMinutes(20))
+            .build();
+
     public RedisRateLimiterService(RedissonClient redissonClient, MeterRegistry meterRegistry) {
         this.redissonClient = redissonClient;
         this.rateLimitHits = Counter.builder("webhook_rate_limit_hits_total")
@@ -57,8 +62,11 @@ public class RedisRateLimiterService {
             String key = KEY_PREFIX + endpointId;
             RRateLimiter limiter = redissonClient.getRateLimiter(key);
 
-            limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
+            if (initializedLimiters.getIfPresent(key) == null) {
+                limiter.trySetRate(RateType.OVERALL, ratePerSecond, 1, RateIntervalUnit.SECONDS);
+                limiter.expire(KEY_TTL);
+                initializedLimiters.put(key, Boolean.TRUE);
+            }
 
             boolean acquired = limiter.tryAcquire(1);
             if (acquired) {

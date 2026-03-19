@@ -1,8 +1,12 @@
 package com.webhook.platform.common.security;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -15,6 +19,12 @@ public class UrlValidator {
             "metadata.google.internal",
             "169.254.169.254"
     );
+
+    // DNS resolution cache: 10min TTL, max 1000 entries
+    private static final Cache<String, InetAddress[]> DNS_CACHE = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofMinutes(10))
+            .maximumSize(1000)
+            .build();
 
     public static void validateWebhookUrl(String url, boolean allowPrivateIps, List<String> allowedHosts) {
         if (url == null || url.trim().isEmpty()) {
@@ -42,7 +52,7 @@ public class UrlValidator {
                 return;
             }
 
-            InetAddress[] addresses = InetAddress.getAllByName(host);
+            InetAddress[] addresses = resolveHost(host);
             
             for (InetAddress address : addresses) {
                 if (!allowPrivateIps && isPrivateOrLocalAddress(address)) {
@@ -135,6 +145,17 @@ public class UrlValidator {
         }
 
         return false;
+    }
+
+    private static InetAddress[] resolveHost(String host) throws UnknownHostException {
+        InetAddress[] cached = DNS_CACHE.getIfPresent(host);
+        if (cached != null) {
+            return cached;
+        }
+
+        InetAddress[] addresses = InetAddress.getAllByName(host);
+        DNS_CACHE.put(host, addresses);
+        return addresses;
     }
 
     public static class InvalidUrlException extends RuntimeException {

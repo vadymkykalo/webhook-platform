@@ -2,6 +2,7 @@ package com.webhook.platform.api.security;
 
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.service.TokenBlacklistService;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,29 +43,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authHeader.substring(BEARER_PREFIX.length());
             
             try {
-                if (jwtUtil.validateToken(token)) {
-                    String jti = jwtUtil.getJtiFromToken(token);
-                    if (tokenBlacklistService.isBlacklisted(jti)) {
-                        log.debug("Token jti={} is blacklisted, rejecting", jti);
+                Claims claims = jwtUtil.parseToken(token);
+                
+                String jti = claims.getId();
+                if (tokenBlacklistService.isBlacklisted(jti)) {
+                    log.debug("Token jti={} is blacklisted, rejecting", jti);
+                } else {
+                    UUID userId = UUID.fromString(claims.getSubject());
+
+                    if (tokenBlacklistService.isTokenRevokedByEpoch(userId, claims.getIssuedAt())) {
+                        log.debug("Token for user {} was issued before revocation epoch, rejecting", userId);
                     } else {
-                        UUID userId = jwtUtil.getUserIdFromToken(token);
+                        UUID organizationId = UUID.fromString(claims.get("organizationId", String.class));
+                        MembershipRole role = MembershipRole.valueOf(claims.get("role", String.class));
 
-                        if (tokenBlacklistService.isTokenRevokedByEpoch(userId, jwtUtil.getIssuedAtFromToken(token))) {
-                            log.debug("Token for user {} was issued before revocation epoch, rejecting", userId);
-                        } else {
-                            UUID organizationId = jwtUtil.getOrganizationIdFromToken(token);
-                            MembershipRole role = jwtUtil.getRoleFromToken(token);
-
-                            JwtAuthenticationToken authentication = new JwtAuthenticationToken(
-                                    userId,
-                                    organizationId,
-                                    role,
-                                    Collections.emptyList()
-                            );
-                            SecurityContextHolder.getContext().setAuthentication(authentication);
-                            MDC.put("organizationId", organizationId.toString());
-                            MDC.put("userId", userId.toString());
-                        }
+                        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+                                userId,
+                                organizationId,
+                                role,
+                                Collections.emptyList()
+                        );
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        MDC.put("organizationId", organizationId.toString());
+                        MDC.put("userId", userId.toString());
                     }
                 }
             } catch (Exception e) {
@@ -78,6 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             MDC.remove("organizationId");
             MDC.remove("userId");
             MDC.remove("projectId");
+            JwtUtil.clearCache();
         }
     }
 }

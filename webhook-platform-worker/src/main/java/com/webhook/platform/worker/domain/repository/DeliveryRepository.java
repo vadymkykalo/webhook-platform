@@ -51,6 +51,12 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             "WHERE id = :id AND status = 'PENDING'", nativeQuery = true)
     int claimForProcessing(@Param("id") UUID id);
 
+    @Query(value = "UPDATE deliveries SET status = 'PROCESSING', " +
+            "last_attempt_at = now(), updated_at = now(), version = version + 1 " +
+            "WHERE id = :id AND status = 'PENDING' " +
+            "RETURNING *", nativeQuery = true)
+    Delivery claimForProcessingAndReturn(@Param("id") UUID id);
+
     @Modifying
     @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
             "updated_at = now(), version = version + 1 " +

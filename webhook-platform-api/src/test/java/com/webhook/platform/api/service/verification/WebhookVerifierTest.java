@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,6 +27,9 @@ class WebhookVerifierTest {
     @Mock
     private HttpServletRequest request;
 
+    @Mock
+    private ReplayDetectionService replayDetectionService;
+
     private static final String SECRET = "whsec_test_secret_key";
     private static final String BODY = "{\"event\":\"push\",\"ref\":\"refs/heads/main\"}";
 
@@ -33,7 +37,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_success() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "", null, null);
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Signature")).thenReturn(hmac);
 
@@ -45,7 +49,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_withPrefix() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Sig", "sha256=");
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Sig", "sha256=", null, null);
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Sig")).thenReturn("sha256=" + hmac);
 
@@ -56,7 +60,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_missingHeader() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "", null, null);
         when(request.getHeader("X-Signature")).thenReturn(null);
 
         var result = verifier.verify(SECRET, BODY, request);
@@ -67,7 +71,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_mismatch() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "", null, null);
         when(request.getHeader("X-Signature")).thenReturn("wrong_signature");
 
         var result = verifier.verify(SECRET, BODY, request);
@@ -279,7 +283,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsNullForNone() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.NONE, null);
 
         assertThat(factory.getVerifier(source)).isNull();
@@ -287,7 +291,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsGenericHmac() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.HMAC_GENERIC, null);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(GenericHmacVerifier.class);
@@ -295,7 +299,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsGitHubForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GITHUB);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(GitHubVerifier.class);
@@ -303,7 +307,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsStripeForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.STRIPE);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(StripeVerifier.class);
@@ -311,7 +315,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsSlackForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.SLACK);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(SlackVerifier.class);
@@ -319,7 +323,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsShopifyForProvider() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.SHOPIFY);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(ShopifyVerifier.class);
@@ -327,7 +331,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_throwsForGenericProviderInProviderMode() {
-        var factory = new WebhookVerifierFactory();
+        var factory = new WebhookVerifierFactory(replayDetectionService);
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GENERIC);
 
         assertThatThrownBy(() -> factory.getVerifier(source))
@@ -339,6 +343,7 @@ class WebhookVerifierTest {
 
     private IncomingSource buildSource(VerificationMode mode, ProviderType providerType) {
         return IncomingSource.builder()
+                .id(UUID.randomUUID())
                 .verificationMode(mode)
                 .providerType(providerType != null ? providerType : ProviderType.GENERIC)
                 .hmacHeaderName("X-Signature")

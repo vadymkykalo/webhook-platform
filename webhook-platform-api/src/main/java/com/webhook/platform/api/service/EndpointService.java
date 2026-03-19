@@ -21,6 +21,8 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import reactor.netty.http.client.HttpClient;
 
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
@@ -41,6 +43,7 @@ public class EndpointService {
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
+    private final boolean endpointVerificationRequired;
 
     public EndpointService(
             EndpointRepository endpointRepository,
@@ -48,15 +51,20 @@ public class EndpointService {
             WebClient.Builder webClientBuilder,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
+            @Value("${webhook.endpoint-verification-required:false}") boolean endpointVerificationRequired) {
         this.endpointRepository = endpointRepository;
         this.projectRepository = projectRepository;
         this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(
+                        SsrfProtectionCustomizer.apply(
+                                HttpClient.create(), allowPrivateIps)))
                 .defaultHeader("User-Agent", "WebhookPlatform/1.0-Test")
                 .build();
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+        this.endpointVerificationRequired = endpointVerificationRequired;
     }
 
     private void validateProjectOwnership(UUID projectId, UUID organizationId) {
@@ -93,6 +101,12 @@ public class EndpointService {
         
         if (request.getEnabled() != null) {
             endpoint.setEnabled(request.getEnabled());
+        }
+        
+        // Set verification status based on feature flag
+        if (endpointVerificationRequired) {
+            endpoint.setVerificationStatus(Endpoint.VerificationStatus.PENDING);
+            log.debug("Endpoint verification required, setting status to PENDING for endpoint: {}", endpoint.getUrl());
         }
         
         endpoint = endpointRepository.saveAndFlush(endpoint);

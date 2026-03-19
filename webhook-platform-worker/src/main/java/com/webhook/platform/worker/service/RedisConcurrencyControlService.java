@@ -31,6 +31,11 @@ public class RedisConcurrencyControlService {
             .maximumSize(10_000)
             .expireAfterAccess(Duration.ofMinutes(5))
             .build();
+
+    private final Cache<String, Boolean> initializedSemaphores = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterWrite(Duration.ofMinutes(20))
+            .build();
     private final int maxConcurrentPerEndpoint;
     private final Counter concurrencyAcquired;
     private final Counter concurrencyRejected;
@@ -69,7 +74,11 @@ public class RedisConcurrencyControlService {
         
         try {
             RPermitExpirableSemaphore semaphore = redissonClient.getPermitExpirableSemaphore(key);
-            semaphore.trySetPermits(maxConcurrentPerEndpoint);
+            
+            if (initializedSemaphores.getIfPresent(key) == null) {
+                semaphore.trySetPermits(maxConcurrentPerEndpoint);
+                initializedSemaphores.put(key, Boolean.TRUE);
+            }
             
             String permitId = semaphore.tryAcquire(100, TimeUnit.MILLISECONDS);
             if (permitId != null) {

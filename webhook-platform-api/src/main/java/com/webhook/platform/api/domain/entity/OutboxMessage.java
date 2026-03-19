@@ -46,6 +46,9 @@ public class OutboxMessage {
     @Column(name = "project_id")
     private UUID projectId;
 
+    @Column(name = "correlation_id", length = 128)
+    private String correlationId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
