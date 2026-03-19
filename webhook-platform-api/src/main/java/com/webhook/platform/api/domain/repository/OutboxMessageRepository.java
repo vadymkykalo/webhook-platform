@@ -17,22 +17,28 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
     @Query(value = """
             SELECT * FROM outbox_messages WHERE id IN (
                 SELECT id FROM (
-                    SELECT id, ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn
+                    SELECT id,
+                           ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn_key,
+                           ROW_NUMBER() OVER (PARTITION BY COALESCE(project_id::text, kafka_key) ORDER BY created_at ASC) AS rn_proj
                     FROM outbox_messages WHERE status = :status
-                ) sub WHERE rn <= :maxPerKey ORDER BY rn ASC LIMIT :limit
+                ) sub WHERE rn_key <= :maxPerKey AND rn_proj <= :maxPerProject
+                ORDER BY rn_proj ASC, rn_key ASC LIMIT :limit
             ) FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    List<OutboxMessage> findPendingBatchForUpdate(@Param("status") String status, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey);
+    List<OutboxMessage> findPendingBatchForUpdate(@Param("status") String status, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey, @Param("maxPerProject") int maxPerProject);
 
     @Query(value = """
             SELECT * FROM outbox_messages WHERE id IN (
                 SELECT id FROM (
-                    SELECT id, ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn
+                    SELECT id,
+                           ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn_key,
+                           ROW_NUMBER() OVER (PARTITION BY COALESCE(project_id::text, kafka_key) ORDER BY created_at ASC) AS rn_proj
                     FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries
-                ) sub WHERE rn <= :maxPerKey ORDER BY rn ASC LIMIT :limit
+                ) sub WHERE rn_key <= :maxPerKey AND rn_proj <= :maxPerProject
+                ORDER BY rn_proj ASC, rn_key ASC LIMIT :limit
             ) FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    List<OutboxMessage> findFailedMessagesForRetry(@Param("status") String status, @Param("maxRetries") int maxRetries, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey);
+    List<OutboxMessage> findFailedMessagesForRetry(@Param("status") String status, @Param("maxRetries") int maxRetries, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey, @Param("maxPerProject") int maxPerProject);
     
     @Modifying
     @Query(value = "DELETE FROM outbox_messages WHERE id IN (SELECT id FROM outbox_messages WHERE status = :status AND created_at < :cutoffTime ORDER BY created_at ASC LIMIT :limit)", nativeQuery = true)

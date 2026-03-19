@@ -134,6 +134,7 @@ public class IncomingEventService {
             throw new IllegalStateException("No enabled destinations for this source");
         }
 
+        UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
         int replayed = 0;
         for (IncomingDestination destination : destinations) {
             Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(eventId, destination.getId());
@@ -164,6 +165,7 @@ public class IncomingEventService {
                         .payload(payload)
                         .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
                         .kafkaKey(destination.getId().toString())
+                        .projectId(projectId)
                         .status(OutboxStatus.PENDING)
                         .retryCount(0)
                         .build();
@@ -255,6 +257,7 @@ public class IncomingEventService {
                             .payload(objectMapper.writeValueAsString(forwardMessage))
                             .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
                             .kafkaKey(destination.getId().toString())
+                            .projectId(projectId)
                             .status(OutboxStatus.PENDING)
                             .retryCount(0)
                             .build();
@@ -276,6 +279,11 @@ public class IncomingEventService {
                 .eventsReplayed(events.size())
                 .totalForwardAttempts(totalAttempts)
                 .build();
+    }
+
+    private UUID resolveProjectIdFromSource(UUID sourceId) {
+        return sourceRepository.findById(sourceId)
+                .map(IncomingSource::getProjectId).orElse(null);
     }
 
     private IncomingEventResponse mapToResponse(IncomingEvent event) {

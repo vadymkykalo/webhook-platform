@@ -83,7 +83,7 @@ class EntitlementServiceTest {
         svc.checkMemberLimit(ORG_ID);
 
         assertThat(svc.hasFeature(ORG_ID, "anything")).isTrue();
-        assertThat(svc.getRateLimit(ORG_ID)).isEqualTo(Integer.MAX_VALUE);
+        assertThat(svc.getRateLimit(ORG_ID)).isEqualTo(100);
         assertThat(svc.getRetentionDays(ORG_ID)).isEqualTo(-1);
         assertThat(svc.isBillingEnabled()).isFalse();
 
@@ -252,11 +252,11 @@ class EntitlementServiceTest {
     }
 
     @Test
-    void getRateLimitForProject_returnsMaxValueForUnknownProject() {
+    void getRateLimitForProject_returnsDefaultForUnknownProject() {
         EntitlementService svc = createService(true);
         when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.empty());
 
-        assertThat(svc.getRateLimitForProject(PROJECT_ID)).isEqualTo(Integer.MAX_VALUE);
+        assertThat(svc.getRateLimitForProject(PROJECT_ID)).isEqualTo(100);
     }
 
     // ── Retention ───────────────────────────────────────────────────
@@ -291,7 +291,8 @@ class EntitlementServiceTest {
 
     private EntitlementService createService(boolean billingEnabled) {
         return new EntitlementService(
-                billingEnabled, organizationRepository, projectRepository,
+                billingEnabled, 100, 100,
+                organizationRepository, projectRepository,
                 endpointRepository, eventRepository, membershipRepository,
                 tunnelSessionRepository, quotaCounterService);
     }

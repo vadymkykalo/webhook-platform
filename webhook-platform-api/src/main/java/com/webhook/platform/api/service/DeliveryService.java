@@ -82,6 +82,11 @@ public class DeliveryService {
         auth.validateProjectAccess(project.getId());
     }
 
+    private UUID resolveProjectId(Delivery delivery) {
+        return eventRepository.findById(delivery.getEventId())
+                .map(Event::getProjectId).orElse(null);
+    }
+
     public DeliveryResponse getDelivery(UUID id, AuthContext auth) {
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
@@ -177,6 +182,7 @@ public class DeliveryService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(resolveProjectId(delivery))
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();
@@ -280,7 +286,7 @@ public class DeliveryService {
 
         int replayedCount = 0;
         for (Delivery delivery : page.getContent()) {
-            if (enqueueReplay(delivery)) {
+            if (enqueueReplay(delivery, projectIdFilter)) {
                 replayedCount++;
             }
         }
@@ -300,6 +306,10 @@ public class DeliveryService {
     }
 
     private boolean enqueueReplay(Delivery delivery) {
+        return enqueueReplay(delivery, resolveProjectId(delivery));
+    }
+
+    private boolean enqueueReplay(Delivery delivery, UUID projectId) {
         delivery.setStatus(DeliveryStatus.PENDING);
         delivery.setAttemptCount(0);
         delivery.setNextRetryAt(null);
@@ -325,6 +335,7 @@ public class DeliveryService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(projectId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();
@@ -450,6 +461,7 @@ public class DeliveryService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(resolveProjectId(delivery))
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();

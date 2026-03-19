@@ -166,7 +166,7 @@ public class EventService {
 
         List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
         for (Delivery delivery : savedDeliveries) {
-            outboxMessages.add(createOutboxMessage(delivery));
+            outboxMessages.add(createOutboxMessage(delivery, projectId));
         }
         outboxMessageRepository.saveAll(outboxMessages);
 
@@ -206,7 +206,7 @@ public class EventService {
                 .build();
     }
 
-    private OutboxMessage createOutboxMessage(Delivery delivery) {
+    private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
         try {
             DeliveryMessage deliveryMessage = DeliveryMessage.builder()
                     .deliveryId(delivery.getId())
@@ -227,6 +227,7 @@ public class EventService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(projectId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();

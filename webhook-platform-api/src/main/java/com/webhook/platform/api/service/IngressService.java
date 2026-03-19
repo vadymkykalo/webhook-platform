@@ -268,6 +268,7 @@ public class IngressService {
                         .payload(payload)
                         .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
                         .kafkaKey(destination.getId().toString())
+                        .projectId(source.getProjectId())
                         .status(OutboxStatus.PENDING)
                         .retryCount(0)
                         .build());

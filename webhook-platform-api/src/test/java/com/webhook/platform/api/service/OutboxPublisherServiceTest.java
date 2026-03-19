@@ -54,12 +54,12 @@ class OutboxPublisherServiceTest {
 
         service = new OutboxPublisherService(
                 outboxMessageRepository, kafkaTemplate, objectMapper,
-                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1);
+                new SimpleMeterRegistry(), txManager, 100, 5, 90, 300, 1, 30);
     }
 
     @Test
     void shouldNotProcessWhenNoPendingMessages() {
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
 
         service.publishPendingMessages();
@@ -69,13 +69,13 @@ class OutboxPublisherServiceTest {
 
     @Test
     void shouldUseFairBatchingWithMaxPerKey() {
-        when(outboxMessageRepository.findPendingBatchForUpdate(eq("PENDING"), eq(100), eq(10)))
+        when(outboxMessageRepository.findPendingBatchForUpdate(eq("PENDING"), eq(100), eq(10), eq(30)))
                 .thenReturn(Collections.emptyList());
 
         service.publishPendingMessages();
 
-        // Verify fair batching: 3rd arg is maxPerKey=10
-        verify(outboxMessageRepository).findPendingBatchForUpdate("PENDING", 100, 10);
+        // Verify fair batching: 3rd arg is maxPerKey=10, 4th arg is maxPerProject=30
+        verify(outboxMessageRepository).findPendingBatchForUpdate("PENDING", 100, 10, 30);
     }
 
     @Test
@@ -85,7 +85,7 @@ class OutboxPublisherServiceTest {
                 .deliveryId(UUID.randomUUID())
                 .build();
 
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(List.of(message));
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
@@ -113,7 +113,7 @@ class OutboxPublisherServiceTest {
     void shouldMarkAsFailedOnException() throws Exception {
         OutboxMessage message = createTestMessage();
 
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(List.of(message));
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
@@ -132,7 +132,7 @@ class OutboxPublisherServiceTest {
                 .deliveryId(UUID.randomUUID())
                 .build();
 
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(List.of(message));
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
@@ -159,7 +159,7 @@ class OutboxPublisherServiceTest {
                 .deliveryId(UUID.randomUUID())
                 .build();
 
-        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt()))
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(List.of(message));
         when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))

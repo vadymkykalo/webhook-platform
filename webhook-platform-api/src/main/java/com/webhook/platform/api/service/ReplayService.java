@@ -279,7 +279,7 @@ public class ReplayService {
             final List<Event> currentBatch = batch;
             try {
                 BatchResult result = txTemplate.execute(status ->
-                        processBatch(currentBatch, activeSubscriptions, sid));
+                        processBatch(currentBatch, activeSubscriptions, sid, projectId));
                 if (result != null) {
                     totalProcessed += currentBatch.size();
                     totalDeliveries += result.deliveriesCreated;
@@ -317,7 +317,7 @@ public class ReplayService {
                 sessionId, totalProcessed, totalDeliveries, totalErrors);
     }
 
-    private BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId) {
+    private BatchResult processBatch(List<Event> events, List<Subscription> subscriptions, UUID sessionId, UUID projectId) {
         int errors = 0;
 
         // Pre-partition subscriptions: exact index O(1) + wildcard list O(W)
@@ -392,7 +392,7 @@ public class ReplayService {
         List<OutboxMessage> outboxMessages = new ArrayList<>();
         for (Delivery delivery : savedDeliveries) {
             try {
-                outboxMessages.add(createOutboxMessage(delivery));
+                outboxMessages.add(createOutboxMessage(delivery, projectId));
             } catch (Exception e) {
                 errors++;
                 log.warn("Failed to create outbox message for delivery {}: {}",
@@ -433,7 +433,7 @@ public class ReplayService {
         return subscriptionRepository.findByProjectIdAndEnabledTrue(projectId);
     }
 
-    private OutboxMessage createOutboxMessage(Delivery delivery) {
+    private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
         try {
             DeliveryMessage msg = DeliveryMessage.builder()
                     .deliveryId(delivery.getId())
@@ -454,6 +454,7 @@ public class ReplayService {
                     .payload(payload)
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
+                    .projectId(projectId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();
