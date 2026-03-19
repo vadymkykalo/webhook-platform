@@ -84,7 +84,7 @@
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
       "id": 6,
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "sum(rate(event_ingest_total{job=\"hookflow-api\"}[5m])) * 60", "legendFormat": "events/min" }],
+      "targets": [{ "expr": "sum(rate(events_ingested_total{job=\"hookflow-api\"}[5m])) * 60", "legendFormat": "events/min" }],
       "title": "Events Ingested / min",
       "type": "stat"
     },
@@ -195,8 +195,12 @@
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 23 },
       "id": 22,
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [{ "expr": "webhook_capture_slug_buckets_size", "legendFormat": "Slug Buckets" }],
-      "title": "Rate Limiter Cache Size",
+      "targets": [
+        { "expr": "outbox_queue_depth{status=\"pending\"}", "legendFormat": "Pending" },
+        { "expr": "outbox_queue_depth{status=\"failed\"}", "legendFormat": "Failed" },
+        { "expr": "outbox_queue_depth{status=\"dead\"}", "legendFormat": "Dead" }
+      ],
+      "title": "Outbox Queue Depth",
       "type": "stat"
     },
     {
@@ -235,6 +239,83 @@
         { "expr": "increase(circuit_breaker_rejected_total[1h])", "legendFormat": "Rejected" }
       ],
       "title": "Circuit Breaker Activity (per hour)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "id": 104,
+      "title": "Outbox Publisher",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "hookflow-prometheus" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2 }, "unit": "short" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "id": 40,
+      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "outbox_queue_depth{status=\"pending\"}", "legendFormat": "Pending" },
+        { "expr": "outbox_queue_depth{status=\"failed\"}", "legendFormat": "Failed" },
+        { "expr": "outbox_queue_depth{status=\"dead\"}", "legendFormat": "Dead" }
+      ],
+      "title": "Outbox Queue Depth",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "hookflow-prometheus" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "s" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "id": 41,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "outbox_oldest_pending_age_seconds", "legendFormat": "Oldest Pending Age" },
+        { "expr": "rate(outbox_publish_latency_seconds_sum[5m]) / rate(outbox_publish_latency_seconds_count[5m])", "legendFormat": "Avg Publish Latency" }
+      ],
+      "title": "Outbox Publish Latency & Staleness",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "id": 105,
+      "title": "Event Ingestion",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "hookflow-prometheus" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "id": 50,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "sum(rate(events_ingested_total[5m]))", "legendFormat": "Ingested/s" },
+        { "expr": "sum(rate(events_duplicate_total[5m]))", "legendFormat": "Duplicates/s" },
+        { "expr": "sum(rate(events_fanout_limited_total[5m]))", "legendFormat": "Fanout Limited/s" }
+      ],
+      "title": "Event Ingestion Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "hookflow-prometheus" },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "id": 51,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "sum(rate(deliveries_created_total[5m]))", "legendFormat": "Deliveries Created/s" },
+        { "expr": "sum(rate(rules_matched_total[5m]))", "legendFormat": "Rules Matched/s" },
+        { "expr": "sum(rate(rules_drop_total[5m]))", "legendFormat": "Rules Dropped/s" }
+      ],
+      "title": "Deliveries & Rules",
       "type": "timeseries"
     }
   ],
