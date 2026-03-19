@@ -79,6 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             MDC.remove("organizationId");
             MDC.remove("userId");
             MDC.remove("projectId");
+            JwtUtil.clearCache();
         }
     }
 }

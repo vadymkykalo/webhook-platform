@@ -1,5 +1,7 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.worker.domain.entity.OrderingCursor;
+import com.webhook.platform.worker.domain.repository.OrderingCursorRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
@@ -7,6 +9,7 @@ import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,6 +21,7 @@ import java.util.UUID;
 /**
  * Manages ordering buffer for FIFO delivery guarantees.
  * Tracks last delivered sequence per endpoint and buffers out-of-order deliveries.
+ * Uses Redis as cache (24h TTL) with Postgres as durable fallback.
  */
 @Service
 @Slf4j
@@ -27,6 +31,7 @@ public class OrderingBufferService {
     private static final String BUFFER_KEY_PREFIX = "seq:buffer:";
 
     private final RedissonClient redissonClient;
+    private final OrderingCursorRepository cursorRepository;
     private final MeterRegistry meterRegistry;
     private final Duration gapTimeout;
     private final Duration deliveredSeqTtl;
@@ -34,11 +39,13 @@ public class OrderingBufferService {
 
     public OrderingBufferService(
             RedissonClient redissonClient,
+            OrderingCursorRepository cursorRepository,
             MeterRegistry meterRegistry,
             @Value("${ordering.gap-timeout-seconds:60}") int gapTimeoutSeconds,
             @Value("${ordering.delivered-seq-ttl-hours:24}") int deliveredSeqTtlHours,
             @Value("${ordering.buffer-ttl-minutes:10}") int bufferTtlMinutes) {
         this.redissonClient = redissonClient;
+        this.cursorRepository = cursorRepository;
         this.meterRegistry = meterRegistry;
         this.gapTimeout = Duration.ofSeconds(gapTimeoutSeconds);
         this.deliveredSeqTtl = Duration.ofHours(deliveredSeqTtlHours);
@@ -67,6 +74,7 @@ public class OrderingBufferService {
 
     /**
      * Gets the last successfully delivered sequence number for an endpoint.
+     * Checks Redis first (cache), falls back to Postgres if TTL expired.
      *
      * @param endpointId the endpoint ID
      * @return the last delivered sequence, or null if none
@@ -74,23 +82,57 @@ public class OrderingBufferService {
     public Long getLastDeliveredSequence(UUID endpointId) {
         String key = DELIVERED_SEQ_KEY_PREFIX + endpointId;
         RBucket<Long> bucket = redissonClient.getBucket(key);
-        return bucket.get();
+        Long fromRedis = bucket.get();
+        
+        if (fromRedis != null) {
+            return fromRedis;
+        }
+        
+        // Redis cache miss - check Postgres
+        try {
+            return cursorRepository.findById(endpointId)
+                    .map(cursor -> {
+                        // Warm Redis cache from DB
+                        bucket.set(cursor.getLastDeliveredSequence(), deliveredSeqTtl);
+                        log.debug("Warmed Redis cache from DB for endpoint {}: seq={}", 
+                                endpointId, cursor.getLastDeliveredSequence());
+                        meterRegistry.counter("webhook_ordering_cache_miss_total").increment();
+                        return cursor.getLastDeliveredSequence();
+                    })
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to query ordering cursor from DB for endpoint {}: {}", 
+                    endpointId, e.getMessage());
+            return null;
+        }
     }
 
     /**
      * Marks a sequence as successfully delivered.
-     * This advances the "cursor" for the endpoint.
+     * This advances the "cursor" for the endpoint in both Redis (cache) and Postgres (durable).
      *
      * @param endpointId the endpoint ID
      * @param sequenceNumber the delivered sequence number
      */
+    @Transactional
     public void markDelivered(UUID endpointId, long sequenceNumber) {
         String key = DELIVERED_SEQ_KEY_PREFIX + endpointId;
         RBucket<Long> bucket = redissonClient.getBucket(key);
         
         Long current = bucket.get();
         if (current == null || sequenceNumber > current) {
+            // Update Redis cache
             bucket.set(sequenceNumber, deliveredSeqTtl);
+            
+            // Persist to Postgres (atomic upsert, only if sequence advances)
+            try {
+                cursorRepository.upsertCursor(endpointId, sequenceNumber);
+            } catch (Exception e) {
+                log.error("Failed to persist ordering cursor to DB for endpoint {}, seq={}: {}", 
+                        endpointId, sequenceNumber, e.getMessage());
+                // Redis update succeeded, log error but don't fail delivery
+            }
+            
             log.debug("Marked sequence {} as delivered for endpoint {}", sequenceNumber, endpointId);
             meterRegistry.counter("webhook_ordering_sequence_advanced").increment();
         }

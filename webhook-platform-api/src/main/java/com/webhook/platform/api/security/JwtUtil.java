@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class JwtUtil {
@@ -20,6 +21,10 @@ public class JwtUtil {
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
+    
+    // Request-scoped cache to avoid parsing same token multiple times per request
+    private static final ThreadLocal<Map<String, Claims>> REQUEST_CACHE = 
+            ThreadLocal.withInitial(ConcurrentHashMap::new);
 
     public JwtUtil(
             @Value("${jwt.secret}") String secret,
@@ -62,11 +67,29 @@ public class JwtUtil {
     }
 
     public Claims parseToken(String token) {
-        return Jwts.parser()
+        // Check cache first to avoid redundant HMAC verification
+        Map<String, Claims> cache = REQUEST_CACHE.get();
+        Claims cached = cache.get(token);
+        if (cached != null) {
+            return cached;
+        }
+        
+        // Parse and cache
+        Claims claims = Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+        cache.put(token, claims);
+        return claims;
+    }
+    
+    /**
+     * Clears the request-scoped token cache.
+     * Should be called at the end of request processing (e.g., in filter's finally block).
+     */
+    public static void clearCache() {
+        REQUEST_CACHE.remove();
     }
 
     public UUID getUserIdFromToken(String token) {
