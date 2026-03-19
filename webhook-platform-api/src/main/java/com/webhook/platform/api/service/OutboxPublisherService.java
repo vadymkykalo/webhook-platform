@@ -214,8 +214,10 @@ public class OutboxPublisherService {
             try {
                 Object payload = deserializePayload(message);
 
-                String correlationId = CorrelationIdFilter.getCurrentCorrelationId();
-                if (correlationId == null) {
+                // Use persisted correlation ID from OutboxMessage (set during event ingestion)
+                // Fallback to new UUID only if not set (e.g., manual replay, old messages)
+                String correlationId = message.getCorrelationId();
+                if (correlationId == null || correlationId.isEmpty()) {
                     correlationId = UUID.randomUUID().toString();
                 }
 

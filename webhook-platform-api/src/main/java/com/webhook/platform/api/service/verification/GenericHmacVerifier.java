@@ -10,7 +10,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 
 /**
- * Generic HMAC-SHA256 verifier.
+ * Generic HMAC-SHA256 verifier with replay protection.
  * Supports configurable header name and signature prefix.
  * Also handles platform's standard format (t=timestamp,v1=signature).
  */
@@ -18,10 +18,15 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
 
     private final String headerName;
     private final String signaturePrefix;
+    private final ReplayDetectionService replayDetectionService;
+    private final String sourceId;
 
-    public GenericHmacVerifier(String headerName, String signaturePrefix) {
+    public GenericHmacVerifier(String headerName, String signaturePrefix, 
+                                ReplayDetectionService replayDetectionService, String sourceId) {
         this.headerName = headerName != null ? headerName : "X-Signature";
         this.signaturePrefix = signaturePrefix != null ? signaturePrefix : "";
+        this.replayDetectionService = replayDetectionService;
+        this.sourceId = sourceId;
     }
 
     @Override
@@ -34,6 +39,13 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
         String signature = signatureHeader;
         if (!signaturePrefix.isEmpty() && signature.startsWith(signaturePrefix)) {
             signature = signature.substring(signaturePrefix.length());
+        }
+
+        // Replay detection: check if we've seen this signature recently
+        if (replayDetectionService != null && sourceId != null) {
+            if (replayDetectionService.isReplay(sourceId, signature)) {
+                return VerificationResult.failure("Replay attack detected");
+            }
         }
 
         // Platform's standard format (t=timestamp,v1=signature)

@@ -22,6 +22,7 @@ import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
 import com.webhook.platform.api.service.ingress.SourceDisabledException;
 import com.webhook.platform.api.service.ingress.SourceNotFoundException;
+import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
@@ -73,9 +74,11 @@ class IngressServiceTest {
     private PlatformTransactionManager transactionManager;
     @Mock
     private TransactionStatus transactionStatus;
+    @Mock
+    private ReplayDetectionService replayDetectionService;
 
     private IngressService service;
-    private final WebhookVerifierFactory verifierFactory = new WebhookVerifierFactory();
+    private WebhookVerifierFactory verifierFactory;
     private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private static final String ENCRYPTION_KEY = "test_encryption_key_32_chars_pad";
@@ -90,6 +93,7 @@ class IngressServiceTest {
     void setUp() throws Exception {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
+        verifierFactory = new WebhookVerifierFactory(replayDetectionService);
         ClientIpResolver clientIpResolver = new ClientIpResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(

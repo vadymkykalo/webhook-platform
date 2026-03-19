@@ -43,6 +43,7 @@ public class EndpointService {
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
+    private final boolean endpointVerificationRequired;
 
     public EndpointService(
             EndpointRepository endpointRepository,
@@ -50,7 +51,8 @@ public class EndpointService {
             WebClient.Builder webClientBuilder,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps,
-            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts) {
+            @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
+            @Value("${webhook.endpoint-verification-required:false}") boolean endpointVerificationRequired) {
         this.endpointRepository = endpointRepository;
         this.projectRepository = projectRepository;
         this.webClient = webClientBuilder
@@ -62,6 +64,7 @@ public class EndpointService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
+        this.endpointVerificationRequired = endpointVerificationRequired;
     }
 
     private void validateProjectOwnership(UUID projectId, UUID organizationId) {
@@ -98,6 +101,12 @@ public class EndpointService {
         
         if (request.getEnabled() != null) {
             endpoint.setEnabled(request.getEnabled());
+        }
+        
+        // Set verification status based on feature flag
+        if (endpointVerificationRequired) {
+            endpoint.setVerificationStatus(Endpoint.VerificationStatus.PENDING);
+            log.debug("Endpoint verification required, setting status to PENDING for endpoint: {}", endpoint.getUrl());
         }
         
         endpoint = endpointRepository.saveAndFlush(endpoint);

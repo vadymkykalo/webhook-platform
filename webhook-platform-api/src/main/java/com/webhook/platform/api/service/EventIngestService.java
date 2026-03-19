@@ -381,6 +381,8 @@ public class EventIngestService {
                     .build();
             
             String payload = objectMapper.writeValueAsString(deliveryMessage);
+            String correlationId = org.slf4j.MDC.get("correlationId");
+            
             return OutboxMessage.builder()
                     .aggregateType("Delivery")
                     .aggregateId(delivery.getId())
@@ -389,6 +391,7 @@ public class EventIngestService {
                     .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
                     .kafkaKey(delivery.getEndpointId().toString())
                     .projectId(projectId)
+                    .correlationId(correlationId)
                     .status(OutboxStatus.PENDING)
                     .retryCount(0)
                     .build();
