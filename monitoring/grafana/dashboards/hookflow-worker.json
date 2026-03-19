@@ -157,25 +157,27 @@
       "id": 30,
       "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "expr": "executor_pool_size{name=~\".*async.*|.*delivery.*\"}", "legendFormat": "Pool Size" },
-        { "expr": "executor_active{name=~\".*async.*|.*delivery.*\"}", "legendFormat": "Active Threads" },
-        { "expr": "executor_queued{name=~\".*async.*|.*delivery.*\"}", "legendFormat": "Queued" }
+        { "expr": "outgoing_delivery_in_flight", "legendFormat": "Outgoing In-Flight" },
+        { "expr": "outgoing_delivery_available_permits", "legendFormat": "Outgoing Available" },
+        { "expr": "incoming_forward_in_flight", "legendFormat": "Incoming In-Flight" },
+        { "expr": "incoming_forward_available_permits", "legendFormat": "Incoming Available" }
       ],
-      "title": "Async Thread Pool",
+      "title": "Executor In-Flight & Available Permits",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "hookflow-prometheus" },
       "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 }, "unit": "ops" }
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2 }, "unit": "short" }
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "id": 31,
-      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "targets": [
-        { "expr": "rate(executor_completed{name=~\".*async.*|.*delivery.*\"}[5m])", "legendFormat": "Completed/s" }
+        { "expr": "outgoing_delivery_paused", "legendFormat": "Outgoing Paused" },
+        { "expr": "incoming_forward_paused", "legendFormat": "Incoming Paused" }
       ],
-      "title": "Async Pool Throughput",
+      "title": "Executor Container Paused State",
       "type": "timeseries"
     }
   ],
