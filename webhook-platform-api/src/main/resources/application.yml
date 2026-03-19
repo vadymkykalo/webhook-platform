@@ -130,7 +130,6 @@ webhook:
   encryption-key-active-version: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:0}
   encryption-salt: ${WEBHOOK_ENCRYPTION_SALT}
   max-payload-size-bytes: ${WEBHOOK_MAX_PAYLOAD_SIZE_BYTES:262144}
-  max-fanout-per-event: ${WEBHOOK_MAX_FANOUT_PER_EVENT:100}
   payload-compression-threshold-bytes: ${WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES:1024}
   url-validation:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
@@ -210,7 +209,7 @@ springdoc:
 entitlement:
   defaults:
     rate-limit-per-second: ${ENTITLEMENT_DEFAULT_RATE_LIMIT:100}
-    max-fanout-per-event: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:100}
+    max-fanout-per-event: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:50}
 
 billing:
   enabled: ${BILLING_ENABLED:false}

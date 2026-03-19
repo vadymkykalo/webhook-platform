@@ -2,7 +2,6 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -21,12 +20,10 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 public class DataRetentionService {
 
-    private final OutboxMessageRepository outboxMessageRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final IncomingEventRepository incomingEventRepository;
     private final TunnelRequestLogRepository tunnelRequestLogRepository;
     private final MeterRegistry meterRegistry;
-    private final int outboxRetentionDays;
     private final int deliveryAttemptsRetentionDays;
     private final int successfulAttemptsRetentionDays;
     private final int incomingEventsRetentionDays;
@@ -38,24 +35,20 @@ public class DataRetentionService {
     private final AtomicLong incomingEventsEstimatedRows = new AtomicLong(0);
 
     public DataRetentionService(
-            OutboxMessageRepository outboxMessageRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
             IncomingEventRepository incomingEventRepository,
             TunnelRequestLogRepository tunnelRequestLogRepository,
             MeterRegistry meterRegistry,
-            @Value("${data-retention.outbox-retention-days:7}") int outboxRetentionDays,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
             @Value("${data-retention.successful-attempts-retention-days:14}") int successfulAttemptsRetentionDays,
             @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
             @Value("${data-retention.tunnel-request-log-retention-days:7}") int tunnelRequestLogRetentionDays,
             @Value("${data-retention.max-attempts-per-delivery:10}") int maxAttemptsPerDelivery,
             @Value("${data-retention.batch-size:1000}") int batchSize) {
-        this.outboxMessageRepository = outboxMessageRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.incomingEventRepository = incomingEventRepository;
         this.tunnelRequestLogRepository = tunnelRequestLogRepository;
         this.meterRegistry = meterRegistry;
-        this.outboxRetentionDays = outboxRetentionDays;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
         this.successfulAttemptsRetentionDays = successfulAttemptsRetentionDays;
         this.incomingEventsRetentionDays = incomingEventsRetentionDays;
@@ -73,49 +66,13 @@ public class DataRetentionService {
                 .description("Estimated row count in incoming_events table")
                 .register(meterRegistry);
         
-        log.info("Data retention configured: outbox={}d, attempts={}d (success={}d), incoming={}d, maxPerDelivery={}, batchSize={}", 
-                outboxRetentionDays, deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, maxAttemptsPerDelivery, batchSize);
+        log.info("Data retention configured: attempts={}d (success={}d), incoming={}d, tunnelLog={}d, maxPerDelivery={}, batchSize={}", 
+                deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, tunnelRequestLogRetentionDays, maxAttemptsPerDelivery, batchSize);
     }
 
-    @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
-    @SchedulerLock(name = "cleanupPublishedOutboxMessages", lockAtMostFor = "9m", lockAtLeastFor = "1m")
-    @Transactional
-    public void cleanupPublishedOutboxMessages() {
-        Instant cutoffTime = Instant.now().minusSeconds(outboxRetentionDays * 86400L);
-        
-        log.info("Starting outbox cleanup for messages older than {}", cutoffTime);
-        
-        int totalDeleted = 0;
-        int deletedInBatch;
-        
-        do {
-            deletedInBatch = outboxMessageRepository.deleteOldPublishedMessages(
-                    "PUBLISHED", cutoffTime, batchSize);
-            totalDeleted += deletedInBatch;
-            
-            if (deletedInBatch > 0) {
-                log.debug("Deleted {} published outbox messages in batch", deletedInBatch);
-            }
-        } while (deletedInBatch >= batchSize);
-        
-        if (totalDeleted > 0) {
-            log.info("Cleanup completed: deleted {} published outbox messages", totalDeleted);
-        } else {
-            log.debug("Outbox cleanup: no old messages to delete");
-        }
-        
-        // Also clean up permanently failed messages (exhausted retries)
-        int failedDeleted = 0;
-        do {
-            deletedInBatch = outboxMessageRepository.deleteOldPublishedMessages(
-                    "FAILED", cutoffTime, batchSize);
-            failedDeleted += deletedInBatch;
-        } while (deletedInBatch >= batchSize);
-        
-        if (failedDeleted > 0) {
-            log.info("Cleanup completed: deleted {} permanently failed outbox messages", failedDeleted);
-        }
-    }
+    // REMOVED: Outbox cleanup is handled by OutboxPublisherService.cleanupOldMessages()
+    // to avoid duplicate cleanup logic. DataRetentionService focuses on delivery_attempts,
+    // incoming_events, and tunnel_request_log tables.
 
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")

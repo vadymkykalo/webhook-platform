@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.WorkflowExecution.ExecutionStatus;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,11 +45,13 @@ public class WorkflowEngine implements DisposableBean {
     private final Map<String, NodeExecutor> executors;
     private final WorkflowExecutionPersistence persistence;
     private final ObjectMapper objectMapper;
+    private final Counter rejectedNodeCounter;
 
     public WorkflowEngine(
             List<NodeExecutor> nodeExecutors,
             WorkflowExecutionPersistence persistence,
             ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
             @Value("${workflow.execution.max-duration-seconds:600}") int maxDurationSeconds,
             @Value("${workflow.node-timeout.default-seconds:30}") int defaultTimeoutSeconds,
             @Value("${workflow.node-timeout.http-seconds:60}") int httpTimeoutSeconds,
@@ -60,6 +64,9 @@ public class WorkflowEngine implements DisposableBean {
                 .collect(Collectors.toMap(NodeExecutor::getType, Function.identity()));
         this.persistence = persistence;
         this.objectMapper = objectMapper;
+        this.rejectedNodeCounter = Counter.builder("workflow_node_executions_rejected_total")
+                .description("Node executions rejected due to pool saturation")
+                .register(meterRegistry);
         this.maxExecutionMs = maxDurationSeconds * 1000L;
         this.defaultNodeTimeoutMs = defaultTimeoutSeconds * 1000L;
         this.shutdownAwaitSeconds = shutdownAwaitSeconds;
@@ -72,7 +79,7 @@ public class WorkflowEngine implements DisposableBean {
                     t.setDaemon(true);
                     return t;
                 },
-                new ThreadPoolExecutor.CallerRunsPolicy()
+                new ThreadPoolExecutor.AbortPolicy()
         );
         pool.allowCoreThreadTimeOut(true);
         this.nodeTimeoutExecutor = pool;
@@ -284,14 +291,23 @@ public class WorkflowEngine implements DisposableBean {
         // Capture depth from calling thread (workflow-* pool) and propagate
         // to nodeTimeoutExecutor thread — critical for recursion guard in CreateEventNodeExecutor
         int callerDepth = WorkflowTriggerService.getCurrentDepth();
-        Future<StepResult> future = nodeTimeoutExecutor.submit(() -> {
-            WorkflowTriggerService.setCurrentDepth(callerDepth);
-            try {
-                return executor.execute(nodeData, input);
-            } finally {
-                WorkflowTriggerService.clearCurrentDepth();
-            }
-        });
+        Future<StepResult> future;
+        try {
+            future = nodeTimeoutExecutor.submit(() -> {
+                WorkflowTriggerService.setCurrentDepth(callerDepth);
+                try {
+                    return executor.execute(nodeData, input);
+                } finally {
+                    WorkflowTriggerService.clearCurrentDepth();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            rejectedNodeCounter.increment();
+            log.warn("Node execution rejected due to pool saturation (type={}, poolSize={}, queueSize={})",
+                    nodeType, ((ThreadPoolExecutor) nodeTimeoutExecutor).getCorePoolSize(),
+                    ((ThreadPoolExecutor) nodeTimeoutExecutor).getQueue().size());
+            return StepResult.failed("Node execution rejected: workflow engine at capacity");
+        }
         try {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
