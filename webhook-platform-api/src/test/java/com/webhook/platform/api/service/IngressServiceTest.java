@@ -93,13 +93,13 @@ class IngressServiceTest {
     void setUp() throws Exception {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        verifierFactory = new WebhookVerifierFactory(replayDetectionService);
+        verifierFactory = new WebhookVerifierFactory();
         ClientIpResolver clientIpResolver = new ClientIpResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
                 forwardAttemptRepository, outboxMessageRepository,
-                objectMapper, meterRegistry, verifierFactory, rateLimiterService,
+                objectMapper, meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
                 clientIpResolver, transactionManager,
                 encryptionKeyRegistry, 524288
         );
@@ -391,6 +391,70 @@ class IngressServiceTest {
         assertThat(result.getId()).isEqualTo(eventId);
         assertThat(result.getVerified()).isTrue();
         assertThat(result.getProviderEventId()).isEqualTo("evt_target");
+        verify(eventRepository).save(any(IncomingEvent.class));
+    }
+
+    @Test
+    void receiveWebhook_replayDetection_rejectsReplayedSignature() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"test\":true}";
+        String validHmac = computeHmac(secret, body);
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+
+        // ReplayDetectionService says this signature was already seen
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(true);
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body, httpRequest))
+                .isInstanceOf(SignatureVerificationFailedException.class)
+                .hasMessageContaining("Replay attack detected");
+
+        // Event must NOT be persisted
+        verify(eventRepository, never()).save(any(IncomingEvent.class));
+    }
+
+    @Test
+    void receiveWebhook_replayDetection_allowsFirstRequest() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"test\":true}";
+        String validHmac = computeHmac(secret, body);
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+
+        // First time — not a replay
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
+
+        IncomingEvent event = service.receiveWebhook("validtoken", body, httpRequest);
+
+        assertThat(event.getVerified()).isTrue();
         verify(eventRepository).save(any(IncomingEvent.class));
     }
 

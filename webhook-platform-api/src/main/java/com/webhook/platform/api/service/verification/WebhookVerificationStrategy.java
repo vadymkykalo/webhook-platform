@@ -18,13 +18,17 @@ public interface WebhookVerificationStrategy {
      */
     VerificationResult verify(String secret, String body, HttpServletRequest request);
 
-    record VerificationResult(boolean verified, String error) {
+    record VerificationResult(boolean verified, String error, String replayKey) {
+        public static VerificationResult success(String replayKey) {
+            return new VerificationResult(true, null, replayKey);
+        }
+
         public static VerificationResult success() {
-            return new VerificationResult(true, null);
+            return new VerificationResult(true, null, null);
         }
 
         public static VerificationResult failure(String error) {
-            return new VerificationResult(false, error);
+            return new VerificationResult(false, error, null);
         }
     }
 }

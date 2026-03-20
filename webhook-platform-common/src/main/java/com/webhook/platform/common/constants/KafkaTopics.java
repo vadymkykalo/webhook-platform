@@ -13,6 +13,7 @@ public final class KafkaTopics {
     // Incoming webhooks forwarding
     public static final String INCOMING_FORWARD_DISPATCH = "incoming.forward.dispatch";
     public static final String INCOMING_FORWARD_RETRY = "incoming.forward.retry";
+    public static final String INCOMING_FORWARD_DLQ = "incoming.forward.dlq";
 
     private KafkaTopics() {
     }

@@ -32,7 +32,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -83,12 +85,20 @@ public class IncomingEventService {
 
         Page<IncomingEvent> events;
         if (sourceId != null) {
+            IncomingSource source = sourceRepository.findById(sourceId)
+                    .orElseThrow(() -> new NotFoundException("Incoming source not found"));
+            if (!source.getProjectId().equals(projectId)) {
+                throw new ForbiddenException("Source does not belong to project");
+            }
             events = eventRepository.findByIncomingSourceId(sourceId, pageable);
         } else {
             events = eventRepository.findByProjectId(projectId, pageable);
         }
 
-        return events.map(this::mapToResponse);
+        // Batch-fetch source names for the page — eliminates N+1 per-row lookup
+        Map<UUID, String> sourceNames = resolveSourceNames(events.getContent());
+
+        return events.map(event -> mapToResponse(event, sourceNames));
     }
 
     public IncomingEventResponse getEvent(UUID id, AuthContext auth) {
@@ -286,17 +296,21 @@ public class IncomingEventService {
                 .map(IncomingSource::getProjectId).orElse(null);
     }
 
-    private IncomingEventResponse mapToResponse(IncomingEvent event) {
-        String sourceName = null;
-        try {
-            sourceName = sourceRepository.findById(event.getIncomingSourceId())
-                    .map(IncomingSource::getName).orElse(null);
-        } catch (Exception ignored) {}
+    private Map<UUID, String> resolveSourceNames(List<IncomingEvent> events) {
+        List<UUID> sourceIds = events.stream()
+                .map(IncomingEvent::getIncomingSourceId)
+                .distinct()
+                .collect(Collectors.toList());
+        if (sourceIds.isEmpty()) return Map.of();
+        return sourceRepository.findAllById(sourceIds).stream()
+                .collect(Collectors.toMap(IncomingSource::getId, IncomingSource::getName, (a, b) -> a));
+    }
 
+    private IncomingEventResponse mapToResponse(IncomingEvent event, Map<UUID, String> sourceNames) {
         return IncomingEventResponse.builder()
+                .sourceName(sourceNames.get(event.getIncomingSourceId()))
                 .id(event.getId())
                 .incomingSourceId(event.getIncomingSourceId())
-                .sourceName(sourceName)
                 .requestId(event.getRequestId())
                 .method(event.getMethod())
                 .path(event.getPath())
@@ -311,5 +325,16 @@ public class IncomingEventService {
                 .verificationError(event.getVerificationError())
                 .receivedAt(event.getReceivedAt())
                 .build();
+    }
+
+    private IncomingEventResponse mapToResponse(IncomingEvent event) {
+        String sourceName = null;
+        try {
+            sourceName = sourceRepository.findById(event.getIncomingSourceId())
+                    .map(IncomingSource::getName).orElse(null);
+        } catch (Exception ignored) {}
+        IncomingEventResponse resp = mapToResponse(event, Map.of());
+        resp.setSourceName(sourceName);
+        return resp;
     }
 }

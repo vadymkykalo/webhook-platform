@@ -12,12 +12,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class WebhookVerifierFactory {
 
-    private final ReplayDetectionService replayDetectionService;
-
-    public WebhookVerifierFactory(ReplayDetectionService replayDetectionService) {
-        this.replayDetectionService = replayDetectionService;
-    }
-
     /**
      * Returns a verification strategy for the given source, or null if verification is disabled.
      */
@@ -29,9 +23,7 @@ public class WebhookVerifierFactory {
         if (source.getVerificationMode() == VerificationMode.HMAC_GENERIC) {
             return new GenericHmacVerifier(
                     source.getHmacHeaderName(), 
-                    source.getHmacSignaturePrefix(),
-                    replayDetectionService,
-                    source.getId().toString());
+                    source.getHmacSignaturePrefix());
         }
 
         // PROVIDER mode — pick strategy based on providerType

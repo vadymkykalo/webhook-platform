@@ -33,10 +33,20 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SubscriptionServiceTest {
 
-    @Mock private SubscriptionRepository subscriptionRepository;
-    @Mock private ProjectRepository projectRepository;
-    @Mock private EndpointRepository endpointRepository;
-    @Mock private TransformationRepository transformationRepository;
+    @Mock
+    private SubscriptionRepository subscriptionRepository;
+
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
+    private EndpointRepository endpointRepository;
+
+    @Mock
+    private TransformationRepository transformationRepository;
+
+    @Mock
+    private SubscriptionMatchingCache subscriptionMatchingCache;
 
     private SubscriptionService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -57,7 +67,7 @@ class SubscriptionServiceTest {
     void setUp() {
         service = new SubscriptionService(
                 subscriptionRepository, projectRepository, endpointRepository,
-                transformationRepository, objectMapper);
+                transformationRepository, subscriptionMatchingCache, objectMapper);
 
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         endpoint = Endpoint.builder().id(endpointId).projectId(projectId).url("https://ok.com").build();

@@ -10,23 +10,19 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 
 /**
- * Generic HMAC-SHA256 verifier with replay protection.
+ * Generic HMAC-SHA256 verifier.
  * Supports configurable header name and signature prefix.
  * Also handles platform's standard format (t=timestamp,v1=signature).
+ * Replay protection is handled at the IngressService level for all verifiers.
  */
 public class GenericHmacVerifier implements WebhookVerificationStrategy {
 
     private final String headerName;
     private final String signaturePrefix;
-    private final ReplayDetectionService replayDetectionService;
-    private final String sourceId;
 
-    public GenericHmacVerifier(String headerName, String signaturePrefix, 
-                                ReplayDetectionService replayDetectionService, String sourceId) {
+    public GenericHmacVerifier(String headerName, String signaturePrefix) {
         this.headerName = headerName != null ? headerName : "X-Signature";
         this.signaturePrefix = signaturePrefix != null ? signaturePrefix : "";
-        this.replayDetectionService = replayDetectionService;
-        this.sourceId = sourceId;
     }
 
     @Override
@@ -41,17 +37,10 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
             signature = signature.substring(signaturePrefix.length());
         }
 
-        // Replay detection: check if we've seen this signature recently
-        if (replayDetectionService != null && sourceId != null) {
-            if (replayDetectionService.isReplay(sourceId, signature)) {
-                return VerificationResult.failure("Replay attack detected");
-            }
-        }
-
         // Platform's standard format (t=timestamp,v1=signature)
         if (signature.contains("t=") && signature.contains("v1=")) {
             boolean valid = WebhookSignatureUtils.verifySignature(secret, signature, body);
-            return valid ? VerificationResult.success() : VerificationResult.failure("Signature mismatch");
+            return valid ? VerificationResult.success(signatureHeader) : VerificationResult.failure("Signature mismatch");
         }
 
         // Raw HMAC-SHA256 hex comparison
@@ -59,7 +48,7 @@ public class GenericHmacVerifier implements WebhookVerificationStrategy {
         boolean valid = MessageDigest.isEqual(
                 computed.getBytes(StandardCharsets.UTF_8),
                 signature.getBytes(StandardCharsets.UTF_8));
-        return valid ? VerificationResult.success() : VerificationResult.failure("Signature mismatch");
+        return valid ? VerificationResult.success(signatureHeader) : VerificationResult.failure("Signature mismatch");
     }
 
     static String computeHmacSha256(String secret, String body) {

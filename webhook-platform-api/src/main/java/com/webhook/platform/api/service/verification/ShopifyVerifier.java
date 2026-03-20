@@ -34,7 +34,7 @@ public class ShopifyVerifier implements WebhookVerificationStrategy {
             boolean valid = MessageDigest.isEqual(
                     computed.getBytes(StandardCharsets.UTF_8),
                     header.getBytes(StandardCharsets.UTF_8));
-            return valid ? VerificationResult.success() : VerificationResult.failure("Shopify signature mismatch");
+            return valid ? VerificationResult.success(header) : VerificationResult.failure("Shopify signature mismatch");
         } catch (Exception e) {
             return VerificationResult.failure("Shopify verification error: " + e.getMessage());
         }

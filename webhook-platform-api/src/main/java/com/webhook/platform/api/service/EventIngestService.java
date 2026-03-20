@@ -17,7 +17,6 @@ import com.webhook.platform.api.service.rules.CompiledRule;
 import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.util.EventTypeMatcher;
 import com.webhook.platform.common.util.PayloadCompressionUtil;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
@@ -41,7 +40,7 @@ import java.util.UUID;
 public class EventIngestService {
 
     private final EventRepository eventRepository;
-    private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionMatchingCache subscriptionMatchingCache;
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
@@ -59,7 +58,7 @@ public class EventIngestService {
 
     public EventIngestService(
             EventRepository eventRepository,
-            SubscriptionRepository subscriptionRepository,
+            SubscriptionMatchingCache subscriptionMatchingCache,
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
             WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository,
@@ -75,7 +74,7 @@ public class EventIngestService {
             @Value("${webhook.max-payload-size-bytes:262144}") long maxPayloadSizeBytes,
             @Value("${webhook.payload-compression-threshold-bytes:1024}") int compressionThresholdBytes) {
         this.eventRepository = eventRepository;
-        this.subscriptionRepository = subscriptionRepository;
+        this.subscriptionMatchingCache = subscriptionMatchingCache;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.workflowTriggerOutboxRepository = workflowTriggerOutboxRepository;
@@ -206,19 +205,10 @@ public class EventIngestService {
             return buildResponse(event, 0);
         }
 
-        // ── Subscription-based deliveries (two-phase: SQL exact + in-memory wildcard) ──
-        List<Subscription> exactMatches = subscriptionRepository
-                .findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getType());
-        List<Subscription> wildcardMatches = subscriptionRepository
-                .findWildcardSubscriptions(projectId).stream()
-                .filter(s -> EventTypeMatcher.matches(s.getEventType(), request.getType()))
-                .toList();
-
-        List<Subscription> subscriptions = new ArrayList<>(exactMatches.size() + wildcardMatches.size());
-        subscriptions.addAll(exactMatches);
-        subscriptions.addAll(wildcardMatches);
-        log.info("Found {} matching subscriptions for event type: {} (exact={}, wildcard={})",
-                subscriptions.size(), request.getType(), exactMatches.size(), wildcardMatches.size());
+        // ── Subscription-based deliveries (cached: O(1) exact + O(W) wildcard, zero DB on hit) ──
+        List<Subscription> subscriptions = subscriptionMatchingCache.findMatching(projectId, request.getType());
+        log.info("Found {} matching subscriptions for event type: {}",
+                subscriptions.size(), request.getType());
 
         // ── Fanout limit — prevent queue flood from 1 event → N deliveries ─
         int totalFanout = subscriptions.size() + ruleRouteEndpoints.size();

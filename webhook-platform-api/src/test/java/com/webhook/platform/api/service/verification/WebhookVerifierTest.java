@@ -27,9 +27,6 @@ class WebhookVerifierTest {
     @Mock
     private HttpServletRequest request;
 
-    @Mock
-    private ReplayDetectionService replayDetectionService;
-
     private static final String SECRET = "whsec_test_secret_key";
     private static final String BODY = "{\"event\":\"push\",\"ref\":\"refs/heads/main\"}";
 
@@ -37,7 +34,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_success() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "", null, null);
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Signature")).thenReturn(hmac);
 
@@ -45,11 +42,12 @@ class WebhookVerifierTest {
 
         assertThat(result.verified()).isTrue();
         assertThat(result.error()).isNull();
+        assertThat(result.replayKey()).isEqualTo(hmac);
     }
 
     @Test
     void genericHmac_withPrefix() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Sig", "sha256=", null, null);
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Sig", "sha256=");
         String hmac = hmacSha256Hex(SECRET, BODY);
         when(request.getHeader("X-Sig")).thenReturn("sha256=" + hmac);
 
@@ -60,7 +58,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_missingHeader() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "", null, null);
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
         when(request.getHeader("X-Signature")).thenReturn(null);
 
         var result = verifier.verify(SECRET, BODY, request);
@@ -71,7 +69,7 @@ class WebhookVerifierTest {
 
     @Test
     void genericHmac_mismatch() {
-        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "", null, null);
+        GenericHmacVerifier verifier = new GenericHmacVerifier("X-Signature", "");
         when(request.getHeader("X-Signature")).thenReturn("wrong_signature");
 
         var result = verifier.verify(SECRET, BODY, request);
@@ -91,6 +89,7 @@ class WebhookVerifierTest {
         var result = verifier.verify(SECRET, BODY, request);
 
         assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo("sha256=" + hmac);
     }
 
     @Test
@@ -134,11 +133,13 @@ class WebhookVerifierTest {
         long timestamp = Instant.now().getEpochSecond();
         String signedPayload = timestamp + "." + BODY;
         String hmac = hmacSha256Hex(SECRET, signedPayload);
-        when(request.getHeader("Stripe-Signature")).thenReturn("t=" + timestamp + ",v1=" + hmac);
+        String header = "t=" + timestamp + ",v1=" + hmac;
+        when(request.getHeader("Stripe-Signature")).thenReturn(header);
 
         var result = verifier.verify(SECRET, BODY, request);
 
         assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(header);
     }
 
     @Test
@@ -197,12 +198,15 @@ class WebhookVerifierTest {
         long timestamp = Instant.now().getEpochSecond();
         String baseString = "v0:" + timestamp + ":" + BODY;
         String hmac = hmacSha256Hex(SECRET, baseString);
-        when(request.getHeader("X-Slack-Signature")).thenReturn("v0=" + hmac);
-        when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn(String.valueOf(timestamp));
+        String sig = "v0=" + hmac;
+        String ts = String.valueOf(timestamp);
+        when(request.getHeader("X-Slack-Signature")).thenReturn(sig);
+        when(request.getHeader("X-Slack-Request-Timestamp")).thenReturn(ts);
 
         var result = verifier.verify(SECRET, BODY, request);
 
         assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(sig + "|" + ts);
     }
 
     @Test
@@ -255,6 +259,7 @@ class WebhookVerifierTest {
         var result = verifier.verify(SECRET, BODY, request);
 
         assertThat(result.verified()).isTrue();
+        assertThat(result.replayKey()).isEqualTo(hmacBase64);
     }
 
     @Test
@@ -283,7 +288,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsNullForNone() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.NONE, null);
 
         assertThat(factory.getVerifier(source)).isNull();
@@ -291,7 +296,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsGenericHmac() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.HMAC_GENERIC, null);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(GenericHmacVerifier.class);
@@ -299,7 +304,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsGitHubForProvider() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GITHUB);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(GitHubVerifier.class);
@@ -307,7 +312,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsStripeForProvider() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.STRIPE);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(StripeVerifier.class);
@@ -315,7 +320,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsSlackForProvider() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.SLACK);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(SlackVerifier.class);
@@ -323,7 +328,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_returnsShopifyForProvider() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.SHOPIFY);
 
         assertThat(factory.getVerifier(source)).isInstanceOf(ShopifyVerifier.class);
@@ -331,7 +336,7 @@ class WebhookVerifierTest {
 
     @Test
     void factory_throwsForGenericProviderInProviderMode() {
-        var factory = new WebhookVerifierFactory(replayDetectionService);
+        var factory = new WebhookVerifierFactory();
         var source = buildSource(VerificationMode.PROVIDER, ProviderType.GENERIC);
 
         assertThatThrownBy(() -> factory.getVerifier(source))
