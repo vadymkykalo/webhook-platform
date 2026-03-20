@@ -41,8 +41,6 @@ class EventIngestServiceTest {
     @Mock
     private EventRepository eventRepository;
     @Mock
-    private SubscriptionRepository subscriptionRepository;
-    @Mock
     private DeliveryRepository deliveryRepository;
     @Mock
     private OutboxMessageRepository outboxMessageRepository;
@@ -62,6 +60,8 @@ class EventIngestServiceTest {
     private WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
     @Mock
     private EntitlementService entitlementService;
+    @Mock
+    private SubscriptionMatchingCache subscriptionMatchingCache;
 
     private EventIngestService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -74,8 +74,11 @@ class EventIngestServiceTest {
     void setUp() {
         when(entitlementService.getMaxFanoutForProject(any())).thenReturn(5);
 
+        when(subscriptionMatchingCache.findMatching(any(), any())).thenReturn(List.of());
+
         service = new EventIngestService(
-                eventRepository, subscriptionRepository, deliveryRepository,
+                eventRepository, subscriptionMatchingCache,
+                deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
                 objectMapper, meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
@@ -114,9 +117,6 @@ class EventIngestServiceTest {
             e.setCreatedAt(Instant.now());
             return e;
         });
-        when(subscriptionRepository.findByProjectIdAndEventTypeAndEnabledTrue(projectId, "order.created"))
-                .thenReturn(List.of());
-
         // TransactionTemplate executes the callback directly in tests
         stubTransactionTemplate();
 

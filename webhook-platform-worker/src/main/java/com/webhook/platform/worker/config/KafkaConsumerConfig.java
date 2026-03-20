@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.config;
 
+import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.worker.service.ShutdownRejectedException;
@@ -97,7 +98,7 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, DeliveryMessage> factory = 
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
-        configureFactory(factory, deliveryConcurrency);
+        configureFactory(factory, deliveryConcurrency, KafkaTopics.DELIVERIES_DLQ);
         return factory;
     }
 
@@ -106,18 +107,18 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, IncomingForwardMessage> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(incomingForwardConsumerFactory());
-        configureFactory(factory, incomingConcurrency);
+        configureFactory(factory, incomingConcurrency, KafkaTopics.INCOMING_FORWARD_DLQ);
         return factory;
     }
 
-    private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency) {
+    private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency, String dlqTopic) {
         factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         factory.getContainerProperties().setShutdownTimeout(30_000L);
 
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 deadLetterKafkaTemplate,
-                (record, exception) -> new TopicPartition(record.topic() + ".DLT", record.partition())
+                (record, exception) -> new TopicPartition(dlqTopic, record.partition())
         );
         
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
@@ -125,7 +126,7 @@ public class KafkaConsumerConfig {
             new FixedBackOff(retryIntervalMs, maxRetries)
         );
 
-        // ShutdownRejectedException: no point retrying on a dying instance — send straight to DLT
+        // ShutdownRejectedException: no point retrying on a dying instance — send straight to DLQ
         errorHandler.addNotRetryableExceptions(
                 ShutdownRejectedException.class
         );
@@ -142,6 +143,7 @@ public class KafkaConsumerConfig {
         
         factory.setCommonErrorHandler(errorHandler);
         
-        log.info("Kafka consumer configured with max retries: {}, retry interval: {}ms", maxRetries, retryIntervalMs);
+        log.info("Kafka consumer configured: dlqTopic={}, concurrency={}, maxRetries={}, retryIntervalMs={}",
+                dlqTopic, concurrency, maxRetries, retryIntervalMs);
     }
 }

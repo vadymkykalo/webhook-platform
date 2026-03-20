@@ -67,6 +67,12 @@ class IncomingForwardServiceTest {
     private EncryptionKeyRegistry encryptionKeyRegistry;
     @Mock
     private TransactionTemplate transactionTemplate;
+    @Mock
+    private RedisConcurrencyControlService concurrencyControlService;
+    @Mock
+    private CircuitBreakerService circuitBreakerService;
+    @Mock
+    private ProjectRateLimiterService projectRateLimiterService;
 
     private IncomingForwardService service;
 
@@ -96,6 +102,11 @@ class IncomingForwardServiceTest {
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(mockWebClient);
 
+        // Tenant isolation guards — permissive by default
+        when(projectRateLimiterService.tryAcquire(any(UUID.class))).thenReturn(true);
+        when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
+        when(concurrencyControlService.tryAcquire(any(UUID.class))).thenReturn(true);
+
         MeterRegistry meterRegistry = new SimpleMeterRegistry();
         service = new IncomingForwardService(
                 eventRepository, destinationRepository, attemptRepository,
@@ -104,7 +115,8 @@ class IncomingForwardServiceTest {
                 encryptionKeyRegistry,
                 true, List.of(),
                 meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection()
+                ConnectionProvider.newConnection(),
+                concurrencyControlService, circuitBreakerService, projectRateLimiterService
         );
     }
 
@@ -210,7 +222,8 @@ class IncomingForwardServiceTest {
                 encryptionKeyRegistry,
                 false, List.of(),
                 meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection()
+                ConnectionProvider.newConnection(),
+                concurrencyControlService, circuitBreakerService, projectRateLimiterService
         );
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()

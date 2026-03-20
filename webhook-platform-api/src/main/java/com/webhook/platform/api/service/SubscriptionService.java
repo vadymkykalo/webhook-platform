@@ -31,6 +31,7 @@ public class SubscriptionService {
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
     private final TransformationRepository transformationRepository;
+    private final SubscriptionMatchingCache subscriptionMatchingCache;
     private final ObjectMapper objectMapper;
 
     public SubscriptionService(
@@ -38,11 +39,13 @@ public class SubscriptionService {
             ProjectRepository projectRepository,
             EndpointRepository endpointRepository,
             TransformationRepository transformationRepository,
+            SubscriptionMatchingCache subscriptionMatchingCache,
             ObjectMapper objectMapper) {
         this.subscriptionRepository = subscriptionRepository;
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.transformationRepository = transformationRepository;
+        this.subscriptionMatchingCache = subscriptionMatchingCache;
         this.objectMapper = objectMapper;
     }
 
@@ -99,6 +102,7 @@ public class SubscriptionService {
                 .build();
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
+        subscriptionMatchingCache.evict(projectId);
         return mapToResponse(subscription);
     }
 
@@ -159,6 +163,7 @@ public class SubscriptionService {
         }
         
         subscription = subscriptionRepository.saveAndFlush(subscription);
+        subscriptionMatchingCache.evict(subscription.getProjectId());
         return mapToResponse(subscription);
     }
 
@@ -169,6 +174,7 @@ public class SubscriptionService {
                 .orElseThrow(() -> new NotFoundException("Subscription not found"));
         validateProjectOwnership(subscription.getProjectId(), organizationId);
         subscriptionRepository.deleteById(id);
+        subscriptionMatchingCache.evict(subscription.getProjectId());
     }
 
     private void validatePayloadTemplate(String template) {

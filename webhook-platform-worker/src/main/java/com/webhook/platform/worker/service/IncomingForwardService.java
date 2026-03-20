@@ -54,6 +54,9 @@ public class IncomingForwardService {
     private final List<String> allowedHosts;
     private final MeterRegistry meterRegistry;
     private final TransactionTemplate transactionTemplate;
+    private final RedisConcurrencyControlService concurrencyControlService;
+    private final CircuitBreakerService circuitBreakerService;
+    private final ProjectRateLimiterService projectRateLimiterService;
 
     private final Counter forwardSuccessCounter;
     private final Counter forwardFailureCounter;
@@ -73,7 +76,10 @@ public class IncomingForwardService {
             @Value("${webhook.url-validation.allowed-hosts:}") List<String> allowedHosts,
             MeterRegistry meterRegistry,
             TransactionTemplate transactionTemplate,
-            ConnectionProvider webhookConnectionProvider) {
+            ConnectionProvider webhookConnectionProvider,
+            RedisConcurrencyControlService concurrencyControlService,
+            CircuitBreakerService circuitBreakerService,
+            ProjectRateLimiterService projectRateLimiterService) {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
@@ -90,6 +96,9 @@ public class IncomingForwardService {
         this.allowedHosts = allowedHosts;
         this.meterRegistry = meterRegistry;
         this.transactionTemplate = transactionTemplate;
+        this.concurrencyControlService = concurrencyControlService;
+        this.circuitBreakerService = circuitBreakerService;
+        this.projectRateLimiterService = projectRateLimiterService;
 
         this.forwardSuccessCounter = Counter.builder("incoming_forward_attempts_total")
                 .tag("result", "success").register(meterRegistry);
@@ -223,18 +232,47 @@ public class IncomingForwardService {
         long startTime = System.currentTimeMillis();
         UUID eventId = event.getId();
         UUID destinationId = destination.getId();
+        UUID sourceId = event.getIncomingSourceId();
 
         log.info("Forwarding incoming event {} to destination {} (attempt {}/{})",
                 eventId, destinationId, attemptNumber, maxAttempts);
 
-        // Build request body — apply payload transformation if configured
-        String body = resolveAndTransformPayload(event.getBodyRaw(), destination);
-        String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
+        // --- Tenant isolation guards (mirrors outgoing WebhookDeliveryService) ---
 
-        // Idempotency key for downstream dedup
-        String idempotencyKey = eventId + "-" + destinationId + "-" + attemptNumber;
+        // 1. Per-source rate limit — prevents noisy-neighbor at source/project level
+        if (!projectRateLimiterService.tryAcquire(sourceId)) {
+            long delaySec = backoffSeconds(attemptNumber, 1, 30);
+            log.warn("Source rate limit exceeded for source {}, rescheduling forward eventId={}, destId={} in {}s",
+                    sourceId, eventId, destinationId, delaySec);
+            revertToPending(eventId, destinationId, attemptNumber, delaySec);
+            return;
+        }
+
+        // 2. Per-destination circuit breaker
+        if (!circuitBreakerService.isCallPermitted(destinationId)) {
+            log.warn("CircuitBreaker OPEN for destination {}, rescheduling forward eventId={}",
+                    destinationId, eventId);
+            revertToPending(eventId, destinationId, attemptNumber, 30);
+            return;
+        }
+
+        // 3. Per-destination concurrency limit
+        if (!concurrencyControlService.tryAcquire(destinationId)) {
+            long delaySec = backoffSeconds(attemptNumber, 2, 60);
+            log.warn("Max concurrency reached for destination {}, rescheduling forward eventId={} in {}s",
+                    destinationId, eventId, delaySec);
+            revertToPending(eventId, destinationId, attemptNumber, delaySec);
+            return;
+        }
 
         try {
+            // Build request body — apply payload transformation if configured
+            String body = resolveAndTransformPayload(event.getBodyRaw(), destination);
+            String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
+
+            // Idempotency key for downstream dedup
+            String idempotencyKey = eventId + "-" + destinationId;
+
             var requestSpec = webClient.post()
                     .uri(destination.getUrl())
                     .header("Content-Type", contentType)
@@ -278,6 +316,8 @@ public class IncomingForwardService {
                     eventId, destinationId, e.getMessage());
             handleError(eventId, destinationId, attemptNumber, maxAttempts,
                     e.getMessage(), durationMs, destination.getRetryDelays());
+        } finally {
+            concurrencyControlService.release(destinationId);
         }
     }
 
@@ -288,12 +328,15 @@ public class IncomingForwardService {
 
         if (success) {
             forwardSuccessCounter.increment();
+            circuitBreakerService.recordSuccess(destinationId, durationMs);
             updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.SUCCESS,
                     statusCode, responseHeaders, responseBody, null, durationMs, null);
             log.info("Forward succeeded: eventId={}, destId={}, attempt={}, status={}",
                     eventId, destinationId, attemptNumber, statusCode);
         } else if (isRetryable(statusCode)) {
             forwardFailureCounter.increment();
+            circuitBreakerService.recordFailure(destinationId,
+                    new RuntimeException("HTTP " + statusCode));
             if (attemptNumber >= maxAttempts) {
                 updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
                         statusCode, responseHeaders, responseBody,
@@ -312,6 +355,8 @@ public class IncomingForwardService {
             }
         } else {
             forwardFailureCounter.increment();
+            circuitBreakerService.recordFailure(destinationId,
+                    new RuntimeException("Non-retryable HTTP " + statusCode));
             updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
                     statusCode, responseHeaders, responseBody,
                     "Non-retryable HTTP " + statusCode, durationMs, null);
@@ -323,6 +368,7 @@ public class IncomingForwardService {
     private void handleError(UUID eventId, UUID destinationId, int attemptNumber, int maxAttempts,
             String errorMessage, int durationMs, String retryDelays) {
         forwardErrorCounter.increment();
+        circuitBreakerService.recordFailure(destinationId, new RuntimeException(errorMessage));
         if (attemptNumber >= maxAttempts) {
             updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
                     null, null, null,
@@ -548,6 +594,33 @@ public class IncomingForwardService {
                     e.getMessage());
             return body;
         }
+    }
+
+    /**
+     * Reverts a PROCESSING attempt back to PENDING with a retry delay.
+     * Used when rate limit / circuit breaker / concurrency limit prevents the HTTP call.
+     * This does NOT consume an attempt — the same attempt number will be retried.
+     */
+    private void revertToPending(UUID eventId, UUID destinationId, int attemptNumber, long delaySeconds) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            List<IncomingForwardAttempt> attempts = attemptRepository
+                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
+            attempts.stream()
+                    .filter(a -> a.getAttemptNumber() == attemptNumber
+                            && a.getStatus() == ForwardAttemptStatus.PROCESSING)
+                    .findFirst()
+                    .ifPresent(a -> {
+                        a.setStatus(ForwardAttemptStatus.PENDING);
+                        a.setNextRetryAt(Instant.now().plusSeconds(delaySeconds));
+                        attemptRepository.save(a);
+                    });
+        });
+    }
+
+    private long backoffSeconds(int attemptNumber, long min, long max) {
+        long base = Math.min(min * (1L << Math.min(attemptNumber, 6)), max);
+        double jitter = 0.5 + ThreadLocalRandom.current().nextDouble(1.0);
+        return Math.max(min, Math.min((long) (base * jitter), max));
     }
 
     private String truncate(String str, int maxLength) {

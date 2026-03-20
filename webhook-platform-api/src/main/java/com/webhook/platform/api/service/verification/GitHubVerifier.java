@@ -31,6 +31,6 @@ public class GitHubVerifier implements WebhookVerificationStrategy {
         boolean valid = MessageDigest.isEqual(
                 computed.getBytes(StandardCharsets.UTF_8),
                 signature.getBytes(StandardCharsets.UTF_8));
-        return valid ? VerificationResult.success() : VerificationResult.failure("GitHub signature mismatch");
+        return valid ? VerificationResult.success(header) : VerificationResult.failure("GitHub signature mismatch");
     }
 }

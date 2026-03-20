@@ -24,6 +24,7 @@ import com.webhook.platform.api.service.ingress.RateLimitExceededException;
 import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
 import com.webhook.platform.api.service.ingress.SourceDisabledException;
 import com.webhook.platform.api.service.ingress.SourceNotFoundException;
+import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
@@ -58,6 +59,7 @@ public class IngressService {
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
     private final WebhookVerifierFactory verifierFactory;
+    private final ReplayDetectionService replayDetectionService;
     private final RedisRateLimiterService rateLimiterService;
     private final ClientIpResolver clientIpResolver;
     private final TransactionTemplate transactionTemplate;
@@ -73,6 +75,7 @@ public class IngressService {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
             WebhookVerifierFactory verifierFactory,
+            ReplayDetectionService replayDetectionService,
             RedisRateLimiterService rateLimiterService,
             ClientIpResolver clientIpResolver,
             PlatformTransactionManager transactionManager,
@@ -86,6 +89,7 @@ public class IngressService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.verifierFactory = verifierFactory;
+        this.replayDetectionService = replayDetectionService;
         this.rateLimiterService = rateLimiterService;
         this.clientIpResolver = clientIpResolver;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
@@ -157,12 +161,14 @@ public class IngressService {
         // if we dedup/persist first, the poisoned record blocks the real webhook.
         Boolean verified = null;
         String verificationError = null;
+        String replayKey = null;
         WebhookVerificationStrategy verifier = verifierFactory.getVerifier(source);
         if (verifier != null) {
             try {
                 String secret = decryptHmacSecret(source);
                 WebhookVerificationStrategy.VerificationResult result = verifier.verify(secret, body, request);
                 verified = result.verified();
+                replayKey = result.replayKey();
                 if (!result.verified()) {
                     verificationError = result.error();
                 }
@@ -170,6 +176,18 @@ public class IngressService {
                 verified = false;
                 verificationError = "Verification error: " + e.getMessage();
                 log.warn("Webhook verification failed for source {}: {}", source.getId(), e.getMessage());
+            }
+        }
+
+        // Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify).
+        // After successful verification, check if this exact signature was already seen.
+        // Key = sourceId + SHA256(replayKey). TTL = 5 min (matches provider timestamp tolerance).
+        if (Boolean.TRUE.equals(verified) && replayKey != null) {
+            if (replayDetectionService.isReplay(source.getId().toString(), replayKey)) {
+                meterRegistry.counter("incoming_events_rejected_total",
+                        "reason", "replay_detected").increment();
+                log.warn("Replay attack detected for source {}", source.getId());
+                throw new SignatureVerificationFailedException("Replay attack detected: signature already seen");
             }
         }
 

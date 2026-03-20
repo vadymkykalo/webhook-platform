@@ -15,6 +15,7 @@ import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.domain.enums.MembershipRole;
@@ -107,7 +108,7 @@ class IncomingEventServiceTest {
         IncomingEvent event = buildEvent();
         when(eventRepository.findByProjectId(eq(projectId), any()))
                 .thenReturn(new PageImpl<>(List.of(event)));
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(sourceRepository.findAllById(List.of(sourceId))).thenReturn(List.of(source));
 
         Page<IncomingEventResponse> page = service.listEvents(projectId, orgId, null, PageRequest.of(0, 20));
 
@@ -120,9 +121,10 @@ class IncomingEventServiceTest {
     void listEvents_bySourceId() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         IncomingEvent event = buildEvent();
+        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
         when(eventRepository.findByIncomingSourceId(eq(sourceId), any()))
                 .thenReturn(new PageImpl<>(List.of(event)));
-        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
+        when(sourceRepository.findAllById(List.of(sourceId))).thenReturn(List.of(source));
 
         Page<IncomingEventResponse> page = service.listEvents(projectId, orgId, sourceId, PageRequest.of(0, 20));
 
@@ -206,6 +208,27 @@ class IncomingEventServiceTest {
         assertThatThrownBy(() -> service.replayEvent(eventId, auth))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No enabled destinations");
+    }
+
+    @Test
+    void listEvents_bySourceId_crossProject_throws() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        UUID foreignSourceId = UUID.randomUUID();
+        UUID otherProjectId = UUID.randomUUID();
+        IncomingSource foreignSource = IncomingSource.builder()
+                .id(foreignSourceId).projectId(otherProjectId).name("Foreign Source")
+                .slug("foreign").providerType(ProviderType.GENERIC)
+                .status(IncomingSourceStatus.ACTIVE)
+                .ingressPathToken("tok2").verificationMode(VerificationMode.NONE)
+                .createdAt(Instant.now()).updatedAt(Instant.now())
+                .build();
+        when(sourceRepository.findById(foreignSourceId)).thenReturn(Optional.of(foreignSource));
+
+        assertThatThrownBy(() -> service.listEvents(projectId, orgId, foreignSourceId, PageRequest.of(0, 20)))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Source does not belong to project");
+
+        verify(eventRepository, never()).findByIncomingSourceId(any(), any());
     }
 
     @Test
