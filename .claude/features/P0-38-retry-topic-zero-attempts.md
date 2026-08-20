@@ -1,6 +1,6 @@
 # P0-38 — Never-attempted deliveries routed to the 24h retry tier
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — backpressure-rescheduled deliveries silently misclassified as "almost given up"
 - **Branch:** `feature/P0-38-retry-topic-zero-attempts`
 - **Depends on:** nothing
