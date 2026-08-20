@@ -44,9 +44,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             
             try {
                 Claims claims = jwtUtil.parseToken(token);
-                
+
                 String jti = claims.getId();
-                if (tokenBlacklistService.isBlacklisted(jti)) {
+                String tokenType = claims.get("typ", String.class);
+                if (!JwtUtil.TOKEN_TYPE_ACCESS.equals(tokenType)) {
+                    // Deliberate rejection of anything that isn't an access token -- a refresh
+                    // token (or a pre-P0-10 token with no "typ" claim) must not authenticate
+                    // API requests. Previously this only failed by accident (NPE below on the
+                    // missing "organizationId" claim, swallowed by the catch block).
+                    log.debug("Token jti={} has type={}, expected access, rejecting", jti, tokenType);
+                } else if (tokenBlacklistService.isBlacklisted(jti)) {
                     log.debug("Token jti={} is blacklisted, rejecting", jti);
                 } else {
                     UUID userId = UUID.fromString(claims.getSubject());
