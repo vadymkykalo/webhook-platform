@@ -5,17 +5,21 @@ import com.webhook.platform.api.dto.DeviceApproveRequest;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
 import com.webhook.platform.api.dto.DeviceTokenRequest;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.TrustedProxyResolver;
+import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.DeviceAuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth/device")
@@ -24,6 +28,8 @@ import org.springframework.web.bind.annotation.*;
 public class DeviceAuthController {
 
     private final DeviceAuthService deviceAuthService;
+    private final AuthRateLimiterService authRateLimiterService;
+    private final TrustedProxyResolver trustedProxyResolver;
 
     @Operation(summary = "Initiate device auth",
             description = "Generates a device code and user code for CLI login. " +
@@ -47,7 +53,15 @@ public class DeviceAuthController {
             @ApiResponse(responseCode = "410", description = "Code expired"),
     })
     @PostMapping("/token")
-    public ResponseEntity<AuthResponse> pollDeviceToken(@Valid @RequestBody DeviceTokenRequest request) {
+    public ResponseEntity<AuthResponse> pollDeviceToken(@Valid @RequestBody DeviceTokenRequest request,
+            HttpServletRequest httpRequest) {
+        // This endpoint is permitAll (no session yet) and the device_code is presented
+        // by an unauthenticated caller, so it is a brute-force target within the code's
+        // expiry window. Bucket by IP and by the presented device_code itself, reusing
+        // the same limiter as refresh/reset-password rather than a parallel one (P0-12).
+        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getDeviceCode())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+        }
         AuthResponse response = deviceAuthService.pollDeviceToken(request.getDeviceCode());
         return ResponseEntity.ok(response);
     }
@@ -63,9 +77,21 @@ public class DeviceAuthController {
     @PostMapping("/approve")
     public ResponseEntity<Void> approveDeviceCode(
             @Valid @RequestBody DeviceApproveRequest request,
-            AuthContext auth) {
+            AuthContext auth,
+            HttpServletRequest httpRequest) {
+        // The "verification" step (RFC 8628 terms): a caller here already holds a valid
+        // JWT, but the user_code space (8 chars, ~40 bits) is small enough that unlimited
+        // authenticated attempts could still enumerate a pending code within its 10-minute
+        // window. Same limiter, bucketed by IP and by the presented user_code (P0-12).
+        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+        }
         deviceAuthService.approveDeviceCode(
                 request.getUserCode(), auth.requireUserId(), auth.organizationId());
         return ResponseEntity.ok().build();
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        return trustedProxyResolver.resolve(request);
     }
 }

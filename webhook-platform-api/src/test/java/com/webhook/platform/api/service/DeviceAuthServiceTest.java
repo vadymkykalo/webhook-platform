@@ -21,12 +21,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -132,9 +132,10 @@ class DeviceAuthServiceTest {
         UUID userId = UUID.randomUUID();
         UUID orgId = UUID.randomUUID();
         String deviceCode = "dev-approved";
+        UUID codeId = UUID.randomUUID();
 
         DeviceAuthCode code = DeviceAuthCode.builder()
-                .id(UUID.randomUUID())
+                .id(codeId)
                 .deviceCode(deviceCode)
                 .userCode("APPR-0001")
                 .status(DeviceAuthStatus.APPROVED)
@@ -147,7 +148,8 @@ class DeviceAuthServiceTest {
         membership.setRole(MembershipRole.OWNER);
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-        when(membershipRepository.findByUserId(userId)).thenReturn(List.of(membership));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, orgId)).thenReturn(Optional.of(membership));
+        when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
         when(jwtUtil.generateAccessToken(userId, orgId, MembershipRole.OWNER)).thenReturn("access-token-123");
         when(jwtUtil.generateRefreshToken(userId)).thenReturn("refresh-token-456");
 
@@ -156,6 +158,129 @@ class DeviceAuthServiceTest {
         assertNotNull(response);
         assertEquals("access-token-123", response.getAccessToken());
         assertEquals("refresh-token-456", response.getRefreshToken());
+        verify(deviceAuthCodeRepository).markConsumedIfApproved(codeId);
+    }
+
+    @Test
+    void shouldUseRoleFromApprovedOrgMembershipNotAnArbitraryOne() {
+        // P0-12 reproduction: a user who is OWNER of their own org and VIEWER in a
+        // client's org approves a device code scoped to the client (low-privilege) org.
+        // The minted token must carry VIEWER, not whatever findByUserId() happened to
+        // return first.
+        UUID userId = UUID.randomUUID();
+        UUID ownOrgId = UUID.randomUUID();
+        UUID clientOrgId = UUID.randomUUID();
+        String deviceCode = "dev-multi-org";
+        UUID codeId = UUID.randomUUID();
+
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(codeId)
+                .deviceCode(deviceCode)
+                .userCode("MORG-0001")
+                .status(DeviceAuthStatus.APPROVED)
+                .userId(userId)
+                .organizationId(clientOrgId)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        Membership ownOrgMembership = new Membership();
+        ownOrgMembership.setRole(MembershipRole.OWNER);
+        Membership clientOrgMembership = new Membership();
+        clientOrgMembership.setRole(MembershipRole.VIEWER);
+
+        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, clientOrgId))
+                .thenReturn(Optional.of(clientOrgMembership));
+        // Deliberately NOT stubbing findByUserIdAndOrganizationId(userId, ownOrgId) or
+        // findByUserId(userId) at all: if the service regressed to the arbitrary lookup,
+        // this test would fail with an unstubbed-mock (null) NPE rather than silently
+        // passing with the wrong role.
+        when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
+        when(jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER)).thenReturn("viewer-token");
+        when(jwtUtil.generateRefreshToken(userId)).thenReturn("refresh-token");
+
+        AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode);
+
+        assertEquals("viewer-token", response.getAccessToken());
+        verify(jwtUtil).generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER);
+        verify(jwtUtil, never()).generateAccessToken(eq(userId), eq(ownOrgId), any());
+        verify(membershipRepository, never()).findByUserId(any());
+    }
+
+    @Test
+    void shouldFailClosedWhenUserHasNoMembershipInApprovedOrg() {
+        UUID userId = UUID.randomUUID();
+        UUID orgId = UUID.randomUUID();
+        String deviceCode = "dev-no-membership";
+
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(UUID.randomUUID())
+                .deviceCode(deviceCode)
+                .userCode("NOMB-0001")
+                .status(DeviceAuthStatus.APPROVED)
+                .userId(userId)
+                .organizationId(orgId)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, orgId)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                deviceAuthService.pollDeviceToken(deviceCode));
+        assertEquals(403, ex.getStatusCode().value());
+        verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any());
+    }
+
+    @Test
+    void shouldFailWhenPollingAlreadyConsumedCode() {
+        String deviceCode = "dev-consumed";
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(UUID.randomUUID())
+                .deviceCode(deviceCode)
+                .status(DeviceAuthStatus.CONSUMED)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                deviceAuthService.pollDeviceToken(deviceCode));
+        assertEquals(410, ex.getStatusCode().value());
+        verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
+    }
+
+    @Test
+    void shouldFailWhenLosingTheConsumeRace() {
+        // Simulates a concurrent second poll: the membership check passes (still a
+        // valid APPROVED row as read), but markConsumedIfApproved reports 0 rows
+        // because another thread already flipped it to CONSUMED first.
+        UUID userId = UUID.randomUUID();
+        UUID orgId = UUID.randomUUID();
+        String deviceCode = "dev-race";
+        UUID codeId = UUID.randomUUID();
+
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(codeId)
+                .deviceCode(deviceCode)
+                .status(DeviceAuthStatus.APPROVED)
+                .userId(userId)
+                .organizationId(orgId)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        Membership membership = new Membership();
+        membership.setRole(MembershipRole.DEVELOPER);
+
+        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, orgId)).thenReturn(Optional.of(membership));
+        when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(0);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                deviceAuthService.pollDeviceToken(deviceCode));
+        assertEquals(410, ex.getStatusCode().value());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any());
     }
 
     @Test

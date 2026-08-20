@@ -119,7 +119,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-09 | P0 | DONE | Any user can rotate every tenant's encryption keys |
 | P0-10 | P0 | DONE | Access token accepted as a refresh token |
 | P0-11 | P0 | DONE | X-Forwarded-For spoofing defeats auth rate limiting |
-| P0-12 | P0 | TODO | Device-code flow grants the wrong org role |
+| P0-12 | P0 | DONE | Device-code flow grants the wrong org role |
 | P0-13 | P0 | TODO | API-key project scoping enforced inconsistently |
 | P0-14 | P0 | TODO | Plaintext reset tokens, logged temp password, unsafe defaults |
 | P1-15 | P1 | TODO | Publish Docker images — product is uninstallable today |
