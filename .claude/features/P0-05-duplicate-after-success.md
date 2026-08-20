@@ -1,6 +1,6 @@
 # P0-05 — A successful 2xx delivery gets re-sent as a duplicate
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0
 - **Branch:** `feature/P0-05-duplicate-after-success`
 - **Depends on:** nothing
