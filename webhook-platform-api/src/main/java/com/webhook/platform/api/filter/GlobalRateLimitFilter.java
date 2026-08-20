@@ -34,6 +34,7 @@ public class GlobalRateLimitFilter implements Filter {
     private final boolean enabled;
     private final Counter globalRateLimitExceeded;
     private final Counter globalRateLimitFallback;
+    private volatile boolean redisRateLimiterInitialized = false;
 
     public GlobalRateLimitFilter(
             RedissonClient redissonClient,
@@ -55,8 +56,20 @@ public class GlobalRateLimitFilter implements Filter {
         this.globalRateLimitFallback = Counter.builder("global_rate_limit_fallback_total")
                 .description("Number of global rate limit checks using local fallback (Redis unavailable)")
                 .register(meterRegistry);
+        initRedisRateLimiter();
         log.info("Global rate limit filter initialized: {}/sec, enabled={}, backend=redis+local-fallback",
                 requestsPerSecond, enabled);
+    }
+
+    private void initRedisRateLimiter() {
+        try {
+            RRateLimiter limiter = redissonClient.getRateLimiter(REDIS_KEY);
+            limiter.trySetRate(RateType.OVERALL, requestsPerSecond, 1, RateIntervalUnit.SECONDS);
+            limiter.expire(KEY_TTL);
+            redisRateLimiterInitialized = true;
+        } catch (Exception e) {
+            log.warn("Failed to initialize Redis rate limiter at startup, will use local fallback: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -92,9 +105,10 @@ public class GlobalRateLimitFilter implements Filter {
 
     private boolean tryAcquire() {
         try {
+            if (!redisRateLimiterInitialized) {
+                initRedisRateLimiter();
+            }
             RRateLimiter limiter = redissonClient.getRateLimiter(REDIS_KEY);
-            limiter.trySetRate(RateType.OVERALL, requestsPerSecond, 1, RateIntervalUnit.SECONDS);
-            limiter.expire(KEY_TTL);
             return limiter.tryAcquire(1);
         } catch (Exception e) {
             log.warn("Redis unavailable for global rate limit, using local fallback: {}", e.getMessage());

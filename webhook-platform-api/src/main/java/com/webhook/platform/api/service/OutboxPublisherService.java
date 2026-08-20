@@ -20,7 +20,6 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -286,25 +285,23 @@ public class OutboxPublisherService {
         }
 
         if (!failedMap.isEmpty()) {
-            // For retry path: messages that exceeded maxRetries go to DEAD, rest to FAILED.
-            // For first-attempt path: all go to FAILED.
-            // Since retry_count is incremented server-side (retry_count + 1), we need to check
-            // which messages will exceed maxRetries. We use a simple heuristic:
-            // on retry path, do individual save for DEAD candidates; batch the rest.
-            // Note: We iterate individually to preserve each message's specific error for debugging.
-            int successCount = 0;
+            // Group by error message to batch updates — typically 1-2 distinct errors per cycle
+            // (e.g. "Broker unavailable") instead of N individual transactions.
+            Map<String, List<UUID>> byError = new HashMap<>();
             for (Map.Entry<UUID, String> entry : failedMap.entrySet()) {
-                UUID messageId = entry.getKey();
-                String error = entry.getValue();
-                try {
-                    txTemplate.executeWithoutResult(status ->
-                            outboxMessageRepository.batchMarkFailed(List.of(messageId), error, now));
-                    successCount++;
-                } catch (Exception e) {
-                    log.error("Failed to mark message {} as FAILED: {}", messageId, e.getMessage());
-                }
+                byError.computeIfAbsent(entry.getValue(), k -> new ArrayList<>()).add(entry.getKey());
             }
-            log.debug("Marked {}/{} outbox messages as FAILED with individual errors", successCount, failedMap.size());
+            try {
+                txTemplate.executeWithoutResult(status -> {
+                    for (Map.Entry<String, List<UUID>> group : byError.entrySet()) {
+                        outboxMessageRepository.batchMarkFailed(group.getValue(), group.getKey(), now);
+                    }
+                });
+                log.debug("Batch-marked {} outbox messages as FAILED ({} distinct errors)",
+                        failedMap.size(), byError.size());
+            } catch (Exception e) {
+                log.error("Failed to batch-mark {} messages as FAILED: {}", failedMap.size(), e.getMessage());
+            }
         }
     }
 
