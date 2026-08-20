@@ -277,4 +277,168 @@ class IncomingForwardServiceTest {
 
         verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt());
     }
+
+    // -- P0-07: a configured transformation that fails must fail the attempt, never forward
+    // the raw body. --
+
+    @Test
+    void configuredTransformationMissing_failsAttemptAsRetryable_doesNotForwardRawBody() {
+        IncomingDestination dest = buildDestination();
+        UUID transformationId = UUID.randomUUID();
+        dest.setTransformationId(transformationId);
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
+        // Simulates the transformation being deleted or disabled after being configured.
+        when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
+
+        IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(2).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(existingAttempt));
+
+        WebClient mockWebClient = mock(WebClient.class);
+        when(webClientBuilder.build()).thenReturn(mockWebClient);
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IncomingForwardService localService = new IncomingForwardService(
+                eventRepository, destinationRepository, attemptRepository,
+                transformationCacheService, payloadTransformService,
+                webClientBuilder, new ObjectMapper(),
+                encryptionKeyRegistry,
+                true, List.of(),
+                meterRegistry, transactionTemplate,
+                ConnectionProvider.newConnection(),
+                concurrencyControlService, circuitBreakerService, projectRateLimiterService
+        );
+
+        // Retry dispatch: scheduler already claimed the row, no re-claim needed.
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(2).replay(false)
+                .build();
+
+        localService.processForward(message);
+
+        // No HTTP call must have been attempted -- the raw (untransformed) body must never
+        // reach the destination.
+        verifyNoInteractions(mockWebClient);
+        verifyNoInteractions(payloadTransformService);
+
+        ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository, times(2)).save(captor.capture());
+        List<IncomingForwardAttempt> saved = captor.getAllValues();
+
+        // FAILED (not DLQ) because attemptNumber (2) < maxAttempts (5) -- retryable.
+        IncomingForwardAttempt failedUpdate = saved.stream()
+                .filter(a -> a.getStatus() == ForwardAttemptStatus.FAILED)
+                .findFirst().orElseThrow();
+        assertThat(failedUpdate.getErrorMessage()).contains("TRANSFORM_FAILED");
+        assertThat(failedUpdate.getResponseCode()).isNull();
+
+        // A retry attempt must have been scheduled -- this is a retryable failure, not terminal.
+        assertThat(saved.stream().anyMatch(a -> a.getStatus() == ForwardAttemptStatus.PENDING
+                && a.getAttemptNumber() == 3)).isTrue();
+
+        assertThat(meterRegistry.get("transform_failed_total").counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void configuredTransformationMissing_atMaxAttempts_goesToDlq_doesNotForwardRawBody() {
+        IncomingDestination dest = buildDestination();
+        dest.setMaxAttempts(2);
+        UUID transformationId = UUID.randomUUID();
+        dest.setTransformationId(transformationId);
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
+        when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
+
+        IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(2).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(existingAttempt));
+
+        WebClient mockWebClient = mock(WebClient.class);
+        when(webClientBuilder.build()).thenReturn(mockWebClient);
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IncomingForwardService localService = new IncomingForwardService(
+                eventRepository, destinationRepository, attemptRepository,
+                transformationCacheService, payloadTransformService,
+                webClientBuilder, new ObjectMapper(),
+                encryptionKeyRegistry,
+                true, List.of(),
+                meterRegistry, transactionTemplate,
+                ConnectionProvider.newConnection(),
+                concurrencyControlService, circuitBreakerService, projectRateLimiterService
+        );
+
+        // attemptCount == maxAttempts -- this is the last attempt.
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(2).replay(false)
+                .build();
+
+        localService.processForward(message);
+
+        verifyNoInteractions(mockWebClient);
+
+        ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository).save(captor.capture());
+        IncomingForwardAttempt saved = captor.getValue();
+        // A permanently broken template must terminate at DLQ, not retry forever.
+        assertThat(saved.getStatus()).isEqualTo(ForwardAttemptStatus.DLQ);
+        assertThat(saved.getErrorMessage()).contains("Max attempts reached");
+    }
+
+    @Test
+    void inlineJsonPathTransformFails_failsAttemptAsRetryable_doesNotForwardRawBody() {
+        IncomingDestination dest = buildDestination();
+        dest.setPayloadTransform("$.this.path.does.not.exist");
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(dest));
+
+        IncomingForwardAttempt existingAttempt = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID()).incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(existingAttempt));
+
+        WebClient mockWebClient = mock(WebClient.class);
+        when(webClientBuilder.build()).thenReturn(mockWebClient);
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        IncomingForwardService localService = new IncomingForwardService(
+                eventRepository, destinationRepository, attemptRepository,
+                transformationCacheService, payloadTransformService,
+                webClientBuilder, new ObjectMapper(),
+                encryptionKeyRegistry,
+                true, List.of(),
+                meterRegistry, transactionTemplate,
+                ConnectionProvider.newConnection(),
+                concurrencyControlService, circuitBreakerService, projectRateLimiterService
+        );
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        localService.processForward(message);
+
+        verifyNoInteractions(mockWebClient);
+
+        ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository, times(2)).save(captor.capture());
+        List<IncomingForwardAttempt> saved = captor.getAllValues();
+        IncomingForwardAttempt failedUpdate = saved.stream()
+                .filter(a -> a.getStatus() == ForwardAttemptStatus.FAILED)
+                .findFirst().orElseThrow();
+        assertThat(failedUpdate.getErrorMessage()).contains("TRANSFORM_FAILED");
+    }
 }

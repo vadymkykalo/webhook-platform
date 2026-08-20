@@ -9,7 +9,8 @@ import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -20,18 +21,25 @@ import java.util.regex.Pattern;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class PayloadTransformService {
 
     private final ObjectMapper objectMapper;
-    
+    private final Counter transformFailedCounter;
+
     private static final Pattern JSONPATH_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
-    
+
     private final Configuration jsonPathConfig = Configuration.builder()
             .jsonProvider(new JacksonJsonNodeJsonProvider())
             .mappingProvider(new JacksonMappingProvider())
             .options(Option.SUPPRESS_EXCEPTIONS)
             .build();
+
+    public PayloadTransformService(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
+        this.objectMapper = objectMapper;
+        this.transformFailedCounter = Counter.builder("transform_failed_total")
+                .tag("component", "payload_transform_service")
+                .register(meterRegistry);
+    }
 
     /**
      * Transforms the event payload using the provided template.
@@ -48,23 +56,33 @@ public class PayloadTransformService {
      * }
      * 
      * @param originalPayload The original event payload JSON
-     * @param template The transformation template
+     * @param template The transformation template. {@code null}/blank means "no
+     *                 transformation configured" — the original payload is fine to send.
      * @return Transformed payload JSON string
+     * @throws PayloadTransformException if a template WAS configured (non-blank) but could
+     *         not be applied — invalid source JSON, invalid template JSON, or any other
+     *         processing failure. Callers must treat this as a failed delivery attempt
+     *         (retryable), never fall back to {@code originalPayload}: the whole point of a
+     *         configured transformation is often to strip PII before the payload leaves the
+     *         platform (P0-07).
      */
     public String transform(String originalPayload, String template) {
         if (template == null || template.isBlank()) {
+            // No transformation configured — sending the payload as-is is correct, not a bug.
             return originalPayload;
         }
-        
+
         try {
             JsonNode sourceNode = objectMapper.readTree(originalPayload);
             JsonNode templateNode = objectMapper.readTree(template);
-            
+
             JsonNode resultNode = processNode(templateNode, sourceNode);
             return objectMapper.writeValueAsString(resultNode);
         } catch (Exception e) {
-            log.warn("Failed to transform payload, returning original: {}", e.getMessage());
-            return originalPayload;
+            transformFailedCounter.increment();
+            log.error("Configured payload transformation failed; refusing to fall back to the " +
+                    "raw payload: {}", e.getMessage());
+            throw new PayloadTransformException("Payload transformation failed: " + e.getMessage(), e);
         }
     }
 
