@@ -1,12 +1,15 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.CapturedRequest;
+import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.TestEndpoint;
 import com.webhook.platform.api.domain.repository.CapturedRequestRepository;
+import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.dto.TestEndpointResponse;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +39,7 @@ public class TestEndpointService {
 
     private final TestEndpointRepository testEndpointRepository;
     private final CapturedRequestRepository capturedRequestRepository;
+    private final ProjectRepository projectRepository;
     private final TrustedProxyResolver trustedProxyResolver;
 
     @Value("${test-endpoint.base-url:http://localhost:8080}")
@@ -51,8 +55,17 @@ public class TestEndpointService {
     private static final int SLUG_LENGTH = 8;
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new NotFoundException("Project not found"));
+        if (!project.getOrganizationId().equals(organizationId)) {
+            throw new ForbiddenException("Access denied");
+        }
+    }
+
     @Transactional
-    public TestEndpointResponse create(UUID projectId, TestEndpointRequest request) {
+    public TestEndpointResponse create(UUID projectId, TestEndpointRequest request, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         long count = testEndpointRepository.countByProjectId(projectId);
         if (count >= maxPerProject) {
             throw new IllegalStateException("Maximum test endpoints limit reached (" + maxPerProject + ")");
@@ -77,14 +90,16 @@ public class TestEndpointService {
         return mapToResponse(endpoint);
     }
 
-    public List<TestEndpointResponse> list(UUID projectId) {
+    public List<TestEndpointResponse> list(UUID projectId, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         return testEndpointRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    public TestEndpointResponse get(UUID projectId, UUID id) {
+    public TestEndpointResponse get(UUID projectId, UUID id, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         TestEndpoint endpoint = testEndpointRepository.findById(id)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
@@ -94,16 +109,17 @@ public class TestEndpointService {
     public TestEndpointResponse getBySlug(String slug) {
         TestEndpoint endpoint = testEndpointRepository.findBySlug(slug)
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
-        
+
         if (endpoint.getExpiresAt().isBefore(Instant.now())) {
             throw new NotFoundException("Test endpoint expired");
         }
-        
+
         return mapToResponse(endpoint);
     }
 
     @Transactional
-    public void delete(UUID projectId, UUID id) {
+    public void delete(UUID projectId, UUID id, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         TestEndpoint endpoint = testEndpointRepository.findById(id)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
@@ -147,7 +163,8 @@ public class TestEndpointService {
         return mapToCapturedResponse(captured);
     }
 
-    public Page<CapturedRequestResponse> getRequests(UUID projectId, UUID testEndpointId, Pageable pageable) {
+    public Page<CapturedRequestResponse> getRequests(UUID projectId, UUID testEndpointId, Pageable pageable, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         TestEndpoint endpoint = testEndpointRepository.findById(testEndpointId)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
@@ -157,7 +174,8 @@ public class TestEndpointService {
     }
 
     @Transactional
-    public void clearRequests(UUID projectId, UUID testEndpointId) {
+    public void clearRequests(UUID projectId, UUID testEndpointId, UUID organizationId) {
+        validateProjectOwnership(projectId, organizationId);
         TestEndpoint endpoint = testEndpointRepository.findById(testEndpointId)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));

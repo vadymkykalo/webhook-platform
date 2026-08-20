@@ -115,7 +115,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-05 | P0 | DONE | Successful delivery re-sent as a duplicate |
 | P0-06 | P0 | DONE | Single scheduler thread stalls platform-wide dispatch |
 | P0-07 | P0 | DONE | Transform failure silently ships the untransformed payload |
-| P0-08 | P0 | TODO | TestEndpointController has no tenancy check at all |
+| P0-08 | P0 | DONE | TestEndpointController has no tenancy check at all |
 | P0-09 | P0 | DONE | Any user can rotate every tenant's encryption keys |
 | P0-10 | P0 | TODO | Access token accepted as a refresh token |
 | P0-11 | P0 | DONE | X-Forwarded-For spoofing defeats auth rate limiting |
