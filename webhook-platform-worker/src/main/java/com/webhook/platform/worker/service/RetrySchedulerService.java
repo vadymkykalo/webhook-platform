@@ -295,7 +295,11 @@ public class RetrySchedulerService {
 
     private String getRetryTopic(int attemptCount) {
         return switch (attemptCount) {
-            case 1 -> KafkaTopics.DELIVERIES_RETRY_1M;
+            // 0: concurrency/rate-limit backpressure reschedules the delivery before its
+            // first HTTP attempt (WebhookDeliveryService increments attempt_count only once
+            // the call is actually about to be made) -- treat it the same as attempt 1, not
+            // as an exhausted ladder.
+            case 0, 1 -> KafkaTopics.DELIVERIES_RETRY_1M;
             case 2 -> KafkaTopics.DELIVERIES_RETRY_5M;
             case 3 -> KafkaTopics.DELIVERIES_RETRY_15M;
             case 4 -> KafkaTopics.DELIVERIES_RETRY_1H;
