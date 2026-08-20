@@ -2,6 +2,8 @@ package com.webhook.platform.api.config;
 
 import com.webhook.platform.api.security.ApiKeyAuthenticationFilter;
 import com.webhook.platform.api.security.JwtAuthenticationFilter;
+import com.webhook.platform.api.security.PlatformAdminAuthenticationFilter;
+import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -21,16 +23,19 @@ public class SecurityConfig {
 
         private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter;
         private final CorsConfigurationSource corsConfigurationSource;
         private final boolean swaggerEnabled;
 
         public SecurityConfig(
                         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
                         JwtAuthenticationFilter jwtAuthenticationFilter,
+                        PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter,
                         @Qualifier("corsConfigurationSource") CorsConfigurationSource corsConfigurationSource,
                         @Value("${swagger.enabled:false}") boolean swaggerEnabled) {
                 this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
                 this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+                this.platformAdminAuthenticationFilter = platformAdminAuthenticationFilter;
                 this.corsConfigurationSource = corsConfigurationSource;
                 this.swaggerEnabled = swaggerEnabled;
         }
@@ -62,6 +67,12 @@ public class SecurityConfig {
                                                         .requestMatchers("/api/v1/public/**").permitAll()
                                                         .requestMatchers("/api/v1/billing/plans").permitAll()
                                                         .requestMatchers("/api/v1/billing/webhook/**").permitAll()
+                                                        // P0-09: cluster-operator routes — gated on the
+                                                        // PLATFORM_ADMIN authority granted only by
+                                                        // PlatformAdminAuthenticationFilter, never by tenant
+                                                        // JWT/API-key role (org OWNER is not platform admin).
+                                                        .requestMatchers("/api/v1/admin/**")
+                                                                        .hasAuthority(PlatformAdminAuthenticationToken.AUTHORITY)
                                                         .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login",
                                                                         "/api/v1/auth/refresh",
                                                                         "/api/v1/auth/verify-email",
@@ -100,6 +111,8 @@ public class SecurityConfig {
                                                 }))
                                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(apiKeyAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class)
+                                .addFilterBefore(platformAdminAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class);
 
                 return http.build();

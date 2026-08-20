@@ -83,5 +83,13 @@ public abstract class AbstractIntegrationTest {
         registry.add("webhook.encryption-salt", () -> "test_salt_for_integration_tests");
         registry.add("jwt.secret", () -> "test_jwt_secret_key_minimum_32_chars_required_here");
         registry.add("jwt.expiration-ms", () -> "3600000");
+        registry.add("platform.admin.token", () -> PLATFORM_ADMIN_TEST_TOKEN);
     }
+
+    /**
+     * Shared platform-admin operator credential for integration tests (P0-09).
+     * Any test wanting to authenticate as the platform admin sends this value in the
+     * {@code X-Platform-Admin-Token} header.
+     */
+    protected static final String PLATFORM_ADMIN_TEST_TOKEN = "test_platform_admin_operator_token";
 }
