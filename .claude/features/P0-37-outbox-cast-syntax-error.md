@@ -1,6 +1,6 @@
 # P0-37 — Outbox publisher never publishes a single message (native-query syntax error)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — the transactional outbox never drains; zero events ever reach Kafka
 - **Branch:** `feature/P0-37-outbox-cast-syntax-error`
 - **Depends on:** nothing

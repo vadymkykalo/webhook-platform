@@ -144,7 +144,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P3-34 | P3 | TODO | Workflow engine and CLI command tests |
 | P3-35 | P3 | TODO | Load/soak harness + SDK contract tests |
 | P3-36 | P3 | TODO | Table partitioning + log aggregation |
-| P0-37 | P0 | TODO | Outbox publisher never publishes (Hibernate mangles `::` cast in native query) |
+| P0-37 | P0 | IN PROGRESS | Outbox publisher never publishes (Hibernate mangles `::` cast in native query) |
 | P0-38 | P0 | TODO | Never-attempted deliveries routed to the 24h retry tier |
 
 Keep this table in sync with each file's `Status:` line — it is the only
