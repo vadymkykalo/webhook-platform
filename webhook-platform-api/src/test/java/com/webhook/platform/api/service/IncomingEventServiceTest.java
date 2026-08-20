@@ -29,9 +29,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.Instant;
 import java.util.List;
@@ -43,6 +47,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class IncomingEventServiceTest {
 
     @Mock
@@ -57,6 +62,8 @@ class IncomingEventServiceTest {
     private OutboxMessageRepository outboxMessageRepository;
     @Mock
     private ProjectRepository projectRepository;
+    @Mock
+    private PlatformTransactionManager txManager;
 
     private IncomingEventService service;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -73,10 +80,12 @@ class IncomingEventServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(txManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+
         service = new IncomingEventService(
                 eventRepository, sourceRepository, forwardAttemptRepository,
                 destinationRepository, outboxMessageRepository, projectRepository,
-                objectMapper
+                objectMapper, txManager
         );
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         source = IncomingSource.builder()

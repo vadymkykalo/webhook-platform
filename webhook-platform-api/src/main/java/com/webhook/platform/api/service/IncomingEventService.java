@@ -29,8 +29,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +43,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class IncomingEventService {
 
+    private static final int BULK_REPLAY_BATCH_SIZE = 100;
+
     private final IncomingEventRepository eventRepository;
     private final IncomingSourceRepository sourceRepository;
     private final IncomingForwardAttemptRepository forwardAttemptRepository;
@@ -47,6 +52,7 @@ public class IncomingEventService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate txTemplate;
 
     public IncomingEventService(
             IncomingEventRepository eventRepository,
@@ -55,7 +61,8 @@ public class IncomingEventService {
             IncomingDestinationRepository destinationRepository,
             OutboxMessageRepository outboxMessageRepository,
             ProjectRepository projectRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            PlatformTransactionManager txManager) {
         this.eventRepository = eventRepository;
         this.sourceRepository = sourceRepository;
         this.forwardAttemptRepository = forwardAttemptRepository;
@@ -63,6 +70,7 @@ public class IncomingEventService {
         this.outboxMessageRepository = outboxMessageRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
+        this.txTemplate = new TransactionTemplate(txManager);
     }
 
     private void validateProjectOwnership(UUID projectId, UUID organizationId) {
@@ -191,7 +199,6 @@ public class IncomingEventService {
         return replayed;
     }
 
-    @Transactional
     public IncomingBulkReplayResponse bulkReplay(UUID projectId, IncomingBulkReplayRequest request, UUID organizationId) {
         validateProjectOwnership(projectId, organizationId);
 
@@ -237,47 +244,11 @@ public class IncomingEventService {
                     .build();
         }
 
+        // Process in batches to avoid long-held DB locks and connection pool exhaustion
         int totalAttempts = 0;
-        for (IncomingEvent event : events) {
-            for (IncomingDestination destination : destinations) {
-                Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(event.getId(), destination.getId());
-                int nextAttempt = (maxAttempt != null ? maxAttempt : 0) + 1;
-
-                IncomingForwardAttempt attempt = IncomingForwardAttempt.builder()
-                        .incomingEventId(event.getId())
-                        .destinationId(destination.getId())
-                        .attemptNumber(nextAttempt)
-                        .status(ForwardAttemptStatus.PENDING)
-                        .build();
-                forwardAttemptRepository.save(attempt);
-
-                try {
-                    IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
-                            .incomingEventId(event.getId())
-                            .destinationId(destination.getId())
-                            .incomingSourceId(source.getId())
-                            .attemptCount(nextAttempt)
-                            .replay(true)
-                            .build();
-
-                    OutboxMessage outboxMessage = OutboxMessage.builder()
-                            .aggregateType("IncomingForward")
-                            .aggregateId(event.getId())
-                            .eventType("IncomingForwardBulkReplay")
-                            .payload(objectMapper.writeValueAsString(forwardMessage))
-                            .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
-                            .kafkaKey(destination.getId().toString())
-                            .projectId(projectId)
-                            .status(OutboxStatus.PENDING)
-                            .retryCount(0)
-                            .build();
-                    outboxMessageRepository.save(outboxMessage);
-                    totalAttempts++;
-                } catch (Exception e) {
-                    log.error("Failed to create bulk replay outbox: eventId={}, destId={}",
-                            event.getId(), destination.getId(), e);
-                }
-            }
+        for (int i = 0; i < events.size(); i += BULK_REPLAY_BATCH_SIZE) {
+            List<IncomingEvent> batch = events.subList(i, Math.min(i + BULK_REPLAY_BATCH_SIZE, events.size()));
+            totalAttempts += processBulkReplayBatch(batch, destinations, source.getId(), projectId);
         }
 
         log.info("Bulk replayed {} events to {} destinations ({} total attempts) for source {}",
@@ -289,6 +260,60 @@ public class IncomingEventService {
                 .eventsReplayed(events.size())
                 .totalForwardAttempts(totalAttempts)
                 .build();
+    }
+
+    private int processBulkReplayBatch(List<IncomingEvent> events, List<IncomingDestination> destinations,
+                                       UUID sourceId, UUID projectId) {
+        Integer result = txTemplate.execute(status -> {
+            List<IncomingForwardAttempt> attemptsToSave = new ArrayList<>();
+            List<OutboxMessage> outboxToSave = new ArrayList<>();
+            int errors = 0;
+
+            for (IncomingEvent event : events) {
+                for (IncomingDestination destination : destinations) {
+                    Integer maxAttempt = forwardAttemptRepository.findMaxAttemptNumber(event.getId(), destination.getId());
+                    int nextAttempt = (maxAttempt != null ? maxAttempt : 0) + 1;
+
+                    attemptsToSave.add(IncomingForwardAttempt.builder()
+                            .incomingEventId(event.getId())
+                            .destinationId(destination.getId())
+                            .attemptNumber(nextAttempt)
+                            .status(ForwardAttemptStatus.PENDING)
+                            .build());
+
+                    try {
+                        IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
+                                .incomingEventId(event.getId())
+                                .destinationId(destination.getId())
+                                .incomingSourceId(sourceId)
+                                .attemptCount(nextAttempt)
+                                .replay(true)
+                                .build();
+
+                        outboxToSave.add(OutboxMessage.builder()
+                                .aggregateType("IncomingForward")
+                                .aggregateId(event.getId())
+                                .eventType("IncomingForwardBulkReplay")
+                                .payload(objectMapper.writeValueAsString(forwardMessage))
+                                .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
+                                .kafkaKey(destination.getId().toString())
+                                .projectId(projectId)
+                                .status(OutboxStatus.PENDING)
+                                .retryCount(0)
+                                .build());
+                    } catch (Exception e) {
+                        log.error("Failed to create bulk replay outbox: eventId={}, destId={}",
+                                event.getId(), destination.getId(), e);
+                        errors++;
+                    }
+                }
+            }
+
+            forwardAttemptRepository.saveAll(attemptsToSave);
+            outboxMessageRepository.saveAll(outboxToSave);
+            return outboxToSave.size();
+        });
+        return result != null ? result : 0;
     }
 
     private UUID resolveProjectIdFromSource(UUID sourceId) {
