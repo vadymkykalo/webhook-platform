@@ -149,6 +149,41 @@ public class WebhookDeliveryService {
         return shuttingDown;
     }
 
+    /**
+     * Called by DeliveryConsumer when the async executor pool is full and this record
+     * can't even be submitted. With MANUAL acks a non-ack does not get redelivered until
+     * a rebalance/restart, and now that KafkaConsumerConfig defers commits until every
+     * lower offset is acked (P0-03), leaving this record unacked would stall the whole
+     * partition forever instead of just delaying it. Kafka's job for this record is done
+     * either way — the retry ladder (RetrySchedulerService), not Kafka redelivery, is
+     * what actually drives reprocessing, so reschedule the DB row explicitly and let the
+     * caller ack.
+     */
+    public void rescheduleForBackpressure(UUID deliveryId, boolean isRetry) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
+            if (delivery == null) {
+                log.debug("Delivery {} disappeared before backpressure reschedule", deliveryId);
+                return;
+            }
+            Delivery.DeliveryStatus expected = isRetry
+                    ? Delivery.DeliveryStatus.PROCESSING
+                    : Delivery.DeliveryStatus.PENDING;
+            if (delivery.getStatus() != expected) {
+                log.debug("Delivery {} no longer {} (already handled?), skipping backpressure reschedule",
+                        deliveryId, expected);
+                return;
+            }
+            long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
+            delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+            delivery.setNextRetryAt(Instant.now().plusSeconds(delaySec));
+            delivery.setUpdatedAt(Instant.now());
+            deliveryRepository.save(delivery);
+            log.warn("Executor pool full, rescheduled delivery {} via retry ladder in {}s instead of leaving it unacked",
+                    deliveryId, delaySec);
+        });
+    }
+
     public void processDelivery(DeliveryMessage message, boolean isRetry) {
         Delivery delivery;
         if (isRetry) {

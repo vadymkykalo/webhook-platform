@@ -12,6 +12,8 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -73,6 +75,54 @@ class DeliveryConsumerTest {
 
         verify(ack, never()).acknowledge();
         verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
+    }
+
+    @Test
+    void consumeDispatch_shouldRescheduleAndAck_whenExecutorFull() throws Exception {
+        // Fill the pool (size 4) so the next submission is rejected — see P0-03: a
+        // rejected record must be explicitly rescheduled and acked, not left unacked.
+        fillExecutorPool();
+
+        when(webhookDeliveryService.isShuttingDown()).thenReturn(false);
+        DeliveryMessage message = dispatchMessage();
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        consumer.consumeDispatch(message, "key", "deliveries.dispatch", null, ack);
+
+        verify(webhookDeliveryService).rescheduleForBackpressure(message.getDeliveryId(), false);
+        verify(ack).acknowledge();
+        verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
+    }
+
+    @Test
+    void consumeRetry_shouldRescheduleAndAck_whenExecutorFull() throws Exception {
+        fillExecutorPool();
+
+        when(webhookDeliveryService.isShuttingDown()).thenReturn(false);
+        DeliveryMessage message = dispatchMessage();
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        consumer.consumeRetry(message, "key", "deliveries.retry.1m", null, ack);
+
+        verify(webhookDeliveryService).rescheduleForBackpressure(message.getDeliveryId(), true);
+        verify(ack).acknowledge();
+        verify(webhookDeliveryService, never()).processDelivery(any(), anyBoolean());
+    }
+
+    private void fillExecutorPool() throws InterruptedException {
+        CountDownLatch blockLatch = new CountDownLatch(1);
+        CountDownLatch allStarted = new CountDownLatch(4);
+        for (int i = 0; i < 4; i++) {
+            asyncExecutor.trySubmit(() -> {
+                allStarted.countDown();
+                try {
+                    blockLatch.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }, mock(Acknowledgment.class), "fill-" + i);
+        }
+        assertTrue(allStarted.await(5, TimeUnit.SECONDS));
     }
 
     private DeliveryMessage dispatchMessage() {

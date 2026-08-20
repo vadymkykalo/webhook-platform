@@ -140,10 +140,17 @@ public class BoundedAsyncExecutor {
                     // uncaught-exception handler, which no Kafka container ever sees.
                     log.warn("{}: shutdown rejected, not acking: id={}", name, id);
                 } catch (Exception e) {
-                    // Don't ack. Whether this is actually redelivered depends on offset
-                    // commit ordering across concurrently-acking sibling tasks (see P0-03) —
-                    // it is not guaranteed by simply skipping the ack.
-                    log.error("{}: async task failed, not acking (will be redelivered): id={}, error={}",
+                    // Don't ack. This is a defensive catch-all for a task that escapes its
+                    // own error handling entirely (WebhookDeliveryService.processDelivery
+                    // already catches everything it can and always acks); it should be
+                    // unreachable in practice. As of P0-03, KafkaConsumerConfig enables
+                    // asyncAcks, so a permanently-unacked record now blocks this
+                    // partition's offset commits until a rebalance/restart, rather than
+                    // silently losing it — a stall is a visible, recoverable failure mode,
+                    // data loss is not. This executor is generic (also backs the incoming
+                    // pipeline) and has no domain-specific retry ladder to reschedule into,
+                    // unlike DeliveryConsumer's executor-full path.
+                    log.error("{}: async task failed, not acking (partition will stall until restart/rebalance): id={}, error={}",
                             name, id, e.getMessage(), e);
                 } finally {
                     inFlight.decrementAndGet();
