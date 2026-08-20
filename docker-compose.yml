@@ -192,7 +192,10 @@ services:
       TUNNEL_CLEANUP_INTERVAL_MS: ${TUNNEL_CLEANUP_INTERVAL_MS:-60000}
       TUNNEL_REQUEST_LOG_RETENTION_DAYS: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:-7}
       WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:-524288}
-      WEBHOOK_INCOMING_TRUSTED_PROXIES: ${WEBHOOK_INCOMING_TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      # Empty by default: the API port is exposed directly to the host here, so the
+      # socket peer is already the real client. Only set this if you put a reverse
+      # proxy in front (see docker-compose.prod.yml, which does).
+      WEBHOOK_TRUSTED_PROXIES: ${WEBHOOK_TRUSTED_PROXIES:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1000}
       OUTBOX_RETRY_INTERVAL_MS: ${OUTBOX_RETRY_INTERVAL_MS:-30000}

@@ -118,7 +118,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-08 | P0 | TODO | TestEndpointController has no tenancy check at all |
 | P0-09 | P0 | DONE | Any user can rotate every tenant's encryption keys |
 | P0-10 | P0 | TODO | Access token accepted as a refresh token |
-| P0-11 | P0 | TODO | X-Forwarded-For spoofing defeats auth rate limiting |
+| P0-11 | P0 | DONE | X-Forwarded-For spoofing defeats auth rate limiting |
 | P0-12 | P0 | TODO | Device-code flow grants the wrong org role |
 | P0-13 | P0 | TODO | API-key project scoping enforced inconsistently |
 | P0-14 | P0 | TODO | Plaintext reset tokens, logged temp password, unsafe defaults |

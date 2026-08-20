@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.webhook.platform.common.util.CryptoUtils;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.Counter;
@@ -23,6 +24,7 @@ public class AuthRateLimiterService {
 
     private static final String LOGIN_IP_KEY_PREFIX = "rate_limiter:auth:login:ip:";
     private static final String LOGIN_EMAIL_KEY_PREFIX = "rate_limiter:auth:login:email:";
+    private static final String LOGIN_TOKEN_KEY_PREFIX = "rate_limiter:auth:login:token:";
     private static final String REGISTER_KEY_PREFIX = "rate_limiter:auth:register:";
     private static final Duration KEY_TTL = Duration.ofMinutes(5);
 
@@ -74,6 +76,24 @@ public class AuthRateLimiterService {
 
     public boolean allowRegister(String ip) {
         return tryAcquire(REGISTER_KEY_PREFIX + ip, registerRateLimit);
+    }
+
+    /**
+     * Like {@link #allowLogin(String, String)}, but for endpoints that identify a
+     * target by a token rather than an email (refresh, password reset). These have
+     * no email to bucket on, so without a second dimension they are IP-only —
+     * bucketing by the presented token as well means repeated guesses/retries
+     * against one token are bounded even if spread across many source IPs.
+     */
+    public boolean allowTokenAction(String ip, String token) {
+        boolean ipAllowed = tryAcquire(LOGIN_IP_KEY_PREFIX + ip, loginRateLimit);
+        if (!ipAllowed) {
+            return false;
+        }
+        if (token != null && !token.isBlank()) {
+            return tryAcquire(LOGIN_TOKEN_KEY_PREFIX + CryptoUtils.hashApiKey(token), loginRateLimit);
+        }
+        return true;
     }
 
     private boolean tryAcquire(String key, int ratePerMinute) {

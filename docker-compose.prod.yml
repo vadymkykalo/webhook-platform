@@ -36,6 +36,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-WARN}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
       ALERTS_NOTIFICATIONS_ENABLED: ${ALERTS_NOTIFICATIONS_ENABLED:-true}
+      # Traffic reaches this API container via the UI nginx proxy over the compose
+      # network, not directly — trust that proxy's docker-network peer address so
+      # X-Forwarded-For (which nginx sets) is honoured for rate limiting / audit
+      # logging. Narrow this to your actual proxy/LB address if you don't use the
+      # default docker-compose bridge network.
+      WEBHOOK_TRUSTED_PROXIES: ${WEBHOOK_TRUSTED_PROXIES:-172.16.0.0/12}
 
   worker:
     image: ${DOCKER_REGISTRY:-webhook-platform}-worker:${WORKER_IMAGE_TAG:-latest}
