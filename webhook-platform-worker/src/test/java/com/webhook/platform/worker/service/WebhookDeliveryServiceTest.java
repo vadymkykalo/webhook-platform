@@ -7,6 +7,7 @@ import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import com.webhook.platform.worker.domain.entity.Event;
+import com.webhook.platform.worker.domain.entity.DeliveryAttempt;
 import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
@@ -309,6 +310,22 @@ class WebhookDeliveryServiceTest {
                 .build();
     }
 
+    // --- P0-07: a configured transformation that fails to apply must never result in the ---
+    // --- raw payload being sent, and must fail the attempt as retryable / eventually DLQ.  ---
+
+    private Endpoint verifiedEndpoint(UUID endpointId, UUID projectId) {
+        return Endpoint.builder()
+                .id(endpointId)
+                .projectId(projectId)
+                .url("http://localhost:8080/hook")
+                .secretEncrypted("cipher")
+                .secretIv("iv")
+                .enabled(true)
+                .verificationStatus(Endpoint.VerificationStatus.VERIFIED)
+                .encryptionKeyVersion(1)
+                .build();
+    }
+
     private Event stubEvent(UUID eventId, UUID projectId) {
         return Event.builder()
                 .id(eventId)
@@ -325,6 +342,21 @@ class WebhookDeliveryServiceTest {
         when(concurrencyControlService.tryAcquire(any())).thenReturn(true);
         when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
         when(payloadTransformService.transform(anyString(), any())).thenReturn("{}");
+    }
+
+    private WebhookDeliveryService serviceWithMockWebClient(WebClient mockWebClient, MeterRegistry meterRegistry) {
+        when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
+        when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
+        when(webClientBuilder.build()).thenReturn(mockWebClient);
+        return new WebhookDeliveryService(
+                deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
+                webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
+                true, List.of(),
+                rateLimiterService, concurrencyControlService, projectRateLimiterService,
+                circuitBreakerService, meterRegistry, new ObjectMapper(),
+                orderingBufferService, kafkaTemplate, payloadTransformService,
+                transactionTemplate, transformationCacheService,
+                ConnectionProvider.newConnection());
     }
 
     /**
@@ -509,5 +541,137 @@ class WebhookDeliveryServiceTest {
         } finally {
             httpServer.stop(0);
         }
+    }
+
+    /**
+     * Reproduces the original P0-07 bug for the "transformationId not found/disabled" site:
+     * the delivery had an explicit transformationId configured (e.g. the transformation was
+     * later disabled or deleted), and old code silently fell back to the inline
+     * payloadTemplate (often null -> the raw payload) instead of failing the attempt.
+     */
+    @Test
+    void attemptDelivery_configuredTransformationMissing_noHttpCall_failsRetryable() {
+        WebClient mockWebClient = mock(WebClient.class);
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        WebhookDeliveryService localService = serviceWithMockWebClient(mockWebClient, meterRegistry);
+
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+
+        Event event = Event.builder()
+                .id(eventId)
+                .projectId(endpoint.getProjectId())
+                .eventType("test.event")
+                .payload("{\"pii\":\"ssn-123-45-6789\"}")
+                .createdAt(Instant.now())
+                .build();
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+
+        when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
+        when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
+        when(concurrencyControlService.tryAcquire(endpointId)).thenReturn(true);
+        when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
+
+        UUID transformationId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId)
+                .eventId(eventId)
+                .endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0)
+                .maxAttempts(5)
+                .transformationId(transformationId)
+                .updatedAt(Instant.now())
+                .build();
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        // Simulates the transformation being disabled/deleted after being configured.
+        when(transformationCacheService.findEnabledTemplate(transformationId)).thenReturn(null);
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        localService.processDelivery(message, true);
+
+        // No HTTP call must have been attempted -- the raw payload must never leave the platform.
+        verifyNoInteractions(mockWebClient);
+        verifyNoInteractions(payloadTransformService);
+
+        ArgumentCaptor<DeliveryAttempt> attemptCaptor = ArgumentCaptor.forClass(DeliveryAttempt.class);
+        verify(deliveryAttemptRepository).save(attemptCaptor.capture());
+        DeliveryAttempt savedAttempt = attemptCaptor.getValue();
+        assertTrue(savedAttempt.getErrorMessage() != null && savedAttempt.getErrorMessage().contains("TRANSFORM_FAILED"),
+                "the attempt must record a clear transform-failure error, not a warn-log-only fallback");
+        assertEquals(null, savedAttempt.getRequestBody(), "request body must be null -- the raw payload was never built");
+        assertEquals(null, savedAttempt.getHttpStatusCode(), "no HTTP response -- no call was made");
+
+        ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(deliveryCaptor.capture());
+        // Retryable: attemptCount(1) < maxAttempts(5) -- scheduled for retry, not terminal.
+        assertEquals(Delivery.DeliveryStatus.PENDING, deliveryCaptor.getValue().getStatus());
+
+        assertEquals(1.0, meterRegistry.get("transform_failed_total").counter().count(),
+                "a configured-but-failing transform must be counted, not just warn-logged");
+    }
+
+    /**
+     * Check the DLQ path: a permanently broken template must eventually terminate at DLQ
+     * rather than retrying forever, exactly like an HTTP-level failure would. This exercises
+     * the other bug site -- PayloadTransformService.transform() itself throwing for a broken
+     * inline payloadTemplate -- with the delivery already on its last attempt.
+     */
+    @Test
+    void attemptDelivery_brokenPayloadTemplate_atMaxAttempts_terminatesAtDlq_noHttpCall() {
+        WebClient mockWebClient = mock(WebClient.class);
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        WebhookDeliveryService localService = serviceWithMockWebClient(mockWebClient, meterRegistry);
+
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+
+        Event event = Event.builder()
+                .id(eventId)
+                .projectId(endpoint.getProjectId())
+                .eventType("test.event")
+                .payload("{\"pii\":\"ssn-123-45-6789\"}")
+                .createdAt(Instant.now())
+                .build();
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+
+        when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
+        when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
+        when(concurrencyControlService.tryAcquire(endpointId)).thenReturn(true);
+        when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
+
+        UUID deliveryId = UUID.randomUUID();
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId)
+                .eventId(eventId)
+                .endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(4)
+                .maxAttempts(5)
+                .payloadTemplate("{ this is not valid json")
+                .updatedAt(Instant.now())
+                .build();
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        when(payloadTransformService.transform(anyString(), anyString()))
+                .thenThrow(new PayloadTransformException("Payload transformation failed: broken JSON"));
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        localService.processDelivery(message, true);
+
+        verifyNoInteractions(mockWebClient);
+
+        ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(deliveryCaptor.capture());
+        assertEquals(Delivery.DeliveryStatus.DLQ, deliveryCaptor.getValue().getStatus(),
+                "a permanently broken template must terminate at DLQ, not retry forever");
     }
 }

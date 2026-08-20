@@ -66,6 +66,7 @@ public class WebhookDeliveryService {
     private final Counter deliveryFailureCounter;
     private final Counter deliveryErrorCounter;
     private final Counter orderingGapTimeoutCounter;
+    private final Counter transformFailedCounter;
     private final Timer deliveryLatency2xx;
     private final Timer deliveryLatency4xx;
     private final Timer deliveryLatency5xx;
@@ -130,6 +131,9 @@ public class WebhookDeliveryService {
                 .tag("result", "error").tag("status_class", "none")
                 .register(meterRegistry);
         this.orderingGapTimeoutCounter = Counter.builder("webhook_ordering_gap_timeout_total")
+                .register(meterRegistry);
+        this.transformFailedCounter = Counter.builder("transform_failed_total")
+                .tag("component", "outgoing_delivery")
                 .register(meterRegistry);
         this.deliveryLatency2xx = Timer.builder("webhook_delivery_latency_ms")
                 .tag("status_class", "2xx").register(meterRegistry);
@@ -383,6 +387,17 @@ public class WebhookDeliveryService {
             saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(),
                     (int) (System.currentTimeMillis() - startTime));
             markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
+        } catch (PayloadTransformException e) {
+            // P0-07: a configured transformation that fails to apply must never result in the
+            // raw payload leaving the platform. Fail this attempt as retryable (same as an
+            // HTTP-level failure) so it goes through the normal retry ladder and eventually
+            // DLQs if the template stays broken — see scheduleRetry/handleError below.
+            transformFailedCounter.increment();
+            String message = "TRANSFORM_FAILED: " + e.getMessage();
+            log.error("Payload transform failed for delivery {}, refusing to send the raw payload: {}",
+                    delivery.getId(), message);
+            handleError(delivery, new PayloadTransformException(message, e), requestHeaders, body,
+                    (int) (System.currentTimeMillis() - startTime));
         } catch (Exception e) {
             log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
             handleError(delivery, e, requestHeaders, body,
@@ -808,12 +823,18 @@ public class WebhookDeliveryService {
 
     private String resolveTransformTemplate(Delivery delivery) {
         if (delivery.getTransformationId() != null) {
+            // A transformationId is an explicit choice — if it's gone or disabled, that's a
+            // configuration failure, not "no transform configured". Falling back to whatever
+            // the inline payloadTemplate happens to be (often null, i.e. raw payload) would
+            // silently ship data the customer configured a transform specifically to strip
+            // (P0-07), so this must fail the attempt instead of falling through.
             String template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
-            if (template != null) {
-                return template;
+            if (template == null) {
+                throw new PayloadTransformException(
+                        "Configured transformation " + delivery.getTransformationId()
+                                + " not found or disabled for delivery " + delivery.getId());
             }
-            log.warn("Transformation {} not found or disabled for delivery {}, falling back to inline payloadTemplate",
-                    delivery.getTransformationId(), delivery.getId());
+            return template;
         }
         return delivery.getPayloadTemplate();
     }
