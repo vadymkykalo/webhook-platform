@@ -6,7 +6,13 @@ spring:
     name: webhook-platform-worker
   lifecycle:
     timeout-per-shutdown-phase: 30s
-  
+  task:
+    scheduling:
+      pool:
+        # P0-06: Spring Boot defaults this to 1, so a single slow @Scheduled job blocks every
+        # other cron on this JVM (e.g. StuckDeliveryRecoveryService waiting behind DlqMonitoringService).
+        size: ${SCHEDULING_POOL_SIZE:8}
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -110,6 +116,9 @@ retry:
 dlq:
   monitoring:
     interval-ms: ${DLQ_MONITORING_INTERVAL_MS:60000}
+    # P0-06: bounds the AdminClient describeTopics/listOffsets calls so a slow/unreachable
+    # broker can't block this scheduler thread indefinitely.
+    admin-client-timeout-seconds: ${DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS:10}
 
 ordering:
   gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}

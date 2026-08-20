@@ -11,6 +11,7 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -28,10 +30,15 @@ public class DlqMonitoringService {
     private final AdminClient adminClient;
     private final AtomicLong dlqDepth = new AtomicLong(0);
     private final MeterRegistry meterRegistry;
+    private final long adminClientTimeoutSeconds;
 
-    public DlqMonitoringService(KafkaAdmin kafkaAdmin, MeterRegistry meterRegistry) {
+    public DlqMonitoringService(
+            KafkaAdmin kafkaAdmin,
+            MeterRegistry meterRegistry,
+            @Value("${dlq.monitoring.admin-client-timeout-seconds:10}") long adminClientTimeoutSeconds) {
         this.adminClient = AdminClient.create(kafkaAdmin.getConfigurationProperties());
         this.meterRegistry = meterRegistry;
+        this.adminClientTimeoutSeconds = adminClientTimeoutSeconds;
 
         Gauge.builder("webhook_dlq_depth", dlqDepth, AtomicLong::get)
                 .description("Number of messages in DLQ topic across all partitions")
@@ -56,12 +63,14 @@ public class DlqMonitoringService {
         try {
             String topic = KafkaTopics.DELIVERIES_DLQ;
 
-            // Discover all partitions dynamically
+            // Discover all partitions dynamically. Bounded .get() - an unbounded call here sat
+            // on a scheduler thread indefinitely if the broker was slow/unreachable, starving
+            // every other @Scheduled job sharing the pool (P0-06).
             TopicDescription description = adminClient
                     .describeTopics(Collections.singletonList(topic))
                     .topicNameValues()
                     .get(topic)
-                    .get();
+                    .get(adminClientTimeoutSeconds, TimeUnit.SECONDS);
 
             List<TopicPartitionInfo> partitions = description.partitions();
 
@@ -76,9 +85,9 @@ public class DlqMonitoringService {
 
             // Query latest and earliest offsets for all partitions
             Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> latestOffsets = adminClient
-                    .listOffsets(latestRequest).all().get();
+                    .listOffsets(latestRequest).all().get(adminClientTimeoutSeconds, TimeUnit.SECONDS);
             Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> earliestOffsets = adminClient
-                    .listOffsets(earliestRequest).all().get();
+                    .listOffsets(earliestRequest).all().get(adminClientTimeoutSeconds, TimeUnit.SECONDS);
 
             // Compute depth per partition: latest - earliest
             long totalMessages = 0;

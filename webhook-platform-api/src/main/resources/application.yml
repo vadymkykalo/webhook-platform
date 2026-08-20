@@ -3,7 +3,14 @@ spring:
     name: webhook-platform-api
   lifecycle:
     timeout-per-shutdown-phase: 30s
-  
+  task:
+    scheduling:
+      pool:
+        # P0-06: Spring Boot defaults this to 1, so a single slow @Scheduled job (e.g. the
+        # materialized-view REFRESH) blocks every other cron on the JVM, including
+        # OutboxPublisherService's 1s dispatch poll - no event reaches Kafka while it runs.
+        size: ${SCHEDULING_POOL_SIZE:8}
+
   data:
     web:
       pageable:

@@ -1,6 +1,9 @@
 package com.webhook.platform.api;
 
+import com.webhook.platform.api.audit.AuditLogRetentionJob;
+import com.webhook.platform.api.domain.entity.AuditLog;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
+import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.service.DataRetentionService;
@@ -99,6 +102,12 @@ public class ShedLockConcurrencyTest {
     private DataRetentionService dataRetentionService;
 
     @Autowired
+    private AuditLogRetentionJob auditLogRetentionJob;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
     private DeliveryAttemptRepository deliveryAttemptRepository;
 
     @Autowired
@@ -117,6 +126,7 @@ public class ShedLockConcurrencyTest {
         jdbcTemplate.execute("SET session_replication_role = replica");
         deliveryAttemptRepository.deleteAll();
         deliveryRepository.deleteAll();
+        auditLogRepository.deleteAll();
         jdbcTemplate.update("DELETE FROM shedlock");
         executionCount.set(0);
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
@@ -146,6 +156,35 @@ public class ShedLockConcurrencyTest {
         assertEquals(20, remaining.get(9).getAttemptNumber());
     }
 
+
+    /**
+     * P0-06: AuditLogRetentionJob went from unguarded to @SchedulerLock-wrapped because it's a
+     * cron (not fixedDelay) that could now genuinely overlap itself/across replicas once the
+     * scheduler pool is wider than 1 thread. This just proves the job still purges correctly
+     * when invoked through the ShedLock-wrapped Spring proxy - a true concurrent-overlap race
+     * test isn't practical here (the job is a single fast DELETE with nothing to observe
+     * mid-flight), and deleteByCreatedAtBefore is idempotent regardless.
+     */
+    @Test
+    void testAuditLogRetentionPurgesOnlyOldEntries() {
+        Instant now = Instant.now();
+        auditLogRepository.save(AuditLog.builder()
+                .action("login").resourceType("user").status("SUCCESS")
+                .createdAt(now.minusSeconds(200 * 86400L)) // older than the 90-day default retention
+                .build());
+        auditLogRepository.save(AuditLog.builder()
+                .action("login").resourceType("user").status("SUCCESS")
+                .createdAt(now.minusSeconds(86400L)) // well within retention
+                .build());
+
+        assertEquals(2, auditLogRepository.count());
+
+        auditLogRetentionJob.purgeOldAuditLogs();
+
+        List<AuditLog> remaining = auditLogRepository.findAll();
+        assertEquals(1, remaining.size());
+        assertTrue(remaining.get(0).getCreatedAt().isAfter(now.minusSeconds(2 * 86400L)));
+    }
 
     private UUID createDelivery() {
         UUID deliveryId = UUID.randomUUID();
