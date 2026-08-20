@@ -145,16 +145,11 @@ public class WebhookDeliveryService {
                 inFlightCount.get());
     }
 
-    public void processDelivery(DeliveryMessage message, boolean isRetry) {
-        if (shuttingDown) {
-            log.warn("Shutdown in progress, rejecting new delivery: {}", message.getDeliveryId());
-            throw new ShutdownRejectedException(
-                    "Worker is shutting down, delivery " + message.getDeliveryId() + " must be redelivered");
-        }
-        doProcessDelivery(message, isRetry);
+    public boolean isShuttingDown() {
+        return shuttingDown;
     }
 
-    private void doProcessDelivery(DeliveryMessage message, boolean isRetry) {
+    public void processDelivery(DeliveryMessage message, boolean isRetry) {
         Delivery delivery;
         if (isRetry) {
             // Retry path: RetrySchedulerService already claimed the row (status=PROCESSING)
