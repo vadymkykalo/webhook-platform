@@ -131,6 +131,13 @@ event:
   ingestion:
     rate-limit-per-second: ${EVENT_INGESTION_RATE_LIMIT_PER_SECOND:100}
 
+platform:
+  admin:
+    # P0-09: cluster-operator credential for /api/v1/admin/** (e.g. encryption key rotation).
+    # Independent of org membership/JWT — see PlatformAdminAuthenticationFilter. Leave unset to
+    # keep these endpoints unreachable (fail closed) until an operator explicitly needs them.
+    token: ${PLATFORM_ADMIN_TOKEN:}
+
 webhook:
   encryption-key: ${WEBHOOK_ENCRYPTION_KEY}
   encryption-keys: ${WEBHOOK_ENCRYPTION_KEYS:}
