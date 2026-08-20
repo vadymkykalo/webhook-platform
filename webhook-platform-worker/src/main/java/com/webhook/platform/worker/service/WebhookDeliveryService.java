@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
@@ -65,6 +66,7 @@ public class WebhookDeliveryService {
     private final Counter deliveryFailureCounter;
     private final Counter deliveryErrorCounter;
     private final Counter orderingGapTimeoutCounter;
+    private final Counter transformFailedCounter;
     private final Timer deliveryLatency2xx;
     private final Timer deliveryLatency4xx;
     private final Timer deliveryLatency5xx;
@@ -130,6 +132,9 @@ public class WebhookDeliveryService {
                 .register(meterRegistry);
         this.orderingGapTimeoutCounter = Counter.builder("webhook_ordering_gap_timeout_total")
                 .register(meterRegistry);
+        this.transformFailedCounter = Counter.builder("transform_failed_total")
+                .tag("component", "outgoing_delivery")
+                .register(meterRegistry);
         this.deliveryLatency2xx = Timer.builder("webhook_delivery_latency_ms")
                 .tag("status_class", "2xx").register(meterRegistry);
         this.deliveryLatency4xx = Timer.builder("webhook_delivery_latency_ms")
@@ -145,22 +150,67 @@ public class WebhookDeliveryService {
                 inFlightCount.get());
     }
 
-    public void processDelivery(DeliveryMessage message) {
-        if (shuttingDown) {
-            log.warn("Shutdown in progress, rejecting new delivery: {}", message.getDeliveryId());
-            throw new ShutdownRejectedException(
-                    "Worker is shutting down, delivery " + message.getDeliveryId() + " must be redelivered");
-        }
-        doProcessDelivery(message);
+    public boolean isShuttingDown() {
+        return shuttingDown;
     }
 
-    private void doProcessDelivery(DeliveryMessage message) {
-        // Atomic claim + read in single transaction (UPDATE ... RETURNING *)
-        Delivery delivery = transactionTemplate
-                .execute(tx -> deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId()));
-        if (delivery == null) {
-            log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
-            return;
+    /**
+     * Called by DeliveryConsumer when the async executor pool is full and this record
+     * can't even be submitted. With MANUAL acks a non-ack does not get redelivered until
+     * a rebalance/restart, and now that KafkaConsumerConfig defers commits until every
+     * lower offset is acked (P0-03), leaving this record unacked would stall the whole
+     * partition forever instead of just delaying it. Kafka's job for this record is done
+     * either way — the retry ladder (RetrySchedulerService), not Kafka redelivery, is
+     * what actually drives reprocessing, so reschedule the DB row explicitly and let the
+     * caller ack.
+     */
+    public void rescheduleForBackpressure(UUID deliveryId, boolean isRetry) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            Delivery delivery = deliveryRepository.findById(deliveryId).orElse(null);
+            if (delivery == null) {
+                log.debug("Delivery {} disappeared before backpressure reschedule", deliveryId);
+                return;
+            }
+            Delivery.DeliveryStatus expected = isRetry
+                    ? Delivery.DeliveryStatus.PROCESSING
+                    : Delivery.DeliveryStatus.PENDING;
+            if (delivery.getStatus() != expected) {
+                log.debug("Delivery {} no longer {} (already handled?), skipping backpressure reschedule",
+                        deliveryId, expected);
+                return;
+            }
+            long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
+            delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+            delivery.setNextRetryAt(Instant.now().plusSeconds(delaySec));
+            delivery.setUpdatedAt(Instant.now());
+            deliveryRepository.save(delivery);
+            log.warn("Executor pool full, rescheduled delivery {} via retry ladder in {}s instead of leaving it unacked",
+                    deliveryId, delaySec);
+        });
+    }
+
+    public void processDelivery(DeliveryMessage message, boolean isRetry) {
+        Delivery delivery;
+        if (isRetry) {
+            // Retry path: RetrySchedulerService already claimed the row (status=PROCESSING)
+            // before publishing to the retry topic — mirrors how IncomingForwardService
+            // treats attempts claimed by IncomingForwardRetryScheduler. No re-claim here;
+            // an UPDATE ... WHERE status = 'PENDING' claim would never match and every
+            // retry would be silently skipped.
+            delivery = deliveryRepository.findById(message.getDeliveryId()).orElse(null);
+            if (delivery == null || delivery.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Retry delivery {} not found or not PROCESSING (already handled?), skipping",
+                        message.getDeliveryId());
+                return;
+            }
+        } else {
+            // Atomic claim + read in single transaction (UPDATE ... RETURNING *)
+            delivery = transactionTemplate
+                    .execute(tx -> deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId()));
+            if (delivery == null) {
+                log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
+                return;
+            }
         }
 
         // Check ordering constraints for ordered deliveries
@@ -254,77 +304,100 @@ public class WebhookDeliveryService {
             return;
         }
 
+        // Everything from here on holds a concurrency permit. Every exit path — including
+        // exceptions thrown before the HTTP call itself (decryptSecret on a key that got
+        // rotated away, the mTLS client factory on a bad cert, ...) — must go through the
+        // finally below, or a single bad endpoint config burns a permit per attempt until
+        // the endpoint is throttled to zero for the full key TTL (P0-04).
+        String requestHeaders = null;
+        String body = null;
         try {
             UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
-        } catch (UrlValidator.InvalidUrlException e) {
-            log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
-            saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(),
-                    (int) (System.currentTimeMillis() - startTime));
-            markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
-            concurrencyControlService.release(endpoint.getId());
-            return;
-        }
 
-        // Increment attempt count NOW — only when we actually attempt the HTTP call
-        transactionTemplate.executeWithoutResult(tx -> deliveryRepository.incrementAttemptCount(delivery.getId()));
-        delivery.setAttemptCount(delivery.getAttemptCount() + 1);
+            // Increment attempt count NOW — only when we actually attempt the HTTP call
+            transactionTemplate.executeWithoutResult(tx -> deliveryRepository.incrementAttemptCount(delivery.getId()));
+            delivery.setAttemptCount(delivery.getAttemptCount() + 1);
 
-        String secret = decryptSecret(endpoint);
-        String originalPayload = event.getPayload();
-        String template = resolveTransformTemplate(delivery);
-        String body = payloadTransformService.transform(originalPayload, template);
-        long timestamp = System.currentTimeMillis();
+            String secret = decryptSecret(endpoint);
+            String originalPayload = event.getPayload();
+            String template = resolveTransformTemplate(delivery);
+            body = payloadTransformService.transform(originalPayload, template);
+            long timestamp = System.currentTimeMillis();
 
-        String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
+            String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
 
-        String requestHeaders = buildRequestHeadersJson(signature, event.getId().toString(),
-                delivery.getId().toString(), String.valueOf(timestamp));
+            requestHeaders = buildRequestHeadersJson(signature, event.getId().toString(),
+                    delivery.getId().toString(), String.valueOf(timestamp));
 
-        Timer.Sample sample = Timer.start(meterRegistry);
+            Timer.Sample sample = Timer.start(meterRegistry);
 
-        String sequenceHeader = delivery.getSequenceNumber() != null
-                ? String.valueOf(delivery.getSequenceNumber())
-                : "0";
+            String sequenceHeader = delivery.getSequenceNumber() != null
+                    ? String.valueOf(delivery.getSequenceNumber())
+                    : "0";
 
-        WebClient client = Boolean.TRUE.equals(endpoint.getMtlsEnabled())
-                ? mtlsWebClientFactory.getWebClient(endpoint)
-                : defaultWebClient;
+            WebClient client = Boolean.TRUE.equals(endpoint.getMtlsEnabled())
+                    ? mtlsWebClientFactory.getWebClient(endpoint)
+                    : defaultWebClient;
 
-        String idempotencyKey = delivery.getIdempotencyKey() != null
-                ? delivery.getIdempotencyKey()
-                : event.getId().toString() + "-" + delivery.getEndpointId().toString();
+            String idempotencyKey = delivery.getIdempotencyKey() != null
+                    ? delivery.getIdempotencyKey()
+                    : event.getId().toString() + "-" + delivery.getEndpointId().toString();
 
-        var requestSpec = client.post()
-                .uri(endpoint.getUrl())
-                .contentType(MediaType.APPLICATION_JSON)
-                .header("X-Signature", signature)
-                .header("X-Event-Id", event.getId().toString())
-                .header("X-Delivery-Id", delivery.getId().toString())
-                .header("X-Timestamp", String.valueOf(timestamp))
-                .header("X-Sequence-Number", sequenceHeader)
-                .header("Idempotency-Key", idempotencyKey);
+            var requestSpec = client.post()
+                    .uri(endpoint.getUrl())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Signature", signature)
+                    .header("X-Event-Id", event.getId().toString())
+                    .header("X-Delivery-Id", delivery.getId().toString())
+                    .header("X-Timestamp", String.valueOf(timestamp))
+                    .header("X-Sequence-Number", sequenceHeader)
+                    .header("Idempotency-Key", idempotencyKey);
 
-        // Add custom headers if configured
-        addCustomHeaders(requestSpec, delivery.getCustomHeaders());
+            // Add custom headers if configured
+            addCustomHeaders(requestSpec, delivery.getCustomHeaders());
 
-        try {
-            requestSpec.bodyValue(body)
+            // The mono only ever produces the raw HTTP outcome — no DB/Redis/Kafka work
+            // happens inside .map/.timeout. handleResponse (DB writes via markAsSuccess/
+            // scheduleRetry, Redis via orderingBufferService, Kafka via kafkaTemplate) runs
+            // below, after block() returns, on this calling thread — never on the reactor-
+            // netty event-loop thread, and never race with the .timeout that guards the HTTP
+            // call itself. Previously handleResponse ran inside .map, so a slow markAsSuccess
+            // could trip .timeout AFTER a 200 was already received, and the resulting
+            // TimeoutException drove scheduleRetry to overwrite the just-written SUCCESS row
+            // back to PENDING — a duplicate delivery of an already-successful webhook (P0-05).
+            ResponseOutcome outcome = requestSpec.bodyValue(body)
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
                         String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
 
                         return response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
-                                .map(responseBody -> {
-                                    sample.stop(timerForStatus(status));
-                                    handleResponse(delivery, status, responseBody, responseHeaders,
-                                            requestHeaders, body,
-                                            (int) (System.currentTimeMillis() - startTime));
-                                    return status;
-                                });
+                                .map(responseBody -> new ResponseOutcome(status, responseBody, responseHeaders));
                     })
                     .timeout(Duration.ofSeconds(clampTimeout(delivery.getTimeoutSeconds())))
                     .block();
+
+            if (outcome != null) {
+                sample.stop(timerForStatus(outcome.status()));
+                handleResponse(delivery, outcome.status(), outcome.responseBody(), outcome.responseHeaders(),
+                        requestHeaders, body, (int) (System.currentTimeMillis() - startTime));
+            }
+        } catch (UrlValidator.InvalidUrlException e) {
+            log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
+            saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(),
+                    (int) (System.currentTimeMillis() - startTime));
+            markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
+        } catch (PayloadTransformException e) {
+            // P0-07: a configured transformation that fails to apply must never result in the
+            // raw payload leaving the platform. Fail this attempt as retryable (same as an
+            // HTTP-level failure) so it goes through the normal retry ladder and eventually
+            // DLQs if the template stays broken — see scheduleRetry/handleError below.
+            transformFailedCounter.increment();
+            String message = "TRANSFORM_FAILED: " + e.getMessage();
+            log.error("Payload transform failed for delivery {}, refusing to send the raw payload: {}",
+                    delivery.getId(), message);
+            handleError(delivery, new PayloadTransformException(message, e), requestHeaders, body,
+                    (int) (System.currentTimeMillis() - startTime));
         } catch (Exception e) {
             log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
             handleError(delivery, e, requestHeaders, body,
@@ -332,6 +405,9 @@ public class WebhookDeliveryService {
         } finally {
             concurrencyControlService.release(endpoint.getId());
         }
+    }
+
+    private record ResponseOutcome(int status, String responseBody, String responseHeaders) {
     }
 
     private void handleResponse(Delivery delivery, int statusCode, String responseBody,
@@ -390,18 +466,19 @@ public class WebhookDeliveryService {
                 return null;
             }
 
+            // A terminal state reached via another path (e.g. markAsSuccess already committed
+            // SUCCESS) must never be clobbered back to PENDING/DLQ by a late-arriving error
+            // handler (P0-05).
+            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Delivery {} no longer PROCESSING (status={}), skipping retry scheduling " +
+                        "— already reached a terminal state via another path", fresh.getId(), fresh.getStatus());
+                return null;
+            }
+
             if (fresh.getAttemptCount() >= fresh.getMaxAttempts()) {
                 log.warn("Max attempts reached for delivery {}, moving to DLQ", fresh.getId());
                 fresh.setStatus(Delivery.DeliveryStatus.DLQ);
                 fresh.setFailedAt(Instant.now());
-
-                // For ordered deliveries, advance sequence and release buffered deliveries
-                if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                    orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
-                    orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                    triggerBufferedDeliveries(fresh.getEndpointId());
-                }
-
                 fresh.setUpdatedAt(Instant.now());
                 deliveryRepository.save(fresh);
                 return fresh;
@@ -416,8 +493,20 @@ public class WebhookDeliveryService {
             }
         });
 
-        // Outside transaction: fire-and-forget DLQ event notification
+        // Outside the transaction: ordering-buffer release and the DLQ Kafka notification are
+        // both fire-and-forget — a Kafka/Redis failure here must not roll back the DLQ write
+        // that already committed above (P0-05).
         if (dlqDelivery != null) {
+            if (Boolean.TRUE.equals(dlqDelivery.getOrderingEnabled()) && dlqDelivery.getSequenceNumber() != null) {
+                try {
+                    orderingBufferService.removeFromBuffer(dlqDelivery.getEndpointId(), dlqDelivery.getId());
+                    orderingBufferService.markDelivered(dlqDelivery.getEndpointId(), dlqDelivery.getSequenceNumber());
+                    triggerBufferedDeliveries(dlqDelivery.getEndpointId());
+                } catch (Exception e) {
+                    log.error("Failed to release ordering buffer for DLQ delivery {}: {}",
+                            dlqDelivery.getId(), e.getMessage(), e);
+                }
+            }
             publishDlqEvent(dlqDelivery);
         }
     }
@@ -495,6 +584,7 @@ public class WebhookDeliveryService {
     }
 
     private void markAsSuccess(Delivery delivery) {
+        AtomicBoolean transitioned = new AtomicBoolean(false);
         transactionTemplate.executeWithoutResult(tx -> {
             // Re-read to get fresh version after async gap
             Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
@@ -502,18 +592,36 @@ public class WebhookDeliveryService {
                 log.warn("Delivery {} disappeared during success marking", delivery.getId());
                 return;
             }
+            // A late writer for this same delivery (e.g. a retry/failure path that lost the
+            // race) must never clobber a terminal state that's already been written (P0-05).
+            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Delivery {} no longer PROCESSING (status={}), skipping success marking",
+                        fresh.getId(), fresh.getStatus());
+                return;
+            }
             fresh.setStatus(Delivery.DeliveryStatus.SUCCESS);
             fresh.setSucceededAt(Instant.now());
             fresh.setUpdatedAt(Instant.now());
             deliveryRepository.save(fresh);
             log.info("Delivery {} succeeded after {} attempts", fresh.getId(), fresh.getAttemptCount());
-
-            // For ordered deliveries, advance sequence and trigger buffered deliveries
-            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                triggerBufferedDeliveries(fresh.getEndpointId());
-            }
+            transitioned.set(true);
         });
+
+        if (!transitioned.get()) {
+            return;
+        }
+
+        // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
+        // not roll back the SUCCESS write that already committed above (P0-05).
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            try {
+                orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+                triggerBufferedDeliveries(delivery.getEndpointId());
+            } catch (Exception e) {
+                log.error("Failed to release ordering buffer after success for delivery {}: {}",
+                        delivery.getId(), e.getMessage(), e);
+            }
+        }
     }
 
     /**
@@ -583,6 +691,7 @@ public class WebhookDeliveryService {
     }
 
     private void markAsFailed(Delivery delivery, String reason) {
+        AtomicBoolean transitioned = new AtomicBoolean(false);
         transactionTemplate.executeWithoutResult(tx -> {
             // Re-read to get fresh version after async gap
             Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
@@ -590,19 +699,37 @@ public class WebhookDeliveryService {
                 log.warn("Delivery {} disappeared during failure marking", delivery.getId());
                 return;
             }
+            // A late writer for this same delivery must never clobber a terminal state that's
+            // already been written (P0-05).
+            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Delivery {} no longer PROCESSING (status={}), skipping failure marking",
+                        fresh.getId(), fresh.getStatus());
+                return;
+            }
             fresh.setStatus(Delivery.DeliveryStatus.FAILED);
             fresh.setFailedAt(Instant.now());
             fresh.setUpdatedAt(Instant.now());
             deliveryRepository.save(fresh);
             log.error("Delivery {} failed: {}", fresh.getId(), reason);
-
-            // For ordered deliveries, advance sequence and release buffered deliveries
-            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
-                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                triggerBufferedDeliveries(fresh.getEndpointId());
-            }
+            transitioned.set(true);
         });
+
+        if (!transitioned.get()) {
+            return;
+        }
+
+        // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
+        // not roll back the FAILED write that already committed above (P0-05).
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            try {
+                orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
+                orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+                triggerBufferedDeliveries(delivery.getEndpointId());
+            } catch (Exception e) {
+                log.error("Failed to release ordering buffer after failure for delivery {}: {}",
+                        delivery.getId(), e.getMessage(), e);
+            }
+        }
     }
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody,
@@ -696,12 +823,18 @@ public class WebhookDeliveryService {
 
     private String resolveTransformTemplate(Delivery delivery) {
         if (delivery.getTransformationId() != null) {
+            // A transformationId is an explicit choice — if it's gone or disabled, that's a
+            // configuration failure, not "no transform configured". Falling back to whatever
+            // the inline payloadTemplate happens to be (often null, i.e. raw payload) would
+            // silently ship data the customer configured a transform specifically to strip
+            // (P0-07), so this must fail the attempt instead of falling through.
             String template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
-            if (template != null) {
-                return template;
+            if (template == null) {
+                throw new PayloadTransformException(
+                        "Configured transformation " + delivery.getTransformationId()
+                                + " not found or disabled for delivery " + delivery.getId());
             }
-            log.warn("Transformation {} not found or disabled for delivery {}, falling back to inline payloadTemplate",
-                    delivery.getTransformationId(), delivery.getId());
+            return template;
         }
         return delivery.getPayloadTemplate();
     }

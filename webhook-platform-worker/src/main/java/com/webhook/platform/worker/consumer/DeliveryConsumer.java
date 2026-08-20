@@ -3,6 +3,7 @@ package com.webhook.platform.worker.consumer;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.service.BoundedAsyncExecutor;
+import com.webhook.platform.worker.service.ShutdownRejectedException;
 import com.webhook.platform.worker.service.WebhookDeliveryService;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -67,13 +68,20 @@ public class DeliveryConsumer {
         log.info("Received delivery from {}: deliveryId={}, endpointId={}",
                 topic, message.getDeliveryId(), message.getEndpointId());
 
+        rejectIfShuttingDown(message.getDeliveryId());
+
         if (!asyncExecutor.trySubmit(
-                () -> webhookDeliveryService.processDelivery(message),
+                () -> webhookDeliveryService.processDelivery(message, false),
                 acknowledgment,
                 message.getDeliveryId().toString())) {
-            // Executor full — containers paused automatically, don't ack.
-            // Message will be re-polled when containers resume.
-            log.debug("Outgoing executor full, not acking deliveryId={}", message.getDeliveryId());
+            // Executor full — containers paused automatically to stop further polling,
+            // but this record has already been handed to us. Don't leave it unacked: a
+            // non-ack does not get redelivered until a rebalance/restart, and with
+            // asyncAcks (P0-03) it would block this partition's offset commits forever.
+            // Reschedule explicitly via the retry ladder instead and ack.
+            log.debug("Outgoing executor full, rescheduling deliveryId={} via retry ladder", message.getDeliveryId());
+            webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), false);
+            acknowledgment.acknowledge();
         }
     }
 
@@ -103,11 +111,32 @@ public class DeliveryConsumer {
         log.info("Received retry from {}: deliveryId={}, attempt={}",
                 topic, message.getDeliveryId(), message.getAttemptCount());
 
+        rejectIfShuttingDown(message.getDeliveryId());
+
         if (!asyncExecutor.trySubmit(
-                () -> webhookDeliveryService.processDelivery(message),
+                () -> webhookDeliveryService.processDelivery(message, true),
                 acknowledgment,
                 message.getDeliveryId().toString())) {
-            log.debug("Outgoing executor full, not acking retry deliveryId={}", message.getDeliveryId());
+            // Same reasoning as consumeDispatch above — reschedule explicitly and ack
+            // rather than relying on a non-ack to trigger redelivery.
+            log.debug("Outgoing executor full, rescheduling retry deliveryId={} via retry ladder", message.getDeliveryId());
+            webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), true);
+            acknowledgment.acknowledge();
+        }
+    }
+
+    /**
+     * Checked on the Kafka consumer thread, before the message is ever handed to the
+     * async executor. Throwing here — rather than from inside the submitted task — is
+     * what lets {@code errorHandler.addNotRetryableExceptions(ShutdownRejectedException.class)}
+     * in KafkaConsumerConfig actually see the exception and route the message to the DLQ;
+     * a throw from inside the pool thread never reaches the container's error handler.
+     */
+    private void rejectIfShuttingDown(UUID deliveryId) {
+        if (webhookDeliveryService.isShuttingDown()) {
+            log.warn("Shutdown in progress, rejecting delivery {} before submission", deliveryId);
+            throw new ShutdownRejectedException(
+                    "Worker is shutting down, delivery " + deliveryId + " must be redelivered");
         }
     }
 

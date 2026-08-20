@@ -20,7 +20,21 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
            "next_retry_at = now(), updated_at = now(), version = version + 1 " +
            "WHERE status = 'PROCESSING' AND (last_attempt_at < :threshold OR (last_attempt_at IS NULL AND updated_at < :threshold))", nativeQuery = true)
     int resetStuckDeliveries(@Param("threshold") Instant threshold);
-    
+
+    /**
+     * Belt-and-braces recovery for rows stuck PENDING with next_retry_at wiped but never
+     * transitioned to PROCESSING (e.g. legacy rows claimed under the pre-fix scheduler
+     * contract). Such rows are invisible to both findPendingRetryIds (needs a non-null
+     * next_retry_at) and resetStuckDeliveries (needs status = PROCESSING). Gated on
+     * updated_at so freshly ingested deliveries — also PENDING with next_retry_at NULL,
+     * relying on their single outbox Kafka message — are never swept.
+     */
+    @Modifying
+    @Query(value = "UPDATE deliveries SET next_retry_at = now(), updated_at = now(), version = version + 1 " +
+           "WHERE status = 'PENDING' AND next_retry_at IS NULL AND updated_at < :threshold", nativeQuery = true)
+    int resetStrandedPendingDeliveries(@Param("threshold") Instant threshold);
+
+
     @Query(value = """
             SELECT id FROM (
                 SELECT d.id,

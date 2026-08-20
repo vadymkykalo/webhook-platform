@@ -4,15 +4,25 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
+import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.service.EmailService;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @AutoConfigureMockMvc
 public class AuthIntegrationTest extends AbstractIntegrationTest {
@@ -25,6 +35,15 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    // Mocked so tests can capture the plaintext verification token EmailService would
+    // have emailed to the user (P0-14a: the DB column now holds only
+    // CryptoUtils.hashApiKey(token), so the raw token can't be read back from the row).
+    @MockBean
+    private EmailService emailService;
 
     @Test
     public void testRegisterLoginAndGetCurrentUser() throws Exception {
@@ -57,8 +76,16 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.organization.name").value("Test Company"))
                 .andExpect(jsonPath("$.role").value("OWNER"));
 
+        // The DB column now holds only a hash of the verification token (P0-14a); the
+        // plaintext is only ever handed to EmailService, which is mocked here so the
+        // test can capture it.
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("test@example.com"), tokenCaptor.capture());
+        String verificationToken = tokenCaptor.getValue();
+
         User user = userRepository.findByEmail("test@example.com").orElseThrow();
-        String verificationToken = user.getVerificationToken();
+        org.assertj.core.api.Assertions.assertThat(user.getVerificationToken())
+                .isNotEqualTo(verificationToken);
 
         mockMvc.perform(post("/api/v1/auth/verify-email")
                         .param("token", verificationToken))
@@ -95,5 +122,112 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * P0-10: an access token must not be exchangeable at /auth/refresh. Before the fix,
+     * JwtUtil stamped no "typ" claim on either token, so AuthService.refreshToken happily
+     * accepted an access token and minted a brand new (renewable) refresh token from it --
+     * turning a 15-minute leak into a permanent session.
+     */
+    @Test
+    public void testAccessTokenRejectedByRefreshEndpoint() throws Exception {
+        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
+
+        AuthResponse tokens = registerAndCaptureTokens("p0-10-access-as-refresh@example.com");
+
+        RefreshTokenRequest refreshRequest = new RefreshTokenRequest(tokens.getAccessToken());
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refreshRequest)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * P0-10: the reverse direction must be a deliberate rejection (typ != access), not the
+     * old accidental NPE on the missing "organizationId" claim.
+     */
+    @Test
+    public void testRefreshTokenRejectedAsBearerCredential() throws Exception {
+        AuthResponse tokens = registerAndCaptureTokens("p0-10-refresh-as-bearer@example.com");
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + tokens.getRefreshToken()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * P0-10: the legitimate login -> refresh -> access cycle must keep working after the
+     * type-claim enforcement is added.
+     */
+    @Test
+    public void testLoginRefreshAccessCycleStillWorks() throws Exception {
+        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
+
+        AuthResponse tokens = registerAndCaptureTokens("p0-10-happy-path@example.com");
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", tokens.getRefreshToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").exists())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().exists("refresh_token"))
+                .andReturn();
+
+        AuthResponse refreshed = objectMapper.readValue(
+                refreshResult.getResponse().getContentAsString(), AuthResponse.class);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + refreshed.getAccessToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.email").value("p0-10-happy-path@example.com"));
+    }
+
+    /**
+     * P0-10 reuse detection: replaying a refresh token that has already been rotated away
+     * (i.e. it is blacklisted) must not just 401 -- it must revoke the whole token family
+     * via tokenBlacklistService.revokeAllUserTokens, since replay of a rotated-away token
+     * is the signature of a stolen refresh token racing the legitimate client.
+     */
+    @Test
+    public void testReplayingRotatedRefreshTokenRevokesTokenFamily() throws Exception {
+        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
+
+        AuthResponse tokens = registerAndCaptureTokens("p0-10-reuse-detection@example.com");
+        String rotatedAwayRefreshToken = tokens.getRefreshToken();
+        var userId = jwtUtil.getUserIdFromToken(rotatedAwayRefreshToken);
+
+        // Simulate that this exact refresh token was already rotated away (or revoked) --
+        // the real blacklist is Redis-backed and mocked out in AbstractIntegrationTest, so
+        // we drive the mock directly rather than depending on real TTL/storage behavior.
+        String rotatedJti = jwtUtil.getJtiFromToken(rotatedAwayRefreshToken);
+        when(tokenBlacklistService.isBlacklisted(eq(rotatedJti))).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refresh_token", rotatedAwayRefreshToken)))
+                .andExpect(status().isUnauthorized());
+
+        verify(tokenBlacklistService).revokeAllUserTokens(eq(userId));
+    }
+
+    private AuthResponse registerAndCaptureTokens(String email) throws Exception {
+        RegisterRequest registerRequest = RegisterRequest.builder()
+                .email(email)
+                .password("Test1234!")
+                .organizationName("Test Company")
+                .build();
+
+        MvcResult result = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(registerRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        AuthResponse response = objectMapper.readValue(
+                result.getResponse().getContentAsString(), AuthResponse.class);
+
+        Cookie refreshCookie = result.getResponse().getCookie("refresh_token");
+        response.setRefreshToken(refreshCookie != null ? refreshCookie.getValue() : null);
+        return response;
     }
 }

@@ -11,13 +11,37 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * SSRF guard for outbound webhook/forward URLs.
+ *
+ * <p>P0-14d: this is a denylist of RFC 5735/6890 special-purpose IPv4/IPv6 ranges,
+ * kept as a denylist rather than inverted to an allowlist of globally-routable
+ * unicast space. Considered and rejected for now: an allowlist would need to track
+ * IANA's registry as new blocks get carved out of previously-reserved space (this
+ * denylist only grows the other, much rarer direction — new special-purpose
+ * allocations), and a webhook-delivery hot path is a risky place to introduce
+ * false-positive rejections of legitimate-but-newly-routable targets. The practical
+ * need an allowlist would serve — an operator knowingly forwarding to an internal
+ * service — is already met by {@code WEBHOOK_ALLOW_PRIVATE_IPS} plus the per-endpoint
+ * allowed-hosts list. Revisit as a dedicated follow-up if the denylist keeps needing
+ * new entries.
+ */
 public class UrlValidator {
 
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
     
+    // Hard-blocked regardless of allowedHosts (see validateWebhookUrl: this check runs
+    // before the allow-list bypass) — nobody has a legitimate reason to forward a
+    // webhook to a cloud metadata endpoint.
     private static final List<String> BLOCKED_HOSTS = List.of(
             "metadata.google.internal",
-            "169.254.169.254"
+            // AWS, Azure, and Oracle Cloud (OCI) all serve their instance-metadata
+            // service on this same well-known link-local address.
+            "169.254.169.254",
+            // Alibaba Cloud's metadata service. Also covered by the 100.64.0.0/10
+            // CGNAT range in isPrivateIPv4 below, but listed explicitly so it's
+            // blocked unconditionally rather than only when private IPs are blocked.
+            "100.100.100.200"
     );
 
     // DNS resolution cache: 10min TTL, max 1000 entries
@@ -96,28 +120,60 @@ public class UrlValidator {
     private static boolean isPrivateIPv4(byte[] addr) {
         int firstOctet = addr[0] & 0xFF;
         int secondOctet = addr[1] & 0xFF;
+        int thirdOctet = addr[2] & 0xFF;
 
         if (firstOctet == 10) {
             return true;
         }
-        
+
         if (firstOctet == 172 && secondOctet >= 16 && secondOctet <= 31) {
             return true;
         }
-        
+
         if (firstOctet == 192 && secondOctet == 168) {
             return true;
         }
-        
+
         if (firstOctet == 169 && secondOctet == 254) {
             return true;
         }
-        
+
         if (firstOctet == 127) {
             return true;
         }
-        
+
         if (firstOctet == 0) {
+            return true;
+        }
+
+        // 100.64.0.0/10 - Carrier-Grade NAT (RFC 6598). In-cluster pod/service traffic
+        // on EKS/GKE frequently lives here, and Alibaba Cloud's metadata service
+        // (100.100.100.200, also hard-blocked via BLOCKED_HOSTS) sits inside this range.
+        if (firstOctet == 100 && secondOctet >= 64 && secondOctet <= 127) {
+            return true;
+        }
+
+        // 192.0.0.0/24 - IETF Protocol Assignments (RFC 6890): includes the DS-Lite
+        // AFTR address (192.0.0.1) and other special-purpose addressing that should
+        // never be a legitimate public webhook target.
+        if (firstOctet == 192 && secondOctet == 0 && thirdOctet == 0) {
+            return true;
+        }
+
+        // 198.18.0.0/15 - benchmarking address space (RFC 2544): routable-looking but
+        // reserved for network testing, not meant to be reachable in production.
+        if (firstOctet == 198 && (secondOctet == 18 || secondOctet == 19)) {
+            return true;
+        }
+
+        // 224.0.0.0/4 - multicast.
+        if (firstOctet >= 224 && firstOctet <= 239) {
+            return true;
+        }
+
+        // 240.0.0.0/4 - reserved for future use, including the 255.255.255.255
+        // broadcast address.
+        if (firstOctet >= 240) {
             return true;
         }
 

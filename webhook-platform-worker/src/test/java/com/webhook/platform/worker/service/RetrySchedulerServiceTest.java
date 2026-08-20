@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
@@ -182,6 +183,40 @@ class RetrySchedulerServiceTest {
                 assertNull(allSaves.get(0).get(0).getNextRetryAt());
         }
 
+        @Test
+        void scheduleRetries_claimPhase_shouldSetStatusProcessingAndLastAttemptAt() {
+                // Regression test for the retry-claim black hole: the old claim phase only
+                // nullified nextRetryAt and left status=PENDING, which is invisible to both
+                // findPendingRetryIds (needs non-null nextRetryAt) and resetStuckDeliveries
+                // (needs status=PROCESSING) if the worker crashes before Phase 3 runs. The
+                // claim must set status=PROCESSING and lastAttemptAt, matching
+                // IncomingForwardRetryScheduler's claim of forward attempts, so a crashed
+                // claim is recoverable by StuckDeliveryRecoveryService's sweep.
+                Instant now = Instant.now();
+                Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
+
+                when(deliveryRepository.findPendingRetryIds(
+                                any(Delivery.DeliveryStatus.class),
+                                any(Instant.class),
+                                anyInt(),
+                                anyInt(),
+                                anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
+
+                SendResult<String, DeliveryMessage> sendResult = mockSendResult();
+                CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
+                                .completedFuture(sendResult);
+                when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
+
+                // Act
+                retrySchedulerService.scheduleRetries(0);
+
+                // Assert — claimed delivery is left in the same state resetStuckDeliveries
+                // matches on: status=PROCESSING with a recent lastAttemptAt.
+                assertEquals(Delivery.DeliveryStatus.PROCESSING, delivery.getStatus());
+                assertNotNull(delivery.getLastAttemptAt());
+        }
+
     @Test
     void scheduleRetries_shouldHandleEmptyResult() {
         // Arrange
@@ -229,6 +264,9 @@ class RetrySchedulerServiceTest {
                 // Phase 3 is the second saveAll — contains rescheduled delivery
                 List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
                 assertNotNull(allSaves.get(1).get(0).getNextRetryAt());
+                // A failed send must revert the Phase 1 PROCESSING claim back to PENDING,
+                // otherwise the row sits unclaimable until the stuck-delivery sweep catches it.
+                assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
         }
 
         @Test
@@ -237,6 +275,12 @@ class RetrySchedulerServiceTest {
                 // Since getRetryTopic is private, we test it indirectly through scheduleRetries
 
                 Instant now = Instant.now();
+                // attemptCount == 0: WebhookDeliveryService reschedules here (concurrency/rate
+                // limit backpressure) *before* the first HTTP attempt is ever made -- the
+                // attempt-count increment only happens once the call is actually about to go
+                // out. This delivery has never been attempted and must not be treated like one
+                // that has exhausted the whole retry ladder.
+                Delivery delivery0 = createDelivery(UUID.randomUUID(), 0, now.minusSeconds(10));
                 Delivery delivery1 = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
                 Delivery delivery2 = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(10));
                 Delivery delivery6 = createDelivery(UUID.randomUUID(), 6, now.minusSeconds(10));
@@ -252,9 +296,12 @@ class RetrySchedulerServiceTest {
                                 anyInt(),
                                 anyInt(),
                                 anyInt()))
+                                .thenReturn(Collections.singletonList(delivery0.getId()))
                                 .thenReturn(Collections.singletonList(delivery1.getId()))
                                 .thenReturn(Collections.singletonList(delivery2.getId()))
                                 .thenReturn(Collections.singletonList(delivery6.getId()));
+                when(deliveryRepository.lockByIds(Collections.singletonList(delivery0.getId())))
+                                .thenReturn(Collections.singletonList(delivery0));
                 when(deliveryRepository.lockByIds(Collections.singletonList(delivery1.getId())))
                                 .thenReturn(Collections.singletonList(delivery1));
                 when(deliveryRepository.lockByIds(Collections.singletonList(delivery2.getId())))
@@ -266,15 +313,17 @@ class RetrySchedulerServiceTest {
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert
                 ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
-                verify(kafkaTemplate, times(3)).send(topicCaptor.capture(), anyString(), any(DeliveryMessage.class));
+                verify(kafkaTemplate, times(4)).send(topicCaptor.capture(), anyString(), any(DeliveryMessage.class));
 
                 List<String> topics = topicCaptor.getAllValues();
-                assertTrue(topics.get(0).contains("1m") || topics.get(0).contains("retry"));
-                assertTrue(topics.get(1).contains("5m") || topics.get(1).contains("retry"));
-                assertTrue(topics.get(2).contains("24h") || topics.get(2).contains("retry"));
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_1M, topics.get(0), "attemptCount=0 (never attempted)");
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_1M, topics.get(1), "attemptCount=1");
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_5M, topics.get(2), "attemptCount=2");
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_24H, topics.get(3), "attemptCount=6 (ladder exhausted)");
         }
 
         @Test
@@ -310,10 +359,14 @@ class RetrySchedulerServiceTest {
                 // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert — completed delivery has nextRetryAt nullified (success)
+                // Assert — completed delivery has nextRetryAt nullified (success) and stays
+                // PROCESSING for the consumer to finalize
                 assertNull(completedDelivery.getNextRetryAt());
-                // Assert — incomplete delivery is rescheduled (has nextRetryAt set)
+                assertEquals(Delivery.DeliveryStatus.PROCESSING, completedDelivery.getStatus());
+                // Assert — incomplete delivery is rescheduled (has nextRetryAt set) and its
+                // PROCESSING claim is reverted back to PENDING
                 assertNotNull(incompleteDelivery.getNextRetryAt());
+                assertEquals(Delivery.DeliveryStatus.PENDING, incompleteDelivery.getStatus());
         }
 
         @Test
@@ -338,8 +391,9 @@ class RetrySchedulerServiceTest {
                 // Act — should not throw
                 assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
 
-                // Assert — delivery is rescheduled with nextRetryAt set
+                // Assert — delivery is rescheduled with nextRetryAt set and reverted to PENDING
                 assertNotNull(delivery.getNextRetryAt());
+                assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
                 // Verify it ends up in the failed batch (Phase 3 saveAll)
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);

@@ -62,6 +62,12 @@ public abstract class AbstractIntegrationTest {
     void setupMocks() {
         when(authRateLimiterService.allowLogin(anyString(), any())).thenReturn(true);
         when(authRateLimiterService.allowRegister(anyString())).thenReturn(true);
+        // allowTokenAction backs /auth/forgot-password's IP+email check and
+        // /auth/reset-password's IP+token check — without stubbing it, an unstubbed
+        // Mockito boolean mock defaults to false and every reset-password call gets a
+        // spurious 429 (pre-existing gap here since allowTokenAction was added; not
+        // related to P0-14a, just needed so PasswordResetIntegrationTest can run at all).
+        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }
@@ -83,5 +89,13 @@ public abstract class AbstractIntegrationTest {
         registry.add("webhook.encryption-salt", () -> "test_salt_for_integration_tests");
         registry.add("jwt.secret", () -> "test_jwt_secret_key_minimum_32_chars_required_here");
         registry.add("jwt.expiration-ms", () -> "3600000");
+        registry.add("platform.admin.token", () -> PLATFORM_ADMIN_TEST_TOKEN);
     }
+
+    /**
+     * Shared platform-admin operator credential for integration tests (P0-09).
+     * Any test wanting to authenticate as the platform admin sends this value in the
+     * {@code X-Platform-Admin-Token} header.
+     */
+    protected static final String PLATFORM_ADMIN_TEST_TOKEN = "test_platform_admin_operator_token";
 }

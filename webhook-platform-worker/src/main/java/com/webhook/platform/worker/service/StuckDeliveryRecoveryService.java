@@ -26,6 +26,9 @@ public class StuckDeliveryRecoveryService {
     @Value("${stuck-delivery.threshold-minutes:5}")
     private int thresholdMinutes;
 
+    @Value("${stuck-delivery.stranded-pending-threshold-minutes:60}")
+    private int strandedPendingThresholdMinutes;
+
     @Scheduled(fixedRateString = "${stuck-delivery.check-interval-ms:60000}")
     @Transactional
     public void recoverStuckDeliveries() {
@@ -43,6 +46,14 @@ public class StuckDeliveryRecoveryService {
 
             if (recovered > 0) {
                 log.warn("Recovered {} stuck deliveries (PROCESSING > {} minutes)", recovered, thresholdMinutes);
+            }
+
+            Instant strandedThreshold = Instant.now().minusSeconds(strandedPendingThresholdMinutes * 60L);
+            int strandedRecovered = deliveryRepository.resetStrandedPendingDeliveries(strandedThreshold);
+
+            if (strandedRecovered > 0) {
+                log.warn("Recovered {} stranded PENDING deliveries (next_retry_at NULL > {} minutes)",
+                        strandedRecovered, strandedPendingThresholdMinutes);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

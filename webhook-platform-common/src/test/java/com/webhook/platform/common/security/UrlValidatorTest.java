@@ -117,8 +117,154 @@ class UrlValidatorTest {
 
     @Test
     void shouldRejectUrlWithoutHost() {
-        assertThrows(UrlValidator.InvalidUrlException.class, () -> 
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
             UrlValidator.validateWebhookUrl("http://", false, Collections.emptyList())
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // P0-14d: previously-missing CIDR ranges and metadata addresses
+    // -----------------------------------------------------------------
+
+    @Test
+    void shouldRejectCgnatRangeStart() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://100.64.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectCgnatRangeEnd() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://100.127.255.255", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowJustBelowCgnatRange() {
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://100.63.255.255", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowJustAboveCgnatRange() {
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://100.128.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectAlibabaMetadataAddress() {
+        // 100.100.100.200 falls inside 100.64.0.0/10 (CGNAT) AND is hard-blocked by
+        // hostname via BLOCKED_HOSTS.
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://100.100.100.200", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectAlibabaMetadataAddress_evenWhenAllowlisted() {
+        // BLOCKED_HOSTS is checked before the allowedHosts bypass — a known cloud
+        // metadata address can never be legitimately allow-listed.
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://100.100.100.200", false, List.of("100.100.100.200"))
+        );
+    }
+
+    @Test
+    void shouldRejectIetfProtocolAssignments() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://192.0.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowJustOutsideIetfProtocolAssignmentsBlock() {
+        // 192.0.0.0/24 only — 192.0.1.x is outside it.
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://192.0.1.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectBenchmarkingRangeStart() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://198.18.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectBenchmarkingRangeEnd() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://198.19.255.254", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowJustBelowBenchmarkingRange() {
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://198.17.255.255", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowJustAboveBenchmarkingRange() {
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://198.20.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectMulticastRangeStart() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://224.0.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectMulticastRangeEnd() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://239.255.255.255", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowJustBelowMulticastRange() {
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://223.255.255.255", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectReservedRange() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://240.0.0.1", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldRejectBroadcastAddress() {
+        assertThrows(UrlValidator.InvalidUrlException.class, () ->
+            UrlValidator.validateWebhookUrl("http://255.255.255.255", false, Collections.emptyList())
+        );
+    }
+
+    @Test
+    void shouldAllowAllNewlyBlockedRangesWhenPrivateIpsAllowed() {
+        // allowPrivateIps=true is the general opt-out for the whole private/special
+        // range check, including the newly-added ranges.
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://100.64.0.1", true, Collections.emptyList())
+        );
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://198.18.0.1", true, Collections.emptyList())
+        );
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://224.0.0.1", true, Collections.emptyList())
+        );
+        assertDoesNotThrow(() ->
+            UrlValidator.validateWebhookUrl("http://240.0.0.1", true, Collections.emptyList())
         );
     }
 }

@@ -87,7 +87,7 @@ public class DeviceAuthService {
         log.info("Device auth approved: userCode={}, userId={}", userCode, userId);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse pollDeviceToken(String deviceCode) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByDeviceCode(deviceCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device code not found"));
@@ -103,14 +103,33 @@ public class DeviceAuthService {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Device authorization was denied");
             case EXPIRED:
                 throw new ResponseStatusException(HttpStatus.GONE, "Device code has expired");
+            case CONSUMED:
+                // Already exchanged for a token pair by a previous (or racing) poll. Fail
+                // closed rather than minting a second pair for the same approval (P0-12).
+                throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
             case APPROVED:
                 break;
         }
 
-        Membership membership = membershipRepository.findByUserId(code.getUserId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "No organization membership found"));
+        // Role MUST come from the same membership row as the organization the code was
+        // approved for — not an arbitrary membership of the user's. A user can be OWNER
+        // of one org and VIEWER of another; picking any membership lets an approval
+        // scoped to the low-privilege org mint a token with the high-privilege role.
+        // Fail closed if the user no longer has (or never had) a membership in that
+        // exact org (P0-12).
+        Membership membership = membershipRepository
+                .findByUserIdAndOrganizationId(code.getUserId(), code.getOrganizationId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "User is not a member of the approved organization"));
+
+        // Single-use, compare-and-set: only the caller that actually flips APPROVED ->
+        // CONSUMED gets to mint tokens. A second concurrent poll (or a replay after the
+        // first succeeded) loses the race and is refused rather than minting another
+        // token pair (P0-12).
+        int consumed = deviceAuthCodeRepository.markConsumedIfApproved(code.getId());
+        if (consumed == 0) {
+            throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
+        }
 
         String accessToken = jwtUtil.generateAccessToken(
                 code.getUserId(), code.getOrganizationId(), membership.getRole());

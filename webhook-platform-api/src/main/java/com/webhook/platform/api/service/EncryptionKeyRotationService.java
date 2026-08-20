@@ -8,6 +8,8 @@ import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
@@ -31,6 +33,7 @@ public class EncryptionKeyRotationService {
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final TransactionTemplate transactionTemplate;
     private final LockingTaskExecutor lockingTaskExecutor;
+    private final Counter partialFailureCounter;
 
     private static final int BATCH_SIZE = 100;
     private static final String LOCK_NAME = "encryption-key-rotation";
@@ -43,13 +46,20 @@ public class EncryptionKeyRotationService {
             IncomingDestinationRepository incomingDestinationRepository,
             EncryptionKeyRegistry encryptionKeyRegistry,
             TransactionTemplate transactionTemplate,
-            LockingTaskExecutor lockingTaskExecutor) {
+            LockingTaskExecutor lockingTaskExecutor,
+            MeterRegistry meterRegistry) {
         this.endpointRepository = endpointRepository;
         this.incomingSourceRepository = incomingSourceRepository;
         this.incomingDestinationRepository = incomingDestinationRepository;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.transactionTemplate = transactionTemplate;
         this.lockingTaskExecutor = lockingTaskExecutor;
+        // P0-09: a partial rotation failure can leave some tenants' secrets encrypted under a
+        // key version other records no longer carry — that must never be silently tolerated.
+        // This counter is the alertable signal (paired with a non-200 response to the caller).
+        this.partialFailureCounter = Counter.builder("encryption_rotation_partial_failures_total")
+                .description("Count of individual secret re-encryption failures during a key rotation run")
+                .register(meterRegistry);
     }
 
     public RotationResult rotateAll() {
@@ -93,7 +103,14 @@ public class EncryptionKeyRotationService {
                 errors.get()
         );
 
-        log.info("Encryption key rotation completed: {}", result);
+        if (result.errors() > 0) {
+            partialFailureCounter.increment(result.errors());
+            log.error("Encryption key rotation completed with {} error(s) — some secrets were NOT "
+                    + "re-encrypted to version {} and may become undecryptable if the old key is "
+                    + "ever retired: {}", result.errors(), activeVersion, result);
+        } else {
+            log.info("Encryption key rotation completed: {}", result);
+        }
         return result;
     }
 

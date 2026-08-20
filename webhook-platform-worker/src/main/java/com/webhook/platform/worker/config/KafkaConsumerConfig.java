@@ -114,6 +114,14 @@ public class KafkaConsumerConfig {
     private <K, V> void configureFactory(ConcurrentKafkaListenerContainerFactory<K, V> factory, int concurrency, String dlqTopic) {
         factory.setConcurrency(concurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+        // Deliveries are acked from arbitrary BoundedAsyncExecutor pool threads whenever
+        // that particular delivery finishes, not in offset order (see P0-03). Plain MANUAL
+        // acks commit straight to the highest acked offset regardless of order, so a fast
+        // record N acking before a slower record N-k would move the committed offset past
+        // still in-flight work — losing N-k on a hard kill. asyncAcks defers out-of-order
+        // commits until every lower offset in the batch has also been acked, and pauses
+        // the consumer meanwhile so the gap can't grow unbounded.
+        factory.getContainerProperties().setAsyncAcks(true);
         factory.getContainerProperties().setShutdownTimeout(30_000L);
 
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(

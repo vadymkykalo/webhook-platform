@@ -14,6 +14,7 @@ import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -72,6 +73,8 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
+        // Only the hash is persisted (P0-14a) — the plaintext token exists solely
+        // to be emailed to the user and is never written to the database or logs.
         String verificationToken = generateVerificationToken();
 
         User user = User.builder()
@@ -80,7 +83,7 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .status(UserStatus.PENDING_VERIFICATION)
                 .emailVerified(false)
-                .verificationToken(verificationToken)
+                .verificationToken(CryptoUtils.hashApiKey(verificationToken))
                 .verificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS))
                 .build();
         user = userRepository.save(user);
@@ -147,12 +150,28 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
 
+        // Reject anything that isn't an actual refresh token: an access token (or any
+        // pre-P0-10 token, which has no "typ" claim at all) must not be exchangeable here.
+        // See CLAUDE.md task P0-10 for why a missing claim is treated as invalid rather
+        // than grandfathered.
+        if (!JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        }
+
         String oldJti = jwtUtil.getJtiFromToken(refreshToken);
+        UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
+
         if (tokenBlacklistService.isBlacklisted(oldJti)) {
+            // Reuse detection: this refresh token was already consumed (rotated away on a
+            // prior refresh, or explicitly revoked via logout). A rotated-away token being
+            // replayed is the signature of a stolen refresh token racing the legitimate
+            // client, so treat it as a compromised token family and kill every token the
+            // user currently holds, not just this one.
+            tokenBlacklistService.revokeAllUserTokens(userId);
+            log.warn("Rejected reuse of already-rotated/revoked refresh token for user {}; revoked all tokens", userId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token has been revoked");
         }
 
-        UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
@@ -192,7 +211,7 @@ public class AuthService {
 
     @Transactional
     public void verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
+        User user = userRepository.findByVerificationToken(CryptoUtils.hashApiKey(token))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid verification token"));
 
         if (user.getVerificationTokenExpiresAt() != null
@@ -218,7 +237,7 @@ public class AuthService {
         }
 
         String newToken = generateVerificationToken();
-        user.setVerificationToken(newToken);
+        user.setVerificationToken(CryptoUtils.hashApiKey(newToken));
         user.setVerificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS));
         userRepository.save(user);
 
@@ -262,8 +281,10 @@ public class AuthService {
             return;
         }
 
+        // Only the hash is persisted (P0-14a); the plaintext token is emailed and
+        // never stored, matching the invite-token pattern in MembershipService.
         String resetToken = generateVerificationToken();
-        user.setPasswordResetToken(resetToken);
+        user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
         userRepository.save(user);
 
@@ -274,7 +295,7 @@ public class AuthService {
     @Auditable(action = AuditAction.PASSWORD_RESET, resourceType = "Auth")
     @Transactional
     public void resetPassword(String token, String newPassword) {
-        User user = userRepository.findByPasswordResetToken(token)
+        User user = userRepository.findByPasswordResetToken(CryptoUtils.hashApiKey(token))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset token"));
 
         if (user.getPasswordResetTokenExpiresAt() != null

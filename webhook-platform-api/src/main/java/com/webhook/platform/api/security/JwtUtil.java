@@ -40,11 +40,26 @@ public class JwtUtil {
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
+    /**
+     * Value of the {@code typ} claim stamped on every access token. Consumers (notably
+     * {@code JwtAuthenticationFilter}) must reject any bearer token whose {@code typ} is
+     * not this value, rather than accepting anything that merely parses.
+     */
+    public static final String TOKEN_TYPE_ACCESS = "access";
+
+    /**
+     * Value of the {@code typ} claim stamped on every refresh token. Consumers (notably
+     * {@code AuthService#refreshToken}) must reject any token presented to the refresh
+     * endpoint whose {@code typ} is not this value.
+     */
+    public static final String TOKEN_TYPE_REFRESH = "refresh";
+
     public String generateAccessToken(UUID userId, UUID organizationId, MembershipRole role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId.toString());
         claims.put("organizationId", organizationId.toString());
         claims.put("role", role.name());
+        claims.put("typ", TOKEN_TYPE_ACCESS);
 
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
@@ -59,6 +74,7 @@ public class JwtUtil {
     public String generateRefreshToken(UUID userId) {
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
+                .claim("typ", TOKEN_TYPE_REFRESH)
                 .subject(userId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
@@ -110,6 +126,16 @@ public class JwtUtil {
     public String getJtiFromToken(String token) {
         Claims claims = parseToken(token);
         return claims.getId();
+    }
+
+    /**
+     * Returns the {@code typ} claim ({@link #TOKEN_TYPE_ACCESS} or {@link #TOKEN_TYPE_REFRESH}),
+     * or {@code null} for tokens issued before this claim existed. Callers must treat a
+     * {@code null}/unexpected value as "wrong token type", not as "any type is fine".
+     */
+    public String getTokenType(String token) {
+        Claims claims = parseToken(token);
+        return claims.get("typ", String.class);
     }
 
     public Date getExpirationFromToken(String token) {

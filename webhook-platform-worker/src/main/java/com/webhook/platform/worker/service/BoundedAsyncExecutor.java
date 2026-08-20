@@ -131,11 +131,26 @@ public class BoundedAsyncExecutor {
                     task.run();
                     ack.acknowledge();
                 } catch (ShutdownRejectedException e) {
+                    // Callers (DeliveryConsumer) are expected to check shutdown state
+                    // themselves before submitting, on the Kafka consumer thread, where
+                    // a throw actually reaches the container's error handler. If one
+                    // still reaches here, this task was already queued/running when
+                    // shutdown began — treat it like any other task failure: log and
+                    // don't ack. Rethrowing would only escape onto this pool thread's
+                    // uncaught-exception handler, which no Kafka container ever sees.
                     log.warn("{}: shutdown rejected, not acking: id={}", name, id);
-                    throw e; // propagate to Kafka error handler → DLT
                 } catch (Exception e) {
-                    // Don't ack — Kafka will redeliver after rebalance
-                    log.error("{}: async task failed, not acking (will be redelivered): id={}, error={}",
+                    // Don't ack. This is a defensive catch-all for a task that escapes its
+                    // own error handling entirely (WebhookDeliveryService.processDelivery
+                    // already catches everything it can and always acks); it should be
+                    // unreachable in practice. As of P0-03, KafkaConsumerConfig enables
+                    // asyncAcks, so a permanently-unacked record now blocks this
+                    // partition's offset commits until a rebalance/restart, rather than
+                    // silently losing it — a stall is a visible, recoverable failure mode,
+                    // data loss is not. This executor is generic (also backs the incoming
+                    // pipeline) and has no domain-specific retry ladder to reschedule into,
+                    // unlike DeliveryConsumer's executor-full path.
+                    log.error("{}: async task failed, not acking (partition will stall until restart/rebalance): id={}, error={}",
                             name, id, e.getMessage(), e);
                 } finally {
                     inFlight.decrementAndGet();

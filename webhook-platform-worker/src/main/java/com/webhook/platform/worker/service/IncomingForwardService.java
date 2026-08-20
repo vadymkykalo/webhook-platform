@@ -2,7 +2,6 @@ package com.webhook.platform.worker.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.PathNotFoundException;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
@@ -61,6 +60,7 @@ public class IncomingForwardService {
     private final Counter forwardSuccessCounter;
     private final Counter forwardFailureCounter;
     private final Counter forwardErrorCounter;
+    private final Counter transformFailedCounter;
     private final Timer forwardLatency;
 
     public IncomingForwardService(
@@ -106,6 +106,8 @@ public class IncomingForwardService {
                 .tag("result", "failure").register(meterRegistry);
         this.forwardErrorCounter = Counter.builder("incoming_forward_attempts_total")
                 .tag("result", "error").register(meterRegistry);
+        this.transformFailedCounter = Counter.builder("transform_failed_total")
+                .tag("component", "incoming_forward").register(meterRegistry);
         this.forwardLatency = Timer.builder("incoming_forward_latency_ms")
                 .register(meterRegistry);
     }
@@ -310,6 +312,18 @@ public class IncomingForwardService {
                     .timeout(Duration.ofSeconds(timeoutSeconds))
                     .block();
 
+        } catch (PayloadTransformException e) {
+            // P0-07: a configured transformation that fails to apply must never result in the
+            // raw payload leaving the platform. Fail this attempt as retryable (same as an
+            // HTTP-level failure) so it goes through the normal retry ladder and eventually
+            // DLQs if the template stays broken.
+            int durationMs = (int) (System.currentTimeMillis() - startTime);
+            transformFailedCounter.increment();
+            String message = "TRANSFORM_FAILED: " + e.getMessage();
+            log.error("Payload transform failed for event {} to destination {}, refusing to forward the raw payload: {}",
+                    eventId, destinationId, message);
+            handleError(eventId, destinationId, attemptNumber, maxAttempts,
+                    message, durationMs, destination.getRetryDelays());
         } catch (Exception e) {
             int durationMs = (int) (System.currentTimeMillis() - startTime);
             log.error("Forward HTTP request failed for event {} to destination {}: {}",
@@ -559,23 +573,32 @@ public class IncomingForwardService {
      * Resolves the transformation template (from reusable Transformation entity or inline payloadTransform)
      * and applies it to the payload.
      * Priority: transformationId > inline payloadTransform > passthrough.
+     *
+     * <p>"No transformation configured" (neither a transformationId nor an inline
+     * payloadTransform) is fine — the body is forwarded as-is. But once either is
+     * configured, a failure to apply it must fail the attempt (P0-07): it must never
+     * silently forward the raw body, since transformations are how customers strip PII
+     * before an incoming payload gets relayed to a destination.
      */
     private String resolveAndTransformPayload(String body, IncomingDestination destination) {
         if (body == null || body.isBlank()) {
             return body;
         }
 
-        // 1. Try reusable transformation by ID
+        // 1. Reusable transformation by ID — an explicit choice. Missing/disabled is a
+        // configuration failure, not "no transform configured", so it must not silently
+        // fall through to the inline JSONPath expression (or to no transform at all).
         if (destination.getTransformationId() != null) {
             String template = transformationCacheService.findEnabledTemplate(destination.getTransformationId());
-            if (template != null) {
-                return payloadTransformService.transform(body, template);
+            if (template == null) {
+                throw new PayloadTransformException(
+                        "Configured transformation " + destination.getTransformationId()
+                                + " not found or disabled for destination " + destination.getId());
             }
-            log.warn("Transformation {} not found or disabled for destination {}, trying inline payloadTransform",
-                    destination.getTransformationId(), destination.getId());
+            return payloadTransformService.transform(body, template);
         }
 
-        // 2. Fallback to inline JSONPath expression
+        // 2. Inline JSONPath expression (only consulted when no reusable transformation is set)
         String payloadTransform = destination.getPayloadTransform();
         if (payloadTransform == null || payloadTransform.isBlank()) {
             return body;
@@ -586,13 +609,10 @@ public class IncomingForwardService {
                 return (String) result;
             }
             return objectMapper.writeValueAsString(result);
-        } catch (PathNotFoundException e) {
-            log.warn("JSONPath '{}' not found in payload, forwarding as-is: {}", payloadTransform, e.getMessage());
-            return body;
         } catch (Exception e) {
-            log.warn("Payload transform failed for expression '{}', forwarding as-is: {}", payloadTransform,
-                    e.getMessage());
-            return body;
+            throw new PayloadTransformException(
+                    "Inline payload transform '" + payloadTransform + "' failed for destination "
+                            + destination.getId() + ": " + e.getMessage(), e);
         }
     }
 

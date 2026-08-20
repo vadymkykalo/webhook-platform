@@ -2,6 +2,7 @@ package com.webhook.platform.api.audit;
 
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,13 @@ public class AuditLogRetentionJob {
         this.retentionDays = retentionDays;
     }
 
+    // P0-06: this is a cron (not fixedDelay), so with a multi-thread scheduler pool and
+    // multiple API replicas it can genuinely fire concurrently. deleteByCreatedAtBefore is
+    // idempotent either way, but the lock avoids redundant duplicate DELETE work across
+    // replicas - same reasoning as every other retention job in DataRetentionService /
+    // RetentionCleanupScheduler, which are all already locked.
     @Scheduled(cron = "${audit.retention-cron:0 0 3 * * *}")
+    @SchedulerLock(name = "audit-log-retention", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional
     public void purgeOldAuditLogs() {
         Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);

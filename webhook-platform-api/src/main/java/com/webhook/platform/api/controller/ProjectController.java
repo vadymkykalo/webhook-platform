@@ -47,9 +47,9 @@ public class ProjectController {
     }
 
     @Operation(summary = "Get project", description = "Returns project details by ID")
-    @GetMapping("/{id}")
+    @GetMapping("/{projectId}")
     public ResponseEntity<ProjectResponse> getProject(
-            @PathVariable("id") UUID id,
+            @PathVariable("projectId") UUID id,
             AuthContext auth) {
         ProjectResponse response = projectService.getProject(id, auth.organizationId());
         return ResponseEntity.ok(response);
@@ -64,9 +64,9 @@ public class ProjectController {
 
     @Operation(summary = "Update project", description = "Updates project details")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/{id}")
+    @PutMapping("/{projectId}")
     public ResponseEntity<ProjectResponse> updateProject(
-            @PathVariable("id") UUID id,
+            @PathVariable("projectId") UUID id,
             @Valid @RequestBody ProjectRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
@@ -77,9 +77,9 @@ public class ProjectController {
     @Operation(summary = "Delete project", description = "Deletes a project and all associated resources")
     @ApiResponse(responseCode = "204", description = "Project deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{projectId}")
     public ResponseEntity<Void> deleteProject(
-            @PathVariable("id") UUID id,
+            @PathVariable("projectId") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
         projectService.deleteProject(id, auth.organizationId());

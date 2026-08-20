@@ -8,6 +8,8 @@ import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
@@ -51,10 +53,12 @@ class EncryptionKeyRotationServiceTest {
 
     private EncryptionKeyRegistry registry;
     private EncryptionKeyRotationService service;
+    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() throws Exception {
         registry = buildRegistry("", "1:" + KEY_V1 + ",2:" + KEY_V2, 2, SALT);
+        meterRegistry = new SimpleMeterRegistry();
 
         // TransactionTemplate that just executes the callback directly
         TransactionTemplate txTemplate = mock(TransactionTemplate.class);
@@ -71,7 +75,7 @@ class EncryptionKeyRotationServiceTest {
 
         service = new EncryptionKeyRotationService(
                 endpointRepository, incomingSourceRepository, incomingDestinationRepository,
-                registry, txTemplate, lockExecutor
+                registry, txTemplate, lockExecutor, meterRegistry
         );
     }
 
@@ -352,6 +356,33 @@ class EncryptionKeyRotationServiceTest {
             assertThat(result.errors()).isEqualTo(1);
             assertThat(result.endpointsRotated()).isEqualTo(1);
         }
+
+        @Test
+        @DisplayName("P0-09: partial failure increments the observability counter, not just the count field")
+        void partialFailureIncrementsCounter() {
+            Endpoint badEndpoint = Endpoint.builder()
+                    .id(UUID.randomUUID())
+                    .projectId(UUID.randomUUID())
+                    .url("https://example.com")
+                    .secretEncrypted("garbage_cipher")
+                    .secretIv("garbage_iv")
+                    .encryptionKeyVersion(1)
+                    .build();
+
+            when(endpointRepository.findAll(any(Pageable.class)))
+                    .thenReturn(endpointPage(List.of(badEndpoint)))
+                    .thenReturn(endpointPage(Collections.emptyList()));
+            when(incomingSourceRepository.findAll(any(Pageable.class))).thenReturn(sourcePage(Collections.emptyList()));
+            when(incomingDestinationRepository.findAll(any(Pageable.class))).thenReturn(destPage(Collections.emptyList()));
+
+            EncryptionKeyRotationService.RotationResult result = service.rotateAll();
+
+            assertThat(result.errors()).isEqualTo(1);
+            assertThat(meterRegistry.find("encryption_rotation_partial_failures_total").counter())
+                    .isNotNull()
+                    .extracting(io.micrometer.core.instrument.Counter::count)
+                    .isEqualTo(1.0);
+        }
     }
 
     @Nested
@@ -369,7 +400,7 @@ class EncryptionKeyRotationServiceTest {
 
             EncryptionKeyRotationService lockedService = new EncryptionKeyRotationService(
                     endpointRepository, incomingSourceRepository, incomingDestinationRepository,
-                    registry, txTemplate, noopLockExecutor
+                    registry, txTemplate, noopLockExecutor, meterRegistry
             );
 
             assertThatThrownBy(lockedService::rotateAll)

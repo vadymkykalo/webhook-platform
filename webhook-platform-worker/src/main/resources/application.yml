@@ -6,7 +6,13 @@ spring:
     name: webhook-platform-worker
   lifecycle:
     timeout-per-shutdown-phase: 30s
-  
+  task:
+    scheduling:
+      pool:
+        # P0-06: Spring Boot defaults this to 1, so a single slow @Scheduled job blocks every
+        # other cron on this JVM (e.g. StuckDeliveryRecoveryService waiting behind DlqMonitoringService).
+        size: ${SCHEDULING_POOL_SIZE:8}
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -86,6 +92,8 @@ webhook:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
   max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
+  concurrency:
+    permit-lease-seconds: ${WEBHOOK_CONCURRENCY_PERMIT_LEASE_SECONDS:90}
   project-rate-limit-per-second: ${WEBHOOK_PROJECT_RATE_LIMIT_PER_SECOND:50}
   outgoing-pool-size: ${WEBHOOK_OUTGOING_POOL_SIZE:50}
   incoming-pool-size: ${WEBHOOK_INCOMING_POOL_SIZE:20}
@@ -108,6 +116,9 @@ retry:
 dlq:
   monitoring:
     interval-ms: ${DLQ_MONITORING_INTERVAL_MS:60000}
+    # P0-06: bounds the AdminClient describeTopics/listOffsets calls so a slow/unreachable
+    # broker can't block this scheduler thread indefinitely.
+    admin-client-timeout-seconds: ${DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS:10}
 
 ordering:
   gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}
@@ -129,6 +140,7 @@ queue-depth:
 
 stuck-delivery:
   threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
+  stranded-pending-threshold-minutes: ${STUCK_DELIVERY_STRANDED_PENDING_THRESHOLD_MINUTES:60}
   check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
 
 stuck-forward:

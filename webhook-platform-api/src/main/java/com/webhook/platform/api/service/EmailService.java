@@ -104,6 +104,39 @@ public class EmailService {
         }
     }
 
+    /**
+     * Sends the one-time temporary password generated for a brand-new user created by
+     * an org invite (see MembershipService#addMember). Unlike the other send*Email
+     * methods, this NEVER falls back to logging the secret when app.email.enabled is
+     * false: a reset/verification token is short-lived and single-use, but this
+     * password grants full, non-expiring account access until changed. In local dev
+     * without SMTP configured, use POST /api/v1/auth/forgot-password instead — that
+     * flow's token is safe to log because it expires in an hour and is single-use.
+     */
+    public void sendTemporaryPasswordEmail(String to, String tempPassword) {
+        if (!emailEnabled) {
+            log.info("========== TEMP PASSWORD EMAIL SKIPPED (app.email.enabled=false) ==========");
+            log.info("To: {} — temporary password was generated but NOT logged or emailed.", to);
+            log.info("Use POST /api/v1/auth/forgot-password to issue a usable (loggable) reset token instead.");
+            log.info("=============================================================================");
+            return;
+        }
+
+        try {
+            var message = mailSender.createMimeMessage();
+            var helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject("Your temporary password — Hookflow");
+            helper.setText(buildTemporaryPasswordHtml(tempPassword), true);
+            mailSender.send(message);
+            log.info("Temporary password email sent to {}", to);
+        } catch (Exception e) {
+            // Do not fall back to logging the password on send failure either.
+            log.error("Failed to send temporary password email to {}: {}", to, e.getMessage());
+        }
+    }
+
     public void sendAlertEmail(String to, String subject, String htmlBody) {
         if (!emailEnabled) {
             log.info("========== ALERT EMAIL ==========");
@@ -145,6 +178,33 @@ public class EmailService {
                 </p>
             </div>
             """.formatted(inviteUrl);
+    }
+
+    private String buildTemporaryPasswordHtml(String tempPassword) {
+        String loginUrl = baseUrl + "/login";
+        return """
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+                <h2 style="color: #111;">Your Hookflow account is ready</h2>
+                <p style="color: #555; line-height: 1.5;">
+                    An organization invited you to Hookflow and an account was created for you.
+                    Use the temporary password below to sign in, then change it right away.
+                </p>
+                <p style="font-family: monospace; font-size: 18px; background: #f4f4f4;
+                          padding: 12px 16px; border-radius: 6px; display: inline-block;">
+                    %s
+                </p>
+                <p style="margin-top: 16px;">
+                    <a href="%s"
+                       style="display: inline-block; padding: 12px 24px; background: #111; color: #fff;
+                              text-decoration: none; border-radius: 6px;">
+                        Sign in
+                    </a>
+                </p>
+                <p style="color: #999; font-size: 12px; margin-top: 24px;">
+                    If you didn't expect this invitation, you can safely ignore this email.
+                </p>
+            </div>
+            """.formatted(tempPassword, loginUrl);
     }
 
     private String buildPasswordResetHtml(String resetUrl) {

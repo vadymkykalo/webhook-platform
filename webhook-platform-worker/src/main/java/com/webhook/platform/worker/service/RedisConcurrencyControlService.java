@@ -37,6 +37,7 @@ public class RedisConcurrencyControlService {
             .expireAfterWrite(Duration.ofMinutes(20))
             .build();
     private final int maxConcurrentPerEndpoint;
+    private final int permitLeaseSeconds;
     private final Counter concurrencyAcquired;
     private final Counter concurrencyRejected;
     private final Counter concurrencyReleased;
@@ -46,9 +47,11 @@ public class RedisConcurrencyControlService {
     public RedisConcurrencyControlService(
             RedissonClient redissonClient,
             MeterRegistry meterRegistry,
-            @Value("${webhook.max-concurrent-per-endpoint:10}") int maxConcurrentPerEndpoint) {
+            @Value("${webhook.max-concurrent-per-endpoint:10}") int maxConcurrentPerEndpoint,
+            @Value("${webhook.concurrency.permit-lease-seconds:90}") int permitLeaseSeconds) {
         this.redissonClient = redissonClient;
         this.maxConcurrentPerEndpoint = maxConcurrentPerEndpoint;
+        this.permitLeaseSeconds = permitLeaseSeconds;
         
         this.concurrencyAcquired = Counter.builder("webhook_concurrency_acquired_total")
                 .description("Number of concurrency permits acquired")
@@ -80,7 +83,12 @@ public class RedisConcurrencyControlService {
                 initializedSemaphores.put(key, Boolean.TRUE);
             }
             
-            String permitId = semaphore.tryAcquire(100, TimeUnit.MILLISECONDS);
+            // leaseTime bounds how long a permit can be held without release() being called.
+            // Without it an orphaned permit (crashed pod, or a code path that throws before
+            // the caller's finally) never comes back until the whole semaphore key's 24h TTL
+            // lapses, and that TTL only refreshes on a successful acquire — so an exhausted
+            // semaphore self-heals here even if the caller-side release is ever skipped again.
+            String permitId = semaphore.tryAcquire(100, permitLeaseSeconds, TimeUnit.SECONDS);
             if (permitId != null) {
                 acquiredPermits.put(threadKey, permitId);
                 semaphore.expire(KEY_TTL);
@@ -118,17 +126,19 @@ public class RedisConcurrencyControlService {
         return false;
     }
 
-    private void releaseLocal(UUID endpointId) {
+    private boolean releaseLocal(UUID endpointId) {
         AtomicInteger permits = localPermits.getIfPresent(endpointId);
-        if (permits != null) {
+        if (permits != null && permits.get() > 0) {
             permits.decrementAndGet();
+            return true;
         }
+        return false;
     }
 
     public void release(UUID endpointId) {
         String key = KEY_PREFIX + endpointId;
         String threadKey = endpointId + ":" + Thread.currentThread().getId();
-        
+
         String permitId = acquiredPermits.remove(threadKey);
         if (permitId != null) {
             try {
@@ -140,8 +150,10 @@ public class RedisConcurrencyControlService {
                 log.warn("Failed to release permit for endpoint {}: {}", endpointId, e.getMessage());
                 activePermits.decrementAndGet();
             }
-        } else {
-            releaseLocal(endpointId);
+        } else if (releaseLocal(endpointId)) {
+            // Only counted here if a local-fallback permit was actually held — otherwise
+            // this is a release() call with no matching acquire (e.g. a duplicate release,
+            // or a path with no permit to begin with) and must not drag the gauge negative.
             activePermits.decrementAndGet();
             concurrencyReleased.increment();
         }

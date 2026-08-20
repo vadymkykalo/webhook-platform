@@ -70,7 +70,13 @@ public class OpenApiConfig {
                                 .type(SecurityScheme.Type.APIKEY)
                                 .in(SecurityScheme.In.HEADER)
                                 .name("X-API-Key")
-                                .description("Project API key for event ingestion")))
+                                .description("Project API key for event ingestion"))
+                        .addSecuritySchemes("platformAdminToken", new SecurityScheme()
+                                .type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.HEADER)
+                                .name("X-Platform-Admin-Token")
+                                .description("Cluster-operator credential (PLATFORM_ADMIN_TOKEN env var), independent "
+                                        + "of tenant org membership — required for cross-tenant admin endpoints")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 }
