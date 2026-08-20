@@ -1,6 +1,6 @@
 # P0-04 — Redis permit leak throttles an endpoint to zero for 24 hours
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0
 - **Branch:** `feature/P0-04-redis-permit-leak`
 - **Depends on:** nothing
