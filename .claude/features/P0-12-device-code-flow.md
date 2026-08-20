@@ -1,6 +1,6 @@
 # P0-12 — Device-code flow grants a role from the wrong membership
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — privilege escalation across organizations
 - **Branch:** `feature/P0-12-device-code-flow`
 - **Depends on:** P0-10 if both are in flight (both touch token issuance)
