@@ -1,6 +1,6 @@
 # P0-06 — One scheduler thread stalls platform-wide dispatch
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — one-line fix, platform-wide impact
 - **Branch:** `feature/P0-06-scheduler-thread-pool`
 - **Depends on:** nothing
