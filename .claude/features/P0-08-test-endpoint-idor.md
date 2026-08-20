@@ -1,6 +1,6 @@
 # P0-08 — TestEndpointController has no tenancy check at all
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — cross-tenant data disclosure
 - **Branch:** `feature/P0-08-test-endpoint-idor`
 - **Depends on:** nothing (P0-13 generalises this; this task fixes the worst instance now)
