@@ -19,7 +19,7 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
                 SELECT id FROM (
                     SELECT id,
                            ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn_key,
-                           ROW_NUMBER() OVER (PARTITION BY COALESCE(project_id::text, kafka_key) ORDER BY created_at ASC) AS rn_proj
+                           ROW_NUMBER() OVER (PARTITION BY COALESCE(CAST(project_id AS text), kafka_key) ORDER BY created_at ASC) AS rn_proj
                     FROM outbox_messages WHERE status = :status
                 ) sub WHERE rn_key <= :maxPerKey AND rn_proj <= :maxPerProject
                 ORDER BY rn_proj ASC, rn_key ASC LIMIT :limit
@@ -32,7 +32,7 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
                 SELECT id FROM (
                     SELECT id,
                            ROW_NUMBER() OVER (PARTITION BY kafka_key ORDER BY created_at ASC) AS rn_key,
-                           ROW_NUMBER() OVER (PARTITION BY COALESCE(project_id::text, kafka_key) ORDER BY created_at ASC) AS rn_proj
+                           ROW_NUMBER() OVER (PARTITION BY COALESCE(CAST(project_id AS text), kafka_key) ORDER BY created_at ASC) AS rn_proj
                     FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries
                 ) sub WHERE rn_key <= :maxPerKey AND rn_proj <= :maxPerProject
                 ORDER BY rn_proj ASC, rn_key ASC LIMIT :limit
