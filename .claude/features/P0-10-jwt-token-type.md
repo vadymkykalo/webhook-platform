@@ -1,6 +1,6 @@
 # P0-10 — An access token is accepted as a refresh token
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — a short leak becomes a permanent session
 - **Branch:** `feature/P0-10-jwt-token-type`
 - **Depends on:** nothing
