@@ -8,6 +8,11 @@ OSS readiness) and every `file:line` citation in these tasks was read and
 verified against the code at commit `a433518`. If a citation no longer matches,
 the code moved — re-locate it before assuming the finding is stale.
 
+`P0-37` and `P0-38` are the exception: they were not part of that audit. Both
+were found live, during the manual verification step of `P0-02`, and their
+citations are verified against whatever commit was current in that session,
+not `a433518`.
+
 ## Working protocol
 
 1. **Take the task you were assigned.** If you were not given one, take the
@@ -139,6 +144,8 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P3-34 | P3 | TODO | Workflow engine and CLI command tests |
 | P3-35 | P3 | TODO | Load/soak harness + SDK contract tests |
 | P3-36 | P3 | TODO | Table partitioning + log aggregation |
+| P0-37 | P0 | TODO | Outbox publisher never publishes (Hibernate mangles `::` cast in native query) |
+| P0-38 | P0 | TODO | Never-attempted deliveries routed to the 24h retry tier |
 
 Keep this table in sync with each file's `Status:` line — it is the only
 place to see the board at a glance.
