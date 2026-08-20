@@ -147,12 +147,28 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
 
+        // Reject anything that isn't an actual refresh token: an access token (or any
+        // pre-P0-10 token, which has no "typ" claim at all) must not be exchangeable here.
+        // See CLAUDE.md task P0-10 for why a missing claim is treated as invalid rather
+        // than grandfathered.
+        if (!JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        }
+
         String oldJti = jwtUtil.getJtiFromToken(refreshToken);
+        UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
+
         if (tokenBlacklistService.isBlacklisted(oldJti)) {
+            // Reuse detection: this refresh token was already consumed (rotated away on a
+            // prior refresh, or explicitly revoked via logout). A rotated-away token being
+            // replayed is the signature of a stolen refresh token racing the legitimate
+            // client, so treat it as a compromised token family and kill every token the
+            // user currently holds, not just this one.
+            tokenBlacklistService.revokeAllUserTokens(userId);
+            log.warn("Rejected reuse of already-rotated/revoked refresh token for user {}; revoked all tokens", userId);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token has been revoked");
         }
 
-        UUID userId = jwtUtil.getUserIdFromToken(refreshToken);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
 
