@@ -62,6 +62,12 @@ public abstract class AbstractIntegrationTest {
     void setupMocks() {
         when(authRateLimiterService.allowLogin(anyString(), any())).thenReturn(true);
         when(authRateLimiterService.allowRegister(anyString())).thenReturn(true);
+        // allowTokenAction backs /auth/forgot-password's IP+email check and
+        // /auth/reset-password's IP+token check — without stubbing it, an unstubbed
+        // Mockito boolean mock defaults to false and every reset-password call gets a
+        // spurious 429 (pre-existing gap here since allowTokenAction was added; not
+        // related to P0-14a, just needed so PasswordResetIntegrationTest can run at all).
+        when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
     }

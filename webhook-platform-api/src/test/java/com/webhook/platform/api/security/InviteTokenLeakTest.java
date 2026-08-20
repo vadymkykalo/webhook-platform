@@ -1,9 +1,33 @@
 package com.webhook.platform.api.security;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.webhook.platform.api.domain.entity.Membership;
+import com.webhook.platform.api.domain.entity.User;
+import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.repository.MembershipRepository;
+import com.webhook.platform.api.domain.repository.UserRepository;
+import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import com.webhook.platform.api.service.EmailService;
+import com.webhook.platform.api.service.MembershipService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Verifies that invite tokens are never exposed in API responses.
@@ -72,7 +96,109 @@ class InviteTokenLeakTest {
             }
         }
 
-        assertFalse(hasInviteTokenMethod, 
+        assertFalse(hasInviteTokenMethod,
             "MemberResponse.Builder must not have inviteToken() method");
+    }
+
+    // -----------------------------------------------------------------
+    // P0-14b: the temp password generated for a brand-new invited user must
+    // never reach the logs, and must be delivered exclusively via EmailService.
+    // -----------------------------------------------------------------
+
+    private ListAppender<ILoggingEvent> logAppender;
+    private Logger membershipServiceLogger;
+
+    @BeforeEach
+    void attachLogAppender() {
+        membershipServiceLogger = (Logger) LoggerFactory.getLogger(MembershipService.class);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        membershipServiceLogger.addAppender(logAppender);
+    }
+
+    @AfterEach
+    void detachLogAppender() {
+        if (membershipServiceLogger != null && logAppender != null) {
+            membershipServiceLogger.detachAppender(logAppender);
+        }
+    }
+
+    @Test
+    void testTempPasswordNeverReachesLogs_andIsSentViaEmail() {
+        UserRepository userRepository = mock(UserRepository.class);
+        MembershipRepository membershipRepository = mock(MembershipRepository.class);
+        EmailService emailService = mock(EmailService.class);
+
+        MembershipService membershipService =
+                new MembershipService(userRepository, membershipRepository, emailService);
+
+        UUID orgId = UUID.randomUUID();
+        String email = "new-invitee@example.com";
+
+        when(userRepository.existsByEmail(email)).thenReturn(false);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(UUID.randomUUID());
+            return u;
+        });
+        when(membershipRepository.existsByUserIdAndOrganizationId(any(), eq(orgId))).thenReturn(false);
+        when(membershipRepository.save(any(Membership.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AddMemberRequest request = AddMemberRequest.builder()
+                .email(email)
+                .role(MembershipRole.DEVELOPER)
+                .build();
+
+        membershipService.addMember(orgId, request, MembershipRole.OWNER);
+
+        // The temp password must have been emailed, not just generated and discarded.
+        ArgumentCaptor<String> tempPasswordCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendTemporaryPasswordEmail(eq(email), tempPasswordCaptor.capture());
+        String tempPassword = tempPasswordCaptor.getValue();
+        assertNotNull(tempPassword);
+        assertFalse(tempPassword.isBlank());
+
+        // No log event at any level may contain the temp password value.
+        for (ILoggingEvent event : logAppender.list) {
+            String formatted = event.getFormattedMessage();
+            assertFalse(formatted.contains(tempPassword),
+                    "Log message must not contain the temp password: " + formatted);
+        }
+    }
+
+    @Test
+    void testExistingUserInvite_doesNotSendTemporaryPasswordEmail() {
+        UserRepository userRepository = mock(UserRepository.class);
+        MembershipRepository membershipRepository = mock(MembershipRepository.class);
+        EmailService emailService = mock(EmailService.class);
+
+        MembershipService membershipService =
+                new MembershipService(userRepository, membershipRepository, emailService);
+
+        UUID orgId = UUID.randomUUID();
+        String email = "existing-user@example.com";
+        User existingUser = User.builder()
+                .id(UUID.randomUUID())
+                .email(email)
+                .passwordHash("$2a$10$existinghash")
+                .build();
+
+        when(userRepository.existsByEmail(email)).thenReturn(true);
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(existingUser));
+        when(membershipRepository.existsByUserIdAndOrganizationId(existingUser.getId(), orgId)).thenReturn(false);
+        when(membershipRepository.save(any(Membership.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AddMemberRequest request = AddMemberRequest.builder()
+                .email(email)
+                .role(MembershipRole.VIEWER)
+                .build();
+
+        membershipService.addMember(orgId, request, MembershipRole.OWNER);
+
+        // An already-registered user already has a usable password; no temp password
+        // should be generated or emailed for them.
+        org.mockito.Mockito.verify(emailService, org.mockito.Mockito.never())
+                .sendTemporaryPasswordEmail(anyString(), anyString());
     }
 }
