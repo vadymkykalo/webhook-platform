@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
@@ -351,25 +352,32 @@ public class WebhookDeliveryService {
             // Add custom headers if configured
             addCustomHeaders(requestSpec, delivery.getCustomHeaders());
 
-            String finalRequestHeaders = requestHeaders;
-            String finalBody = body;
-            requestSpec.bodyValue(body)
+            // The mono only ever produces the raw HTTP outcome — no DB/Redis/Kafka work
+            // happens inside .map/.timeout. handleResponse (DB writes via markAsSuccess/
+            // scheduleRetry, Redis via orderingBufferService, Kafka via kafkaTemplate) runs
+            // below, after block() returns, on this calling thread — never on the reactor-
+            // netty event-loop thread, and never race with the .timeout that guards the HTTP
+            // call itself. Previously handleResponse ran inside .map, so a slow markAsSuccess
+            // could trip .timeout AFTER a 200 was already received, and the resulting
+            // TimeoutException drove scheduleRetry to overwrite the just-written SUCCESS row
+            // back to PENDING — a duplicate delivery of an already-successful webhook (P0-05).
+            ResponseOutcome outcome = requestSpec.bodyValue(body)
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
                         String responseHeaders = buildResponseHeadersJson(response.headers().asHttpHeaders());
 
                         return response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
-                                .map(responseBody -> {
-                                    sample.stop(timerForStatus(status));
-                                    handleResponse(delivery, status, responseBody, responseHeaders,
-                                            finalRequestHeaders, finalBody,
-                                            (int) (System.currentTimeMillis() - startTime));
-                                    return status;
-                                });
+                                .map(responseBody -> new ResponseOutcome(status, responseBody, responseHeaders));
                     })
                     .timeout(Duration.ofSeconds(clampTimeout(delivery.getTimeoutSeconds())))
                     .block();
+
+            if (outcome != null) {
+                sample.stop(timerForStatus(outcome.status()));
+                handleResponse(delivery, outcome.status(), outcome.responseBody(), outcome.responseHeaders(),
+                        requestHeaders, body, (int) (System.currentTimeMillis() - startTime));
+            }
         } catch (UrlValidator.InvalidUrlException e) {
             log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
             saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(),
@@ -382,6 +390,9 @@ public class WebhookDeliveryService {
         } finally {
             concurrencyControlService.release(endpoint.getId());
         }
+    }
+
+    private record ResponseOutcome(int status, String responseBody, String responseHeaders) {
     }
 
     private void handleResponse(Delivery delivery, int statusCode, String responseBody,
@@ -440,18 +451,19 @@ public class WebhookDeliveryService {
                 return null;
             }
 
+            // A terminal state reached via another path (e.g. markAsSuccess already committed
+            // SUCCESS) must never be clobbered back to PENDING/DLQ by a late-arriving error
+            // handler (P0-05).
+            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Delivery {} no longer PROCESSING (status={}), skipping retry scheduling " +
+                        "— already reached a terminal state via another path", fresh.getId(), fresh.getStatus());
+                return null;
+            }
+
             if (fresh.getAttemptCount() >= fresh.getMaxAttempts()) {
                 log.warn("Max attempts reached for delivery {}, moving to DLQ", fresh.getId());
                 fresh.setStatus(Delivery.DeliveryStatus.DLQ);
                 fresh.setFailedAt(Instant.now());
-
-                // For ordered deliveries, advance sequence and release buffered deliveries
-                if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                    orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
-                    orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                    triggerBufferedDeliveries(fresh.getEndpointId());
-                }
-
                 fresh.setUpdatedAt(Instant.now());
                 deliveryRepository.save(fresh);
                 return fresh;
@@ -466,8 +478,20 @@ public class WebhookDeliveryService {
             }
         });
 
-        // Outside transaction: fire-and-forget DLQ event notification
+        // Outside the transaction: ordering-buffer release and the DLQ Kafka notification are
+        // both fire-and-forget — a Kafka/Redis failure here must not roll back the DLQ write
+        // that already committed above (P0-05).
         if (dlqDelivery != null) {
+            if (Boolean.TRUE.equals(dlqDelivery.getOrderingEnabled()) && dlqDelivery.getSequenceNumber() != null) {
+                try {
+                    orderingBufferService.removeFromBuffer(dlqDelivery.getEndpointId(), dlqDelivery.getId());
+                    orderingBufferService.markDelivered(dlqDelivery.getEndpointId(), dlqDelivery.getSequenceNumber());
+                    triggerBufferedDeliveries(dlqDelivery.getEndpointId());
+                } catch (Exception e) {
+                    log.error("Failed to release ordering buffer for DLQ delivery {}: {}",
+                            dlqDelivery.getId(), e.getMessage(), e);
+                }
+            }
             publishDlqEvent(dlqDelivery);
         }
     }
@@ -545,6 +569,7 @@ public class WebhookDeliveryService {
     }
 
     private void markAsSuccess(Delivery delivery) {
+        AtomicBoolean transitioned = new AtomicBoolean(false);
         transactionTemplate.executeWithoutResult(tx -> {
             // Re-read to get fresh version after async gap
             Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
@@ -552,18 +577,36 @@ public class WebhookDeliveryService {
                 log.warn("Delivery {} disappeared during success marking", delivery.getId());
                 return;
             }
+            // A late writer for this same delivery (e.g. a retry/failure path that lost the
+            // race) must never clobber a terminal state that's already been written (P0-05).
+            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Delivery {} no longer PROCESSING (status={}), skipping success marking",
+                        fresh.getId(), fresh.getStatus());
+                return;
+            }
             fresh.setStatus(Delivery.DeliveryStatus.SUCCESS);
             fresh.setSucceededAt(Instant.now());
             fresh.setUpdatedAt(Instant.now());
             deliveryRepository.save(fresh);
             log.info("Delivery {} succeeded after {} attempts", fresh.getId(), fresh.getAttemptCount());
-
-            // For ordered deliveries, advance sequence and trigger buffered deliveries
-            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                triggerBufferedDeliveries(fresh.getEndpointId());
-            }
+            transitioned.set(true);
         });
+
+        if (!transitioned.get()) {
+            return;
+        }
+
+        // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
+        // not roll back the SUCCESS write that already committed above (P0-05).
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            try {
+                orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+                triggerBufferedDeliveries(delivery.getEndpointId());
+            } catch (Exception e) {
+                log.error("Failed to release ordering buffer after success for delivery {}: {}",
+                        delivery.getId(), e.getMessage(), e);
+            }
+        }
     }
 
     /**
@@ -633,6 +676,7 @@ public class WebhookDeliveryService {
     }
 
     private void markAsFailed(Delivery delivery, String reason) {
+        AtomicBoolean transitioned = new AtomicBoolean(false);
         transactionTemplate.executeWithoutResult(tx -> {
             // Re-read to get fresh version after async gap
             Delivery fresh = deliveryRepository.findById(delivery.getId()).orElse(null);
@@ -640,19 +684,37 @@ public class WebhookDeliveryService {
                 log.warn("Delivery {} disappeared during failure marking", delivery.getId());
                 return;
             }
+            // A late writer for this same delivery must never clobber a terminal state that's
+            // already been written (P0-05).
+            if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Delivery {} no longer PROCESSING (status={}), skipping failure marking",
+                        fresh.getId(), fresh.getStatus());
+                return;
+            }
             fresh.setStatus(Delivery.DeliveryStatus.FAILED);
             fresh.setFailedAt(Instant.now());
             fresh.setUpdatedAt(Instant.now());
             deliveryRepository.save(fresh);
             log.error("Delivery {} failed: {}", fresh.getId(), reason);
-
-            // For ordered deliveries, advance sequence and release buffered deliveries
-            if (Boolean.TRUE.equals(fresh.getOrderingEnabled()) && fresh.getSequenceNumber() != null) {
-                orderingBufferService.removeFromBuffer(fresh.getEndpointId(), fresh.getId());
-                orderingBufferService.markDelivered(fresh.getEndpointId(), fresh.getSequenceNumber());
-                triggerBufferedDeliveries(fresh.getEndpointId());
-            }
+            transitioned.set(true);
         });
+
+        if (!transitioned.get()) {
+            return;
+        }
+
+        // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
+        // not roll back the FAILED write that already committed above (P0-05).
+        if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
+            try {
+                orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
+                orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+                triggerBufferedDeliveries(delivery.getEndpointId());
+            } catch (Exception e) {
+                log.error("Failed to release ordering buffer after failure for delivery {}: {}",
+                        delivery.getId(), e.getMessage(), e);
+            }
+        }
     }
 
     private void saveAttempt(Delivery delivery, Integer statusCode, String responseBody,

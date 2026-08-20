@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.Delivery;
@@ -27,17 +28,24 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.resources.ConnectionProvider;
 
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /**
@@ -284,5 +292,222 @@ class WebhookDeliveryServiceTest {
         assertTrue(realConcurrencyControl.tryAcquire(endpointId),
                 "a fixed decrypt (or any other pre-HTTP throw) must not leave the endpoint " +
                         "permanently throttled to zero — every failing attempt has to release its permit");
+    }
+
+    // --- P0-05: a successful 2xx delivery must never be re-sent as a duplicate ------------
+
+    private Endpoint verifiedEndpoint(UUID endpointId, String url) {
+        return Endpoint.builder()
+                .id(endpointId)
+                .projectId(UUID.randomUUID())
+                .url(url)
+                .secretEncrypted("cipher")
+                .secretIv("iv")
+                .enabled(true)
+                .verificationStatus(Endpoint.VerificationStatus.VERIFIED)
+                .encryptionKeyVersion(1)
+                .build();
+    }
+
+    private Event stubEvent(UUID eventId, UUID projectId) {
+        return Event.builder()
+                .id(eventId)
+                .projectId(projectId)
+                .eventType("test.event")
+                .payload("{}")
+                .createdAt(Instant.now())
+                .build();
+    }
+
+    private void stubHappyPathPrerequisites(Endpoint endpoint) throws Exception {
+        when(projectRateLimiterService.tryAcquire(any())).thenReturn(true);
+        when(circuitBreakerService.isCallPermitted(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquire(any())).thenReturn(true);
+        when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
+        when(payloadTransformService.transform(anyString(), any())).thenReturn("{}");
+    }
+
+    /**
+     * Reproduces the P0-05 defect: handleResponse (markAsSuccess et al.) used to run inside
+     * the reactive .map, i.e. inside the .timeout guarding the HTTP call itself. A 200 response
+     * followed by slow success bookkeeping tripped the timeout AFTER the row was already
+     * written SUCCESS, and the resulting TimeoutException drove scheduleRetry to blindly
+     * overwrite it back to PENDING — a duplicate send of an already-successful webhook.
+     * <p>
+     * On unfixed code this test fails: a PENDING save is observed. On fixed code, bookkeeping
+     * runs after block() returns (off the netty event-loop thread) and is no longer subject to
+     * the HTTP timeout, so the delivery only ever ends up SUCCESS.
+     */
+    @Test
+    void attemptDelivery_200ResponseFollowedBySlowSuccessBookkeeping_neverEndsPending() throws Exception {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/hook", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+        });
+        httpServer.start();
+        try {
+            UUID endpointId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+
+            Endpoint endpoint = verifiedEndpoint(endpointId,
+                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+            Event event = stubEvent(eventId, endpoint.getProjectId());
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            stubHappyPathPrerequisites(endpoint);
+
+            Delivery delivery = Delivery.builder()
+                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .attemptCount(0).maxAttempts(5)
+                    .timeoutSeconds(1) // shorter than the slow bookkeeping below
+                    .updatedAt(Instant.now())
+                    .build();
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            List<Delivery.DeliveryStatus> savedStatuses = Collections.synchronizedList(new ArrayList<>());
+            AtomicReference<String> successSaveThreadName = new AtomicReference<>();
+            when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> {
+                Delivery d = inv.getArgument(0);
+                if (d.getStatus() == Delivery.DeliveryStatus.SUCCESS) {
+                    successSaveThreadName.set(Thread.currentThread().getName());
+                    Thread.sleep(1500); // slow success bookkeeping — longer than the 1s timeout above
+                }
+                savedStatuses.add(d.getStatus());
+                return d;
+            });
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+            service.processDelivery(message, true);
+
+            // Give a still-in-flight background thread (unfixed code: the netty event-loop
+            // thread finishing its slow save inside .map) time to land before asserting, so the
+            // test isn't racy and doesn't leak a running thread into the next test.
+            Thread.sleep(2000);
+
+            assertFalse(savedStatuses.contains(Delivery.DeliveryStatus.PENDING),
+                    "a delivery that already received a 2xx response must never be re-scheduled " +
+                            "as a duplicate PENDING retry, even when success bookkeeping is slow " +
+                            "enough to trip the HTTP timeout");
+            assertTrue(savedStatuses.contains(Delivery.DeliveryStatus.SUCCESS),
+                    "the 2xx response must still be recorded as SUCCESS");
+            assertFalse(successSaveThreadName.get() != null
+                            && successSaveThreadName.get().startsWith("reactor-http-nio"),
+                    "success bookkeeping must not run on the reactor-netty event-loop thread, " +
+                            "was: " + successSaveThreadName.get());
+        } finally {
+            httpServer.stop(0);
+        }
+    }
+
+    /**
+     * Direct coverage of scheduleRetry's own guard: if the row already reached SUCCESS via
+     * another path by the time scheduleRetry re-reads it, scheduling a retry must be a no-op
+     * rather than blindly overwriting the terminal state back to PENDING.
+     */
+    @Test
+    void scheduleRetry_rowAlreadySuccess_isNoOp() throws Exception {
+        int closedPort;
+        try (ServerSocket serverSocket = new ServerSocket(0)) {
+            closedPort = serverSocket.getLocalPort();
+        }
+
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, "http://127.0.0.1:" + closedPort + "/hook");
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        Event event = stubEvent(eventId, endpoint.getProjectId());
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+        stubHappyPathPrerequisites(endpoint);
+
+        Delivery claimed = Delivery.builder()
+                .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0).maxAttempts(5).timeoutSeconds(2)
+                .updatedAt(Instant.now())
+                .build();
+        Delivery alreadySucceeded = Delivery.builder()
+                .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.SUCCESS)
+                .attemptCount(1).maxAttempts(5)
+                .succeededAt(Instant.now()).updatedAt(Instant.now())
+                .build();
+        // First read is processDelivery's own claim check (PROCESSING); the second is
+        // scheduleRetry's fresh re-read, simulating that markAsSuccess won the race and
+        // already committed SUCCESS in between.
+        when(deliveryRepository.findById(deliveryId))
+                .thenReturn(Optional.of(claimed), Optional.of(alreadySucceeded));
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        service.processDelivery(message, true);
+
+        verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+    }
+
+    /**
+     * A Kafka send failure while releasing the ordering buffer after a successful delivery
+     * must not roll back the SUCCESS write — the DB commit already happened in its own
+     * transaction before the Kafka call runs.
+     */
+    @Test
+    void markAsSuccess_kafkaSendFailureAfterCommit_doesNotRollBackToPending() throws Exception {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/hook", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+        });
+        httpServer.start();
+        try {
+            UUID endpointId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+            UUID bufferedDeliveryId = UUID.randomUUID();
+
+            Endpoint endpoint = verifiedEndpoint(endpointId,
+                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+            Event event = stubEvent(eventId, endpoint.getProjectId());
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            stubHappyPathPrerequisites(endpoint);
+
+            Delivery delivery = Delivery.builder()
+                    .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
+                    .orderingEnabled(true).sequenceNumber(2L)
+                    .updatedAt(Instant.now())
+                    .build();
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            Delivery bufferedDelivery = Delivery.builder()
+                    .id(bufferedDeliveryId).eventId(eventId).endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PENDING)
+                    .attemptCount(0).maxAttempts(5).sequenceNumber(3L)
+                    .updatedAt(Instant.now())
+                    .build();
+            when(orderingBufferService.canDeliver(endpointId, 2L)).thenReturn(true);
+            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of(bufferedDeliveryId));
+            when(deliveryRepository.findAllById(List.of(bufferedDeliveryId))).thenReturn(List.of(bufferedDelivery));
+            when(kafkaTemplate.send(anyString(), anyString(), any()))
+                    .thenThrow(new RuntimeException("producer buffer exhausted"));
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+            service.processDelivery(message, true);
+
+            verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
+            verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
+        } finally {
+            httpServer.stop(0);
+        }
     }
 }
