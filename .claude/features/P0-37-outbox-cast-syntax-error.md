@@ -1,6 +1,6 @@
 # P0-37 — Outbox publisher never publishes a single message (native-query syntax error)
 
-- **Status:** IN PROGRESS
+- **Status:** DONE
 - **Priority:** P0 — the transactional outbox never drains; zero events ever reach Kafka
 - **Branch:** `feature/P0-37-outbox-cast-syntax-error`
 - **Depends on:** nothing
@@ -43,23 +43,23 @@ leaves the `outbox_messages` table.
 
 ## Steps
 
-- [ ] Reproduce first: a repository-level test (real Postgres via
+- [x] Reproduce first: a repository-level test (real Postgres via
       Testcontainers, following `AbstractIntegrationTest`) that inserts a
       `PENDING` `OutboxMessage` and calls `findPendingBatchForUpdate` —
       assert it does not throw and returns the row. Confirm it fails against
       the current code with the `SQLGrammarException` / `syntax error at or
       near ":"` before touching production code.
-- [ ] Fix both native queries. `CAST(project_id AS text)` avoids the `::`
+- [x] Fix both native queries. `CAST(project_id AS text)` avoids the `::`
       colon-parsing ambiguity entirely (verified working against a live
       Postgres in the P0-02 session); prefer that over escaping the colon,
       since escaped-colon behavior is Hibernate-version-dependent.
-- [ ] Audit the rest of the module for the same `::` pattern inside a
+- [x] Audit the rest of the module for the same `::` pattern inside a
       `nativeQuery = true` `@Query` — this bug class isn't unique to
       `OutboxMessageRepository` if the pattern was copy-pasted anywhere else.
 
 ## Tests to write
 
-- New `OutboxMessageRepositoryTest.java` (Testcontainers Postgres, extends
+- [x] New `OutboxMessageRepositoryTest.java` (Testcontainers Postgres, extends
   `AbstractIntegrationTest` or mirrors `DeliveryRepositoryTest`'s
   `@DataJpaTest` + Testcontainers pattern from `webhook-platform-worker`):
   covers `findPendingBatchForUpdate` and `findFailedMessagesForRetry`
@@ -82,8 +82,93 @@ make up && make wait-healthy
 
 ## Definition of done
 
-- [ ] `OutboxPublisherService`'s scheduled poll no longer throws.
-- [ ] A real event sent through the API is actually delivered end to end.
-- [ ] `mvn test` green for `webhook-platform-api`.
+- [x] `OutboxPublisherService`'s scheduled poll no longer throws.
+- [x] A real event sent through the API is actually delivered end to end.
+- [x] `mvn test` green for `webhook-platform-api`.
 
 ## Progress log
+
+### Що змінено
+
+- `OutboxMessageRepository.java`: `project_id::text` → `CAST(project_id AS
+  text)` в обох нативних запитах (`findPendingBatchForUpdate`,
+  `findFailedMessagesForRetry`). `CAST(... AS ...)` не містить символу `:`
+  узагалі, тож Hibernate-парсер іменованих параметрів native-запитів не має
+  що зіпсувати — на відміну від `\:\:`-екранування, поведінка якого залежить
+  від версії Hibernate.
+- Аудит: `grep -rnE "[a-zA-Z_]+::[a-zA-Z]"` по `api`/`worker`/`common`/`cli` —
+  жодного іншого збігу всередині `nativeQuery = true` (усі інші `::` — це
+  Java method references, не SQL).
+- Новий тест `OutboxMessageRepositoryTest.java`
+  (`webhook-platform-api/src/test/.../OutboxMessageRepositoryTest.java`,
+  `extends AbstractIntegrationTest` — реальний Postgres через Testcontainers,
+  Flyway-міграції, а не Hibernate `ddl-auto=create`, щоб перевіряти саме
+  продакшн-схему): 3 тести — `PENDING` рядок з `project_id`, `PENDING` рядок
+  з `project_id IS NULL` (гілка `COALESCE`), `FAILED` рядок нижче
+  `maxRetries`.
+
+### Reproduce first — реальний вивід ДО фіксу
+
+```
+mvn test -pl webhook-platform-api -Dtest=OutboxMessageRepositoryTest
+
+Tests run: 3, Failures: 0, Errors: 3, Skipped: 0
+  findFailedMessagesForRetry_shouldReturnRowBelowMaxRetries » InvalidDataAccessResourceUsage
+  findPendingBatchForUpdate_shouldReturnRowWithNullProjectId » InvalidDataAccessResourceUsage
+  findPendingBatchForUpdate_shouldReturnRowWithProjectId » InvalidDataAccessResourceUsage
+```
+Причина у всіх трьох — той самий рядок SQL з реального Postgres-драйвера:
+```
+Caused by: org.postgresql.util.PSQLException:
+ERROR: syntax error at or near ":"
+  Position: 244
+```
+і видно сам зіпсований запит (`project_id:text`, замість `project_id::text`
+в джерелі) — саме те, що описано в дефекті.
+
+### Verification (unit + integration)
+
+```
+mvn test -pl webhook-platform-api -Dtest=OutboxMessageRepositoryTest
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+Повний unit suite `webhook-platform-api` (+ `common`):
+```
+mvn test -pl webhook-platform-api -am -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest'
+Tests run: 129, Failures: 0, Errors: 0, Skipped: 0   (common)
+Tests run: 293, Failures: 0, Errors: 0, Skipped: 0   (api)
+BUILD SUCCESS
+```
+(`OutboxPublisherServiceTest` — існуючий, mock-based — теж зелений, 6/6; він
+мокає репозиторій, тож ніколи не міг спіймати цей клас багів, звідси й
+потреба саме в repository-тесті.)
+
+### Manual verification — живий стек
+
+`make up` (образи вже частково закешовані з сесії P0-02, підйом швидший).
+Проєкт + endpoint на локальний Python-лічильник (`WEBHOOK_ALLOW_PRIVATE_IPS=true`
+за замовчуванням), таргет — docker-мережевий gateway.
+
+- 1 smoke-подія + пакет 30 подій через `POST /api/v1/events`.
+- `docker logs webhook-platform-api-1` — **0 входжень "syntax error"** (до
+  фіксу кожен цикл поллінгу `OutboxPublisherService`, раз на секунду, писав
+  цю помилку в лог).
+- Лічильник-приймач: **31/31 доставлено** (`received_p037.log`).
+
+Побічно помічена (НЕ пов'язана з цим фіксом, не чіпалась): при завантаженні
+повного `@SpringBootTest`-контексту `AbstractIntegrationTest` у логах
+з'являється `Unexpected error occurred in scheduled task —
+InvalidDataAccessApiUsageException: For queries with named parameters you
+need to provide names for method parameters` з `TunnelService.expireStale`
+і `DeviceAuthService.expireOldCodes` (відсутній `-parameters` javac флаг або
+`@Param` на якихось методах репозиторію). Тести все одно проходять (сама
+помилка лише логується, не пробрасується), тому це не блокує P0-37, але це
+третя, окрема, невивчена знахідка — залишаю нотатку, не тікет (значно менш
+критично: не блокує жодного продакшн-шляху, лише шумить у логах при
+scheduled cleanup).
+
+Стек лишив живим для наступної, аналогічної ручної перевірки [[P0-38]] в
+цій самій сесії (той самий баг-звіт, той самий проєкт/endpoint) — приберу
+його після неї.
