@@ -1,6 +1,6 @@
 # P0-02 — Deliveries dropped on every rolling deploy
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — loss happens on every deploy
 - **Branch:** `feature/P0-02-shutdown-message-loss`
 - **Depends on:** nothing (but land P0-01 first if you can; they touch adjacent code)
