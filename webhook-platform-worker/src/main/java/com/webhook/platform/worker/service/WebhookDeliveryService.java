@@ -145,22 +145,37 @@ public class WebhookDeliveryService {
                 inFlightCount.get());
     }
 
-    public void processDelivery(DeliveryMessage message) {
+    public void processDelivery(DeliveryMessage message, boolean isRetry) {
         if (shuttingDown) {
             log.warn("Shutdown in progress, rejecting new delivery: {}", message.getDeliveryId());
             throw new ShutdownRejectedException(
                     "Worker is shutting down, delivery " + message.getDeliveryId() + " must be redelivered");
         }
-        doProcessDelivery(message);
+        doProcessDelivery(message, isRetry);
     }
 
-    private void doProcessDelivery(DeliveryMessage message) {
-        // Atomic claim + read in single transaction (UPDATE ... RETURNING *)
-        Delivery delivery = transactionTemplate
-                .execute(tx -> deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId()));
-        if (delivery == null) {
-            log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
-            return;
+    private void doProcessDelivery(DeliveryMessage message, boolean isRetry) {
+        Delivery delivery;
+        if (isRetry) {
+            // Retry path: RetrySchedulerService already claimed the row (status=PROCESSING)
+            // before publishing to the retry topic — mirrors how IncomingForwardService
+            // treats attempts claimed by IncomingForwardRetryScheduler. No re-claim here;
+            // an UPDATE ... WHERE status = 'PENDING' claim would never match and every
+            // retry would be silently skipped.
+            delivery = deliveryRepository.findById(message.getDeliveryId()).orElse(null);
+            if (delivery == null || delivery.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                log.debug("Retry delivery {} not found or not PROCESSING (already handled?), skipping",
+                        message.getDeliveryId());
+                return;
+            }
+        } else {
+            // Atomic claim + read in single transaction (UPDATE ... RETURNING *)
+            delivery = transactionTemplate
+                    .execute(tx -> deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId()));
+            if (delivery == null) {
+                log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
+                return;
+            }
         }
 
         // Check ordering constraints for ordered deliveries
