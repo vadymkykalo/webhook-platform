@@ -10,9 +10,11 @@ the code moved — re-locate it before assuming the finding is stale.
 
 ## Working protocol
 
-1. **Pick the lowest-numbered task whose `Status:` is `TODO`** and whose
-   `Depends on:` tasks are all `DONE`. Priority prefix is the order:
-   `P0` (blocks any public exposure) → `P1` → `P2` → `P3`.
+1. **Take the task you were assigned.** If you were not given one, take the
+   lowest-numbered `TODO` whose `Depends on:` tasks are all `DONE` — but read
+   "Running agents in parallel" below first: the `Status:` line is bookkeeping,
+   **not a lock**, because your branch is invisible to other agents until it
+   merges. Two agents can silently claim the same task.
 2. **Branch from `develop`**, per the GitFlow policy in the root `CLAUDE.md`:
    ```bash
    git checkout develop && git pull
@@ -37,6 +39,43 @@ the code moved — re-locate it before assuming the finding is stale.
    anything you deliberately left out, then open a PR into `develop`.
 8. If you cannot finish, set `Status: BLOCKED`, write why in the log, and leave
    the ticked steps ticked. Partial progress is useful; silent abandonment is not.
+
+## Running agents in parallel
+
+Most of these tasks touch the same handful of files, so "36 tasks" is not "36
+parallel agents". There are **two independent streams**. Within a stream the
+tasks are sequential — they edit the same files and would conflict; across the
+two streams they are safe to run at the same time.
+
+**Stream A — worker / delivery core.** Strictly in order. Every one of these
+touches `WebhookDeliveryService`, `BoundedAsyncExecutor`, `DeliveryConsumer`,
+`KafkaConsumerConfig` or `RetrySchedulerService`:
+
+```
+P0-01 → P0-02 → P0-03 → P0-04 → P0-05 → P0-07 → P1-21 → P1-22 → P1-23 → P1-24
+```
+
+**Stream B — api / security.** Mostly independent files, with two chains:
+
+```
+P0-09 ┐
+P0-11 ├── independent, any order
+P0-06 ┘   (P0-06 edits both application.yml files — do it when Stream A is between tasks)
+
+P0-08 → P0-13          (P0-13 generalises P0-08's fix; same controllers)
+P0-10 → P0-12          (both touch token issuance)
+P0-10 → P0-14          (both touch AuthService)
+```
+
+**After both P0 streams are green**, the rest parallelises much more freely —
+P1-15/16/17/18 (packaging and CI), P2-29..33 (UI, a different language), and
+P3-34..36 barely overlap at all. Two exceptions that must stay ordered:
+**P1-19** (Spring Boot upgrade) comes after P1-21 and P1-22, because upgrading an
+untested delivery engine means finding the regressions in production; and
+**P1-27** (SDK rename) is time-critical — it becomes impossible once the packages
+are published.
+
+If you are running one agent at a time, just follow the numbers.
 
 ## Test commands (this repo splits tests by class-name suffix)
 
