@@ -129,6 +129,7 @@ queue-depth:
 
 stuck-delivery:
   threshold-minutes: ${STUCK_DELIVERY_THRESHOLD_MINUTES:5}
+  stranded-pending-threshold-minutes: ${STUCK_DELIVERY_STRANDED_PENDING_THRESHOLD_MINUTES:60}
   check-interval-ms: ${STUCK_DELIVERY_CHECK_INTERVAL_MS:60000}
 
 stuck-forward:

@@ -68,7 +68,7 @@ public class DeliveryConsumer {
                 topic, message.getDeliveryId(), message.getEndpointId());
 
         if (!asyncExecutor.trySubmit(
-                () -> webhookDeliveryService.processDelivery(message),
+                () -> webhookDeliveryService.processDelivery(message, false),
                 acknowledgment,
                 message.getDeliveryId().toString())) {
             // Executor full — containers paused automatically, don't ack.
@@ -104,7 +104,7 @@ public class DeliveryConsumer {
                 topic, message.getDeliveryId(), message.getAttemptCount());
 
         if (!asyncExecutor.trySubmit(
-                () -> webhookDeliveryService.processDelivery(message),
+                () -> webhookDeliveryService.processDelivery(message, true),
                 acknowledgment,
                 message.getDeliveryId().toString())) {
             log.debug("Outgoing executor full, not acking retry deliveryId={}", message.getDeliveryId());

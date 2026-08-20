@@ -131,9 +131,14 @@ public class RetrySchedulerService {
                 return List.<Delivery>of();
             }
 
-            // Nullify nextRetryAt to prevent re-pick by another scheduler instance
+            // Mark PROCESSING (matches IncomingForwardRetryScheduler) so a crash between
+            // this commit and the Phase 3 save leaves the row recoverable by
+            // StuckDeliveryRecoveryService instead of a PENDING + null next_retry_at row
+            // invisible to both findPendingRetryIds and resetStuckDeliveries.
             for (Delivery d : locked) {
+                d.setStatus(Delivery.DeliveryStatus.PROCESSING);
                 d.setNextRetryAt(null);
+                d.setLastAttemptAt(Instant.now());
                 d.setUpdatedAt(Instant.now());
             }
             deliveryRepository.saveAll(locked);
@@ -217,7 +222,8 @@ public class RetrySchedulerService {
                 }
                 SendResult<String, DeliveryMessage> result = future.get();
                 RecordMetadata metadata = result.getRecordMetadata();
-                // nextRetryAt already null from Phase 1
+                // Status stays PROCESSING (set in Phase 1) — the consumer finalizes it
+                // (success/failure/reschedule) once it picks up the retry message.
                 successfulDeliveries.add(delivery);
 
                 log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
@@ -268,6 +274,9 @@ public class RetrySchedulerService {
     private void rescheduleDelivery(Delivery delivery, String reason) {
         long jitter = ThreadLocalRandom.current().nextLong(0, Math.max(1, rescheduleDelaySeconds / 2) + 1);
         Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds + jitter);
+        // Revert the Phase 1 PROCESSING claim so the delivery is picked up again by
+        // findPendingRetryIds instead of waiting out a stuck-delivery sweep.
+        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
         delivery.setNextRetryAt(rescheduleTime);
         delivery.setUpdatedAt(Instant.now());
 

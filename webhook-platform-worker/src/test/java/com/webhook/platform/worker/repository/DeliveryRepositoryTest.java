@@ -146,6 +146,59 @@ class DeliveryRepositoryTest {
     }
 
     @Test
+    void resetStrandedPendingDeliveries_shouldRecoverOldStrandedPendingRow() {
+        // Reproduces the retry-claim black hole: a PENDING delivery with next_retry_at
+        // wiped (the pre-fix claim contract nulled it without ever setting PROCESSING) is
+        // invisible to both existing recovery mechanisms.
+        createSharedEndpoint();
+        Delivery stranded = createAndPersistDelivery(
+                Delivery.DeliveryStatus.PENDING, null, Instant.now().minus(2, java.time.temporal.ChronoUnit.HOURS));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<UUID> pendingIds = deliveryRepository.findPendingRetryIds(
+                Delivery.DeliveryStatus.PENDING, Instant.now(), 10, 100, 100);
+        assertTrue(pendingIds.isEmpty(), "black-holed row must not be visible to findPendingRetryIds");
+
+        int recoveredByStuckSweep = deliveryRepository.resetStuckDeliveries(Instant.now().plusSeconds(3600));
+        assertEquals(0, recoveredByStuckSweep,
+                "black-holed row never reached PROCESSING, so resetStuckDeliveries can't see it either");
+
+        // Act — the belt-and-braces recovery query
+        int recovered = deliveryRepository.resetStrandedPendingDeliveries(Instant.now().minusSeconds(300));
+
+        // Assert
+        assertEquals(1, recovered);
+        entityManager.clear();
+        Delivery reloaded = deliveryRepository.findById(stranded.getId()).orElseThrow();
+        assertNotNull(reloaded.getNextRetryAt());
+        assertEquals(Delivery.DeliveryStatus.PENDING, reloaded.getStatus());
+
+        // And now it is visible to the normal retry poll again
+        List<UUID> idsAfterRecovery = deliveryRepository.findPendingRetryIds(
+                Delivery.DeliveryStatus.PENDING, Instant.now().plusSeconds(1), 10, 100, 100);
+        assertTrue(idsAfterRecovery.contains(stranded.getId()));
+    }
+
+    @Test
+    void resetStrandedPendingDeliveries_shouldNotSweepFreshlyIngestedRow() {
+        // Freshly ingested deliveries are also PENDING with next_retry_at = NULL and rely
+        // entirely on their one outbox Kafka message — the sweep must not touch them.
+        createSharedEndpoint();
+        Delivery fresh = createAndPersistDelivery(Delivery.DeliveryStatus.PENDING, null, Instant.now());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        int recovered = deliveryRepository.resetStrandedPendingDeliveries(Instant.now().minusSeconds(300));
+
+        assertEquals(0, recovered);
+        Delivery reloaded = deliveryRepository.findById(fresh.getId()).orElseThrow();
+        assertNull(reloaded.getNextRetryAt());
+    }
+
+    @Test
     void findPendingRetryIds_shouldRespectPageSize() {
         // Arrange
         createSharedEndpoint();
@@ -166,6 +219,10 @@ class DeliveryRepositoryTest {
     }
 
     private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt) {
+        return createAndPersistDelivery(status, nextRetryAt, Instant.now());
+    }
+
+    private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt, Instant updatedAt) {
         Delivery delivery = Delivery.builder()
                 .id(UUID.randomUUID())
                 .eventId(UUID.randomUUID())
@@ -177,9 +234,9 @@ class DeliveryRepositoryTest {
                 .orderingEnabled(false)
                 .nextRetryAt(nextRetryAt)
                 .createdAt(Instant.now())
-                .updatedAt(Instant.now())
+                .updatedAt(updatedAt)
                 .build();
-        
+
         return entityManager.persist(delivery);
     }
 }

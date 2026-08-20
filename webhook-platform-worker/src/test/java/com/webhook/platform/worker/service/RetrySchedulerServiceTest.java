@@ -182,6 +182,40 @@ class RetrySchedulerServiceTest {
                 assertNull(allSaves.get(0).get(0).getNextRetryAt());
         }
 
+        @Test
+        void scheduleRetries_claimPhase_shouldSetStatusProcessingAndLastAttemptAt() {
+                // Regression test for the retry-claim black hole: the old claim phase only
+                // nullified nextRetryAt and left status=PENDING, which is invisible to both
+                // findPendingRetryIds (needs non-null nextRetryAt) and resetStuckDeliveries
+                // (needs status=PROCESSING) if the worker crashes before Phase 3 runs. The
+                // claim must set status=PROCESSING and lastAttemptAt, matching
+                // IncomingForwardRetryScheduler's claim of forward attempts, so a crashed
+                // claim is recoverable by StuckDeliveryRecoveryService's sweep.
+                Instant now = Instant.now();
+                Delivery delivery = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
+
+                when(deliveryRepository.findPendingRetryIds(
+                                any(Delivery.DeliveryStatus.class),
+                                any(Instant.class),
+                                anyInt(),
+                                anyInt(),
+                                anyInt())).thenReturn(Collections.singletonList(delivery.getId()));
+                when(deliveryRepository.lockByIds(anyList())).thenReturn(Collections.singletonList(delivery));
+
+                SendResult<String, DeliveryMessage> sendResult = mockSendResult();
+                CompletableFuture<SendResult<String, DeliveryMessage>> future = CompletableFuture
+                                .completedFuture(sendResult);
+                when(kafkaTemplate.send(anyString(), anyString(), any(DeliveryMessage.class))).thenReturn(future);
+
+                // Act
+                retrySchedulerService.scheduleRetries(0);
+
+                // Assert — claimed delivery is left in the same state resetStuckDeliveries
+                // matches on: status=PROCESSING with a recent lastAttemptAt.
+                assertEquals(Delivery.DeliveryStatus.PROCESSING, delivery.getStatus());
+                assertNotNull(delivery.getLastAttemptAt());
+        }
+
     @Test
     void scheduleRetries_shouldHandleEmptyResult() {
         // Arrange
@@ -229,6 +263,9 @@ class RetrySchedulerServiceTest {
                 // Phase 3 is the second saveAll — contains rescheduled delivery
                 List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
                 assertNotNull(allSaves.get(1).get(0).getNextRetryAt());
+                // A failed send must revert the Phase 1 PROCESSING claim back to PENDING,
+                // otherwise the row sits unclaimable until the stuck-delivery sweep catches it.
+                assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
         }
 
         @Test
@@ -310,10 +347,14 @@ class RetrySchedulerServiceTest {
                 // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert — completed delivery has nextRetryAt nullified (success)
+                // Assert — completed delivery has nextRetryAt nullified (success) and stays
+                // PROCESSING for the consumer to finalize
                 assertNull(completedDelivery.getNextRetryAt());
-                // Assert — incomplete delivery is rescheduled (has nextRetryAt set)
+                assertEquals(Delivery.DeliveryStatus.PROCESSING, completedDelivery.getStatus());
+                // Assert — incomplete delivery is rescheduled (has nextRetryAt set) and its
+                // PROCESSING claim is reverted back to PENDING
                 assertNotNull(incompleteDelivery.getNextRetryAt());
+                assertEquals(Delivery.DeliveryStatus.PENDING, incompleteDelivery.getStatus());
         }
 
         @Test
@@ -338,8 +379,9 @@ class RetrySchedulerServiceTest {
                 // Act — should not throw
                 assertDoesNotThrow(() -> retrySchedulerService.scheduleRetries(0));
 
-                // Assert — delivery is rescheduled with nextRetryAt set
+                // Assert — delivery is rescheduled with nextRetryAt set and reverted to PENDING
                 assertNotNull(delivery.getNextRetryAt());
+                assertEquals(Delivery.DeliveryStatus.PENDING, delivery.getStatus());
                 // Verify it ends up in the failed batch (Phase 3 saveAll)
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
