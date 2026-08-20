@@ -26,6 +26,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.2.0</spring-boot.version>
         <lombok.version>1.18.30</lombok.version>
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -46,11 +47,32 @@
     </dependencyManagement>
 
     <build>
+        <plugins>
+            <!--
+              Declared here (not just in pluginManagement) so the -parameters
+              flag actually applies: pluginManagement only supplies config for
+              plugins a module invokes explicitly, and none of common/api/worker
+              declare their own compiler-plugin, so without this the default
+              lifecycle-bound compile never received it. Confirmed missing via
+              javap (no MethodParameters attribute), which broke unnamed
+              @RequestParam bindings (e.g. AuditLogController) and named JPQL
+              @Query parameters at runtime with IllegalArgumentException.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+        </plugins>
         <pluginManagement>
             <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <parameters>true</parameters>
                     </configuration>
