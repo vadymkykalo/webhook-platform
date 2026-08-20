@@ -14,6 +14,7 @@ import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -72,6 +73,8 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
+        // Only the hash is persisted (P0-14a) — the plaintext token exists solely
+        // to be emailed to the user and is never written to the database or logs.
         String verificationToken = generateVerificationToken();
 
         User user = User.builder()
@@ -80,7 +83,7 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .status(UserStatus.PENDING_VERIFICATION)
                 .emailVerified(false)
-                .verificationToken(verificationToken)
+                .verificationToken(CryptoUtils.hashApiKey(verificationToken))
                 .verificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS))
                 .build();
         user = userRepository.save(user);
@@ -208,7 +211,7 @@ public class AuthService {
 
     @Transactional
     public void verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
+        User user = userRepository.findByVerificationToken(CryptoUtils.hashApiKey(token))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid verification token"));
 
         if (user.getVerificationTokenExpiresAt() != null
@@ -234,7 +237,7 @@ public class AuthService {
         }
 
         String newToken = generateVerificationToken();
-        user.setVerificationToken(newToken);
+        user.setVerificationToken(CryptoUtils.hashApiKey(newToken));
         user.setVerificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS));
         userRepository.save(user);
 
@@ -278,8 +281,10 @@ public class AuthService {
             return;
         }
 
+        // Only the hash is persisted (P0-14a); the plaintext token is emailed and
+        // never stored, matching the invite-token pattern in MembershipService.
         String resetToken = generateVerificationToken();
-        user.setPasswordResetToken(resetToken);
+        user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
         userRepository.save(user);
 
@@ -290,7 +295,7 @@ public class AuthService {
     @Auditable(action = AuditAction.PASSWORD_RESET, resourceType = "Auth")
     @Transactional
     public void resetPassword(String token, String newPassword) {
-        User user = userRepository.findByPasswordResetToken(token)
+        User user = userRepository.findByPasswordResetToken(CryptoUtils.hashApiKey(token))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired reset token"));
 
         if (user.getPasswordResetTokenExpiresAt() != null

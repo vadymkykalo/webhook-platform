@@ -4,14 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
+import com.webhook.platform.api.service.EmailService;
+import com.webhook.platform.common.util.CryptoUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +33,12 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    // Mocked so tests can capture the plaintext reset token EmailService would have
+    // emailed to the user (P0-14a: the DB column now holds only CryptoUtils.hashApiKey(token),
+    // so the raw token is no longer recoverable by reading the row back).
+    @MockBean
+    private EmailService emailService;
 
     private static final String EMAIL = "reset-test@example.com";
     private static final String ORIGINAL_PASSWORD = "Original1!";
@@ -48,13 +60,13 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
         }
     }
 
-    // ---------------------------------------------------------------
-    // Happy path: forgot → reset → login with new password
-    // ---------------------------------------------------------------
+    /**
+     * Triggers forgot-password and returns the plaintext token EmailService was asked
+     * to send — the only place the raw token is observable now that the DB stores a hash.
+     */
+    private String requestResetAndCaptureToken() throws Exception {
+        org.mockito.Mockito.clearInvocations(emailService);
 
-    @Test
-    void testForgotAndResetPassword_fullFlow() throws Exception {
-        // 1. Request password reset
         ForgotPasswordRequest forgotReq = ForgotPasswordRequest.builder()
                 .email(EMAIL)
                 .build();
@@ -64,13 +76,27 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(forgotReq)))
                 .andExpect(status().isOk());
 
-        // 2. Verify token was saved in DB
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendPasswordResetEmail(eq(EMAIL), tokenCaptor.capture());
+        return tokenCaptor.getValue();
+    }
+
+    // ---------------------------------------------------------------
+    // Happy path: forgot → reset → login with new password
+    // ---------------------------------------------------------------
+
+    @Test
+    void testForgotAndResetPassword_fullFlow() throws Exception {
+        // 1. Request password reset, capturing the plaintext token that would be emailed
+        String resetToken = requestResetAndCaptureToken();
+
+        // 2. Verify only a HASH of the token was saved in DB (P0-14a) — never the plaintext
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
         assertThat(user.getPasswordResetToken()).isNotNull();
+        assertThat(user.getPasswordResetToken()).isNotEqualTo(resetToken);
+        assertThat(user.getPasswordResetToken()).isEqualTo(CryptoUtils.hashApiKey(resetToken));
         assertThat(user.getPasswordResetTokenExpiresAt()).isNotNull();
         assertThat(user.getPasswordResetTokenExpiresAt()).isAfter(java.time.Instant.now());
-
-        String resetToken = user.getPasswordResetToken();
 
         // 3. Reset password using the token
         ResetPasswordRequest resetReq = ResetPasswordRequest.builder()
@@ -153,18 +179,10 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
     @Test
     void testResetPassword_expiredToken_returns400() throws Exception {
         // 1. Request reset
-        ForgotPasswordRequest forgotReq = ForgotPasswordRequest.builder()
-                .email(EMAIL)
-                .build();
-
-        mockMvc.perform(post("/api/v1/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(forgotReq)))
-                .andExpect(status().isOk());
+        String resetToken = requestResetAndCaptureToken();
 
         // 2. Manually expire the token
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
-        String resetToken = user.getPasswordResetToken();
         user.setPasswordResetTokenExpiresAt(java.time.Instant.now().minusSeconds(3600));
         userRepository.save(user);
 
@@ -187,17 +205,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
     @Test
     void testResetPassword_tokenSingleUse() throws Exception {
         // 1. Request reset
-        ForgotPasswordRequest forgotReq = ForgotPasswordRequest.builder()
-                .email(EMAIL)
-                .build();
-
-        mockMvc.perform(post("/api/v1/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(forgotReq)))
-                .andExpect(status().isOk());
-
-        User user = userRepository.findByEmail(EMAIL).orElseThrow();
-        String resetToken = user.getPasswordResetToken();
+        String resetToken = requestResetAndCaptureToken();
 
         // 2. First reset — succeeds
         ResetPasswordRequest resetReq = ResetPasswordRequest.builder()
@@ -229,17 +237,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
     @Test
     void testResetPassword_weakPassword_returns400() throws Exception {
         // 1. Request reset
-        ForgotPasswordRequest forgotReq = ForgotPasswordRequest.builder()
-                .email(EMAIL)
-                .build();
-
-        mockMvc.perform(post("/api/v1/auth/forgot-password")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(forgotReq)))
-                .andExpect(status().isOk());
-
-        User user = userRepository.findByEmail(EMAIL).orElseThrow();
-        String resetToken = user.getPasswordResetToken();
+        String resetToken = requestResetAndCaptureToken();
 
         // 2. Reset with weak password
         ResetPasswordRequest resetReq = ResetPasswordRequest.builder()

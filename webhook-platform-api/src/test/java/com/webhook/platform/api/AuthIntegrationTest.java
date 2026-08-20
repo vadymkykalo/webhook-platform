@@ -5,10 +5,13 @@ import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.service.EmailService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -35,6 +38,12 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    // Mocked so tests can capture the plaintext verification token EmailService would
+    // have emailed to the user (P0-14a: the DB column now holds only
+    // CryptoUtils.hashApiKey(token), so the raw token can't be read back from the row).
+    @MockBean
+    private EmailService emailService;
 
     @Test
     public void testRegisterLoginAndGetCurrentUser() throws Exception {
@@ -67,8 +76,16 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.organization.name").value("Test Company"))
                 .andExpect(jsonPath("$.role").value("OWNER"));
 
+        // The DB column now holds only a hash of the verification token (P0-14a); the
+        // plaintext is only ever handed to EmailService, which is mocked here so the
+        // test can capture it.
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationEmail(eq("test@example.com"), tokenCaptor.capture());
+        String verificationToken = tokenCaptor.getValue();
+
         User user = userRepository.findByEmail("test@example.com").orElseThrow();
-        String verificationToken = user.getVerificationToken();
+        org.assertj.core.api.Assertions.assertThat(user.getVerificationToken())
+                .isNotEqualTo(verificationToken);
 
         mockMvc.perform(post("/api/v1/auth/verify-email")
                         .param("token", verificationToken))
