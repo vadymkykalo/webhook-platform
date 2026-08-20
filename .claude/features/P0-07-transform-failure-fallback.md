@@ -1,6 +1,6 @@
 # P0-07 — Transform failure silently ships the untransformed payload
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — data exposure shaped
 - **Branch:** `feature/P0-07-transform-failure-fallback`
 - **Depends on:** nothing
