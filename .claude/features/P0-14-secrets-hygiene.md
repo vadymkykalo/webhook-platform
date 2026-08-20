@@ -1,6 +1,6 @@
 # P0-14 — Plaintext reset tokens, a logged temp password, unsafe shipped defaults
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0
 - **Branch:** `feature/P0-14-secrets-hygiene`
 - **Depends on:** nothing
