@@ -299,60 +299,60 @@ public class WebhookDeliveryService {
             return;
         }
 
+        // Everything from here on holds a concurrency permit. Every exit path — including
+        // exceptions thrown before the HTTP call itself (decryptSecret on a key that got
+        // rotated away, the mTLS client factory on a bad cert, ...) — must go through the
+        // finally below, or a single bad endpoint config burns a permit per attempt until
+        // the endpoint is throttled to zero for the full key TTL (P0-04).
+        String requestHeaders = null;
+        String body = null;
         try {
             UrlValidator.validateWebhookUrl(endpoint.getUrl(), allowPrivateIps, allowedHosts);
-        } catch (UrlValidator.InvalidUrlException e) {
-            log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
-            saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(),
-                    (int) (System.currentTimeMillis() - startTime));
-            markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
-            concurrencyControlService.release(endpoint.getId());
-            return;
-        }
 
-        // Increment attempt count NOW — only when we actually attempt the HTTP call
-        transactionTemplate.executeWithoutResult(tx -> deliveryRepository.incrementAttemptCount(delivery.getId()));
-        delivery.setAttemptCount(delivery.getAttemptCount() + 1);
+            // Increment attempt count NOW — only when we actually attempt the HTTP call
+            transactionTemplate.executeWithoutResult(tx -> deliveryRepository.incrementAttemptCount(delivery.getId()));
+            delivery.setAttemptCount(delivery.getAttemptCount() + 1);
 
-        String secret = decryptSecret(endpoint);
-        String originalPayload = event.getPayload();
-        String template = resolveTransformTemplate(delivery);
-        String body = payloadTransformService.transform(originalPayload, template);
-        long timestamp = System.currentTimeMillis();
+            String secret = decryptSecret(endpoint);
+            String originalPayload = event.getPayload();
+            String template = resolveTransformTemplate(delivery);
+            body = payloadTransformService.transform(originalPayload, template);
+            long timestamp = System.currentTimeMillis();
 
-        String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
+            String signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
 
-        String requestHeaders = buildRequestHeadersJson(signature, event.getId().toString(),
-                delivery.getId().toString(), String.valueOf(timestamp));
+            requestHeaders = buildRequestHeadersJson(signature, event.getId().toString(),
+                    delivery.getId().toString(), String.valueOf(timestamp));
 
-        Timer.Sample sample = Timer.start(meterRegistry);
+            Timer.Sample sample = Timer.start(meterRegistry);
 
-        String sequenceHeader = delivery.getSequenceNumber() != null
-                ? String.valueOf(delivery.getSequenceNumber())
-                : "0";
+            String sequenceHeader = delivery.getSequenceNumber() != null
+                    ? String.valueOf(delivery.getSequenceNumber())
+                    : "0";
 
-        WebClient client = Boolean.TRUE.equals(endpoint.getMtlsEnabled())
-                ? mtlsWebClientFactory.getWebClient(endpoint)
-                : defaultWebClient;
+            WebClient client = Boolean.TRUE.equals(endpoint.getMtlsEnabled())
+                    ? mtlsWebClientFactory.getWebClient(endpoint)
+                    : defaultWebClient;
 
-        String idempotencyKey = delivery.getIdempotencyKey() != null
-                ? delivery.getIdempotencyKey()
-                : event.getId().toString() + "-" + delivery.getEndpointId().toString();
+            String idempotencyKey = delivery.getIdempotencyKey() != null
+                    ? delivery.getIdempotencyKey()
+                    : event.getId().toString() + "-" + delivery.getEndpointId().toString();
 
-        var requestSpec = client.post()
-                .uri(endpoint.getUrl())
-                .contentType(MediaType.APPLICATION_JSON)
-                .header("X-Signature", signature)
-                .header("X-Event-Id", event.getId().toString())
-                .header("X-Delivery-Id", delivery.getId().toString())
-                .header("X-Timestamp", String.valueOf(timestamp))
-                .header("X-Sequence-Number", sequenceHeader)
-                .header("Idempotency-Key", idempotencyKey);
+            var requestSpec = client.post()
+                    .uri(endpoint.getUrl())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Signature", signature)
+                    .header("X-Event-Id", event.getId().toString())
+                    .header("X-Delivery-Id", delivery.getId().toString())
+                    .header("X-Timestamp", String.valueOf(timestamp))
+                    .header("X-Sequence-Number", sequenceHeader)
+                    .header("Idempotency-Key", idempotencyKey);
 
-        // Add custom headers if configured
-        addCustomHeaders(requestSpec, delivery.getCustomHeaders());
+            // Add custom headers if configured
+            addCustomHeaders(requestSpec, delivery.getCustomHeaders());
 
-        try {
+            String finalRequestHeaders = requestHeaders;
+            String finalBody = body;
             requestSpec.bodyValue(body)
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
@@ -363,13 +363,18 @@ public class WebhookDeliveryService {
                                 .map(responseBody -> {
                                     sample.stop(timerForStatus(status));
                                     handleResponse(delivery, status, responseBody, responseHeaders,
-                                            requestHeaders, body,
+                                            finalRequestHeaders, finalBody,
                                             (int) (System.currentTimeMillis() - startTime));
                                     return status;
                                 });
                     })
                     .timeout(Duration.ofSeconds(clampTimeout(delivery.getTimeoutSeconds())))
                     .block();
+        } catch (UrlValidator.InvalidUrlException e) {
+            log.error("SSRF protection: invalid URL for delivery {}: {}", delivery.getId(), e.getMessage());
+            saveAttempt(delivery, null, null, null, null, null, "SSRF_PROTECTION: " + e.getMessage(),
+                    (int) (System.currentTimeMillis() - startTime));
+            markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
         } catch (Exception e) {
             log.error("HTTP request failed for delivery {}: {}", delivery.getId(), e.getMessage());
             handleError(delivery, e, requestHeaders, body,

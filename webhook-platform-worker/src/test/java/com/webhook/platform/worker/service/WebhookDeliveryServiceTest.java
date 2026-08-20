@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.Delivery;
+import com.webhook.platform.worker.domain.entity.Endpoint;
+import com.webhook.platform.worker.domain.entity.Event;
 import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import com.webhook.platform.worker.domain.repository.EndpointRepository;
@@ -18,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.redisson.api.RedissonClient;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -33,6 +36,7 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -191,5 +195,94 @@ class WebhookDeliveryServiceTest {
         service.rescheduleForBackpressure(id, false);
 
         verify(deliveryRepository, never()).save(any());
+    }
+
+    /**
+     * P0-04: decryptSecret (bad key version / rotated-away key) used to throw outside the
+     * try/finally that releases the concurrency permit, so every failing attempt burned a
+     * permit that never came back. maxConcurrentPerEndpoint + 1 failing attempts against the
+     * REAL RedisConcurrencyControlService (a mocked RedissonClient forces its local-fallback
+     * path, so no Docker/Redis is needed) reproduces the leak on unfixed code: the semaphore
+     * exhausts and a subsequent acquire is rejected, i.e. the endpoint is permanently blocked.
+     * On fixed code every attempt releases its permit in the finally, so the endpoint never
+     * blocks and a later attempt (the "operator fixed the cert" case) can still acquire.
+     */
+    @Test
+    void attemptDelivery_decryptSecretThrows_releasesPermitEveryTime_soEndpointNeverBlocks() throws Exception {
+        int maxConcurrent = 5;
+        RedissonClient redissonClient = mock(RedissonClient.class);
+        when(redissonClient.getPermitExpirableSemaphore(anyString()))
+                .thenThrow(new RuntimeException("Redis unavailable in this test"));
+        RedisConcurrencyControlService realConcurrencyControl = new RedisConcurrencyControlService(
+                redissonClient, new SimpleMeterRegistry(), maxConcurrent, 90);
+
+        WebClient mockWebClient = WebClient.builder().build();
+        when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
+        when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
+        when(webClientBuilder.build()).thenReturn(mockWebClient);
+
+        WebhookDeliveryService localService = new WebhookDeliveryService(
+                deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
+                webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
+                true, List.of(),
+                rateLimiterService, realConcurrencyControl, projectRateLimiterService,
+                circuitBreakerService, new SimpleMeterRegistry(), new ObjectMapper(),
+                orderingBufferService, kafkaTemplate, payloadTransformService,
+                transactionTemplate, transformationCacheService,
+                ConnectionProvider.newConnection());
+
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        Endpoint endpoint = Endpoint.builder()
+                .id(endpointId)
+                .projectId(UUID.randomUUID())
+                .url("http://localhost:8080/hook")
+                .secretEncrypted("cipher")
+                .secretIv("iv")
+                .enabled(true)
+                .verificationStatus(Endpoint.VerificationStatus.VERIFIED)
+                .encryptionKeyVersion(1)
+                .build();
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+
+        Event event = Event.builder()
+                .id(eventId)
+                .projectId(endpoint.getProjectId())
+                .eventType("test.event")
+                .payload("{}")
+                .createdAt(Instant.now())
+                .build();
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+
+        when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
+        when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
+        when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt()))
+                .thenThrow(new RuntimeException("Failed to decrypt secret: key rotated away"));
+
+        for (int i = 0; i < maxConcurrent + 1; i++) {
+            UUID deliveryId = UUID.randomUUID();
+            Delivery delivery = Delivery.builder()
+                    .id(deliveryId)
+                    .eventId(eventId)
+                    .endpointId(endpointId)
+                    .status(Delivery.DeliveryStatus.PROCESSING)
+                    .attemptCount(0)
+                    .maxAttempts(10)
+                    .updatedAt(Instant.now())
+                    .build();
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId)
+                    .eventId(eventId)
+                    .endpointId(endpointId)
+                    .build();
+
+            localService.processDelivery(message, true);
+        }
+
+        assertTrue(realConcurrencyControl.tryAcquire(endpointId),
+                "a fixed decrypt (or any other pre-HTTP throw) must not leave the endpoint " +
+                        "permanently throttled to zero — every failing attempt has to release its permit");
     }
 }
