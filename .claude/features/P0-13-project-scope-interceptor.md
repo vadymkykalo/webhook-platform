@@ -1,6 +1,6 @@
 # P0-13 — API-key project scoping is enforced inconsistently (systemic)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — largest single security task; do it properly, not by hand
 - **Branch:** `feature/P0-13-project-scope-interceptor`
 - **Depends on:** P0-08 (fixes the worst instance; this generalises the fix)
