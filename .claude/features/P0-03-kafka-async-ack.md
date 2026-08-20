@@ -1,6 +1,6 @@
 # P0-03 — Kafka offsets committed ahead of unfinished work (at-most-once)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0
 - **Branch:** `feature/P0-03-kafka-async-ack`
 - **Depends on:** P0-02 (same consumer/executor code — sequence them)
