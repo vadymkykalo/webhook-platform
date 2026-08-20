@@ -84,6 +84,36 @@ If you need to deliver webhooks to internal services:
 WEBHOOK_ALLOWED_HOSTS: "internal-service.default.svc.cluster.local,10.0.1.50"
 ```
 
+### Reverse Proxy / Trusted Proxies
+
+If Hookflow's API sits behind a reverse proxy, load balancer, or ingress controller
+(anything that terminates the client connection and forwards to the API), you **must**
+tell it which peer to trust, or none of `X-Forwarded-For` / `X-Real-IP` is honoured:
+
+```yaml
+WEBHOOK_TRUSTED_PROXIES: "10.0.0.5,172.20.0.0/16"   # your proxy's address or pod/service CIDR
+```
+
+This is used for auth rate limiting (login/register/refresh/reset-password), audit
+logging, and incoming-webhook source IP checks. The default is **empty — trust
+nothing**, which is correct when the API is reached directly (no proxy in front, e.g.
+`make up`'s default docker-compose). When `X-Forwarded-For` carries multiple hops (a
+chain of proxies), the resolver walks from the right and returns the first hop that
+isn't itself in `WEBHOOK_TRUSTED_PROXIES` — never the naive left-most entry, which is
+attacker-controlled.
+
+Get this wrong in either direction:
+- **Leave it empty behind a real proxy** → every request is bucketed under the proxy's
+  one IP; legitimate users behind that proxy share a single rate-limit bucket and can
+  lock each other out, and audit logs record the proxy's address instead of the client.
+- **Set it too broadly (or trust a peer you don't control)** → an attacker who can reach
+  that peer, or spoof its address, can forge `X-Forwarded-For` and get a fresh IP per
+  request, defeating rate limiting entirely.
+
+`docker-compose.prod.yml` (traffic goes through the bundled UI-nginx proxy) sets this to
+`172.16.0.0/12` by default, matching Docker Compose's default bridge network range —
+narrow it to the proxy's actual address if you've pinned a custom subnet.
+
 ---
 
 ## 3. Pre-flight Checks
@@ -279,6 +309,7 @@ helm install hookflow ./hookflow -n hookflow -f values-mycompany.yaml
 |----------|---------|-------------|
 | `WEBHOOK_ALLOW_PRIVATE_IPS` | `false` (prod) | Allow delivery to private IPs |
 | `WEBHOOK_ALLOWED_HOSTS` | (empty) | Comma-separated internal hosts allowlist |
+| `WEBHOOK_TRUSTED_PROXIES` | (empty — trust nothing) | Comma-separated trusted reverse-proxy IPs/CIDRs; gates `X-Forwarded-For` (see §2) |
 | `DB_POOL_MAX_SIZE` | `20` (API), `30` (Worker) | HikariCP max connections |
 | `KAFKA_DELIVERY_CONCURRENCY` | `8` | Worker Kafka consumer threads |
 | `SWAGGER_ENABLED` | `false` (prod) | Enable Swagger UI |

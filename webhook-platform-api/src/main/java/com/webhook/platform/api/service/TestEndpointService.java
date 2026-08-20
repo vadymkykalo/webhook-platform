@@ -8,6 +8,7 @@ import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.dto.TestEndpointResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.TrustedProxyResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,7 @@ public class TestEndpointService {
 
     private final TestEndpointRepository testEndpointRepository;
     private final CapturedRequestRepository capturedRequestRepository;
+    private final TrustedProxyResolver trustedProxyResolver;
 
     @Value("${test-endpoint.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -214,11 +216,7 @@ public class TestEndpointService {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        return trustedProxyResolver.resolve(request);
     }
 
     private TestEndpointResponse mapToResponse(TestEndpoint endpoint) {

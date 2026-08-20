@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.AuditLog;
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.security.TrustedProxyResolver;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 public class AuditLogAspect {
 
     private final AuditLogRepository auditLogRepository;
+    private final TrustedProxyResolver trustedProxyResolver;
     private final ObjectMapper objectMapper;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "audit-log-writer");
@@ -40,8 +42,9 @@ public class AuditLogAspect {
         return t;
     });
 
-    public AuditLogAspect(AuditLogRepository auditLogRepository) {
+    public AuditLogAspect(AuditLogRepository auditLogRepository, TrustedProxyResolver trustedProxyResolver) {
         this.auditLogRepository = auditLogRepository;
+        this.trustedProxyResolver = trustedProxyResolver;
         this.objectMapper = new ObjectMapper()
                 .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
     }
@@ -208,11 +211,7 @@ public class AuditLogAspect {
                     (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs == null) return null;
             HttpServletRequest request = attrs.getRequest();
-            String xff = request.getHeader("X-Forwarded-For");
-            if (xff != null && !xff.isBlank()) {
-                return xff.split(",")[0].trim();
-            }
-            return request.getRemoteAddr();
+            return trustedProxyResolver.resolve(request);
         } catch (Exception e) {
             return null;
         }

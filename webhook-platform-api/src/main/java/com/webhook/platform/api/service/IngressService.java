@@ -16,7 +16,7 @@ import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
-import com.webhook.platform.api.service.ingress.ClientIpResolver;
+import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.ProviderEventIdExtractor;
@@ -61,7 +61,7 @@ public class IngressService {
     private final WebhookVerifierFactory verifierFactory;
     private final ReplayDetectionService replayDetectionService;
     private final RedisRateLimiterService rateLimiterService;
-    private final ClientIpResolver clientIpResolver;
+    private final TrustedProxyResolver clientIpResolver;
     private final TransactionTemplate transactionTemplate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final long maxPayloadSizeBytes;
@@ -77,7 +77,7 @@ public class IngressService {
             WebhookVerifierFactory verifierFactory,
             ReplayDetectionService replayDetectionService,
             RedisRateLimiterService rateLimiterService,
-            ClientIpResolver clientIpResolver,
+            TrustedProxyResolver clientIpResolver,
             PlatformTransactionManager transactionManager,
             EncryptionKeyRegistry encryptionKeyRegistry,
             @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes) {

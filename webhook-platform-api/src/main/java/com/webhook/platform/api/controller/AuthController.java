@@ -12,6 +12,7 @@ import com.webhook.platform.api.dto.ResetPasswordRequest;
 import com.webhook.platform.api.dto.UpdateProfileRequest;
 import com.webhook.platform.api.dto.UserResponse;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,14 +39,17 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthRateLimiterService authRateLimiterService;
+    private final TrustedProxyResolver trustedProxyResolver;
     private final boolean isProduction;
 
     public AuthController(
             AuthService authService,
             AuthRateLimiterService authRateLimiterService,
+            TrustedProxyResolver trustedProxyResolver,
             @Value("${app.env:development}") String appEnv) {
         this.authService = authService;
         this.authRateLimiterService = authRateLimiterService;
+        this.trustedProxyResolver = trustedProxyResolver;
         this.isProduction = "production".equalsIgnoreCase(appEnv);
     }
 
@@ -107,12 +111,14 @@ public class AuthController {
             @RequestBody(required = false) RefreshTokenRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), null)) {
+        String refreshToken = cookieRefreshToken != null ? cookieRefreshToken :
+                (request != null ? request.getRefreshToken() : null);
+        // No email bucket applies here (unlike login) — bucket by the presented token
+        // too, so guessing/retrying is bounded per-token as well as per-IP.
+        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), refreshToken)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
         try {
-            String refreshToken = cookieRefreshToken != null ? cookieRefreshToken : 
-                (request != null ? request.getRefreshToken() : null);
             if (refreshToken == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing");
             }
@@ -245,7 +251,9 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
             HttpServletRequest httpRequest) {
-        if (!authRateLimiterService.allowLogin(getClientIp(httpRequest), null)) {
+        // No email bucket applies here (unlike login) — bucket by the presented reset
+        // token too, so guessing/retrying is bounded per-token as well as per-IP.
+        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getToken())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "Too many requests. Try again later.");
         }
@@ -254,11 +262,7 @@ public class AuthController {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        return trustedProxyResolver.resolve(request);
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {

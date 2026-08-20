@@ -16,7 +16,7 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
-import com.webhook.platform.api.service.ingress.ClientIpResolver;
+import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
@@ -94,7 +94,7 @@ class IngressServiceTest {
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
         verifierFactory = new WebhookVerifierFactory();
-        ClientIpResolver clientIpResolver = new ClientIpResolver(
+        TrustedProxyResolver clientIpResolver = new TrustedProxyResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
@@ -487,11 +487,14 @@ class IngressServiceTest {
         });
         when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
         stubHttpRequest();
+        // Peer (127.0.0.1) is trusted; "203.0.113.50" is attacker-suppliable
+        // left-most padding, "70.41.3.18" is the right-most hop -- what the
+        // trusted proxy actually saw as its peer, and therefore the real client.
         when(httpRequest.getHeader("X-Forwarded-For")).thenReturn("203.0.113.50, 70.41.3.18");
 
         IncomingEvent event = service.receiveWebhook("validtoken", "{}", httpRequest);
 
-        assertThat(event.getClientIp()).isEqualTo("203.0.113.50");
+        assertThat(event.getClientIp()).isEqualTo("70.41.3.18");
     }
 
     @Test
