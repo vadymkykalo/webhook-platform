@@ -113,7 +113,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-03 | P0 | DONE | Kafka offsets committed ahead of unfinished work |
 | P0-04 | P0 | DONE | Redis permit leak throttles an endpoint to zero for 24h |
 | P0-05 | P0 | DONE | Successful delivery re-sent as a duplicate |
-| P0-06 | P0 | IN PROGRESS | Single scheduler thread stalls platform-wide dispatch |
+| P0-06 | P0 | DONE | Single scheduler thread stalls platform-wide dispatch |
 | P0-07 | P0 | TODO | Transform failure silently ships the untransformed payload |
 | P0-08 | P0 | TODO | TestEndpointController has no tenancy check at all |
 | P0-09 | P0 | TODO | Any user can rotate every tenant's encryption keys |
