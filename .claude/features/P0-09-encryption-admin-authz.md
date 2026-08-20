@@ -1,6 +1,6 @@
 # P0-09 — Any registered user can rotate every tenant's encryption keys
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P0 — platform-wide denial of service
 - **Branch:** `feature/P0-09-encryption-admin-authz`
 - **Depends on:** nothing
