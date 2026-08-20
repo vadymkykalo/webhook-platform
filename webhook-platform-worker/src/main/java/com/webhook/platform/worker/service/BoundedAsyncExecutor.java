@@ -131,10 +131,18 @@ public class BoundedAsyncExecutor {
                     task.run();
                     ack.acknowledge();
                 } catch (ShutdownRejectedException e) {
+                    // Callers (DeliveryConsumer) are expected to check shutdown state
+                    // themselves before submitting, on the Kafka consumer thread, where
+                    // a throw actually reaches the container's error handler. If one
+                    // still reaches here, this task was already queued/running when
+                    // shutdown began — treat it like any other task failure: log and
+                    // don't ack. Rethrowing would only escape onto this pool thread's
+                    // uncaught-exception handler, which no Kafka container ever sees.
                     log.warn("{}: shutdown rejected, not acking: id={}", name, id);
-                    throw e; // propagate to Kafka error handler → DLT
                 } catch (Exception e) {
-                    // Don't ack — Kafka will redeliver after rebalance
+                    // Don't ack. Whether this is actually redelivered depends on offset
+                    // commit ordering across concurrently-acking sibling tasks (see P0-03) —
+                    // it is not guaranteed by simply skipping the ack.
                     log.error("{}: async task failed, not acking (will be redelivered): id={}, error={}",
                             name, id, e.getMessage(), e);
                 } finally {

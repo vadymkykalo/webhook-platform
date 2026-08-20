@@ -104,7 +104,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | Task | Priority | Status | What it fixes |
 |------|----------|--------|---------------|
 | P0-01 | P0 | DONE | Retry claim leaves deliveries in an unrecoverable state |
-| P0-02 | P0 | TODO | Deliveries dropped on every rolling deploy |
+| P0-02 | P0 | DONE | Deliveries dropped on every rolling deploy |
 | P0-03 | P0 | TODO | Kafka offsets committed ahead of unfinished work |
 | P0-04 | P0 | TODO | Redis permit leak throttles an endpoint to zero for 24h |
 | P0-05 | P0 | TODO | Successful delivery re-sent as a duplicate |
