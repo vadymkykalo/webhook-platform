@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
@@ -274,6 +275,12 @@ class RetrySchedulerServiceTest {
                 // Since getRetryTopic is private, we test it indirectly through scheduleRetries
 
                 Instant now = Instant.now();
+                // attemptCount == 0: WebhookDeliveryService reschedules here (concurrency/rate
+                // limit backpressure) *before* the first HTTP attempt is ever made -- the
+                // attempt-count increment only happens once the call is actually about to go
+                // out. This delivery has never been attempted and must not be treated like one
+                // that has exhausted the whole retry ladder.
+                Delivery delivery0 = createDelivery(UUID.randomUUID(), 0, now.minusSeconds(10));
                 Delivery delivery1 = createDelivery(UUID.randomUUID(), 1, now.minusSeconds(10));
                 Delivery delivery2 = createDelivery(UUID.randomUUID(), 2, now.minusSeconds(10));
                 Delivery delivery6 = createDelivery(UUID.randomUUID(), 6, now.minusSeconds(10));
@@ -289,9 +296,12 @@ class RetrySchedulerServiceTest {
                                 anyInt(),
                                 anyInt(),
                                 anyInt()))
+                                .thenReturn(Collections.singletonList(delivery0.getId()))
                                 .thenReturn(Collections.singletonList(delivery1.getId()))
                                 .thenReturn(Collections.singletonList(delivery2.getId()))
                                 .thenReturn(Collections.singletonList(delivery6.getId()));
+                when(deliveryRepository.lockByIds(Collections.singletonList(delivery0.getId())))
+                                .thenReturn(Collections.singletonList(delivery0));
                 when(deliveryRepository.lockByIds(Collections.singletonList(delivery1.getId())))
                                 .thenReturn(Collections.singletonList(delivery1));
                 when(deliveryRepository.lockByIds(Collections.singletonList(delivery2.getId())))
@@ -303,15 +313,17 @@ class RetrySchedulerServiceTest {
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
                 retrySchedulerService.scheduleRetries(0);
+                retrySchedulerService.scheduleRetries(0);
 
                 // Assert
                 ArgumentCaptor<String> topicCaptor = ArgumentCaptor.forClass(String.class);
-                verify(kafkaTemplate, times(3)).send(topicCaptor.capture(), anyString(), any(DeliveryMessage.class));
+                verify(kafkaTemplate, times(4)).send(topicCaptor.capture(), anyString(), any(DeliveryMessage.class));
 
                 List<String> topics = topicCaptor.getAllValues();
-                assertTrue(topics.get(0).contains("1m") || topics.get(0).contains("retry"));
-                assertTrue(topics.get(1).contains("5m") || topics.get(1).contains("retry"));
-                assertTrue(topics.get(2).contains("24h") || topics.get(2).contains("retry"));
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_1M, topics.get(0), "attemptCount=0 (never attempted)");
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_1M, topics.get(1), "attemptCount=1");
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_5M, topics.get(2), "attemptCount=2");
+                assertEquals(KafkaTopics.DELIVERIES_RETRY_24H, topics.get(3), "attemptCount=6 (ladder exhausted)");
         }
 
         @Test
