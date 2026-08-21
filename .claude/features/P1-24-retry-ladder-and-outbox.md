@@ -1,6 +1,6 @@
 # P1-24 — Retry ladder vs 48h cap, outbox ordering, SENDING recovery
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-24-retry-ladder-and-outbox`
 - **Depends on:** P0-01 (adjacent code)
