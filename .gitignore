@@ -90,3 +90,8 @@ backups/
 deploy/helm/**/charts/
 deploy/helm/**/Chart.lock
 *.tgz
+
+# === Agent task-board scratch space ===
+# Working files for coordinating parallel coding-agent runs — not project
+# documentation, not meant to be published in the repo.
+.claude/features/
