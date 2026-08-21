@@ -5,11 +5,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -146,5 +149,52 @@ class RetryPolicyTest {
     void calculateNextRetry_attemptCountOne_alwaysUsesFirstTier() {
         // Regression guard for the index math: attemptCount is 1-indexed (index = attemptCount - 1).
         assertEquals(0, Math.min(1 - 1, RetryPolicy.parseRetryDelays(null).length - 1));
+    }
+
+    // --- worstCaseSpanSeconds / validateLadderFitsCap (P1-24a) --------------------------
+
+    @Test
+    void worstCaseSpanSeconds_defaultLadder_matchesKnownWorstCase() {
+        // 60,300,900,3600,21600,86400 over 7 attempts (last two clamp to 86400), each at the
+        // top of full jitter (1.5x): 90+450+1350+5400+32400+129600+129600 = 298890s (~83.03h).
+        long worstCase = RetryPolicy.worstCaseSpanSeconds(RetryPolicy.DEFAULT_RETRY_DELAYS, 7);
+        assertEquals(298_890L, worstCase);
+    }
+
+    @Test
+    void worstCaseSpanSeconds_singleAttempt_isJustThatTierAt150Percent() {
+        assertEquals(90L, RetryPolicy.worstCaseSpanSeconds(new long[] { 60 }, 1));
+    }
+
+    @Test
+    void worstCaseSpanSeconds_attemptsBeyondLadderLength_clampToLastTier() {
+        long[] delays = { 10, 20 };
+        // attempts 1,2,3: tiers 10,20,20 -> worst case 15+30+30 = 75
+        assertEquals(75L, RetryPolicy.worstCaseSpanSeconds(delays, 3));
+    }
+
+    @Test
+    void validateLadderFitsCap_ladderFitsInsideCap_doesNotThrow() {
+        // 298890s worst case fits comfortably inside a 96h (345600s) cap.
+        assertDoesNotThrow(() -> RetryPolicy.validateLadderFitsCap(
+                "60,300,900,3600,21600,86400", 7, Duration.ofHours(96).getSeconds()));
+    }
+
+    @Test
+    void validateLadderFitsCap_ladderExceedsCap_throwsIllegalStateException() {
+        // Regression test for P1-24a: the original defaults (ladder worst-case ~83h) against
+        // the original 48h hard-cap must be rejected at startup, not silently let the last
+        // retry tiers get DLQ'd before they ever fire.
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> RetryPolicy.validateLadderFitsCap(
+                        "60,300,900,3600,21600,86400", 7, Duration.ofHours(48).getSeconds()));
+        assertTrue(ex.getMessage().contains("hard-cap-hours"));
+    }
+
+    @Test
+    void validateLadderFitsCap_capExactlyEqualToWorstCase_doesNotThrow() {
+        long worstCase = RetryPolicy.worstCaseSpanSeconds(RetryPolicy.DEFAULT_RETRY_DELAYS, 7);
+        assertDoesNotThrow(() -> RetryPolicy.validateLadderFitsCap(
+                "60,300,900,3600,21600,86400", 7, worstCase));
     }
 }

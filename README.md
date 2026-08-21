@@ -94,7 +94,8 @@ CI publishes both as workflow artifacts (`jacoco-aggregate-report`, `vitest-cove
 ### Outgoing Delivery
 - **Transactional outbox → Kafka** — at-least-once, zero event loss
 - **FIFO ordering** per endpoint (Redis ordering buffer + sequence numbers)
-- **6-tier retry** — 1m, 5m, 15m, 1h, 6h, 24h
+- **6-tier retry** — 1m, 5m, 15m, 1h, 6h, 24h (up to 7 attempts, ~55h expected / ~83h worst-case
+  span with jitter, before the 96h hard-cap escalates an unresponded delivery to DLQ — see P1-24a)
 - **DLQ** with one-click reprocess · **Circuit breaker** per endpoint
 - **HMAC-SHA256** signatures · **mTLS** · **Endpoint verification** (challenge-response)
 

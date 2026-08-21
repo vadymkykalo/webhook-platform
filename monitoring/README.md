@@ -18,14 +18,15 @@ make monitoring-up
 ### Prometheus
 - **Scrapes:** API (`:8082/actuator/prometheus`), Worker (`:8081/actuator/prometheus`) — see
   "Metrics-scrape auth" below for why these are *not* 8080/the app's main port
-- **Alert rules:** 14 rules in `prometheus/alerts.yml` — retry backlog (4), DLQ (3),
-  retry governor (2), circuit breaker (2), API error rate (1), oldest-pending-age (2)
+- **Alert rules:** 15 rules in `prometheus/alerts.yml` — retry backlog (4), DLQ (3),
+  retry governor (2), circuit breaker (2), API error rate (1), oldest-pending-age (2),
+  outbox SENDING stuck (1, P1-24c)
 - **Retention:** 30 days
 - **Port:** 9090 (localhost only)
 
 ### Alertmanager
 
-Routes the 14 `alerts.yml` rules to a real receiver — Prometheus firing an alert
+Routes the 15 `alerts.yml` rules to a real receiver — Prometheus firing an alert
 with nowhere to send it is a red square on a dashboard nobody is watching during
 the incident, which was the state of this repo before P1-20.
 
@@ -42,7 +43,7 @@ the incident, which was the state of this repo before P1-20.
   its own faster-paging route (`group_wait: 10s`, `repeat_interval: 1h`),
   `warning` and `info` route separately with longer repeat intervals.
 - **Inhibition:** a firing `*Critical` alert suppresses the corresponding
-  `*High`/`*Growing`/`*Stale` warning for the same `component` — 14 rules firing
+  `*High`/`*Growing`/`*Stale` warning for the same `component` — 15 rules firing
   ungrouped at 3am is its own failure mode. See `alertmanager/render-config.sh`
   for the exact rules.
 - **Verified live** (P1-20): a synthetic `DeliveryPendingBacklogCritical` alert

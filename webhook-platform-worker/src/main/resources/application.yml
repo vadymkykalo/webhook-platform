@@ -112,6 +112,13 @@ retry:
     high-watermark: ${RETRY_SCHEDULER_HIGH_WATERMARK:5000}
     send-timeout-seconds: ${RETRY_SCHEDULER_SEND_TIMEOUT_SECONDS:30}
     reschedule-delay-seconds: ${RETRY_SCHEDULER_RESCHEDULE_DELAY_SECONDS:60}
+  ladder:
+    # P1-24a: mirrors the default Subscription/Delivery retry ladder created by the API
+    # (EventIngestService/SubscriptionService et al) — used only to validate at startup that
+    # the ladder's worst-case span fits inside delivery.escalation.hard-cap-hours below.
+    # Keep in sync if the API-side defaults ever change.
+    default-delays-seconds: ${RETRY_LADDER_DEFAULT_DELAYS_SECONDS:60,300,900,3600,21600,86400}
+    default-max-attempts: ${RETRY_LADDER_DEFAULT_MAX_ATTEMPTS:7}
 
 dlq:
   monitoring:
@@ -149,7 +156,11 @@ stuck-forward:
 
 delivery:
   escalation:
-    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:48}
+    # P1-24a: raised from 48h to 96h so the hard cap comfortably covers the retry ladder's
+    # worst-case span (~83h with full jitter across the default 7 attempts/6 tiers) — at 48h
+    # the last two retry tiers (the "6h" and "24h" README advertises) never got a chance to
+    # fire before escalation to DLQ. RetrySchedulerService validates this pair fits at startup.
+    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:96}
     batch-size: ${DELIVERY_ESCALATION_BATCH_SIZE:100}
     interval-ms: ${DELIVERY_ESCALATION_INTERVAL_MS:300000}
 

@@ -75,4 +75,43 @@ final class RetryPolicy {
         long jitter = (long) (delay * 0.25);
         return delay - jitter + ThreadLocalRandom.current().nextLong(2 * jitter + 1);
     }
+
+    /**
+     * Upper bound (worst case) on the total time a delivery can spend retrying before the
+     * ladder is exhausted: every tier hit at the top of {@link #calculateNextRetry}'s full-jitter
+     * range (1.5x base delay), summed across {@code maxAttempts} attempts with the same
+     * last-tier clamp {@code calculateNextRetry} uses for attempts beyond the ladder's length.
+     *
+     * <p>Used at startup (P1-24a) to check the retry ladder actually fits inside
+     * {@code delivery.escalation.hard-cap-hours} — StaleDeliveryEscalationService escalates
+     * any PENDING delivery older than that cap straight to DLQ regardless of attempt count, so
+     * if the ladder's worst case exceeds the cap, the last tiers can never fire.
+     */
+    static long worstCaseSpanSeconds(long[] delays, int maxAttempts) {
+        long total = 0;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            int index = Math.min(attempt - 1, delays.length - 1);
+            total += Math.round(delays[index] * 1.5);
+        }
+        return total;
+    }
+
+    /**
+     * Fails fast if the given retry ladder's worst-case span doesn't fit inside the given
+     * hard-cap (both in seconds). See {@link #worstCaseSpanSeconds}.
+     */
+    static void validateLadderFitsCap(String retryDelaysStr, int maxAttempts, long hardCapSeconds) {
+        long[] delays = parseRetryDelays(retryDelaysStr);
+        long worstCase = worstCaseSpanSeconds(delays, maxAttempts);
+        if (worstCase > hardCapSeconds) {
+            throw new IllegalStateException(String.format(
+                    "Retry ladder/escalation cap mismatch: the default retry ladder [%s] over %d attempts " +
+                    "has a worst-case span of %ds (%.1fh), which exceeds delivery.escalation.hard-cap-hours " +
+                    "of %ds (%.1fh). At that cap, later retry tiers would never fire before the delivery is " +
+                    "escalated to DLQ. Either shorten retry.ladder.default-delays-seconds / " +
+                    "retry.ladder.default-max-attempts, or raise delivery.escalation.hard-cap-hours, so the " +
+                    "two agree.",
+                    retryDelaysStr, maxAttempts, worstCase, worstCase / 3600.0, hardCapSeconds, hardCapSeconds / 3600.0));
+        }
+    }
 }

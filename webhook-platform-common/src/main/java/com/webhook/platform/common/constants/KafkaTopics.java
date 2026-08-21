@@ -2,6 +2,15 @@ package com.webhook.platform.common.constants;
 
 public final class KafkaTopics {
     public static final String DELIVERIES_DISPATCH = "deliveries.dispatch";
+
+    // P1-24d: these 6 names are labels, not delay mechanisms. Kafka does not delay delivery of
+    // a message to a consumer just because the topic name says "1h" — DeliveryConsumer listens
+    // to all six and processes whatever it receives immediately. The actual retry delay is
+    // enforced entirely by next_retry_at on the `deliveries` row: RetrySchedulerService only
+    // claims (findPendingRetryIds) deliveries whose next_retry_at has passed, and it picks
+    // *which* of these topics to publish to purely by attemptCount, as a routing/observability
+    // label (see RetrySchedulerService#getRetryTopic and RetryPolicy#calculateNextRetry). Do
+    // not "fix" the scheduler to add a matching delay here — that would double the wait.
     public static final String DELIVERIES_RETRY_1M = "deliveries.retry.1m";
     public static final String DELIVERIES_RETRY_5M = "deliveries.retry.5m";
     public static final String DELIVERIES_RETRY_15M = "deliveries.retry.15m";
