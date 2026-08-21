@@ -345,8 +345,12 @@ make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
 ### CLI Commands
 
 ```bash
-# Install CLI (auto-installs Java 17 if missing)
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+# Install CLI (verifies a published SHA256 checksum; add --with-java to let it
+# install Java 17 via sudo if you don't already have it — see -h for all flags)
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --with-java
+
+# Uninstall
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --uninstall
 
 # Or build from source (optional)
 # mvn clean package -pl webhook-platform-cli -am -DskipTests

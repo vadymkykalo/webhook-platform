@@ -30,6 +30,10 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           cp webhook-platform-cli/target/webhook-platform-cli-*.jar hookflow-cli.jar
+          # install.sh refuses to run a JAR that doesn't match this file (see
+          # verify_checksum() in webhook-platform-cli/install.sh) — table
+          # stakes for a curl-pipe installer.
+          sha256sum hookflow-cli.jar > SHA256SUMS
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create GitHub Release
@@ -51,7 +55,14 @@ jobs:
 
             ### Requirements
             - Java 17+ (auto-installed by the install script)
+
+            ### Verify
+
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
           files: |
             hookflow-cli.jar
+            SHA256SUMS
           draft: false
           prerelease: false

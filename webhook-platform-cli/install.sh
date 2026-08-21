@@ -4,15 +4,39 @@ set -euo pipefail
 # Hookflow CLI installer
 # Usage: curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
 #
+# Pass flags after `--` when piping into bash:
+#   curl -fsSL .../install.sh | bash -s -- --with-java
+#   curl -fsSL .../install.sh | bash -s -- --uninstall
+#
 # Environment variables:
 #   HOOKFLOW_VERSION       — version to install (default: latest release)
 #   HOOKFLOW_INSTALL_DIR   — where to put the hookflow wrapper (default: ~/.local/bin)
-#   HOOKFLOW_SKIP_JAVA     — set to 1 to skip auto-install of Java
+#   HOOKFLOW_SKIP_JAVA     — set to 1 to skip auto-install of Java entirely (you manage
+#                            your own JVM, e.g. via SDKMAN, and `java` may not be on PATH
+#                            yet in this non-interactive shell)
+#   HOOKFLOW_WITH_JAVA     — set to 1 to allow this script to install Java 17 via the OS
+#                            package manager (requires sudo). Equivalent to --with-java.
+#
+# Flags:
+#   --with-java   allow installing Java 17 via sudo + the OS package manager. Without
+#                 this flag (or HOOKFLOW_WITH_JAVA=1), if Java 17+ isn't already on PATH
+#                 the script tells you how to install it yourself rather than silently
+#                 invoking sudo.
+#   --uninstall   remove the hookflow wrapper and installed JAR, then exit.
+#   -h, --help    show this help and exit.
 
 VERSION="${HOOKFLOW_VERSION:-latest}"
 INSTALL_DIR="${HOOKFLOW_INSTALL_DIR:-$HOME/.local/bin}"
 JAR_DIR="$HOME/.local/lib/hookflow"
 REPO="vadymkykalo/webhook-platform"
+WITH_JAVA="${HOOKFLOW_WITH_JAVA:-0}"
+DO_UNINSTALL=0
+
+# Override points for CI/tests only — point the installer at a local fixture
+# server instead of real GitHub, so tests don't depend on (or mutate) actual
+# releases. Not meant to be set by end users; not documented above on purpose.
+GITHUB_BASE_URL="${HOOKFLOW_GITHUB_BASE_URL:-https://github.com}"
+GITHUB_API_BASE_URL="${HOOKFLOW_GITHUB_API_BASE_URL:-https://api.github.com}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -25,6 +49,57 @@ info()  { echo -e "${CYAN}▸${RESET} $1"; }
 ok()    { echo -e "${GREEN}✓${RESET} $1"; }
 warn()  { echo -e "${YELLOW}!${RESET} $1"; }
 fail()  { echo -e "${RED}✗${RESET} $1" >&2; exit 1; }
+
+print_help() {
+    cat <<'EOF'
+Hookflow CLI installer
+
+Usage:
+  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+  curl -fsSL .../install.sh | bash -s -- [--with-java] [--uninstall] [-h|--help]
+
+Flags:
+  --with-java   allow installing Java 17 via sudo + the OS package manager
+  --uninstall   remove the hookflow wrapper and installed JAR, then exit
+  -h, --help    show this help and exit
+
+Environment variables:
+  HOOKFLOW_VERSION       version to install (default: latest release)
+  HOOKFLOW_INSTALL_DIR   wrapper install location (default: ~/.local/bin)
+  HOOKFLOW_SKIP_JAVA     1 = skip Java auto-install entirely
+  HOOKFLOW_WITH_JAVA     1 = same as --with-java
+EOF
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --with-java) WITH_JAVA=1 ;;
+        --uninstall) DO_UNINSTALL=1 ;;
+        -h|--help) print_help; exit 0 ;;
+        *) fail "Unknown argument: $arg (see --help)" ;;
+    esac
+done
+
+# ── Uninstall ─────────────────────────────────────────────────
+uninstall() {
+    info "Uninstalling hookflow..."
+    if [ -e "$INSTALL_DIR/hookflow" ]; then
+        rm -f "$INSTALL_DIR/hookflow"
+        ok "Removed $INSTALL_DIR/hookflow"
+    else
+        warn "$INSTALL_DIR/hookflow not found — nothing to remove there"
+    fi
+
+    if [ -d "$JAR_DIR" ]; then
+        rm -rf "$JAR_DIR"
+        ok "Removed $JAR_DIR"
+    fi
+
+    echo ""
+    echo "Note: any PATH entry added to your shell profile was left in place"
+    echo "(harmless if hookflow is gone), and ~/.config/hookflow/config.json"
+    echo "was left in place — remove it manually if you want a clean slate."
+}
 
 # ── Detect OS & package manager ──────────────────────────────
 detect_os() {
@@ -53,22 +128,64 @@ detect_os() {
     ok "Detected $OS ($ARCH), package manager: ${PKG_MGR:-none}"
 }
 
+# ── Java version detection ───────────────────────────────────
+# Handles both the common quoted form (`... version "17.0.9" ...`) and
+# unquoted output some JVM builds emit, plus the old 1.x versioning scheme
+# (`1.8.0_x` means Java 8).
+detect_java_major_version() {
+    local raw ver major
+    raw=$(java -version 2>&1 | head -1)
+
+    ver=$(echo "$raw" | grep -oE '"[0-9]+([._][0-9]+)*"' | head -1 | tr -d '"')
+    if [ -z "$ver" ]; then
+        ver=$(echo "$raw" | grep -oE '[0-9]+([._][0-9]+)*' | head -1)
+    fi
+    if [ -z "$ver" ]; then
+        echo ""
+        return
+    fi
+
+    major=$(echo "$ver" | cut -d'.' -f1)
+    if [ "$major" = "1" ]; then
+        # old scheme: "1.8.0_x" -> Java 8
+        major=$(echo "$ver" | cut -d'.' -f2)
+    fi
+    echo "$major"
+}
+
 # ── Ensure Java 17+ ─────────────────────────────────────────
 ensure_java() {
     if command -v java &>/dev/null; then
-        JAVA_VER=$(java -version 2>&1 | head -1 | cut -d'"' -f2 | cut -d'.' -f1)
-        if [ "$JAVA_VER" -ge 17 ] 2>/dev/null; then
+        JAVA_VER="$(detect_java_major_version)"
+        if [ -n "$JAVA_VER" ] && [ "$JAVA_VER" -ge 17 ] 2>/dev/null; then
             ok "Java $JAVA_VER already installed"
             return
         fi
-        warn "Found Java $JAVA_VER, but 17+ is required"
+        warn "Found Java ${JAVA_VER:-(unrecognized version)}, but 17+ is required"
     fi
 
     if [ "${HOOKFLOW_SKIP_JAVA:-0}" = "1" ]; then
-        fail "Java 17+ is required. Set HOOKFLOW_SKIP_JAVA=0 to auto-install."
+        warn "HOOKFLOW_SKIP_JAVA=1 — skipping Java auto-install."
+        warn "Make sure a Java 17+ 'java' is on PATH before running hookflow."
+        return
     fi
 
-    info "Installing Java 17 (headless runtime)..."
+    if [ "$WITH_JAVA" != "1" ]; then
+        fail "Java 17+ was not found on PATH, and this script will not silently run sudo for you.
+    Install Java 17 yourself, e.g.:
+    Ubuntu/Debian:  sudo apt install openjdk-17-jre-headless
+    Fedora/RHEL:    sudo dnf install java-17-openjdk-headless
+    Arch:           sudo pacman -S jre17-openjdk-headless
+    macOS:          brew install openjdk@17
+
+    ...or re-run with --with-java (or HOOKFLOW_WITH_JAVA=1) to let this script
+    install it for you via sudo + your OS package manager.
+
+    If you manage Java yourself and it just isn't on PATH in this shell yet
+    (e.g. SDKMAN before a profile reload), set HOOKFLOW_SKIP_JAVA=1 instead."
+    fi
+
+    info "Installing Java 17 (headless runtime) — this will use sudo..."
 
     case "$PKG_MGR" in
         apt)
@@ -102,7 +219,7 @@ ensure_java() {
     if ! command -v java &>/dev/null; then
         fail "Java installation succeeded but 'java' not found in PATH. Restart your terminal and try again."
     fi
-    JAVA_VER=$(java -version 2>&1 | head -1 | cut -d'"' -f2 | cut -d'.' -f1)
+    JAVA_VER="$(detect_java_major_version)"
     ok "Java $JAVA_VER installed"
 }
 
@@ -110,7 +227,7 @@ ensure_java() {
 resolve_version() {
     if [ "$VERSION" = "latest" ]; then
         info "Resolving latest release..."
-        VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+        VERSION=$(curl -fsSL "$GITHUB_API_BASE_URL/repos/$REPO/releases/latest" 2>/dev/null \
             | grep '"tag_name"' | head -1 | cut -d'"' -f4) || true
         if [ -z "$VERSION" ]; then
             VERSION="2.2.1"
@@ -121,29 +238,79 @@ resolve_version() {
     ok "Version: $VERSION"
 }
 
+# ── Checksum verification ────────────────────────────────────
+# Every real release publishes SHA256SUMS alongside hookflow-cli.jar (see
+# .github/workflows/release-cli.yml). Refuse to install a JAR we can't
+# verify against it — this is a curl-pipe installer, integrity checking is
+# table stakes, not optional.
+verify_checksum() {
+    local tag="$1"
+    local sums_url="$GITHUB_BASE_URL/$REPO/releases/download/$tag/SHA256SUMS"
+    local sums_file
+    sums_file="$(mktemp)"
+
+    if ! curl -fsSL -o "$sums_file" "$sums_url" 2>/dev/null; then
+        rm -f "$sums_file"
+        fail "Could not download SHA256SUMS for $tag ($sums_url) — refusing to install an unverified JAR."
+    fi
+
+    local expected
+    expected=$(grep 'hookflow-cli\.jar' "$sums_file" | awk '{print $1}' | head -1)
+    rm -f "$sums_file"
+    if [ -z "$expected" ]; then
+        fail "SHA256SUMS for $tag does not list hookflow-cli.jar — refusing to install an unverified JAR."
+    fi
+
+    local actual
+    if command -v sha256sum &>/dev/null; then
+        actual=$(sha256sum "$JAR_FILE" | awk '{print $1}')
+    elif command -v shasum &>/dev/null; then
+        actual=$(shasum -a 256 "$JAR_FILE" | awk '{print $1}')
+    else
+        fail "Neither sha256sum nor shasum is available — cannot verify JAR integrity. Install one and re-run."
+    fi
+
+    if [ "$expected" != "$actual" ]; then
+        rm -f "$JAR_FILE"
+        fail "Checksum mismatch for hookflow-cli.jar — refusing to run it.
+    expected: $expected
+    actual:   $actual
+    The downloaded JAR does not match the published SHA256SUMS and has been
+    deleted. This could mean a corrupted download or a tampered release —
+    try again, and report it if it persists."
+    fi
+
+    ok "Checksum verified (sha256)"
+}
+
 # ── Download JAR ─────────────────────────────────────────────
 download_jar() {
     mkdir -p "$JAR_DIR"
     JAR_FILE="$JAR_DIR/hookflow-cli.jar"
 
     if echo "$VERSION" | grep -q "SNAPSHOT"; then
-        # SNAPSHOT — try local build first, then CI artifact
+        # SNAPSHOT — try a local build first (only meaningful when this script
+        # is run directly from a checked-out repo, e.g. `./install.sh`; under
+        # `curl | bash` there is no local checkout, so this always falls
+        # through to the nightly-artifact attempt below).
         for candidate in \
             "$(pwd)/webhook-platform-cli/target/webhook-platform-cli-${VERSION}.jar" \
-            "$(pwd)/target/webhook-platform-cli-${VERSION}.jar" \
-            "$(dirname "$0")/target/webhook-platform-cli-${VERSION}.jar"; do
+            "$(pwd)/target/webhook-platform-cli-${VERSION}.jar"; do
             if [ -f "$candidate" ]; then
                 cp "$candidate" "$JAR_FILE"
-                ok "Copied local build from $candidate"
+                ok "Copied local build from $candidate (unsigned local dev build — not checksum-verified)"
                 return
             fi
         done
 
         # Try CI artifact download
-        ARTIFACT_URL="https://github.com/$REPO/releases/download/nightly/webhook-platform-cli-${VERSION}.jar"
+        ARTIFACT_URL="$GITHUB_BASE_URL/$REPO/releases/download/nightly/webhook-platform-cli-${VERSION}.jar"
         info "Trying nightly build: $ARTIFACT_URL"
         if curl -fsSL -o "$JAR_FILE" "$ARTIFACT_URL" 2>/dev/null; then
             ok "Downloaded nightly build"
+            if ! verify_checksum "nightly" 2>/dev/null; then
+                warn "No SHA256SUMS published for the nightly build — proceeding without checksum verification."
+            fi
             return
         fi
 
@@ -153,12 +320,13 @@ download_jar() {
     mvn clean package -pl webhook-platform-cli -am -DskipTests
     ./webhook-platform-cli/install.sh"
     else
-        DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/hookflow-cli.jar"
+        DOWNLOAD_URL="$GITHUB_BASE_URL/$REPO/releases/download/$VERSION/hookflow-cli.jar"
         info "Downloading hookflow-cli $VERSION..."
         if ! curl -fsSL -o "$JAR_FILE" "$DOWNLOAD_URL"; then
             fail "Download failed. Check: https://github.com/$REPO/releases"
         fi
         ok "Downloaded to $JAR_FILE ($(du -h "$JAR_FILE" | cut -f1))"
+        verify_checksum "$VERSION"
     fi
 }
 
@@ -169,8 +337,20 @@ create_wrapper() {
 
     cat > "$WRAPPER" << 'WRAPPER_EOF'
 #!/usr/bin/env bash
+set -euo pipefail
 JAR_DIR="$HOME/.local/lib/hookflow"
-exec java -jar "$JAR_DIR/hookflow-cli.jar" "$@"
+JAR_FILE="$JAR_DIR/hookflow-cli.jar"
+
+if [ ! -f "$JAR_FILE" ]; then
+    echo "hookflow: $JAR_FILE not found. Re-run the installer:" >&2
+    echo "  curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash" >&2
+    exit 1
+fi
+
+# shellcheck disable=SC2086
+# JAVA_OPTS is intentionally unquoted so a caller can pass multiple options
+# (e.g. JAVA_OPTS="-Xmx512m -Dfoo=bar") without building an array here.
+exec java ${JAVA_OPTS:-} -jar "$JAR_FILE" "$@"
 WRAPPER_EOF
 
     chmod +x "$WRAPPER"
@@ -183,32 +363,47 @@ ensure_path() {
         return
     fi
 
-    # Try to add to shell profile automatically
-    SHELL_NAME="$(basename "$SHELL" 2>/dev/null || echo bash)"
+    SHELL_NAME="$(basename "${SHELL:-bash}" 2>/dev/null || echo bash)"
     case "$SHELL_NAME" in
         zsh)  PROFILE="$HOME/.zshrc" ;;
         fish) PROFILE="$HOME/.config/fish/config.fish" ;;
         *)    PROFILE="$HOME/.bashrc" ;;
     esac
 
-    if [ -f "$PROFILE" ]; then
-        if ! grep -q "HOOKFLOW_INSTALL_DIR\|\.local/bin" "$PROFILE" 2>/dev/null; then
-            echo "" >> "$PROFILE"
-            echo "# Hookflow CLI" >> "$PROFILE"
-            echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$PROFILE"
-            ok "Added $INSTALL_DIR to PATH in $PROFILE"
-            warn "Run: source $PROFILE  (or restart terminal)"
-            return
+    mkdir -p "$(dirname "$PROFILE")"
+    touch "$PROFILE"
+
+    if [ "$SHELL_NAME" = "fish" ]; then
+        if ! grep -q "fish_add_path.*$INSTALL_DIR" "$PROFILE" 2>/dev/null; then
+            {
+                echo ""
+                echo "# Hookflow CLI"
+                echo "fish_add_path $INSTALL_DIR"
+            } >> "$PROFILE"
+            ok "Added $INSTALL_DIR to PATH in $PROFILE (via fish_add_path)"
+            warn "Run: source $PROFILE  (or restart your shell)"
         fi
+        return
     fi
 
-    echo ""
-    echo -e "${BOLD}Add to your shell profile:${RESET}"
-    echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
+    if ! grep -qxF "export PATH=\"$INSTALL_DIR:\$PATH\"" "$PROFILE" 2>/dev/null; then
+        {
+            echo ""
+            echo "# Hookflow CLI"
+            echo "export PATH=\"$INSTALL_DIR:\$PATH\""
+        } >> "$PROFILE"
+        ok "Added $INSTALL_DIR to PATH in $PROFILE"
+        warn "Run: source $PROFILE  (or restart your shell)"
+    fi
 }
 
 # ── Main ─────────────────────────────────────────────────────
 main() {
+    if [ "$DO_UNINSTALL" = "1" ]; then
+        uninstall
+        exit 0
+    fi
+
     echo ""
     echo -e "${BOLD}${CYAN}  ╔═══════════════════════════════════╗${RESET}"
     echo -e "${BOLD}${CYAN}  ║   Hookflow CLI Installer          ║${RESET}"
@@ -223,16 +418,31 @@ main() {
     ensure_path
 
     echo ""
-    echo -e "${GREEN}${BOLD}  Installation complete!${RESET}"
+    # Only claim success once hookflow is genuinely runnable as a bare
+    # command on the CURRENT PATH. If ensure_path just appended to a shell
+    # profile, that doesn't take effect until the shell is reloaded — this
+    # process still won't see it, and users need to be told that plainly
+    # instead of an unconditional "Installation complete!".
+    if command -v hookflow &>/dev/null; then
+        echo -e "${GREEN}${BOLD}  Installation complete!${RESET}"
+        echo ""
+        echo "  Quick start:"
+        echo "    hookflow login              # Authenticate with your server"
+        echo "    hookflow listen 3000        # Start tunnel → localhost:3000"
+        echo "    hookflow tunnels status     # Check active tunnels"
+        echo "    hookflow config show        # View configuration"
+        echo ""
+        echo "  Config: ~/.config/hookflow/config.json"
+        echo "  Docs:   https://github.com/$REPO#cli-commands"
+    else
+        echo -e "${YELLOW}${BOLD}  hookflow is installed but not yet on your PATH.${RESET}"
+        echo ""
+        echo "  Start a new shell (or run the export below), then verify:"
+        echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
+        echo "    hookflow --version"
+    fi
     echo ""
-    echo "  Quick start:"
-    echo "    hookflow login              # Authenticate with your server"
-    echo "    hookflow listen 3000        # Start tunnel → localhost:3000"
-    echo "    hookflow tunnels status     # Check active tunnels"
-    echo "    hookflow config show        # View configuration"
-    echo ""
-    echo "  Config: ~/.config/hookflow/config.json"
-    echo "  Docs:   https://github.com/$REPO#cli-commands"
+    echo "  Uninstall: curl -fsSL https://raw.githubusercontent.com/$REPO/main/webhook-platform-cli/install.sh | bash -s -- --uninstall"
     echo ""
 }
 
