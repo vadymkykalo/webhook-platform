@@ -59,7 +59,7 @@ jobs:
           ref: ${{ needs.resolve-version.outputs.ref }}
 
       - name: Set up QEMU (multi-arch emulation)
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64
 
