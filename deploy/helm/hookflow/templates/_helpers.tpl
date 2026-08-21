@@ -75,7 +75,11 @@ Database port
 */}}
 {{- define "hookflow.database.port" -}}
 {{- if .Values.postgresql.enabled }}
-{{- default 5432 .Values.postgresql.primary.service.ports.postgresql }}
+{{/* P1-19: dig (not plain dot-chaining) because this chart no longer ships
+     a postgresql subchart - primary.service.ports.postgresql only has a
+     value if a caller supplies their own subchart-shaped override, and dig
+     tolerates the (now-default) case where those keys are absent entirely. */}}
+{{- dig "primary" "service" "ports" "postgresql" 5432 .Values.postgresql }}
 {{- else }}
 {{- default 5432 .Values.postgresql.external.port }}
 {{- end }}
@@ -108,7 +112,9 @@ Redis port
 */}}
 {{- define "hookflow.redis.port" -}}
 {{- if .Values.redis.enabled }}
-{{- default 6379 .Values.redis.master.service.ports.redis }}
+{{/* P1-19: dig, for the same reason as hookflow.database.port above - this
+     chart no longer ships a redis subchart. */}}
+{{- dig "master" "service" "ports" "redis" 6379 .Values.redis }}
 {{- else }}
 {{- default 6379 .Values.redis.external.port }}
 {{- end }}

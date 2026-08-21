@@ -76,18 +76,12 @@ backup:
   retainCount: 14             # Keep 2 weeks of backups
   storageSize: 50Gi
 
+# P1-19: no embedded Redis subchart any more (see Chart.yaml / values.yaml) -
+# production must point redis.external at a managed instance
+# (ElastiCache/Memorystore/etc.), e.g. via
+# `--set redis.external.host=redis.prod.local` at install time.
 redis:
-  enabled: true
-  master:
-    resources:
-      requests:
-        cpu: 250m
-        memory: 256Mi
-      limits:
-        cpu: 1000m
-        memory: 512Mi
-    persistence:
-      size: 5Gi
+  enabled: false
 
 # Monitoring — enable for kube-prometheus-stack
 monitoring:
