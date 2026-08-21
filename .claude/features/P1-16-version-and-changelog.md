@@ -1,6 +1,6 @@
 # P1-16 — Reconcile versions, backfill CHANGELOG, write UPGRADING.md
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-16-version-and-changelog`
 - **Depends on:** coordinate with P1-15 (release workflow)
