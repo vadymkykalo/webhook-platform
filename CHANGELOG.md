@@ -13,6 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Issue and PR templates
 - SECURITY.md policy
 
+### Changed
+- **Spring Boot upgraded 3.2.0 → 3.5.16** (the 3.2.x line went OSS-EOL in
+  2024; 3.5.16 was the final OSS release of the 3.5.x line before it too
+  went EOL 2026-06-30 - see `docs`/the P1-19 task record for why this stops
+  short of the current Spring Boot 4.x line). Along with it: jjwt 0.12.3 →
+  0.13.0, redisson-spring-boot-starter 3.24.3 → 3.52.0, ShedLock 5.10.0 →
+  5.16.0, springdoc-openapi 2.3.0 → 2.9.0, stripe-java 28.2.0 → 28.4.0,
+  maven-surefire-plugin 2.22.2 → 3.5.6 (required - the old version silently
+  discovered zero tests under Boot 3.5.16's newer JUnit Jupiter).
+- UI build image `node:18-alpine` (EOL April 2025) → `node:22-alpine`;
+  runtime image `nginx:1.25-alpine` → `nginx:1.30-alpine`. Vite 5 → 7,
+  Vitest 1 → 3.
+- Helm chart (`deploy/helm/hookflow`): removed the Bitnami
+  postgresql/redis/kafka subchart dependencies (Bitnami restricted its free
+  catalog in August 2025 and dropped Kafka from it entirely). The chart now
+  requires bring-your-own PostgreSQL/Kafka/Redis via each service's
+  `external.*` values - see the Helm README.
+
 ### Fixed
 - Integration tests with proper `@MockBean` for Redis services
 - `GlobalExceptionHandler` now properly handles `ResponseStatusException`

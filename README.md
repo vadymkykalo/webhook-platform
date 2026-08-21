@@ -8,7 +8,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-52%25_lines-yellow)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17](https://img.shields.io/badge/Java-17-orange)]()
-[![Spring Boot 3.2](https://img.shields.io/badge/Spring%20Boot-3.2-green)]()
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-green)]()
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Fhookflow-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
 
