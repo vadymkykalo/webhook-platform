@@ -14,6 +14,11 @@ import java.util.UUID;
 
 @Repository
 public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UUID> {
+    // P1-24b: the outer SELECT..IN(...) FOR UPDATE has its own ORDER BY created_at — without it,
+    // Postgres is free to return the id-filtered rows in arbitrary (plan) order even though the
+    // inner subquery computed the correct rn_proj/rn_key ranking, so the List<OutboxMessage>
+    // handed to OutboxPublisherService#publishBatchAsync could interleave up to maxPerKey
+    // messages for the same endpoint out of order.
     @Query(value = """
             SELECT * FROM outbox_messages WHERE id IN (
                 SELECT id FROM (
@@ -23,10 +28,11 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
                     FROM outbox_messages WHERE status = :status
                 ) sub WHERE rn_key <= :maxPerKey AND rn_proj <= :maxPerProject
                 ORDER BY rn_proj ASC, rn_key ASC LIMIT :limit
-            ) FOR UPDATE SKIP LOCKED
+            ) ORDER BY created_at ASC FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<OutboxMessage> findPendingBatchForUpdate(@Param("status") String status, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey, @Param("maxPerProject") int maxPerProject);
 
+    // Same fix as findPendingBatchForUpdate above — this feeds the same publishBatchAsync path.
     @Query(value = """
             SELECT * FROM outbox_messages WHERE id IN (
                 SELECT id FROM (
@@ -36,7 +42,7 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
                     FROM outbox_messages WHERE status = :status AND retry_count < :maxRetries
                 ) sub WHERE rn_key <= :maxPerKey AND rn_proj <= :maxPerProject
                 ORDER BY rn_proj ASC, rn_key ASC LIMIT :limit
-            ) FOR UPDATE SKIP LOCKED
+            ) ORDER BY created_at ASC FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
     List<OutboxMessage> findFailedMessagesForRetry(@Param("status") String status, @Param("maxRetries") int maxRetries, @Param("limit") int limit, @Param("maxPerKey") int maxPerKey, @Param("maxPerProject") int maxPerProject);
     

@@ -46,6 +46,20 @@ helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <versi
 # deliveries.dispatch, deliveries.retry.{1m,5m,15m,1h,6h,24h}, deliveries.dlq
 ```
 
+### Retry ladder vs. DLQ hard-cap (P1-24a)
+
+Outgoing deliveries retry through the 6 tiers above (1m, 5m, 15m, 1h, 6h, 24h) over up to 7
+attempts — an expected span of ~55h and a worst case of ~83h once full jitter (0.5x-1.5x per
+tier) is factored in. Independently, `StaleDeliveryEscalationService` force-escalates *any*
+`PENDING` delivery older than `DELIVERY_ESCALATION_HARD_CAP_HOURS` (default **96h**) straight to
+DLQ, regardless of how many attempts it has left — it's a safety net against unbounded backlog
+growth, not part of the retry ladder itself. The default hard-cap is set above the ladder's
+worst case on purpose, so a delivery genuinely gets to run through all 6 tiers before the safety
+net kicks in. If you ever change `RETRY_LADDER_DEFAULT_DELAYS_SECONDS`/
+`RETRY_LADDER_DEFAULT_MAX_ATTEMPTS` or `DELIVERY_ESCALATION_HARD_CAP_HOURS`, the worker fails to
+start if the ladder's worst case no longer fits inside the cap (`RetryPolicy.validateLadderFitsCap`,
+called from `RetrySchedulerService`) — so they cannot silently drift apart again.
+
 ## Common Issues
 
 ### High Kafka lag
