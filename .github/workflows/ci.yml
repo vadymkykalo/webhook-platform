@@ -60,14 +60,37 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
+      # P1-28: this and the integration job below are separate GitHub Actions
+      # jobs on separate runners with no shared filesystem, so each writes
+      # its own distinctly-named exec file (jacoco-unit.exec here,
+      # jacoco-it.exec in the integration job) rather than the plugin's
+      # default target/jacoco.exec - a naive setup where both jobs wrote the
+      # same filename and only one got published/read downstream would
+      # silently report only whichever run happened to be looked at, not the
+      # true merged coverage. The coverage-report job later downloads both
+      # sets of exec files into one checkout and runs jacoco:report-aggregate,
+      # whose default file pattern (**/jacoco*.exec) picks up both.
       - name: Run unit tests
-        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' --fail-at-end
-      
+        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' -Djacoco.destFile=target/jacoco-unit.exec --fail-at-end
+
       - name: Test Summary
         if: always()
         run: |
           echo "### Backend Unit Test Results" >> $GITHUB_STEP_SUMMARY
           echo "Unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+
+      # Uploaded even on failure (--fail-at-end above means a failing class
+      # doesn't stop the rest of the module's tests from running and
+      # recording coverage) so the aggregate job can still build the fullest
+      # picture available.
+      - name: Upload unit test coverage data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-unit-exec
+          path: webhook-platform-*/target/jacoco-unit.exec
+          retention-days: 7
+          if-no-files-found: warn
 
   backend-integration-test:
     name: Backend Integration Tests
@@ -86,17 +109,109 @@ jobs:
           cache: 'maven'
       
       - name: Run integration tests with Testcontainers
-        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false --fail-at-end
+        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false -Djacoco.destFile=target/jacoco-it.exec --fail-at-end
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
           DOCKER_API_VERSION: "1.44"
-      
+
       - name: Integration Test Summary
         if: always()
         run: |
           echo "### Backend Integration Test Results" >> $GITHUB_STEP_SUMMARY
           echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
+
+      # P1-28: see the matching comment in the unit-test job above - distinct
+      # filename, uploaded so coverage-report can merge this with the unit
+      # job's exec data into one real aggregate.
+      - name: Upload integration test coverage data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-integration-exec
+          path: webhook-platform-*/target/jacoco-it.exec
+          retention-days: 7
+          if-no-files-found: warn
+
+  # P1-28: the actual point of splitting exec-data upload above - neither
+  # backend-test nor backend-integration-test alone has the full picture
+  # (each only ran half the test classes), and they run on separate runners
+  # with no shared filesystem, so "coverage" can't just be read out of
+  # either job directly. This job collects both artifacts into one checkout,
+  # recompiles (tests skipped - only the just-downloaded exec data is used
+  # for coverage, not a fresh run) so class files exist for JaCoCo to map
+  # execution data onto, then runs `mvn verify` so both
+  # jacoco:report-aggregate (webhook-platform-coverage-report/pom.xml) and
+  # each real module's own jacoco:merge + jacoco:check (root pom.xml +
+  # common/api/worker/cli's own pom.xml) fire against the true merged
+  # unit+integration coverage.
+  #
+  # `if: ${{ !cancelled() }}` (not the default "needs both to succeed") so a
+  # real coverage number - even partial - is still visible on the PR when
+  # one suite has unrelated failures; --fail-at-end in both test jobs above
+  # means a failing class doesn't stop its module's other tests from running
+  # and recording coverage either.
+  coverage-report:
+    name: Aggregate Coverage Report
+    runs-on: ubuntu-latest
+    needs: [backend-test, backend-integration-test]
+    if: ${{ !cancelled() }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Download unit test coverage data
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-unit-exec
+        continue-on-error: true
+
+      - name: Download integration test coverage data
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-integration-exec
+        continue-on-error: true
+
+      # -DskipTests: tests are not re-run here - class files are needed only
+      # so JaCoCo can map the exec data just downloaded onto real bytecode
+      # and source. Needs `verify`, not `test`: report-aggregate (in
+      # webhook-platform-coverage-report/pom.xml) is bound to `test`, but the
+      # per-module jacoco-merge (root pom.xml) and jacoco:check executions
+      # (each of common/api/worker/cli's own pom.xml) are bound to `verify` -
+      # deliberately later than `test`, so CI's two split `mvn test`
+      # invocations elsewhere in this file (unit-only / integration-only
+      # filters) never trip a threshold check against partial data. This is
+      # the one place in the whole pipeline that reaches `verify`, so it's
+      # the only place those merge+check executions run for real.
+      - name: Compile modules, aggregate report, threshold check
+        run: mvn verify -B -pl webhook-platform-coverage-report -am -DskipTests
+
+      - name: Coverage Summary
+        if: always()
+        run: |
+          echo "### Coverage Report (unit + integration merged)" >> $GITHUB_STEP_SUMMARY
+          if [ -f target/site/jacoco-aggregate/index.html ]; then
+            echo "Aggregate report generated - see the jacoco-aggregate-report artifact." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::No aggregate report was produced - check the exec-data download steps above." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload aggregate coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-aggregate-report
+          path: target/site/jacoco-aggregate
+          retention-days: 30
+          if-no-files-found: warn
 
   # P1-20: proves backups are actually restorable, not just "a CronJob ran".
   # backup -> destroy the data -> restore -> assert it's back. An untested
@@ -216,15 +331,29 @@ jobs:
         working-directory: webhook-platform-ui
         run: npm ci
       
-      - name: Run tests
+      # P1-28: test:coverage (vitest run --coverage) subsumes test:ci - it
+      # still runs every test, plus instruments and enforces the thresholds
+      # in vite.config.ts. Using it here (rather than a separate coverage
+      # step) means the coverage gate is the same command a PR's CI actually
+      # ran, not a second, easier-to-drift-from invocation.
+      - name: Run tests with coverage
         working-directory: webhook-platform-ui
-        run: npm run test:ci
-      
+        run: npm run test:coverage
+
       - name: Test Summary
         if: always()
         run: |
           echo "### Frontend Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Vitest unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          echo "Vitest tests + coverage thresholds completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-coverage-report
+          path: webhook-platform-ui/coverage
+          retention-days: 30
+          if-no-files-found: warn
 
   frontend-build:
     name: Frontend Build
