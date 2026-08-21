@@ -191,6 +191,74 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
             </plugin>
+            <!--
+              P1-28: see the matching comment in webhook-platform-common's
+              pom.xml for the shared rationale (merged exec file, `verify`
+              phase choice). Two rules here, not one:
+
+              1. BUNDLE - project floor for this module. Baseline measured
+                 2026-08-21 (unit + integration merged): INSTRUCTION 33.1%
+                 (35542/107430) - by far the biggest module (602 classes),
+                 which is why its bundle percentage is so much lower than
+                 worker's even though plenty of individual classes are well
+                 covered.
+              2. CLASS - floor on OutboxPublisherService specifically
+                 (measured 56.5% 2026-08-21), the outbox-side half of the
+                 delivery path this task was asked to call out (the other
+                 half - WebhookDeliveryService, RetrySchedulerService,
+                 OrderingBufferService, DeliveryConsumer - lives in
+                 webhook-platform-worker and has its own CLASS rule there).
+                 50% leaves a margin under the measured value.
+
+                 SequenceGeneratorService (com.webhook.platform.api.service)
+                 is deliberately NOT included here despite also being part of
+                 the ordering/delivery path: measured at 6.8% today,
+                 essentially untested. Setting a floor near its actual value
+                 would just rubber-stamp the gap instead of flagging it - left
+                 for P1-23 (FIFO ordering fixes) to raise for real and add to
+                 this rule.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.30</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com.webhook.platform.api.service.OutboxPublisherService</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.50</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

@@ -182,6 +182,70 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
             </plugin>
+            <!--
+              P1-28: see the matching comment in webhook-platform-common's
+              pom.xml for the shared rationale (merged exec file, `verify`
+              phase choice). Two rules here, not one:
+
+              1. BUNDLE - project floor for this module. Baseline measured
+                 2026-08-21 (unit + integration merged): INSTRUCTION 73.0%
+                 (9332/12779).
+              2. CLASS - P1-28's actual point, not the BUNDLE number above:
+                 this module's overall percentage could stay high while the
+                 delivery path itself regresses, because it also contains a
+                 lot of easy-to-cover CRUD/config code. Pins a floor
+                 specifically to the classes P1-21/P1-22 added delivery-path
+                 tests for (WebhookDeliveryService 73.2%, RetrySchedulerService
+                 82.7%, OrderingBufferService 95.3%, DeliveryConsumer 95.8%
+                 - all measured 2026-08-21), so those cannot silently erode
+                 while the module-wide number keeps climbing elsewhere. 65%
+                 leaves a margin under the lowest of the four
+                 (WebhookDeliveryService).
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com.webhook.platform.worker.service.WebhookDeliveryService</include>
+                                        <include>com.webhook.platform.worker.service.RetrySchedulerService</include>
+                                        <include>com.webhook.platform.worker.service.OrderingBufferService</include>
+                                        <include>com.webhook.platform.worker.consumer.DeliveryConsumer</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

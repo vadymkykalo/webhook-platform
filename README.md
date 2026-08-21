@@ -5,6 +5,7 @@
 **Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
 
 [![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-52%25_lines-yellow)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17](https://img.shields.io/badge/Java-17-orange)]()
 [![Spring Boot 3.2](https://img.shields.io/badge/Spring%20Boot-3.2-green)]()
@@ -70,6 +71,21 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 make up                   # Start everything (builds all 3 images from source)
 make verify-link          # Get email verification link from logs
 ```
+
+**Coverage.** Backend (JaCoCo, unit + integration merged):
+
+```bash
+mvn clean test jacoco:report
+open target/site/jacoco-aggregate/index.html   # or target/site/jacoco-aggregate/jacoco.csv
+```
+
+Frontend (Vitest + v8):
+
+```bash
+cd webhook-platform-ui && npm run test:coverage
+```
+
+CI publishes both as workflow artifacts (`jacoco-aggregate-report`, `vitest-coverage-report`) on every run — see `.github/workflows/ci.yml`. The Coverage badge above is a static shields.io badge (no Codecov/similar integration wired up), so it only reflects reality if it's updated by hand alongside the numbers in `.claude/features/P1-28-coverage-tooling.md`'s Progress log.
 
 ---
 

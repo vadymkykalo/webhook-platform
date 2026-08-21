@@ -46,6 +46,61 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
             </plugin>
+            <!--
+              P1-28: threshold gate against this module's own merged
+              unit+integration coverage (target/jacoco-merged.exec, built by
+              the jacoco-merge execution in the root pom). Bound to `verify`
+              deliberately - see the root pom's jacoco-merge comment and
+              ci.yml's coverage-report job: CI's two split `mvn test`
+              invocations (unit-only / integration-only filters) never reach
+              `verify`, so this never fires against partial data there; it
+              only runs for real via the dedicated coverage-report job's
+              `mvn verify` and via a developer explicitly running
+              `mvn verify` locally.
+
+              Baseline measured 2026-08-21: INSTRUCTION 45.51% (2420/5317),
+              using ONLY this module's own jacoco-merged.exec (common's own
+              tests, unit + integration). NOTE this is lower than the 60.9%
+              this same class set shows in the cross-module aggregate report
+              (webhook-platform-coverage-report) - that number additionally
+              counts common's classes (e.g. simple enums) getting
+              incidentally exercised while api/worker/cli run THEIR OWN
+              tests, which a per-module check scoped to this module's own
+              exec data correctly does not see. Confirmed the hard way: this
+              rule was first set at 0.55 (matching the aggregate figure) and
+              failed immediately with "instructions covered ratio is 0.45" -
+              see this task's Progress log. Set a few points below the real
+              45.51%, not at it, per the same "don't repeat P1-17" reasoning
+              documented on every rule in this task.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.40</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

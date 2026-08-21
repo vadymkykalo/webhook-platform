@@ -17,6 +17,13 @@
         <module>webhook-platform-api</module>
         <module>webhook-platform-worker</module>
         <module>webhook-platform-cli</module>
+        <!--
+          Must come after the four real modules above: it depends on all of
+          them (compile scope) purely so JaCoCo's report-aggregate goal can
+          discover their target/classes + jacoco*.exec at reactor build time.
+          See webhook-platform-coverage-report/pom.xml for why it exists.
+        -->
+        <module>webhook-platform-coverage-report</module>
     </modules>
 
     <properties>
@@ -27,6 +34,23 @@
         <spring-boot.version>3.2.0</spring-boot.version>
         <lombok.version>1.18.30</lombok.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <jacoco.version>0.8.12</jacoco.version>
+        <!--
+          P1-28: single knob controlling where the JaCoCo agent writes exec
+          data AND where the per-module `report` goal reads it back from, so
+          the two stay in sync. CI overrides this on the command line
+          (-Djacoco.destFile=target/jacoco-unit.exec vs
+          target/jacoco-it.exec) because the unit and integration suites run
+          as two separate `mvn test` invocations in two separate GitHub
+          Actions jobs (see ci.yml) - distinct file names let both sets of
+          exec data survive side by side once collected into one checkout,
+          instead of one invocation silently clobbering the other's data (or,
+          worse, a report step only ever seeing whichever job happened to run
+          last). jacoco-maven-plugin's `destFile` parameter is already bound
+          to this exact property name by default; it's declared here mainly
+          to document it and to give `report`'s `dataFile` the same value.
+        -->
+        <jacoco.destFile>${project.build.directory}/jacoco.exec</jacoco.destFile>
     </properties>
 
     <dependencyManagement>
@@ -65,6 +89,96 @@
                 <configuration>
                     <parameters>true</parameters>
                 </configuration>
+            </plugin>
+            <!--
+              P1-28: declared here (not just pluginManagement) for the same
+              reason as maven-compiler-plugin above - so every child module
+              gets it without having to declare it itself. Two executions:
+
+              1. prepare-agent: attaches the JaCoCo javaagent to whatever
+                 forked JVM surefire uses for `mvn test`, appending
+                 (default `append=true`) to ${jacoco.destFile} rather than
+                 overwriting it. That default append behavior is what makes
+                 local verification work (`mvn clean test jacoco:report` runs
+                 unit + integration classes together in one `test` phase, one
+                 exec file) - it is NOT sufficient on its own for CI, where
+                 the unit and integration suites are two separate `mvn test`
+                 invocations on two separate runners with no shared
+                 filesystem; see the CI job wiring in ci.yml and the
+                 jacoco.destFile property comment above for how that gap is
+                 closed (distinct file names + a downstream aggregate job).
+              2. report: generates a per-module HTML/CSV/XML report right
+                 after that module's own tests, from ${jacoco.destFile}. This
+                 is NOT the cross-module number - see
+                 webhook-platform-coverage-report for the real aggregate.
+                 It's just a quick per-module sanity report, and is skipped
+                 (not failed) by JaCoCo when no exec data exists yet, which is
+                 why it's harmless on modules like the coverage-report
+                 aggregator itself that have no tests of their own.
+              3. merge: folds every jacoco*.exec sitting in THIS module's own
+                 target/ (jacoco.exec from a single local run, or
+                 jacoco-unit.exec + jacoco-it.exec once CI's two test jobs'
+                 artifacts have both been downloaded into it - see ci.yml)
+                 into one target/jacoco-merged.exec. This exists because
+                 jacoco:check (see the per-module `check` execution each of
+                 common/api/worker/cli declares in its own pom.xml) - unlike
+                 report-aggregate - only reads a single `dataFile` and has no
+                 built-in way to combine several; merge is what makes that
+                 single file the TRUE merged unit+integration coverage
+                 instead of just whichever suite happened to run.
+                 Deliberately does NOT include the exec file it itself
+                 produces (jacoco-merged.exec) in its own inputs, so re-running
+                 without a `clean` in between can't fold a merge into itself.
+                 Bound to `verify` (after `check`'s own phase note below for
+                 why), not `test`: see the check execution's comment in each
+                 module's pom.xml for why that phase choice matters.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <destFile>${jacoco.destFile}</destFile>
+                            <append>true</append>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${jacoco.destFile}</dataFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>jacoco-merge</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>merge</goal>
+                        </goals>
+                        <configuration>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                        <include>jacoco-unit.exec</include>
+                                        <include>jacoco-it.exec</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                            <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <pluginManagement>
