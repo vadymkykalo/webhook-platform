@@ -1,6 +1,6 @@
 # Hookflow Monitoring Stack
 
-**Prometheus + Alertmanager + Grafana** — fully pre-configured, decoupled from the main platform.
+**Prometheus + Alertmanager + Grafana + Loki/Promtail** — fully pre-configured, decoupled from the main platform.
 
 ## Quick Start
 
@@ -90,6 +90,46 @@ container's network namespace. That's not a monitoring nice-to-have, that's a
 worker pod that can never become `Ready` in a real cluster. Default is now
 `0.0.0.0`; the port still isn't published to the host anywhere.
 
+### Logs (P3-36b)
+
+No log aggregation existed before this: `docker-compose.prod.yml` sets `LOG_LEVEL`
+and logs go straight to stdout, with no collector and no rotation — a restarted or
+rescheduled container's history was simply gone. Meanwhile api/worker already had
+all the structured-logging groundwork in place and it was being thrown away:
+`JwtAuthenticationFilter`/`ApiKeyAuthenticationFilter` populate MDC with
+`organizationId`/`userId`/`projectId`, `CorrelationIdFilter` (api) and
+`DeliveryConsumer`/`IncomingForwardConsumer` (worker) populate `correlationId`,
+and both modules' `logback-spring.xml` already emit single-line JSON in production
+via `LogstashEncoder` — but each `logback-spring.xml` also had an
+`<includeMdcKeyName>` allow-list that silently dropped everything except
+`correlationId` (api) / a list that didn't even match what the worker code puts
+into MDC (worker) from the shipped JSON. Both were fixed as part of this change
+(see the two `logback-spring.xml` files) — the encoder now emits the whole MDC map.
+
+- **Loki**: single-node, filesystem-backed (`monitoring/loki/loki-config.yml`).
+  Retention via the compactor, `LOKI_RETENTION_PERIOD` (default `336h` / 14 days,
+  independent of the Postgres `DATA_RETENTION_*` days — see `.env.dist`).
+  Port 3100 (localhost only).
+- **Promtail**: discovers containers via the Docker daemon
+  (`docker_sd_configs`) and relabels on the `com.docker.compose.service` Docker
+  label rather than assuming fixed container names — this repo doesn't set
+  `container_name` for api/worker, and is routinely checked out into
+  differently-named directories (parallel-agent worktrees, forks, ...), which
+  changes Compose's default project name and therefore the generated container
+  names. Only ships `api`/`worker` logs (see the `keep` relabel rule in
+  `monitoring/promtail/promtail-config.yml` if you want to widen this).
+  Extracts `level` as a Loki label from the production JSON logs; per-request/
+  per-tenant identifiers (`correlationId`, `organizationId`, `deliveryId`, ...)
+  deliberately stay unindexed in the log line body — promoting them to Loki
+  labels would blow up index cardinality — and are queried with `| json` /
+  a substring filter instead (see the runbook below).
+- **Grafana**: a `Loki` datasource is auto-provisioned alongside `Prometheus`
+  (`monitoring/grafana/provisioning/datasources/datasource.yml`), and the new
+  **Hookflow — Logs** dashboard below gives a starting point for pivoting on
+  `correlationId`/`organizationId`.
+- **Runbook**: `docs/runbooks/trace-webhook-logs.md` — "given a delivery ID,
+  find every log line across api and worker."
+
 ### Grafana Dashboards
 
 | Dashboard | Description |
@@ -98,10 +138,11 @@ worker pod that can never become `Ready` in a real cluster. Default is now
 | **Hookflow — Worker & Circuit Breaker** | Circuit breaker trips/rejects/slow-trips, retry governor, async pool threads, queue depths |
 | **Hookflow — JVM & Micrometer** | Heap memory, GC pauses, threads, HTTP request rates & latency percentiles, HikariCP pool, CPU |
 | **Hookflow — Kafka** | Consumer lag by topic/partition, records consumed rate, fetch latency, producer queue time |
+| **Hookflow — Logs** | Logs panel + volume-by-level, with `correlation_id`/`organization_id` template variables for pivoting (P3-36b) |
 
 ### Auto-provisioned
-- Prometheus datasource (no manual setup needed)
-- All 4 dashboards loaded on first boot
+- Prometheus + Loki datasources (no manual setup needed)
+- All 5 dashboards loaded on first boot
 - Home dashboard: Hookflow Overview
 
 ## Configuration
@@ -117,6 +158,7 @@ All config is via environment variables (defaults in `docker-compose.yml`):
 | `ALERTMANAGER_SLACK_CHANNEL` | `#hookflow-alerts` | Slack channel |
 | `ALERTMANAGER_WEBHOOK_URL` | _(unset)_ | generic webhook receiver (PagerDuty/Opsgenie/custom) |
 | `ALERTMANAGER_EMAIL_TO` / `_FROM` / `_SMTP_HOST` / `_SMTP_PORT` | _(unset)_ / `alerts@hookflow.dev` / `localhost` / `1025` | email receiver |
+| `LOKI_RETENTION_PERIOD` | `336h` (14d) | how long Loki keeps ingested logs |
 
 To override, create a `.env` file in `monitoring/` or pass env vars:
 
@@ -157,11 +199,19 @@ curl -s http://localhost:9093/api/v2/alerts | jq .
 │  │   API    │   │  Worker   │   │  Prometheus   │  │Alertmanager││
 │  │ :8080    │   │ :8081    │◄──│    :9090      │─►│   :9093    ││
 │  │ mgmt:8082│◄──┤(mgmt port)│  └───────┬───────┘  └─────┬──────┘│
-│  └─────────┘   └──────────┘           │                │       │
-│                                 ┌───────▼───────┐   Slack/webhook│
-│                                 │   Grafana     │   /email       │
-│                                 │   :3001       │   (ALERTMANAGER_*)
-│                                 └───────────────┘                │
+│  └────┬────┘   └────┬─────┘           │                │       │
+│       │(stdout)      │(stdout)  ┌───────▼───────┐   Slack/webhook│
+│       ▼              ▼          │   Grafana     │   /email       │
+│  ┌──────────────────────┐       │   :3001       │   (ALERTMANAGER_*)
+│  │       Promtail        │──┐   └───────▲───────┘                │
+│  │ docker_sd_configs,    │  │           │                        │
+│  │ api+worker logs only  │  │  reads Loki + Prometheus            │
+│  └───────────────────────┘  │           │                        │
+│                              ▼           │                        │
+│                        ┌──────────┐      │                        │
+│                        │   Loki    │──────┘                        │
+│                        │  :3100    │                               │
+│                        └──────────┘                               │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

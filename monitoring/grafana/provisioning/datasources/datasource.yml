@@ -11,3 +11,13 @@ datasources:
     jsonData:
       timeInterval: 10s
       httpMethod: POST
+
+  # P3-36b — see monitoring/README.md "Logs" and docs/runbooks/trace-webhook-logs.md
+  - name: Loki
+    type: loki
+    uid: hookflow-loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000
