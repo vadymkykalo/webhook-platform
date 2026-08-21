@@ -21,7 +21,7 @@ Test classes are routed to a CI job by their **class-name suffix** — there are
 mvn test -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest'
 
 # integration tests (Testcontainers → needs Docker)
-mvn test -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false
+mvn test -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
 
 # single class / single method — always scope with -pl, the reactor is multi-module
 mvn test -pl webhook-platform-api -Dtest=TunnelServiceTest

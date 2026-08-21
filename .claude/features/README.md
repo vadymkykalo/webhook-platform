@@ -89,7 +89,7 @@ If you are running one agent at a time, just follow the numbers.
 mvn test -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest'
 
 # integration (needs Docker — Testcontainers)
-mvn test -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false
+mvn test -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
 
 # one class / one method, scoped to a module
 mvn test -pl webhook-platform-worker -Dtest=WebhookDeliveryServiceTest

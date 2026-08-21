@@ -122,7 +122,13 @@ jobs:
           cache: 'maven'
       
       - name: Run integration tests with Testcontainers
-        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false -Djacoco.destFile=target/jacoco-it.exec --fail-at-end
+        # P1-19: surefire 3.x split the old failIfNoTests flag in two - failIfNoTests
+        # still covers "this whole run found zero tests", but a -Dtest=pattern that
+        # matches zero classes in a given module (e.g. common/cli, which have no
+        # *RepositoryTest/*IntegrationTest/etc classes) now needs
+        # surefire.failIfNoSpecifiedTests=false too, or the reactor build fails there
+        # before ever reaching api/worker.
+        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.destFile=target/jacoco-it.exec --fail-at-end
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
           DOCKER_API_VERSION: "1.44"
@@ -308,7 +314,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webhook-platform-ui/package-lock.json
       
@@ -336,7 +342,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webhook-platform-ui/package-lock.json
       
@@ -380,7 +386,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webhook-platform-ui/package-lock.json
       
