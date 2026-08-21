@@ -134,7 +134,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P1-24 | P1 | TODO | Retry ladder vs 48h cap, outbox ordering, SENDING recovery |
 | P1-25 | P1 | DONE (25a/25b; 25c/25d follow-up) | Incoming-forward claim + IngressService transaction scope |
 | P1-26 | P1 | TODO | Thread/pool sizing, @Transactional bypass, lying metrics |
-| P1-27 | P1 | TODO | Rename SDK packages to hookflow (irreversible after publish) |
+| P1-27 | P1 | DONE | Rename SDK packages to hookflow (irreversible after publish) |
 | P1-28 | P1 | DONE | Coverage tooling (JaCoCo + vitest) |
 | P2-29 | P2 | DONE | UI never tells the user the backend is down |
 | P2-30 | P2 | DONE | Accessibility: zero aria-labels in the whole UI |

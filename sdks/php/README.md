@@ -1,6 +1,19 @@
-# webhook-platform/php
+# hookflow/php
 
 Official PHP SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
+
+> Renamed from `webhook-platform/php` on Packagist. The `Hookflow\` namespace
+> doesn't change. The old package had zero real usage (no installs) and was
+> abandoned rather than kept alive as a deprecation shim — point Composer at
+> `hookflow/php` going forward.
+
+**Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
+Incoming Sources, Incoming Events, and webhook signature verification —
+about 6 of the platform's 35 API controllers. It does not wrap
+Transformations, Rules, Workflows, Schemas, DLQ, Analytics, Usage, Alerts,
+Incidents, PII rules, Audit Log, Tunnels, API keys, Members, or Projects —
+use the [Generic Requests](#generic-requests) helpers for those until the
+SDK grows to cover them.
 
 ## Requirements
 
@@ -11,7 +24,7 @@ Official PHP SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform)
 ## Installation
 
 ```bash
-composer require webhook-platform/php
+composer require hookflow/php
 ```
 
 ## Quick Start
