@@ -5,6 +5,7 @@ import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
+import com.webhook.platform.api.service.SequenceReconciliationService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
 import com.webhook.platform.api.service.TokenBlacklistService;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,9 @@ public abstract class AbstractIntegrationTest {
 
     @MockBean
     protected SequenceGeneratorService sequenceGeneratorService;
+
+    @MockBean
+    protected SequenceReconciliationService sequenceReconciliationService;
 
     @MockBean
     protected RedisRateLimiterService redisRateLimiterService;
