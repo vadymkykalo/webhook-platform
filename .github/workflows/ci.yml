@@ -505,6 +505,13 @@ jobs:
       # pull ~500MB of real NVD data. That failure is intentionally NOT
       # swallowed by continue-on-error: a security gate that can't fetch fresh
       # vulnerability data should go red, not silently pass.
+      # ossindexAnalyzerEnabled=false: Sonatype's OSS Index component-report
+      # API started returning 401 Unauthorized for unauthenticated requests
+      # (it's a supplementary enrichment source, not the primary one - NVD,
+      # fetched above with an API key, is). Without an OSS Index account/token
+      # this analyzer can't run at all, and unlike the NVD fetch it isn't
+      # worth gating the build on: disable it rather than let an optional
+      # analyzer's auth requirement take down an otherwise-working scan.
       - name: Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
@@ -512,6 +519,7 @@ jobs:
           mvn org.owasp:dependency-check-maven:12.1.0:aggregate -B -DskipTests
           -DfailBuildOnCVSS=9
           -DknownExploitedEnabled=false
+          -DossindexAnalyzerEnabled=false
           -DnvdApiKey="${NVD_API_KEY}"
           -DdataDirectory="$HOME/.m2/repository/org/owasp/dependency-check-data"
           -DsuppressionFiles=.github/dependency-check-suppressions.xml
