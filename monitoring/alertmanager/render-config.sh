@@ -47,7 +47,7 @@ inhibit_rules:
   # These alertname pairs are different rules (each fixed to one severity —
   # see prometheus/alerts.yml), so a plain `equal: [alertname]` rule can never
   # match across them; each pair is listed explicitly by "family" instead. 14
-  # rules firing ungrouped at 3am is its own failure mode (P1-20).
+  # rules firing ungrouped at 3am is its own failure mode.
   #
   # DeliveryPendingBacklogCritical firing means the High/Growing warnings for
   # the same component are a known consequence, not new information.

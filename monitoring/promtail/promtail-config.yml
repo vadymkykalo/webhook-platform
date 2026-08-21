@@ -1,4 +1,4 @@
-# Hookflow Promtail config (P3-36b).
+# Hookflow Promtail config.
 #
 # Discovers containers via the Docker daemon (docker_sd_configs) rather than assuming
 # fixed container names — the main docker-compose.yml doesn't set container_name for

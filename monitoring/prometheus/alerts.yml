@@ -10,7 +10,7 @@
 #   - retry_governor_cooldown_remaining{scheduler=...}
 #   - webhook_dlq_depth{topic=deliveries.dlq}         (DlqMonitoringService; actionable
 #     backlog -- deliveries still in DeliveryStatus.DLQ, returns to 0 once retried/purged.
-#     P1-26: this used to be a Kafka latest-earliest offset count that never returned to 0;
+#     this used to be a Kafka latest-earliest offset count that never returned to 0;
 #     see webhook_dlq_topic_retained_total below for that raw, non-actionable signal)
 #   - webhook_dlq_topic_retained_total{topic=deliveries.dlq}  (informational only, do not alert)
 #   - webhook_delivery_attempts_total{result=success|failure|error}
@@ -112,7 +112,7 @@ groups:
           description: |
             {{ $value | printf "%.1f" }}% failure rate. SLO target: <5% DLQ rate.
 
-      # Actionable DLQ backlog (deliveries still in DeliveryStatus.DLQ; P1-26 -- this is
+      # Actionable DLQ backlog (deliveries still in DeliveryStatus.DLQ -- this is
       # DB-backed and genuinely returns to 0 once retried/purged via DlqService, unlike the
       # old Kafka-offset-based computation it replaced)
       - alert: DlqActionableBacklog
