@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnRisky="true"
+         failOnWarning="false">
+    <!--
+        Separate suite for tests/Contract: these hit a REAL API instance
+        (see tests/Contract/README.md), unlike the default phpunit.xml suite
+        (tests/), which stubs cURL's response entirely. Run with:
+          vendor/bin/phpunit -c phpunit.contract.xml
+    -->
+    <testsuites>
+        <testsuite name="contract">
+            <directory>tests/Contract</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

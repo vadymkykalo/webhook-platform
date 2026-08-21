@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "test:contract": "jest --config jest.contract.config.js",
     "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build"
   },
