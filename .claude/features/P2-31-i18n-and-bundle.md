@@ -1,6 +1,6 @@
 # P2-31 — Hardcoded strings and a 704KB bundle from eager locales
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P2
 - **Branch:** `feature/P2-31-i18n-and-bundle`
 - **Depends on:** nothing
