@@ -1,6 +1,6 @@
 # P2-30 — Accessibility: zero aria-labels in the entire UI
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P2
 - **Branch:** `feature/P2-30-accessibility`
 - **Depends on:** P2-29 ideally lands first (both touch the same pages)
