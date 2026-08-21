@@ -22,84 +22,68 @@ export const nodeTypes = {
 
 export interface NodeTemplate {
   type: string;
-  label: string;
+  /** i18n key under `workflows.nodeTypes.<type>` — resolve via t() at render time, never hardcode English here. */
   icon: string;
   color: string;
-  description: string;
   defaultData: Record<string, unknown>;
 }
 
+// Note: `defaultData` intentionally omits `label` — each node component falls
+// back to t(`workflows.nodeTypes.<type>.label`) when `data.label` is unset, so
+// a freshly dropped node renders in the active locale instead of baked-in English.
 export const nodeTemplates: NodeTemplate[] = [
   {
     type: 'webhookTrigger',
-    label: 'Webhook Trigger',
     icon: '⚡',
     color: '#f59e0b',
-    description: 'Trigger on incoming webhook event',
-    defaultData: { label: 'Webhook Trigger', eventTypePattern: '*' },
+    defaultData: { eventTypePattern: '*' },
   },
   {
     type: 'filter',
-    label: 'Filter',
     icon: '🔀',
     color: '#8b5cf6',
-    description: 'Filter events by conditions',
-    defaultData: { label: 'Filter', conditions: null },
+    defaultData: { conditions: null },
   },
   {
     type: 'transform',
-    label: 'Transform',
     icon: '🔄',
     color: '#06b6d4',
-    description: 'Transform JSON payload',
-    defaultData: { label: 'Transform', template: '{}' },
+    defaultData: { template: '{}' },
   },
   {
     type: 'http',
-    label: 'HTTP Request',
     icon: '🌐',
     color: '#10b981',
-    description: 'Make an outbound HTTP request',
-    defaultData: { label: 'HTTP Request', url: '', method: 'POST', headers: {}, body: null, timeout: 30 },
+    defaultData: { url: '', method: 'POST', headers: {}, body: null, timeout: 30 },
   },
   {
     type: 'slack',
-    label: 'Slack',
     icon: '💬',
     color: '#e11d48',
-    description: 'Send a Slack message',
-    defaultData: { label: 'Slack', webhookUrl: '', message: '', channel: '' },
+    defaultData: { webhookUrl: '', message: '', channel: '' },
   },
   {
     type: 'delivery',
-    label: 'Deliver to Endpoint',
     icon: '📦',
     color: '#3b82f6',
-    description: 'Deliver via platform endpoint',
-    defaultData: { label: 'Deliver to Endpoint', endpointId: '' },
+    defaultData: { endpointId: '' },
   },
   {
     type: 'branch',
-    label: 'Branch',
     icon: '🔀',
     color: '#f97316',
-    description: 'IF/ELSE conditional branching',
-    defaultData: { label: 'Branch', conditions: null },
+    defaultData: { conditions: null },
   },
   {
     type: 'delay',
-    label: 'Delay',
     icon: '⏱️',
     color: '#eab308',
-    description: 'Pause execution',
-    defaultData: { label: 'Delay', delaySeconds: 5 },
+    defaultData: { delaySeconds: 5 },
   },
   {
     type: 'createEvent',
-    label: 'Create Event',
     icon: '📤',
     color: '#7c3aed',
-    description: 'Emit event into platform pipeline',
-    defaultData: { label: 'Create Event', projectId: '', eventType: '', payloadTemplate: '' },
+    defaultData: { projectId: '', eventType: '', payloadTemplate: '' },
   },
 ];

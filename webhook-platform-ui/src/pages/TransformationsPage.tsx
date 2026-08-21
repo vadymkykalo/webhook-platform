@@ -352,28 +352,28 @@ export default function TransformationsPage() {
           <div className="bg-muted/40 border rounded-lg p-4 space-y-3">
             <p className="text-xs font-semibold flex items-center gap-1.5">
               <Info className="h-3.5 w-3.5 text-primary" />
-              How Transformations Work
+              {t('transformations.howItWorks.title')}
             </p>
             <div className="flex items-center gap-3 text-xs">
               <div className="flex-1 bg-background border rounded-md p-2.5 text-center">
-                <p className="font-semibold text-foreground">Incoming Event</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Original payload from your API</p>
+                <p className="font-semibold text-foreground">{t('transformations.howItWorks.incomingEvent')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.incomingEventDesc')}</p>
               </div>
               <ArrowRight className="h-4 w-4 text-primary shrink-0" />
               <div className="flex-1 bg-primary/10 border border-primary/20 rounded-md p-2.5 text-center">
-                <p className="font-semibold text-primary">Template</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Your transformation reshapes the data</p>
+                <p className="font-semibold text-primary">{t('transformations.howItWorks.templateStep')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.templateStepDesc')}</p>
               </div>
               <ArrowRight className="h-4 w-4 text-primary shrink-0" />
               <div className="flex-1 bg-background border rounded-md p-2.5 text-center">
-                <p className="font-semibold text-foreground">Delivered Payload</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">What your endpoint receives</p>
+                <p className="font-semibold text-foreground">{t('transformations.howItWorks.deliveredPayload')}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.deliveredPayloadDesc')}</p>
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Use <code className="bg-muted px-1 rounded">${'{'}$.field{'}'}</code> to reference fields from the original event.
-              Assign this transformation to a subscription to apply it automatically.
-            </p>
+            <p
+              className="text-[11px] text-muted-foreground [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded"
+              dangerouslySetInnerHTML={{ __html: t('transformations.howItWorks.hint') }}
+            />
           </div>
 
           <div className="space-y-4 py-2">
@@ -391,7 +391,7 @@ export default function TransformationsPage() {
                 {formTouched && !formName.trim() ? (
                   <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.nameRequired')}</p>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground">A short name to identify this transformation (e.g. "Slack Format", "Stripe Normalize")</p>
+                  <p className="text-[11px] text-muted-foreground">{t('transformations.nameHint')}</p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -402,7 +402,7 @@ export default function TransformationsPage() {
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder={t('transformations.descriptionPlaceholder')}
                 />
-                <p className="text-[11px] text-muted-foreground">Describe what this transformation does and when to use it</p>
+                <p className="text-[11px] text-muted-foreground">{t('transformations.descriptionHint')}</p>
               </div>
             </div>
 
@@ -447,29 +447,29 @@ export default function TransformationsPage() {
                   )}
                 </div>
                 <div className="text-[11px] text-muted-foreground space-y-1">
-                  <p className="font-medium">Available expressions:</p>
+                  <p className="font-medium">{t('transformations.expressionsAvailable')}</p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                     <code className="bg-muted px-1 rounded">${'{'}$.id{'}'}</code>
-                    <span>Event ID</span>
+                    <span>{t('transformations.expressionEventId')}</span>
                     <code className="bg-muted px-1 rounded">${'{'}$.type{'}'}</code>
-                    <span>Event type</span>
+                    <span>{t('transformations.expressionEventType')}</span>
                     <code className="bg-muted px-1 rounded">${'{'}$.data{'}'}</code>
-                    <span>Full payload object</span>
+                    <span>{t('transformations.expressionFullPayload')}</span>
                     <code className="bg-muted px-1 rounded">${'{'}$.data.field{'}'}</code>
-                    <span>Nested field</span>
+                    <span>{t('transformations.expressionNestedField')}</span>
                     <code className="bg-muted px-1 rounded">${'{'}$.createdAt{'}'}</code>
-                    <span>Timestamp</span>
+                    <span>{t('transformations.expressionTimestamp')}</span>
                   </div>
                 </div>
               </div>
 
               {/* Right: Live Preview */}
               <div className="space-y-1.5">
-                <Label className="text-xs">Live Preview</Label>
+                <Label className="text-xs">{t('transformations.livePreview')}</Label>
 
                 <div className="space-y-2">
                   <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Sample Input Event</p>
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{t('transformations.sampleInputEvent')}</p>
                     <pre className="bg-muted/50 border rounded-md p-2.5 text-[11px] font-mono overflow-x-auto max-h-[120px] text-muted-foreground">
                       {JSON.stringify(sampleInput, null, 2)}
                     </pre>
@@ -480,7 +480,7 @@ export default function TransformationsPage() {
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider font-semibold text-green-600 dark:text-green-400">Output (what endpoint receives)</p>
+                    <p className="text-[10px] uppercase tracking-wider font-semibold text-green-600 dark:text-green-400">{t('transformations.outputPreview')}</p>
                     {livePreview ? (
                       <pre className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md p-2.5 text-[11px] font-mono overflow-x-auto max-h-[160px] text-green-800 dark:text-green-300">
                         {livePreview}
@@ -488,11 +488,11 @@ export default function TransformationsPage() {
                     ) : templateHasContent && !templateIsJson ? (
                       <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
                         <XCircle className="h-4 w-4 shrink-0" />
-                        Fix the template JSON to see the preview
+                        {t('transformations.previewFixJson')}
                       </div>
                     ) : (
                       <div className="bg-muted/30 border border-dashed rounded-md p-6 text-xs text-muted-foreground text-center">
-                        Write a template to see the live output preview
+                        {t('transformations.previewEmpty')}
                       </div>
                     )}
                   </div>
@@ -508,8 +508,8 @@ export default function TransformationsPage() {
                   <Label htmlFor="tf-enabled" className="cursor-pointer">{t('common.enabled')}</Label>
                   <p className="text-[11px] text-muted-foreground">
                     {formEnabled
-                      ? 'This transformation can be assigned to subscriptions'
-                      : 'Disabled — won\'t be available for new subscriptions'}
+                      ? t('transformations.enabledHint')
+                      : t('transformations.disabledHint')}
                   </p>
                 </div>
               </div>
@@ -519,11 +519,11 @@ export default function TransformationsPage() {
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2.5">
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
               <div className="text-xs space-y-1">
-                <p className="font-medium text-blue-900 dark:text-blue-200">How to apply this transformation</p>
-                <p className="text-blue-700 dark:text-blue-300">
-                  After saving, go to <strong>Subscriptions</strong> → edit or create a subscription → under <strong>Advanced Settings</strong>,
-                  select this transformation from the dropdown. Every delivery for that subscription will use this template instead of the original payload.
-                </p>
+                <p className="font-medium text-blue-900 dark:text-blue-200">{t('transformations.howToApply.title')}</p>
+                <p
+                  className="text-blue-700 dark:text-blue-300"
+                  dangerouslySetInnerHTML={{ __html: t('transformations.howToApply.body') }}
+                />
               </div>
             </div>
           </div>

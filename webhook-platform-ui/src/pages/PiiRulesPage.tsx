@@ -25,11 +25,7 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 
-const MASK_STYLE_OPTIONS: { value: MaskStyle; label: string }[] = [
-  { value: 'PARTIAL', label: 'Partial' },
-  { value: 'FULL', label: 'Full' },
-  { value: 'HASH', label: 'Hash (SHA-256)' },
-];
+const MASK_STYLE_VALUES: MaskStyle[] = ['PARTIAL', 'FULL', 'HASH'];
 
 export default function PiiRulesPage() {
   const { t } = useTranslation();
@@ -230,8 +226,8 @@ export default function PiiRulesPage() {
                   value={newMaskStyle}
                   onChange={(e) => setNewMaskStyle(e.target.value as MaskStyle)}
                 >
-                  {MASK_STYLE_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                  {MASK_STYLE_VALUES.map(value => (
+                    <option key={value} value={value}>{t(`piiRules.maskStyles.${value}`)}</option>
                   ))}
                 </Select>
               </div>
@@ -293,13 +289,13 @@ export default function PiiRulesPage() {
                         onChange={(e) => handleChangeMaskStyle(rule, e.target.value as MaskStyle)}
                         className="h-8 text-xs w-28"
                       >
-                        {MASK_STYLE_OPTIONS.map(o => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
+                        {MASK_STYLE_VALUES.map(value => (
+                          <option key={value} value={value}>{t(`piiRules.maskStyles.${value}`)}</option>
                         ))}
                       </Select>
                     ) : (
                       <span className={`text-xs px-2 py-0.5 rounded ${getMaskStyleBadge(rule.maskStyle)}`}>
-                        {rule.maskStyle}
+                        {t(`piiRules.maskStyles.${rule.maskStyle}`)}
                       </span>
                     )}
                   </TableCell>

@@ -53,9 +53,9 @@ export default function EventDetailPage() {
 
   const deliveries: DeliveryResponse[] = (deliveriesData as PageResponse<DeliveryResponse>)?.content ?? [];
 
-  const handleCopy = (text: string, label: string) => {
+  const handleCopy = (text: string, copiedMessage: string) => {
     navigator.clipboard.writeText(text);
-    showSuccess(`${label} copied`);
+    showSuccess(copiedMessage);
   };
 
   const formatPayload = (payload: string | undefined) => {
@@ -74,7 +74,7 @@ export default function EventDetailPage() {
     try {
       const link = await debugLinksApi.create(projectId, eventId, { expiryHours: 24 });
       await navigator.clipboard.writeText(link.shareUrl);
-      showSuccess(t('eventDetail.debugLinkCreated', 'Debug link copied to clipboard'));
+      showSuccess(t('eventDetail.debugLinkCreated'));
       refetchLinks();
     } catch (err: any) {
       showApiError(err, 'eventDetail.debugLinkFailed');
@@ -88,30 +88,30 @@ export default function EventDetailPage() {
     for (const d of failedDeliveries) {
       try { await deliveriesApi.replay(d.id); } catch { /* continue */ }
     }
-    showSuccess(t('eventDetail.replayedFailed', { count: failedDeliveries.length, defaultValue: 'Replayed {{count}} failed deliveries' }));
+    showSuccess(t('eventDetail.replayedFailed', { count: failedDeliveries.length }));
   };
 
   // Find matching schema for event type
   const matchingSchema = eventTypes?.find((et: any) => et.name === event?.eventType);
 
   if (isLoading) return <PageSkeleton maxWidth="max-w-7xl" />;
-  if (!event) return <div className="p-8 text-center text-muted-foreground">{t('events.details.notFound', 'Event not found')}</div>;
+  if (!event) return <div className="p-8 text-center text-muted-foreground">{t('events.details.notFound')}</div>;
 
   const failedCount = deliveries.filter(d => d.status === 'FAILED' || d.status === 'DLQ').length;
 
   const tabs = [
-    { id: 'raw' as const, label: t('eventDetail.tabs.raw', 'Raw Payload'), icon: FileJson },
-    { id: 'sanitized' as const, label: t('eventDetail.tabs.sanitized', 'Sanitized'), icon: Shield },
-    { id: 'schema' as const, label: t('eventDetail.tabs.schema', 'Schema'), icon: FileType },
-    { id: 'deliveries' as const, label: t('eventDetail.tabs.deliveries', 'Deliveries'), icon: Send, badge: deliveries.length },
-    { id: 'debug' as const, label: t('eventDetail.tabs.debug', 'Debug Links'), icon: Share2, badge: debugLinks.length },
+    { id: 'raw' as const, label: t('eventDetail.tabs.raw'), icon: FileJson },
+    { id: 'sanitized' as const, label: t('eventDetail.tabs.sanitized'), icon: Shield },
+    { id: 'schema' as const, label: t('eventDetail.tabs.schema'), icon: FileType },
+    { id: 'deliveries' as const, label: t('eventDetail.tabs.deliveries'), icon: Send, badge: deliveries.length },
+    { id: 'debug' as const, label: t('eventDetail.tabs.debug'), icon: Share2, badge: debugLinks.length },
   ];
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/projects/${projectId}/events`)} title={t('eventDetail.back', 'Back to events')} aria-label={t('eventDetail.back', 'Back to events')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/projects/${projectId}/events`)} title={t('eventDetail.back')} aria-label={t('eventDetail.back')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -122,7 +122,7 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1.5 group">
               <code className="font-mono text-xs">{event.id}</code>
-              <Button variant="ghost" size="icon-sm" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => handleCopy(event.id, 'Event ID')} title={t('common.copyId')} aria-label={t('common.copyId')}>
+              <Button variant="ghost" size="icon-sm" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => handleCopy(event.id, t('eventDetail.eventIdCopied'))} title={t('common.copyId')} aria-label={t('common.copyId')}>
                 <Copy className="h-3 w-3" />
               </Button>
             </div>
@@ -133,16 +133,16 @@ export default function EventDetailPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" onClick={() => handleCopy(generateCurl(), 'cURL')}>
+          <Button variant="outline" size="sm" onClick={() => handleCopy(generateCurl(), t('eventDetail.curlCopied'))}>
             <Terminal className="h-4 w-4 mr-1" /> cURL
           </Button>
           <Button variant="outline" size="sm" onClick={handleShareDebug} disabled={sharingDebug}>
             {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Share2 className="h-4 w-4 mr-1" />}
-            {t('eventDetail.share', 'Share Debug')}
+            {t('eventDetail.share')}
           </Button>
           {failedCount > 0 && canManageEndpoints && (
             <Button size="sm" variant="destructive" onClick={handleReplayFailed}>
-              <Send className="h-4 w-4 mr-1" /> {t('eventDetail.replayFailed', { count: failedCount, defaultValue: 'Replay {{count}} Failed' })}
+              <Send className="h-4 w-4 mr-1" /> {t('eventDetail.replayFailed', { count: failedCount })}
             </Button>
           )}
         </div>
@@ -152,25 +152,25 @@ export default function EventDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.eventType', 'Event Type')}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.eventType')}</p>
             <Badge variant="secondary" className="font-mono text-xs">{event.eventType}</Badge>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.deliveriesCount', 'Deliveries')}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.deliveriesCount')}</p>
             <p className="text-xl font-bold">{event.deliveriesCreated ?? deliveries.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.payloadSize', 'Payload Size')}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.payloadSize')}</p>
             <p className="text-xl font-bold">{event.payload ? `${(event.payload.length / 1024).toFixed(1)} KB` : '—'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.project', 'Project')}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.project')}</p>
             <code className="text-xs font-mono">{event.projectId.substring(0, 8)}…</code>
           </CardContent>
         </Card>
@@ -203,14 +203,14 @@ export default function EventDetailPage() {
         {activeTab === 'raw' && (
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">{t('eventDetail.rawPayload', 'Raw Payload')}</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => handleCopy(formatPayload(event.payload), 'Payload')}>
-                <Copy className="h-3.5 w-3.5 mr-1" /> {t('common.copy', 'Copy')}
+              <CardTitle className="text-sm">{t('eventDetail.rawPayload')}</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => handleCopy(formatPayload(event.payload), t('eventDetail.payloadCopied'))}>
+                <Copy className="h-3.5 w-3.5 mr-1" /> {t('common.copy')}
               </Button>
             </CardHeader>
             <CardContent>
               <pre className="bg-muted/50 border rounded-lg p-4 text-xs font-mono overflow-x-auto max-h-[60vh] whitespace-pre-wrap break-words">
-                {formatPayload(event.payload) || <span className="italic text-muted-foreground">No payload</span>}
+                {formatPayload(event.payload) || <span className="italic text-muted-foreground">{t('events.details.noPayload')}</span>}
               </pre>
             </CardContent>
           </Card>
@@ -222,23 +222,23 @@ export default function EventDetailPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Shield className="h-4 w-4 text-green-600" />
-                {t('eventDetail.sanitized', 'PII-Sanitized Payload')}
+                {t('eventDetail.sanitized')}
               </CardTitle>
-              <p className="text-xs text-muted-foreground">{t('eventDetail.sanitizedHint', 'This is the payload with PII masking rules applied — safe to share externally')}</p>
+              <p className="text-xs text-muted-foreground">{t('eventDetail.sanitizedHint')}</p>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground py-8 text-center">
-                {t('eventDetail.sanitizedUseDebug', 'Use "Share Debug" to create a PII-safe shareable link. The sanitized view is generated server-side with your project\'s PII rules.')}
+                {t('eventDetail.sanitizedUseDebug')}
               </p>
               {debugLinks.length > 0 && (
                 <div className="border-t pt-4">
-                  <p className="text-xs text-muted-foreground mb-2">{t('eventDetail.existingLinks', 'Existing debug links (PII-safe):')}</p>
+                  <p className="text-xs text-muted-foreground mb-2">{t('eventDetail.existingLinks')}</p>
                   {debugLinks.map((link) => (
                     <div key={link.id} className="flex items-center gap-2 py-1">
                       <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-primary hover:underline truncate flex-1">
                         {link.shareUrl}
                       </a>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, 'Link')} title={t('eventDetail.copyLink', 'Copy link')} aria-label={t('eventDetail.copyLink', 'Copy link')}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, t('eventDetail.linkCopied'))} title={t('eventDetail.copyLink')} aria-label={t('eventDetail.copyLink')}>
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
@@ -253,7 +253,7 @@ export default function EventDetailPage() {
         {activeTab === 'schema' && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{t('eventDetail.schemaInfo', 'Schema Information')}</CardTitle>
+              <CardTitle className="text-sm">{t('eventDetail.schemaInfo')}</CardTitle>
             </CardHeader>
             <CardContent>
               {matchingSchema ? (
@@ -264,12 +264,12 @@ export default function EventDetailPage() {
                   </div>
                   {matchingSchema.description && <p className="text-sm text-muted-foreground">{matchingSchema.description}</p>}
                   <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/schemas`)}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> {t('eventDetail.viewSchemaRegistry', 'View in Schema Registry')}
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> {t('eventDetail.viewSchemaRegistry')}
                   </Button>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  {t('eventDetail.noSchema', 'No schema registered for event type "{{type}}"', { type: event.eventType })}
+                  {t('eventDetail.noSchema', { type: event.eventType })}
                 </p>
               )}
             </CardContent>
@@ -280,14 +280,14 @@ export default function EventDetailPage() {
         {activeTab === 'deliveries' && (
           <Card className="overflow-hidden">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{t('eventDetail.linkedDeliveries', 'Linked Deliveries')} ({deliveries.length})</CardTitle>
+              <CardTitle className="text-sm">{t('eventDetail.linkedDeliveries')} ({deliveries.length})</CardTitle>
             </CardHeader>
             {deliveriesLoading ? (
               <CardContent><Loader2 className="h-5 w-5 animate-spin mx-auto my-8" /></CardContent>
             ) : deliveries.length === 0 ? (
               <CardContent>
                 <div className="text-center py-8 space-y-2">
-                  <p className="text-sm font-medium">{t('eventDetail.noDeliveries', 'No deliveries for this event')}</p>
+                  <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto" dangerouslySetInnerHTML={{ __html: t('events.details.noDeliveriesNoSub', { eventType: event.eventType }) }} />
                   <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
                   <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
@@ -299,10 +299,10 @@ export default function EventDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">{t('deliveries.columns.status', 'Status')}</TableHead>
-                    <TableHead>{t('deliveries.columns.endpoint', 'Endpoint')}</TableHead>
-                    <TableHead className="w-[80px]">{t('deliveries.columns.attempts', 'Attempts')}</TableHead>
-                    <TableHead className="w-[140px]">{t('deliveries.columns.time', 'Time')}</TableHead>
+                    <TableHead className="w-[100px]">{t('deliveries.columns.status')}</TableHead>
+                    <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
+                    <TableHead className="w-[80px]">{t('deliveries.columns.attempts')}</TableHead>
+                    <TableHead className="w-[140px]">{t('deliveries.columns.time')}</TableHead>
                     <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -315,7 +315,7 @@ export default function EventDetailPage() {
                            d.status === 'DLQ' ? <AlertTriangle className="h-3 w-3" /> :
                            d.status === 'FAILED' ? <XCircle className="h-3 w-3" /> :
                            <Clock className="h-3 w-3" />}
-                          {d.status}
+                          {t(`deliveries.status.${d.status}`)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -325,7 +325,7 @@ export default function EventDetailPage() {
                       <TableCell className="text-xs text-muted-foreground">{formatRelativeTime(d.createdAt)}</TableCell>
                       <TableCell>
                         {(d.status === 'FAILED' || d.status === 'DLQ') && canManageEndpoints && (
-                          <Button variant="ghost" size="icon-sm" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed'))} title={t('events.details.replay')} aria-label={t('events.details.replay')}>
+                          <Button variant="ghost" size="icon-sm" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess(t('eventDetail.replayed')))} title={t('events.details.replay')} aria-label={t('events.details.replay')}>
                             <Send className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -342,15 +342,15 @@ export default function EventDetailPage() {
         {activeTab === 'debug' && (
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">{t('eventDetail.debugLinks', 'Debug Links')}</CardTitle>
+              <CardTitle className="text-sm">{t('eventDetail.tabs.debug')}</CardTitle>
               <Button size="sm" onClick={handleShareDebug} disabled={sharingDebug}>
                 {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Share2 className="h-4 w-4 mr-1" />}
-                {t('eventDetail.createLink', 'Create Link')}
+                {t('eventDetail.createLink')}
               </Button>
             </CardHeader>
             <CardContent>
               {debugLinks.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">{t('eventDetail.noDebugLinks', 'No debug links created yet')}</p>
+                <p className="text-sm text-muted-foreground text-center py-8">{t('eventDetail.noDebugLinks')}</p>
               ) : (
                 <div className="space-y-3">
                   {debugLinks.map((link) => (
@@ -360,11 +360,11 @@ export default function EventDetailPage() {
                           {link.shareUrl}
                         </a>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-                          <span>{t('eventDetail.views', '{{count}} views', { count: link.viewCount })}</span>
-                          <span>{t('eventDetail.expires', 'Expires {{time}}', { time: formatRelativeTime(link.expiresAt) })}</span>
+                          <span>{t('eventDetail.views', { count: link.viewCount })}</span>
+                          <span>{t('eventDetail.expires', { time: formatRelativeTime(link.expiresAt) })}</span>
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, 'Debug link')} title={t('eventDetail.copyLink', 'Copy link')} aria-label={t('eventDetail.copyLink', 'Copy link')}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, t('eventDetail.debugLinkCopied'))} title={t('eventDetail.copyLink')} aria-label={t('eventDetail.copyLink')}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                     </div>
