@@ -350,7 +350,7 @@ curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/w
 
 # Or build from source (optional)
 # mvn clean package -pl webhook-platform-cli -am -DskipTests
-# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-2.2.1.jar'
 
 # Auth
 hookflow login                             # Device code flow (browser approve)

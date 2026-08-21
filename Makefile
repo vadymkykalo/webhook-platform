@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -236,6 +236,14 @@ scale-api: ## Scale API instances (usage: make scale-api N=3)
 	@echo "$(GREEN)Scaling api to $(N) instances (each replica gets its own ephemeral host port)...$(NC)"
 	@API_PORT= $(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
 	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' shows each replica's assigned port$(NC)"
+
+##@ Release
+version-check: ## Fail if pom/Chart/UI/SDK versions disagree (same check CI runs)
+	@scripts/check-version-drift.sh
+
+version-set: ## Set the version everywhere (usage: make version-set VERSION=2.3.0)
+	@if [ -z "$(VERSION)" ]; then echo "$(RED)Usage: make version-set VERSION=2.3.0$(NC)"; exit 1; fi
+	@scripts/set-version.sh $(VERSION)
 
 ##@ Kafka
 KAFKA_PARTITIONS ?= 12
