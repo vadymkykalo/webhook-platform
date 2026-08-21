@@ -131,6 +131,9 @@ ordering:
   gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}
   delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
   buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
+  # P1-26: how often webhook_ordering_buffer_size is resynced against Redis (ms). A SCAN over
+  # seq:buffer:* keys, not a per-call increment -- see OrderingBufferService#resyncBufferSizeGauge.
+  buffer-gauge-resync-ms: ${ORDERING_BUFFER_GAUGE_RESYNC_MS:30000}
 
 circuit-breaker:
   failure-rate-threshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}

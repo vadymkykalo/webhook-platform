@@ -70,7 +70,7 @@ called from `RetrySchedulerService`) — so they cannot silently drift apart aga
 ### Database issues
 - Backup: `make backup-db` (docker-compose only)
 - Check connections: `docker exec webhook-postgres pg_isready`
-- Connection pool exhausted: increase `DB_POOL_MAX_SIZE`
+- Connection pool exhausted: increase `DB_POOL_MAX_SIZE` (API) or `WORKER_DB_POOL_MAX_SIZE` (Worker) — separately named as of P1-26, see `.env.dist`
 
 ### Failed deliveries spike
 - Check DLQ: Navigate to UI → Failed Messages
@@ -202,7 +202,7 @@ Production must have:
 Key settings:
 - `APP_ENV=production` - enables production mode
 - `LOG_LEVEL=WARN` - reduces log verbosity
-- `DB_POOL_MAX_SIZE=20` (API), `30` (Worker)
+- `DB_POOL_MAX_SIZE=20` (API); `WORKER_DB_POOL_MAX_SIZE=40` (Worker — a separately-named var as of P1-26, not a shared `DB_POOL_MAX_SIZE`)
 - `KAFKA_DELIVERY_CONCURRENCY=8` - parallel deliveries per worker
 
 ## Detailed Documentation

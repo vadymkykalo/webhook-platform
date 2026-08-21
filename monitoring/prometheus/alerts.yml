@@ -8,7 +8,11 @@
 #   - retry_governor_effective_batch{scheduler=...}
 #   - retry_governor_consecutive_failures{scheduler=...}
 #   - retry_governor_cooldown_remaining{scheduler=...}
-#   - webhook_dlq_depth{topic=deliveries.dlq}
+#   - webhook_dlq_depth{topic=deliveries.dlq}         (DlqMonitoringService; actionable
+#     backlog -- deliveries still in DeliveryStatus.DLQ, returns to 0 once retried/purged.
+#     P1-26: this used to be a Kafka latest-earliest offset count that never returned to 0;
+#     see webhook_dlq_topic_retained_total below for that raw, non-actionable signal)
+#   - webhook_dlq_topic_retained_total{topic=deliveries.dlq}  (informational only, do not alert)
 #   - webhook_delivery_attempts_total{result=success|failure|error}
 #   - circuit_breaker_state_transitions_total
 #   - circuit_breaker_rejected_total
@@ -108,8 +112,10 @@ groups:
           description: |
             {{ $value | printf "%.1f" }}% failure rate. SLO target: <5% DLQ rate.
 
-      # Kafka DLQ topic depth
-      - alert: KafkaDlqTopicNotEmpty
+      # Actionable DLQ backlog (deliveries still in DeliveryStatus.DLQ; P1-26 -- this is
+      # DB-backed and genuinely returns to 0 once retried/purged via DlqService, unlike the
+      # old Kafka-offset-based computation it replaced)
+      - alert: DlqActionableBacklog
         expr: |
           webhook_dlq_depth > 0
         for: 30m
@@ -117,9 +123,10 @@ groups:
           severity: info
           component: worker
         annotations:
-          summary: "Kafka DLQ topic contains {{ $value | printf \"%.0f\" }} messages"
+          summary: "{{ $value | printf \"%.0f\" }} deliveries in DLQ status"
           description: |
-            Messages in DLQ topic may need manual replay or investigation.
+            Deliveries awaiting manual retry or purge via DlqService. Not tied to Kafka
+            topic retention -- see webhook_dlq_topic_retained_total for raw topic volume.
 
   # ── Retry Governor ───────────────────────────────────────────
   - name: hookflow.retry_governor

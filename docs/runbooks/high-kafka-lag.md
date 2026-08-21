@@ -87,7 +87,8 @@ curl http://worker:8081/actuator/metrics/hikaricp.connections.pending
 ```
 
 **Fix:**
-- Increase `DB_POOL_MAX_SIZE` in worker env
+- Increase `WORKER_DB_POOL_MAX_SIZE` in `.env` (P1-26: this is the worker-specific var; the
+  plain `DB_POOL_MAX_SIZE` only affects the API)
 - Check for long-running transactions: `SELECT * FROM pg_stat_activity WHERE state = 'active' ORDER BY query_start;`
 - Check for lock contention: `SELECT * FROM pg_locks WHERE NOT granted;`
 
@@ -125,4 +126,4 @@ kafka-topics.sh --bootstrap-server $KAFKA_BOOTSTRAP --describe --under-replicate
 - Set HPA `targetCPUUtilizationPercentage: 60` for workers (aggressive scaling)
 - Monitor `retry_governor_pending_count` for early warning
 - Set up alerts on consumer lag per topic
-- Ensure worker `DB_POOL_MAX_SIZE` >= `KAFKA_DELIVERY_CONCURRENCY` × 2
+- Ensure worker `WORKER_DB_POOL_MAX_SIZE` >= `KAFKA_DELIVERY_CONCURRENCY` × 2
