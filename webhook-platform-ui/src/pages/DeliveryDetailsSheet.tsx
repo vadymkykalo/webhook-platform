@@ -187,7 +187,7 @@ export default function DeliveryDetailsSheet({
     return (
       <Badge variant={config.variant} className="gap-1">
         <Icon className="h-3 w-3" />
-        {status}
+        {t(`deliveries.status.${status}`)}
       </Badge>
     );
   };

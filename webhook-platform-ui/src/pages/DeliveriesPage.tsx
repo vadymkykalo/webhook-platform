@@ -33,20 +33,24 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'SUCCESS', label: 'Success' },
-  { value: 'FAILED', label: 'Failed' },
-  { value: 'DLQ', label: 'DLQ' },
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'PROCESSING', label: 'Processing' },
-];
+const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
+const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
 
-const DATE_RANGE_OPTIONS = [
-  { value: '24h', label: 'Last 24 hours' },
-  { value: '7d', label: 'Last 7 days' },
-  { value: '30d', label: 'Last 30 days' },
-];
+function statusOptions(t: (key: string) => string) {
+  return STATUS_VALUES.map((value) => ({
+    value,
+    label: value === '' ? t('deliveries.filters.allStatuses') : t(`deliveries.status.${value}`),
+  }));
+}
+
+function dateRangeOptions(t: (key: string) => string) {
+  const labelKeys: Record<(typeof DATE_RANGE_VALUES)[number], string> = {
+    '24h': 'deliveries.filters.last24h',
+    '7d': 'deliveries.filters.last7d',
+    '30d': 'deliveries.filters.last30d',
+  };
+  return DATE_RANGE_VALUES.map((value) => ({ value, label: t(labelKeys[value]) }));
+}
 
 /** Trailing window bound to a coarse (minute) grain so the upper bound keeps
  * advancing as time passes without changing — and re-fetching — on every render. */
@@ -141,7 +145,7 @@ export default function DeliveriesPage() {
     return (
       <Badge variant={config.variant} className="gap-1">
         <Icon className="h-3 w-3" />
-        {status}
+        {t(`deliveries.status.${status}`)}
       </Badge>
     );
   };
@@ -231,7 +235,7 @@ export default function DeliveriesPage() {
             <div className="space-y-1.5">
               <Label htmlFor="status" className="text-xs">{t('deliveries.filters.status')}</Label>
               <Select id="status" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
-                {STATUS_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+                {statusOptions(t).map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -244,7 +248,7 @@ export default function DeliveriesPage() {
             <div className="space-y-1.5">
               <Label htmlFor="dateRange" className="text-xs">{t('deliveries.filters.dateRange')}</Label>
               <Select id="dateRange" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-                {DATE_RANGE_OPTIONS.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+                {dateRangeOptions(t).map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -258,7 +262,7 @@ export default function DeliveriesPage() {
                 <VerificationGate>
                 <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline" size="sm">
                   {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                  {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: statusFilter })}
+                  {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: t(`deliveries.status.${statusFilter}`) })}
                 </Button>
                 </VerificationGate>
               </PermissionGate>
@@ -293,7 +297,7 @@ export default function DeliveriesPage() {
             action={
               <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
                 <Radio className="h-3.5 w-3.5 mr-1.5" />
-                {t('deliveries.goToEvents', 'View Events')}
+                {t('deliveries.goToEvents')}
               </Button>
             }
             docsLink="/docs#deliveries-api"
@@ -395,9 +399,9 @@ export default function DeliveriesPage() {
       <AlertDialog open={showBulkReplayDialog} onOpenChange={setShowBulkReplayDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('deliveries.bulkReplayDialog.title')}</AlertDialogTitle>
+            <AlertDialogTitle>{t('deliveries.bulkReplayDialog.title', { status: t(`deliveries.status.${statusFilter}`) })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('deliveries.bulkReplayDialog.description', { status: statusFilter, count: totalElements })}
+              {t('deliveries.bulkReplayDialog.description', { status: t(`deliveries.status.${statusFilter}`), count: totalElements })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg mx-1">
