@@ -147,33 +147,14 @@ public class DataRetentionIntegrationTest {
         assertEquals(15, delivery1Attempts.get(9).getAttemptNumber());
     }
 
-    @Test
-    void testAgeBasedCleanup() {
-        UUID deliveryId = createDelivery();
-
-        Instant old = Instant.now().minus(91, ChronoUnit.DAYS);
-        Instant recent = Instant.now().minus(30, ChronoUnit.DAYS);
-
-        createAttemptWithTimestamp(deliveryId, 1, old);
-        createAttemptWithTimestamp(deliveryId, 2, old);
-        createAttemptWithTimestamp(deliveryId, 3, recent);
-        createAttemptWithTimestamp(deliveryId, 4, recent);
-
-        long beforeCount = deliveryAttemptRepository.count();
-        assertEquals(4, beforeCount);
-
-        transactionTemplate.execute(status -> {
-            dataRetentionService.cleanupOldDeliveryAttempts();
-            return null;
-        });
-
-        List<DeliveryAttempt> remaining = deliveryAttemptRepository
-                .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
-
-        assertEquals(2, remaining.size());
-        assertEquals(3, remaining.get(0).getAttemptNumber());
-        assertEquals(4, remaining.get(1).getAttemptNumber());
-    }
+    // testAgeBasedCleanup (dataRetentionService.cleanupOldDeliveryAttempts()) was removed
+    // for P3-36a: delivery_attempts is now partitioned monthly (V052) and the global
+    // age-based cutoff this test exercised is now enforced by
+    // PartitionMaintenanceService.dropExpiredPartitions() (O(1) DROP TABLE on whole
+    // expired partitions) instead of a row-level DELETE. See
+    // PartitionMaintenanceServiceIntegrationTest for coverage of that behavior.
+    // deliveryAttemptRepository.deleteOldAttempts() itself is untouched and still
+    // covered by testBatchSizeRespected() below.
 
     @Test
     void testBatchSizeRespected() {

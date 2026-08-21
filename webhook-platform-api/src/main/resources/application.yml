@@ -124,6 +124,17 @@ data-retention:
   tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
   tunnel-log-cleanup-cron: ${TUNNEL_LOG_CLEANUP_CRON:0 30 2 * * *}
 
+# Partition maintenance for the declaratively-partitioned high-volume tables
+# (delivery_attempts, tunnel_request_log — see V052/V053 migrations and
+# PartitionMaintenanceService). Creates future partitions ahead of need and drops
+# partitions once fully past the corresponding data-retention.*-retention-days above,
+# replacing DELETE-based retention with O(1) DROP TABLE for those two tables.
+partition-maintenance:
+  enabled: ${PARTITION_MAINTENANCE_ENABLED:true}
+  delivery-attempts-lookahead-months: ${PARTITION_MAINTENANCE_DELIVERY_ATTEMPTS_LOOKAHEAD_MONTHS:3}
+  tunnel-request-log-lookahead-weeks: ${PARTITION_MAINTENANCE_TUNNEL_LOG_LOOKAHEAD_WEEKS:3}
+  cron: ${PARTITION_MAINTENANCE_CRON:0 45 1 * * *}
+
 replay:
   batch-size: ${REPLAY_BATCH_SIZE:200}
   batch-delay-ms: ${REPLAY_BATCH_DELAY_MS:50}

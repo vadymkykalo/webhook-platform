@@ -1,0 +1,63 @@
+# Hookflow Promtail config (P3-36b).
+#
+# Discovers containers via the Docker daemon (docker_sd_configs) rather than assuming
+# fixed container names — the main docker-compose.yml doesn't set container_name for
+# api/worker/ui, and this repo is routinely checked out into differently-named
+# directories (parallel-agent worktrees, forks, ...), which changes Compose's default
+# project name and therefore the generated container names. `com.docker.compose.service`
+# is a label Docker Compose sets on every container regardless of project name, so
+# relabeling on that is robust across all of those.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: hookflow-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    relabel_configs:
+      # Only ship logs for the two services this task's correlation-ID tracing cares
+      # about — api and worker. (Postgres/Kafka/Redis/etc. logs aren't structured with
+      # the correlationId/organizationId MDC fields and would just add noise+cardinality
+      # for no query value; add more values to the regex here if that changes.)
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        regex: "api|worker"
+        action: keep
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels: [__meta_docker_container_name]
+        regex: "/(.*)"
+        target_label: container
+    pipeline_stages:
+      # Unwraps the Docker JSON log-driver envelope ({"log":"...","stream":"stdout",
+      # "time":"..."}) to get at the actual line api/worker wrote.
+      - docker: {}
+      # Production logs are single-line JSON (LogstashEncoder — see logback-spring.xml
+      # in both modules). Extract only `level` as a Loki *label* (low cardinality, useful
+      # for filtering/alerting on log volume by severity); correlationId/organizationId/
+      # userId/projectId/deliveryId/etc. deliberately stay unindexed in the line body —
+      # promoting per-request/per-tenant IDs to labels would blow up Loki's index
+      # cardinality. Query them with `| json` at query time instead — see
+      # docs/runbooks/trace-webhook-logs.md.
+      - json:
+          expressions:
+            level: level
+      - labels:
+          level:
+      # Dev-mode (non-production profile) logs are plain text, not JSON — the `json`
+      # stage above silently no-ops on a line that isn't valid JSON, setting the
+      # __error__ label instead of failing the pipeline, so this config works
+      # unchanged against `make up` (dev profile) too, just without the `level` label
+      # dev-mode lines don't have. Drop that error label unconditionally (a no-op
+      # when it was never set) so it never gets indexed.
+      - labeldrop:
+          - __error__

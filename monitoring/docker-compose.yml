@@ -96,16 +96,75 @@ services:
       - hookflow
     depends_on:
       - prometheus
+      - loki
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 256m
 
+  # P3-36b: log aggregation. api/worker already populate MDC with correlationId /
+  # organizationId / userId / projectId (JwtAuthenticationFilter, ApiKeyAuthenticationFilter,
+  # CorrelationIdFilter) and emit structured JSON logs in production
+  # (LogstashEncoder — see each module's logback-spring.xml), but until now nothing
+  # shipped or indexed them: docker-compose.prod.yml just sets LOG_LEVEL and logs go
+  # to stdout with no collector, so a restarted/rescheduled container's history was
+  # simply gone. Loki + Promtail is the natural fit next to the Prometheus/Grafana
+  # already here. See docs/runbooks/trace-webhook-logs.md.
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: hookflow-loki
+    command:
+      - "-config.file=/etc/loki/loki-config.yml"
+      - "-config.expand-env=true"
+    environment:
+      LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:-336h}
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks:
+      - monitoring
+      - hookflow
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: hookflow-promtail
+    command:
+      - "-config.file=/etc/promtail/promtail-config.yml"
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - promtail_positions:/var/lib/promtail
+      # Read-only access to the Docker log files + daemon socket (service discovery) —
+      # this is why promtail runs outside the `monitoring` network's isolation the same
+      # way prometheus/grafana do: it needs the `hookflow` network to reach `loki`, and
+      # the host's Docker socket to discover api/worker containers regardless of which
+      # compose project (directory name) they were started from.
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - monitoring
+      - hookflow
+    depends_on:
+      - loki
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
 volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
+  loki_data:
+  promtail_positions:
 
 networks:
   monitoring:
