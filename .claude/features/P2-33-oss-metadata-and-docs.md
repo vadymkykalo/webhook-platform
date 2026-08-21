@@ -1,6 +1,6 @@
 # P2-33 — OSS metadata, docs site, demo, committed OpenAPI
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P2
 - **Branch:** `feature/P2-33-oss-metadata-and-docs`
 - **Depends on:** P1-15 and P1-16 (badges and install docs depend on those landing)
