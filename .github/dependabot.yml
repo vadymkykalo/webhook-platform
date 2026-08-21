@@ -10,6 +10,7 @@ updates:
   # --- Maven (root multi-module build: common, api, worker, cli) ---
   - package-ecosystem: "maven"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -24,6 +25,7 @@ updates:
   # --- npm: dashboard UI ---
   - package-ecosystem: "npm"
     directory: "/webhook-platform-ui"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -39,6 +41,7 @@ updates:
   # --- npm: Node SDK ---
   - package-ecosystem: "npm"
     directory: "/sdks/node"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -54,6 +57,7 @@ updates:
   # --- pip: Python SDK ---
   - package-ecosystem: "pip"
     directory: "/sdks/python"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -69,6 +73,7 @@ updates:
   # --- composer: PHP SDK ---
   - package-ecosystem: "composer"
     directory: "/sdks/php"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -84,6 +89,7 @@ updates:
   # --- github-actions: workflow action versions ---
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
