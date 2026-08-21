@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, ArrowLeft, Mail, CheckCircle2 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
@@ -61,7 +61,9 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 className="h-7 w-7 text-success" />
               </div>
               <h1 className="text-2xl font-bold tracking-tight">{t('auth.forgotPassword.checkEmail')}</h1>
-              <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: t('auth.forgotPassword.sentMessage', { email }) }} />
+              <p className="text-muted-foreground">
+                <Trans i18nKey="auth.forgotPassword.sentMessage" values={{ email }} components={{ strong: <strong /> }} />
+              </p>
               <div className="flex flex-col gap-3 pt-2">
                 <Button variant="outline" onClick={() => setSent(false)}>
                   <Mail className="h-4 w-4" />

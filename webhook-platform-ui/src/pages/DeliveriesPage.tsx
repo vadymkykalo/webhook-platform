@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, Bell, Info, Radio } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
 import { SkeletonRows } from '../components/PageSkeleton';
@@ -214,7 +214,9 @@ export default function DeliveriesPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-title tracking-tight">{t('deliveries.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('deliveries.subtitle', { project: project.name }) }} />
+        <p className="text-sm text-muted-foreground mt-1">
+          <Trans i18nKey="deliveries.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+        </p>
       </div>
 
       {eventIdFilter && (
@@ -278,7 +280,9 @@ export default function DeliveriesPage() {
               <Info className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             </div>
             <h3 className="text-lg font-semibold mb-2">{t('deliveries.noDeliveriesForEvent')}</h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-6" dangerouslySetInnerHTML={{ __html: t('deliveries.noDeliveriesForEventDesc', { eventType: filteredEventType }) }} />
+            <p className="text-sm text-muted-foreground max-w-md mb-6">
+              <Trans i18nKey="deliveries.noDeliveriesForEventDesc" values={{ eventType: filteredEventType }} components={{ strong: <strong /> }} />
+            </p>
             <div className="flex gap-3">
               <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
                 <Bell className="h-3.5 w-3.5 mr-1.5" />

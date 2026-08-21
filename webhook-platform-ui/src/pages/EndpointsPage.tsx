@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight, Cable } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { showApiError, showError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -296,7 +296,9 @@ export default function EndpointsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('endpoints.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('endpoints.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="endpoints.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canManageEndpoints}>
           <VerificationGate>

@@ -2,7 +2,7 @@ import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -986,7 +986,9 @@ function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProp
         </p>
 
         <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.security.challengeRequest')}</h3>
-        <p className="text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('docsPage.security.challengeRequestDesc') }} />
+        <p className="text-muted-foreground mb-4">
+          <Trans i18nKey="docsPage.security.challengeRequestDesc" components={{ code: <code /> }} />
+        </p>
         <ResponseBlock>
 {`POST https://your-endpoint.com/webhooks
 Content-Type: application/json
@@ -999,7 +1001,9 @@ Content-Type: application/json
         </ResponseBlock>
 
         <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.security.expectedResponse')}</h3>
-        <p className="text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('docsPage.security.expectedResponseDesc') }} />
+        <p className="text-muted-foreground mb-4">
+          <Trans i18nKey="docsPage.security.expectedResponseDesc" components={{ code: <code /> }} />
+        </p>
         <ResponseBlock>
 {`HTTP/1.1 200 OK
 Content-Type: application/json

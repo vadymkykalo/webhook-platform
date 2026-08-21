@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, CheckCircle2, XCircle, ArrowRight, Info, ArrowDown, Link2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
@@ -370,10 +370,9 @@ export default function TransformationsPage() {
                 <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.deliveredPayloadDesc')}</p>
               </div>
             </div>
-            <p
-              className="text-[11px] text-muted-foreground [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded"
-              dangerouslySetInnerHTML={{ __html: t('transformations.howItWorks.hint') }}
-            />
+            <p className="text-[11px] text-muted-foreground [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded">
+              <Trans i18nKey="transformations.howItWorks.hint" components={{ code: <code /> }} />
+            </p>
           </div>
 
           <div className="space-y-4 py-2">
@@ -520,10 +519,9 @@ export default function TransformationsPage() {
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
               <div className="text-xs space-y-1">
                 <p className="font-medium text-blue-900 dark:text-blue-200">{t('transformations.howToApply.title')}</p>
-                <p
-                  className="text-blue-700 dark:text-blue-300"
-                  dangerouslySetInnerHTML={{ __html: t('transformations.howToApply.body') }}
-                />
+                <p className="text-blue-700 dark:text-blue-300">
+                  <Trans i18nKey="transformations.howToApply.body" components={{ strong: <strong /> }} />
+                </p>
               </div>
             </div>
           </div>

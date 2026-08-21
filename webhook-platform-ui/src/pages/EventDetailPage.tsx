@@ -4,7 +4,7 @@ import {
   Radio, ArrowLeft, Copy, Send, Share2, Terminal, FileJson, Shield,
   FileType, Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, ExternalLink
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useEvent, useEventTypes } from '../api/queries';
 import { deliveriesApi } from '../api/deliveries.api';
 import { debugLinksApi } from '../api/debugLinks.api';
@@ -288,7 +288,9 @@ export default function EventDetailPage() {
               <CardContent>
                 <div className="text-center py-8 space-y-2">
                   <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto" dangerouslySetInnerHTML={{ __html: t('events.details.noDeliveriesNoSub', { eventType: event.eventType }) }} />
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
+                  </p>
                   <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
                   <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
                     {t('deliveries.noDeliveriesForEventAction')}

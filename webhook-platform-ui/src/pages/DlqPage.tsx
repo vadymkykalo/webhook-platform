@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square, Search, X, Calendar } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
@@ -142,7 +142,9 @@ export default function DlqPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('dlq.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('dlq.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="dlq.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canManageDlq}>
           <VerificationGate>

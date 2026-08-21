@@ -4,7 +4,7 @@ import {
   Activity, Loader2, Copy, ChevronLeft, ChevronRight, CheckCircle, XCircle, MinusCircle,
   RotateCcw, Clock, AlertTriangle, Calendar, ArrowDownToLine
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
@@ -150,7 +150,9 @@ export default function IncomingEventsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-title tracking-tight">{t('incomingEvents.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingEvents.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="incomingEvents.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Select
