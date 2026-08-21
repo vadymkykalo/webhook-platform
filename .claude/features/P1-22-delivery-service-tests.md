@@ -1,6 +1,6 @@
 # P1-22 — Tests for WebhookDeliveryService
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-22-delivery-service-tests`
 - **Depends on:** P1-21 helps but is not required
