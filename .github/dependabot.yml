@@ -1,0 +1,103 @@
+# Dependabot version-update configuration.
+#
+# Five ecosystems: root Maven build, the UI app, the three published SDKs
+# (Node/npm, Python/pip, PHP/composer), and the GitHub Actions used in
+# .github/workflows/. Patch-level updates are grouped per ecosystem so
+# Dependabot doesn't open a PR per patch bump — minor/major still land as
+# individual PRs so they get a real look before merging.
+version: 2
+updates:
+  # --- Maven (root multi-module build: common, api, worker, cli) ---
+  - package-ecosystem: "maven"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      maven-patch:
+        update-types:
+          - "patch"
+    labels:
+      - "dependencies"
+      - "maven"
+
+  # --- npm: dashboard UI ---
+  - package-ecosystem: "npm"
+    directory: "/webhook-platform-ui"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      ui-patch:
+        update-types:
+          - "patch"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "ui"
+
+  # --- npm: Node SDK ---
+  - package-ecosystem: "npm"
+    directory: "/sdks/node"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      node-sdk-patch:
+        update-types:
+          - "patch"
+    labels:
+      - "dependencies"
+      - "npm"
+      - "sdk"
+
+  # --- pip: Python SDK ---
+  - package-ecosystem: "pip"
+    directory: "/sdks/python"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      python-sdk-patch:
+        update-types:
+          - "patch"
+    labels:
+      - "dependencies"
+      - "pip"
+      - "sdk"
+
+  # --- composer: PHP SDK ---
+  - package-ecosystem: "composer"
+    directory: "/sdks/php"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      php-sdk-patch:
+        update-types:
+          - "patch"
+    labels:
+      - "dependencies"
+      - "composer"
+      - "sdk"
+
+  # --- github-actions: workflow action versions ---
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      actions-patch:
+        update-types:
+          - "patch"
+          - "minor"
+    labels:
+      - "dependencies"
+      - "github-actions"

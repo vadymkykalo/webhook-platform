@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Webhook, Calendar, Loader2, Trash2, Power, PowerOff, RefreshCw, Copy, Zap, ShieldCheck, CheckCircle, AlertCircle, Clock, ShieldOff, ChevronLeft, ChevronRight, Cable } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -6,10 +6,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { showApiError, showError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { endpointsApi } from '../api/endpoints.api';
-import { projectsApi } from '../api/projects.api';
-import type { EndpointResponse, ProjectResponse, PageResponse } from '../types/api.types';
+import {
+  useProject, useEndpointsPaged, useCreateEndpoint, useDeleteEndpoint, useUpdateEndpoint,
+  useRotateSecret, useVerifyEndpoint, useSkipVerification,
+} from '../api/queries';
+import type { EndpointResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -44,21 +47,14 @@ export default function EndpointsPage() {
   const { canManageEndpoints } = usePermissions();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
   const [rateLimitPerSecond, setRateLimitPerSecond] = useState<number | undefined>(undefined);
   const [allowedSourceIps, setAllowedSourceIps] = useState('');
-  const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [toggleId, setToggleId] = useState<string | null>(null);
-  const [toggling, setToggling] = useState(false);
   const [rotateId, setRotateId] = useState<string | null>(null);
-  const [rotating, setRotating] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [testId, setTestId] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
@@ -67,45 +63,41 @@ export default function EndpointsPage() {
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const [skippingId, setSkippingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
-  const [pageInfo, setPageInfo] = useState<PageResponse<EndpointResponse> | null>(null);
   const PAGE_SIZE = 20;
 
-  useEffect(() => {
-    if (projectId) {
-      loadData();
-    }
-  }, [projectId, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: project, isLoading: projectLoading, isError: projectIsError, error: projectError, refetch: refetchProject } = useProject(projectId);
+  const {
+    data: pageInfo, isLoading: endpointsLoading, isError: endpointsIsError, error: endpointsError, refetch: refetchEndpoints,
+  } = useEndpointsPaged(projectId, currentPage, PAGE_SIZE);
+  const endpoints = pageInfo?.content ?? [];
+  const [localEndpointOverrides, setLocalEndpointOverrides] = useState<Record<string, EndpointResponse>>({});
+  const displayEndpoints = endpoints.map((e) => localEndpointOverrides[e.id] ?? e);
 
-  const loadData = async () => {
-    if (!projectId) return;
-    
-    try {
-      setLoading(true);
-      const [projectData, endpointsData] = await Promise.all([
-        projectsApi.get(projectId),
-        endpointsApi.listPaged(projectId, currentPage, PAGE_SIZE),
-      ]);
-      setProject(projectData);
-      setEndpoints(endpointsData.content);
-      setPageInfo(endpointsData);
-    } catch (err: any) {
-      showApiError(err, 'endpoints.toast.loadFailed', { retry: loadData });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = projectLoading || endpointsLoading;
+  const isError = projectIsError || endpointsIsError;
+  const retry = () => { refetchProject(); refetchEndpoints(); };
+
+  const createEndpoint = useCreateEndpoint(projectId!);
+  const deleteEndpoint = useDeleteEndpoint(projectId!);
+  const updateEndpoint = useUpdateEndpoint(projectId!);
+  const rotateSecret = useRotateSecret(projectId!);
+  const verifyEndpoint = useVerifyEndpoint(projectId!);
+  const skipVerification = useSkipVerification(projectId!);
+  const creating = createEndpoint.isPending;
+  const deleting = deleteEndpoint.isPending;
+  const toggling = updateEndpoint.isPending;
+  const rotating = rotateSecret.isPending;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return;
-    
-    setCreating(true);
+
     try {
       const secret = generateSecret();
-      await endpointsApi.create(projectId, { 
-        url, 
-        description, 
-        enabled: true, 
+      await createEndpoint.mutateAsync({
+        url,
+        description,
+        enabled: true,
         secret,
         rateLimitPerSecond: rateLimitPerSecond || undefined,
         allowedSourceIps: allowedSourceIps || undefined,
@@ -117,70 +109,56 @@ export default function EndpointsPage() {
       setAllowedSourceIps('');
       setNewSecret(secret);
       showSuccess(t('endpoints.toast.created'));
-      queryClient.invalidateQueries({ queryKey: ['endpoints', projectId] });
-      loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.createFailed');
-    } finally {
-      setCreating(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteId || !projectId) return;
-    
-    setDeleting(true);
+
     try {
-      await endpointsApi.delete(projectId, deleteId);
+      await deleteEndpoint.mutateAsync(deleteId);
       showCriticalSuccess(t('endpoints.toast.deleted'));
       setDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ['endpoints', projectId] });
-      loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.deleteFailed');
-    } finally {
-      setDeleting(false);
     }
   };
 
   const handleToggle = async () => {
     if (!toggleId || !projectId) return;
-    
-    const endpoint = endpoints.find((e) => e.id === toggleId);
+
+    const endpoint = displayEndpoints.find((e) => e.id === toggleId);
     if (!endpoint) return;
 
-    setToggling(true);
     try {
-      await endpointsApi.update(projectId, toggleId, {
-        url: endpoint.url,
-        description: endpoint.description,
-        enabled: !endpoint.enabled,
-        rateLimitPerSecond: endpoint.rateLimitPerSecond,
+      await updateEndpoint.mutateAsync({
+        id: toggleId,
+        data: {
+          url: endpoint.url,
+          description: endpoint.description,
+          enabled: !endpoint.enabled,
+          rateLimitPerSecond: endpoint.rateLimitPerSecond,
+        },
       });
       showSuccess(!endpoint.enabled ? t('endpoints.toast.enabled') : t('endpoints.toast.disabled'));
       setToggleId(null);
-      loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.toggleFailed');
-    } finally {
-      setToggling(false);
     }
   };
 
   const handleRotateSecret = async () => {
     if (!rotateId || !projectId) return;
 
-    setRotating(true);
     try {
-      const response = await endpointsApi.rotateSecret(projectId, rotateId);
+      const response = await rotateSecret.mutateAsync(rotateId);
       setNewSecret(response.secret || null);
       showSuccess(t('endpoints.toast.secretRotated'));
-      loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.rotateFailed');
       setRotateId(null);
-    } finally {
-      setRotating(false);
     }
   };
 
@@ -198,11 +176,11 @@ export default function EndpointsPage() {
 
   const handleTest = async (endpointId: string) => {
     if (!projectId) return;
-    
+
     setTestId(endpointId);
     setTesting(true);
     setTestResult(null);
-    
+
     try {
       const result = await endpointsApi.test(projectId, endpointId);
       setTestResult(result);
@@ -226,16 +204,14 @@ export default function EndpointsPage() {
 
   const handleVerify = async (endpointId: string) => {
     if (!projectId) return;
-    
+
     setVerifyingId(endpointId);
     try {
-      const result = await endpointsApi.verify(projectId, endpointId);
+      const result = await verifyEndpoint.mutateAsync(endpointId);
       if (result.success) {
         showSuccess(t('endpoints.toast.verified'));
-        loadData();
       } else {
         showError(t('endpoints.toast.verifyFailed', { message: result.message }));
-        loadData();
       }
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.verifyError');
@@ -246,12 +222,11 @@ export default function EndpointsPage() {
 
   const handleSkipVerification = async (endpointId: string) => {
     if (!projectId) return;
-    
+
     setSkippingId(endpointId);
     try {
-      await endpointsApi.skipVerification(projectId, endpointId, 'Manually skipped by user');
+      await skipVerification.mutateAsync({ id: endpointId, reason: 'Manually skipped by user' });
       showSuccess(t('endpoints.toast.skipped'));
-      loadData();
     } catch (err: any) {
       showApiError(err, 'endpoints.toast.skipFailed');
     } finally {
@@ -290,13 +265,21 @@ export default function EndpointsPage() {
   };
 
 
-  const getToggleEndpoint = () => endpoints.find((e) => e.id === toggleId);
+  const getToggleEndpoint = () => displayEndpoints.find((e) => e.id === toggleId);
 
   if (loading) {
     return (
       <PageSkeleton>
         <SkeletonRows count={3} height="h-32" />
       </PageSkeleton>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+        <ErrorState error={projectError ?? endpointsError} fallbackKey="endpoints.toast.loadFailed" onRetry={retry} />
+      </div>
     );
   }
 
@@ -324,7 +307,7 @@ export default function EndpointsPage() {
         </PermissionGate>
       </div>
 
-      {endpoints.length === 0 ? (
+      {displayEndpoints.length === 0 ? (
         <EmptyState
           icon={Webhook}
           title={t('endpoints.noEndpoints')}
@@ -347,7 +330,7 @@ export default function EndpointsPage() {
         />
       ) : (
         <div className="space-y-3 animate-fade-in">
-          {endpoints.map((endpoint) => (
+          {displayEndpoints.map((endpoint) => (
             <Card key={endpoint.id} className="overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -740,7 +723,8 @@ export default function EndpointsPage() {
           projectId={projectId}
           endpoint={mtlsEndpoint}
           onUpdate={(updated) => {
-            setEndpoints(endpoints.map(e => e.id === updated.id ? updated : e));
+            setLocalEndpointOverrides((prev) => ({ ...prev, [updated.id]: updated }));
+            queryClient.invalidateQueries({ queryKey: ['endpoints', projectId] });
             setMtlsEndpoint(null);
           }}
         />

@@ -7,7 +7,7 @@ import { subscriptionsApi, type SubscriptionRequest } from './subscriptions.api'
 import { membersApi, type MembershipRole, type AddMemberRequest } from './members.api';
 import { apiKeysApi, type ApiKeyRequest } from './apiKeys.api';
 import { dashboardApi } from './dashboard.api';
-import { dlqApi } from './dlq.api';
+import { dlqApi, type DlqFilters } from './dlq.api';
 import { testEndpointsApi } from './testEndpoints.api';
 import { auditLogApi, type AuditLogFilters } from './auditLog.api';
 import { incomingSourcesApi } from './incomingSources.api';
@@ -55,7 +55,7 @@ export const queryKeys = {
         paged: (projectId: string, page: number, size: number) => ['api-keys', projectId, page, size] as const,
     },
     dlq: {
-        list: (projectId: string, page: number, size: number) => ['dlq', projectId, page, size] as const,
+        list: (projectId: string, page: number, size: number, filters?: DlqFilters) => ['dlq', projectId, page, size, filters ?? {}] as const,
     },
     testEndpoints: {
         list: (projectId: string) => ['test-endpoints', projectId] as const,
@@ -249,6 +249,14 @@ export function useDeliveries(projectId: string | undefined, filters: DeliveryFi
         queryKey: queryKeys.deliveries.list(projectId!, filters),
         queryFn: () => deliveriesApi.listByProject(projectId!, filters),
         enabled: !!projectId,
+        // Poll only while there are deliveries still in flight — replaces the
+        // page-level setInterval + eslint-disable react-hooks/exhaustive-deps.
+        refetchInterval: (query) => {
+            const hasActive = query.state.data?.content?.some(
+                (d) => d.status === 'PENDING' || d.status === 'PROCESSING'
+            );
+            return hasActive ? 5000 : false;
+        },
     });
 }
 
@@ -393,10 +401,10 @@ export function useRevokeApiKey(projectId: string) {
 
 // ─── DLQ ───────────────────────────────────────────────────────────
 
-export function useDlq(projectId: string | undefined, page: number, size = 20) {
+export function useDlq(projectId: string | undefined, page: number, size = 20, filters?: DlqFilters) {
     return useQuery({
-        queryKey: queryKeys.dlq.list(projectId!, page, size),
-        queryFn: () => dlqApi.list(projectId!, page, size),
+        queryKey: queryKeys.dlq.list(projectId!, page, size, filters),
+        queryFn: () => dlqApi.list(projectId!, page, size, filters),
         enabled: !!projectId,
     });
 }

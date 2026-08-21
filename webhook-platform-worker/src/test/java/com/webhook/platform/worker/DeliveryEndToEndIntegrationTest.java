@@ -1,0 +1,576 @@
+package com.webhook.platform.worker;
+
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.webhook.platform.common.constants.KafkaTopics;
+import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.util.WebhookSignatureUtils;
+import com.webhook.platform.worker.domain.entity.Delivery;
+import com.webhook.platform.worker.domain.entity.Endpoint;
+import com.webhook.platform.worker.domain.entity.Event;
+import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
+import com.webhook.platform.worker.domain.repository.DeliveryRepository;
+import com.webhook.platform.worker.domain.repository.EndpointRepository;
+import com.webhook.platform.worker.domain.repository.EventRepository;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.KafkaContainer;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * End-to-end delivery-pipeline test (P1-21): real Postgres + Kafka + Redis (Testcontainers)
+ * and a real HTTP endpoint (WireMock), with the actual worker Spring context — real
+ * {@link com.webhook.platform.worker.config.KafkaConsumerConfig}, {@link
+ * com.webhook.platform.worker.consumer.DeliveryConsumer}, {@link
+ * com.webhook.platform.worker.service.WebhookDeliveryService}, {@link
+ * com.webhook.platform.worker.service.RetrySchedulerService}, {@link
+ * com.webhook.platform.worker.service.StuckDeliveryRecoveryService} and {@link
+ * com.webhook.platform.worker.service.BoundedAsyncExecutor} — every class the launch
+ * punch-list's README groups together as "Stream A — worker / delivery core". Nothing here
+ * is mocked and no autoconfiguration is excluded.
+ *
+ * <p><b>Deliberately unrelated to {@code com.webhook.platform.api.AbstractIntegrationTest}</b>
+ * (a different module: {@code webhook-platform-api}). That class excludes Kafka/Redisson
+ * autoconfiguration and {@code @MockBean}s {@code OutboxPublisherService},
+ * {@code SequenceGeneratorService} and {@code RedisRateLimiterService} on purpose, so that
+ * api-module tests which only care about REST/DB behaviour don't pay for a broker and a cache
+ * on every run. This class exists specifically to exercise the real Kafka/Redis wiring that
+ * {@code AbstractIntegrationTest} excludes. Do not "fix" one to look like the other — one
+ * tests the REST/DB layer in isolation, the other proves the delivery pipeline actually
+ * moves bytes over a wire. See {@code .claude/features/P1-21-e2e-delivery-test.md}.</p>
+ *
+ * <p><b>Scope note</b>: this class lives entirely in the {@code worker} module and does not
+ * boot the {@code api} module's Spring context, so it does not exercise
+ * {@code EventIngestService}/{@code OutboxPublisherService} — the "{@code POST
+ * /api/v1/events} -&gt; outbox row -&gt; Kafka" leg. api and worker are separate Spring Boot
+ * applications with separate entity copies of the same tables (see root {@code CLAUDE.md});
+ * there is no existing precedent in this repo for booting both contexts in one JVM, and the
+ * P0-01/02/03/05 regressions this test targets are all worker-side (see the README's "Stream
+ * A" grouping, which places P1-21 directly after them). Each test method below publishes a
+ * {@link DeliveryMessage} to Kafka exactly the way {@code OutboxPublisherService} does —
+ * {@code kafkaTemplate.send(topic, endpointId, message)} to {@link
+ * KafkaTopics#DELIVERIES_DISPATCH} — which is the real, unmodified send call the worker
+ * consumes from in production; only the api-side scheduled poller that would normally
+ * originate that call is not exercised here. Closing that specific remaining gap (proving
+ * {@code OutboxPublisherService} itself really publishes a real outbox row to a real Kafka
+ * topic) is a good candidate for a small, separate, api-module-only follow-up test and is
+ * called out as such in P1-21's progress log rather than attempted here.</p>
+ */
+@SpringBootTest(classes = WebhookPlatformWorkerApplication.class)
+@Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class DeliveryEndToEndIntegrationTest {
+
+    private static final String TEST_ENCRYPTION_KEY = "e2e-test-encryption-key-please-ignore";
+    private static final String TEST_ENCRYPTION_SALT = "e2e-test-salt-0123456789abcdef";
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
+            .withDatabaseName("webhook_e2e")
+            .withUsername("test")
+            .withPassword("test");
+
+    @Container
+    static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:3.7.0");
+
+    @Container
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine")
+            .withExposedPorts(6379);
+
+    private static WireMockServer wireMock;
+
+    @DynamicPropertySource
+    static void dynamicProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        // Worker doesn't own migrations (api does, per root CLAUDE.md) and has no Flyway
+        // dependency at all; let Hibernate derive the schema from the worker's own entity
+        // copies, same approach as the existing DeliveryRepositoryTest.
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+
+        registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        registry.add("spring.data.redis.password", () -> "");
+
+        registry.add("webhook.encryption-key", () -> TEST_ENCRYPTION_KEY);
+        registry.add("webhook.encryption-salt", () -> TEST_ENCRYPTION_SALT);
+        // WireMock runs on localhost:<random port> - the SSRF guard must not block it.
+        registry.add("webhook.url-validation.allow-private-ips", () -> "true");
+
+        // Fast enough for a test to observe within a bounded Awaitility window without being
+        // so aggressive it races genuinely in-flight (not stuck) attempts between test methods.
+        registry.add("retry.scheduler.poll-interval-ms", () -> "500");
+        registry.add("retry.scheduler.reschedule-delay-seconds", () -> "1");
+        registry.add("stuck-delivery.check-interval-ms", () -> "500");
+        registry.add("stuck-delivery.threshold-minutes", () -> "1");
+
+        // Worker autoconfigures a reactive web app (webflux is only used for the outbound
+        // WebClient) - nothing serves inbound traffic, so don't bind a port for it.
+        registry.add("spring.main.web-application-type", () -> "none");
+        registry.add("management.server.port", () -> "-1");
+    }
+
+    @BeforeAll
+    static void startWireMock() {
+        wireMock = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        wireMock.start();
+    }
+
+    @AfterAll
+    static void stopWireMock() {
+        if (wireMock != null) {
+            wireMock.stop();
+        }
+    }
+
+    @BeforeEach
+    void resetWireMock() {
+        wireMock.resetAll();
+    }
+
+    @Autowired
+    private DeliveryRepository deliveryRepository;
+    @Autowired
+    private EndpointRepository endpointRepository;
+    @Autowired
+    private EventRepository eventRepository;
+    @Autowired
+    private DeliveryAttemptRepository deliveryAttemptRepository;
+    @Autowired
+    private EncryptionKeyRegistry encryptionKeyRegistry;
+    @Autowired
+    private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    // ── fixture helpers ─────────────────────────────────────────────────────────────────
+
+    /** Creates and persists an Endpoint pointed at a WireMock path, returns the raw secret. */
+    private String createEndpoint(UUID endpointId, String path) {
+        String secret = "secret-" + endpointId;
+        var encrypted = encryptionKeyRegistry.encrypt(secret);
+        Endpoint endpoint = Endpoint.builder()
+                .id(endpointId)
+                .projectId(UUID.randomUUID())
+                .url(wireMock.baseUrl() + path)
+                .secretEncrypted(encrypted.getCiphertext())
+                .secretIv(encrypted.getIv())
+                .encryptionKeyVersion(encrypted.getKeyVersion())
+                .enabled(true)
+                .mtlsEnabled(false)
+                .verificationStatus(Endpoint.VerificationStatus.SKIPPED)
+                .updatedAt(Instant.now())
+                .build();
+        endpointRepository.save(endpoint);
+        return secret;
+    }
+
+    private Event createEvent(UUID eventId, String payloadJson) {
+        Event event = Event.builder()
+                .id(eventId)
+                .projectId(UUID.randomUUID())
+                .eventType("order.created")
+                .payload(payloadJson)
+                .createdAt(Instant.now())
+                .build();
+        return eventRepository.save(event);
+    }
+
+    private Delivery createPendingDelivery(UUID deliveryId, UUID eventId, UUID endpointId,
+            int maxAttempts, String retryDelays, int timeoutSeconds) {
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId)
+                .eventId(eventId)
+                .endpointId(endpointId)
+                .subscriptionId(UUID.randomUUID())
+                .deliveryOrigin(Delivery.DeliveryOrigin.SUBSCRIPTION)
+                .status(Delivery.DeliveryStatus.PENDING)
+                .attemptCount(0)
+                .maxAttempts(maxAttempts)
+                .orderingEnabled(false)
+                .timeoutSeconds(timeoutSeconds)
+                .retryDelays(retryDelays)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        return deliveryRepository.save(delivery);
+    }
+
+    /** Publishes exactly the record OutboxPublisherService's Phase 2 send would publish. */
+    private void publishDispatch(Delivery delivery) {
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(delivery.getId())
+                .eventId(delivery.getEventId())
+                .endpointId(delivery.getEndpointId())
+                .subscriptionId(delivery.getSubscriptionId())
+                .status(delivery.getStatus().name())
+                .attemptCount(delivery.getAttemptCount())
+                .orderingEnabled(delivery.getOrderingEnabled())
+                .build();
+        kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, delivery.getEndpointId().toString(), message);
+    }
+
+    private Delivery reload(UUID deliveryId) {
+        return deliveryRepository.findById(deliveryId).orElseThrow();
+    }
+
+    // ── tests ────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void happyPath_ingestedEventIsDeliveredWithValidSignature() throws Exception {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        String path = "/hook/happy-" + deliveryId;
+        String payload = "{\"order_id\":\"ord_123\",\"amount\":42}";
+
+        String secret = createEndpoint(endpointId, path);
+        createEvent(eventId, payload);
+        createPendingDelivery(deliveryId, eventId, endpointId, 5, "60", 30);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(200)));
+
+        publishDispatch(reload(deliveryId));
+
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+
+        Delivery finalDelivery = reload(deliveryId);
+        assertEquals(1, finalDelivery.getAttemptCount());
+        assertNotNull(finalDelivery.getSucceededAt());
+
+        wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
+        var served = wireMock.getServeEvents().getRequests().get(0).getRequest();
+
+        // Postgres' jsonb column normalizes key order/whitespace on round-trip, so compare
+        // parsed JSON trees rather than raw strings - the signature below is what actually
+        // verifies byte-for-byte, on the exact body string that was signed and sent.
+        assertEquals(new com.fasterxml.jackson.databind.ObjectMapper().readTree(payload),
+                new com.fasterxml.jackson.databind.ObjectMapper().readTree(served.getBodyAsString()));
+        String signatureHeader = served.getHeader("X-Signature");
+        assertNotNull(signatureHeader, "X-Signature header must be present on the wire");
+        assertTrue(WebhookSignatureUtils.verifySignature(secret, signatureHeader, served.getBodyAsString()),
+                "signature must verify against the endpoint's own secret");
+        assertEquals(eventId.toString(), served.getHeader("X-Event-Id"));
+        assertEquals(deliveryId.toString(), served.getHeader("X-Delivery-Id"));
+    }
+
+    @Test
+    void serverError_thenRecovery_isRetriedAndEventuallySucceeds() {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        String path = "/hook/retry-" + deliveryId;
+
+        createEndpoint(endpointId, path);
+        createEvent(eventId, "{\"n\":1}");
+        // Tight retry ladder ("1" second, jittered 0.5-1.5s) so this doesn't have to wait for
+        // the production default of 60s.
+        createPendingDelivery(deliveryId, eventId, endpointId, 5, "1", 30);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("retry")
+                .whenScenarioStateIs(com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED)
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("recovered"));
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("retry")
+                .whenScenarioStateIs("recovered")
+                .willReturn(aResponse().withStatus(200)));
+
+        publishDispatch(reload(deliveryId));
+
+        // RetrySchedulerService's steady-state poll cadence is adaptive (RetryGovernor), not
+        // the retry.scheduler.poll-interval-ms override above (that only sets the *first*
+        // poll's startup delay) - it backs off to a 30s interval whenever the pending-retry
+        // queue is empty, which happens between test methods here. Give this comfortable
+        // headroom past that worst case rather than racing it.
+        await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+
+        Delivery finalDelivery = reload(deliveryId);
+        assertEquals(2, finalDelivery.getAttemptCount(), "one failed attempt + one successful retry");
+        wireMock.verify(2, postRequestedFor(urlEqualTo(path)));
+    }
+
+    @Test
+    void endpointDownForEveryAttempt_reachesDlq() {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        String path = "/hook/dlq-" + deliveryId;
+
+        createEndpoint(endpointId, path);
+        createEvent(eventId, "{\"n\":1}");
+        // maxAttempts=2 so this reaches DLQ quickly instead of exhausting a long ladder.
+        createPendingDelivery(deliveryId, eventId, endpointId, 2, "1", 30);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(500)));
+
+        publishDispatch(reload(deliveryId));
+
+        // See the comment in serverError_thenRecovery_isRetriedAndEventuallySucceeds above re:
+        // RetryGovernor's adaptive (up to 30s) idle poll interval.
+        await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.DLQ, reload(deliveryId).getStatus()));
+
+        Delivery finalDelivery = reload(deliveryId);
+        assertEquals(2, finalDelivery.getAttemptCount());
+        assertNotNull(finalDelivery.getFailedAt());
+        wireMock.verify(2, postRequestedFor(urlEqualTo(path)));
+    }
+
+    /**
+     * This is P0-01's regression test: a retry claimed by the real {@code
+     * RetrySchedulerService} (status flipped PENDING -&gt; PROCESSING, exactly the line P0-01
+     * fixed) that then sits abandoned — as if the worker process that claimed it had been hard
+     * killed before finishing — must be recovered by {@code StuckDeliveryRecoveryService} and
+     * eventually delivered, not left stranded forever.
+     *
+     * <p>Pre-fix, the claim left the row PENDING with {@code next_retry_at} nulled instead of
+     * PROCESSING — invisible to both {@code findPendingRetryIds} (needs a non-null
+     * next_retry_at) and the stuck-delivery sweep (needs status=PROCESSING). Reverting that fix
+     * makes the first {@code await()} below (which specifically waits for the real claim to
+     * produce {@code status=PROCESSING, attemptCount=2}) time out, because the retry consumer's
+     * {@code processDelivery(isRetry=true)} guard requires an existing PROCESSING row and would
+     * silently skip a still-PENDING one — no second HTTP attempt is ever made.</p>
+     *
+     * <p>The second half of this test is also P0-05's regression test: the abandoned second
+     * attempt's slow WireMock response eventually resolves (200) well after a third, independent
+     * attempt has already finalized the delivery as SUCCESS. Reverting P0-05 removes the
+     * {@code fresh.getStatus() == PROCESSING} guard from {@code markAsSuccess}, so that late,
+     * stale response blindly re-writes {@code succeededAt} - the {@code assertEquals(
+     * succeededAtFromThirdAttempt, ...)} assertion below catches exactly that.</p>
+     */
+    @Test
+    void retryClaimedThenAbandoned_isRecoveredNotStranded() {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        String path = "/hook/stuck-" + deliveryId;
+
+        createEndpoint(endpointId, path);
+        createEvent(eventId, "{\"n\":1}");
+        // timeoutSeconds=10 comfortably covers the deliberately slow second attempt below.
+        createPendingDelivery(deliveryId, eventId, endpointId, 5, "1", 10);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("stuck")
+                .whenScenarioStateIs(com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED)
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("claimed-attempt-in-flight"));
+        // The retry attempt that gets "claimed" is deliberately slow, giving the test a wide,
+        // reliable window to observe the real PROCESSING claim and simulate the worker dying
+        // right after it, before this response is ever acted on.
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("stuck")
+                .whenScenarioStateIs("claimed-attempt-in-flight")
+                .willReturn(aResponse().withStatus(200).withFixedDelay(4000))
+                .willSetStateTo("up"));
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("stuck")
+                .whenScenarioStateIs("up")
+                .willReturn(aResponse().withStatus(200)));
+
+        publishDispatch(reload(deliveryId));
+
+        // Wait for the real RetrySchedulerService claim (Phase 1) of the retry attempt: status
+        // flips PENDING -> PROCESSING with attemptCount still at 1 (attempt 2's HTTP call is
+        // slow and hasn't incremented it yet). This is the exact invariant P0-01 introduced.
+        // RetrySchedulerService's steady-state poll cadence is adaptive (RetryGovernor) and
+        // backs off up to 30s when the pending-retry queue is empty between test methods, so
+        // this needs comfortable headroom past that worst case.
+        await().atMost(Duration.ofSeconds(50)).pollInterval(Duration.ofMillis(150))
+                .untilAsserted(() -> {
+                    Delivery d = reload(deliveryId);
+                    assertEquals(Delivery.DeliveryStatus.PROCESSING, d.getStatus());
+                });
+
+        // Wait until the slow attempt has actually started (attempt_count bumped to 2) so we
+        // know we're mid the *second* attempt, not still inside the fast first one.
+        await().atMost(Duration.ofSeconds(15)).pollInterval(Duration.ofMillis(150))
+                .untilAsserted(() -> assertEquals(2, reload(deliveryId).getAttemptCount()));
+
+        // Simulate "the worker that claimed this retry got hard-killed": backdate the claim so
+        // it looks abandoned to StuckDeliveryRecoveryService (threshold configured to 1 minute
+        // above), without waiting real wall-clock time.
+        int updated = jdbcTemplate.update(
+                "UPDATE deliveries SET last_attempt_at = now() - interval '2 minutes', "
+                        + "updated_at = now() - interval '2 minutes' WHERE id = ?",
+                deliveryId);
+        assertEquals(1, updated, "must have backdated exactly the delivery under test");
+
+        // StuckDeliveryRecoveryService (real scheduled bean, check-interval-ms=500 above) must
+        // reclaim it back to PENDING - the recovery half of the P0-01 fix.
+        await().atMost(Duration.ofSeconds(15)).pollInterval(Duration.ofMillis(150))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.PENDING, reload(deliveryId).getStatus()));
+
+        // ... and the normal retry ladder must pick the recovered row back up and complete it
+        // (via a third, independent claim+attempt - the abandoned second attempt is still
+        // sitting inside its 4s-delayed WireMock call at this point).
+        await().atMost(Duration.ofSeconds(50)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+
+        Instant succeededAtFromThirdAttempt = reload(deliveryId).getSucceededAt();
+        assertNotNull(succeededAtFromThirdAttempt);
+
+        // The abandoned second attempt's WireMock response (4s fixed delay, state
+        // "claimed-attempt-in-flight") lands well after this point and also resolves to 200 -
+        // its handleResponse/markAsSuccess call is a late, stale write for a delivery some
+        // other path has already finalized. This is exactly the P0-05 defect: pre-fix,
+        // markAsSuccess had no "fresh.getStatus() == PROCESSING" guard and would blindly
+        // overwrite the row (new succeededAt, same SUCCESS status) regardless of what the
+        // third attempt already committed. Waiting past the 4s delay and asserting succeededAt
+        // is untouched is a deterministic discriminator for that guard - unlike racing a
+        // reactive .timeout() against DB write latency, this doesn't depend on incidental
+        // timing to flip.
+        try {
+            TimeUnit.SECONDS.sleep(6);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        Delivery finalDelivery = reload(deliveryId);
+        assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
+        assertEquals(succeededAtFromThirdAttempt, finalDelivery.getSucceededAt(),
+                "a late-arriving response for an already-abandoned attempt must not re-write "
+                        + "succeededAt over what the attempt that actually finalized the delivery wrote (P0-05)");
+        // Exactly one delivered webhook must exist on the wire from the third attempt; the
+        // abandoned second attempt's request also happened but its late response must not have
+        // produced a second successful bookkeeping cycle.
+        wireMock.verify(3, postRequestedFor(urlEqualTo(path)));
+    }
+
+    /**
+     * At-least-once redelivery of the same Kafka message (e.g. a consumer-group rebalance
+     * reprocessing an offset) must never re-deliver an already-terminal webhook. In production
+     * this is stopped by {@code processDelivery(isRetry=true)}'s own entry check (the message's
+     * delivery must currently be PROCESSING) - a layer that predates and is independent of
+     * P0-05's {@code markAsSuccess}/{@code scheduleRetry}/{@code markAsFailed} re-read guards
+     * (see {@link #retryClaimedThenAbandoned_isRecoveredNotStranded()} for a test that
+     * specifically targets those). This test proves that outer layer holds for the common
+     * at-least-once-redelivery case.
+     */
+    @Test
+    void duplicateKafkaMessage_afterSuccess_isNotRedelivered() {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        String path = "/hook/dup-" + deliveryId;
+
+        createEndpoint(endpointId, path);
+        createEvent(eventId, "{\"n\":1}");
+        createPendingDelivery(deliveryId, eventId, endpointId, 5, "60", 30);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(200)));
+
+        publishDispatch(reload(deliveryId));
+
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+        Instant succeededAt = reload(deliveryId).getSucceededAt();
+        wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
+
+        // Simulate an at-least-once Kafka redelivery of the exact same message on both the
+        // dispatch and a retry topic.
+        Delivery successState = reload(deliveryId);
+        DeliveryMessage duplicate = DeliveryMessage.builder()
+                .deliveryId(successState.getId())
+                .eventId(successState.getEventId())
+                .endpointId(successState.getEndpointId())
+                .subscriptionId(successState.getSubscriptionId())
+                .status(successState.getStatus().name())
+                .attemptCount(successState.getAttemptCount())
+                .build();
+        kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(), duplicate);
+        kafkaTemplate.send(KafkaTopics.DELIVERIES_RETRY_1M, endpointId.toString(), duplicate);
+
+        // Give the consumer ample time to process (and correctly no-op on) both duplicates.
+        await().pollDelay(Duration.ofSeconds(5)).atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+
+        Delivery finalDelivery = reload(deliveryId);
+        assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
+        assertEquals(succeededAt, finalDelivery.getSucceededAt(), "the original SUCCESS write must not be re-committed");
+        assertEquals(1, finalDelivery.getAttemptCount(), "a duplicate message must not trigger a second HTTP attempt");
+        wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
+    }
+
+    /**
+     * A 2xx response that arrives close to the delivery timeout boundary must still count as
+     * exactly one successful delivery. The P0-05 defect was specifically a slow
+     * post-response bookkeeping step (the DB write in {@code markAsSuccess}, running inside the
+     * reactive {@code .map()}/{@code .timeout()} window pre-fix) racing the HTTP timeout after a
+     * 200 had already been received - persistence now runs strictly after {@code .block()}
+     * returns, outside that window, so it can never race the timeout at all.
+     *
+     * <p><b>Honesty note</b>: this test only makes the HTTP response itself slow (via WireMock's
+     * fixed delay), not the bookkeeping step that actually raced the timeout pre-fix - there is
+     * no test-only seam into that DB write's timing without adding one to production code, which
+     * this task deliberately avoids. The margin here (1s timeout, ~950ms response) is tightened
+     * as far as reasonably possible so that ordinary Testcontainers-Postgres write latency has a
+     * real chance of tipping a reverted build over the boundary, but unlike
+     * {@link #retryClaimedThenAbandoned_isRecoveredNotStranded()} (which deterministically proves
+     * the same guard via a late, stale write with no timing dependency at all), this one is a
+     * best-effort approximation of the original race and is not guaranteed to fail on every run
+     * against reverted code.</p>
+     */
+    @Test
+    void slowSuccessResponseNearTimeoutBoundary_isDeliveredExactlyOnce() {
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        String path = "/hook/boundary-" + deliveryId;
+
+        createEndpoint(endpointId, path);
+        createEvent(eventId, "{\"n\":1}");
+        // 1s timeout (the minimum clampTimeout allows) with the response delayed to ~950ms -
+        // as tight a margin as practical without flaking the *fixed* build too.
+        createPendingDelivery(deliveryId, eventId, endpointId, 5, "1", 1);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path))
+                .willReturn(aResponse().withStatus(200).withFixedDelay(950)));
+
+        publishDispatch(reload(deliveryId));
+
+        await().atMost(Duration.ofSeconds(20)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+
+        // Hold a bit longer to make sure no delayed/duplicate retry sneaks in afterwards.
+        try {
+            TimeUnit.SECONDS.sleep(3);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        Delivery finalDelivery = reload(deliveryId);
+        assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
+        assertEquals(1, finalDelivery.getAttemptCount());
+        wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
+    }
+}

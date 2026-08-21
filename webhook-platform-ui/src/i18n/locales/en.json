@@ -54,6 +54,8 @@
     "noResults": "No results found",
     "error": "An unexpected error occurred",
     "retry": "Retry",
+    "retrying": "Retrying...",
+    "loadErrorTitle": "Couldn't load this page",
     "backToHome": "Back to home",
     "learnMore": "Learn more",
     "optional": "optional"
@@ -372,6 +374,9 @@
       "dlq": "Failed Messages",
       "incomingSources": "Sources",
       "incomingEvents": "Received"
+    },
+    "toast": {
+      "loadFailed": "Failed to load dashboard data"
     }
   },
   "endpoints": {
@@ -622,7 +627,8 @@
     "toast": {
       "idCopied": "Event ID copied to clipboard",
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
-      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
+      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions.",
+      "loadFailed": "Failed to load events"
     },
     "sendModal": {
       "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
@@ -701,6 +707,10 @@
       "description": "This will re-send {{count}} deliveries with status {{status}}. Each delivery will be attempted again from scratch.",
       "warning": "Bulk replay may cause duplicate deliveries if the destination is not idempotent. Make sure your consumers can handle repeated events.",
       "confirm": "Replay All"
+    },
+    "toast": {
+      "loadFailed": "Failed to load deliveries",
+      "replayFailed": "Failed to replay delivery"
     }
   },
   "apiKeys": {

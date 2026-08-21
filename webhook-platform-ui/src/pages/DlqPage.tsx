@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Trash2, Loader2, CheckSquare, Square, Search, X, Calendar } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { projectsApi } from '../api/projects.api';
-import { dlqApi, DlqItemResponse, DlqStatsResponse } from '../api/dlq.api';
-import { endpointsApi } from '../api/endpoints.api';
-import type { ProjectResponse, EndpointResponse } from '../types/api.types';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import {
+  useProject, useDlq, useDlqStats, useEndpoints, useDlqRetry, useDlqBulkRetry, useDlqPurge,
+} from '../api/queries';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -24,96 +23,74 @@ export default function DlqPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageDlq } = usePermissions();
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [items, setItems] = useState<DlqItemResponse[]>([]);
-  const [stats, setStats] = useState<DlqStatsResponse | null>(null);
-  const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [endpointFilter, setEndpointFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [retrying, setRetrying] = useState(false);
   const [showPurgeDialog, setShowPurgeDialog] = useState(false);
-  const [purging, setPurging] = useState(false);
 
-  useEffect(() => {
-    if (projectId) {
-      loadData();
-    }
-  }, [projectId, page, endpointFilter, searchQuery, dateFrom, dateTo]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadData = async () => {
-    if (!projectId) return;
-    
-    try {
-      setLoading(true);
-      const [projectData, dlqData, statsData, endpointsData] = await Promise.all([
-        projectsApi.get(projectId),
-        dlqApi.list(projectId, page, 20, {
-          endpointId: endpointFilter || undefined,
-          search: searchQuery || undefined,
-          dateFrom: dateFrom || undefined,
-          dateTo: dateTo || undefined,
-        }),
-        dlqApi.getStats(projectId),
-        endpointsApi.list(projectId),
-      ]);
-      setProject(projectData);
-      setItems(dlqData.content);
-      setTotalPages(dlqData.totalPages);
-      setStats(statsData);
-      setEndpoints(endpointsData);
-      setSelectedIds(new Set());
-    } catch (err: any) {
-      showApiError(err, 'dlq.toast.loadFailed', { retry: loadData });
-    } finally {
-      setLoading(false);
-    }
+  const dlqFilters = {
+    endpointId: endpointFilter || undefined,
+    search: searchQuery || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
   };
+
+  const {
+    data: project, isLoading: projectLoading, isError: projectIsError, error: projectError, refetch: refetchProject,
+  } = useProject(projectId);
+  const {
+    data: dlqData, isLoading: dlqLoading, isError: dlqIsError, error: dlqError, refetch: refetchDlq,
+  } = useDlq(projectId, page, 20, dlqFilters);
+  const { data: stats, refetch: refetchStats } = useDlqStats(projectId);
+  const { data: endpoints = [] } = useEndpoints(projectId);
+  const items = dlqData?.content ?? [];
+  const totalPages = dlqData?.totalPages ?? 0;
+
+  const loading = projectLoading || dlqLoading;
+  const isError = projectIsError || dlqIsError;
+  const retry = () => { refetchProject(); refetchDlq(); refetchStats(); };
+
+  const retrySingleMutation = useDlqRetry(projectId!);
+  const retryBulkMutation = useDlqBulkRetry(projectId!);
+  const purgeMutation = useDlqPurge(projectId!);
+  const retrying = retrySingleMutation.isPending || retryBulkMutation.isPending;
+  const purging = purgeMutation.isPending;
 
   const handleRetrySingle = async (deliveryId: string) => {
     try {
-      setRetrying(true);
-      await dlqApi.retrySingle(projectId!, deliveryId);
+      await retrySingleMutation.mutateAsync(deliveryId);
       showSuccess(t('dlq.toast.retried'));
-      loadData();
+      refetchStats();
     } catch (err: any) {
       showApiError(err, 'dlq.toast.retryFailed');
-    } finally {
-      setRetrying(false);
     }
   };
 
   const handleRetrySelected = async () => {
     if (selectedIds.size === 0) return;
-    
+
     try {
-      setRetrying(true);
-      const result = await dlqApi.retryBulk(projectId!, Array.from(selectedIds));
+      const result = await retryBulkMutation.mutateAsync(Array.from(selectedIds));
       showSuccess(t('dlq.toast.bulkRetried', { count: result.retried }));
-      loadData();
+      setSelectedIds(new Set());
+      refetchStats();
     } catch (err: any) {
       showApiError(err, 'dlq.toast.bulkRetryFailed');
-    } finally {
-      setRetrying(false);
     }
   };
 
   const handlePurgeAll = async () => {
     try {
-      setPurging(true);
-      const result = await dlqApi.purgeAll(projectId!);
+      const result = await purgeMutation.mutateAsync();
       showCriticalSuccess(t('dlq.toast.purged', { count: result.purged }));
       setShowPurgeDialog(false);
-      loadData();
+      setSelectedIds(new Set());
+      refetchStats();
     } catch (err: any) {
       showApiError(err, 'dlq.toast.purgeFailed');
-    } finally {
-      setPurging(false);
     }
   };
 
@@ -135,12 +112,20 @@ export default function DlqPage() {
     }
   };
 
-  if (loading && !project) {
+  if (loading) {
     return (
       <PageSkeleton maxWidth="max-w-7xl">
         <SkeletonCards count={3} height="h-20" cols="grid-cols-3" />
         <div className="h-[300px] bg-muted animate-pulse rounded-xl" />
       </PageSkeleton>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <ErrorState error={projectError ?? dlqError} fallbackKey="dlq.toast.loadFailed" onRetry={retry} />
+      </div>
     );
   }
 
@@ -260,7 +245,7 @@ export default function DlqPage() {
                 />
               </div>
 
-              <Button variant="outline" size="icon-sm" onClick={loadData} title={t('analytics.refresh')}>
+              <Button variant="outline" size="icon-sm" onClick={retry} title={t('analytics.refresh')}>
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </div>

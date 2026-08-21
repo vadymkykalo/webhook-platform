@@ -124,19 +124,19 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-14 | P0 | DONE | Plaintext reset tokens, logged temp password, unsafe defaults |
 | P1-15 | P1 | TODO | Publish Docker images — product is uninstallable today |
 | P1-16 | P1 | TODO | Reconcile versions, backfill CHANGELOG, UPGRADING.md |
-| P1-17 | P1 | TODO | Make CI security gates actually fail; add Dependabot |
+| P1-17 | P1 | DONE | Make CI security gates actually fail; add Dependabot |
 | P1-18 | P1 | TODO | Fix and harden install.sh |
 | P1-19 | P1 | TODO | Upgrade Spring Boot 3.2.0 (EOL) and base images |
-| P1-20 | P1 | TODO | Alertmanager + Compose backup/restore automation |
-| P1-21 | P1 | TODO | End-to-end delivery test (highest-value test in the list) |
+| P1-20 | P1 | DONE | Alertmanager + Compose backup/restore automation |
+| P1-21 | P1 | DONE | End-to-end delivery test (highest-value test in the list) |
 | P1-22 | P1 | TODO | Tests for WebhookDeliveryService |
 | P1-23 | P1 | TODO | Fix FIFO ordering (cursor regression, gap check, sequence) |
 | P1-24 | P1 | TODO | Retry ladder vs 48h cap, outbox ordering, SENDING recovery |
-| P1-25 | P1 | TODO | Incoming-forward claim + IngressService transaction scope |
+| P1-25 | P1 | DONE (25a/25b; 25c/25d follow-up) | Incoming-forward claim + IngressService transaction scope |
 | P1-26 | P1 | TODO | Thread/pool sizing, @Transactional bypass, lying metrics |
 | P1-27 | P1 | TODO | Rename SDK packages to hookflow (irreversible after publish) |
 | P1-28 | P1 | TODO | Coverage tooling (JaCoCo + vitest) |
-| P2-29 | P2 | TODO | UI never tells the user the backend is down |
+| P2-29 | P2 | DONE | UI never tells the user the backend is down |
 | P2-30 | P2 | TODO | Accessibility: zero aria-labels in the whole UI |
 | P2-31 | P2 | TODO | Hardcoded strings + 704KB bundle from eager locales |
 | P2-32 | P2 | TODO | Stored XSS via dangerouslySetInnerHTML + i18n |

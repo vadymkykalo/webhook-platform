@@ -28,13 +28,15 @@ export interface PageResponse<T> {
   number: number;
 }
 
+export interface DlqFilters {
+  endpointId?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export const dlqApi = {
-  list: (projectId: string, page = 0, size = 20, filters?: {
-    endpointId?: string;
-    search?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }): Promise<PageResponse<DlqItemResponse>> => {
+  list: (projectId: string, page = 0, size = 20, filters?: DlqFilters): Promise<PageResponse<DlqItemResponse>> => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (filters?.endpointId) params.append('endpointId', filters.endpointId);
     if (filters?.search) params.append('search', filters.search);

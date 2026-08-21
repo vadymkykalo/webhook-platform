@@ -195,6 +195,66 @@ class IncomingForwardServiceTest {
         verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt());
     }
 
+    // -- P1-25a: duplicate Kafka delivery of a retry message must not double-POST --
+
+    @Test
+    void retryMessageWithoutFencingToken_legacyProducer_stillDispatches() {
+        // Rolling-deploy compatibility: a message published before the startedAt field
+        // existed (null) must not be silently dropped -- fall back to the old behavior.
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(2).replay(false)
+                .startedAt(null)
+                .build();
+
+        service.processForward(message);
+
+        verify(attemptRepository, never()).claimRetryForProcessing(any(), any(), anyInt(), any());
+        // Guard chain must have been entered -- proves attemptForward ran.
+        verify(concurrencyControlService).tryAcquire(destinationId);
+    }
+
+    @Test
+    void duplicateRetryMessage_secondDeliveryFailsClaim_neverEntersDispatch() {
+        // Reproduces P1-25a: IncomingForwardRetryScheduler publishes a retry message,
+        // the Kafka offset commit is lost on a rebalance (ordinary at-least-once), the
+        // record is re-consumed, and both copies call processForward with an identical
+        // message (same fencing token). Without the CAS claim, both would see
+        // status=PROCESSING and both would call attemptForward, POSTing twice to the
+        // destination. With the CAS, only the delivery that still matches the token
+        // proceeds -- the duplicate is rejected before the guard chain (and therefore
+        // before the HTTP call) even starts.
+        Instant fencingToken = Instant.now();
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
+
+        // First delivery wins the CAS; the redelivered duplicate finds the token already
+        // consumed (started_at moved on) and updates 0 rows.
+        when(attemptRepository.claimRetryForProcessing(eventId, destinationId, 2, fencingToken))
+                .thenReturn(1)
+                .thenReturn(0);
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(2).replay(false)
+                .startedAt(fencingToken)
+                .build();
+
+        // Simulate the exact same Kafka record being delivered twice.
+        service.processForward(message);
+        service.processForward(message);
+
+        verify(attemptRepository, times(2))
+                .claimRetryForProcessing(eventId, destinationId, 2, fencingToken);
+        // Only the winning delivery must reach the dispatch guard chain -- i.e. exactly
+        // one attempt to acquire a concurrency permit, which is what gates the HTTP POST.
+        verify(concurrencyControlService, times(1)).tryAcquire(destinationId);
+    }
+
     // -- SSRF failure: claim + update, not INSERT --
 
     @Test

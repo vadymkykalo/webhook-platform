@@ -98,67 +98,130 @@ public class IngressService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
+    /**
+     * P1-25b: only the writes (IncomingEvent + forward attempts + outbox) run inside a
+     * transaction. Token lookup, rate limiting, payload-size check, signature verification and
+     * replay-marking all happen first, on plain (non-transactional) reads and Redis round
+     * trips -- previously the whole method ran inside one transaction, so every invalid-token
+     * or rate-limited request held a Hikari connection for the duration of two Redis calls that
+     * never wrote anything (a cheap DoS on the connection pool).
+     */
     public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
-        try {
-            return transactionTemplate.execute(status -> doReceiveWebhook(token, body, request));
-        } catch (DataIntegrityViolationException e) {
-            return handleDuplicateRace(token, body, request, e);
-        }
-    }
+        IncomingSource source = resolveActiveSource(token);
+        enforceRateLimit(source);
+        enforcePayloadSize(body);
 
-    private IncomingEvent handleDuplicateRace(String token, String body, HttpServletRequest request,
-                                               DataIntegrityViolationException e) {
+        RequestMetadata meta = extractMetadata(body, request);
+        VerificationOutcome verification = verifyAndCheckReplay(source, body, request);
+
+        // Block immediately when signature verification is configured and not verified
+        if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verification.verified())) {
+            meterRegistry.counter("incoming_events_rejected_total",
+                    "reason", "signature_verification_failed").increment();
+            String reason = verification.verificationError() != null
+                    ? verification.verificationError() : "Verification not completed";
+            log.warn("Rejecting incoming webhook due to failed signature verification: sourceId={}, error={}",
+                    source.getId(), reason);
+            throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
+        }
+
+        // Extract provider event ID for dedup (well-known headers only, no body hash fallback)
         String providerEventId = ProviderEventIdExtractor.extract(request, body);
+
+        // Dedup: if same source + same provider event ID already exists, return existing
+        // (idempotent). Plain read, no explicit transaction needed.
         if (providerEventId != null) {
-            var source = sourceRepository.findByIngressPathToken(token);
-            if (source.isPresent()) {
-                var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(
-                        source.get().getId(), providerEventId);
-                if (existing.isPresent()) {
-                    log.info("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
-                            source.get().getId(), providerEventId, existing.get().getId());
-                    meterRegistry.counter("incoming_events_deduplicated_total").increment();
-                    return existing.get();
-                }
+            var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
+            if (existing.isPresent()) {
+                log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
+                        source.getId(), providerEventId, existing.get().getId());
+                meterRegistry.counter("incoming_events_deduplicated_total").increment();
+                return existing.get();
             }
         }
-        throw e;
+
+        try {
+            return transactionTemplate.execute(status ->
+                    persistEventAndForwardAttempts(source, meta, providerEventId, verification));
+        } catch (DataIntegrityViolationException e) {
+            IncomingEvent recovered = handleDuplicateRace(source, providerEventId, e);
+            if (recovered != null) {
+                return recovered;
+            }
+            // Genuinely lost -- nothing was persisted and there's no existing row to fall back
+            // to. The replay marker (if any) must not stay burned for a webhook that never made
+            // it to disk, or the provider's legitimate resend gets rejected as a replay for the
+            // rest of the TTL window instead of just being retried.
+            releaseReplayMarkerAfterFailedPersist(source, verification);
+            throw e;
+        } catch (RuntimeException e) {
+            releaseReplayMarkerAfterFailedPersist(source, verification);
+            throw e;
+        }
     }
 
-    private IncomingEvent doReceiveWebhook(String token, String body, HttpServletRequest request) {
+    private IncomingSource resolveActiveSource(String token) {
         IncomingSource source = sourceRepository.findByIngressPathToken(token)
                 .orElseThrow(() -> new SourceNotFoundException("Invalid ingress token"));
-
         if (source.getStatus() != IncomingSourceStatus.ACTIVE) {
             throw new SourceDisabledException("Source is disabled");
         }
+        return source;
+    }
 
+    private void enforceRateLimit(IncomingSource source) {
         // Per-source rate limiting (fail-closed: reject if Redis is down)
         if (source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0) {
             if (!rateLimiterService.tryAcquireForSourceFailClosed(source.getId(), source.getRateLimitPerSecond())) {
                 throw new RateLimitExceededException("Rate limit exceeded for source " + source.getId());
             }
         }
+    }
 
+    private void enforcePayloadSize(String body) {
         // Enforce size limit (measure in bytes, not characters — multi-byte UTF-8 matters)
         if (body != null && body.getBytes(StandardCharsets.UTF_8).length > maxPayloadSizeBytes) {
             throw new PayloadTooLargeException("Payload exceeds maximum allowed size of " + maxPayloadSizeBytes + " bytes");
         }
+    }
 
-        // Extract metadata
+    private record RequestMetadata(String requestId, String method, String path, String queryParams,
+                                    String contentType, String clientIp, String userAgent,
+                                    String headersJson, String bodySha256, String body) {
+    }
+
+    private RequestMetadata extractMetadata(String body, HttpServletRequest request) {
         String requestId = UUID.randomUUID().toString();
         String method = request.getMethod();
         String path = request.getRequestURI();
         String queryParams = request.getQueryString();
         String contentType = request.getContentType();
         String clientIp = clientIpResolver.resolve(request);
-        String userAgent = request.getHeader("User-Agent");
+        String rawUserAgent = request.getHeader("User-Agent");
+        String userAgent = rawUserAgent != null && rawUserAgent.length() > 512
+                ? rawUserAgent.substring(0, 512) : rawUserAgent;
         String headersJson = HeaderSanitizer.toJson(request, objectMapper);
         String bodySha256 = computeSha256(body);
+        return new RequestMetadata(requestId, method, path, queryParams, contentType, clientIp, userAgent,
+                headersJson, bodySha256, body);
+    }
 
-        // Verify signature BEFORE dedup to prevent dedup poisoning (P0 security fix).
-        // An attacker could send a webhook with a known providerEventId but invalid signature;
-        // if we dedup/persist first, the poisoned record blocks the real webhook.
+    private record VerificationOutcome(Boolean verified, String verificationError, String replayKey) {
+    }
+
+    /**
+     * Verifies the signature BEFORE dedup to prevent dedup poisoning (P0 security fix). An
+     * attacker could send a webhook with a known providerEventId but invalid signature; if we
+     * dedup/persist first, the poisoned record blocks the real webhook.
+     *
+     * <p>Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify):
+     * after successful verification, check if this exact signature was already seen. Key =
+     * sourceId + SHA256(replayKey). TTL = 5 min (matches provider timestamp tolerance). The
+     * check marks the signature as seen as a side effect (P1-25b) -- if the write that's
+     * supposed to follow never commits, the caller must release this mark via
+     * {@link #releaseReplayMarkerAfterFailedPersist}.
+     */
+    private VerificationOutcome verifyAndCheckReplay(IncomingSource source, String body, HttpServletRequest request) {
         Boolean verified = null;
         String verificationError = null;
         String replayKey = null;
@@ -179,9 +242,6 @@ public class IngressService {
             }
         }
 
-        // Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify).
-        // After successful verification, check if this exact signature was already seen.
-        // Key = sourceId + SHA256(replayKey). TTL = 5 min (matches provider timestamp tolerance).
         if (Boolean.TRUE.equals(verified) && replayKey != null) {
             if (replayDetectionService.isReplay(source.getId().toString(), replayKey)) {
                 meterRegistry.counter("incoming_events_rejected_total",
@@ -191,46 +251,54 @@ public class IngressService {
             }
         }
 
-        // Block immediately when signature verification is configured and not verified
-        if (source.getVerificationMode() != VerificationMode.NONE && !Boolean.TRUE.equals(verified)) {
-            meterRegistry.counter("incoming_events_rejected_total",
-                    "reason", "signature_verification_failed").increment();
-            String reason = verificationError != null ? verificationError : "Verification not completed";
-            log.warn("Rejecting incoming webhook due to failed signature verification: sourceId={}, error={}",
-                    source.getId(), reason);
-            throw new SignatureVerificationFailedException("Signature verification failed: " + reason);
+        return new VerificationOutcome(verified, verificationError, replayKey);
+    }
+
+    private void releaseReplayMarkerAfterFailedPersist(IncomingSource source, VerificationOutcome verification) {
+        if (Boolean.TRUE.equals(verification.verified()) && verification.replayKey() != null) {
+            replayDetectionService.unmark(source.getId().toString(), verification.replayKey());
+            log.warn("Released replay marker after failed persist so a legitimate resend is not "
+                    + "permanently rejected: sourceId={}", source.getId());
         }
+    }
 
-        // Extract provider event ID for dedup (well-known headers only, no body hash fallback)
-        String providerEventId = ProviderEventIdExtractor.extract(request, body);
-
-        // Dedup: if same source + same provider event ID already exists, return existing (idempotent)
+    private IncomingEvent handleDuplicateRace(IncomingSource source, String providerEventId,
+                                               DataIntegrityViolationException e) {
         if (providerEventId != null) {
             var existing = eventRepository.findByIncomingSourceIdAndProviderEventId(source.getId(), providerEventId);
             if (existing.isPresent()) {
-                log.info("Duplicate incoming webhook detected: sourceId={}, providerEventId={}, existingEventId={}",
+                log.info("Duplicate race resolved for incoming webhook: sourceId={}, providerEventId={}, existingEventId={}",
                         source.getId(), providerEventId, existing.get().getId());
                 meterRegistry.counter("incoming_events_deduplicated_total").increment();
                 return existing.get();
             }
         }
+        return null;
+    }
 
-        // Persist the event
+    /**
+     * Everything that must be transactional: persisting the IncomingEvent row and, if there are
+     * enabled destinations, the forward-attempt + outbox rows in the same transaction as the
+     * outbox pattern requires. Runs inside {@code transactionTemplate.execute} only -- no
+     * Redis/verification work happens in here (P1-25b).
+     */
+    private IncomingEvent persistEventAndForwardAttempts(IncomingSource source, RequestMetadata meta,
+                                                           String providerEventId, VerificationOutcome verification) {
         IncomingEvent event = IncomingEvent.builder()
                 .incomingSourceId(source.getId())
-                .requestId(requestId)
-                .method(method)
-                .path(path)
-                .queryParams(queryParams)
-                .headersJson(headersJson)
-                .bodyRaw(body)
-                .bodySha256(bodySha256)
+                .requestId(meta.requestId())
+                .method(meta.method())
+                .path(meta.path())
+                .queryParams(meta.queryParams())
+                .headersJson(meta.headersJson())
+                .bodyRaw(meta.body())
+                .bodySha256(meta.bodySha256())
                 .providerEventId(providerEventId)
-                .contentType(contentType)
-                .clientIp(clientIp)
-                .userAgent(userAgent != null && userAgent.length() > 512 ? userAgent.substring(0, 512) : userAgent)
-                .verified(verified)
-                .verificationError(verificationError)
+                .contentType(meta.contentType())
+                .clientIp(meta.clientIp())
+                .userAgent(meta.userAgent())
+                .verified(verification.verified())
+                .verificationError(verification.verificationError())
                 .receivedAt(Instant.now())
                 .build();
 
@@ -240,7 +308,7 @@ public class IngressService {
                 "provider_type", source.getProviderType().name()).increment();
 
         log.info("Received incoming webhook: eventId={}, sourceId={}, requestId={}, verified={}",
-                event.getId(), source.getId(), requestId, verified);
+                event.getId(), source.getId(), meta.requestId(), verification.verified());
 
         // Create forward attempts + outbox messages in batch
         List<IncomingDestination> destinations = destinationRepository

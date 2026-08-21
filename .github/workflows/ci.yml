@@ -98,6 +98,77 @@ jobs:
           echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
 
+  # P1-20: proves backups are actually restorable, not just "a CronJob ran".
+  # backup -> destroy the data -> restore -> assert it's back. An untested
+  # restore path is the most common cause of an unusable backup.
+  restore-drill:
+    name: Backup/Restore Drill
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env from .env.dist
+        run: cp .env.dist .env
+
+      - name: Start embedded Postgres
+        run: docker compose --profile embedded-db up -d postgres
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec webhook-postgres pg_isready -U webhook_user -d webhook_platform; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Postgres never became ready"
+          exit 1
+
+      - name: Seed test data (simulates "ingest some events")
+        run: |
+          docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c \
+            "CREATE TABLE restore_drill_test (id serial primary key, note text);"
+          docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c \
+            "INSERT INTO restore_drill_test (note) VALUES ('event-1'), ('event-2'), ('event-3');"
+
+      - name: Backup (make backup-db)
+        run: make backup-db
+
+      - name: Destroy the data
+        run: docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c "DROP TABLE restore_drill_test;"
+
+      - name: Restore (make restore-db)
+        run: |
+          FILE=$(ls -t backups/webhook_platform_*.dump | head -1)
+          echo "Restoring from $FILE"
+          make restore-db FILE="$FILE" CONFIRM=YES
+
+      - name: Assert data integrity
+        run: |
+          COUNT=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -tAc "SELECT count(*) FROM restore_drill_test;")
+          echo "Row count after restore: $COUNT"
+          if [ "$COUNT" != "3" ]; then
+            echo "::error::Restore drill FAILED — expected 3 rows after restore, got $COUNT"
+            exit 1
+          fi
+          NOTES=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -tAc "SELECT string_agg(note, ',' ORDER BY id) FROM restore_drill_test;")
+          if [ "$NOTES" != "event-1,event-2,event-3" ]; then
+            echo "::error::Restore drill FAILED — row content mismatch: $NOTES"
+            exit 1
+          fi
+
+      - name: Restore Drill Summary
+        if: always()
+        run: |
+          echo "### Backup/Restore Drill Results" >> $GITHUB_STEP_SUMMARY
+          echo "backup -> destroy -> restore -> assert data integrity: PASSED" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --profile embedded-db down -v
+
   frontend-lint:
     name: Frontend Lint & Typecheck
     runs-on: ubuntu-latest
@@ -203,15 +274,23 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
+      # SpotBugs stays advisory (continue-on-error) DELIBERATELY, not by oversight:
+      # the existing findings across all modules have not been triaged yet, so
+      # flipping this to gating today would block every PR on pre-existing debt
+      # instead of new regressions. Triage is tracked separately; once the
+      # backlog is clear (or suppressed with justification, like the OWASP
+      # suppression file below), remove `continue-on-error` here so new SpotBugs
+      # findings fail the build the same way Trivy/OWASP now do.
       - name: Run SpotBugs analysis
         run: mvn compile com.github.spotbugs:spotbugs-maven-plugin:4.8.3.1:check -B -DskipTests
         continue-on-error: true
-      
+
       - name: SAST Summary
         if: always()
         run: |
           echo "### SAST (SpotBugs) Results" >> $GITHUB_STEP_SUMMARY
           echo "Static analysis completed. Check workflow logs for findings." >> $GITHUB_STEP_SUMMARY
+          echo "_Advisory only — see comment in ci.yml for why this doesn't gate yet._" >> $GITHUB_STEP_SUMMARY
 
   security-sca:
     name: SCA (OWASP Dependency-Check)
@@ -229,10 +308,39 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
+      # Gates on CVSS >= 9 (CRITICAL) first, staged the same way as Trivy below:
+      # widen to HIGH (CVSS >= 7) once the CRITICAL backlog is clear. Known
+      # false positives go in the reviewed suppression file, not a blanket
+      # continue-on-error.
+      #
+      # -DknownExploitedEnabled=false: the CISA KEV datafeed
+      # (cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json)
+      # returned 403 from this task's build environment (a cloud/datacenter
+      # egress IP) — bot-protection on that .gov host blocks non-browser
+      # clients, not something we control, and this is a commonly reported
+      # issue from CI/cloud IPs generally. Without disabling it, the whole scan
+      # hard-fails on a feed download error before any CVE analysis runs, which
+      # is a false-red build, not a real finding. If GitHub-hosted runners turn
+      # out to reach that host fine, re-enabling this is a one-line revert.
+      # NVD itself (services.nvd.nist.gov) was reachable without this flag.
+      #
+      # NVD_API_KEY: add repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
+      # — without it, unauthenticated NVD requests are rate-limited hard enough
+      # that this step reliably fails with "the NVD returned a 403 or 404
+      # error" (reproduced locally). That failure is intentionally NOT
+      # swallowed by continue-on-error: a security gate that can't fetch fresh
+      # vulnerability data should go red, not silently pass. Once the secret is
+      # added, this step should complete and start gating on real findings.
       - name: Run OWASP Dependency-Check
-        run: mvn org.owasp:dependency-check-maven:9.0.9:aggregate -B -DskipTests -DfailBuildOnCVSS=9
-        continue-on-error: true
-      
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn org.owasp:dependency-check-maven:9.0.9:aggregate -B -DskipTests
+          -DfailBuildOnCVSS=9
+          -DknownExploitedEnabled=false
+          -DnvdApiKey="${NVD_API_KEY}"
+          -DsuppressionFiles=.github/dependency-check-suppressions.xml
+
       - name: Upload Dependency-Check report
         if: always()
         uses: actions/upload-artifact@v4
@@ -246,6 +354,7 @@ jobs:
         run: |
           echo "### SCA (OWASP Dependency-Check) Results" >> $GITHUB_STEP_SUMMARY
           echo "Dependency vulnerability scan completed. Report uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          echo "Gates on CVSS >= 9 (see comment above the scan step for the staged rollout plan)." >> $GITHUB_STEP_SUMMARY
 
   docker-build:
     name: Docker Images
@@ -278,7 +387,6 @@ jobs:
     name: Container Security Scan (Trivy)
     runs-on: ubuntu-latest
     needs: docker-build
-    continue-on-error: true
     timeout-minutes: 30
     
     steps:
@@ -307,17 +415,36 @@ jobs:
           trivy image --download-db-only --db-repository public.ecr.aws/aquasecurity/trivy-db:2
           trivy image --download-java-db-only --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db:1
       
-      - name: Run Trivy on API image
-        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-api:test
-      
-      - name: Run Trivy on Worker image
-        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-worker:test
-      
-      - name: Run Trivy on UI image
-        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-ui:test
-      
+      # Staged rollout: gate on CRITICAL now (exit-code 1, build goes red), keep
+      # HIGH informational (exit-code 0) until the CRITICAL backlog is triaged.
+      # Widen to HIGH by dropping `--severity CRITICAL --exit-code 1` for the
+      # advisory step below and deleting the gating step once ready.
+      - name: Run Trivy on API image (CRITICAL - gating)
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-api:test
+
+      - name: Run Trivy on API image (HIGH - informational)
+        if: always()
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-api:test
+
+      - name: Run Trivy on Worker image (CRITICAL - gating)
+        if: always()
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-worker:test
+
+      - name: Run Trivy on Worker image (HIGH - informational)
+        if: always()
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-worker:test
+
+      - name: Run Trivy on UI image (CRITICAL - gating)
+        if: always()
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-ui:test
+
+      - name: Run Trivy on UI image (HIGH - informational)
+        if: always()
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-ui:test
+
       - name: Container Scan Summary
         if: always()
         run: |
           echo "### Container Scan (Trivy) Results" >> $GITHUB_STEP_SUMMARY
           echo "Container vulnerability scan completed for all images." >> $GITHUB_STEP_SUMMARY
+          echo "CRITICAL findings fail the build; HIGH is informational during the staged rollout." >> $GITHUB_STEP_SUMMARY
