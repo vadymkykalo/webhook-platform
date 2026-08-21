@@ -1,6 +1,6 @@
 # P1-18 — Fix and harden install.sh
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1 — it is the headline install method, piped to bash
 - **Branch:** `feature/P1-18-install-sh-hardening`
 - **Depends on:** P1-15 (checksums are published by the release workflow)
