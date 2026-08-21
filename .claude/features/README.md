@@ -136,7 +136,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P1-26 | P1 | TODO | Thread/pool sizing, @Transactional bypass, lying metrics |
 | P1-27 | P1 | TODO | Rename SDK packages to hookflow (irreversible after publish) |
 | P1-28 | P1 | TODO | Coverage tooling (JaCoCo + vitest) |
-| P2-29 | P2 | TODO | UI never tells the user the backend is down |
+| P2-29 | P2 | DONE | UI never tells the user the backend is down |
 | P2-30 | P2 | TODO | Accessibility: zero aria-labels in the whole UI |
 | P2-31 | P2 | TODO | Hardcoded strings + 704KB bundle from eager locales |
 | P2-32 | P2 | TODO | Stored XSS via dangerouslySetInnerHTML + i18n |

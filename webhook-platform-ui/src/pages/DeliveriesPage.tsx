@@ -5,12 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
 import { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { deliveriesApi } from '../api/deliveries.api';
-import { projectsApi } from '../api/projects.api';
-import { endpointsApi } from '../api/endpoints.api';
-import { eventsApi } from '../api/events.api';
-import type { DeliveryResponse, ProjectResponse, EndpointResponse } from '../types/api.types';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import { useProject, useEndpoints, useDeliveries, useEvent, useBulkReplayDeliveries } from '../api/queries';
+import type { DeliveryResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -51,20 +48,28 @@ const DATE_RANGE_OPTIONS = [
   { value: '30d', label: 'Last 30 days' },
 ];
 
+/** Trailing window bound to a coarse (minute) grain so the upper bound keeps
+ * advancing as time passes without changing — and re-fetching — on every render. */
+function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: string; toDate?: string } {
+  const now = nowMinute * 60_000;
+  const toDate = new Date(now).toISOString();
+  const spanMs: Record<string, number> = {
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+  };
+  const span = spanMs[dateRange];
+  if (!span) return {};
+  return { fromDate: new Date(now - span).toISOString(), toDate };
+}
+
 export default function DeliveriesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const eventIdFilter = searchParams.get('eventId') || '';
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [filteredEventType, setFilteredEventType] = useState<string | null>(null);
-  const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
-  const [deliveries, setDeliveries] = useState<DeliveryResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  
+
   const [statusFilter, setStatusFilter] = useState('');
   const [endpointFilter, setEndpointFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,106 +80,51 @@ export default function DeliveriesPage() {
   const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
 
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
-  const [bulkReplaying, setBulkReplaying] = useState(false);
   const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
   const { canReplayDeliveries } = usePermissions();
-
-  useEffect(() => {
-    if (projectId) {
-      loadInitialData();
-    }
-  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (projectId) {
-      loadDeliveries();
-    }
-  }, [projectId, statusFilter, endpointFilter, eventIdFilter, debouncedSearch, dateRange, page, pageSize, sortParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const timer = setTimeout(() => { setDebouncedSearch(searchQuery); setPage(0); }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Advances once a minute so the trailing date-range window keeps including
+  // newly-created deliveries without recomputing (and re-fetching) every render.
+  const [nowMinute, setNowMinute] = useState(() => Math.floor(Date.now() / 60_000));
   useEffect(() => {
-    if (projectId && eventIdFilter) {
-      eventsApi.get(projectId, eventIdFilter).then(e => setFilteredEventType(e.eventType)).catch(() => setFilteredEventType(null));
-    } else {
-      setFilteredEventType(null);
-    }
-  }, [projectId, eventIdFilter]);
+    const id = setInterval(() => setNowMinute(Math.floor(Date.now() / 60_000)), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
-  // Auto-refresh when there are active deliveries
-  useEffect(() => {
-    const hasActive = deliveries.some(d => d.status === 'PENDING' || d.status === 'PROCESSING');
-    if (!hasActive) return;
-    const interval = setInterval(loadDeliveries, 5000);
-    return () => clearInterval(interval);
-  }, [deliveries]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: project, isLoading: projectLoading, isError: projectIsError, error: projectError, refetch: refetchProject } = useProject(projectId);
+  const { data: endpoints = [] } = useEndpoints(projectId);
+  const { data: filteredEvent } = useEvent(projectId, eventIdFilter || undefined);
+  const filteredEventType = filteredEvent?.eventType ?? null;
 
-  const loadInitialData = async () => {
-    if (!projectId) return;
-    
-    try {
-      const [projectData, endpointsData] = await Promise.all([
-        projectsApi.get(projectId),
-        endpointsApi.list(projectId),
-      ]);
-      setProject(projectData);
-      setEndpoints(endpointsData);
-    } catch (err: any) {
-      showApiError(err, 'endpoints.toast.loadFailed', { retry: loadInitialData });
-    }
-  };
+  const { fromDate, toDate } = dateRangeBounds(dateRange, nowMinute);
+  const {
+    data: deliveriesData, isLoading: deliveriesLoading, isError: deliveriesIsError, error: deliveriesError, refetch: refetchDeliveries,
+  } = useDeliveries(projectId, {
+    page,
+    size: pageSize,
+    sort: sortParam,
+    status: statusFilter || undefined,
+    endpointId: endpointFilter || undefined,
+    eventId: eventIdFilter || undefined,
+    eventType: debouncedSearch || undefined,
+    fromDate: eventIdFilter ? undefined : fromDate,
+    toDate: eventIdFilter ? undefined : toDate,
+  });
+  const deliveries = deliveriesData?.content ?? [];
+  const totalElements = deliveriesData?.totalElements ?? 0;
+  const totalPages = deliveriesData?.totalPages ?? 0;
 
-  const loadDeliveries = async () => {
-    if (!projectId) return;
-    
-    try {
-      setLoading(true);
-      
-      // Calculate date range for fromDate/toDate
-      let fromDate: string | undefined;
-      let toDate: string | undefined;
-      
-      if (dateRange) {
-        const now = new Date();
-        toDate = now.toISOString();
-        
-        switch (dateRange) {
-          case '24h':
-            fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-            break;
-          case '7d':
-            fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            break;
-          case '30d':
-            fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
-            break;
-        }
-      }
-      
-      const response = await deliveriesApi.listByProject(projectId, {
-        page,
-        size: pageSize,
-        sort: sortParam,
-        status: statusFilter || undefined,
-        endpointId: endpointFilter || undefined,
-        eventId: eventIdFilter || undefined,
-        eventType: debouncedSearch || undefined,
-        fromDate: eventIdFilter ? undefined : fromDate,
-        toDate: eventIdFilter ? undefined : toDate,
-      });
-      
-      setDeliveries(response.content);
-      setTotalElements(response.totalElements);
-      setTotalPages(response.totalPages);
-    } catch (err: any) {
-      showApiError(err, 'endpoints.toast.loadFailed', { retry: loadDeliveries });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = projectLoading || deliveriesLoading;
+  const isError = projectIsError || deliveriesIsError;
+  const retry = () => { refetchProject(); refetchDeliveries(); };
+
+  const bulkReplayMutation = useBulkReplayDeliveries();
+  const bulkReplaying = bulkReplayMutation.isPending;
 
   const getStatusBadge = (status: DeliveryResponse['status']) => {
     const variants: Record<typeof status, { variant: any; icon: any }> = {
@@ -204,37 +154,49 @@ export default function DeliveriesPage() {
 
   const handleBulkReplay = async () => {
     if (!projectId) return;
-    
+
     const hasFilters = statusFilter || endpointFilter;
     const failedOrDlqSelected = statusFilter === 'FAILED' || statusFilter === 'DLQ';
-    
+
     if (!hasFilters && !failedOrDlqSelected) {
       showApiError(new Error('Filter required'), 'deliveries.replayError');
       return;
     }
-    
-    setBulkReplaying(true);
+
     try {
-      const response = await deliveriesApi.bulkReplay({
+      const response = await bulkReplayMutation.mutateAsync({
         projectId,
         status: statusFilter || undefined,
         endpointId: endpointFilter || undefined,
       });
-      
+
       if (response.hasMore) {
         showWarning(t('deliveries.bulkReplayHasMore', { replayed: response.replayed, total: response.totalMatched }));
       } else {
         showSuccess(response.message);
       }
-      loadDeliveries();
     } catch (err: any) {
       showApiError(err, 'deliveries.toast.replayFailed');
-    } finally {
-      setBulkReplaying(false);
     }
   };
 
   const filteredDeliveries = deliveries;
+
+  if (loading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <SkeletonRows count={5} />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <ErrorState error={projectError ?? deliveriesError} fallbackKey="deliveries.toast.loadFailed" onRetry={retry} />
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -305,9 +267,7 @@ export default function DeliveriesPage() {
         </CardContent>
       </Card>
 
-      {loading ? (
-        <SkeletonRows count={5} />
-      ) : filteredDeliveries.length === 0 ? (
+      {filteredDeliveries.length === 0 ? (
         eventIdFilter && filteredEventType ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
             <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
@@ -428,7 +388,7 @@ export default function DeliveriesPage() {
         deliveryId={selectedDeliveryId}
         open={!!selectedDeliveryId}
         onClose={() => setSelectedDeliveryId(null)}
-        onRefresh={loadDeliveries}
+        onRefresh={refetchDeliveries}
       />
 
       {/* Bulk Replay Confirmation */}
