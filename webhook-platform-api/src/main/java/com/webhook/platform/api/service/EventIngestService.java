@@ -96,8 +96,7 @@ public class EventIngestService {
         // *without* a sequence number. Deliberately generated and assigned only after this
         // method's transaction has committed (see assignSequenceNumbersPostCommit) so that a
         // rollback here -- including the DataIntegrityViolationException idempotency-race path
-        // below -- can never burn a sequence number that no delivery ends up carrying (P1-23 /
-        // 23c).
+        // below -- can never burn a sequence number that no delivery ends up carrying.
         List<Delivery> pendingSequenceAssignment = new ArrayList<>();
         EventIngestResponse response;
         try {
@@ -196,10 +195,10 @@ public class EventIngestService {
         event = eventRepository.saveAndFlush(event);
         Counter.builder("events_ingested_total").register(meterRegistry).increment();
         // Increment Redis quota counter (fire-and-forget, approximate is OK)
-        // NOTE (P1-23 audit, tracked for P1-26 not fixed here): like the old sequence
+        // NOTE (known bug, not fixed here): like the old sequence
         // generator, this runs *inside* the ingest transaction and is not rolled back if the
-        // transaction later aborts -- a rolled-back ingest still consumes quota. Non-ordering
-        // bug, out of scope for this task; flagged for P1-26.
+        // transaction later aborts -- a rolled-back ingest still consumes quota. A
+        // non-ordering bug, out of scope here.
         if (project != null) {
             quotaCounterService.increment(project.getOrganizationId());
         }
@@ -270,7 +269,7 @@ public class EventIngestService {
 
         for (Subscription subscription : subscriptions) {
             // Ordering-enabled deliveries are saved without a sequence number here — it is
-            // generated and backfilled only after this transaction commits (P1-23 / 23c), see
+            // generated and backfilled only after this transaction commits, see
             // assignSequenceNumbersPostCommit. sequenceNumber stays null until then; the
             // worker only enforces ordering once both orderingEnabled and sequenceNumber are
             // set, so a delivery is simply delivered unordered in the narrow window before

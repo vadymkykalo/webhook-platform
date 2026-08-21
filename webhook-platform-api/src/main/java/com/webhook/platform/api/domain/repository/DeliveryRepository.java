@@ -133,7 +133,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
      * Highest sequence number ever generated (and persisted) for an endpoint. Used by
      * {@code SequenceGeneratorService} to reseed its Redis counter after a cache miss (e.g.
      * a Redis flush) instead of restarting from zero and permanently desyncing from
-     * {@code ordering_cursors} (P1-23 / 23c).
+     * {@code ordering_cursors}.
      */
     @Query("SELECT MAX(d.sequenceNumber) FROM Delivery d WHERE d.endpointId = :endpointId")
     Long findMaxSequenceNumber(@Param("endpointId") UUID endpointId);
@@ -141,7 +141,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     /**
      * Per-endpoint high-water mark of generated sequence numbers, restricted to endpoints
      * with ordering-enabled activity since {@code since}. Used by the periodic sequence/cursor
-     * reconciliation job (P1-23 / 23c) — bounded to recently-active endpoints so it stays
+     * reconciliation job — bounded to recently-active endpoints so it stays
      * cheap regardless of total endpoint count.
      */
     @Query(value = """

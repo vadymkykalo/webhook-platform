@@ -107,7 +107,7 @@ public class DataRetentionService {
         updateMetrics();
     }
     
-    // REMOVED (P3-36a): cleanupOldDeliveryAttempts() used to DELETE every attempt
+    // REMOVED: cleanupOldDeliveryAttempts() used to DELETE every attempt
     // (success or failure) older than deliveryAttemptsRetentionDays — an O(rows) scan
     // of the whole table on every run. delivery_attempts is now partitioned monthly
     // (V052) and PartitionMaintenanceService.dropExpiredPartitions() achieves the same
@@ -212,7 +212,7 @@ public class DataRetentionService {
         updateMetrics();
     }
 
-    // REMOVED (P3-36a): cleanupTunnelRequestLog() used to DELETE every row older than
+    // REMOVED: cleanupTunnelRequestLog() used to DELETE every row older than
     // tunnelRequestLogRetentionDays in one unbounded statement. tunnel_request_log is
     // now partitioned weekly (V053) and PartitionMaintenanceService.dropExpiredPartitions()
     // drops whole expired partitions instead. tunnelRequestLogRepository.deleteByCreatedAtBefore()

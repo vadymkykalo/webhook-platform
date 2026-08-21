@@ -49,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String tokenType = claims.get("typ", String.class);
                 if (!JwtUtil.TOKEN_TYPE_ACCESS.equals(tokenType)) {
                     // Deliberate rejection of anything that isn't an access token -- a refresh
-                    // token (or a pre-P0-10 token with no "typ" claim) must not authenticate
+                    // token (or a legacy token with no "typ" claim) must not authenticate
                     // API requests. Previously this only failed by accident (NPE below on the
                     // missing "organizationId" claim, swallowed by the catch block).
                     log.debug("Token jti={} has type={}, expected access, rejecting", jti, tokenType);

@@ -25,7 +25,7 @@ import java.util.UUID;
  * endpoint that goes quiet right after a Redis flush would otherwise sit desynced —
  * invisibly, since nothing would ever call {@code nextSequence} again to notice — until
  * traffic resumes. This job closes that gap and gives the desync a loud metric instead of
- * letting it stay silent (P1-23 / 23c).
+ * letting it stay silent.
  */
 @Service
 @Slf4j

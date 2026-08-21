@@ -27,7 +27,7 @@ public class UsageDailyAggregator {
     private final UsageDailyRepository usageDailyRepository;
     private final IncomingEventRepository incomingEventRepository;
     private final IncomingForwardAttemptRepository incomingForwardAttemptRepository;
-    // P1-26: aggregateForProject is invoked via `this` from aggregateYesterday, which bypasses
+    // aggregateForProject is invoked via `this` from aggregateYesterday, which bypasses
     // the Spring proxy, so @Transactional silently does nothing there. TransactionTemplate is
     // driven explicitly instead, matching the pattern used by OutboxPublisherService /
     // EventIngestService / EncryptionKeyRotationService in this codebase.

@@ -32,7 +32,7 @@ public interface DeviceAuthCodeRepository extends JpaRepository<DeviceAuthCode, 
      * and the second re-evaluates the WHERE against the now-committed row and finds
      * it no longer APPROVED (returns 0). Callers MUST check the return value rather
      * than assuming success — this is what makes {@code pollDeviceToken} single-use
-     * under concurrent polls (P0-12).
+     * under concurrent polls.
      */
     @Modifying
     @Query("UPDATE DeviceAuthCode d SET d.status = 'CONSUMED' WHERE d.id = :id AND d.status = 'APPROVED'")

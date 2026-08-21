@@ -78,7 +78,7 @@ public class OutboxPublisherService {
                 .tag("status", "pending")
                 .register(meterRegistry);
 
-        // P1-24c: SENDING was previously invisible to outbox_queue_depth entirely, so a batch
+        // SENDING was previously invisible to outbox_queue_depth entirely, so a batch
         // of messages stuck SENDING (in-flight past batch-send-timeout-seconds) produced no
         // metric signal at all — see deploy/prometheus/alerts.yml's OutboxSendingStuck alert.
         Gauge.builder("outbox_queue_depth", outboxMessageRepository,
@@ -132,7 +132,7 @@ public class OutboxPublisherService {
     @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
     @SchedulerLock(name = "outbox-publisher-retry", lockAtLeastFor = "PT5S", lockAtMostFor = "PT2M")
     public void retryFailedMessages() {
-        // P1-24c: recover stuck SENDING rows here, on the 30s retry cycle, instead of the
+        // Recover stuck SENDING rows here, on the 30s retry cycle, instead of the
         // hourly cleanupOldMessages() job. A message that stays SENDING past
         // batch-send-timeout-seconds (in-flight when publishBatchAsync's wait times out) used to
         // wait up to ~59 extra minutes for the hourly job to reclaim it — worst case ~1h of an
@@ -181,7 +181,7 @@ public class OutboxPublisherService {
     @Scheduled(fixedDelayString = "${outbox.publisher.cleanup-interval-ms:3600000}")
     @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
     public void cleanupOldMessages() {
-        // P1-24c: stuck-SENDING recovery moved to the 30s retryFailedMessages() cycle — see
+        // Stuck-SENDING recovery moved to the 30s retryFailedMessages() cycle — see
         // recoverStuckSendingMessages() below. Not duplicated here; this job just does deletes.
         Instant publishedCutoff = Instant.now().minus(Duration.ofDays(3));
         Integer deletedPublished = txTemplate.execute(status ->
@@ -209,7 +209,7 @@ public class OutboxPublisherService {
      * send never got a callback, before {@link #publishBatchAsync} could mark them
      * PUBLISHED/FAILED) back to PENDING so the next {@link #publishPendingMessages} poll can
      * reclaim them. Default {@code sendingRecoverySeconds}=300s provides margin over Kafka's
-     * delivery.timeout.ms (default 120s). Runs on the 30s retry cycle (P1-24c) rather than the
+     * delivery.timeout.ms (default 120s). Runs on the 30s retry cycle rather than the
      * hourly cleanup job so a transient broker hiccup doesn't leave messages stuck for up to an
      * hour with no visibility (see the "sending" outbox_queue_depth gauge registered above).
      */

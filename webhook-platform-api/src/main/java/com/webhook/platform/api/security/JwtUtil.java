@@ -26,7 +26,7 @@ public class JwtUtil {
      * Request-scoped cache to avoid re-verifying the same token's HMAC signature
      * multiple times within one request.
      *
-     * <p><b>Invariant (P1-19):</b> this is only safe because it is a {@code static}
+     * <p><b>Invariant:</b> this is only safe because it is a {@code static}
      * field shared across every {@code JwtUtil} instance on a given thread, and
      * {@link JwtAuthenticationFilter#doFilterInternal} unconditionally calls
      * {@link #clearCache()} in a {@code finally} block after the filter chain

@@ -99,7 +99,7 @@ public class IngressService {
     }
 
     /**
-     * P1-25b: only the writes (IncomingEvent + forward attempts + outbox) run inside a
+     * Only the writes (IncomingEvent + forward attempts + outbox) run inside a
      * transaction. Token lookup, rate limiting, payload-size check, signature verification and
      * replay-marking all happen first, on plain (non-transactional) reads and Redis round
      * trips -- previously the whole method ran inside one transaction, so every invalid-token
@@ -217,7 +217,7 @@ public class IngressService {
      * <p>Unified replay detection for ALL verifiers (Generic, Stripe, GitHub, Slack, Shopify):
      * after successful verification, check if this exact signature was already seen. Key =
      * sourceId + SHA256(replayKey). TTL = 5 min (matches provider timestamp tolerance). The
-     * check marks the signature as seen as a side effect (P1-25b) -- if the write that's
+     * check marks the signature as seen as a side effect -- if the write that's
      * supposed to follow never commits, the caller must release this mark via
      * {@link #releaseReplayMarkerAfterFailedPersist}.
      */
@@ -280,7 +280,7 @@ public class IngressService {
      * Everything that must be transactional: persisting the IncomingEvent row and, if there are
      * enabled destinations, the forward-attempt + outbox rows in the same transaction as the
      * outbox pattern requires. Runs inside {@code transactionTemplate.execute} only -- no
-     * Redis/verification work happens in here (P1-25b).
+     * Redis/verification work happens in here.
      */
     private IncomingEvent persistEventAndForwardAttempts(IncomingSource source, RequestMetadata meta,
                                                            String providerEventId, VerificationOutcome verification) {

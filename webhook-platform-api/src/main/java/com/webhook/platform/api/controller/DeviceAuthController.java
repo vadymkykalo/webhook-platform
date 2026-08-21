@@ -58,7 +58,7 @@ public class DeviceAuthController {
         // This endpoint is permitAll (no session yet) and the device_code is presented
         // by an unauthenticated caller, so it is a brute-force target within the code's
         // expiry window. Bucket by IP and by the presented device_code itself, reusing
-        // the same limiter as refresh/reset-password rather than a parallel one (P0-12).
+        // the same limiter as refresh/reset-password rather than a parallel one.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getDeviceCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
@@ -82,7 +82,7 @@ public class DeviceAuthController {
         // The "verification" step (RFC 8628 terms): a caller here already holds a valid
         // JWT, but the user_code space (8 chars, ~40 bits) is small enough that unlimited
         // authenticated attempts could still enumerate a pending code within its 10-minute
-        // window. Same limiter, bucketed by IP and by the presented user_code (P0-12).
+        // window. Same limiter, bucketed by IP and by the presented user_code.
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }

@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @Repository
 public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UUID> {
-    // P1-24b: the outer SELECT..IN(...) FOR UPDATE has its own ORDER BY created_at — without it,
+    // The outer SELECT..IN(...) FOR UPDATE has its own ORDER BY created_at — without it,
     // Postgres is free to return the id-filtered rows in arbitrary (plan) order even though the
     // inner subquery computed the correct rn_proj/rn_key ranking, so the List<OutboxMessage>
     // handed to OutboxPublisherService#publishBatchAsync could interleave up to maxPerKey
