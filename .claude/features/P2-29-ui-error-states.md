@@ -1,6 +1,6 @@
 # P2-29 — The UI never tells the user the backend is down
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P2 — first thing a self-hoster hits on day one
 - **Branch:** `feature/P2-29-ui-error-states`
 - **Depends on:** nothing
