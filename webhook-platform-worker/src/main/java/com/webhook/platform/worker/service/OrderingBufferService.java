@@ -96,7 +96,11 @@ public class OrderingBufferService {
      */
     public Long getLastDeliveredSequence(UUID endpointId) {
         String key = DELIVERED_SEQ_KEY_PREFIX + endpointId;
-        RBucket<Long> bucket = redissonClient.getBucket(key);
+        // LongCodec so this key's value on the wire is a plain decimal string -- exactly what
+        // the CAS Lua script in markDelivered() writes via a raw Redis SET. Reading it back
+        // with Redisson's default (Kryo) codec would fail to decode a value the script wrote,
+        // and vice versa; every accessor of this key must agree on one codec.
+        RBucket<Long> bucket = redissonClient.getBucket(key, LongCodec.INSTANCE);
         Long fromRedis = bucket.get();
         
         if (fromRedis != null) {

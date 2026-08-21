@@ -172,6 +172,8 @@ class DeliveryEndToEndIntegrationTest {
     private KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private org.redisson.api.RedissonClient redissonClient;
 
     // ── fixture helpers ─────────────────────────────────────────────────────────────────
 
@@ -572,5 +574,205 @@ class DeliveryEndToEndIntegrationTest {
         assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
         assertEquals(1, finalDelivery.getAttemptCount());
         wireMock.verify(1, postRequestedFor(urlEqualTo(path)));
+    }
+
+    private Delivery createOrderedPendingDelivery(UUID deliveryId, UUID eventId, UUID endpointId,
+            long sequenceNumber, int maxAttempts, String retryDelays, int timeoutSeconds) {
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId)
+                .eventId(eventId)
+                .endpointId(endpointId)
+                .subscriptionId(UUID.randomUUID())
+                .deliveryOrigin(Delivery.DeliveryOrigin.SUBSCRIPTION)
+                .status(Delivery.DeliveryStatus.PENDING)
+                .attemptCount(0)
+                .maxAttempts(maxAttempts)
+                .orderingEnabled(true)
+                .sequenceNumber(sequenceNumber)
+                .timeoutSeconds(timeoutSeconds)
+                .retryDelays(retryDelays)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        return deliveryRepository.save(delivery);
+    }
+
+    /**
+     * P1-23's own end-to-end proof, on this same real Postgres+Kafka+Redis+WireMock harness:
+     * N ordering-enabled deliveries for one endpoint, published to Kafka <em>out of sequence
+     * order</em>, with an induced retry (one 500 then a 200) on a delivery in the middle of the
+     * range. They must still arrive at WireMock in strict sequence order.
+     *
+     * <p>This is the integration-level complement to the unit tests in
+     * {@code OrderingBufferServiceTest} and the {@code canDeliverWithOrdering} tests in {@code
+     * WebhookDeliveryServiceTest} — those prove the CAS/range/timeout logic in isolation with
+     * mocked Redis/DB; this proves the real {@code OrderingBufferService} +
+     * {@code OrderingCursorRepository} + real Redis + real Postgres wiring actually holds FIFO
+     * under a genuine out-of-order publish and a genuine mid-range retry, not just against
+     * mocked collaborators.</p>
+     */
+    @Test
+    void orderedDeliveries_publishedOutOfOrderWithAnInducedRetry_arriveAtWireMockInOrder() {
+        UUID endpointId = UUID.randomUUID();
+        String path = "/hook/ordered-" + endpointId;
+        createEndpoint(endpointId, path);
+
+        int n = 5;
+        int retrySeq = 3; // fails once (500) then succeeds -- forces the rest to wait behind it
+        UUID[] eventIds = new UUID[n];
+        Delivery[] deliveries = new Delivery[n];
+        for (int i = 0; i < n; i++) {
+            int seq = i + 1;
+            eventIds[i] = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+            createEvent(eventIds[i], "{\"n\":" + seq + "}");
+            // Tight retry ladder (1s) so the induced failure on seq 3 resolves quickly.
+            deliveries[i] = createOrderedPendingDelivery(deliveryId, eventIds[i], endpointId, seq, 5, "1", 30);
+        }
+
+        // Catch-all: succeed immediately (lowest priority -- only applies when nothing more
+        // specific below matches).
+        wireMock.stubFor(WireMock.post(urlEqualTo(path))
+                .atPriority(10)
+                .willReturn(aResponse().withStatus(200)));
+        // Sequence 3 specifically: 500 on the first attempt, then 200 from then on. Highest
+        // priority so it overrides the catch-all only for this one delivery's body.
+        wireMock.stubFor(WireMock.post(urlEqualTo(path))
+                .atPriority(1)
+                .withRequestBody(WireMock.equalToJson("{\"n\":" + retrySeq + "}"))
+                .inScenario("ordering-e2e-retry")
+                .whenScenarioStateIs(com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED)
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("seq3-recovered"));
+        wireMock.stubFor(WireMock.post(urlEqualTo(path))
+                .atPriority(1)
+                .withRequestBody(WireMock.equalToJson("{\"n\":" + retrySeq + "}"))
+                .inScenario("ordering-e2e-retry")
+                .whenScenarioStateIs("seq3-recovered")
+                .willReturn(aResponse().withStatus(200)));
+
+        // Publish deliberately out of sequence order -- the whole point is that the ordering
+        // buffer, not incidental publish/consume order, is what enforces FIFO here.
+        int[] publishOrder = {4, 2, 5, 1, 3};
+        for (int seq : publishOrder) {
+            publishDispatch(deliveries[seq - 1]);
+        }
+
+        for (Delivery delivery : deliveries) {
+            UUID deliveryId = delivery.getId();
+            await().atMost(Duration.ofSeconds(60)).pollInterval(Duration.ofMillis(200))
+                    .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
+        }
+
+        // The induced retry means seq 3 hit WireMock twice (500 then 200); only the terminal
+        // 200 responses reflect delivery order as WebhookDeliveryService actually released them.
+        java.util.List<com.github.tomakehurst.wiremock.stubbing.ServeEvent> successfulCalls =
+                new java.util.ArrayList<>();
+        for (com.github.tomakehurst.wiremock.stubbing.ServeEvent event : wireMock.getAllServeEvents()) {
+            if (event.getResponse().getStatus() == 200) {
+                successfulCalls.add(event);
+            }
+        }
+        successfulCalls.sort(java.util.Comparator.comparing(e -> e.getRequest().getLoggedDate()));
+
+        assertEquals(n, successfulCalls.size(), "exactly one successful delivery per sequence");
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        java.util.List<Integer> arrivalOrder = new java.util.ArrayList<>();
+        for (com.github.tomakehurst.wiremock.stubbing.ServeEvent event : successfulCalls) {
+            try {
+                arrivalOrder.add(mapper.readTree(event.getRequest().getBodyAsString()).get("n").asInt());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        assertEquals(java.util.List.of(1, 2, 3, 4, 5), arrivalOrder,
+                "ordering-enabled deliveries must reach the endpoint in strict sequence order despite "
+                        + "an out-of-order publish and an induced mid-range retry (P1-23)");
+    }
+
+    /**
+     * Automated equivalent of P1-23's manual verification drill ("send N events; mid-run,
+     * FLUSHALL Redis; assert delivery order is preserved... and the endpoint is not permanently
+     * stalled") -- run here against the real Testcontainers Redis instead of a hand-run {@code
+     * make up} stack, so it's part of the regular suite rather than a step that can silently
+     * bit-rot.
+     *
+     * <p>Deliberately deletes only the {@code seq:*} ordering keys rather than issuing a real
+     * {@code FLUSHALL} against the whole Redis instance: a full flush also wipes {@code
+     * RedisConcurrencyControlService}'s per-endpoint semaphore keys out from under its local
+     * "already initialized" cache (a separate, pre-existing issue unrelated to ordering -- see
+     * this task's Progress log), which stalls delivery entirely and would make this test fail
+     * for a reason that has nothing to do with 23a/23c. Deleting only {@code seq:*} is also a
+     * more faithful simulation of the actual bug scenario described in the task
+     * ("the 24h delivered-seq-ttl-hours lapses, or Redis is flushed") than a full flush would
+     * be, since a TTL lapse naturally only ever removes these specific keys.
+     *
+     * <p>Deliberately a single, strictly-sequential publish (1, flush, 2, 3) rather than the
+     * out-of-order/concurrent-retry stress in {@link
+     * #orderedDeliveries_publishedOutOfOrderWithAnInducedRetry_arriveAtWireMockInOrder()} --
+     * that test already covers the buffering/range-check machinery; this one isolates the
+     * specific thing a flush threatens: {@code getLastDeliveredSequence}'s cache-miss warm-from-
+     * Postgres path, and {@code markDelivered}'s CAS-from-authoritative-Postgres-value path, once
+     * Redis has nothing cached at all. Pre-23a, {@code markDelivered} trusted whatever the
+     * (now-empty) Redis bucket said, so a value written after the flush could regress below what
+     * Postgres already knew; this test's bounded {@code await()} windows would time out (endpoint
+     * stalled, draining only via the 60s gap timeout) if that regression reoccurred.</p>
+     */
+    @Test
+    void redisFlushMidOrderedRun_cursorSurvivesAndDeliveryContinues() {
+        UUID endpointId = UUID.randomUUID();
+        String path = "/hook/flush-" + endpointId;
+        createEndpoint(endpointId, path);
+
+        wireMock.stubFor(WireMock.post(urlEqualTo(path)).willReturn(aResponse().withStatus(200)));
+
+        UUID event1 = UUID.randomUUID();
+        UUID delivery1Id = UUID.randomUUID();
+        createEvent(event1, "{\"n\":1}");
+        Delivery delivery1 = createOrderedPendingDelivery(delivery1Id, event1, endpointId, 1, 5, "1", 30);
+
+        publishDispatch(delivery1);
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(delivery1Id).getStatus()));
+
+        // The scenario the manual drill calls out: the ordering cursor/counter keys vanish mid-run,
+        // exactly as they would from a `redis-cli FLUSHALL` or a TTL lapse against the real deployment.
+        redissonClient.getKeys().deleteByPattern("seq:*");
+
+        UUID event2 = UUID.randomUUID();
+        UUID delivery2Id = UUID.randomUUID();
+        createEvent(event2, "{\"n\":2}");
+        Delivery delivery2 = createOrderedPendingDelivery(delivery2Id, event2, endpointId, 2, 5, "1", 30);
+        publishDispatch(delivery2);
+
+        // Must complete comfortably inside the 60s gap timeout, not merely "eventually" -- if
+        // the flush had permanently desynced the cursor (the pre-23a bug), this would only ever
+        // drain via that 60s-per-item timeout and this bounded wait would fail.
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(delivery2Id).getStatus()));
+
+        UUID event3 = UUID.randomUUID();
+        UUID delivery3Id = UUID.randomUUID();
+        createEvent(event3, "{\"n\":3}");
+        Delivery delivery3 = createOrderedPendingDelivery(delivery3Id, event3, endpointId, 3, 5, "1", 30);
+        publishDispatch(delivery3);
+
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(delivery3Id).getStatus()));
+
+        java.util.List<com.github.tomakehurst.wiremock.stubbing.ServeEvent> calls = wireMock.getAllServeEvents();
+        calls.sort(java.util.Comparator.comparing(e -> e.getRequest().getLoggedDate()));
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        java.util.List<Integer> arrivalOrder = new java.util.ArrayList<>();
+        for (com.github.tomakehurst.wiremock.stubbing.ServeEvent event : calls) {
+            try {
+                arrivalOrder.add(mapper.readTree(event.getRequest().getBodyAsString()).get("n").asInt());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        assertEquals(java.util.List.of(1, 2, 3), arrivalOrder,
+                "order must be preserved across the Redis flush, not just eventual delivery (P1-23 / 23a)");
     }
 }

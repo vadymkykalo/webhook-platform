@@ -237,7 +237,11 @@ class OrderingBufferServiceTest {
     @SuppressWarnings("unchecked")
     private RBucket<Long> mockBucket(UUID endpointId) {
         RBucket<Long> bucket = mock(RBucket.class);
-        when(redissonClient.<Long>getBucket(eq("seq:delivered:" + endpointId))).thenReturn(bucket);
+        // getLastDeliveredSequence() explicitly requests LongCodec (see the comment there): the
+        // delivered-seq key must decode consistently whether it was last written by the plain
+        // Redis SET inside the CAS Lua script or by this bucket's own set().
+        when(redissonClient.<Long>getBucket(eq("seq:delivered:" + endpointId), eq(org.redisson.client.codec.LongCodec.INSTANCE)))
+                .thenReturn(bucket);
         return bucket;
     }
 
