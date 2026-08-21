@@ -1,6 +1,6 @@
 # P1-21 — End-to-end delivery test (highest-value test in the whole list)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1 — would have caught P0-01, P0-02, P0-03 and P0-05
 - **Branch:** `feature/P1-21-e2e-delivery-test`
 - **Depends on:** nothing (but it is what proves the P0 fixes)
