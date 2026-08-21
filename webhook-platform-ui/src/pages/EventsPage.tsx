@@ -3,12 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Copy, Share2, Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
-import { useEvents } from '../api/queries';
+import { useEvents, useProject } from '../api/queries';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { projectsApi } from '../api/projects.api';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -34,16 +33,18 @@ export default function EventsPage() {
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
-  const { data: project } = useQuery({
-    queryKey: ['projects', projectId],
-    queryFn: () => projectsApi.get(projectId!),
-    enabled: !!projectId,
-  });
+  const { data: project, isError: projectIsError, error: projectError, refetch: refetchProject } = useProject(projectId);
 
-  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize, sortParam);
+  const {
+    data: eventsData, isLoading: eventsLoading, isError: eventsIsError, error: eventsError, refetch: refetchEvents,
+  } = useEvents(projectId, page, pageSize, sortParam);
   const events = eventsData?.content ?? [];
   const totalElements = eventsData?.totalElements ?? 0;
   const totalPages = eventsData?.totalPages ?? 0;
+
+  const loading = eventsLoading;
+  const isError = projectIsError || eventsIsError;
+  const retry = () => { refetchProject(); refetchEvents(); };
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -67,6 +68,14 @@ export default function EventsPage() {
 
   if (loading) {
     return <PageSkeleton maxWidth="max-w-7xl" />;
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <ErrorState error={projectError ?? eventsError} fallbackKey="events.toast.loadFailed" onRetry={retry} />
+      </div>
+    );
   }
 
   if (!project) {

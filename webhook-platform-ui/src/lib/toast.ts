@@ -42,6 +42,18 @@ function extractHttpStatus(err: unknown): number | null {
   return null;
 }
 
+/**
+ * True when the request never reached a server at all — connection refused,
+ * DNS failure, timeout, or the backend simply isn't up. Distinct from a 4xx/5xx,
+ * which means a server *did* respond. This is the "the API is down" case.
+ */
+export function isNetworkError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as any;
+  if (e.response) return false; // server responded — not a network error
+  return Boolean(e.request) || e.code === 'ERR_NETWORK' || e.code === 'ECONNABORTED' || e.message === 'Network Error';
+}
+
 /** Generates a stable dedup ID from the fallback key + optional error message */
 function dedupeId(fallbackKey: string, apiMsg: string | null): string {
   return apiMsg ? `${fallbackKey}::${apiMsg}` : fallbackKey;
@@ -65,22 +77,35 @@ const STATUS_MESSAGE_KEYS: Record<number, string> = {
 // ─── Public API ─────────────────────────────────────────────────────
 
 /**
+ * Resolves a human-readable message from an API error.
+ * Priority: API message → HTTP status mapping → fallback i18n key.
+ * Shared by toast notifications and inline error states so the wording matches.
+ */
+export function resolveErrorMessage(err: unknown, fallbackKey: string): string {
+  if (isNetworkError(err)) {
+    return t('toast.errors.network');
+  }
+
+  const apiMsg = extractApiMessage(err);
+  const status = extractHttpStatus(err);
+
+  if (apiMsg) {
+    return apiMsg;
+  }
+  if (status && STATUS_MESSAGE_KEYS[status]) {
+    return t(STATUS_MESSAGE_KEYS[status]);
+  }
+  return t(fallbackKey);
+}
+
+/**
  * Show an error toast from an API error.
  * Priority: API message → HTTP status mapping → fallback i18n key.
  * Automatically deduplicates identical errors.
  */
 export function showApiError(err: unknown, fallbackKey: string, options?: ToastOptions) {
   const apiMsg = extractApiMessage(err);
-  const status = extractHttpStatus(err);
-
-  let message: string;
-  if (apiMsg) {
-    message = apiMsg;
-  } else if (status && STATUS_MESSAGE_KEYS[status]) {
-    message = t(STATUS_MESSAGE_KEYS[status]);
-  } else {
-    message = t(fallbackKey);
-  }
+  const message = resolveErrorMessage(err, fallbackKey);
 
   const id = options?.id ?? dedupeId(fallbackKey, apiMsg);
 
