@@ -141,7 +141,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P2-31 | P2 | DONE | Hardcoded strings + 704KB bundle from eager locales |
 | P2-32 | P2 | DONE | Stored XSS via dangerouslySetInnerHTML + i18n |
 | P2-33 | P2 | DONE (demo deferred — no hosting access in sandbox) | OSS metadata, docs site, demo, committed OpenAPI |
-| P3-34 | P3 | TODO | Workflow engine and CLI command tests |
+| P3-34 | P3 | DONE (caveats: WorkflowService/Persistence/OutboxService, ListenCommand/WebSocketTunnelClient, and ~15 other API services deferred — see task file) | Workflow engine and CLI command tests |
 | P3-35 | P3 | DONE (harness + contract tests done; real numbers/soak run pending a live-stack run) | Load/soak harness + SDK contract tests |
 | P3-36 | P3 | DONE | Table partitioning + log aggregation |
 | P0-37 | P0 | DONE | Outbox publisher never publishes (Hibernate mangles `::` cast in native query) |
