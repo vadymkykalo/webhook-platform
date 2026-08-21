@@ -206,11 +206,11 @@ export default function TestEndpointsPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyToClipboard(endpoint.url); }}>
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyToClipboard(endpoint.url); }} title={t('common.copy', 'Copy')} aria-label={t('common.copy', 'Copy')}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                       {canManageTestEndpoints && (
-                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setDeleteId(endpoint.id); }} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}

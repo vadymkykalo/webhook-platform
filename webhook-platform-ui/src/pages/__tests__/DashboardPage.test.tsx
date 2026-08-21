@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse } from '../../types/api.types';
@@ -83,6 +84,14 @@ describe('DashboardPage', () => {
     vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
     renderDashboard();
     expect(await screen.findByText('42')).toBeInTheDocument();
+  });
+
+  it('has no detectable axe accessibility violations when populated', async () => {
+    vi.mocked(projectsApi.list).mockResolvedValue([PROJECT]);
+    vi.mocked(dashboardApi.getProjectStats).mockResolvedValue(STATS);
+    const { container } = renderDashboard();
+    await screen.findByText('42');
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('renders an explicit error state — not "no projects yet" — when the API is unreachable', async () => {

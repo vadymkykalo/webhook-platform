@@ -128,7 +128,7 @@ export default function EventsPage() {
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
                   <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
                   <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('events.created')}</SortableTableHead>
-                  <TableHead className="w-[80px]"></TableHead>
+                  <TableHead className="w-[80px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -140,7 +140,7 @@ export default function EventsPage() {
                     <TableCell>
                       <div className="flex items-center gap-1.5 group">
                         <code className="text-[13px] font-mono text-muted-foreground">{event.id.substring(0, 8)}...</code>
-                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }}>
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }} title={t('common.copyId')} aria-label={t('common.copyId')}>
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
@@ -174,6 +174,7 @@ export default function EventsPage() {
                             onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
                             disabled={sharingEventId === event.id}
                             title={t('debugLinks.share')}
+                            aria-label={t('debugLinks.share')}
                           >
                             {sharingEventId === event.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -187,6 +188,7 @@ export default function EventsPage() {
                           size="icon-sm"
                           onClick={() => navigate(`/admin/projects/${projectId}/deliveries?eventId=${event.id}`)}
                           title={t('events.viewDeliveries')}
+                          aria-label={t('events.viewDeliveries')}
                         >
                           <Send className="h-3.5 w-3.5" />
                         </Button>

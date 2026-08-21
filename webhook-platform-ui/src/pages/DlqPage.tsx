@@ -201,6 +201,8 @@ export default function DlqPage() {
                 <button
                   onClick={() => { setSearchQuery(''); setPage(0); }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title={t('dlq.clearSearch')}
+                  aria-label={t('dlq.clearSearch')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -245,7 +247,7 @@ export default function DlqPage() {
                 />
               </div>
 
-              <Button variant="outline" size="icon-sm" onClick={retry} title={t('analytics.refresh')}>
+              <Button variant="outline" size="icon-sm" onClick={retry} title={t('analytics.refresh')} aria-label={t('analytics.refresh')}>
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -275,7 +277,12 @@ export default function DlqPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
-                    <button onClick={toggleSelectAll} className="p-1">
+                    <button
+                      onClick={toggleSelectAll}
+                      className="p-1"
+                      title={t(selectedIds.size === items.length ? 'dlq.deselectAll' : 'dlq.selectAll')}
+                      aria-label={t(selectedIds.size === items.length ? 'dlq.deselectAll' : 'dlq.selectAll')}
+                    >
                       {selectedIds.size === items.length ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground" />}
                     </button>
                   </TableHead>
@@ -284,14 +291,19 @@ export default function DlqPage() {
                   <TableHead className="text-xs">{t('dlq.columns.attempts')}</TableHead>
                   <TableHead className="text-xs">{t('dlq.columns.lastError')}</TableHead>
                   <TableHead className="text-xs">{t('dlq.columns.failedAt')}</TableHead>
-                  {canManageDlq && <TableHead className="w-[60px]"></TableHead>}
+                  {canManageDlq && <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.deliveryId} className="hover:bg-muted/30">
                     <TableCell>
-                      <button onClick={() => toggleSelect(item.deliveryId)} className="p-1">
+                      <button
+                        onClick={() => toggleSelect(item.deliveryId)}
+                        className="p-1"
+                        title={t(selectedIds.has(item.deliveryId) ? 'dlq.deselectItem' : 'dlq.selectItem')}
+                        aria-label={t(selectedIds.has(item.deliveryId) ? 'dlq.deselectItem' : 'dlq.selectItem')}
+                      >
                         {selectedIds.has(item.deliveryId) ? <CheckSquare className="h-4 w-4 text-primary" /> : <Square className="h-4 w-4 text-muted-foreground" />}
                       </button>
                     </TableCell>
@@ -302,7 +314,7 @@ export default function DlqPage() {
                     <TableCell><span className="text-[13px] text-muted-foreground">{formatDateTime(item.failedAt)}</span></TableCell>
                     {canManageDlq && (
                       <TableCell>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title={t('dlq.retry')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleRetrySingle(item.deliveryId)} disabled={retrying} title={t('dlq.retry')} aria-label={t('dlq.retry')}>
                           <RefreshCw className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>

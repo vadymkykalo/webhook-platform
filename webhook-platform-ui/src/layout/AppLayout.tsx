@@ -150,6 +150,7 @@ function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: bool
       to={item.path}
       onClick={onClick}
       title={collapsed ? name : undefined}
+      aria-label={collapsed ? name : undefined}
       className={cn(
         "flex items-center gap-3 px-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-150",
         collapsed && "justify-center px-2",
@@ -347,7 +348,14 @@ export default function AppLayout() {
           )}
         </Link>
         {isMobile && (
-          <Button variant="ghost" size="icon-sm" onClick={() => setSidebarOpen(false)} className="ml-auto">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setSidebarOpen(false)}
+            className="ml-auto"
+            title={t('common.close')}
+            aria-label={t('common.close')}
+          >
             <X className="h-4 w-4" />
           </Button>
         )}
@@ -358,6 +366,7 @@ export default function AppLayout() {
             onClick={() => setCollapsed(!collapsed)}
             className={cn("ml-auto text-muted-foreground hover:text-foreground", collapsed && "ml-0 mt-2")}
             title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            aria-label={t(collapsed ? 'nav.expandSidebar' : 'nav.collapseSidebar')}
           >
             <ChevronsLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
           </Button>
@@ -529,6 +538,7 @@ export default function AppLayout() {
               onClick={handleLogout}
               className="text-muted-foreground hover:text-destructive flex-shrink-0"
               title={t('nav.logout')}
+              aria-label={t('nav.logout')}
             >
               <LogOut className="h-3.5 w-3.5" />
             </Button>
@@ -540,6 +550,12 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+      >
+        {t('nav.skipToContent')}
+      </a>
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar - Desktop */}
         <aside
@@ -573,6 +589,8 @@ export default function AppLayout() {
               size="icon-sm"
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden"
+              title={t('nav.openMenu')}
+              aria-label={t('nav.openMenu')}
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -599,12 +617,14 @@ export default function AppLayout() {
                 size="icon-sm"
                 className="text-muted-foreground sm:hidden"
                 onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+                title={t('nav.search')}
+                aria-label={t('nav.search')}
               >
                 <Search className="h-4 w-4" />
               </Button>
               <LanguageSwitcher />
               <Link to="/docs">
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title={t('nav.documentation')}>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" title={t('nav.documentation')} aria-label={t('nav.documentation')}>
                   <BookOpen className="h-4 w-4" />
                 </Button>
               </Link>
@@ -613,6 +633,7 @@ export default function AppLayout() {
                 size="icon-sm"
                 className="text-muted-foreground"
                 title={t('nav.toggleTheme')}
+                aria-label={t('nav.toggleTheme')}
                 onClick={() => {
                   const current = getTheme();
                   const next = current === 'dark' ? 'light' : 'dark';
@@ -646,7 +667,7 @@ export default function AppLayout() {
           )}
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto bg-muted/30">
+          <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto bg-muted/30">
             <div className="animate-fade-in">
               <Outlet />
             </div>

@@ -1,6 +1,6 @@
 # P2-30 — Accessibility: zero aria-labels in the entire UI
 
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** P2
 - **Branch:** `feature/P2-30-accessibility`
 - **Depends on:** P2-29 ideally lands first (both touch the same pages)
@@ -26,29 +26,29 @@ One good sign: all 8 `<img>` tags have `alt`.
 
 ## Steps
 
-- [ ] Run axe (browser extension or `@axe-core/playwright`) against the running
+- [x] Run axe (browser extension or `@axe-core/playwright`) against the running
       dashboard and capture the baseline violation count. That number is the
       before/after.
-- [ ] Add `aria-label` to every icon-only control: the 6 `size="icon"` buttons,
+- [x] Add `aria-label` to every icon-only control: the 6 `size="icon"` buttons,
       the collapsed sidebar nav links in `AppLayout.tsx`, table row action
       buttons, and modal close affordances not already covered by shadcn.
-- [ ] Add a skip-to-content link and confirm the page has proper landmarks
+- [x] Add a skip-to-content link and confirm the page has proper landmarks
       (`<main>`, `<nav>`) — check before adding, some may already be there.
-- [ ] Fix `SettingsPage.tsx:341`, which hand-rolls `role="switch"` on a `div`
+- [x] Fix `SettingsPage.tsx:341`, which hand-rolls `role="switch"` on a `div`
       instead of using the existing `ui/switch.tsx` primitive. Use the component;
       that is what it is for.
-- [ ] Keyboard-test the core flows: tab order, focus visibility, escape closes
+- [x] Keyboard-test the core flows: tab order, focus visibility, escape closes
       dialogs, focus returns to the trigger on close. Radix provides most of this
       — verify rather than assume, and fix what it does not cover.
-- [ ] Route all labels through `t()` — an untranslated `aria-label` is a
+- [x] Route all labels through `t()` — an untranslated `aria-label` is a
       half-fix, and P2-31 is doing the i18n sweep in parallel.
 
 ## Tests to write
 
-- [ ] Add `@axe-core/playwright` (or jest-axe against rendered components) and a
+- [x] Add `@axe-core/playwright` (or jest-axe against rendered components) and a
       test that fails on new violations for the core pages. Without this, the
       count drifts straight back up.
-- [ ] Extend the P2-29 render tests with a keyboard-navigation assertion on one
+- [x] Extend the P2-29 render tests with a keyboard-navigation assertion on one
       representative modal.
 
 ## Verification
@@ -66,8 +66,159 @@ Manual:
 
 ## Definition of done
 
-- [ ] Every icon-only control has a translated accessible name.
-- [ ] Skip link and landmarks present; keyboard flows work.
-- [ ] Automated a11y check in CI with the count recorded before and after.
+- [x] Every icon-only control has a translated accessible name.
+- [x] Skip link and landmarks present; keyboard flows work.
+- [x] Automated a11y check in CI with the count recorded before and after.
 
 ## Progress log
+
+**Scope.** `size="icon"`/`size="icon-sm"` `Button`s and plain `<button>`s across
+the whole `webhook-platform-ui/src` tree (not just the 6 originally cited), the
+`AppLayout.tsx` sidebar/header, `ui/dialog.tsx` and `ui/sheet.tsx` close buttons,
+two hand-rolled `role="switch"` toggles (`SettingsPage.tsx`, and a second one
+found in `SchemasPage.tsx` during the sweep), the shared `ui/select.tsx`
+primitive, empty table-header action columns, and one keyboard-trap bug
+(`EventDiffPage.tsx` nested a clickable icon inside a `<button>`, which is
+invalid HTML and unreachable by keyboard — restructured to a valid trigger +
+real nested clear-button).
+
+**aria-label count:** `grep -ro "aria-label" webhook-platform-ui/src | wc -l`
+— **0 → 114**.
+
+**Root-cause fixes beyond the "add a label" checklist**, found by wiring up
+axe and reading its output rather than guessing:
+- `ui/select.tsx` accepted `SelectHTMLAttributes` (which includes `aria-label`)
+  but silently dropped every prop except `className`/`children`/`value`/
+  `onChange`/`disabled`/`id` before rendering the Radix trigger — so any
+  caller that *did* pass `aria-label` to a `<Select>` had it thrown away. Fixed
+  to forward `aria-label`/`aria-labelledby`. This is the shared component
+  behind every filter dropdown and the `TablePagination` page-size selector in
+  the app, so the one fix closes the gap everywhere `<Select>` is used without
+  a paired `<Label htmlFor>`.
+- `TablePagination`'s page-size `<Select>` had no accessible name anywhere in
+  the app (new `common.pageSize` key).
+- `IncomingEventsPage`'s source-filter `<Select>` had no accessible name (reused
+  the existing `incomingEvents.filters.source` key).
+- Empty `<TableHead>` action-column cells (`DeliveriesPage`, `DlqPage`,
+  `EventsPage`, `EventDetailPage`, `SubscriptionsPage`, `MembersPage`,
+  `TransformationsPage`, `AlertsPage` ×2) — axe's `empty-table-header` rule.
+  Given `<span className="sr-only">{t('common.actions')}</span>` (new key), or
+  page-specific text for `AlertsPage`'s severity-icon/expand columns (new
+  `alerts.columns.severityIcon` / `alerts.columns.details` keys).
+- `dialog.tsx` / `sheet.tsx` close buttons had a hardcoded English `"Close"` in
+  their `sr-only` span (not routed through `t()` at all) — fixed to
+  `t('common.close')`, translated in both locales.
+
+**Hand-rolled switches replaced with `ui/switch.tsx`:**
+- `SettingsPage.tsx` (notification-channel toggles) — the citation in this
+  ticket.
+- `SchemasPage.tsx` (schema-validation-enabled toggle) — same anti-pattern,
+  found independently during the sweep; wasn't cited in the original grep but
+  is the same bug.
+
+**Keyboard-trap bug found and fixed (not in the original checklist, but exactly
+the "verify rather than assume, fix what Radix doesn't cover" instruction):**
+- `EventDiffPage.tsx`'s event-picker trigger was a `<button>` containing an `<X
+  role="button" tabIndex={0}>` as a clear-selection affordance. HTML forbids
+  interactive content inside `<button>` (invalid nesting — browsers handle it
+  unpredictably), and the inner "button" had no keyboard handler, so it was
+  unreachable by keyboard regardless. Restructured: outer trigger is now a
+  `<div role="button" tabIndex={0}>` with an `onKeyDown` for Enter/Space, and
+  the inner clear control is a real `<button type="button">`.
+- `OnboardingChecklist.tsx`'s clickable step row had `role="button"` but no
+  `tabIndex` and no `onKeyDown` — so it was in the accessibility tree as a
+  button but not actually reachable or operable from the keyboard. Added both.
+
+**Skip link + landmarks** (`AppLayout.tsx`): added a `sr-only focus:not-sr-only`
+"Skip to main content" link (`nav.skipToContent`) as the first child of the
+layout, targeting `<main id="main-content" tabIndex={-1}>` (already existed as
+a `<main>`, just needed the id/tabIndex for the skip target). `<nav>` was
+already present for the sidebar. `LandingPage.tsx` had a `<nav>` (via its
+`Navigation` component) but no `<main>` around its content sections — wrapped
+`Hero`…`FinalCTA` in `<main>`.
+
+**Automated a11y check — before/after (jest-axe, wired into vitest via
+`src/test/setup.ts`; `@axe-core/playwright` wasn't used since this repo has no
+Playwright infra, only vitest + Testing Library + jsdom).** Added a `has no
+detectable axe accessibility violations when populated` test to each of the
+six P2-29 core-page test files (`DashboardPage`, `DeliveriesPage`, `DlqPage`,
+`EndpointsPage`, `EventsPage`, `IncomingEventsPage`). Measured by temporarily
+`git checkout`-ing the six page files plus `select.tsx`/`table-pagination.tsx`/
+`dialog.tsx`/`sheet.tsx` back to the pre-P2-30 `develop` commit (`f34d971`),
+running the axe tests against that, then restoring:
+
+```
+BEFORE (pre-P2-30 code, axe-audited):
+ × DeliveriesPage      — 2 violations (button-name × pagination Select; empty-table-header)
+ × DlqPage              — 4 violations (button-name × 2 row-action icon buttons; empty-table-header × 2)
+ × EventsPage           — 3 violations (button-name × copy-id icon button + pagination Select; empty-table-header)
+ × IncomingEventsPage   — 1 violation  (button-name × source-filter Select)
+ ✓ EndpointsPage        — 0 violations
+ ✓ DashboardPage        — 0 violations
+ Test Files  4 failed | 2 passed (10 total violation instances across 2 rule types:
+                                    button-name × 6, empty-table-header × 4)
+
+AFTER (current code):
+ ✓ IncomingEventsPage.test.tsx > has no detectable axe accessibility violations when populated  577ms
+ ✓ EndpointsPage.test.tsx      > has no detectable axe accessibility violations when populated  604ms
+ ✓ DlqPage.test.tsx            > has no detectable axe accessibility violations when populated  926ms
+ ✓ DeliveriesPage.test.tsx     > has no detectable axe accessibility violations when populated 1083ms
+ ✓ DashboardPage.test.tsx      > has no detectable axe accessibility violations when populated 1438ms
+ ✓ EventsPage.test.tsx         > has no detectable axe accessibility violations when populated  628ms
+ Test Files  6 passed (0 violations)
+```
+
+**Keyboard-navigation test** added to `EndpointsPage.test.tsx`: opens the
+create-endpoint dialog, asserts Radix auto-focused something inside it, presses
+Escape, asserts the dialog unmounts. Focus-return-to-trigger is Radix Dialog's
+documented default (`onCloseAutoFocus`, not overridden anywhere in this
+codebase) but jsdom has no layout engine, so Radix's `focus-scope` visibility
+check (`getClientRects`/`offsetParent`) can't be reliably exercised in this
+test environment — confirmed the assertion times out in jsdom even though the
+close-on-Escape half of the same interaction passes reliably. Documented this
+jsdom limitation in the test name/body rather than asserting something jsdom
+can't actually verify; recommend a real-browser check (agent-browser / manual)
+if this ever needs stronger proof than "Radix's own test suite covers it and
+we don't override the relevant prop."
+
+**Verification — commands run verbatim:**
+
+```
+$ cd webhook-platform-ui && npm run lint
+> webhook-platform-ui@1.0.0 lint
+> eslint src --ext .ts,.tsx
+(no output — clean)
+
+$ npm run typecheck
+> webhook-platform-ui@1.0.0 typecheck
+> tsc --noEmit
+(no output — clean)
+
+$ npm run test:ci
+...
+ Test Files  11 passed (11)
+      Tests  81 passed (81)
+   Start at  16:01:02
+   Duration  10.53s (transform 3.86s, setup 6.22s, collect 16.18s, tests 16.61s, environment 17.06s, prepare 4.93s)
+```
+
+**Deliberately left out / follow-up candidates (not blocking, noted for
+honesty):**
+- Several other pages have `<TableRow onClick={...}>` "click row to expand"
+  patterns (`AuditLogPage`, `EventDetailPage`, `MembersPage`,
+  `SubscriptionsPage`, `AlertsPage`, `DlqPage`, `EventsPage`,
+  `TransformationsPage`, `PiiRulesPage`, `DeliveriesPage`) where the row itself
+  isn't focusable/keyboard-operable — only `AlertsPage`'s was directly in scope
+  of this sweep (fixed: labelled the expand-indicator column header). A full
+  audit of every expandable-row keyboard flow across ~10 files is a bigger,
+  separate piece of work; flagging it rather than silently leaving it
+  unaudited.
+- Full manual screen-reader pass (VoiceOver/NVDA/Orca) was not run in this
+  session — no interactive AT tooling available in this environment. The axe
+  suite plus manual review of every changed label covers the automatable half
+  of the "Manual" verification block; the screen-reader pass itself is
+  unverified and should be spot-checked by a human before/at release.
+- P2-31 (i18n/hardcoded-strings sweep) is a separate ticket; all new labels
+  added here go through `t()`, but some pre-existing hardcoded strings
+  elsewhere in these files (unrelated to aria-labels) were left as found, per
+  this ticket's scope.

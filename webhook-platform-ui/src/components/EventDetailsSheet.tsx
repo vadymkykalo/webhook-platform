@@ -125,6 +125,8 @@ export default function EventDetailsSheet({
                     size="icon-sm"
                     className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                     onClick={() => handleCopy(event.id, 'Event ID')}
+                    title={t('common.copyId')}
+                    aria-label={t('common.copyId')}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -245,7 +247,7 @@ export default function EventDetailsSheet({
                         </div>
                       </div>
                       {(d.status === 'FAILED' || d.status === 'DLQ') && (
-                        <Button variant="ghost" size="icon-sm" title="Replay" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed')).catch(e => showApiError(e, 'deliveries.replayFailed'))}>
+                        <Button variant="ghost" size="icon-sm" title={t('events.details.replay')} aria-label={t('events.details.replay')} onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed')).catch(e => showApiError(e, 'deliveries.replayFailed'))}>
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
                       )}

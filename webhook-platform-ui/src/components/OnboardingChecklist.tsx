@@ -63,6 +63,13 @@ function StepRow({ step, navigate, t }: { step: Step; navigate: (path: string) =
       )}
       onClick={() => !step.done && navigate(step.path)}
       role={step.done ? undefined : 'button'}
+      tabIndex={step.done ? undefined : 0}
+      onKeyDown={(e) => {
+        if (!step.done && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          navigate(step.path);
+        }
+      }}
     >
       {step.done ? (
         <CheckCircle2 className="h-[18px] w-[18px] text-success flex-shrink-0" />
@@ -167,6 +174,8 @@ export default function OnboardingChecklist({
               size="icon-sm"
               onClick={() => setExpanded(!expanded)}
               className="text-muted-foreground h-7 w-7"
+              title={t(expanded ? 'onboarding.collapse' : 'onboarding.expand')}
+              aria-label={t(expanded ? 'onboarding.collapse' : 'onboarding.expand')}
             >
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
@@ -176,6 +185,7 @@ export default function OnboardingChecklist({
               onClick={handleDismiss}
               className="text-muted-foreground h-7 w-7"
               title={t('onboarding.dismiss')}
+              aria-label={t('onboarding.dismiss')}
             >
               <X className="h-3.5 w-3.5" />
             </Button>

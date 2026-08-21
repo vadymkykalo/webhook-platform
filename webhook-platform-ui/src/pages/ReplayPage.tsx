@@ -495,7 +495,13 @@ function SessionCard({
                 {t('replay.cancel')}
               </Button>
             )}
-            <Button variant="ghost" size="icon-sm" onClick={() => setExpanded(!expanded)}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setExpanded(!expanded)}
+              title={t(expanded ? 'replay.session.collapseDetails' : 'replay.session.expandDetails')}
+              aria-label={t(expanded ? 'replay.session.collapseDetails' : 'replay.session.expandDetails')}
+            >
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </Button>
           </div>

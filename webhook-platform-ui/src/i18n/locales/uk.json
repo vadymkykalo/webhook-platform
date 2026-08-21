@@ -41,6 +41,7 @@
     "viewAll": "Переглянути всі",
     "manage": "Керувати",
     "copyId": "Копіювати ID",
+    "copy": "Копіювати",
     "copied": "Скопійовано в буфер обміну",
     "enable": "Увімкнути",
     "disable": "Вимкнути",
@@ -58,7 +59,9 @@
     "loadErrorTitle": "Не вдалося завантажити сторінку",
     "backToHome": "На головну",
     "learnMore": "Дізнатися більше",
-    "optional": "необов'язково"
+    "optional": "необов'язково",
+    "pageSize": "Рядків на сторінці",
+    "actions": "Дії"
   },
   "passwordStrength": {
     "weak": "Слабкий",
@@ -142,7 +145,10 @@
     "automation": "Автоматизація",
     "workflows": "Воркфлоу",
     "showAdvanced": "Показати розширені функції",
-    "hideAdvanced": "Приховати розширені функції"
+    "hideAdvanced": "Приховати розширені функції",
+    "openMenu": "Відкрити меню",
+    "closeMenu": "Закрити меню",
+    "skipToContent": "Перейти до основного вмісту"
   },
   "auth": {
     "login": {
@@ -645,8 +651,13 @@
       "noDeliveriesNoSub": "Немає активних підписок для типу події <strong>{{eventType}}</strong>. Створіть підписку для цього типу подій, щоб почати отримувати доставки.",
       "noDeliveriesHint": "Події доставляються лише на ендпоінти, які мають відповідну підписку.",
       "openFull": "Відкрити повні деталі",
-      "notFound": "Подію не знайдено"
+      "notFound": "Подію не знайдено",
+      "replay": "Повторити"
     }
+  },
+  "eventDetail": {
+    "back": "Назад до подій",
+    "copyLink": "Копіювати посилання"
   },
   "deliveries": {
     "title": "Доставки",
@@ -1175,7 +1186,9 @@
       "eventType": "Тип події",
       "endpoint": "Ендпоінт",
       "allTypes": "Всі типи",
-      "allEndpoints": "Всі ендпоінти"
+      "allEndpoints": "Всі ендпоінти",
+      "expandDetails": "Розгорнути деталі",
+      "collapseDetails": "Згорнути деталі"
     },
     "status": {
       "PENDING": "Очікує",
@@ -1221,6 +1234,7 @@
     "filterEndpoint": "Фільтр за ендпоінтом",
     "allEndpoints": "Всі ендпоінти",
     "searchPlaceholder": "Пошук за типом події або ID...",
+    "clearSearch": "Очистити пошук",
     "filterFrom": "Від дати",
     "filterTo": "До дати",
     "activeFilters": "Активні фільтри",
@@ -1228,6 +1242,10 @@
     "endpointFiltered": "Ендпоінт",
     "dateFiltered": "Діапазон дат",
     "clearFilters": "Очистити всі",
+    "selectAll": "Вибрати всі",
+    "deselectAll": "Скасувати вибір усіх",
+    "selectItem": "Вибрати рядок",
+    "deselectItem": "Скасувати вибір рядка",
     "columns": {
       "eventType": "Тип події",
       "endpoint": "Ендпоінт",
@@ -2411,6 +2429,7 @@
     "endpointId": "ID ендпоінта",
     "subscriptionId": "ID підписки",
     "goTo": "Перейти до ресурсу",
+    "copyValue": "Копіювати значення",
     "latencyTrend": "Тренд затримки",
     "later": "пізніше",
     "created": "Створено",
@@ -2608,7 +2627,8 @@
     "response": "Відповідь",
     "requestHeaders": "Заголовки запиту",
     "requestBody": "Тіло запиту",
-    "responseHeaders": "Заголовки відповіді"
+    "responseHeaders": "Заголовки відповіді",
+    "copyContent": "Копіювати {{label}}"
   },
   "connectionSetup": {
     "title": "Налаштування з'єднання",
@@ -2843,6 +2863,8 @@
     "title": "Початок роботи",
     "subtitle": "Виконайте ці кроки, щоб налаштувати вашу webhook інфраструктуру",
     "dismiss": "Приховати",
+    "expand": "Розгорнути список",
+    "collapse": "Згорнути список",
     "collapsed": "{{completed}} з {{total}} виконано",
     "steps": {
       "createProject": "Створіть проєкт",
@@ -2994,6 +3016,9 @@
     "noRules": "Правил немає",
     "noRulesDesc": "Створіть перше правило сповіщень для моніторингу стану доставок",
     "muted": "Вимкнено",
+    "mute": "Приглушити",
+    "unmute": "Увімкнути звук",
+    "deleteRule": "Видалити правило",
     "snoozed": "Відкладено",
     "threshold": "Поріг",
     "window": "Вікно",
@@ -3006,7 +3031,9 @@
       "severity": "Важливість",
       "value": "Значення",
       "time": "Час",
-      "status": "Статус"
+      "status": "Статус",
+      "severityIcon": "Іконка важливості",
+      "details": "Деталі"
     },
     "createDialog": {
       "title": "Створити правило сповіщень",
@@ -3210,7 +3237,15 @@
       "selectEndpoint": "Оберіть ендпоінт…",
       "selectTransformation": "Оберіть трансформацію…",
       "tagPlaceholder": "Назва тегу, напр. high-priority",
-      "dropHint": "Відповідні події будуть тихо відкинуті — доставки не створюватимуться."
+      "dropHint": "Відповідні події будуть тихо відкинуті — доставки не створюватимуться.",
+      "removeAction": "Видалити дію",
+      "conditionTree": {
+        "cycleOperator": "Натисніть, щоб перемкнути: AND → OR → NOT",
+        "addCondition": "Додати умову",
+        "addGroup": "Додати вкладену групу",
+        "removeGroup": "Видалити групу",
+        "removeCondition": "Видалити умову"
+      }
     }
   },
   "transformations": {
@@ -3371,6 +3406,8 @@
     },
     "builder": {
       "notFound": "Воркфлоу не знайдено",
+      "back": "Назад до воркфлоу",
+      "closeHistory": "Закрити історію",
       "unsaved": "Не збережено",
       "enabled": "Увімкнено",
       "disabled": "Вимкнено",

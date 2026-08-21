@@ -211,7 +211,7 @@ export default function ApiKeysPage() {
                     </div>
                   </div>
                   {canManageApiKeys && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title={t('apiKeys.revoke')} className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title={t('apiKeys.revoke')} aria-label={t('apiKeys.revoke')} className="text-muted-foreground hover:text-destructive flex-shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
@@ -361,6 +361,7 @@ export default function ApiKeysPage() {
                     size="icon"
                     onClick={() => setShowKey(!showKey)}
                     title={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
+                    aria-label={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
                   >
                     {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -369,6 +370,7 @@ export default function ApiKeysPage() {
                     size="icon"
                     onClick={() => newApiKey?.key && handleCopyKey(newApiKey.key)}
                     title={t('apiKeys.keyDialog.copyKey')}
+                    aria-label={t('apiKeys.keyDialog.copyKey')}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>

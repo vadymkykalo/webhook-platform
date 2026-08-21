@@ -477,6 +477,7 @@ function ResultsPanel({
                 <p className="text-xs font-medium text-muted-foreground">{t('testConsole.responseBody')}</p>
                 <button
                   onClick={() => copyText(pingResult.responseBody!, 'ping-body')}
+                  aria-label={t('testConsole.copyContent', { label: t('testConsole.responseBody') })}
                   className="text-muted-foreground hover:text-foreground"
                 >
                   {copiedId === 'ping-body' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -516,7 +517,7 @@ function ResultsPanel({
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{t('testConsole.eventId')}</p>
                 <div className="flex items-center gap-1">
                   <code className="font-mono text-[11px] truncate">{lastEvent.id}</code>
-                  <button onClick={() => copyText(lastEvent.id, 'event-id')} className="text-muted-foreground hover:text-foreground shrink-0">
+                  <button onClick={() => copyText(lastEvent.id, 'event-id')} aria-label={t('common.copyId')} className="text-muted-foreground hover:text-foreground shrink-0">
                     {copiedId === 'event-id' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                   </button>
                 </div>
@@ -773,11 +774,12 @@ function CodeBlock({
   copiedId: string | null;
   copyText: (text: string, id: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded border bg-muted/30">
       <div className="flex items-center justify-between px-2.5 py-1 border-b">
         <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
-        <button onClick={() => copyText(content, id)} className="text-muted-foreground hover:text-foreground">
+        <button onClick={() => copyText(content, id)} aria-label={t('testConsole.copyContent', { label })} className="text-muted-foreground hover:text-foreground">
           {copiedId === id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         </button>
       </div>

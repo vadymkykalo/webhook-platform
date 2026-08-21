@@ -373,24 +373,24 @@ export default function EndpointsPage() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {canManageEndpoints && (
                       <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title={t('endpoints.test')} disabled={testing && testId === endpoint.id}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleTest(endpoint.id)} title={t('endpoints.test')} aria-label={t('endpoints.test')} disabled={testing && testId === endpoint.id}>
                           {testing && testId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5 text-primary" />}
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? t('common.disable') : t('common.enable')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setToggleId(endpoint.id)} title={endpoint.enabled ? t('common.disable') : t('common.enable')} aria-label={endpoint.enabled ? t('common.disable') : t('common.enable')}>
                           {endpoint.enabled ? <PowerOff className="h-3.5 w-3.5 text-warning" /> : <Power className="h-3.5 w-3.5 text-success" />}
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title={t('endpoints.rotateSecret')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setRotateId(endpoint.id)} title={t('endpoints.rotateSecret')} aria-label={t('endpoints.rotateSecret')}>
                           <RefreshCw className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? t('endpoints.configureMtls') : t('endpoints.enableMtls')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => setMtlsEndpoint(endpoint)} title={endpoint.mtlsEnabled ? t('endpoints.configureMtls') : t('endpoints.enableMtls')} aria-label={endpoint.mtlsEnabled ? t('endpoints.configureMtls') : t('endpoints.enableMtls')}>
                           <ShieldCheck className={`h-3.5 w-3.5 ${endpoint.mtlsEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
                         </Button>
                         {endpoint.verificationStatus !== 'VERIFIED' && (
-                          <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title={t('endpoints.verifyEndpoint')} disabled={verifyingId === endpoint.id}>
+                          <Button variant="ghost" size="icon-sm" onClick={() => handleVerify(endpoint.id)} title={t('endpoints.verifyEndpoint')} aria-label={t('endpoints.verifyEndpoint')} disabled={verifyingId === endpoint.id}>
                             {verifyingId === endpoint.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className={`h-3.5 w-3.5 ${endpoint.verificationStatus === 'FAILED' ? 'text-destructive' : 'text-muted-foreground'}`} />}
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(endpoint.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </>
@@ -623,6 +623,7 @@ export default function EndpointsPage() {
                 size="icon"
                 onClick={handleCopySecret}
                 title={t('endpoints.secretDialog.copy')}
+                aria-label={t('endpoints.secretDialog.copy')}
               >
                 <Copy className="h-4 w-4" />
               </Button>

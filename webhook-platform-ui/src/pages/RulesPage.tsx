@@ -593,7 +593,7 @@ export default function RulesPage() {
                             <p className="text-xs text-muted-foreground">{t('rules.form.dropHint')}</p>
                           )}
                         </div>
-                        <button onClick={() => removeAction(idx)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                        <button onClick={() => removeAction(idx)} aria-label={t('rules.form.removeAction')} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>

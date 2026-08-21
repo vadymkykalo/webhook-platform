@@ -111,7 +111,7 @@ export default function EventDetailPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/projects/${projectId}/events`)} title={t('eventDetail.back', 'Back to events')} aria-label={t('eventDetail.back', 'Back to events')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -122,7 +122,7 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1.5 group">
               <code className="font-mono text-xs">{event.id}</code>
-              <Button variant="ghost" size="icon-sm" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => handleCopy(event.id, 'Event ID')}>
+              <Button variant="ghost" size="icon-sm" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => handleCopy(event.id, 'Event ID')} title={t('common.copyId')} aria-label={t('common.copyId')}>
                 <Copy className="h-3 w-3" />
               </Button>
             </div>
@@ -238,7 +238,7 @@ export default function EventDetailPage() {
                       <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-primary hover:underline truncate flex-1">
                         {link.shareUrl}
                       </a>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, 'Link')}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, 'Link')} title={t('eventDetail.copyLink', 'Copy link')} aria-label={t('eventDetail.copyLink', 'Copy link')}>
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
@@ -303,7 +303,7 @@ export default function EventDetailPage() {
                     <TableHead>{t('deliveries.columns.endpoint', 'Endpoint')}</TableHead>
                     <TableHead className="w-[80px]">{t('deliveries.columns.attempts', 'Attempts')}</TableHead>
                     <TableHead className="w-[140px]">{t('deliveries.columns.time', 'Time')}</TableHead>
-                    <TableHead className="w-[60px]"></TableHead>
+                    <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -325,7 +325,7 @@ export default function EventDetailPage() {
                       <TableCell className="text-xs text-muted-foreground">{formatRelativeTime(d.createdAt)}</TableCell>
                       <TableCell>
                         {(d.status === 'FAILED' || d.status === 'DLQ') && canManageEndpoints && (
-                          <Button variant="ghost" size="icon-sm" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed'))}>
+                          <Button variant="ghost" size="icon-sm" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed'))} title={t('events.details.replay')} aria-label={t('events.details.replay')}>
                             <Send className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -364,7 +364,7 @@ export default function EventDetailPage() {
                           <span>{t('eventDetail.expires', 'Expires {{time}}', { time: formatRelativeTime(link.expiresAt) })}</span>
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, 'Debug link')}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, 'Debug link')} title={t('eventDetail.copyLink', 'Copy link')} aria-label={t('eventDetail.copyLink', 'Copy link')}>
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                     </div>

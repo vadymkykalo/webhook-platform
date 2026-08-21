@@ -170,10 +170,10 @@ export default function ProjectsPage() {
                     <FolderKanban className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopyId(project.id)} title={t('common.copyId')}>
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopyId(project.id)} title={t('common.copyId')} aria-label={t('common.copyId')}>
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    {canDeleteProject && <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                    {canDeleteProject && <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(project.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>}
                   </div>

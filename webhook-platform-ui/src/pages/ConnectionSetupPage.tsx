@@ -366,7 +366,7 @@ export default function ConnectionSetupPage() {
                       readOnly
                       className="font-mono text-xs"
                     />
-                    <Button variant="outline" size="icon" onClick={handleCopySecret} title={t('common.copy')}>
+                    <Button variant="outline" size="icon" onClick={handleCopySecret} title={t('common.copy')} aria-label={t('common.copy')}>
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -541,7 +541,7 @@ export default function ConnectionSetupPage() {
                         className="text-xs"
                       />
                       {eventTypes.length > 1 && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => removeEventType(i)}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => removeEventType(i)} title={t('common.delete')} aria-label={t('common.delete')}>
                           ×
                         </Button>
                       )}

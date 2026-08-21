@@ -267,7 +267,7 @@ export default function TransformationsPage() {
                 <TableHead className="text-xs">{t('transformations.status')}</TableHead>
                 <TableHead className="text-xs">{t('transformations.usedBy', 'Used by')}</TableHead>
                 <TableHead className="text-xs">{t('transformations.updated')}</TableHead>
-                {canManage && <TableHead className="w-[100px]"></TableHead>}
+                {canManage && <TableHead className="w-[100px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -309,10 +309,10 @@ export default function TransformationsPage() {
                   {canManage && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(item)} title={t('common.edit')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(item)} title={t('common.edit')} aria-label={t('common.edit')}>
                           <Settings className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicate(item)} title={t('transformations.duplicate')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleDuplicate(item)} title={t('transformations.duplicate')} aria-label={t('transformations.duplicate')}>
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
                         <Button
@@ -320,6 +320,7 @@ export default function TransformationsPage() {
                           size="icon-sm"
                           onClick={() => setDeleteId(item.id)}
                           title={t('common.delete')}
+                          aria-label={t('common.delete')}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
