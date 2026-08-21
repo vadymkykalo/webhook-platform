@@ -1,6 +1,6 @@
 # P3-35 — Load/soak harness and SDK contract tests
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P3
 - **Branch:** `feature/P3-35-load-and-contract-tests`
 - **Depends on:** P1-21 (e2e harness), P1-15 (published images make load rigs easy)
