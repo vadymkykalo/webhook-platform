@@ -366,8 +366,14 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       DB_JDBC_URL: ${DB_JDBC_URL:-}
-      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-30}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-15}
+      # P1-26: deliberately a DIFFERENT host-level env var from the API's DB_POOL_MAX_SIZE/
+      # DB_POOL_MIN_IDLE (see .env.dist). Both used to read the exact same shared
+      # DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE names -- .env.dist sets those once, so `make up`
+      # silently gave the worker the API's smaller pool (20/10) instead of its own tuned
+      # 40/20, no matter what default this fallback below claimed. The two must stay named
+      # distinctly or they will drift back into colliding again.
+      DB_POOL_MAX_SIZE: ${WORKER_DB_POOL_MAX_SIZE:-40}
+      DB_POOL_MIN_IDLE: ${WORKER_DB_POOL_MIN_IDLE:-20}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}

@@ -11,6 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.redisson.api.RBucket;
+import org.redisson.api.RKeys;
+import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 
@@ -28,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -273,5 +276,69 @@ class OrderingBufferServiceTest {
         Instant longAgo = Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5);
         assertTrue(service.isGapTimedOut(longAgo));
         assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
+    }
+
+    // ── P1-26: webhook_ordering_buffer_size registered once, resynced from Redis truth ──
+
+    @Test
+    void gauge_registeredExactlyOnceAtConstruction_startsAtZero() {
+        // Previously registered via meterRegistry.gauge(...) (no tags) inside bufferDelivery()
+        // itself, so only the very first endpoint's buffer was ever actually tracked --
+        // Micrometer silently discards a re-registration under the same untagged name. Now
+        // registered exactly once, in the constructor.
+        var gauge = meterRegistry.find("webhook_ordering_buffer_size").gauge();
+        assertNotNull(gauge, "webhook_ordering_buffer_size must be registered at construction");
+        assertEquals(0.0, gauge.value());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void resyncBufferSizeGauge_sumsAcrossAllEndpoints_notJustTheFirstRegistered() {
+        UUID endpointA = endpointId();
+        UUID endpointB = endpointId();
+        String keyA = "seq:buffer:" + endpointA;
+        String keyB = "seq:buffer:" + endpointB;
+
+        RKeys keys = mock(RKeys.class);
+        when(redissonClient.getKeys()).thenReturn(keys);
+        when(keys.getKeysByPattern("seq:buffer:*")).thenReturn(List.of(keyA, keyB));
+
+        RScoredSortedSet<String> bufferA = mock(RScoredSortedSet.class);
+        RScoredSortedSet<String> bufferB = mock(RScoredSortedSet.class);
+        when(bufferA.size()).thenReturn(3);
+        when(bufferB.size()).thenReturn(5);
+        when(redissonClient.<String>getScoredSortedSet(keyA)).thenReturn(bufferA);
+        when(redissonClient.<String>getScoredSortedSet(keyB)).thenReturn(bufferB);
+
+        service.resyncBufferSizeGauge();
+
+        assertEquals(8.0, meterRegistry.find("webhook_ordering_buffer_size").gauge().value(),
+                "gauge must sum every endpoint's buffer, not just the first one registered");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void resyncBufferSizeGauge_returnsToZero_afterBacklogCleared() {
+        UUID endpointId = endpointId();
+        String key = "seq:buffer:" + endpointId;
+
+        RKeys keys = mock(RKeys.class);
+        when(redissonClient.getKeys()).thenReturn(keys);
+
+        RScoredSortedSet<String> buffer = mock(RScoredSortedSet.class);
+        when(redissonClient.<String>getScoredSortedSet(key)).thenReturn(buffer);
+
+        when(keys.getKeysByPattern("seq:buffer:*")).thenReturn(List.of(key));
+        when(buffer.size()).thenReturn(4);
+        service.resyncBufferSizeGauge();
+        assertEquals(4.0, meterRegistry.find("webhook_ordering_buffer_size").gauge().value());
+
+        // Every buffered delivery for this endpoint has since been released (getReadyDeliveries)
+        // or the key expired via bufferTtl -- either way it's gone from Redis on the next scan.
+        when(keys.getKeysByPattern("seq:buffer:*")).thenReturn(List.of());
+        service.resyncBufferSizeGauge();
+
+        assertEquals(0.0, meterRegistry.find("webhook_ordering_buffer_size").gauge().value(),
+                "gauge must return to 0 once no buffer keys remain");
     }
 }

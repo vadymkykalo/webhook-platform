@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.worker.domain.repository.OrderingCursorRepository;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
@@ -10,6 +11,7 @@ import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.LongCodec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manages ordering buffer for FIFO delivery guarantees.
@@ -33,6 +36,7 @@ public class OrderingBufferService {
 
     private static final String DELIVERED_SEQ_KEY_PREFIX = "seq:delivered:";
     private static final String BUFFER_KEY_PREFIX = "seq:buffer:";
+    private static final String BUFFER_KEY_PATTERN = BUFFER_KEY_PREFIX + "*";
 
     private final RedissonClient redissonClient;
     private final OrderingCursorRepository cursorRepository;
@@ -41,6 +45,17 @@ public class OrderingBufferService {
     private final Duration deliveredSeqTtl;
     private final Duration bufferTtl;
     private final String cursorCasScript;
+    // P1-26: webhook_ordering_buffer_size used to be registered with meterRegistry.gauge(...)
+    // (no tags) on every single bufferDelivery() call. Micrometer silently keeps only the
+    // first-registered meter for a given unregistered-tag name, so every call after the very
+    // first endpoint's first buffered delivery was a no-op -- the gauge permanently reported
+    // whichever endpoint's RScoredSortedSet got there first, no matter how many other
+    // endpoints buffered deliveries afterward. Registered exactly once here instead, backed by
+    // a periodically Redis-truth-resynced aggregate (see resyncBufferSizeGauge) rather than a
+    // manually incremented/decremented counter -- buffer entries can also disappear via TTL
+    // expiry or the gap-timeout "proceed anyway" path without an explicit remove call, so only
+    // a resync against Redis itself stays honest.
+    private final AtomicLong totalBufferedDeliveries = new AtomicLong(0);
 
     public OrderingBufferService(
             RedissonClient redissonClient,
@@ -56,6 +71,31 @@ public class OrderingBufferService {
         this.deliveredSeqTtl = Duration.ofHours(deliveredSeqTtlHours);
         this.bufferTtl = Duration.ofMinutes(bufferTtlMinutes);
         this.cursorCasScript = loadLuaScript("lua/ordering_cursor_cas.lua");
+
+        Gauge.builder("webhook_ordering_buffer_size", totalBufferedDeliveries, AtomicLong::get)
+                .description("Total deliveries currently buffered awaiting their predecessor sequence, summed across all endpoints")
+                .register(meterRegistry);
+    }
+
+    /**
+     * Recomputes {@code webhook_ordering_buffer_size} from Redis directly, by summing the
+     * size of every per-endpoint buffer key. Deliberately aggregated rather than tagged by
+     * endpoint -- endpoint UUIDs are unbounded cardinality, and an untagged-but-still-per-
+     * endpoint gauge is exactly the bug this replaces (see the class-level comment on {@code
+     * totalBufferedDeliveries}). {@code getKeysByPattern} is SCAN-based (non-blocking), so this
+     * is safe to run periodically even against a large keyspace.
+     */
+    @Scheduled(fixedDelayString = "${ordering.buffer-gauge-resync-ms:30000}")
+    public void resyncBufferSizeGauge() {
+        try {
+            long total = 0;
+            for (String key : redissonClient.getKeys().getKeysByPattern(BUFFER_KEY_PATTERN)) {
+                total += redissonClient.getScoredSortedSet(key).size();
+            }
+            totalBufferedDeliveries.set(total);
+        } catch (Exception e) {
+            log.warn("Failed to resync webhook_ordering_buffer_size gauge: {}", e.getMessage());
+        }
     }
 
     private String loadLuaScript(String path) {
@@ -200,7 +240,6 @@ public class OrderingBufferService {
             log.warn("Ordering buffer growing large for endpoint {}: {} deliveries buffered", endpointId, bufferSize);
         }
         meterRegistry.counter("webhook_ordering_buffered_total").increment();
-        meterRegistry.gauge("webhook_ordering_buffer_size", buffer, RScoredSortedSet::size);
     }
 
     /**
