@@ -1,6 +1,6 @@
 # P1-27 — Rename SDK packages to hookflow (irreversible after publish)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1 — **time-critical**: cheap now, impossible after first publish
 - **Branch:** `feature/P1-27-sdk-rename`
 - **Depends on:** P1-16 (version reconciliation) — coordinate, both touch SDK manifests
