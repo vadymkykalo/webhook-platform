@@ -56,6 +56,18 @@ public class SecurityConfig {
                                                 .frameOptions(frame -> frame.deny()))
                                 .authorizeHttpRequests(auth -> {
                                         auth
+                                                        // P1-20: these matchers only apply when actuator is served
+                                                        // from THIS filter chain, i.e. management.server.port is
+                                                        // unset or equal to server.port (the default — true for
+                                                        // tests, plain `mvn spring-boot:run`, and any deployment
+                                                        // that hasn't opted into the port split). The Compose
+                                                        // deployment sets MANAGEMENT_PORT to a separate port so
+                                                        // Prometheus can reach /actuator/prometheus without a
+                                                        // JWT/API-key — see application.yml `management.server.*`
+                                                        // and monitoring/README.md "Metrics-scrape auth". A
+                                                        // Kubernetes/Helm deployment that wants the same needs its
+                                                        // own port split (chart currently scrapes /actuator/prometheus
+                                                        // on the main authenticated port — see docs/OPERATIONS.md).
                                                         .requestMatchers("/actuator/health", "/actuator/health/**",
                                                                         "/actuator/info")
                                                         .permitAll()

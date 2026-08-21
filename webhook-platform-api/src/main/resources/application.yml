@@ -85,6 +85,18 @@ management:
       enabled: true
     readinessState:
       enabled: true
+  server:
+    # P1-20: defaults to the same port as `server.port` (i.e. no split — actuator
+    # stays behind SecurityConfig's JWT/API-key auth on the main port, same as
+    # before). The Compose deployment overrides MANAGEMENT_PORT to a dedicated
+    # port not exposed to the host, so Prometheus can scrape /actuator/prometheus
+    # without authenticating (see monitoring/README.md "Metrics-scrape auth" and
+    # docker-compose.yml). When management.server.port differs from server.port,
+    # Spring Boot serves actuator from a separate embedded web server that never
+    # passes through the main SecurityFilterChain — do not point this at a port
+    # reachable from outside the trusted docker network.
+    port: ${MANAGEMENT_PORT:${SERVER_PORT:8080}}
+    address: ${MANAGEMENT_ADDRESS:0.0.0.0}
 
 outbox:
   publisher:
