@@ -1,6 +1,6 @@
 # P3-34 — Workflow engine and CLI command tests
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P3 — post-launch, but say so publicly rather than implying coverage
 - **Branch:** `feature/P3-34-workflow-and-cli-tests`
 - **Depends on:** P1-28 (so the improvement is measurable)
