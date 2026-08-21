@@ -1,6 +1,6 @@
 # P1-26 — Thread/pool sizing, @Transactional bypass, lying metrics
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-26-pools-transactions-metrics`
 - **Depends on:** P0-06 (scheduler pool) — land that first
