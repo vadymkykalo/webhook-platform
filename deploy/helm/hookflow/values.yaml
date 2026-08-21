@@ -169,7 +169,7 @@ ui:
           - app.hookflow.dev
 
 # PostgreSQL configuration
-# P1-19: this chart no longer ships a PostgreSQL subchart (was Bitnami,
+# This chart no longer ships a PostgreSQL subchart (was Bitnami,
 # removed - see Chart.yaml). `enabled` now only selects which host/port
 # templates.tpl reads (see hookflow.postgresql.* in templates/_helpers.tpl);
 # it does not deploy a database. Point `external` at your own instance -
@@ -197,7 +197,7 @@ postgresql:
     existingSecretPasswordKey: password
 
 # Kafka configuration
-# P1-19: this chart no longer ships a Kafka subchart (was Bitnami, removed -
+# This chart no longer ships a Kafka subchart (was Bitnami, removed -
 # see Chart.yaml; Bitnami had already dropped Kafka from its free catalog
 # entirely). Point `external` at your own cluster - managed (MSK/Confluent
 # Cloud/etc.) for production, or your own StatefulSet/Docker container
@@ -216,7 +216,7 @@ kafka:
     bootstrapServers: ""  # e.g., kafka-1:9092,kafka-2:9092,kafka-3:9092
 
 # Redis configuration
-# P1-19: this chart no longer ships a Redis subchart (was Bitnami, removed -
+# This chart no longer ships a Redis subchart (was Bitnami, removed -
 # see Chart.yaml) - `enabled` therefore now defaults to false (it defaulted
 # to true when a subchart still backed it). Point `external` at your own
 # instance - managed (ElastiCache/Memorystore/etc.) for production, or your

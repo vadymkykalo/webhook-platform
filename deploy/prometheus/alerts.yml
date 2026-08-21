@@ -19,7 +19,7 @@ groups:
   # ── Outbox ───────────────────────────────────────────────────
   - name: hookflow.outbox
     rules:
-      # P1-24c: SENDING rows are recovered on the 30s retry cycle after
+      # SENDING rows are recovered on the 30s retry cycle after
       # outbox.publisher.sending-recovery-seconds (default 300s). Sustained SENDING depth means
       # recovery isn't keeping up (or is failing outright) — those messages are undelivered
       # webhooks sitting invisibly until recovered.
@@ -243,7 +243,7 @@ groups:
             A delivery has been pending for over 1 hour.
             This may indicate a stuck delivery or scheduler issue.
 
-      # P1-24a: threshold tracks DELIVERY_ESCALATION_HARD_CAP_HOURS (default 96h) plus a margin
+      # Threshold tracks DELIVERY_ESCALATION_HARD_CAP_HOURS (default 96h) plus a margin
       # for the 5-minute escalation poll interval — below the cap, a PENDING delivery may
       # legitimately still be working through the retry ladder (worst case ~83h with jitter),
       # so alerting at 24h as before would fire on healthy in-flight retries.

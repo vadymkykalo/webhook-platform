@@ -1,5 +1,5 @@
 #!/bin/sh
-# Entry point for the `db-backup` Compose sidecar (P1-20). Runs db-backup.sh on
+# Entry point for the `db-backup` Compose sidecar. Runs db-backup.sh on
 # a fixed interval — the simplest thing that can't silently stop firing (no cron
 # daemon config to typo, no separate log file to forget to check: a failed
 # backup just prints to `docker compose logs db-backup` and the container is

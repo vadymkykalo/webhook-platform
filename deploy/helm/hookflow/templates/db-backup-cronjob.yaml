@@ -1,5 +1,5 @@
 {{- /*
-P1-20: the Compose path (docker-compose.yml `db-backup` service, `make backup-db`)
+The Compose path (docker-compose.yml `db-backup` service, `make backup-db`)
 uses deploy/scripts/db-backup.sh instead of this inline script. They can't
 share one file — a packaged Helm chart only ships files under its own chart
 directory, so a script living at the repo root (where the Makefile/Compose
