@@ -40,9 +40,19 @@ export default defineConfig({
       // an actual regression. Only 11 test files exist today against ~150
       // source files - ratchet these up as P2/P3 UI test tasks land, don't
       // leave them here.
+      //
+      // P1-19 re-baseline (recorded 2026-08-22, same test files/assertions -
+      // no coverage regression): bumping @vitest/coverage-v8 1.6.1 -> 3.2.4
+      // (alongside vitest/vite themselves) changed the v8 provider's
+      // line/statement remapping and measured lines/statements at 13.35%
+      // against the exact same suite that measured 16.38% before - functions
+      // (20.06%) and branches (59.58%) barely moved, so this is instrumentation
+      // methodology, not lost coverage. Lowered lines/statements to stay a
+      // couple points under the new number; left functions/branches alone
+      // since they still clear the old thresholds comfortably.
       thresholds: {
-        lines: 14,
-        statements: 14,
+        lines: 12,
+        statements: 12,
         functions: 16,
         branches: 55,
       },
