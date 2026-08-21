@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { Suspense, type ReactElement } from 'react';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -48,14 +48,20 @@ interface RenderPageOptions {
 export function renderPage(ui: ReactElement, { path, initialEntry, queryClient }: RenderPageOptions) {
   const client = queryClient ?? createTestQueryClient();
   return render(
-    <QueryClientProvider client={client}>
-      <AuthContext.Provider value={FAKE_AUTH_STATE}>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <Routes>
-            <Route path={path} element={ui} />
-          </Routes>
-        </MemoryRouter>
-      </AuthContext.Provider>
-    </QueryClientProvider>
+    // Matches the top-level <Suspense> in main.tsx: useTranslation() can
+    // suspend while its locale bundle loads (see src/i18n). setup.ts
+    // preloads both bundles synchronously so this fallback shouldn't
+    // normally be hit, but it keeps tests honest with production wiring.
+    <Suspense fallback={null}>
+      <QueryClientProvider client={client}>
+        <AuthContext.Provider value={FAKE_AUTH_STATE}>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <Routes>
+              <Route path={path} element={ui} />
+            </Routes>
+          </MemoryRouter>
+        </AuthContext.Provider>
+      </QueryClientProvider>
+    </Suspense>
   );
 }
