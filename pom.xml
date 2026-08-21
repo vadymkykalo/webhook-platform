@@ -31,7 +31,17 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>3.2.0</spring-boot.version>
+        <!--
+          P1-19: bumped from the EOL 3.2.0 line. Target is 3.5.16, the final
+          OSS release of the 3.5.x line (3.5 itself went OSS-EOL 2026-06-30,
+          after this task was originally scoped against "the current 3.5.x
+          line" - see the P1-19 task file's Progress log for why this task
+          stops at 3.5.16 rather than chasing the now-current Spring Boot
+          4.0/4.1 major line: 4.x is a much larger, separately-risky migration
+          (module restructuring, Spring Security 7) that deserves its own
+          dedicated, reviewed task rather than silent scope creep here.
+        -->
+        <spring-boot.version>3.5.16</spring-boot.version>
         <lombok.version>1.18.30</lombok.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <jacoco.version>0.8.12</jacoco.version>

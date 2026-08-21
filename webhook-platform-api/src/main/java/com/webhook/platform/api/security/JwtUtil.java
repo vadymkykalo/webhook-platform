@@ -22,8 +22,42 @@ public class JwtUtil {
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
     
-    // Request-scoped cache to avoid parsing same token multiple times per request
-    private static final ThreadLocal<Map<String, Claims>> REQUEST_CACHE = 
+    /**
+     * Request-scoped cache to avoid re-verifying the same token's HMAC signature
+     * multiple times within one request.
+     *
+     * <p><b>Invariant (P1-19):</b> this is only safe because it is a {@code static}
+     * field shared across every {@code JwtUtil} instance on a given thread, and
+     * {@link JwtAuthenticationFilter#doFilterInternal} unconditionally calls
+     * {@link #clearCache()} in a {@code finally} block after the filter chain
+     * returns - so by the time a thread is free to pick up its next unit of work,
+     * this thread's entry is gone. That holds today because Spring MVC's default
+     * (non-virtual-thread) servlet model dedicates one pooled platform thread to a
+     * request for its full duration and only returns that thread to the pool
+     * afterward, i.e. "this thread's next unit of work" always means "this
+     * thread's next HTTP request".
+     *
+     * <p><b>This breaks if virtual threads are ever enabled</b>
+     * ({@code spring.threads.virtual.enabled=true}) without revisiting this class,
+     * UNLESS the virtual-thread executor keeps spawning one fresh (never reused)
+     * virtual thread per request, as Tomcot/Spring's own virtual-thread support
+     * does today (Tomcat's virtual-thread support spawns a fresh virtual thread
+     * per request rather than pooling them) - because then there is no "next
+     * request on this thread" for stale entries to leak into in the first place.
+     * The trap is any executor that pools/reuses virtual threads across requests
+     * (e.g. a fixed-size worker pool built on virtual threads, or manually
+     * routing requests through a shared virtual-thread pool): under thread reuse,
+     * an entry this class cached for one request and never got a chance to clear
+     * would answer a later {@code parseToken} call on that same reused thread
+     * with the wrong request's Claims - a genuine cross-request identity leak,
+     * not just stale/duplicate work.
+     * {@link com.webhook.platform.api.security.JwtAuthenticationFilterTest} pins
+     * the clearing half of this invariant (real filter, real cache, asserts empty
+     * after the chain returns); it cannot by itself prove thread-reuse safety,
+     * which depends on how the servlet container schedules requests onto threads,
+     * not on anything in this class.
+     */
+    private static final ThreadLocal<Map<String, Claims>> REQUEST_CACHE =
             ThreadLocal.withInitial(ConcurrentHashMap::new);
 
     public JwtUtil(
