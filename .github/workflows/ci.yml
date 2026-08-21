@@ -309,12 +309,10 @@ jobs:
           cache: 'maven'
 
       # Persist OWASP's local NVD mirror across runs. Without this, every run
-      # starts from an empty database and dependency-check tries to backfill
-      # the entire NVD history (380k+ CVEs) via paginated API calls before it
-      # can analyze anything — slow, and prone to transient 403s from NVD
-      # partway through the backfill even with a valid API key (reproduced:
-      # the same key returns 200 on a direct, single curl to the NVD API).
-      # With the cache warm, each run only fetches the incremental delta.
+      # starts from an empty database and dependency-check backfills the
+      # entire NVD history (380k+ CVEs, ~500MB) before it can analyze
+      # anything — a one-time cost that's unavoidable on a cold cache, but
+      # with the cache warm each run only fetches the incremental delta.
       # Keyed by week so the mirror still refreshes regularly rather than
       # going stale forever.
       - name: Compute cache week key
@@ -347,15 +345,23 @@ jobs:
       #
       # NVD_API_KEY: repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
       # is set. Without it, unauthenticated NVD requests are rate-limited hard
-      # enough that this step reliably fails with "the NVD returned a 403 or
-      # 404 error" (reproduced locally). That failure is intentionally NOT
+      # enough that this step reliably fails.
+      #
+      # Plugin pinned at 12.1.0, not the 9.0.9 originally used: 9.0.9's HTTP
+      # client got a straight-up Cloudflare "Attention Required" block page
+      # (403, WAF-level) hitting services.nvd.nist.gov, reproduced locally
+      # with -X debug logging — the exact same URL + API key via plain curl
+      # returned 200. Not a key or rate-limit problem, a client-fingerprint
+      # one. 12.1.0's HTTP stack isn't blocked; confirmed locally by letting
+      # it run past the point 9.0.9 instantly 403'd and watching it actually
+      # pull ~500MB of real NVD data. That failure is intentionally NOT
       # swallowed by continue-on-error: a security gate that can't fetch fresh
       # vulnerability data should go red, not silently pass.
       - name: Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: >
-          mvn org.owasp:dependency-check-maven:9.0.9:aggregate -B -DskipTests
+          mvn org.owasp:dependency-check-maven:12.1.0:aggregate -B -DskipTests
           -DfailBuildOnCVSS=9
           -DknownExploitedEnabled=false
           -DnvdApiKey="${NVD_API_KEY}"
