@@ -9,7 +9,9 @@ global:
 api:
   replicaCount: 2
   image:
-    repository: hookflow/api
+    # Published by .github/workflows/docker-publish.yml on every version tag
+    # (multi-arch: linux/amd64, linux/arm64).
+    repository: ghcr.io/vadymkykalo/hookflow-api
     tag: latest
     pullPolicy: IfNotPresent
   
@@ -65,7 +67,9 @@ api:
 worker:
   replicaCount: 2
   image:
-    repository: hookflow/worker
+    # Published by .github/workflows/docker-publish.yml on every version tag
+    # (multi-arch: linux/amd64, linux/arm64).
+    repository: ghcr.io/vadymkykalo/hookflow-worker
     tag: latest
     pullPolicy: IfNotPresent
   
@@ -116,7 +120,9 @@ worker:
 ui:
   replicaCount: 2
   image:
-    repository: hookflow/ui
+    # Published by .github/workflows/docker-publish.yml on every version tag
+    # (multi-arch: linux/amd64, linux/arm64).
+    repository: ghcr.io/vadymkykalo/hookflow-ui
     tag: latest
     pullPolicy: IfNotPresent
   

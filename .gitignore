@@ -81,3 +81,10 @@ sdks/node/coverage/
 
 # === Backups ===
 backups/
+
+# === Helm ===
+# Bitnami subchart deps fetched by `helm dependency build` — not vendored,
+# CI (docker-publish.yml) fetches them fresh before packaging/linting.
+deploy/helm/**/charts/
+deploy/helm/**/Chart.lock
+*.tgz

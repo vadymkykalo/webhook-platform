@@ -54,7 +54,7 @@
 | Service | Port | Protocol | Direction | Notes |
 |---------|------|----------|-----------|-------|
 | API (HTTP) | 8080 | TCP | Inbound | REST API + webhook ingestion |
-| API (Actuator) | 8080 | TCP | Internal | `/actuator/health` on same port |
+| API (Actuator) | 8082 | TCP | Internal | `/actuator/health` — separate port, never exposed to the host in docker-compose.yml (bypasses the JWT/API-key auth chain on 8080) |
 | Worker (Actuator) | 8081 | TCP | Internal | Health checks + metrics |
 | UI (HTTP) | 80/443 | TCP | Inbound | Web dashboard |
 | PostgreSQL | 5432 | TCP | Internal | Database |
@@ -158,15 +158,16 @@ kubectl describe nodes | grep -A5 "Allocated resources"
 
 ## 4. Installation Methods
 
-### 4.1 Docker Compose (Small / Dev)
+### 4.1 Docker Compose — pull pre-built images (Small / Dev, no toolchain)
+
+No repo clone needed — `docker-compose.pull.yml` is fully standalone (see the
+comment at the top of that file for how it differs from
+`docker-compose.prod.yml`, which is an overlay and still needs the rest of the
+repo present):
 
 ```bash
-# Clone repository
-git clone https://github.com/vadymkykalo/webhook-platform.git
-cd webhook-platform
-
-# Copy environment template
-cp .env.dist .env
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
 
 # Edit .env — set required secrets:
 #   WEBHOOK_ENCRYPTION_KEY (32 chars)
@@ -175,23 +176,75 @@ cp .env.dist .env
 #   DB_PASSWORD
 #   REDIS_PASSWORD
 
-# Start with production overrides
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.pull.yml up -d
 
-# Verify
-curl http://localhost:8080/actuator/health
+# Verify — actuator lives on its own port (8082, loopback-only), not 8080
+# (see the "API (Actuator)" row in the port table above). /liveness rather than
+# the aggregate /actuator/health: the latter also reflects the mail health
+# indicator, which reads DOWN whenever no SMTP server is reachable — true by
+# default here even with EMAIL_ENABLED=false — so it's not a reliable signal.
+curl http://localhost:8082/actuator/health/liveness
+curl http://localhost:8080/                # main API port — expect 401 (auth required), not a connection error
 ```
 
-**Or via Makefile:**
+### 4.1b Docker Compose — build from source (if you've cloned the repo anyway)
+
 ```bash
-make up-prod           # Embedded PostgreSQL + Kafka + Redis
+# Clone repository
+git clone https://github.com/vadymkykalo/webhook-platform.git
+cd webhook-platform
+
+# Copy environment template
+cp .env.dist .env
+# Edit .env as above
+
+# --no-build: docker-compose.yml still has `build:` contexts for the source
+# path (make up/make rebuild); pass this or Compose will build from source
+# instead of pulling, since docker-compose.prod.yml is an overlay and doesn't
+# remove the base file's `build:` key.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+
+# Verify — this overlay doesn't publish the actuator port (8082) to the host at
+# all, unlike docker-compose.pull.yml, so check from inside the network instead:
+docker compose exec -T api wget -q -O - http://localhost:8082/actuator/health/liveness
+# or: make health
+```
+
+**Or via Makefile (from a clone):**
+```bash
+make up-pull           # Pull pre-built images, no source build
+make up-prod           # Build+run with production overrides, embedded DB
 make up-prod-external  # External managed services (provide connection strings in .env)
 ```
 
 ### 4.2 Kubernetes + Helm (Medium / Large / Production)
 
+The chart is published as an OCI artifact to GHCR on every release (P1-15), so
+`helm install` works against a clean cluster with **no repo clone**:
+
 ```bash
-# Add Hookflow Helm chart (or use local chart)
+kubectl create namespace hookflow
+
+kubectl -n hookflow create secret generic hookflow-secrets \
+  --from-literal=encryption-key=$(openssl rand -hex 16) \
+  --from-literal=jwt-secret=$(openssl rand -base64 48)
+kubectl -n hookflow create secret generic hookflow-postgresql-secret --from-literal=password=$DB_PASSWORD
+kubectl -n hookflow create secret generic hookflow-redis-secret --from-literal=password=$REDIS_PASSWORD
+
+helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <version> -n hookflow \
+  --set postgresql.external.host=your-postgres.example.com \
+  --set kafka.external.bootstrapServers=kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+  --set redis.external.host=your-redis.example.com \
+  --set ui.ingress.hosts[0].host=hookflow.yourdomain.com
+
+kubectl -n hookflow get pods    # no ImagePullBackOff
+```
+
+If you need to customize the chart itself (not just `--set` overrides), clone
+the repo and install the local copy instead — this also picks up
+`values-production.yaml`:
+
+```bash
 cd deploy/helm
 
 # Create namespace
@@ -468,14 +521,14 @@ For service mesh mTLS (Istio/Linkerd):
 ### Health Checks
 
 ```bash
-# API health
-curl http://api:8080/actuator/health
+# API health (actuator is split onto its own port, not the main 8080 — see §2 port table)
+curl http://api:8082/actuator/health/liveness
 
 # Worker health
 curl http://worker:8081/actuator/health
 
 # Detailed health (includes DB, Kafka, Redis status)
-curl http://api:8080/actuator/health | jq .
+curl http://api:8082/actuator/health | jq .
 ```
 
 ### Monitoring Stack (Docker Compose — Self-Hosted)

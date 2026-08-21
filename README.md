@@ -9,12 +9,15 @@
 [![Java 17](https://img.shields.io/badge/Java-17-orange)]()
 [![Spring Boot 3.2](https://img.shields.io/badge/Spring%20Boot-3.2-green)]()
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Fhookflow-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
 
 ```bash
-git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform && make up
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+docker compose -f docker-compose.pull.yml up -d
 ```
 
-**Dashboard** → http://localhost:5173 &nbsp;|&nbsp; **API Docs** → http://localhost:8080/swagger-ui.html
+No Maven, no npm, no clone — two files and Docker. **Dashboard** → http://localhost:5173 &nbsp;|&nbsp; **API Docs** → http://localhost:8080/swagger-ui.html
 
 </div>
 
@@ -26,12 +29,20 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
 
 ## Quick Start
 
-**Prerequisites:** Docker 20.10+, Docker Compose v2+, `make`
+**Prerequisites:** Docker 20.10+, Docker Compose v2+. That's it — the commands below
+pull pre-built [multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
+(amd64 + arm64) images from GHCR, so nothing gets compiled on your machine.
 
 ```bash
-make up                   # Start everything
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+# Edit .env: set WEBHOOK_ENCRYPTION_KEY / WEBHOOK_ENCRYPTION_SALT / JWT_SECRET
+# (dev defaults work out of the box for a local trial run)
+
+docker compose -f docker-compose.pull.yml up -d
+curl -f http://localhost:8082/actuator/health/liveness   # actuator is split onto its own port — see below
 # Open http://localhost:5173, register, create project, get API key
-make verify-link          # Get email verification link from logs
+docker compose -f docker-compose.pull.yml logs api | grep "Verify URL:" | tail -1
 ```
 
 ```bash
@@ -40,6 +51,24 @@ curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"type": "user.signup", "payload": {"userId": "usr_42"}}'
+```
+
+> Actuator (`/actuator/health`, `/actuator/prometheus`) runs on its own port (8082,
+> loopback-only) rather than the main API port (8080) — it never passes through the
+> JWT/API-key-authenticated security chain, so it stays reachable for health checks
+> and Prometheus even if auth config is broken. The main platform API (events,
+> projects, ingress) is on 8080 as usual.
+
+### Building from source (contributors)
+
+If you're changing code rather than just running the platform, clone the repo and
+build locally instead — this path needs Maven + npm (or just `make`, which shells
+out to both via Docker build contexts):
+
+```bash
+git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
+make up                   # Start everything (builds all 3 images from source)
+make verify-link          # Get email verification link from logs
 ```
 
 ---
@@ -254,7 +283,16 @@ sequenceDiagram
 
 ## Deployment
 
-### Development
+### Pull pre-built images (no toolchain)
+
+```bash
+make up-pull          # Pull ghcr.io/vadymkykalo/hookflow-* and start (needs repo clone for `make`)
+# or, with no clone at all:
+docker compose -f docker-compose.pull.yml up -d
+make down-pull         # Stop (data preserved)
+```
+
+### Development (build from source)
 
 ```bash
 make up              # Start all (embedded PostgreSQL)
@@ -356,9 +394,9 @@ hookflow config profile delete staging      # Remove profile
 | **Dashboard** | http://localhost:5173 | — |
 | **Grafana** | http://localhost:3001 | `hookflow` / `hookflow_monitor_2024` |
 | **Prometheus** | http://localhost:9090 | — |
-| **API Health** | http://localhost:8080/actuator/health | — |
-| **Worker Health** | http://localhost:8081/actuator/health | — |
-| **Metrics** | http://localhost:8080/actuator/prometheus | — |
+| **API Health** | `make health`, or http://localhost:8082/actuator/health/liveness with `docker-compose.pull.yml` (not published by `make up`) | — |
+| **Worker Health** | `make health` (internal-only, not published to host) | — |
+| **Metrics** | `/actuator/prometheus` on the same internal port as health above | — |
 
 ### Common Issues
 
