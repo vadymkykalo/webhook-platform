@@ -1,6 +1,6 @@
 # P1-25 — Incoming-forward claim + IngressService transaction scope
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-25-forward-claim-and-ingress-tx`
 - **Depends on:** nothing
