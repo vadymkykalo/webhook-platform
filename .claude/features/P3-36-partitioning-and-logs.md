@@ -1,6 +1,6 @@
 # P3-36 — Table partitioning and log aggregation
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P3 — matters at volume, not at launch
 - **Branch:** `feature/P3-36-partitioning-and-logs`
 - **Depends on:** nothing
