@@ -307,7 +307,28 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
-      
+
+      # Persist OWASP's local NVD mirror across runs. Without this, every run
+      # starts from an empty database and dependency-check tries to backfill
+      # the entire NVD history (380k+ CVEs) via paginated API calls before it
+      # can analyze anything — slow, and prone to transient 403s from NVD
+      # partway through the backfill even with a valid API key (reproduced:
+      # the same key returns 200 on a direct, single curl to the NVD API).
+      # With the cache warm, each run only fetches the incremental delta.
+      # Keyed by week so the mirror still refreshes regularly rather than
+      # going stale forever.
+      - name: Compute cache week key
+        id: dc-cache-week
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache OWASP Dependency-Check NVD data
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
+          restore-keys: |
+            dependency-check-data-
+
       # Gates on CVSS >= 9 (CRITICAL) first, staged the same way as Trivy below:
       # widen to HIGH (CVSS >= 7) once the CRITICAL backlog is clear. Known
       # false positives go in the reviewed suppression file, not a blanket
@@ -324,13 +345,12 @@ jobs:
       # out to reach that host fine, re-enabling this is a one-line revert.
       # NVD itself (services.nvd.nist.gov) was reachable without this flag.
       #
-      # NVD_API_KEY: add repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
-      # — without it, unauthenticated NVD requests are rate-limited hard enough
-      # that this step reliably fails with "the NVD returned a 403 or 404
-      # error" (reproduced locally). That failure is intentionally NOT
+      # NVD_API_KEY: repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
+      # is set. Without it, unauthenticated NVD requests are rate-limited hard
+      # enough that this step reliably fails with "the NVD returned a 403 or
+      # 404 error" (reproduced locally). That failure is intentionally NOT
       # swallowed by continue-on-error: a security gate that can't fetch fresh
-      # vulnerability data should go red, not silently pass. Once the secret is
-      # added, this step should complete and start gating on real findings.
+      # vulnerability data should go red, not silently pass.
       - name: Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
@@ -339,6 +359,7 @@ jobs:
           -DfailBuildOnCVSS=9
           -DknownExploitedEnabled=false
           -DnvdApiKey="${NVD_API_KEY}"
+          -DdataDirectory="$HOME/.m2/repository/org/owasp/dependency-check-data"
           -DsuppressionFiles=.github/dependency-check-suppressions.xml
 
       - name: Upload Dependency-Check report
