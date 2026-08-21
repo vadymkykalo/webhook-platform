@@ -1,6 +1,6 @@
 # P1-15 — Publish Docker images (the product is uninstallable today)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1 — the single biggest gap between "impressive repo" and "product"
 - **Branch:** `feature/P1-15-publish-docker-images`
 - **Depends on:** nothing
