@@ -1,0 +1,6 @@
+# Consolidates the two commit identities used by the same person across this
+# repo's history (`vadymkykalo` — 446 commits, `vkykalo` — 96 commits, both
+# under the same vadymkykalo@gmail.com address) into one canonical name, so
+# `git shortlog -sn` and the GitHub contributor graph stop showing them as
+# two different people. See .claude/features/P1-16-version-and-changelog.md.
+Vadym Kykalo <vadymkykalo@gmail.com>

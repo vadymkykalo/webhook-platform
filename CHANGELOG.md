@@ -18,6 +18,166 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GlobalExceptionHandler` now properly handles `ResponseStatusException`
 - Test assertions in `MembershipRbacTest` and `AuthIntegrationTest`
 
+## [2.2.1] - 2026-03-18
+
+### Fixed
+- Small worker-side fix following the CLI module release (`8aba8fa`).
+
+## [2.2.0] - 2026-03-16
+
+A large release spanning several new subsystems, folded into one changelog
+entry because the underlying commit history (`add feature` / `add cli
+module` / `fix`, ~160 commits) doesn't distinguish them individually. The
+Flyway migrations added in this range (`V028`–`V042`) are the most reliable
+record of what shipped:
+
+### Added
+- **Rules engine** for conditional event routing (`V028_rules_engine`,
+  `V029_rules_condition_tree`)
+- **Workflow engine**: multi-step workflows with reliability/retry tracking
+  (`V030_workflows`, `V031_workflow_reliability`)
+- **Billing**: plans, subscriptions, and yearly-interval pricing
+  (`V036_billing_plans`, `V037_billing_subscriptions`,
+  `V038_billing_yearly_interval`)
+- **CLI** (`webhook-platform-cli`) as a standalone Picocli module, published
+  via a new `release-cli.yml` workflow
+- **Tunnel**: `CLI ↔ /ws/tunnel` local-development tunneling, with session
+  tracking, request logging, and plan-based limits (`V040_tunnel_sessions`,
+  `V041_tunnel_request_log`, `V042_tunnel_plan_limits`)
+- Multi-key encryption support for zero-downtime key rotation
+  (`WEBHOOK_ENCRYPTION_KEYS`, `WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION`,
+  `V039_encryption_key_versioning`) — additive and optional; existing
+  single-key deployments are unaffected
+- Dashboard materialized view for faster analytics queries
+  (`V033_dashboard_materialized_view`)
+- Event payload compression (`V032_event_payload_compression`)
+- API key scopes (`V025_api_key_scope`)
+- PII masking and debug links for delivery inspection
+  (`V012_pii_masking_and_debug_links`)
+- Replay sessions for re-driving past deliveries (`V013_replay_sessions`,
+  `V018_replay_unique_constraint`)
+
+### Changed
+- Invite tokens are now hashed at rest rather than stored in plaintext
+  (`V034_hash_invite_tokens`)
+- Several indexing passes for delivery-dashboard and high-load query paths
+  (`V015`, `V019`, `V022`, `V035`)
+
+## [2.1.0] - 2026-03-02
+
+### Added
+- Wildcard subscriptions (route by event-type pattern, not just exact match)
+- Event schema registry (`V010_schema_registry`)
+- Deterministic replay support (`V011_deterministic_replay`)
+
+## [2.0.0] - 2026-03-01
+
+**Major release — breaking changes. See [UPGRADING.md](UPGRADING.md) before
+upgrading an existing v1.x deployment.**
+
+### Security
+- **Encryption key derivation replaced.** Secrets (endpoint signing
+  secrets, source secrets, destination auth) were previously encrypted with
+  a key derived by truncating a SHA-256 digest of `WEBHOOK_ENCRYPTION_KEY`
+  to 16 bytes (effectively AES-128). This is now `PBKDF2WithHmacSHA256`
+  (65,536 iterations) over `WEBHOOK_ENCRYPTION_KEY` + a new required
+  `WEBHOOK_ENCRYPTION_SALT`, producing a real 256-bit AES key
+  (`CryptoUtils.deriveKey`). **Ciphertext encrypted under v1.x cannot be
+  decrypted by v2.x** — see UPGRADING.md.
+- Request/payload size limits enforced via a new `RequestSizeLimitFilter`
+  (`WEBHOOK_MAX_PAYLOAD_SIZE_BYTES`, `WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES`)
+- Auth rate limiting on login/register, independent of the general API rate
+  limiter (`AUTH_RATE_LIMIT_LOGIN_PER_MINUTE`, `AUTH_RATE_LIMIT_REGISTER_PER_MINUTE`)
+- Refresh-token handling hardened; typed exceptions replace generic ones in
+  several security-sensitive paths
+- Redis now requires authentication (`REDIS_PASSWORD`, defaulted in
+  `docker-compose.yml` but must be set explicitly in production)
+- Kafka, Redis, and API ports are no longer published on all interfaces by
+  default — Kafka/Redis bind to `127.0.0.1`, and the API respects a new
+  `API_BIND` variable (default `127.0.0.1`, was implicitly `0.0.0.0`)
+- Membership invite tokens now expire and are tracked server-side
+  (`V008_membership_invite_tokens`)
+- Outbox publisher tracks `last_attempt_at` to prevent silently stuck
+  messages from being re-picked forever (`V009_outbox_last_attempt_at`)
+- Webhook signature verification enforcement tightened in
+  `WebhookVerifierFactory`
+- `ProductionSafetyValidator` added — fails startup on unsafe production
+  config (default secrets, `WEBHOOK_ALLOW_PRIVATE_IPS=true` in prod, etc.)
+
+### Added
+- Incoming webhooks (ingress) pipeline: source/destination management,
+  request forwarding, retry scheduling
+  (`V005_incoming_webhooks`, `V006_incoming_webhooks_highload`,
+  `V007_incoming_webhooks_enhancements`)
+- Redis-distributed rate limiting and reactive delivery path; Kafka topics
+  moved to 12 partitions for higher throughput
+- DLQ management, payload transformation, custom headers, and IP allowlist
+  for outgoing endpoints
+- OpenAPI docs, request DTO validation, rate-limit response headers, and a
+  delivery circuit breaker
+- mTLS support for outbound webhook delivery
+- Endpoint ownership verification flow
+- PHP SDK (`sdks/php`), alongside the existing Node and Python SDKs
+- Email service for verification and password-reset mail
+  (`V003_email_verification`, `V004_password_reset`), with `EMAIL_ENABLED`,
+  `SMTP_*` env vars (SMTP disabled by default — verification links are
+  logged to console)
+- Audit log (`V002_audit_log`)
+- UI internationalization: English and Ukrainian locales
+- Resource limits, log rotation, and healthcheck tuning across all
+  `docker-compose.yml` services
+
+### Changed
+- **Schema history replaced.** All pre-2.0 Flyway migrations
+  (`V001`–`V025` under the old numbering) were consolidated into a new
+  `V001__initial_schema.sql`…`V009__outbox_last_attempt_at.sql` set. This is
+  a fresh baseline, not a continuation — see UPGRADING.md for what this
+  means for an existing v1.x database.
+- `docker-compose.yml` no longer sets explicit `container_name` on the
+  `api`/`worker`/`ui` services; the default `TEST_ENDPOINT_BASE_URL`
+  changed from `http://webhook-api:8080` to `http://api:8080` to match
+  (Docker Compose's built-in service-name DNS, not the removed container
+  name)
+- Vendored PHP SDK dependencies (`sdks/php/vendor/`) removed from version
+  control — run `composer install` locally instead
+
+## [1.1.0] - 2026-02-16
+
+*Tagging anomaly: this tag is an ancestor of `v1.0.1`–`v1.0.3` below — those
+three patch releases were cut from the `1.1.0` line but kept the `1.0.x`
+numbering rather than `1.1.x`. Listed here in the chronological order the
+releases actually happened, not strict numeric order.*
+
+### Added
+- DLQ management, payload transformation, custom headers, and IP allowlist
+  for outgoing endpoints
+- OpenAPI documentation, request DTO validation, rate-limit response
+  headers, delivery circuit breaker
+- PHP client SDK
+- Redis-distributed rate limiting, reactive delivery path, 12 Kafka
+  partitions for higher throughput (`feat(highload)`)
+- JVM tuning for the API/worker containers
+
+### Fixed
+- CI: Testcontainers/Docker compatibility fixes for integration tests
+  (Docker API version pinning, container pre-pull, socket permissions)
+- Various integration-test stability fixes (Redis/Kafka mocking, ordering
+  fields, `ResponseStatusException` handling)
+
+## [1.0.1] - 2026-02-18
+
+- First publish of the Node.js, Python, and PHP SDKs to npm/PyPI/Packagist,
+  with a dedicated CI workflow (`publish-sdks.yml`)
+
+## [1.0.2] - 2026-02-18
+
+- Fixed PHPUnit configuration in the PHP SDK's CI job
+
+## [1.0.3] - 2026-02-18
+
+- Fixed PHP SDK CI (`--no-coverage` flag) and corrected author metadata in
+  package manifests
+
 ## [1.0.0] - 2025-12-17
 
 ### Added
@@ -61,5 +221,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.3...v2.0.0
+[1.1.0]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.0...v1.1.0
+[1.0.1]: https://github.com/vadymkykalo/webhook-platform/compare/v1.1.0...v1.0.1
+[1.0.2]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.1...v1.0.2
+[1.0.3]: https://github.com/vadymkykalo/webhook-platform/compare/v1.0.2...v1.0.3
 [1.0.0]: https://github.com/vadymkykalo/webhook-platform/releases/tag/v1.0.0

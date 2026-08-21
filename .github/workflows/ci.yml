@@ -16,10 +16,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version-check:
+    name: Version drift check
+    runs-on: ubuntu-latest
+    # No SNAPSHOT-suffix skip here: pom.xml is intentionally allowed to run a
+    # -SNAPSHOT ahead of the Chart/UI/SDK versions between releases (see
+    # scripts/check-version-drift.sh) but every real value still has to agree.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check pom / Chart / UI / SDK versions agree
+        run: scripts/check-version-drift.sh
+
   backend-build:
     name: Backend Build & Compile
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

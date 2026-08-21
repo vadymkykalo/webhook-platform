@@ -113,7 +113,7 @@ resolve_version() {
         VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
             | grep '"tag_name"' | head -1 | cut -d'"' -f4) || true
         if [ -z "$VERSION" ]; then
-            VERSION="1.0.0-SNAPSHOT"
+            VERSION="2.2.1"
             warn "No release found yet — using development build ($VERSION)"
             return
         fi

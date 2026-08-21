@@ -102,10 +102,20 @@ npm run build
 ## Release Process
 
 1. Create release branch: `git checkout -b release/1.x.0 develop`
-2. Update version numbers
-3. Create PR to `main`
-4. After merge, tag release: `git tag v1.x.0`
-5. Merge back to `develop`
+2. Update version numbers everywhere in one step: `make version-set VERSION=1.x.0`
+   (wraps `scripts/set-version.sh`, which sets the reactor poms, `Chart.yaml`,
+   `webhook-platform-ui/package.json` and the three SDK manifests together —
+   don't hand-edit them individually, that's how these drifted apart in the
+   first place). Verify with `make version-check`.
+3. Update `CHANGELOG.md`: move `[Unreleased]` content under the new version
+   heading, and write `UPGRADING.md` notes if the release breaks anything.
+4. Create PR to `main`
+5. After merge, tag release: `git tag v1.x.0`
+6. Merge back to `develop` and bump the reactor to the next `-SNAPSHOT`
+   (`make version-set VERSION=1.x+1.0-SNAPSHOT`)
+
+CI's `version-check` job (`.github/workflows/ci.yml`) fails the build if the
+pom, Chart, UI and SDK versions ever disagree again.
 
 ## Questions?
 
