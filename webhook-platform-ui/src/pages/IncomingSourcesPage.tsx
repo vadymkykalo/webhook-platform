@@ -4,7 +4,7 @@ import {
   Plus, ArrowDownToLine, Calendar, Loader2, Trash2, Pencil, Copy, ChevronLeft, ChevronRight,
   Power, PowerOff, ShieldCheck, ShieldOff, ExternalLink, AlertTriangle
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
@@ -184,7 +184,9 @@ export default function IncomingSourcesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('incomingSources.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingSources.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="incomingSources.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canManageIncomingSources}>
           <VerificationGate>

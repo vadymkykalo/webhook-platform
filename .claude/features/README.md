@@ -139,7 +139,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P2-29 | P2 | DONE | UI never tells the user the backend is down |
 | P2-30 | P2 | DONE | Accessibility: zero aria-labels in the whole UI |
 | P2-31 | P2 | DONE | Hardcoded strings + 704KB bundle from eager locales |
-| P2-32 | P2 | TODO | Stored XSS via dangerouslySetInnerHTML + i18n |
+| P2-32 | P2 | DONE | Stored XSS via dangerouslySetInnerHTML + i18n |
 | P2-33 | P2 | TODO | OSS metadata, docs site, demo, committed OpenAPI |
 | P3-34 | P3 | TODO | Workflow engine and CLI command tests |
 | P3-35 | P3 | DONE (harness + contract tests done; real numbers/soak run pending a live-stack run) | Load/soak harness + SDK contract tests |

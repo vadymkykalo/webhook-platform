@@ -58,7 +58,14 @@ export default function LoginPage() {
 
           <div className="space-y-8">
             <div>
-              <h2 className="text-4xl font-bold leading-tight mb-4" dangerouslySetInnerHTML={{ __html: t('auth.login.brandTitle').replace('\n', '<br />') }} />
+              <h2 className="text-4xl font-bold leading-tight mb-4">
+                {t('auth.login.brandTitle').split('\n').map((line, i, arr) => (
+                  <span key={i}>
+                    {line}
+                    {i < arr.length - 1 && <br />}
+                  </span>
+                ))}
+              </h2>
               <p className="text-white/70 text-lg max-w-md">
                 {t('auth.login.brandSubtitle')}
               </p>

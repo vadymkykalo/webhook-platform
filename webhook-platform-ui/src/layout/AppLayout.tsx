@@ -7,7 +7,7 @@ import {
   ArrowDownToLine, Activity, FileJson2, Shield, GitCompare, History, Repeat2, Cable, Play, Network, GitBranch
 } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/auth.store';
 import { useProject } from '../api/queries';
 import { authApi } from '../api/auth.api';
@@ -651,7 +651,9 @@ export default function AppLayout() {
             <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/40 px-4 lg:px-6 py-2.5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
                 <Mail className="h-4 w-4 flex-shrink-0" />
-                <span dangerouslySetInnerHTML={{ __html: t('auth.verification.banner', { email: user?.user?.email }) }} />
+                <span>
+                  <Trans i18nKey="auth.verification.banner" values={{ email: user?.user?.email }} components={{ strong: <strong /> }} />
+                </span>
               </div>
               <Button
                 variant="outline"

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Copy, Share2, Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { useEvents, useProject } from '../api/queries';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
@@ -91,7 +91,9 @@ export default function EventsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('events.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('events.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="events.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canSendEvents}>
           <VerificationGate>

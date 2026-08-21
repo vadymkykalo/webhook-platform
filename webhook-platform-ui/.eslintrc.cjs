@@ -29,6 +29,15 @@ module.exports = {
     'react-hooks/exhaustive-deps': 'warn',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'off',
+    // P2-32: i18next is configured with interpolation.escapeValue: false (correct
+    // for normal React rendering, since React already escapes text children).
+    // That setting becomes a stored-XSS hole the moment translated, interpolated
+    // text is piped into dangerouslySetInnerHTML instead — an unescaped
+    // user-controlled value (project name, event type, email, …) gets injected
+    // as raw HTML. Use react-i18next's <Trans> component for "bold a word in a
+    // translated sentence" instead; it renders markup as real React elements and
+    // escapes interpolated values. See .claude/features/P2-32-dangerously-set-inner-html.md.
+    'react/no-danger': 'error',
   },
   overrides: [
     {

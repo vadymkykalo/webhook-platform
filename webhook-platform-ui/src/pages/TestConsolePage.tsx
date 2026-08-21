@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronRight, Zap, Timer, AlertTriangle,
   FileJson2, Copy, Check
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { eventsApi, type EventResponse } from '../api/events.api';
 import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
@@ -211,7 +211,9 @@ export default function TestConsolePage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-title tracking-tight">{t('testConsole.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('testConsole.subtitle', { project: project.name }) }} />
+        <p className="text-sm text-muted-foreground mt-1">
+          <Trans i18nKey="testConsole.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6">

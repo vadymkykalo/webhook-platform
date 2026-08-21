@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Copy, Radio, Send, Clock, FileJson, Shield, ExternalLink,
@@ -227,7 +227,9 @@ export default function EventDetailsSheet({
                   <div className="py-8 text-center space-y-2">
                     <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
                     {event.eventType && (
-                      <p className="text-xs text-muted-foreground max-w-sm mx-auto" dangerouslySetInnerHTML={{ __html: t('events.details.noDeliveriesNoSub', { eventType: event.eventType }) }} />
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
+                      </p>
                     )}
                     <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
                   </div>
