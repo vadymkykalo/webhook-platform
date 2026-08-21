@@ -129,7 +129,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P1-19 | P1 | TODO | Upgrade Spring Boot 3.2.0 (EOL) and base images |
 | P1-20 | P1 | DONE | Alertmanager + Compose backup/restore automation |
 | P1-21 | P1 | DONE | End-to-end delivery test (highest-value test in the list) |
-| P1-22 | P1 | TODO | Tests for WebhookDeliveryService |
+| P1-22 | P1 | DONE | Tests for WebhookDeliveryService |
 | P1-23 | P1 | TODO | Fix FIFO ordering (cursor regression, gap check, sequence) |
 | P1-24 | P1 | TODO | Retry ladder vs 48h cap, outbox ordering, SENDING recovery |
 | P1-25 | P1 | DONE (25a/25b; 25c/25d follow-up) | Incoming-forward claim + IngressService transaction scope |

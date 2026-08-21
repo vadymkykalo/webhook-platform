@@ -272,7 +272,7 @@ public class WebhookDeliveryService {
 
         // Project-level rate limit — prevent noisy-neighbor
         if (!projectRateLimiterService.tryAcquire(endpoint.getProjectId())) {
-            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 1, 30);
+            long delaySec = RetryPolicy.backoffWithJitter(delivery.getAttemptCount(), 1, 30);
             log.warn("Project rate limit exceeded for project {}, rescheduling delivery {} in {}s",
                     endpoint.getProjectId(), delivery.getId(), delaySec);
             rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
@@ -289,7 +289,7 @@ public class WebhookDeliveryService {
 
         Integer rateLimit = endpoint.getRateLimitPerSecond();
         if (rateLimit != null && !rateLimiterService.tryAcquire(endpoint.getId(), rateLimit)) {
-            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 2, 60);
+            long delaySec = RetryPolicy.backoffWithJitter(delivery.getAttemptCount(), 2, 60);
             log.warn("Rate limited for endpoint {}, rescheduling delivery {} in {}s",
                     endpoint.getId(), delivery.getId(), delaySec);
             rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
@@ -297,7 +297,7 @@ public class WebhookDeliveryService {
         }
 
         if (!concurrencyControlService.tryAcquire(endpoint.getId())) {
-            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 2, 60);
+            long delaySec = RetryPolicy.backoffWithJitter(delivery.getAttemptCount(), 2, 60);
             log.warn("Max concurrency reached for endpoint {}, rescheduling delivery {} in {}s",
                     endpoint.getId(), delivery.getId(), delaySec);
             rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
@@ -424,7 +424,7 @@ public class WebhookDeliveryService {
         if (statusCode >= 200 && statusCode < 300) {
             circuitBreakerService.recordSuccess(delivery.getEndpointId(), durationMs);
             markAsSuccess(delivery);
-        } else if (isRetryable(statusCode)) {
+        } else if (RetryPolicy.isRetryable(statusCode)) {
             circuitBreakerService.recordFailure(delivery.getEndpointId(),
                     new RuntimeException("HTTP " + statusCode));
             scheduleRetry(delivery);
@@ -450,10 +450,6 @@ public class WebhookDeliveryService {
         if (statusCode >= 400 && statusCode < 500)
             return deliveryLatency4xx;
         return deliveryLatency5xx;
-    }
-
-    private boolean isRetryable(int statusCode) {
-        return statusCode == 408 || statusCode == 429 || (statusCode >= 500 && statusCode < 600);
     }
 
     private void scheduleRetry(Delivery delivery) {
@@ -484,7 +480,7 @@ public class WebhookDeliveryService {
                 return fresh;
             } else {
                 fresh.setStatus(Delivery.DeliveryStatus.PENDING);
-                fresh.setNextRetryAt(calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
+                fresh.setNextRetryAt(RetryPolicy.calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
                 log.info("Scheduled retry {} for delivery {} at {}",
                         fresh.getAttemptCount(), fresh.getId(), fresh.getNextRetryAt());
                 fresh.setUpdatedAt(Instant.now());
@@ -530,43 +526,6 @@ public class WebhookDeliveryService {
             // Best-effort: DB is source of truth, Kafka DLQ is a notification
             log.error("Failed to publish DLQ event for delivery {}: {}", delivery.getId(), e.getMessage(), e);
         }
-    }
-
-    private Instant calculateNextRetry(int attemptCount, String retryDelaysStr) {
-        long[] delays = parseRetryDelays(retryDelaysStr);
-        int index = Math.min(attemptCount - 1, delays.length - 1);
-        long baseDelay = delays[index];
-        // Full jitter: 50%-150% of base delay to prevent thundering herd
-        double jitterMultiplier = 0.5 + java.util.concurrent.ThreadLocalRandom.current().nextDouble(1.0);
-        long jitteredDelay = (long) (baseDelay * jitterMultiplier);
-        return Instant.now().plusSeconds(jitteredDelay);
-    }
-
-    private long[] parseRetryDelays(String retryDelaysStr) {
-        if (retryDelaysStr == null || retryDelaysStr.isEmpty()) {
-            return new long[] { 60, 300, 900, 3600, 21600, 86400 };
-        }
-        try {
-            String[] parts = retryDelaysStr.split(",");
-            long[] delays = new long[parts.length];
-            for (int i = 0; i < parts.length; i++) {
-                delays[i] = Long.parseLong(parts[i].trim());
-            }
-            return delays;
-        } catch (NumberFormatException e) {
-            log.warn("Invalid retry delays format: {}, using defaults", retryDelaysStr);
-            return new long[] { 60, 300, 900, 3600, 21600, 86400 };
-        }
-    }
-
-    /**
-     * Exponential backoff with ±25% jitter.
-     * base * 2^attempt capped at maxSeconds.
-     */
-    private static long backoffWithJitter(int attempt, long baseSeconds, long maxSeconds) {
-        long delay = Math.min(baseSeconds * (1L << Math.min(attempt, 10)), maxSeconds);
-        long jitter = (long) (delay * 0.25);
-        return delay - jitter + ThreadLocalRandom.current().nextLong(2 * jitter + 1);
     }
 
     private void rescheduleDelivery(UUID deliveryId, Instant nextRetryAt) {
