@@ -1,6 +1,6 @@
 # P1-19 — Upgrade Spring Boot 3.2.0 (EOL) and stale base images
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-19-framework-upgrade`
 - **Depends on:** P1-21 and P1-22 ideally land first — upgrading a delivery engine
