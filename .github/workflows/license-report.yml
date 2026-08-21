@@ -1,0 +1,101 @@
+name: License & SBOM Report
+
+# P2-33: keeps docs/licenses/ honest between manual refreshes. Runs monthly and
+# on demand rather than on every push - the underlying license/SBOM files
+# aren't expected to change often enough to justify committing generated JSON
+# on every PR, and a copyleft dependency sneaking in is exactly the kind of
+# slow-moving risk a monthly check catches in time. See docs/licenses/README.md
+# for the manual regenerate-and-commit flow this mirrors.
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'  # 06:00 UTC on the 1st of each month
+  workflow_dispatch: {}
+
+jobs:
+  backend-report:
+    name: Backend license report + SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Install all modules (reactor must resolve locally)
+        run: mvn -q install -DskipTests -pl webhook-platform-common,webhook-platform-api,webhook-platform-worker,webhook-platform-cli,webhook-platform-coverage-report -am -B
+
+      - name: Generate third-party license report
+        run: mvn -q org.codehaus.mojo:license-maven-plugin:2.4.0:aggregate-add-third-party -DskipTests -B
+
+      - name: Generate SBOM (CycloneDX)
+        run: mvn -q org.cyclonedx:cyclonedx-maven-plugin:2.8.0:makeAggregateBom -DskipTests -DoutputFormat=json -DoutputName=sbom -B
+
+      - name: Check for copyleft licenses
+        run: |
+          FOUND=$(grep -iE "agpl|affero|sspl|commons clause|\bgpl-3|business source" target/generated-sources/license/THIRD-PARTY.txt || true)
+          if [ -n "$FOUND" ]; then
+            echo "::warning::Possible copyleft dependency detected - review docs/licenses/DECISIONS.md and update it:"
+            echo "$FOUND"
+          else
+            echo "No AGPL/SSPL/BSL/GPL-3 dependencies found in the Maven tree."
+          fi
+
+      - name: Upload backend license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-license-report
+          path: |
+            target/generated-sources/license/THIRD-PARTY.txt
+            target/sbom.json
+          retention-days: 90
+
+  frontend-report:
+    name: Frontend license report + SBOM
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webhook-platform-ui
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webhook-platform-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate license report
+        run: npx license-checker --json --excludePrivatePackages > frontend-licenses.json
+
+      - name: Generate SBOM (CycloneDX)
+        run: npx @cyclonedx/cyclonedx-npm --output-format json --output-file frontend-sbom.json
+
+      - name: Check for copyleft licenses
+        run: |
+          FOUND=$(grep -iE "agpl|affero|sspl|gpl-3" frontend-licenses.json || true)
+          if [ -n "$FOUND" ]; then
+            echo "::warning::Possible copyleft dependency detected in the UI's npm tree - review docs/licenses/DECISIONS.md:"
+            echo "$FOUND"
+          else
+            echo "No AGPL/SSPL/GPL-3 dependencies found in the npm tree."
+          fi
+
+      - name: Upload frontend license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-license-report
+          path: |
+            webhook-platform-ui/frontend-licenses.json
+            webhook-platform-ui/frontend-sbom.json
+          retention-days: 90

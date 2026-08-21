@@ -590,6 +590,9 @@ jobs:
           API_IMAGE_TAG: test
           WORKER_IMAGE_TAG: test
           UI_IMAGE_TAG: test
+          # P2-33: /v3/api-docs.yaml is gated behind swagger.enabled (SecurityConfig),
+          # default false. Needed here so the OpenAPI drift check below can reach it.
+          SWAGGER_ENABLED: "true"
         run: docker compose -f docker-compose.pull.yml --env-file .env up -d
 
       - name: Wait for API and UI health, then curl both endpoints
@@ -622,6 +625,28 @@ jobs:
           echo ""
           echo "--- curl http://localhost:5173 (status only) ---"
           curl -f -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:5173
+
+      # P2-33: the committed openapi.yaml (repo root) is the source evaluators and
+      # docs.hookflow.dev's Redoc renderer read - it must never silently drift from
+      # what the running API actually serves. Springdoc generates it live from the
+      # 33 @RestController classes, so this is a real drift check, not a rebuild of
+      # a hand-maintained file.
+      - name: Export OpenAPI spec and check for drift
+        run: |
+          curl -sf http://localhost:8080/v3/api-docs.yaml -o /tmp/openapi-live.yaml
+          echo "--- diff against committed openapi.yaml ---"
+          if ! diff -u openapi.yaml /tmp/openapi-live.yaml; then
+            echo "::error::openapi.yaml is stale. Regenerate it: curl -s http://localhost:8080/v3/api-docs.yaml -o openapi.yaml (with SWAGGER_ENABLED=true) and commit the result."
+            exit 1
+          fi
+          echo "openapi.yaml matches the live spec."
+
+      - name: Upload generated OpenAPI spec
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: /tmp/openapi-live.yaml
+          retention-days: 30
 
       - name: Smoke Test Summary
         if: always()

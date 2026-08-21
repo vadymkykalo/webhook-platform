@@ -5,6 +5,7 @@
 **Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
 
 [![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/webhook-platform?label=release)](https://github.com/vadymkykalo/webhook-platform/releases/latest)
 [![Coverage](https://img.shields.io/badge/coverage-52%25_lines-yellow)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17](https://img.shields.io/badge/Java-17-orange)]()
@@ -24,6 +25,12 @@ No Maven, no npm, no clone — two files and Docker. **Dashboard** → http://lo
 
 <div align="center">
   <img src="docs/img.png" alt="Hookflow Dashboard" width="100%">
+</div>
+
+<div align="center">
+
+*Live public demo: not deployed yet — see [`docs/DEMO.md`](docs/DEMO.md) for the scoped plan (seeded, read-only, isolation-verified) and why it's deferred rather than faked.*
+
 </div>
 
 ---
@@ -298,6 +305,31 @@ sequenceDiagram
 
 ---
 
+## API Reference & SDKs
+
+- **In-app docs** — the dashboard's [Documentation page](webhook-platform-ui/src/pages/DocumentationPage.tsx) has prose, concepts and per-language quick-start samples for every endpoint (visit `/docs` after logging in, or run the UI locally).
+- **OpenAPI spec** — [`openapi.yaml`](./openapi.yaml), committed at the repo root and regenerated from the live `springdoc-openapi` output on every push to `main` (see `.github/workflows/ci.yml`'s `docker-compose-smoke` job, which fails the build if the checked-in spec drifts from what the running API actually serves). Browse it rendered at [`docs/api-reference.html`](docs/api-reference.html) (Redoc) — served live at the project's GitHub Pages site once `Settings → Pages → Source = GitHub Actions` is enabled, or open it locally: `python3 -m http.server 8000` from the repo root, then visit `http://localhost:8000/docs/api-reference.html`.
+- **Swagger UI** — `http://localhost:8080/swagger-ui.html` against a running instance (`SWAGGER_ENABLED=true`).
+
+### SDK coverage
+
+The official SDKs ([`sdks/node`](sdks/node), [`sdks/python`](sdks/python), [`sdks/php`](sdks/php) — package names are mid-rename to the `hookflow` brand, check each `README.md` for the exact current install command) cover the "send an event / manage endpoints / verify a signature" workflow, not the full dashboard surface. As of this writing that's **7 of the platform's 33 REST controllers**:
+
+| Covered by the SDKs | REST-only (use `openapi.yaml` / the dashboard) |
+|---|---|
+| Events (send, list) | Auth, Device Authentication |
+| Endpoints (CRUD) | Organizations, Projects, Members, API Keys |
+| Subscriptions | Dashboard, Usage, Billing |
+| Deliveries (status, replay) | Rules, Workflows, Schema Registry |
+| Incoming Sources | Transformations, Transform Preview |
+| Incoming Destinations | Alerts, Incidents, Audit Log |
+| Incoming Events | DLQ, Encryption Admin, PII Masking |
+| Signature verification (client-side helper, not a controller) | Tunnels, Tunnel Ingress, Ingress, Webhook Capture, Debug Links, Test Endpoints |
+
+If you need something from the right-hand column, call the REST API directly (each SDK exposes a generic authenticated-request escape hatch for this — see its README) or use the dashboard.
+
+---
+
 ## Deployment
 
 ### Pull pre-built images (no toolchain)
@@ -520,4 +552,9 @@ openssl rand -base64 18   # For DB/Redis passwords
 
 ## License
 
-[MIT](./LICENSE) © Vadym Kykalo
+[MIT](./LICENSE) © Vadym Kykalo — see [`NOTICE`](./NOTICE) for third-party
+attributions and [`docs/licenses/`](docs/licenses/) for the generated
+dependency license report and SBOM (backend: 230 Maven dependencies scanned,
+0 copyleft; frontend: 654 npm packages scanned, 0 copyleft), plus the
+recorded decisions on MinIO's AGPL-3.0 license and the Helm chart's Bitnami
+subchart pins.
