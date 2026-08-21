@@ -1,6 +1,6 @@
 # P1-20 — Alertmanager routing and Compose backup/restore automation
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-20-alerting-and-backups`
 - **Depends on:** nothing
