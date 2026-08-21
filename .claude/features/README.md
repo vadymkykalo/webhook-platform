@@ -124,7 +124,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-14 | P0 | DONE | Plaintext reset tokens, logged temp password, unsafe defaults |
 | P1-15 | P1 | TODO | Publish Docker images — product is uninstallable today |
 | P1-16 | P1 | TODO | Reconcile versions, backfill CHANGELOG, UPGRADING.md |
-| P1-17 | P1 | TODO | Make CI security gates actually fail; add Dependabot |
+| P1-17 | P1 | DONE | Make CI security gates actually fail; add Dependabot |
 | P1-18 | P1 | TODO | Fix and harden install.sh |
 | P1-19 | P1 | TODO | Upgrade Spring Boot 3.2.0 (EOL) and base images |
 | P1-20 | P1 | TODO | Alertmanager + Compose backup/restore automation |
