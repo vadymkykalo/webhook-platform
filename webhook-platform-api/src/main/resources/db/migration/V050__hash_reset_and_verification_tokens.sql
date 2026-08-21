@@ -1,4 +1,4 @@
--- P0-14a: password_reset_token and verification_token now store
+-- password_reset_token and verification_token now store
 -- CryptoUtils.hashApiKey(token) (SHA-256 + Base64) instead of the raw token,
 -- matching the pattern already used for invite tokens (see V034).
 --

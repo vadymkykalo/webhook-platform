@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for SequenceGeneratorService (P1-23 / 23c) -- previously had no tests despite
+ * Unit coverage for SequenceGeneratorService -- previously had no tests despite
  * being the sole source of the sequence numbers FIFO ordering depends on.
  *
  * <p>RAtomicLong is mocked with stateful answers (backed by a plain AtomicLong/AtomicBoolean)

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for StuckForwardRecoveryService (P1-22): the incoming-forward analogue
+ * Unit coverage for StuckForwardRecoveryService: the incoming-forward analogue
  * of StuckDeliveryRecoveryService -- same lock-guarded recovery, different table.
  */
 @ExtendWith(MockitoExtension.class)

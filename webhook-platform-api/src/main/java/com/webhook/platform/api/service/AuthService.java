@@ -73,7 +73,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
-        // Only the hash is persisted (P0-14a) — the plaintext token exists solely
+        // Only the hash is persisted — the plaintext token exists solely
         // to be emailed to the user and is never written to the database or logs.
         String verificationToken = generateVerificationToken();
 
@@ -151,9 +151,8 @@ public class AuthService {
         }
 
         // Reject anything that isn't an actual refresh token: an access token (or any
-        // pre-P0-10 token, which has no "typ" claim at all) must not be exchangeable here.
-        // See CLAUDE.md task P0-10 for why a missing claim is treated as invalid rather
-        // than grandfathered.
+        // legacy token, which has no "typ" claim at all) must not be exchangeable here.
+        // A missing claim is treated as invalid rather than grandfathered.
         if (!JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
@@ -281,7 +280,7 @@ public class AuthService {
             return;
         }
 
-        // Only the hash is persisted (P0-14a); the plaintext token is emailed and
+        // Only the hash is persisted; the plaintext token is emailed and
         // never stored, matching the invite-token pattern in MembershipService.
         String resetToken = generateVerificationToken();
         user.setPasswordResetToken(CryptoUtils.hashApiKey(resetToken));

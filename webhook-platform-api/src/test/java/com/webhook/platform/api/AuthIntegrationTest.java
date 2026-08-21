@@ -40,7 +40,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     private JwtUtil jwtUtil;
 
     // Mocked so tests can capture the plaintext verification token EmailService would
-    // have emailed to the user (P0-14a: the DB column now holds only
+    // have emailed to the user (the DB column now holds only
     // CryptoUtils.hashApiKey(token), so the raw token can't be read back from the row).
     @MockBean
     private EmailService emailService;
@@ -76,7 +76,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.organization.name").value("Test Company"))
                 .andExpect(jsonPath("$.role").value("OWNER"));
 
-        // The DB column now holds only a hash of the verification token (P0-14a); the
+        // The DB column now holds only a hash of the verification token; the
         // plaintext is only ever handed to EmailService, which is mocked here so the
         // test can capture it.
         ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
@@ -125,7 +125,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * P0-10: an access token must not be exchangeable at /auth/refresh. Before the fix,
+     * An access token must not be exchangeable at /auth/refresh. Before the fix,
      * JwtUtil stamped no "typ" claim on either token, so AuthService.refreshToken happily
      * accepted an access token and minted a brand new (renewable) refresh token from it --
      * turning a 15-minute leak into a permanent session.
@@ -144,7 +144,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * P0-10: the reverse direction must be a deliberate rejection (typ != access), not the
+     * The reverse direction must be a deliberate rejection (typ != access), not the
      * old accidental NPE on the missing "organizationId" claim.
      */
     @Test
@@ -157,7 +157,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * P0-10: the legitimate login -> refresh -> access cycle must keep working after the
+     * The legitimate login -> refresh -> access cycle must keep working after the
      * type-claim enforcement is added.
      */
     @Test
@@ -184,7 +184,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     /**
-     * P0-10 reuse detection: replaying a refresh token that has already been rotated away
+     * Reuse detection: replaying a refresh token that has already been rotated away
      * (i.e. it is blacklisted) must not just 401 -- it must revoke the whole token family
      * via tokenBlacklistService.revokeAllUserTokens, since replay of a rotated-away token
      * is the signature of a stolen refresh token racing the legitimate client.

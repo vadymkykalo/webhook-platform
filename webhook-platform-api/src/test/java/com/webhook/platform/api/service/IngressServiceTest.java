@@ -687,7 +687,7 @@ class IngressServiceTest {
         assertThat(HeaderSanitizer.isSensitiveHeader("Host")).isFalse();
     }
 
-    // -- P1-25b: transaction scope must cover only the writes, and a replay marker must not
+    // -- transaction scope must cover only the writes, and a replay marker must not
     // survive a persist that never committed. --
 
     @Test
@@ -740,7 +740,7 @@ class IngressServiceTest {
 
     @Test
     void receiveWebhook_failedPersistWithNoExistingRow_releasesReplayMarker() {
-        // Reproduces P1-25b: isReplay marks the signature as seen the moment it's checked
+        // Reproduces: isReplay marks the signature as seen the moment it's checked
         // (before persisting anything). If the write that follows never commits and there's no
         // existing row to fall back to, the event is genuinely lost -- the marker must be
         // released, or the provider's legitimate resend of the exact same webhook is rejected

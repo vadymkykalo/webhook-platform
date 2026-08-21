@@ -144,7 +144,7 @@ class AuthRateLimiterServiceTest {
 
     @Test
     void rateLimitingEngages_forRepeatedRegisterFromOneRealPeer_despiteSpoofedXff() {
-        // End-to-end reproduction of the P0-11 scenario at the service boundary:
+        // End-to-end reproduction of the XFF-spoofing scenario at the service boundary:
         // the peer is NOT a trusted proxy, so TrustedProxyResolver must ignore a
         // freshly-spoofed X-Forwarded-For value on every request and always
         // resolve to the real socket peer -- which then lets the register rate

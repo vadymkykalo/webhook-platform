@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import en from '../locales/en.json';
 import uk from '../locales/uk.json';
 
-// Locale-parity guard (P2-31): the two locale files currently have zero key
+// Locale-parity guard: the two locale files currently have zero key
 // drift in either direction. This test locks that in — a key added to one
 // locale without its translation in the other should fail CI immediately,
 // rather than surfacing later as a silent fallback-to-English string (or a

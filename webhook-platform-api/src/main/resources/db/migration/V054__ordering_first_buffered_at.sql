@@ -1,4 +1,4 @@
--- P1-23 (23b): the FIFO gap timeout used to be measured from a delivery's ingest
+-- The FIFO gap timeout used to be measured from a delivery's ingest
 -- created_at, which meant any backlog older than the timeout made isGapTimedOut()
 -- unconditionally true (ordering silently disabled during a fan-out burst or Kafka
 -- lag spike). It needs to be measured from when the delivery itself first got stuck

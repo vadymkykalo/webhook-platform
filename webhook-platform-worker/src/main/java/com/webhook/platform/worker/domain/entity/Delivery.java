@@ -53,7 +53,7 @@ public class Delivery {
      * When this delivery was first buffered waiting on a missing predecessor sequence.
      * Null if it has never been buffered. Drives the gap timeout in
      * {@code OrderingBufferService#isGapTimedOut} — measured from here, not from
-     * {@link #createdAt} (P1-23 / 23b).
+     * {@link #createdAt}.
      */
     @Column(name = "ordering_first_buffered_at")
     private Instant orderingFirstBufferedAt;

@@ -4,7 +4,7 @@ import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
 
-// Regression test for P2-32: DeliveriesPage used to render
+// Regression test: DeliveriesPage used to render
 // `t('deliveries.subtitle', { project: project.name })` through the React
 // prop that injects a string as raw HTML (`{{ __html: ... }}`). i18next is
 // configured with `interpolation: { escapeValue: false }` (correct for
@@ -83,7 +83,7 @@ function renderDeliveries() {
   });
 }
 
-describe('DeliveriesPage XSS (P2-32)', () => {
+describe('DeliveriesPage XSS', () => {
   let alertSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {

@@ -2,7 +2,7 @@ import { Hookflow } from '@hookflow/node';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../../package.json');
 
-// Regression test for the P1-27 rename (@webhook-platform/node -> @hookflow/node).
+// Regression test for the package rename (@webhook-platform/node -> @hookflow/node).
 // This must fail loudly if either the manifest or the published export surface
 // ever drifts away from the new package identity.
 describe('package rename (@hookflow/node)', () => {

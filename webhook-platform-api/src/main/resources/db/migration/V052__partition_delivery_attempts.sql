@@ -1,4 +1,4 @@
--- P3-36a: convert delivery_attempts to declarative RANGE partitioning by created_at
+-- Convert delivery_attempts to declarative RANGE partitioning by created_at
 -- (monthly). This is the single biggest disk/vacuum cost in the schema — it stores
 -- full request/response bodies and headers per attempt — and was pruned entirely by
 -- DELETE (DataRetentionService.cleanupOldDeliveryAttempts, 90-day global cutoff),

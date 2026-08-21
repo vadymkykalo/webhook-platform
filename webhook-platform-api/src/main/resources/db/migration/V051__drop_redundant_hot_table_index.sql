@@ -1,4 +1,4 @@
--- P3-36a: index audit on the hottest tables (deliveries, delivery_attempts, ...).
+-- Index audit on the hottest tables (deliveries, delivery_attempts, ...).
 --
 -- idx_deliveries_next_retry_at (next_retry_at) WHERE next_retry_at IS NOT NULL
 -- is strictly dominated by idx_deliveries_retry_query (status, next_retry_at) WHERE
@@ -13,6 +13,5 @@
 -- status-less index over the composite one for the hot retry-scan path, so it exists
 -- purely as extra write cost (every insert/update touching next_retry_at maintains a
 -- second btree entry) with no read ever able to prefer it. Confirmed by grepping both
--- api and worker for `next_retry_at` — see Progress log in
--- .claude/features/P3-36-partitioning-and-logs.md for the exact search.
+-- api and worker for `next_retry_at`.
 DROP INDEX IF EXISTS idx_deliveries_next_retry_at;

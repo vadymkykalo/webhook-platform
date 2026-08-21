@@ -163,7 +163,7 @@ class DeviceAuthServiceTest {
 
     @Test
     void shouldUseRoleFromApprovedOrgMembershipNotAnArbitraryOne() {
-        // P0-12 reproduction: a user who is OWNER of their own org and VIEWER in a
+        // Reproduction: a user who is OWNER of their own org and VIEWER in a
         // client's org approves a device code scoped to the client (low-privilege) org.
         // The minted token must carry VIEWER, not whatever findByUserId() happened to
         // return first.

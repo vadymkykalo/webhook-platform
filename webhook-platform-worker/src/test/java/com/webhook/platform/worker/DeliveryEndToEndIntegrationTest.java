@@ -45,15 +45,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * End-to-end delivery-pipeline test (P1-21): real Postgres + Kafka + Redis (Testcontainers)
+ * End-to-end delivery-pipeline test: real Postgres + Kafka + Redis (Testcontainers)
  * and a real HTTP endpoint (WireMock), with the actual worker Spring context — real
  * {@link com.webhook.platform.worker.config.KafkaConsumerConfig}, {@link
  * com.webhook.platform.worker.consumer.DeliveryConsumer}, {@link
  * com.webhook.platform.worker.service.WebhookDeliveryService}, {@link
  * com.webhook.platform.worker.service.RetrySchedulerService}, {@link
  * com.webhook.platform.worker.service.StuckDeliveryRecoveryService} and {@link
- * com.webhook.platform.worker.service.BoundedAsyncExecutor} — every class the launch
- * punch-list's README groups together as "Stream A — worker / delivery core". Nothing here
+ * com.webhook.platform.worker.service.BoundedAsyncExecutor} — the worker module's whole
+ * delivery core, exercised together. Nothing here
  * is mocked and no autoconfiguration is excluded.
  *
  * <p><b>Deliberately unrelated to {@code com.webhook.platform.api.AbstractIntegrationTest}</b>
@@ -64,7 +64,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * on every run. This class exists specifically to exercise the real Kafka/Redis wiring that
  * {@code AbstractIntegrationTest} excludes. Do not "fix" one to look like the other — one
  * tests the REST/DB layer in isolation, the other proves the delivery pipeline actually
- * moves bytes over a wire. See {@code .claude/features/P1-21-e2e-delivery-test.md}.</p>
+ * moves bytes over a wire.</p>
  *
  * <p><b>Scope note</b>: this class lives entirely in the {@code worker} module and does not
  * boot the {@code api} module's Spring context, so it does not exercise
@@ -72,8 +72,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * /api/v1/events} -&gt; outbox row -&gt; Kafka" leg. api and worker are separate Spring Boot
  * applications with separate entity copies of the same tables (see root {@code CLAUDE.md});
  * there is no existing precedent in this repo for booting both contexts in one JVM, and the
- * P0-01/02/03/05 regressions this test targets are all worker-side (see the README's "Stream
- * A" grouping, which places P1-21 directly after them). Each test method below publishes a
+ * regressions this test targets are all worker-side. Each test method below publishes a
  * {@link DeliveryMessage} to Kafka exactly the way {@code OutboxPublisherService} does —
  * {@code kafkaTemplate.send(topic, endpointId, message)} to {@link
  * KafkaTopics#DELIVERIES_DISPATCH} — which is the real, unmodified send call the worker
@@ -81,7 +80,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * originate that call is not exercised here. Closing that specific remaining gap (proving
  * {@code OutboxPublisherService} itself really publishes a real outbox row to a real Kafka
  * topic) is a good candidate for a small, separate, api-module-only follow-up test and is
- * called out as such in P1-21's progress log rather than attempted here.</p>
+ * intentionally out of scope here.</p>
  */
 @SpringBootTest(classes = WebhookPlatformWorkerApplication.class)
 @Testcontainers
@@ -351,9 +350,9 @@ class DeliveryEndToEndIntegrationTest {
     }
 
     /**
-     * This is P0-01's regression test: a retry claimed by the real {@code
-     * RetrySchedulerService} (status flipped PENDING -&gt; PROCESSING, exactly the line P0-01
-     * fixed) that then sits abandoned — as if the worker process that claimed it had been hard
+     * Regression test: a retry claimed by the real {@code
+     * RetrySchedulerService} (status flipped PENDING -&gt; PROCESSING)
+     * that then sits abandoned — as if the worker process that claimed it had been hard
      * killed before finishing — must be recovered by {@code StuckDeliveryRecoveryService} and
      * eventually delivered, not left stranded forever.
      *
@@ -365,9 +364,9 @@ class DeliveryEndToEndIntegrationTest {
      * {@code processDelivery(isRetry=true)} guard requires an existing PROCESSING row and would
      * silently skip a still-PENDING one — no second HTTP attempt is ever made.</p>
      *
-     * <p>The second half of this test is also P0-05's regression test: the abandoned second
+     * <p>The second half of this test is also a regression test: the abandoned second
      * attempt's slow WireMock response eventually resolves (200) well after a third, independent
-     * attempt has already finalized the delivery as SUCCESS. Reverting P0-05 removes the
+     * attempt has already finalized the delivery as SUCCESS. Removing the
      * {@code fresh.getStatus() == PROCESSING} guard from {@code markAsSuccess}, so that late,
      * stale response blindly re-writes {@code succeededAt} - the {@code assertEquals(
      * succeededAtFromThirdAttempt, ...)} assertion below catches exactly that.</p>
@@ -403,7 +402,7 @@ class DeliveryEndToEndIntegrationTest {
 
         // Wait for the real RetrySchedulerService claim (Phase 1) of the retry attempt: status
         // flips PENDING -> PROCESSING with attemptCount still at 1 (attempt 2's HTTP call is
-        // slow and hasn't incremented it yet). This is the exact invariant P0-01 introduced.
+        // slow and hasn't incremented it yet). This is the exact invariant the claim relies on.
         // RetrySchedulerService's steady-state poll cadence is adaptive (RetryGovernor) and
         // backs off up to 30s when the pending-retry queue is empty between test methods, so
         // this needs comfortable headroom past that worst case.
@@ -428,7 +427,7 @@ class DeliveryEndToEndIntegrationTest {
         assertEquals(1, updated, "must have backdated exactly the delivery under test");
 
         // StuckDeliveryRecoveryService (real scheduled bean, check-interval-ms=500 above) must
-        // reclaim it back to PENDING - the recovery half of the P0-01 fix.
+        // reclaim it back to PENDING - the recovery half of the claim/recover cycle.
         await().atMost(Duration.ofSeconds(15)).pollInterval(Duration.ofMillis(150))
                 .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.PENDING, reload(deliveryId).getStatus()));
 
@@ -444,7 +443,7 @@ class DeliveryEndToEndIntegrationTest {
         // The abandoned second attempt's WireMock response (4s fixed delay, state
         // "claimed-attempt-in-flight") lands well after this point and also resolves to 200 -
         // its handleResponse/markAsSuccess call is a late, stale write for a delivery some
-        // other path has already finalized. This is exactly the P0-05 defect: pre-fix,
+        // other path has already finalized. Without the guard,
         // markAsSuccess had no "fresh.getStatus() == PROCESSING" guard and would blindly
         // overwrite the row (new succeededAt, same SUCCESS status) regardless of what the
         // third attempt already committed. Waiting past the 4s delay and asserting succeededAt
@@ -461,7 +460,7 @@ class DeliveryEndToEndIntegrationTest {
         assertEquals(Delivery.DeliveryStatus.SUCCESS, finalDelivery.getStatus());
         assertEquals(succeededAtFromThirdAttempt, finalDelivery.getSucceededAt(),
                 "a late-arriving response for an already-abandoned attempt must not re-write "
-                        + "succeededAt over what the attempt that actually finalized the delivery wrote (P0-05)");
+                        + "succeededAt over what the attempt that actually finalized the delivery wrote");
         // Exactly one delivered webhook must exist on the wire from the third attempt; the
         // abandoned second attempt's request also happened but its late response must not have
         // produced a second successful bookkeeping cycle.
@@ -473,7 +472,7 @@ class DeliveryEndToEndIntegrationTest {
      * reprocessing an offset) must never re-deliver an already-terminal webhook. In production
      * this is stopped by {@code processDelivery(isRetry=true)}'s own entry check (the message's
      * delivery must currently be PROCESSING) - a layer that predates and is independent of
-     * P0-05's {@code markAsSuccess}/{@code scheduleRetry}/{@code markAsFailed} re-read guards
+     * the {@code markAsSuccess}/{@code scheduleRetry}/{@code markAsFailed} re-read guards
      * (see {@link #retryClaimedThenAbandoned_isRecoveredNotStranded()} for a test that
      * specifically targets those). This test proves that outer layer holds for the common
      * at-least-once-redelivery case.
@@ -525,7 +524,7 @@ class DeliveryEndToEndIntegrationTest {
 
     /**
      * A 2xx response that arrives close to the delivery timeout boundary must still count as
-     * exactly one successful delivery. The P0-05 defect was specifically a slow
+     * exactly one successful delivery. The regression this guards against was specifically a slow
      * post-response bookkeeping step (the DB write in {@code markAsSuccess}, running inside the
      * reactive {@code .map()}/{@code .timeout()} window pre-fix) racing the HTTP timeout after a
      * 200 had already been received - persistence now runs strictly after {@code .block()}
@@ -598,7 +597,7 @@ class DeliveryEndToEndIntegrationTest {
     }
 
     /**
-     * P1-23's own end-to-end proof, on this same real Postgres+Kafka+Redis+WireMock harness:
+     * End-to-end proof, on this same real Postgres+Kafka+Redis+WireMock harness:
      * N ordering-enabled deliveries for one endpoint, published to Kafka <em>out of sequence
      * order</em>, with an induced retry (one 500 then a 200) on a delivery in the middle of the
      * range. They must still arrive at WireMock in strict sequence order.
@@ -688,11 +687,11 @@ class DeliveryEndToEndIntegrationTest {
 
         assertEquals(java.util.List.of(1, 2, 3, 4, 5), arrivalOrder,
                 "ordering-enabled deliveries must reach the endpoint in strict sequence order despite "
-                        + "an out-of-order publish and an induced mid-range retry (P1-23)");
+                        + "an out-of-order publish and an induced mid-range retry");
     }
 
     /**
-     * Automated equivalent of P1-23's manual verification drill ("send N events; mid-run,
+     * Automated equivalent of a manual verification drill ("send N events; mid-run,
      * FLUSHALL Redis; assert delivery order is preserved... and the endpoint is not permanently
      * stalled") -- run here against the real Testcontainers Redis instead of a hand-run {@code
      * make up} stack, so it's part of the regular suite rather than a step that can silently
@@ -773,6 +772,6 @@ class DeliveryEndToEndIntegrationTest {
             }
         }
         assertEquals(java.util.List.of(1, 2, 3), arrivalOrder,
-                "order must be preserved across the Redis flush, not just eventual delivery (P1-23 / 23a)");
+                "order must be preserved across the Redis flush, not just eventual delivery");
     }
 }

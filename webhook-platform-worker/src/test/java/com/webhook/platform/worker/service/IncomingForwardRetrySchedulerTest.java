@@ -38,7 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for IncomingForwardRetryScheduler.pollPendingRetries (P1-22) --
+ * Unit coverage for IncomingForwardRetryScheduler.pollPendingRetries --
  * claim/dispatch/result bookkeeping, mirroring RetrySchedulerServiceTest's coverage of
  * the outgoing-delivery equivalent.
  */

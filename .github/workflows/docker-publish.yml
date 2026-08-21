@@ -1,6 +1,6 @@
 name: Docker Publish
 
-# P1-15: publishes the images the Helm chart and docker-compose.pull.yml
+# Publishes the images the Helm chart and docker-compose.pull.yml
 # reference by default. Runs only on version tags — every push/PR still goes
 # through ci.yml's `docker-build` job (:test tag, never pushed), which is what
 # catches Dockerfile breakage day to day. This workflow is the one that makes

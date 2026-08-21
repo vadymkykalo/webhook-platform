@@ -45,7 +45,7 @@ public class OrderingBufferService {
     private final Duration deliveredSeqTtl;
     private final Duration bufferTtl;
     private final String cursorCasScript;
-    // P1-26: webhook_ordering_buffer_size used to be registered with meterRegistry.gauge(...)
+    // webhook_ordering_buffer_size used to be registered with meterRegistry.gauge(...)
     // (no tags) on every single bufferDelivery() call. Micrometer silently keeps only the
     // first-registered meter for a given unregistered-tag name, so every call after the very
     // first endpoint's first buffered delivery was a no-op -- the gauge permanently reported
@@ -282,7 +282,7 @@ public class OrderingBufferService {
      * createdAt}. That distinction matters: measuring from {@code createdAt} meant any
      * backlog older than the timeout made this unconditionally {@code true} for every
      * delivery — silently turning ordering off during a fan-out burst or Kafka lag spike,
-     * exactly when it matters most (P1-23 / 23b).
+     * exactly when it matters most.
      *
      * <p>Callers do not increment a metric here — see {@code
      * WebhookDeliveryService#canDeliverWithOrdering} for the single counting site, to avoid

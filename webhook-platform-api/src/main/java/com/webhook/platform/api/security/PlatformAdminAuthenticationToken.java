@@ -6,7 +6,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.List;
 
 /**
- * Authentication for the platform-admin operator credential (P0-09).
+ * Authentication for the platform-admin operator credential.
  *
  * <p>Deliberately independent of {@link MembershipRole} / organization membership: this
  * represents a cluster operator, not a tenant user. It is granted only by

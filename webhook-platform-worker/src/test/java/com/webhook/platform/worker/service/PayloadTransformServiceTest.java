@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * P0-07: a *configured* payload transformation that fails to apply must never fall back to
+ * A *configured* payload transformation that fails to apply must never fall back to
  * shipping the raw payload — customers use transformations to strip PII before a payload
  * leaves the platform, so a broken template must fail loudly (retryable), not silently.
  *
@@ -56,7 +56,7 @@ class PayloadTransformServiceTest {
     }
 
     /**
-     * Reproduces the original P0-07 bug: a broken (non-JSON) template used to be swallowed
+     * Reproduces the original bug: a broken (non-JSON) template used to be swallowed
      * and the raw, untransformed payload — including the PII the transform exists to strip —
      * was returned instead. On fixed code this must throw rather than leaking the payload.
      */

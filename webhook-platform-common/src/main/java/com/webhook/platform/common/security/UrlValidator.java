@@ -14,7 +14,7 @@ import java.util.Set;
 /**
  * SSRF guard for outbound webhook/forward URLs.
  *
- * <p>P0-14d: this is a denylist of RFC 5735/6890 special-purpose IPv4/IPv6 ranges,
+ * <p>This is a denylist of RFC 5735/6890 special-purpose IPv4/IPv6 ranges,
  * kept as a denylist rather than inverted to an allowlist of globally-routable
  * unicast space. Considered and rejected for now: an allowlist would need to track
  * IANA's registry as new blocks get carved out of previously-reserved space (this

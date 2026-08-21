@@ -1,6 +1,6 @@
 name: Install Script
 
-# P1-18: webhook-platform-cli/install.sh is the headline install method
+# webhook-platform-cli/install.sh is the headline install method
 # (README tells users to curl | bash it) but was never exercised in CI. This
 # workflow runs it end to end against a fake "GitHub release" fixture built
 # from the JAR this job compiles — not the real repo's releases — so the run

@@ -6,6 +6,6 @@ CREATE UNIQUE INDEX idx_incoming_events_source_provider_event
     ON incoming_events (incoming_source_id, provider_event_id)
     WHERE provider_event_id IS NOT NULL;
 
--- Add unique index on incoming_forward_attempts to prevent duplicate attempt numbers (P0-9)
+-- Add unique index on incoming_forward_attempts to prevent duplicate attempt numbers
 CREATE UNIQUE INDEX idx_incoming_forward_attempts_unique_attempt
     ON incoming_forward_attempts (incoming_event_id, destination_id, attempt_number);

@@ -123,7 +123,7 @@ class UrlValidatorTest {
     }
 
     // -----------------------------------------------------------------
-    // P0-14d: previously-missing CIDR ranges and metadata addresses
+    // Previously-missing CIDR ranges and metadata addresses
     // -----------------------------------------------------------------
 
     @Test

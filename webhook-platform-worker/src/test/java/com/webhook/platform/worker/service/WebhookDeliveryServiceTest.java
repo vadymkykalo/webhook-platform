@@ -51,7 +51,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /**
- * Covers WebhookDeliveryService.rescheduleForBackpressure — the P0-03 fix for
+ * Covers WebhookDeliveryService.rescheduleForBackpressure — the fix for
  * DeliveryConsumer's executor-full path, which used to leave the Kafka record unacked
  * and rely on redelivery that MANUAL acks don't actually provide. See DeliveryConsumerTest
  * for the consumer-side wiring (reschedule-then-ack) and KafkaAckOrderingIntegrationTest
@@ -209,7 +209,7 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
-     * P0-04: decryptSecret (bad key version / rotated-away key) used to throw outside the
+     * decryptSecret (bad key version / rotated-away key) used to throw outside the
      * try/finally that releases the concurrency permit, so every failing attempt burned a
      * permit that never came back. maxConcurrentPerEndpoint + 1 failing attempts against the
      * REAL RedisConcurrencyControlService (a mocked RedissonClient forces its local-fallback
@@ -297,7 +297,7 @@ class WebhookDeliveryServiceTest {
                         "permanently throttled to zero — every failing attempt has to release its permit");
     }
 
-    // --- P0-05: a successful 2xx delivery must never be re-sent as a duplicate ------------
+    // --- a successful 2xx delivery must never be re-sent as a duplicate ------------
 
     private Endpoint verifiedEndpoint(UUID endpointId, String url) {
         return Endpoint.builder()
@@ -312,7 +312,7 @@ class WebhookDeliveryServiceTest {
                 .build();
     }
 
-    // --- P0-07: a configured transformation that fails to apply must never result in the ---
+    // --- a configured transformation that fails to apply must never result in the ---
     // --- raw payload being sent, and must fail the attempt as retryable / eventually DLQ.  ---
 
     private Endpoint verifiedEndpoint(UUID endpointId, UUID projectId) {
@@ -362,7 +362,7 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
-     * Reproduces the P0-05 defect: handleResponse (markAsSuccess et al.) used to run inside
+     * Reproduces the defect: handleResponse (markAsSuccess et al.) used to run inside
      * the reactive .map, i.e. inside the .timeout guarding the HTTP call itself. A 200 response
      * followed by slow success bookkeeping tripped the timeout AFTER the row was already
      * written SUCCESS, and the resulting TimeoutException drove scheduleRetry to blindly
@@ -546,7 +546,7 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
-     * Reproduces the original P0-07 bug for the "transformationId not found/disabled" site:
+     * Reproduces the original bug for the "transformationId not found/disabled" site:
      * the delivery had an explicit transformationId configured (e.g. the transformation was
      * later disabled or deleted), and old code silently fell back to the inline
      * payloadTemplate (often null -> the raw payload) instead of failing the attempt.
@@ -677,7 +677,7 @@ class WebhookDeliveryServiceTest {
                 "a permanently broken template must terminate at DLQ, not retry forever");
     }
 
-    // --- P1-22: basic stateful-path coverage (2xx/4xx/5xx/timeout/DLQ/concurrency/SSRF) ---
+    // --- basic stateful-path coverage (2xx/4xx/5xx/timeout/DLQ/concurrency/SSRF) ---
 
     private Delivery baseDelivery(UUID id, UUID eventId, UUID endpointId, int attemptCount, int maxAttempts) {
         return Delivery.builder()
@@ -962,7 +962,7 @@ class WebhookDeliveryServiceTest {
 
         verifyNoInteractions(mockWebClient);
         // The permit WAS acquired before the URL validation ran, so it must be released
-        // in the finally regardless of which exception path was taken (P0-04).
+        // in the finally regardless of which exception path was taken.
         verify(concurrencyControlService).release(endpointId);
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
@@ -976,7 +976,7 @@ class WebhookDeliveryServiceTest {
                 "attempt must record the SSRF rejection, not silently drop it");
     }
 
-    // ── P1-23 / 23b: gap check spans the full missing range, not just seq-1 ────
+    // ── gap check spans the full missing range, not just seq-1 ────
 
     private Delivery orderedDelivery(UUID id, UUID eventId, UUID endpointId, long sequenceNumber,
             Instant orderingFirstBufferedAt) {
@@ -991,7 +991,7 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
-     * Reproduces P1-23 / 23b Scenario A: cursor is at 5, sequence 6 is genuinely still
+     * Reproduces Scenario A: cursor is at 5, sequence 6 is genuinely still
      * outstanding (retrying), and sequence 10 arrives. The old code only checked sequence 9
      * (already SUCCESS, so absent from PENDING/PROCESSING) via findOldestPendingCreatedAt(...,
      * 9), got null back, and isGapTimedOut(null) used to mean "proceed" -- so 10 was delivered
@@ -1078,7 +1078,7 @@ class WebhookDeliveryServiceTest {
     }
 
     /**
-     * P1-23 / 23b: webhook_ordering_gap_timeout_total used to be incremented in both
+     * webhook_ordering_gap_timeout_total used to be incremented in both
      * OrderingBufferService.isGapTimedOut and WebhookDeliveryService.canDeliverWithOrdering.
      * With OrderingBufferService fully mocked here (its own increment can't fire), a count of
      * exactly 1 confirms WebhookDeliveryService's own increment is the only one left.

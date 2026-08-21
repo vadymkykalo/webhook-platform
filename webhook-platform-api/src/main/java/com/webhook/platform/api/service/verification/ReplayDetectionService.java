@@ -50,7 +50,7 @@ public class ReplayDetectionService {
     }
 
     /**
-     * Undo a previous {@link #isReplay} mark (P1-25b). isReplay marks a signature as seen the
+     * Undo a previous {@link #isReplay} mark. isReplay marks a signature as seen the
      * moment it is first checked, before the caller has actually persisted anything for it. If
      * the write that was supposed to follow never commits (a validation failure downstream, an
      * unresolvable duplicate-key race, ...), the mark must not survive -- otherwise the

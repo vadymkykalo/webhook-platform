@@ -73,7 +73,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
-      # P1-28: this and the integration job below are separate GitHub Actions
+      # This and the integration job below are separate GitHub Actions
       # jobs on separate runners with no shared filesystem, so each writes
       # its own distinctly-named exec file (jacoco-unit.exec here,
       # jacoco-it.exec in the integration job) rather than the plugin's
@@ -122,7 +122,7 @@ jobs:
           cache: 'maven'
       
       - name: Run integration tests with Testcontainers
-        # P1-19: surefire 3.x split the old failIfNoTests flag in two - failIfNoTests
+        # surefire 3.x split the old failIfNoTests flag in two - failIfNoTests
         # still covers "this whole run found zero tests", but a -Dtest=pattern that
         # matches zero classes in a given module (e.g. common/cli, which have no
         # *RepositoryTest/*IntegrationTest/etc classes) now needs
@@ -140,7 +140,7 @@ jobs:
           echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
 
-      # P1-28: see the matching comment in the unit-test job above - distinct
+      # See the matching comment in the unit-test job above - distinct
       # filename, uploaded so coverage-report can merge this with the unit
       # job's exec data into one real aggregate.
       - name: Upload integration test coverage data
@@ -152,7 +152,7 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # P1-28: the actual point of splitting exec-data upload above - neither
+  # The actual point of splitting exec-data upload above - neither
   # backend-test nor backend-integration-test alone has the full picture
   # (each only ran half the test classes), and they run on separate runners
   # with no shared filesystem, so "coverage" can't just be read out of
@@ -232,7 +232,7 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-  # P1-20: proves backups are actually restorable, not just "a CronJob ran".
+  # Proves backups are actually restorable, not just "a CronJob ran".
   # backup -> destroy the data -> restore -> assert it's back. An untested
   # restore path is the most common cause of an unusable backup.
   restore-drill:
@@ -350,7 +350,7 @@ jobs:
         working-directory: webhook-platform-ui
         run: npm ci
       
-      # P1-28: test:coverage (vitest run --coverage) subsumes test:ci - it
+      # test:coverage (vitest run --coverage) subsumes test:ci - it
       # still runs every test, plus instruments and enforces the thresholds
       # in vite.config.ts. Using it here (rather than a separate coverage
       # step) means the coverage gate is the same command a PR's CI actually
@@ -558,7 +558,7 @@ jobs:
           echo "### Docker Build Results" >> $GITHUB_STEP_SUMMARY
           echo "✅ All images built successfully" >> $GITHUB_STEP_SUMMARY
 
-  # P1-15: proves docker-compose.pull.yml (the no-Maven/no-npm quick start
+  # Proves docker-compose.pull.yml (the no-Maven/no-npm quick start
   # advertised in the README) actually boots and answers health checks, so it
   # can't silently rot the way the old build-only compose flow did. Rebuilds
   # the three images itself (same pattern as container-scan below) and tags
@@ -596,7 +596,7 @@ jobs:
           API_IMAGE_TAG: test
           WORKER_IMAGE_TAG: test
           UI_IMAGE_TAG: test
-          # P2-33: /v3/api-docs.yaml is gated behind swagger.enabled (SecurityConfig),
+          # /v3/api-docs.yaml is gated behind swagger.enabled (SecurityConfig),
           # default false. Needed here so the OpenAPI drift check below can reach it.
           SWAGGER_ENABLED: "true"
         run: docker compose -f docker-compose.pull.yml --env-file .env up -d
@@ -632,7 +632,7 @@ jobs:
           echo "--- curl http://localhost:5173 (status only) ---"
           curl -f -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:5173
 
-      # P2-33: the committed openapi.yaml (repo root) is the source evaluators and
+      # The committed openapi.yaml (repo root) is the source evaluators and
       # docs.hookflow.dev's Redoc renderer read - it must never silently drift from
       # what the running API actually serves. Springdoc generates it live from the
       # 33 @RestController classes, so this is a real drift check, not a rebuild of

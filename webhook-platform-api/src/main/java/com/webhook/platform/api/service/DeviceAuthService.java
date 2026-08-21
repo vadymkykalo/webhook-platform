@@ -105,7 +105,7 @@ public class DeviceAuthService {
                 throw new ResponseStatusException(HttpStatus.GONE, "Device code has expired");
             case CONSUMED:
                 // Already exchanged for a token pair by a previous (or racing) poll. Fail
-                // closed rather than minting a second pair for the same approval (P0-12).
+                // closed rather than minting a second pair for the same approval.
                 throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
             case APPROVED:
                 break;
@@ -116,7 +116,7 @@ public class DeviceAuthService {
         // of one org and VIEWER of another; picking any membership lets an approval
         // scoped to the low-privilege org mint a token with the high-privilege role.
         // Fail closed if the user no longer has (or never had) a membership in that
-        // exact org (P0-12).
+        // exact org.
         Membership membership = membershipRepository
                 .findByUserIdAndOrganizationId(code.getUserId(), code.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -125,7 +125,7 @@ public class DeviceAuthService {
         // Single-use, compare-and-set: only the caller that actually flips APPROVED ->
         // CONSUMED gets to mint tokens. A second concurrent poll (or a replay after the
         // first succeeded) loses the race and is refused rather than minting another
-        // token pair (P0-12).
+        // token pair.
         int consumed = deviceAuthCodeRepository.markConsumedIfApproved(code.getId());
         if (consumed == 0) {
             throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");

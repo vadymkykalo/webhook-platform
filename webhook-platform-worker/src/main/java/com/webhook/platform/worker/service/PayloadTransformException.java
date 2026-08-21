@@ -7,7 +7,7 @@ package com.webhook.platform.worker.service;
  *
  * <p>Customers configure transformations specifically to strip PII before a payload
  * leaves the platform. A failure here must never be swallowed into "send the raw
- * payload instead" (P0-07) — callers are expected to catch this and fail the
+ * payload instead" — callers are expected to catch this and fail the
  * delivery/forward attempt as retryable, the same way an HTTP-level failure would,
  * so it flows through the normal retry ladder and eventually DLQs rather than
  * silently leaking the untransformed payload.

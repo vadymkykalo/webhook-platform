@@ -64,7 +64,7 @@ public class PayloadTransformService {
      *         processing failure. Callers must treat this as a failed delivery attempt
      *         (retryable), never fall back to {@code originalPayload}: the whole point of a
      *         configured transformation is often to strip PII before the payload leaves the
-     *         platform (P0-07).
+     *         platform.
      */
     public String transform(String originalPayload, String template) {
         if (template == null || template.isBlank()) {

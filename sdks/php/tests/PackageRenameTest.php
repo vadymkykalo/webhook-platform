@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Hookflow\Hookflow;
 
 /**
- * Regression test for the P1-27 rename (webhook-platform/php -> hookflow/php).
+ * Regression test for the package rename (webhook-platform/php -> hookflow/php).
  * The Hookflow\ namespace was always correct; only the Packagist package
  * name changes here. This must fail loudly if either drifts.
  */

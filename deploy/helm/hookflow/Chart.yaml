@@ -15,7 +15,7 @@ sources:
 maintainers:
   - name: Hookflow Team
     email: info@hookflow.dev
-# P1-19: the postgresql (12.x.x), redis (18.x.x) and kafka (26.x.x) Bitnami
+# The postgresql (12.x.x), redis (18.x.x) and kafka (26.x.x) Bitnami
 # subchart dependencies that used to live here were removed. Bitnami moved
 # its free catalog to a restricted/"Legacy" tier starting 2025-08-28 (see
 # https://github.com/bitnami/charts/issues/35164) - images referenced by

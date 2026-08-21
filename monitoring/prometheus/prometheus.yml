@@ -6,7 +6,7 @@ global:
 rule_files:
   - alerts.yml
 
-# P1-20: without this, the 14 rules in alerts.yml evaluate but never notify
+# Without this, the 14 rules in alerts.yml evaluate but never notify
 # anyone — see monitoring/README.md "Alerting".
 alerting:
   alertmanagers:
@@ -15,7 +15,7 @@ alerting:
 
 scrape_configs:
   # ── Hookflow API (Spring Boot Actuator / Micrometer) ──────────
-  # P1-20: port 8082, not 8080 — SecurityConfig requires a JWT/API-key on
+  # Port 8082, not 8080 — SecurityConfig requires a JWT/API-key on
   # `/actuator/**` over the main port (8080), which Prometheus can't supply.
   # 8082 is a separate management.server.port that bypasses that filter chain
   # entirely (see application.yml `management.server.*` and SecurityConfig.java).

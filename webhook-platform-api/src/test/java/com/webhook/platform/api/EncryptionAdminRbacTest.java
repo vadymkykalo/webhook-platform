@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * P0-09: encryption admin endpoints are cluster-operator operations
+ * Encryption admin endpoints are cluster-operator operations
  * (EncryptionKeyRotationService touches every tenant's secrets, no org predicate),
  * so they must be unreachable by ordinary tenant users — including a user who is
  * OWNER of their own org, which is the exploit this test guards against.

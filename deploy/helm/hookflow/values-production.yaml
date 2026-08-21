@@ -76,7 +76,7 @@ backup:
   retainCount: 14             # Keep 2 weeks of backups
   storageSize: 50Gi
 
-# P1-19: no embedded Redis subchart any more (see Chart.yaml / values.yaml) -
+# No embedded Redis subchart any more (see Chart.yaml / values.yaml) -
 # production must point redis.external at a managed instance
 # (ElastiCache/Memorystore/etc.), e.g. via
 # `--set redis.external.host=redis.prod.local` at install time.

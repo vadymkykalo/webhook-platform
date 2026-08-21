@@ -20,7 +20,7 @@ public class IncomingForwardMessage {
     private boolean replay;
 
     /**
-     * Fencing token for the retry path (P1-25a): the {@code started_at} value the retry
+     * Fencing token for the retry path: the {@code started_at} value the retry
      * scheduler stamped on the attempt row when it claimed PENDING -> PROCESSING and
      * published this message. IncomingForwardService CAS-claims on this value before
      * dispatching, so a duplicate delivery of this exact Kafka message (offset commit lost

@@ -30,9 +30,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for CircuitBreakerService (P1-22) -- open/half-open/closed transitions,
- * thresholds, and fail-open behaviour when Redis is unavailable. Never tested before this
- * task despite gating every delivery attempt.
+ * Unit coverage for CircuitBreakerService -- open/half-open/closed transitions,
+ * thresholds, and fail-open behaviour when Redis is unavailable.
  *
  * <p>The Lua scripts themselves run inside Redis in production; here RScript.eval is
  * mocked to return the {failCount, callCount, shouldTrip, failureRate} / {callCount,
@@ -59,7 +58,7 @@ class CircuitBreakerServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        // P1-19: Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
+        // Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
         // overload, so a bare any() is ambiguous at compile time - pin the
         // matcher's type to disambiguate to the Codec overload actually used
         // in production (see CircuitBreakerService).

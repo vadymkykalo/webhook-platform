@@ -50,7 +50,7 @@ class StaleDeliveryEscalationServiceTest {
                 kafkaTemplate,
                 transactionTemplate,
                 new SimpleMeterRegistry(),
-                96,   // hardCapHours — P1-24a: raised from 48h to fit the retry ladder's ~83h worst case
+                96,   // hardCapHours — raised from 48h to fit the retry ladder's ~83h worst case
                 100   // escalationBatchSize
         );
     }
@@ -111,7 +111,7 @@ class StaleDeliveryEscalationServiceTest {
 
     @Test
     void runEscalation_deliveryWithAttemptsRemaining_notEscalatedPrematurely() {
-        // Regression test for P1-24a: with the old 48h hard-cap, a delivery still working
+        // Regression test: with the old 48h hard-cap, a delivery still working
         // through the retry ladder (attempt 5 of 7, worst-case span ~83h) would already be
         // past the cutoff at 48h and get force-escalated to DLQ before attempts 6/7 (the 6h,
         // 24h tiers) ever fired. The cutoff this service computes and hands to

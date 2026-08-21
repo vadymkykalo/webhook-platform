@@ -88,7 +88,7 @@ public class MembershipService {
                             .status(UserStatus.ACTIVE)
                             .build();
                     User saved = userRepository.save(newUser);
-                    // P0-14b: the temp password is emailed directly to the invitee and is
+                    // The temp password is emailed directly to the invitee and is
                     // never logged, at any level — only non-secret metadata reaches the log.
                     emailService.sendTemporaryPasswordEmail(request.getEmail(), tempPass);
                     log.info("Created new user for invite: userId={}, email={}", saved.getId(), request.getEmail());

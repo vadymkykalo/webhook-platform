@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * P0-12: the device-code flow must mint a token whose role comes from the same
+ * The device-code flow must mint a token whose role comes from the same
  * membership row as the organization the code was approved for, must be single-use
  * under concurrency, and the poll/approve endpoints must be rate-limited.
  *

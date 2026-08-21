@@ -37,7 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for UsageDailyAggregator (P1-26 / 26b).
+ * Unit coverage for UsageDailyAggregator.
  *
  * <p>{@code aggregateForProject} used to be {@code @Transactional} but was invoked from {@code
  * aggregateYesterday} via {@code this}, bypassing the Spring AOP proxy entirely -- so the

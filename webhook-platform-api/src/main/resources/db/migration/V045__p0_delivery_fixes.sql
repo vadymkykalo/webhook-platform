@@ -1,4 +1,4 @@
--- P0-5: Allow NULL subscription_id for rule-driven deliveries.
+-- Allow NULL subscription_id for rule-driven deliveries.
 -- Rule ROUTE actions create deliveries without a subscription.
 ALTER TABLE deliveries ALTER COLUMN subscription_id DROP NOT NULL;
 
@@ -21,7 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_rule_origin
     ON deliveries(endpoint_id, created_at DESC)
     WHERE delivery_origin = 'RULE';
 
--- P0-10: Add UNIQUE index on delivery_attempts(delivery_id, attempt_number).
+-- Add UNIQUE index on delivery_attempts(delivery_id, attempt_number).
 -- For incoming_forward_attempts this was already done in V016; delivery_attempts was missing.
 DROP INDEX IF EXISTS idx_delivery_attempts_delivery_attempt_number;
 CREATE UNIQUE INDEX idx_delivery_attempts_unique_attempt

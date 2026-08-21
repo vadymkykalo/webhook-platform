@@ -1,7 +1,7 @@
 name: Load & Contract Tests
 
 # Manually-triggered (or nightly at most) on purpose — these boot the full
-# stack plus a k6 load run, which is expensive and, per P3-35's own findings,
+# stack plus a k6 load run, which is expensive, and
 # "a load test on every push is a load test everyone disables". Never add a
 # `pull_request:` or `push:` trigger here.
 on:

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Covers the pure retry/backoff math extracted from WebhookDeliveryService (P1-22):
+ * Covers the pure retry/backoff math extracted from WebhookDeliveryService:
  * status-code retryability, delay-ladder parsing (including malformed config), jitter
  * bounds, and next-retry calculation at each attempt tier including the clamp at the
  * last tier.
@@ -151,7 +151,7 @@ class RetryPolicyTest {
         assertEquals(0, Math.min(1 - 1, RetryPolicy.parseRetryDelays(null).length - 1));
     }
 
-    // --- worstCaseSpanSeconds / validateLadderFitsCap (P1-24a) --------------------------
+    // --- worstCaseSpanSeconds / validateLadderFitsCap --------------------------
 
     @Test
     void worstCaseSpanSeconds_defaultLadder_matchesKnownWorstCase() {
@@ -182,7 +182,7 @@ class RetryPolicyTest {
 
     @Test
     void validateLadderFitsCap_ladderExceedsCap_throwsIllegalStateException() {
-        // Regression test for P1-24a: the original defaults (ladder worst-case ~83h) against
+        // Regression test: the original defaults (ladder worst-case ~83h) against
         // the original 48h hard-cap must be rejected at startup, not silently let the last
         // retry tiers get DLQ'd before they ever fire.
         IllegalStateException ex = assertThrows(IllegalStateException.class,

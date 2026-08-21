@@ -1,4 +1,4 @@
--- P3-36a: convert tunnel_request_log to declarative RANGE partitioning by created_at
+-- Convert tunnel_request_log to declarative RANGE partitioning by created_at
 -- (weekly). Retention here is only 7 days (data-retention.tunnel-request-log-retention-days)
 -- — monthly partitions would routinely hold 3-4x the intended retention window before a
 -- whole partition became droppable, so this table uses a tighter, weekly grain instead of

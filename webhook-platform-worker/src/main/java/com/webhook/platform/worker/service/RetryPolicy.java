@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Pure, side-effect-free retry/backoff math used by {@link WebhookDeliveryService}.
- * Pulled out of that class (P1-22) so the arithmetic — status-code retryability, delay
+ * Pulled out of that class so the arithmetic — status-code retryability, delay
  * parsing, jitter, and the last-tier clamp — can be unit tested without standing up any
  * of WebhookDeliveryService's 18 collaborators.
  *
@@ -82,7 +82,7 @@ final class RetryPolicy {
      * range (1.5x base delay), summed across {@code maxAttempts} attempts with the same
      * last-tier clamp {@code calculateNextRetry} uses for attempts beyond the ladder's length.
      *
-     * <p>Used at startup (P1-24a) to check the retry ladder actually fits inside
+     * <p>Used at startup to check the retry ladder actually fits inside
      * {@code delivery.escalation.hard-cap-hours} — StaleDeliveryEscalationService escalates
      * any PENDING delivery older than that cap straight to DLQ regardless of attempt count, so
      * if the ladder's worst case exceeds the cap, the last tiers can never fire.

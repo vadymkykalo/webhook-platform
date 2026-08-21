@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared Postgres backup logic for Hookflow (P1-20).
+# Shared Postgres backup logic for Hookflow.
 #
 # One script, two Compose callers:
 #   - `make backup-db`                          (Makefile, embedded or external DB)

@@ -18,7 +18,7 @@ import java.util.UUID;
 
 /**
  * Enforces {@link RequireScope} annotations on controller methods for API key requests,
- * and — separately — the structural {@code {projectId}} tenancy guard described below (P0-13).
+ * and — separately — the structural {@code {projectId}} tenancy guard described below.
  *
  * <h2>API-key read/write scope ({@link RequireScope})</h2>
  * <p>Resolution order:
@@ -30,7 +30,7 @@ import java.util.UUID;
  * </ol>
  * <p>For non-API-key authentication (JWT), this half of the check is a no-op.</p>
  *
- * <h2>API-key project confinement (P0-13)</h2>
+ * <h2>API-key project confinement</h2>
  * <p>{@code AuthContext.organizationId} is derived from an API key's project, so a
  * service-layer check that only compares organization IDs passes for <b>any</b>
  * project in that org. The only thing that ever confined a key to its own project
@@ -45,7 +45,7 @@ import java.util.UUID;
  * {@link ProjectScopeExempt} annotation — see its Javadoc for when that's legitimate.
  *
  * <p>Existing per-handler {@code validateProjectAccess(...)} calls are left in place
- * as harmless defence-in-depth rather than removed; see the P0-13 task log for why.
+ * as harmless defence-in-depth rather than removed.
  */
 @Slf4j
 @Component
@@ -91,7 +91,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     }
 
     /**
-     * Structural, path-based project-tenancy guard (P0-13). Runs for every request,
+     * Structural, path-based project-tenancy guard. Runs for every request,
      * independent of the {@link RequireScope} check above and of anything the handler
      * method itself does.
      */
@@ -99,7 +99,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
                                       Authentication authentication) {
         if (!(authentication instanceof ApiKeyAuthenticationToken apiKeyAuth)) {
             // JWT / platform-admin auth: project access within an org is governed by
-            // org membership at the service layer, same as before P0-13. Only API
+            // org membership at the service layer. Only API
             // keys are meant to be confined to a single project.
             return;
         }

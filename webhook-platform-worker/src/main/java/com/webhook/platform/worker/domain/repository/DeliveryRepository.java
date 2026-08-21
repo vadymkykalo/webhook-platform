@@ -105,7 +105,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     /**
      * All-time count of deliveries still sitting in {@code DeliveryStatus.DLQ} -- i.e. the
      * actionable backlog: deliveries that have not yet been retried (back to PENDING) or
-     * purged via {@code DlqService}. Used by {@code DlqMonitoringService} (P1-26) as the
+     * purged via {@code DlqService}. Used by {@code DlqMonitoringService} as the
      * source of truth for the "needs manual intervention" gauge, in place of a Kafka
      * latest-earliest offset computation that could only ever measure topic retention, not
      * whether anything had actually been remediated.

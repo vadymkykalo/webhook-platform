@@ -25,7 +25,7 @@ public class AuditLogRetentionJob {
         this.retentionDays = retentionDays;
     }
 
-    // P0-06: this is a cron (not fixedDelay), so with a multi-thread scheduler pool and
+    // This is a cron (not fixedDelay), so with a multi-thread scheduler pool and
     // multiple API replicas it can genuinely fire concurrently. deleteByCreatedAtBefore is
     // idempotent either way, but the lock avoids redundant duplicate DELETE work across
     // replicas - same reasoning as every other retention job in DataRetentionService /

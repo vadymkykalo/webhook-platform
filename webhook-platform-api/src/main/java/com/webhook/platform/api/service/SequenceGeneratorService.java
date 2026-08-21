@@ -19,7 +19,7 @@ import java.util.UUID;
  * makes new events get sequence 1, 2, 3... while {@code ordering_cursors} (Postgres, written
  * by the worker) already holds a much higher "last delivered" value — at which point
  * {@code canDeliver} never matches again and ordering is dead for that endpoint until an
- * operator manually intervenes (P1-23 / 23c). {@link #nextSequence} guards against that by
+ * operator manually intervenes. {@link #nextSequence} guards against that by
  * reseeding from the durable high-water mark — {@code MAX(sequence_number)} already persisted
  * in {@code deliveries} — the moment it notices the Redis key is gone.
  */

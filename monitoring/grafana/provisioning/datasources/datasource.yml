@@ -12,7 +12,7 @@ datasources:
       timeInterval: 10s
       httpMethod: POST
 
-  # P3-36b — see monitoring/README.md "Logs" and docs/runbooks/trace-webhook-logs.md
+  # See monitoring/README.md "Logs" and docs/runbooks/trace-webhook-logs.md
   - name: Loki
     type: loki
     uid: hookflow-loki

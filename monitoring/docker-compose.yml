@@ -36,7 +36,7 @@ services:
         limits:
           memory: 512m
 
-  # P1-20: the 14 rules in prometheus/alerts.yml evaluate correctly but, without
+  # The 14 rules in prometheus/alerts.yml evaluate correctly but, without
   # this, route nowhere — no receiver, just a red square on a dashboard nobody
   # is watching. See monitoring/README.md "Alerting" for receiver setup
   # (ALERTMANAGER_* in .env) and the routing/grouping/inhibition design.
@@ -103,7 +103,7 @@ services:
         limits:
           memory: 256m
 
-  # P3-36b: log aggregation. api/worker already populate MDC with correlationId /
+  # Log aggregation. api/worker already populate MDC with correlationId /
   # organizationId / userId / projectId (JwtAuthenticationFilter, ApiKeyAuthenticationFilter,
   # CorrelationIdFilter) and emit structured JSON logs in production
   # (LogstashEncoder — see each module's logback-spring.xml), but until now nothing

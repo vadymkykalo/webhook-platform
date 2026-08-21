@@ -147,8 +147,8 @@ public class DataRetentionIntegrationTest {
         assertEquals(15, delivery1Attempts.get(9).getAttemptNumber());
     }
 
-    // testAgeBasedCleanup (dataRetentionService.cleanupOldDeliveryAttempts()) was removed
-    // for P3-36a: delivery_attempts is now partitioned monthly (V052) and the global
+    // testAgeBasedCleanup (dataRetentionService.cleanupOldDeliveryAttempts()) was removed:
+    // delivery_attempts is now partitioned monthly (V052) and the global
     // age-based cutoff this test exercised is now enforced by
     // PartitionMaintenanceService.dropExpiredPartitions() (O(1) DROP TABLE on whole
     // expired partitions) instead of a row-level DELETE. See
