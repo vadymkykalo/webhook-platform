@@ -1,6 +1,6 @@
 # P1-23 — Fix FIFO ordering: cursor regression, gap check, sequence durability
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1 — the ordering guarantee is currently advertised but not held
 - **Branch:** `feature/P1-23-fifo-ordering-fixes`
 - **Depends on:** P1-21 (the e2e harness makes these provable)
