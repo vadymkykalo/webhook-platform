@@ -51,7 +51,7 @@ jobs:
         run: mvn package -DskipTests -B
 
       - name: Upload CLI JAR
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hookflow-cli
           path: webhook-platform-cli/target/webhook-platform-cli-*.jar
@@ -98,7 +98,7 @@ jobs:
       # picture available.
       - name: Upload unit test coverage data
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-unit-exec
           path: webhook-platform-*/target/jacoco-unit.exec
@@ -145,7 +145,7 @@ jobs:
       # job's exec data into one real aggregate.
       - name: Upload integration test coverage data
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-integration-exec
           path: webhook-platform-*/target/jacoco-it.exec
@@ -225,7 +225,7 @@ jobs:
 
       - name: Upload aggregate coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-aggregate-report
           path: target/site/jacoco-aggregate
@@ -367,7 +367,7 @@ jobs:
 
       - name: Upload frontend coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vitest-coverage-report
           path: webhook-platform-ui/coverage
@@ -518,7 +518,7 @@ jobs:
 
       - name: Upload Dependency-Check report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-check-report
           path: target/dependency-check-report.html
@@ -648,7 +648,7 @@ jobs:
           echo "openapi.yaml matches the live spec."
 
       - name: Upload generated OpenAPI spec
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openapi-spec
           path: /tmp/openapi-live.yaml
