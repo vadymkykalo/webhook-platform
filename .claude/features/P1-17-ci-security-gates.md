@@ -1,6 +1,6 @@
 # P1-17 — Make CI security gates actually fail; add Dependabot
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1
 - **Branch:** `feature/P1-17-ci-security-gates`
 - **Depends on:** nothing
