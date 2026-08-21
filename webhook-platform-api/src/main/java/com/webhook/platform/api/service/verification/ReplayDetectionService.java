@@ -50,6 +50,22 @@ public class ReplayDetectionService {
     }
 
     /**
+     * Undo a previous {@link #isReplay} mark (P1-25b). isReplay marks a signature as seen the
+     * moment it is first checked, before the caller has actually persisted anything for it. If
+     * the write that was supposed to follow never commits (a validation failure downstream, an
+     * unresolvable duplicate-key race, ...), the mark must not survive -- otherwise the
+     * provider's legitimate re-send of the exact same webhook is rejected as a replay attack
+     * for the rest of the TTL window and the event is lost for good instead of merely delayed.
+     * Only call this for a signature this same request actually marked; never call it after a
+     * successful commit.
+     */
+    public void unmark(String sourceId, String signature) {
+        String signatureHash = hashSignature(signature);
+        String redisKey = REDIS_KEY_PREFIX + sourceId + ":" + signatureHash;
+        redisTemplate.delete(redisKey);
+    }
+
+    /**
      * Hash the signature to reduce Redis key size and prevent leaking raw signatures in logs.
      */
     private static String hashSignature(String signature) {

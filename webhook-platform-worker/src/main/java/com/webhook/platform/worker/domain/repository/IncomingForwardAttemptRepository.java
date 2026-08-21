@@ -52,6 +52,24 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         "WHERE status = 'PROCESSING' AND started_at < :threshold", nativeQuery = true)
         int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
 
+        /**
+         * CAS claim for the retry path (P1-25a). IncomingForwardRetryScheduler already
+         * transitioned the row PENDING -> PROCESSING and stamped {@code started_at} as a
+         * fencing token before publishing the Kafka retry message; this bumps that token
+         * again, but only if it still matches what the scheduler stamped. A duplicate
+         * delivery of the same Kafka message races to match the now-stale token and
+         * updates 0 rows, so only the first delivery proceeds to dispatch.
+         */
+        @Modifying
+        @Query(value = "UPDATE incoming_forward_attempts SET started_at = now() " +
+                        "WHERE incoming_event_id = :eventId AND destination_id = :destinationId " +
+                        "AND attempt_number = :attemptNumber AND status = 'PROCESSING' " +
+                        "AND started_at = :expectedStartedAt", nativeQuery = true)
+        int claimRetryForProcessing(@Param("eventId") UUID eventId,
+                        @Param("destinationId") UUID destinationId,
+                        @Param("attemptNumber") int attemptNumber,
+                        @Param("expectedStartedAt") Instant expectedStartedAt);
+
         @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PENDING' AND a.createdAt > :since")
         long countPending(@Param("since") Instant since);
 

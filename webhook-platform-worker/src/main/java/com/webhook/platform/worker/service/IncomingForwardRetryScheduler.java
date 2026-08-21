@@ -122,10 +122,16 @@ public class IncomingForwardRetryScheduler {
                     return List.<IncomingForwardAttempt>of();
                 }
 
-                // Mark as PROCESSING to prevent re-pick by another scheduler instance
+                // Mark as PROCESSING to prevent re-pick by another scheduler instance.
+                // started_at doubles as a fencing token (P1-25a): it's echoed in the Kafka
+                // message and CAS-checked by IncomingForwardService before dispatch, so a
+                // duplicate delivery of the same message can't double-POST. Truncate to
+                // microseconds -- Postgres TIMESTAMP columns default to microsecond precision,
+                // and comparing a full-nanosecond Instant against the DB-truncated value on
+                // claim would spuriously fail to match.
                 for (IncomingForwardAttempt attempt : pendingRetries) {
                     attempt.setStatus(ForwardAttemptStatus.PROCESSING);
-                    attempt.setStartedAt(Instant.now());
+                    attempt.setStartedAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
                     attempt.setNextRetryAt(null);
                 }
                 attemptRepository.saveAll(pendingRetries);
@@ -149,6 +155,7 @@ public class IncomingForwardRetryScheduler {
                             .destinationId(attempt.getDestinationId())
                             .attemptCount(attempt.getAttemptNumber())
                             .replay(false)
+                            .startedAt(attempt.getStartedAt())
                             .build();
 
                     CompletableFuture<SendResult<String, IncomingForwardMessage>> future = kafkaTemplate.send(
