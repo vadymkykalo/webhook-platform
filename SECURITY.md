@@ -11,8 +11,9 @@
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT** open a public GitHub issue
-2. Email the maintainers directly or use GitHub's private vulnerability reporting
-3. Include:
+2. Preferred: use [GitHub's private vulnerability reporting](https://github.com/vadymkykalo/webhook-platform/security/advisories/new)
+   for this repository (Security tab → Report a vulnerability).
+3. Alternatively, email **vadymkykalo@gmail.com** with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
