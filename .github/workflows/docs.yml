@@ -1,6 +1,6 @@
 name: Docs Site
 
-# P2-33: publishes the committed OpenAPI spec (openapi.yaml, kept current by
+# Publishes the committed OpenAPI spec (openapi.yaml, kept current by
 # the drift check in ci.yml's docker-compose-smoke job) as a browsable,
 # linkable API reference via GitHub Pages. Rebuilds on every push to `main`
 # (i.e. every release) and on manual dispatch - not on `develop`, so the

@@ -1,6 +1,6 @@
 name: Publish SDKs
 
-# NOTE (P1-27): this workflow used to fire an unconditional `npm publish` /
+# NOTE: this workflow used to fire an unconditional `npm publish` /
 # `twine upload` on *every* GitHub release, including CLI-only releases that
 # never touch sdks/. That fails with "version already exists" the moment an
 # SDK's manifest version wasn't bumped for that release. Every publish job
@@ -173,7 +173,7 @@ jobs:
       # Packagist auto-updates from GitHub via webhook; this just nudges it.
       # NOTE: the old webhook-platform/php package (pre-rename) was backed by
       # a separate repository and had zero real downloads/usage, so it was
-      # abandoned rather than kept alive as a deprecation shim (P1-27).
+      # abandoned rather than kept alive as a deprecation shim.
       - name: Trigger Packagist update
         if: steps.check.outputs.should_publish == 'true'
         env:
