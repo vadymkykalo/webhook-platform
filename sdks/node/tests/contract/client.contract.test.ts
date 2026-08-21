@@ -8,11 +8,11 @@
 // — defaults to http://localhost:8080, i.e. `make up`). See
 // tests/contract/README.md.
 //
-// P2-33 (not yet done — see .claude/features/) tracks committing an OpenAPI
-// spec; once that lands, generating these expectations from the spec is
-// preferable to hand-asserting field-by-field, since it catches drift at
-// build time rather than only when this suite happens to run. Until then,
-// this is the fallback the P3-35 task explicitly allows.
+// The repo now commits an OpenAPI spec (openapi.yaml at the repo root);
+// generating these expectations from the spec would be preferable to
+// hand-asserting field-by-field, since it would catch drift at build time
+// rather than only when this suite happens to run. This hand-asserted
+// suite is the accepted fallback until that generation exists.
 import { Hookflow } from '../../src/index';
 import { bootstrapContractProject, isApiReachable, BASE_URL, ContractContext } from './support';
 

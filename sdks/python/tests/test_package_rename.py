@@ -1,4 +1,4 @@
-"""Regression test for the P1-27 rename (PyPI dist `webhook-platform` -> `hookflow-sdk`).
+"""Regression test for the package rename (PyPI dist `webhook-platform` -> `hookflow-sdk`).
 
 The importable module has always been named `hookflow`; only the PyPI
 *distribution* name changes here. This must fail loudly if either the

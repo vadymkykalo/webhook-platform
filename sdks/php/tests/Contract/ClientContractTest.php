@@ -16,10 +16,10 @@ namespace Hookflow\Tests\Contract;
  * CONTRACT_API_BASE_URL reachable — defaults to http://localhost:8080, i.e.
  * `make up`). See tests/Contract/README.md.
  *
- * P2-33 (not yet done) tracks committing an OpenAPI spec; once that lands,
- * generating these expectations from the spec is preferable to
- * hand-asserting field-by-field. Until then this is the documented fallback
- * (see P3-35's task file).
+ * The repo now commits an OpenAPI spec (openapi.yaml at the repo root);
+ * generating these expectations from the spec would be preferable to
+ * hand-asserting field-by-field. This hand-asserted suite is the accepted
+ * fallback until that generation exists.
  */
 
 use PHPUnit\Framework\TestCase;
