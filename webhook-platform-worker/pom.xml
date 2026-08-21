@@ -136,7 +136,7 @@
                  extension was found" - wiremock-standalone bundles a shaded Jetty 11. -->
             <groupId>org.wiremock</groupId>
             <artifactId>wiremock-standalone</artifactId>
-            <version>3.13.1</version>
+            <version>3.13.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
