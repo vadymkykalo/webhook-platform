@@ -41,10 +41,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for OrderingBufferService (P1-23 / 23a, 23b) -- previously had no tests at
+ * Unit coverage for OrderingBufferService -- previously had no tests at
  * all despite gating FIFO delivery ordering.
  *
- * <p>23a: markDelivered() now upserts Postgres first (authoritative, GREATEST-guarded) and
+ * <p>Postgres-first cursor updates: markDelivered() now upserts Postgres first (authoritative, GREATEST-guarded) and
  * only ever advances the Redis cache from that returned value via a Lua CAS script, so the
  * cache can never regress below what Postgres already knows -- not even after a Redis TTL
  * expiry/flush that resets the "current" value the naive read-modify-write used to trust.
@@ -54,7 +54,7 @@ import static org.mockito.Mockito.when;
  * exercise OrderingBufferService's own logic (what it sends the script, what it does with the
  * result) against a *correct* CAS, not Lua itself.
  *
- * <p>23b: isGapTimedOut() now measures from "when this delivery was first buffered", not from
+ * <p>Gap-timeout measurement: isGapTimedOut() now measures from "when this delivery was first buffered", not from
  * an unrelated row's ingest createdAt -- and no longer double-counts the gap-timeout metric
  * (that counting now lives solely in WebhookDeliveryService).
  */
@@ -83,7 +83,7 @@ class OrderingBufferServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         fakeRedisState.clear();
 
-        // P1-19: Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
+        // Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
         // overload, so a bare any() is ambiguous at compile time - pin the
         // matcher's type to disambiguate to the Codec overload actually used
         // in production (see OrderingBufferService).
@@ -149,7 +149,7 @@ class OrderingBufferServiceTest {
         service.markDelivered(endpointId, 5L);
 
         assertEquals(100L, fakeRedisState.get(key),
-                "Cursor must not regress to 5 after the Redis flush -- this was the P1-23 / 23a bug");
+                "Cursor must not regress to 5 after the Redis flush -- this was the flush-regression bug");
     }
 
     @Test
@@ -275,7 +275,7 @@ class OrderingBufferServiceTest {
 
     @Test
     void isGapTimedOut_doesNotIncrementMetric_countingMovedToCaller() {
-        // P1-23 / 23b fixed a double-count: webhook_ordering_gap_timeout_total used to be
+        // Fixed a double-count: webhook_ordering_gap_timeout_total used to be
         // incremented both here and in WebhookDeliveryService. It must now only be
         // incremented by the caller (WebhookDeliveryService.canDeliverWithOrdering).
         Instant longAgo = Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5);
@@ -283,7 +283,7 @@ class OrderingBufferServiceTest {
         assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
     }
 
-    // ── P1-26: webhook_ordering_buffer_size registered once, resynced from Redis truth ──
+    // ── webhook_ordering_buffer_size registered once, resynced from Redis truth ──
 
     @Test
     void gauge_registeredExactlyOnceAtConstruction_startsAtZero() {

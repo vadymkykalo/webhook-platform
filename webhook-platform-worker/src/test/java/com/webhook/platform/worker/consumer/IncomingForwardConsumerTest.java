@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for IncomingForwardConsumer (P1-22) -- the incoming-forward analogue of
+ * Unit coverage for IncomingForwardConsumer -- the incoming-forward analogue of
  * DeliveryConsumerTest. Unlike the outgoing consumer, this one does not reschedule via a
  * retry ladder when the executor is full: it simply leaves the record unacked so the
  * container's own backpressure (pause on full pool) causes redelivery.

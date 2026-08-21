@@ -20,7 +20,7 @@ import static org.mockito.Mockito.when;
 /**
  * Unit coverage for DlqMonitoringService.
  *
- * <p>P1-26: {@code webhook_dlq_depth} used to be computed as a Kafka latest-earliest offset
+ * <p>{@code webhook_dlq_depth} used to be computed as a Kafka latest-earliest offset
  * difference on the {@code deliveries.dlq} topic -- i.e. total retained volume, not actionable
  * backlog, since nothing consumes that topic. It never returned to 0 after remediation. It is
  * now backed by {@code DeliveryRepository#countDlqTotal()} (the same status column {@code
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
  * <p>DlqMonitoringService builds its own AdminClient internally (AdminClient.create(...))
  * rather than taking one as a collaborator, so the Kafka side can't be mocked the usual way --
  * instead this points a real KafkaAdmin at an address nothing is listening on, with a short
- * bounded timeout (the P0-06 fix this class documents: an unbounded AdminClient call here would
+ * bounded timeout (an unbounded AdminClient call here would
  * starve every other @Scheduled job sharing the pool), and verifies the scheduled poll degrades
  * gracefully rather than hanging or throwing. DeliveryRepository, by contrast, is a plain Spring
  * Data interface and is mocked directly.
@@ -111,8 +111,8 @@ class DlqMonitoringServiceTest {
         assertEquals(12.0, gauge.value(), "depth must reflect the DLQ backlog while it exists");
 
         // Backlog worked through (retried/purged via DlqService on the API side) -- the next
-        // poll must see the DB count go back to 0. This is exactly the P1-26 regression: the
-        // old Kafka-retention-based computation never did this.
+        // poll must see the DB count go back to 0 -- the old Kafka-retention-based
+        // computation never did this.
         when(deliveryRepository.countDlqTotal()).thenReturn(0L);
         service.monitorDlqDepth();
 
@@ -129,7 +129,7 @@ class DlqMonitoringServiceTest {
         assertDoesNotThrow(() -> service.monitorDlqDepth());
         long elapsedMs = System.currentTimeMillis() - start;
 
-        // The whole point of the P0-06-adjacent bounded .get() calls: this must return
+        // The whole point of the bounded .get() calls: this must return
         // quickly (well under the scheduler's own poll interval), not hang indefinitely
         // waiting on an unreachable broker.
         org.junit.jupiter.api.Assertions.assertTrue(elapsedMs < 15_000,

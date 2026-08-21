@@ -54,7 +54,7 @@ class RetrySchedulerServiceTest {
 
         @BeforeEach
         void setUp() {
-                // Make TransactionTemplate execute the callbacks directly. Lenient: the P1-24a
+                // Make TransactionTemplate execute the callbacks directly. Lenient: the
                 // constructor/validation-only tests below build the service without ever
                 // calling scheduleRetries(), so this stub goes unused there.
                 lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
@@ -429,7 +429,7 @@ class RetrySchedulerServiceTest {
 
         @Test
         void constructor_ladderWorstCaseExceedsHardCap_throwsAtStartup() {
-                // Regression test for P1-24a: the original defaults (retry ladder worst-case
+                // Regression test: the original defaults (retry ladder worst-case
                 // ~83h) against the original 48h escalation hard-cap must fail fast at startup
                 // instead of silently letting StaleDeliveryEscalationService DLQ deliveries
                 // before the last retry tiers (6h, 24h) ever get a chance to fire.
@@ -441,7 +441,7 @@ class RetrySchedulerServiceTest {
 
         @Test
         void constructor_ladderFitsInsideHardCap_doesNotThrow() {
-                // The current, agreed-upon default pairing (P1-24a's decision: raise the cap to
+                // The current, agreed-upon default pairing (raise the cap to
                 // 96h rather than shorten the advertised 6-tier ladder) must not throw.
                 assertDoesNotThrow(() -> newRetrySchedulerService("60,300,900,3600,21600,86400", 7, 96L));
         }

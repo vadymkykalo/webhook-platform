@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
 /**
- * Reproduces the P0-03 defect against a real broker: records 5..9 are handed to the
+ * Reproduces the out-of-order-ack defect against a real broker: records 5..9 are handed to the
  * listener, complete (and ack) before records 0..4 do, mirroring how BoundedAsyncExecutor
  * acks from whichever pool thread finishes first. Without {@code asyncAcks}, MANUAL ack
  * mode commits straight to the highest acked offset regardless of order, so the commit

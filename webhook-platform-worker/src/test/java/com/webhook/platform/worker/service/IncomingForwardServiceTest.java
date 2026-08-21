@@ -195,7 +195,7 @@ class IncomingForwardServiceTest {
         verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt());
     }
 
-    // -- P1-25a: duplicate Kafka delivery of a retry message must not double-POST --
+    // -- duplicate Kafka delivery of a retry message must not double-POST --
 
     @Test
     void retryMessageWithoutFencingToken_legacyProducer_stillDispatches() {
@@ -219,7 +219,7 @@ class IncomingForwardServiceTest {
 
     @Test
     void duplicateRetryMessage_secondDeliveryFailsClaim_neverEntersDispatch() {
-        // Reproduces P1-25a: IncomingForwardRetryScheduler publishes a retry message,
+        // Reproduces the duplicate-delivery scenario: IncomingForwardRetryScheduler publishes a retry message,
         // the Kafka offset commit is lost on a rebalance (ordinary at-least-once), the
         // record is re-consumed, and both copies call processForward with an identical
         // message (same fencing token). Without the CAS claim, both would see
@@ -338,7 +338,7 @@ class IncomingForwardServiceTest {
         verify(attemptRepository, never()).claimForProcessing(any(), any(), anyInt());
     }
 
-    // -- P0-07: a configured transformation that fails must fail the attempt, never forward
+    // -- a configured transformation that fails must fail the attempt, never forward
     // the raw body. --
 
     @Test

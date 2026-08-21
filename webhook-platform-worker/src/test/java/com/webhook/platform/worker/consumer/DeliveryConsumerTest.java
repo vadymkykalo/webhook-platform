@@ -79,7 +79,7 @@ class DeliveryConsumerTest {
 
     @Test
     void consumeDispatch_shouldRescheduleAndAck_whenExecutorFull() throws Exception {
-        // Fill the pool (size 4) so the next submission is rejected — see P0-03: a
+        // Fill the pool (size 4) so the next submission is rejected — a
         // rejected record must be explicitly rescheduled and acked, not left unacked.
         fillExecutorPool();
 

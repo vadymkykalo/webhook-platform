@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for StuckDeliveryRecoveryService (P1-22): rows are recovered exactly
+ * Unit coverage for StuckDeliveryRecoveryService: rows are recovered exactly
  * when the recovery lock is held, and left untouched when another instance already
  * holds it.
  */

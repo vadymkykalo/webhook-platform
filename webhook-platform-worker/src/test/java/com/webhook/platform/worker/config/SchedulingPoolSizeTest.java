@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P0-06 regression guard: Spring Boot defaults spring.task.scheduling.pool.size to 1, which
+ * Regression guard: Spring Boot defaults spring.task.scheduling.pool.size to 1, which
  * means a single slow @Scheduled job (e.g. DlqMonitoringService blocking on an unbounded
  * Kafka AdminClient call) delays every other cron sharing the JVM, including
  * StuckDeliveryRecoveryService. See webhook-platform-api's SchedulingPoolSizeTest for the API
@@ -49,7 +49,7 @@ class SchedulingPoolSizeTest {
                             "spring.task.scheduling.pool.size resolved to " + poolSize +
                                     " - a pool of 1 means a single slow @Scheduled job (e.g. an " +
                                     "unbounded Kafka AdminClient call) delays every other cron on " +
-                                    "this JVM (P0-06)");
+                                    "this JVM");
                 });
     }
 

@@ -23,11 +23,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * P0-04: RedisConcurrencyControlService.tryAcquire used to call the
+ * RedisConcurrencyControlService.tryAcquire used to call the
  * RPermitExpirableSemaphore#tryAcquire(waitTime, unit) overload — no leaseTime — so a permit
  * never auto-expired and could only come back via an explicit release(permitId). A crashed
- * pod or any code path that throws before its release() call (see WebhookDeliveryServiceTest's
- * P0-04 test) leaked the permit forever, until the whole semaphore key's 24h TTL lapsed — and
+ * pod or any code path that throws before its release() call (see the corresponding
+ * WebhookDeliveryServiceTest coverage) leaked the permit forever, until the whole semaphore key's 24h TTL lapsed — and
  * that TTL only refreshes on a *successful* acquire, so an exhausted semaphore stayed
  * exhausted. These tests stay Docker-free (see backend-tests skill): a mocked RedissonClient
  * lets us assert exactly what our code controls — the parameters passed to Redisson — without
