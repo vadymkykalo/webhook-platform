@@ -1,6 +1,6 @@
 # P2-32 — Stored XSS via dangerouslySetInnerHTML + unescaped i18n
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P2 — low blast radius, but a researcher finds it on day one
 - **Branch:** `feature/P2-32-dangerously-set-inner-html`
 - **Depends on:** coordinate with P2-31 (same i18n surface)
