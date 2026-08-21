@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
 import { Select } from '../components/ui/select';
+import { Switch } from '../components/ui/switch';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 
 const COMMON_TIMEZONES = [
@@ -336,25 +337,15 @@ export default function SettingsPage() {
                     <p className="text-sm font-medium">{t(`settings.notifications.${channel}`)}</p>
                     <p className="text-xs text-muted-foreground">{t(`settings.notifications.${channel}Desc`)}</p>
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={notifPrefs[channel]}
-                    onClick={() => {
-                      const updated = { ...notifPrefs, [channel]: !notifPrefs[channel] };
+                  <Switch
+                    checked={notifPrefs[channel]}
+                    onCheckedChange={(checked) => {
+                      const updated = { ...notifPrefs, [channel]: checked };
                       setNotifPrefsState(updated);
                       setNotifPrefs(updated);
                     }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                      notifPrefs[channel] ? 'bg-primary' : 'bg-input'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                        notifPrefs[channel] ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
+                    aria-label={t(`settings.notifications.${channel}`)}
+                  />
                 </label>
               ))}
             </div>

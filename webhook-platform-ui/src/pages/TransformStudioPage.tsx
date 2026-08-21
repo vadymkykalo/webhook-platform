@@ -191,7 +191,7 @@ export default function TransformStudioPage() {
                   <Download className="h-3.5 w-3.5 mr-1" /> {t('transform.loadEvent', 'Load Event')}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleFormatInput}>{t('transform.format', 'Format')}</Button>
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(inputPayload)}>
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(inputPayload)} title={t('common.copy', 'Copy')} aria-label={t('common.copy', 'Copy')}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -201,7 +201,7 @@ export default function TransformStudioPage() {
                 <div className="mb-3 border rounded-lg bg-muted/30 p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium">{t('transform.recentEvents', 'Recent Events')}</p>
-                    <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => setShowEventPicker(false)}>✕</Button>
+                    <Button variant="ghost" size="sm" className="h-5 text-[10px] px-1.5" onClick={() => setShowEventPicker(false)} title={t('common.close')} aria-label={t('common.close')}>✕</Button>
                   </div>
                   <Input
                     className="h-7 text-xs font-mono"
@@ -372,7 +372,7 @@ export default function TransformStudioPage() {
                 {success === false && <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Errors</Badge>}
               </CardTitle>
               {outputPayload && (
-                <Button variant="ghost" size="sm" onClick={() => handleCopy(outputPayload)}>
+                <Button variant="ghost" size="sm" onClick={() => handleCopy(outputPayload)} title={t('common.copy', 'Copy')} aria-label={t('common.copy', 'Copy')}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               )}
@@ -461,7 +461,7 @@ export default function TransformStudioPage() {
                     <div className="flex items-center gap-2 text-xs">
                       <Shield className="h-3.5 w-3.5 text-green-600" />
                       <span className="font-medium text-green-700 dark:text-green-400">{t('transform.dryRunSignature', 'HMAC Signature')}</span>
-                      <Button variant="ghost" size="sm" className="h-5 px-1.5" onClick={() => handleCopy(dryRunResult.signature!)}>
+                      <Button variant="ghost" size="sm" className="h-5 px-1.5" onClick={() => handleCopy(dryRunResult.signature!)} title={t('common.copy', 'Copy')} aria-label={t('common.copy', 'Copy')}>
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>
@@ -487,7 +487,7 @@ export default function TransformStudioPage() {
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-medium">{t('transform.dryRunBody', 'Request Body')}</p>
-                      <Button variant="ghost" size="sm" className="h-5 px-1.5" onClick={() => handleCopy(dryRunResult.transformedPayload!)}>
+                      <Button variant="ghost" size="sm" className="h-5 px-1.5" onClick={() => handleCopy(dryRunResult.transformedPayload!)} title={t('common.copy', 'Copy')} aria-label={t('common.copy', 'Copy')}>
                         <Copy className="h-3 w-3" />
                       </Button>
                     </div>

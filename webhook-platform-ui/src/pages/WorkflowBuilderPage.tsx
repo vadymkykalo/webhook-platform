@@ -243,7 +243,7 @@ function WorkflowBuilderInner() {
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-card gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)}>
+          <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)} title={t('workflows.builder.back')} aria-label={t('workflows.builder.back')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">
@@ -365,7 +365,7 @@ function WorkflowBuilderInner() {
         <div className="border-t bg-card max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between px-4 py-2 border-b sticky top-0 bg-card z-10">
             <h3 className="text-xs font-semibold">{t('workflows.builder.executionHistory')}</h3>
-            <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)}>
+            <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)} title={t('workflows.builder.closeHistory')} aria-label={t('workflows.builder.closeHistory')}>
               <ChevronDown className="h-4 w-4" />
             </Button>
           </div>

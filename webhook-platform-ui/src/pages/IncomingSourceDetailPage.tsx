@@ -318,7 +318,7 @@ export default function IncomingSourceDetailPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <code className="text-xs font-mono bg-muted px-3 py-2 rounded flex-1 truncate">{source.ingressUrl}</code>
-              <Button variant="outline" size="icon-sm" onClick={copyIngressUrl} title={t('incomingSources.howToSend.copy')}>
+              <Button variant="outline" size="icon-sm" onClick={copyIngressUrl} title={t('incomingSources.howToSend.copy')} aria-label={t('incomingSources.howToSend.copy')}>
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -431,10 +431,10 @@ export default function IncomingSourceDetailPage() {
                     </div>
                     {canManageIncomingSources && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDest(dest)} title={t('common.edit')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDest(dest)} title={t('common.edit')} aria-label={t('common.edit')}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteDestId(dest.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteDestId(dest.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -450,11 +450,11 @@ export default function IncomingSourceDetailPage() {
                   {t('common.showing', { from: destPage * PAGE_SIZE + 1, to: Math.min((destPage + 1) * PAGE_SIZE, destPageInfo.totalElements), total: destPageInfo.totalElements })}
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p - 1)} disabled={destPageInfo.first}>
+                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p - 1)} disabled={destPageInfo.first} title={t('common.previous')} aria-label={t('common.previous')}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">{destPage + 1} / {destPageInfo.totalPages}</span>
-                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p + 1)} disabled={destPageInfo.last}>
+                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p + 1)} disabled={destPageInfo.last} title={t('common.next')} aria-label={t('common.next')}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

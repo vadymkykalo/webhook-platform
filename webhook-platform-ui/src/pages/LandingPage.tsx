@@ -17,6 +17,7 @@ export default function LandingPage() {
       <div className="page-aurora"><span /></div>
       <div className="relative z-10">
       <Navigation />
+      <main>
       <Hero isAuthenticated={isAuthenticated} />
       <QuickWins />
       <LogoCloud />
@@ -38,6 +39,7 @@ export default function LandingPage() {
       <Pricing />
       <FAQ />
       <FinalCTA />
+      </main>
       </div>
     </div>
   );

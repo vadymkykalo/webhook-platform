@@ -313,6 +313,8 @@ export default function PiiRulesPage() {
                       <button
                         onClick={() => handleToggle(rule)}
                         className="flex items-center gap-1 text-sm"
+                        title={t(rule.enabled ? 'common.disable' : 'common.enable')}
+                        aria-label={t(rule.enabled ? 'common.disable' : 'common.enable')}
                       >
                         {rule.enabled ? (
                           <ToggleRight className="h-5 w-5 text-success" />
@@ -334,6 +336,8 @@ export default function PiiRulesPage() {
                           size="icon-sm"
                           onClick={() => setDeleteId(rule.id)}
                           className="text-muted-foreground hover:text-destructive"
+                          title={t('common.delete')}
+                          aria-label={t('common.delete')}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

@@ -168,6 +168,7 @@ export default function WorkflowsPage() {
                       variant="ghost"
                       size="icon-sm"
                       title={wf.enabled ? t('workflows.disable') : t('workflows.enable')}
+                      aria-label={wf.enabled ? t('workflows.disable') : t('workflows.enable')}
                       onClick={() => toggleMutation.mutate({ id: wf.id, enabled: !wf.enabled })}
                     >
                       {wf.enabled ? <ToggleRight className="h-4 w-4 text-green-500" /> : <ToggleLeft className="h-4 w-4" />}
@@ -176,6 +177,7 @@ export default function WorkflowsPage() {
                       variant="ghost"
                       size="icon-sm"
                       title={t('workflows.edit')}
+                      aria-label={t('workflows.edit')}
                       onClick={() => navigate(`/admin/projects/${projectId}/workflows/${wf.id}`)}
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -185,6 +187,7 @@ export default function WorkflowsPage() {
                       size="icon-sm"
                       className="text-destructive hover:text-destructive"
                       title={t('workflows.delete')}
+                      aria-label={t('workflows.delete')}
                       onClick={() => { if (confirm(t('workflows.deleteConfirm'))) deleteMutation.mutate(wf.id); }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />

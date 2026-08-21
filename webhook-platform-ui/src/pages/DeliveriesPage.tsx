@@ -311,7 +311,7 @@ export default function DeliveriesPage() {
                   <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort}>{t('deliveries.columns.attempts')}</SortableTableHead>
                   <SortableTableHead field="nextRetryAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.nextRetry')}</SortableTableHead>
                   <TableHead className="text-xs hidden lg:table-cell">{t('deliveries.columns.lastError')}</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="w-[50px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -363,7 +363,7 @@ export default function DeliveriesPage() {
                       ) : null}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title={t('common.viewAll')}>
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title={t('common.viewAll')} aria-label={t('common.viewAll')}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                     </TableCell>

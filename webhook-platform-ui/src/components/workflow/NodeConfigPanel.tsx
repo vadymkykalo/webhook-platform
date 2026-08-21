@@ -50,7 +50,7 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
     <div className="w-80 border-l bg-card h-full overflow-y-auto flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <h3 className="font-semibold text-sm">{t('workflows.builder.configureNode')}</h3>
-        <Button variant="ghost" size="icon-sm" onClick={onClose}>
+        <Button variant="ghost" size="icon-sm" onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -422,7 +422,7 @@ function ApiKeyInfo() {
           <p className="text-[10px] font-semibold text-green-700 dark:text-green-400">{t('workflows.nodeConfig.apiKeyCopyWarning')}</p>
           <div className="flex items-center gap-1">
             <code className="flex-1 text-[10px] font-mono bg-background rounded px-1.5 py-0.5 truncate select-all">{createdKey}</code>
-            <button onClick={handleCopy} className="p-1 rounded hover:bg-muted transition-colors shrink-0" title="Copy">
+            <button onClick={handleCopy} className="p-1 rounded hover:bg-muted transition-colors shrink-0" title={t('apiKeys.keyDialog.copyKey')} aria-label={t('apiKeys.keyDialog.copyKey')}>
               {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
             </button>
           </div>

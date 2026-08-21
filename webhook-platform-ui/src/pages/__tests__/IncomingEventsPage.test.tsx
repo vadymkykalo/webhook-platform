@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, IncomingEventResponse, IncomingSourceResponse, PageResponse } from '../../types/api.types';
@@ -104,6 +105,14 @@ describe('IncomingEventsPage', () => {
     vi.mocked(incomingEventsApi.list).mockResolvedValue(populatedEventsPage([INCOMING_EVENT]));
     renderIncomingEvents();
     expect(await screen.findByText(/req-12345678/)).toBeInTheDocument();
+  });
+
+  it('has no detectable axe accessibility violations when populated', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(incomingEventsApi.list).mockResolvedValue(populatedEventsPage([INCOMING_EVENT]));
+    const { container } = renderIncomingEvents();
+    await screen.findByText(/req-12345678/);
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('renders an explicit error state — not the empty state — when the API is down', async () => {

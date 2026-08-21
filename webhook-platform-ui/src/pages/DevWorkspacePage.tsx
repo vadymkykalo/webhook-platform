@@ -104,7 +104,7 @@ function SendEventTab({ projectId }: { projectId: string }) {
                 <span className="text-muted-foreground">{t('devWorkspace.send.eventId')}</span>
                 <div className="flex items-center gap-1 mt-0.5">
                   <code className="font-mono text-xs">{result.eventId.substring(0, 12)}...</code>
-                  <button onClick={() => { navigator.clipboard.writeText(result.eventId); showSuccess(t('common.copied')); }}>
+                  <button onClick={() => { navigator.clipboard.writeText(result.eventId); showSuccess(t('common.copied')); }} aria-label={t('common.copyId')}>
                     <Copy className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                   </button>
                 </div>

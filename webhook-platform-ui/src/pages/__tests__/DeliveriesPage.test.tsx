@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, DeliveryResponse, PageResponse, EndpointResponse } from '../../types/api.types';
@@ -101,6 +102,14 @@ describe('DeliveriesPage', () => {
     vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
     renderDeliveries();
     expect(await screen.findByText('https://example.com/webhook')).toBeInTheDocument();
+  });
+
+  it('has no detectable axe accessibility violations when populated', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(deliveriesApi.listByProject).mockResolvedValue(populatedPage([DELIVERY]));
+    const { container } = renderDeliveries();
+    await screen.findByText('https://example.com/webhook');
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('renders an explicit error state — not "no deliveries found" — when the API is down (the outage-debugging case)', async () => {

@@ -92,7 +92,7 @@ export default function AnalyticsPage() {
                 </button>
               ))}
             </div>
-            <button onClick={refreshAnalytics} className="p-2 rounded-lg bg-card border hover:bg-accent transition-colors">
+            <button onClick={refreshAnalytics} aria-label={t('analytics.refresh')} className="p-2 rounded-lg bg-card border hover:bg-accent transition-colors">
               <RefreshCw className="h-4 w-4 text-muted-foreground" />
             </button>
           </div>

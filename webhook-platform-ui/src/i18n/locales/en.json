@@ -41,6 +41,7 @@
     "viewAll": "View all",
     "manage": "Manage",
     "copyId": "Copy ID",
+    "copy": "Copy",
     "copied": "Copied to clipboard",
     "enable": "Enable",
     "disable": "Disable",
@@ -58,7 +59,9 @@
     "loadErrorTitle": "Couldn't load this page",
     "backToHome": "Back to home",
     "learnMore": "Learn more",
-    "optional": "optional"
+    "optional": "optional",
+    "pageSize": "Rows per page",
+    "actions": "Actions"
   },
   "passwordStrength": {
     "weak": "Weak",
@@ -142,7 +145,10 @@
     "automation": "Automation",
     "workflows": "Workflows",
     "showAdvanced": "Show Advanced Features",
-    "hideAdvanced": "Hide Advanced Features"
+    "hideAdvanced": "Hide Advanced Features",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "skipToContent": "Skip to main content"
   },
   "auth": {
     "login": {
@@ -645,8 +651,13 @@
       "noDeliveriesNoSub": "No active subscriptions match event type <strong>{{eventType}}</strong>. Create a subscription for this event type to start receiving deliveries.",
       "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
       "openFull": "Open Full Details",
-      "notFound": "Event not found"
+      "notFound": "Event not found",
+      "replay": "Replay"
     }
+  },
+  "eventDetail": {
+    "back": "Back to events",
+    "copyLink": "Copy link"
   },
   "deliveries": {
     "title": "Deliveries",
@@ -1175,7 +1186,9 @@
       "eventType": "Event type",
       "endpoint": "Endpoint",
       "allTypes": "All types",
-      "allEndpoints": "All endpoints"
+      "allEndpoints": "All endpoints",
+      "expandDetails": "Expand details",
+      "collapseDetails": "Collapse details"
     },
     "status": {
       "PENDING": "Pending",
@@ -1221,6 +1234,7 @@
     "filterEndpoint": "Filter by Endpoint",
     "allEndpoints": "All endpoints",
     "searchPlaceholder": "Search by event type or ID...",
+    "clearSearch": "Clear search",
     "filterFrom": "From Date",
     "filterTo": "To Date",
     "activeFilters": "Active filters",
@@ -1228,6 +1242,10 @@
     "endpointFiltered": "Endpoint",
     "dateFiltered": "Date range",
     "clearFilters": "Clear all",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selectItem": "Select row",
+    "deselectItem": "Deselect row",
     "columns": {
       "eventType": "Event Type",
       "endpoint": "Endpoint",
@@ -2411,6 +2429,7 @@
     "endpointId": "Endpoint ID",
     "subscriptionId": "Subscription ID",
     "goTo": "Navigate to resource",
+    "copyValue": "Copy value",
     "latencyTrend": "Latency Trend",
     "later": "later",
     "created": "Created",
@@ -2608,7 +2627,8 @@
     "response": "Response",
     "requestHeaders": "Request Headers",
     "requestBody": "Request Body",
-    "responseHeaders": "Response Headers"
+    "responseHeaders": "Response Headers",
+    "copyContent": "Copy {{label}}"
   },
   "connectionSetup": {
     "title": "Connection Setup",
@@ -2843,6 +2863,8 @@
     "title": "Getting Started",
     "subtitle": "Complete these steps to set up your webhook infrastructure",
     "dismiss": "Dismiss",
+    "expand": "Expand checklist",
+    "collapse": "Collapse checklist",
     "collapsed": "{{completed}} of {{total}} completed",
     "steps": {
       "createProject": "Create a project",
@@ -2994,6 +3016,9 @@
     "noRules": "No alert rules",
     "noRulesDesc": "Create your first alert rule to monitor delivery health",
     "muted": "Muted",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "deleteRule": "Delete rule",
     "snoozed": "Snoozed",
     "threshold": "Threshold",
     "window": "Window",
@@ -3006,7 +3031,9 @@
       "severity": "Severity",
       "value": "Value",
       "time": "Time",
-      "status": "Status"
+      "status": "Status",
+      "severityIcon": "Severity icon",
+      "details": "Details"
     },
     "createDialog": {
       "title": "Create Alert Rule",
@@ -3210,7 +3237,15 @@
       "selectEndpoint": "Select endpoint…",
       "selectTransformation": "Select transformation…",
       "tagPlaceholder": "Tag name, e.g. high-priority",
-      "dropHint": "Matching events will be silently dropped — no deliveries created."
+      "dropHint": "Matching events will be silently dropped — no deliveries created.",
+      "removeAction": "Remove action",
+      "conditionTree": {
+        "cycleOperator": "Click to cycle: AND → OR → NOT",
+        "addCondition": "Add condition",
+        "addGroup": "Add nested group",
+        "removeGroup": "Remove group",
+        "removeCondition": "Remove condition"
+      }
     }
   },
   "transformations": {
@@ -3371,6 +3406,8 @@
     },
     "builder": {
       "notFound": "Workflow not found",
+      "back": "Back to workflows",
+      "closeHistory": "Close history",
       "unsaved": "Unsaved",
       "enabled": "Enabled",
       "disabled": "Disabled",

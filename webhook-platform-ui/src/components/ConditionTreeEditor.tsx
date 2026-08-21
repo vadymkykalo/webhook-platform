@@ -5,6 +5,7 @@
  * field inputs and value inputs. No raw JSON editing needed.
  */
 import { X, PlusCircle, FolderPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Input } from './ui/input';
 import { Select } from './ui/select';
 import type {
@@ -75,6 +76,8 @@ export default function ConditionTreeEditor({
   depth = 0,
   compact = false,
 }: ConditionTreeEditorProps) {
+  const { t } = useTranslation();
+
   if (node.type === 'predicate') {
     return (
       <PredicateEditor
@@ -129,7 +132,8 @@ export default function ConditionTreeEditor({
         <button
           onClick={cycleOp}
           className={`px-2.5 py-0.5 rounded text-[11px] font-bold text-white transition-colors ${opBtnColor[node.op] || 'bg-gray-600'}`}
-          title="Click to cycle: AND → OR → NOT"
+          title={t('rules.form.conditionTree.cycleOperator')}
+          aria-label={t('rules.form.conditionTree.cycleOperator')}
         >
           {node.op}
         </button>
@@ -140,14 +144,16 @@ export default function ConditionTreeEditor({
         <button
           onClick={() => addChild(mkPredicate())}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Add condition"
+          title={t('rules.form.conditionTree.addCondition')}
+          aria-label={t('rules.form.conditionTree.addCondition')}
         >
           <PlusCircle className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => addChild(mkGroup('AND'))}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Add nested group"
+          title={t('rules.form.conditionTree.addGroup')}
+          aria-label={t('rules.form.conditionTree.addGroup')}
         >
           <FolderPlus className="h-3.5 w-3.5" />
         </button>
@@ -155,7 +161,8 @@ export default function ConditionTreeEditor({
           <button
             onClick={onRemove}
             className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-            title="Remove group"
+            title={t('rules.form.conditionTree.removeGroup')}
+            aria-label={t('rules.form.conditionTree.removeGroup')}
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -197,6 +204,7 @@ function PredicateEditor({
   onRemove: () => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const needsValue = !NO_VALUE_OPS.includes(node.operator);
 
   const handleValueChange = (raw: string) => {
@@ -224,6 +232,8 @@ function PredicateEditor({
           <button
             onClick={onRemove}
             className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+            title={t('rules.form.conditionTree.removeCondition')}
+            aria-label={t('rules.form.conditionTree.removeCondition')}
           >
             <X className="h-3 w-3" />
           </button>
@@ -282,6 +292,8 @@ function PredicateEditor({
       <button
         onClick={onRemove}
         className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors mt-0.5"
+        title={t('rules.form.conditionTree.removeCondition')}
+        aria-label={t('rules.form.conditionTree.removeCondition')}
       >
         <X className="h-3.5 w-3.5" />
       </button>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
@@ -106,6 +107,15 @@ describe('DlqPage', () => {
     vi.mocked(dlqApi.getStats).mockResolvedValue(POPULATED_STATS);
     renderDlq();
     expect(await screen.findByText('order.created')).toBeInTheDocument();
+  });
+
+  it('has no detectable axe accessibility violations when populated', async () => {
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(dlqApi.list).mockResolvedValue(populatedPage([DLQ_ITEM]));
+    vi.mocked(dlqApi.getStats).mockResolvedValue(POPULATED_STATS);
+    const { container } = renderDlq();
+    await screen.findByText('order.created');
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('renders an explicit error state — not the empty state — when the API is down', async () => {

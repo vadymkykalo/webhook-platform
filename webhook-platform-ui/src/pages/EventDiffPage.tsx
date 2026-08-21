@@ -46,11 +46,20 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
     <div className="space-y-1.5" ref={wrapperRef}>
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <div className="relative">
-        {/* Trigger */}
-        <button
-          type="button"
-          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border rounded-md bg-background hover:bg-accent transition-colors text-left ${selectedId ? '' : 'text-muted-foreground'}`}
+        {/* Trigger — a div (not a <button>) because it hosts a real nested clear-button;
+            HTML forbids interactive content inside <button>, so this restores valid,
+            keyboard-operable markup instead of a button-in-button. */}
+        <div
+          role="button"
+          tabIndex={0}
+          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border rounded-md bg-background hover:bg-accent transition-colors text-left cursor-pointer ${selectedId ? '' : 'text-muted-foreground'}`}
           onClick={() => setOpen(!open)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen(!open);
+            }
+          }}
         >
           {selected ? (
             <span className="truncate">
@@ -61,9 +70,16 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
             <span>{t('eventDiff.selectPlaceholder')}</span>
           )}
           {selectedId && (
-            <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground shrink-0" onClick={(e) => { e.stopPropagation(); onSelect(''); }} />
+            <button
+              type="button"
+              className="shrink-0 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={(e) => { e.stopPropagation(); onSelect(''); }}
+              aria-label={t('common.close')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           )}
-        </button>
+        </div>
 
         {/* Dropdown */}
         {open && (
@@ -123,10 +139,10 @@ function EventPicker({ label, events, selectedId, onSelect, totalPages, currentP
               <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
                 <span>{t('eventDiff.eventsCount', { count: totalElements })} · {t('eventDiff.pageInfo', { current: currentPage + 1, total: totalPages })}</span>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon-sm" className="h-6 w-6" disabled={currentPage === 0} onClick={() => onPageChange(currentPage - 1)}>
+                  <Button variant="ghost" size="icon-sm" className="h-6 w-6" disabled={currentPage === 0} onClick={() => onPageChange(currentPage - 1)} title={t('common.previous')} aria-label={t('common.previous')}>
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon-sm" className="h-6 w-6" disabled={currentPage >= totalPages - 1} onClick={() => onPageChange(currentPage + 1)}>
+                  <Button variant="ghost" size="icon-sm" className="h-6 w-6" disabled={currentPage >= totalPages - 1} onClick={() => onPageChange(currentPage + 1)} title={t('common.next')} aria-label={t('common.next')}>
                     <ChevronRight className="h-3.5 w-3.5" />
                   </Button>
                 </div>

@@ -153,7 +153,12 @@ export default function IncomingEventsPage() {
           <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingEvents.subtitle', { project: project.name }) }} />
         </div>
         <div className="flex items-center gap-2">
-          <Select className="w-[200px]" value={filterSourceId} onChange={(e) => { setFilterSourceId(e.target.value); setCurrentPage(0); }}>
+          <Select
+            className="w-[200px]"
+            value={filterSourceId}
+            onChange={(e) => { setFilterSourceId(e.target.value); setCurrentPage(0); }}
+            aria-label={t('incomingEvents.filters.source')}
+          >
             <option value="">{t('incomingEvents.filters.allSources')}</option>
             {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
@@ -193,11 +198,11 @@ export default function IncomingEventsPage() {
                       <Calendar className="h-3 w-3" /> {formatRelativeTime(event.receivedAt)}
                     </span>
                     {canReplayIncomingEvents && (
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setReplayEventId(event.id); }} title={t('incomingEvents.replay.submit')}>
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setReplayEventId(event.id); }} title={t('incomingEvents.replay.submit')} aria-label={t('incomingEvents.replay.submit')}>
                         <RotateCcw className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyRequestId(event.requestId); }} title={t('common.copyId')}>
+                    <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyRequestId(event.requestId); }} title={t('common.copyId')} aria-label={t('common.copyId')}>
                       <Copy className="h-3 w-3" />
                     </Button>
                   </div>
