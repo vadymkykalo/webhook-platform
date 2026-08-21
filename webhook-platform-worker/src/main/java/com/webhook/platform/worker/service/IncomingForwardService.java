@@ -160,7 +160,7 @@ public class IncomingForwardService {
         //   Retry (attemptCount > 0, replay == false): IncomingForwardRetryScheduler
         //     already claimed the existing row (set PROCESSING) and published
         //     attemptCount = attemptNumber, plus a started_at fencing token. We CAS on
-        //     that token below (P1-25a) rather than trusting status=PROCESSING alone --
+        //     that token below rather than trusting status=PROCESSING alone --
         //     Kafka is at-least-once, so the same retry message can be redelivered (a
         //     rebalance loses the offset commit after this consumer already dispatched
         //     once) and both copies would otherwise see PROCESSING and double-POST.
@@ -184,7 +184,7 @@ public class IncomingForwardService {
             attemptNumber = message.getAttemptCount();
             Instant expectedStartedAt = message.getStartedAt();
             if (expectedStartedAt != null) {
-                // CAS on the fencing token (P1-25a): only the first delivery of this exact
+                // CAS on the fencing token: only the first delivery of this exact
                 // Kafka message can still see the token the scheduler stamped, so only it
                 // proceeds to dispatch. A redelivered duplicate finds the token already
                 // consumed and is dropped here instead of double-POSTing.
@@ -340,7 +340,7 @@ public class IncomingForwardService {
                     .block();
 
         } catch (PayloadTransformException e) {
-            // P0-07: a configured transformation that fails to apply must never result in the
+            // A configured transformation that fails to apply must never result in the
             // raw payload leaving the platform. Fail this attempt as retryable (same as an
             // HTTP-level failure) so it goes through the normal retry ladder and eventually
             // DLQs if the template stays broken.
@@ -603,7 +603,7 @@ public class IncomingForwardService {
      *
      * <p>"No transformation configured" (neither a transformationId nor an inline
      * payloadTransform) is fine — the body is forwarded as-is. But once either is
-     * configured, a failure to apply it must fail the attempt (P0-07): it must never
+     * configured, a failure to apply it must fail the attempt: it must never
      * silently forward the raw body, since transformations are how customers strip PII
      * before an incoming payload gets relayed to a destination.
      */

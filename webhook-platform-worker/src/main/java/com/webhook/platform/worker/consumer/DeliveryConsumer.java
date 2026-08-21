@@ -77,7 +77,7 @@ public class DeliveryConsumer {
             // Executor full — containers paused automatically to stop further polling,
             // but this record has already been handed to us. Don't leave it unacked: a
             // non-ack does not get redelivered until a rebalance/restart, and with
-            // asyncAcks (P0-03) it would block this partition's offset commits forever.
+            // asyncAcks it would block this partition's offset commits forever.
             // Reschedule explicitly via the retry ladder instead and ack.
             log.debug("Outgoing executor full, rescheduling deliveryId={} via retry ladder", message.getDeliveryId());
             webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), false);

@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *       ({@code delivery_oldest_pending_age_seconds}) for alerting.</li>
  *   <li>Finds deliveries in PENDING state whose {@code created_at} is older than the hard-cap threshold
  *       (default 96h — chosen to comfortably exceed the default retry ladder's ~83h worst-case span,
- *       see {@code RetryPolicy#validateLadderFitsCap}, P1-24a) and escalates them to DLQ status.</li>
+ *       see {@code RetryPolicy#validateLadderFitsCap}) and escalates them to DLQ status.</li>
  *   <li>Publishes a DLQ notification to Kafka for each escalated delivery (best-effort).</li>
  * </ol>
  */

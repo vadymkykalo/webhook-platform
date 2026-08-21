@@ -53,7 +53,7 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
         int resetStuckForwardAttempts(@Param("threshold") Instant threshold);
 
         /**
-         * CAS claim for the retry path (P1-25a). IncomingForwardRetryScheduler already
+         * CAS claim for the retry path. IncomingForwardRetryScheduler already
          * transitioned the row PENDING -> PROCESSING and stamped {@code started_at} as a
          * fencing token before publishing the Kafka retry message; this bumps that token
          * again, but only if it still matches what the scheduler stamped. A duplicate

@@ -75,7 +75,7 @@ public class RetrySchedulerService {
                 "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
 
-        // P1-24a: fail fast at startup rather than silently DLQ-ing the last retry tiers —
+        // Fail fast at startup rather than silently DLQ-ing the last retry tiers —
         // see RetryPolicy.validateLadderFitsCap for the full explanation.
         RetryPolicy.validateLadderFitsCap(defaultRetryDelays, defaultMaxAttempts, escalationHardCapHours * 3600L);
     }

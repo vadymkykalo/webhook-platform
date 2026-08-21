@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *       alert.
  * </ul>
  *
- * <p>P1-26: previously there was only one gauge, {@code webhook_dlq_depth}, and it was computed
+ * <p>Previously there was only one gauge, {@code webhook_dlq_depth}, and it was computed
  * as the Kafka latest-earliest offset difference above. That number is structurally incapable
  * of representing "needs manual intervention" -- it counts every record retained in the topic,
  * remediated or not, so it never returned to 0 and the "manual intervention may be required"
@@ -120,7 +120,7 @@ public class DlqMonitoringService {
 
             // Discover all partitions dynamically. Bounded .get() - an unbounded call here sat
             // on a scheduler thread indefinitely if the broker was slow/unreachable, starving
-            // every other @Scheduled job sharing the pool (P0-06).
+            // every other @Scheduled job sharing the pool.
             TopicDescription description = adminClient
                     .describeTopics(Collections.singletonList(topic))
                     .topicNameValues()

@@ -123,7 +123,7 @@ public class IncomingForwardRetryScheduler {
                 }
 
                 // Mark as PROCESSING to prevent re-pick by another scheduler instance.
-                // started_at doubles as a fencing token (P1-25a): it's echoed in the Kafka
+                // started_at doubles as a fencing token: it's echoed in the Kafka
                 // message and CAS-checked by IncomingForwardService before dispatch, so a
                 // duplicate delivery of the same message can't double-POST. Truncate to
                 // microseconds -- Postgres TIMESTAMP columns default to microsecond precision,

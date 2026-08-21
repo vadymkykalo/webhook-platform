@@ -158,7 +158,7 @@ public class WebhookDeliveryService {
      * Called by DeliveryConsumer when the async executor pool is full and this record
      * can't even be submitted. With MANUAL acks a non-ack does not get redelivered until
      * a rebalance/restart, and now that KafkaConsumerConfig defers commits until every
-     * lower offset is acked (P0-03), leaving this record unacked would stall the whole
+     * lower offset is acked, leaving this record unacked would stall the whole
      * partition forever instead of just delaying it. Kafka's job for this record is done
      * either way — the retry ladder (RetrySchedulerService), not Kafka redelivery, is
      * what actually drives reprocessing, so reschedule the DB row explicitly and let the
@@ -308,7 +308,7 @@ public class WebhookDeliveryService {
         // exceptions thrown before the HTTP call itself (decryptSecret on a key that got
         // rotated away, the mTLS client factory on a bad cert, ...) — must go through the
         // finally below, or a single bad endpoint config burns a permit per attempt until
-        // the endpoint is throttled to zero for the full key TTL (P0-04).
+        // the endpoint is throttled to zero for the full key TTL.
         String requestHeaders = null;
         String body = null;
         try {
@@ -364,7 +364,7 @@ public class WebhookDeliveryService {
             // call itself. Previously handleResponse ran inside .map, so a slow markAsSuccess
             // could trip .timeout AFTER a 200 was already received, and the resulting
             // TimeoutException drove scheduleRetry to overwrite the just-written SUCCESS row
-            // back to PENDING — a duplicate delivery of an already-successful webhook (P0-05).
+            // back to PENDING — a duplicate delivery of an already-successful webhook.
             ResponseOutcome outcome = requestSpec.bodyValue(body)
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
@@ -388,7 +388,7 @@ public class WebhookDeliveryService {
                     (int) (System.currentTimeMillis() - startTime));
             markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
         } catch (PayloadTransformException e) {
-            // P0-07: a configured transformation that fails to apply must never result in the
+            // A configured transformation that fails to apply must never result in the
             // raw payload leaving the platform. Fail this attempt as retryable (same as an
             // HTTP-level failure) so it goes through the normal retry ladder and eventually
             // DLQs if the template stays broken — see scheduleRetry/handleError below.
@@ -464,7 +464,7 @@ public class WebhookDeliveryService {
 
             // A terminal state reached via another path (e.g. markAsSuccess already committed
             // SUCCESS) must never be clobbered back to PENDING/DLQ by a late-arriving error
-            // handler (P0-05).
+            // handler.
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping retry scheduling " +
                         "— already reached a terminal state via another path", fresh.getId(), fresh.getStatus());
@@ -491,7 +491,7 @@ public class WebhookDeliveryService {
 
         // Outside the transaction: ordering-buffer release and the DLQ Kafka notification are
         // both fire-and-forget — a Kafka/Redis failure here must not roll back the DLQ write
-        // that already committed above (P0-05).
+        // that already committed above.
         if (dlqDelivery != null) {
             if (Boolean.TRUE.equals(dlqDelivery.getOrderingEnabled()) && dlqDelivery.getSequenceNumber() != null) {
                 try {
@@ -552,7 +552,7 @@ public class WebhookDeliveryService {
                 return;
             }
             // A late writer for this same delivery (e.g. a retry/failure path that lost the
-            // race) must never clobber a terminal state that's already been written (P0-05).
+            // race) must never clobber a terminal state that's already been written.
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping success marking",
                         fresh.getId(), fresh.getStatus());
@@ -571,7 +571,7 @@ public class WebhookDeliveryService {
         }
 
         // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
-        // not roll back the SUCCESS write that already committed above (P0-05).
+        // not roll back the SUCCESS write that already committed above.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
             try {
                 orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
@@ -595,7 +595,7 @@ public class WebhookDeliveryService {
             return true;
         }
 
-        // Check the *whole* missing range, not just sequenceNumber - 1 (P1-23 / 23b): a
+        // Check the *whole* missing range, not just sequenceNumber - 1: a
         // single-sequence check meant a delivery several sequences ahead of an outstanding
         // one would sail through the moment the immediately-preceding sequence happened to
         // already be terminal, even though something further back in the gap was still
@@ -619,14 +619,14 @@ public class WebhookDeliveryService {
 
         // Something in the gap is genuinely still outstanding. How long has *this* delivery
         // been waiting on it? Measured from when it was first buffered, not from the blocking
-        // row's ingest createdAt (P1-23 / 23b) — that timestamp is unrelated to how long we've
+        // row's ingest createdAt — that timestamp is unrelated to how long we've
         // actually been stuck, and using it made isGapTimedOut trivially true for an entire
         // backlog older than the timeout.
         if (orderingBufferService.isGapTimedOut(delivery.getOrderingFirstBufferedAt())) {
             log.warn("Gap timeout for endpoint {}, proceeding with seq={} despite outstanding range [{}, {}]",
                     endpointId, sequenceNumber, rangeStart, rangeEnd);
             // Single counting site for webhook_ordering_gap_timeout_total -- OrderingBufferService
-            // no longer increments it too (P1-23 / 23b fixed a double-count here).
+            // no longer increments it too.
             orderingGapTimeoutCounter.increment();
             return true;
         }
@@ -687,7 +687,7 @@ public class WebhookDeliveryService {
                 return;
             }
             // A late writer for this same delivery must never clobber a terminal state that's
-            // already been written (P0-05).
+            // already been written.
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping failure marking",
                         fresh.getId(), fresh.getStatus());
@@ -706,7 +706,7 @@ public class WebhookDeliveryService {
         }
 
         // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
-        // not roll back the FAILED write that already committed above (P0-05).
+        // not roll back the FAILED write that already committed above.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
             try {
                 orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
@@ -814,7 +814,7 @@ public class WebhookDeliveryService {
             // configuration failure, not "no transform configured". Falling back to whatever
             // the inline payloadTemplate happens to be (often null, i.e. raw payload) would
             // silently ship data the customer configured a transform specifically to strip
-            // (P0-07), so this must fail the attempt instead of falling through.
+            // so this must fail the attempt instead of falling through.
             String template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
             if (template == null) {
                 throw new PayloadTransformException(
