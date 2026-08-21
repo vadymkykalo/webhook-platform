@@ -13,6 +13,7 @@ import org.mockito.quality.Strictness;
 import org.redisson.api.RBucket;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.Codec;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -79,7 +80,11 @@ class OrderingBufferServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         fakeRedisState.clear();
 
-        when(redissonClient.getScript(any())).thenReturn(rScript);
+        // P1-19: Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
+        // overload, so a bare any() is ambiguous at compile time - pin the
+        // matcher's type to disambiguate to the Codec overload actually used
+        // in production (see OrderingBufferService).
+        when(redissonClient.getScript(any(Codec.class))).thenReturn(rScript);
         // Faithfully mirrors lua/ordering_cursor_cas.lua: SET only if newVal > current
         // (missing key treated as "current == false"), atomically (synchronized -- this test
         // fake is what stands in for Redis's single-threaded Lua execution guarantee).

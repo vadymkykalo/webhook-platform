@@ -12,6 +12,7 @@ import org.redisson.api.RBucket;
 import org.redisson.api.RKeys;
 import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.Codec;
 
 import java.time.Duration;
 import java.util.List;
@@ -58,7 +59,11 @@ class CircuitBreakerServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        when(redissonClient.getScript(any())).thenReturn(rScript);
+        // P1-19: Redisson 3.5x added an RedissonClient#getScript(OptionalOptions)
+        // overload, so a bare any() is ambiguous at compile time - pin the
+        // matcher's type to disambiguate to the Codec overload actually used
+        // in production (see CircuitBreakerService).
+        when(redissonClient.getScript(any(Codec.class))).thenReturn(rScript);
         service = new CircuitBreakerService(redissonClient, meterRegistry,
                 FAILURE_RATE_THRESHOLD, MIN_CALLS, WAIT_DURATION_SECONDS, 120, 10000, 80);
     }
