@@ -126,6 +126,42 @@
             <version>1.21.4</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- No dedicated Testcontainers Redis module is used anywhere in this repo yet;
+                 a plain GenericContainer("redis:7-alpine") (matching docker-compose.yml's
+                 default REDIS_IMAGE) is used instead, so no extra Testcontainers artifact is
+                 needed here beyond the generic "testcontainers" one already above. -->
+            <!-- "wiremock" (not -standalone) has no bundled HTTP server implementation
+                 (Jetty), so it fails at startup with "no suitable HttpServerFactory
+                 extension was found" - wiremock-standalone bundles a shaded Jetty 11. -->
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.13.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- wiremock-standalone:3.13.1 transitively pulls httpclient5:5.2.1, which is
+                 missing RequestConfig.Builder#setProtocolUpgradeEnabled that WireMock's own
+                 (non-shaded) admin/proxy client calls (NoSuchMethodError at startup) - pin
+                 explicitly to a version that has it, along with the matching
+                 httpcore5/httpcore5-h2 versions it needs. -->
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5-h2</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
