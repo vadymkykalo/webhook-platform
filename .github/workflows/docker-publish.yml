@@ -54,7 +54,7 @@ jobs:
         service: [api, worker, ui]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.resolve-version.outputs.ref }}
 
@@ -111,7 +111,7 @@ jobs:
     needs: [resolve-version, build-and-push]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.resolve-version.outputs.ref }}
 
