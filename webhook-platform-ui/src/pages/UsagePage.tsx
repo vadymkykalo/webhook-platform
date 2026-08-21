@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BarChart3, Activity, CheckCircle2, XCircle, AlertTriangle, Clock, Webhook, ArrowDownToLine, Bell, TrendingUp, Radio } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useUsageStats } from '../api/queries';
 import { projectsApi } from '../api/projects.api';
 import { useQuery } from '@tanstack/react-query';
@@ -71,8 +71,14 @@ export default function UsagePage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{t('usage.title', 'Usage & Metrics')}</h1>
-            <p className="text-sm text-muted-foreground"
-               dangerouslySetInnerHTML={{ __html: t('usage.subtitle', { project: project?.name || '…', defaultValue: 'Resource usage for <strong>{{project}}</strong>' }) }} />
+            <p className="text-sm text-muted-foreground">
+              <Trans
+                i18nKey="usage.subtitle"
+                values={{ project: project?.name || '…' }}
+                defaults="Resource usage for <strong>{{project}}</strong>"
+                components={{ strong: <strong /> }}
+              />
+            </p>
           </div>
         </div>
         <div className="w-36">

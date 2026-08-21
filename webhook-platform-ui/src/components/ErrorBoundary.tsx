@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
+import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -42,9 +43,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="mx-auto h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-6">
               <AlertTriangle className="h-8 w-8 text-destructive" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Something went wrong</h1>
+            <h1 className="text-2xl font-bold mb-2">{i18n.t('errorBoundary.title')}</h1>
             <p className="text-sm text-muted-foreground mb-4">
-              An unexpected error occurred. This has been logged.
+              {i18n.t('errorBoundary.description')}
             </p>
             {this.state.error && (
               <pre className="text-xs text-left bg-muted rounded-lg p-3 mb-6 overflow-auto max-h-32 text-muted-foreground">
@@ -53,10 +54,10 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
             <div className="flex items-center justify-center gap-3">
               <Button variant="outline" onClick={this.handleReload}>
-                <RefreshCw className="h-4 w-4" /> Reload page
+                <RefreshCw className="h-4 w-4" /> {i18n.t('errorBoundary.reloadPage')}
               </Button>
               <Button onClick={this.handleReset}>
-                Go to Dashboard
+                {i18n.t('errorBoundary.goToDashboard')}
               </Button>
             </div>
           </div>

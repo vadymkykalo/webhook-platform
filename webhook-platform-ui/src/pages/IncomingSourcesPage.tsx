@@ -4,7 +4,7 @@ import {
   Plus, ArrowDownToLine, Calendar, Loader2, Trash2, Pencil, Copy, ChevronLeft, ChevronRight,
   Power, PowerOff, ShieldCheck, ShieldOff, ExternalLink, AlertTriangle
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
@@ -184,7 +184,9 @@ export default function IncomingSourcesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('incomingSources.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingSources.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="incomingSources.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canManageIncomingSources}>
           <VerificationGate>
@@ -253,7 +255,7 @@ export default function IncomingSourcesPage() {
                         <code className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground truncate max-w-[400px]">
                           {source.ingressUrl}
                         </code>
-                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyIngressUrl(source.ingressUrl); }} title={t('incomingSources.howToSend.copy')}>
+                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyIngressUrl(source.ingressUrl); }} title={t('incomingSources.howToSend.copy')} aria-label={t('incomingSources.howToSend.copy')}>
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
@@ -269,13 +271,13 @@ export default function IncomingSourcesPage() {
                   <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {canManageIncomingSources && (
                       <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(source)} title={t('common.edit')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(source)} title={t('common.edit')} aria-label={t('common.edit')}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/incoming-sources/${source.id}`)} title={t('incomingSources.viewDetails')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/incoming-sources/${source.id}`)} title={t('incomingSources.viewDetails')} aria-label={t('incomingSources.viewDetails')}>
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(source.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(source.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </>

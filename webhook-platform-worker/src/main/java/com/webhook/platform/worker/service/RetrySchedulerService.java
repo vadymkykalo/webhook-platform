@@ -58,7 +58,10 @@ public class RetrySchedulerService {
             @Value("${retry.scheduler.send-timeout-seconds:30}") long sendTimeoutSeconds,
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
             @Value("${retry.scheduler.high-watermark:5000}") long highWatermark,
-            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs) {
+            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs,
+            @Value("${retry.ladder.default-delays-seconds:60,300,900,3600,21600,86400}") String defaultRetryDelays,
+            @Value("${retry.ladder.default-max-attempts:7}") int defaultMaxAttempts,
+            @Value("${delivery.escalation.hard-cap-hours:96}") long escalationHardCapHours) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
@@ -71,6 +74,10 @@ public class RetrySchedulerService {
         this.governor = new RetryGovernor(
                 "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
+
+        // Fail fast at startup rather than silently DLQ-ing the last retry tiers —
+        // see RetryPolicy.validateLadderFitsCap for the full explanation.
+        RetryPolicy.validateLadderFitsCap(defaultRetryDelays, defaultMaxAttempts, escalationHardCapHours * 3600L);
     }
 
     @PostConstruct

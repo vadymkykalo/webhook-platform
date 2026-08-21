@@ -6,13 +6,26 @@ global:
 rule_files:
   - alerts.yml
 
+# Without this, the 14 rules in alerts.yml evaluate but never notify
+# anyone — see monitoring/README.md "Alerting".
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   # ── Hookflow API (Spring Boot Actuator / Micrometer) ──────────
+  # Port 8082, not 8080 — SecurityConfig requires a JWT/API-key on
+  # `/actuator/**` over the main port (8080), which Prometheus can't supply.
+  # 8082 is a separate management.server.port that bypasses that filter chain
+  # entirely (see application.yml `management.server.*` and SecurityConfig.java).
+  # It is not published to the host, only reachable on the private
+  # webhook-network this Prometheus container also joins — see docker-compose.yml.
   - job_name: hookflow-api
     metrics_path: /actuator/prometheus
     scrape_interval: 10s
     static_configs:
-      - targets: ["api:8080"]
+      - targets: ["api:8082"]
         labels:
           service: api
           component: hookflow

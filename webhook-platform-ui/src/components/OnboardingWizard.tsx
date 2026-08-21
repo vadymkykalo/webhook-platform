@@ -71,7 +71,7 @@ function CurlSnippet({ t }: { t: (key: string) => string }) {
     <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{t('wizard.send.curlLabel')}</span>
-        <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors" title={t('common.copy')} aria-label={t('common.copy')}>
           {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -134,6 +134,8 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
         <button
           onClick={handleClose}
           className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+          title={t('common.close')}
+          aria-label={t('common.close')}
         >
           <X className="h-4 w-4" />
         </button>

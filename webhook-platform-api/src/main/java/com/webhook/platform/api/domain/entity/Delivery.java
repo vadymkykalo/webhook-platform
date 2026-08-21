@@ -57,6 +57,14 @@ public class Delivery {
     @Builder.Default
     private Boolean orderingEnabled = false;
 
+    /**
+     * When this delivery was first buffered by the worker waiting on a missing predecessor
+     * sequence. Null if it has never been buffered. Written only by the worker; kept here
+     * purely so Hibernate schema validation (ddl-auto=validate) passes on this side too.
+     */
+    @Column(name = "ordering_first_buffered_at")
+    private Instant orderingFirstBufferedAt;
+
     @Column(name = "timeout_seconds")
     @Builder.Default
     private Integer timeoutSeconds = 30;

@@ -45,11 +45,13 @@ function cloneNode(node: ConditionNode): ConditionNode {
 }
 
 
-const ACTION_TYPE_META: Record<ActionType, { icon: React.ElementType; label: string; color: string; bg: string }> = {
-  ROUTE: { icon: Route, label: 'Route to endpoint', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10' },
-  TRANSFORM: { icon: Wand2, label: 'Transform payload', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10' },
-  DROP: { icon: Ban, label: 'Drop event', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
-  TAG: { icon: Tag, label: 'Tag event', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+// `label` is intentionally not stored here — it's resolved via
+// t(`rules.actionTypes.${type}`) at render time so it follows the active locale.
+const ACTION_TYPE_META: Record<ActionType, { icon: React.ElementType; color: string; bg: string }> = {
+  ROUTE: { icon: Route, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10' },
+  TRANSFORM: { icon: Wand2, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10' },
+  DROP: { icon: Ban, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
+  TAG: { icon: Tag, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
 };
 
 // ─── Component ──────────────────────────────────────────────────
@@ -343,7 +345,7 @@ export default function RulesPage() {
                         return (
                           <div key={i} className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${meta.bg} ${meta.color}`}>
                             <Icon className="h-3 w-3" />
-                            {a.type}
+                            {t(`rules.actionTypes.${a.type}`)}
                           </div>
                         );
                       })}
@@ -408,7 +410,7 @@ export default function RulesPage() {
                                     <Icon className={`h-3.5 w-3.5 ${meta.color}`} />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-medium">{meta.label}</span>
+                                    <span className="text-sm font-medium">{t(`rules.actionTypes.${a.type}`)}</span>
                                     {a.endpointUrl && (
                                       <span className="text-xs text-muted-foreground ml-2 font-mono truncate">{a.endpointUrl}</span>
                                     )}
@@ -550,7 +552,7 @@ export default function RulesPage() {
                       className={`flex items-center gap-2 p-3 rounded-lg border border-dashed hover:border-solid transition-all text-sm font-medium ${meta.bg} ${meta.color} hover:shadow-sm`}
                     >
                       <Icon className="h-4 w-4" />
-                      {type}
+                      {t(`rules.actionTypes.${type}`)}
                     </button>
                   );
                 })}
@@ -568,7 +570,7 @@ export default function RulesPage() {
                           <Icon className={`h-4 w-4 ${meta.color}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold mb-1.5">{meta.label}</div>
+                          <div className="text-xs font-semibold mb-1.5">{t(`rules.actionTypes.${action.type}`)}</div>
                           {action.type === 'ROUTE' && (
                             <Select value={action.endpointId || ''} onChange={(e) => updateAction(idx, { endpointId: e.target.value || undefined })}>
                               <option value="">{t('rules.form.selectEndpoint')}</option>
@@ -593,7 +595,7 @@ export default function RulesPage() {
                             <p className="text-xs text-muted-foreground">{t('rules.form.dropHint')}</p>
                           )}
                         </div>
-                        <button onClick={() => removeAction(idx)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                        <button onClick={() => removeAction(idx)} aria-label={t('rules.form.removeAction')} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>

@@ -159,6 +159,7 @@ export default function TunnelsPage() {
                           size="icon-sm"
                           onClick={() => handleCopyUrl(tunnel.publicUrl)}
                           title={t('tunnels.copyUrl')}
+                          aria-label={t('tunnels.copyUrl')}
                           className="h-5 w-5 text-muted-foreground hover:text-foreground"
                         >
                           <Copy className="h-3 w-3" />
@@ -190,6 +191,7 @@ export default function TunnelsPage() {
                       size="icon-sm"
                       onClick={() => setCloseId(tunnel.id)}
                       title={t('tunnels.close')}
+                      aria-label={t('tunnels.close')}
                       className="text-muted-foreground hover:text-destructive flex-shrink-0"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

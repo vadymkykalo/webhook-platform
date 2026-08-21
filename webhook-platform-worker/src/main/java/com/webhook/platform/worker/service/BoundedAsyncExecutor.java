@@ -143,7 +143,7 @@ public class BoundedAsyncExecutor {
                     // Don't ack. This is a defensive catch-all for a task that escapes its
                     // own error handling entirely (WebhookDeliveryService.processDelivery
                     // already catches everything it can and always acks); it should be
-                    // unreachable in practice. As of P0-03, KafkaConsumerConfig enables
+                    // unreachable in practice. KafkaConsumerConfig enables
                     // asyncAcks, so a permanently-unacked record now blocks this
                     // partition's offset commits until a rebalance/restart, rather than
                     // silently losing it — a stall is a visible, recoverable failure mode,

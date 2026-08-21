@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 /**
  * Explicit, greppable opt-out from the automatic project-tenancy check that
  * {@link ScopeEnforcementInterceptor} applies to every route whose resolved
- * URL contains a {@code {projectId}} path variable (P0-13).
+ * URL contains a {@code {projectId}} path variable.
  *
  * <p>By default, any such route is confined to an API key's own project: the
  * interceptor compares the {@code projectId} path variable against

@@ -50,7 +50,7 @@ class StaleDeliveryEscalationServiceTest {
                 kafkaTemplate,
                 transactionTemplate,
                 new SimpleMeterRegistry(),
-                48,   // hardCapHours
+                96,   // hardCapHours — raised from 48h to fit the retry ladder's ~83h worst case
                 100   // escalationBatchSize
         );
     }
@@ -82,8 +82,8 @@ class StaleDeliveryEscalationServiceTest {
                 .attemptCount(5)
                 .maxAttempts(7)
                 .orderingEnabled(false)
-                .createdAt(Instant.now().minus(72, ChronoUnit.HOURS))
-                .updatedAt(Instant.now().minus(48, ChronoUnit.HOURS))
+                .createdAt(Instant.now().minus(120, ChronoUnit.HOURS))
+                .updatedAt(Instant.now().minus(96, ChronoUnit.HOURS))
                 .build();
 
         when(deliveryRepository.findOldestPendingCreatedAtGlobal())
@@ -107,6 +107,33 @@ class StaleDeliveryEscalationServiceTest {
 
         // Verify DLQ notification sent to Kafka
         verify(kafkaTemplate).send(anyString(), eq(endpointId.toString()), any(DeliveryMessage.class));
+    }
+
+    @Test
+    void runEscalation_deliveryWithAttemptsRemaining_notEscalatedPrematurely() {
+        // Regression test: with the old 48h hard-cap, a delivery still working
+        // through the retry ladder (attempt 5 of 7, worst-case span ~83h) would already be
+        // past the cutoff at 48h and get force-escalated to DLQ before attempts 6/7 (the 6h,
+        // 24h tiers) ever fired. The cutoff this service computes and hands to
+        // findStaleDeliveryIds must now be old enough (hardCapHours=96) that such a delivery
+        // is not yet "stale" — i.e. its createdAt must not be older than the cutoff.
+        Instant deliveryStillWithinLadderSpan = Instant.now().minus(70, ChronoUnit.HOURS);
+        when(deliveryRepository.findOldestPendingCreatedAtGlobal())
+                .thenReturn(deliveryStillWithinLadderSpan);
+        when(deliveryRepository.findStaleDeliveryIds(any(Instant.class), anyInt()))
+                .thenReturn(Collections.emptyList());
+
+        service.runEscalation();
+
+        ArgumentCaptor<Instant> cutoffCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(deliveryRepository).findStaleDeliveryIds(cutoffCaptor.capture(), anyInt());
+        Instant cutoff = cutoffCaptor.getValue();
+
+        assertTrue(deliveryStillWithinLadderSpan.isAfter(cutoff),
+                "a delivery only 70h old (attempt 5/7, still within the ~83h worst-case ladder "
+                        + "span) must not be older than the escalation cutoff (" + cutoff + "), "
+                        + "or it would be escalated before its remaining retry tiers ever fire");
+        verify(deliveryRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -149,8 +176,8 @@ class StaleDeliveryEscalationServiceTest {
                 .attemptCount(7)
                 .maxAttempts(7)
                 .orderingEnabled(false)
-                .createdAt(Instant.now().minus(72, ChronoUnit.HOURS))
-                .updatedAt(Instant.now().minus(48, ChronoUnit.HOURS))
+                .createdAt(Instant.now().minus(120, ChronoUnit.HOURS))
+                .updatedAt(Instant.now().minus(96, ChronoUnit.HOURS))
                 .build();
 
         when(deliveryRepository.findOldestPendingCreatedAtGlobal())

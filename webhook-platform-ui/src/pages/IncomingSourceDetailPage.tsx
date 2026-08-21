@@ -37,11 +37,13 @@ import { usePermissions } from '../auth/usePermissions';
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
 const PAGE_SIZE = 20;
 
-const RETRY_PRESETS: { label: string; delays: string; attempts: string; desc: string }[] = [
-  { label: 'Aggressive', delays: '10,30,60,120', attempts: '4', desc: '10s → 30s → 1m → 2m' },
-  { label: 'Standard', delays: '60,300,900,3600', attempts: '5', desc: '1m → 5m → 15m → 1h' },
-  { label: 'Patient', delays: '300,900,3600,21600,86400', attempts: '6', desc: '5m → 15m → 1h → 6h → 24h' },
-  { label: 'No retry', delays: '', attempts: '1', desc: 'Single attempt only' },
+// `key` maps to incomingDestinations.retryPresets.<key>.{label,desc} — resolved
+// via t() at render time instead of storing English text directly.
+const RETRY_PRESETS: { key: string; delays: string; attempts: string }[] = [
+  { key: 'aggressive', delays: '10,30,60,120', attempts: '4' },
+  { key: 'standard', delays: '60,300,900,3600', attempts: '5' },
+  { key: 'patient', delays: '300,900,3600,21600,86400', attempts: '6' },
+  { key: 'none', delays: '', attempts: '1' },
 ];
 
 function isValidJson(value: string): boolean {
@@ -318,7 +320,7 @@ export default function IncomingSourceDetailPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <code className="text-xs font-mono bg-muted px-3 py-2 rounded flex-1 truncate">{source.ingressUrl}</code>
-              <Button variant="outline" size="icon-sm" onClick={copyIngressUrl} title={t('incomingSources.howToSend.copy')}>
+              <Button variant="outline" size="icon-sm" onClick={copyIngressUrl} title={t('incomingSources.howToSend.copy')} aria-label={t('incomingSources.howToSend.copy')}>
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -431,10 +433,10 @@ export default function IncomingSourceDetailPage() {
                     </div>
                     {canManageIncomingSources && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDest(dest)} title={t('common.edit')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDest(dest)} title={t('common.edit')} aria-label={t('common.edit')}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteDestId(dest.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteDestId(dest.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -450,11 +452,11 @@ export default function IncomingSourceDetailPage() {
                   {t('common.showing', { from: destPage * PAGE_SIZE + 1, to: Math.min((destPage + 1) * PAGE_SIZE, destPageInfo.totalElements), total: destPageInfo.totalElements })}
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p - 1)} disabled={destPageInfo.first}>
+                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p - 1)} disabled={destPageInfo.first} title={t('common.previous')} aria-label={t('common.previous')}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <span className="text-sm text-muted-foreground px-2">{destPage + 1} / {destPageInfo.totalPages}</span>
-                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p + 1)} disabled={destPageInfo.last}>
+                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p + 1)} disabled={destPageInfo.last} title={t('common.next')} aria-label={t('common.next')}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -527,7 +529,7 @@ export default function IncomingSourceDetailPage() {
                 <div className="grid grid-cols-4 gap-2">
                   {RETRY_PRESETS.map((preset) => (
                     <button
-                      key={preset.label}
+                      key={preset.key}
                       type="button"
                       className={`text-left border rounded-lg px-3 py-2 transition-colors hover:border-primary/50 ${
                         destRetryDelays === preset.delays && destMaxAttempts === preset.attempts
@@ -536,8 +538,8 @@ export default function IncomingSourceDetailPage() {
                       }`}
                       onClick={() => { setDestRetryDelays(preset.delays); setDestMaxAttempts(preset.attempts); resetValidation(); }}
                     >
-                      <span className="text-xs font-medium">{preset.label}</span>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{preset.desc}</p>
+                      <span className="text-xs font-medium">{t(`incomingDestinations.retryPresets.${preset.key}.label`)}</span>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{t(`incomingDestinations.retryPresets.${preset.key}.desc`)}</p>
                     </button>
                   ))}
                 </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Link as LinkIcon, Plus, Loader2, Trash2, Settings, ListOrdered, Power, PowerOff, ArrowRightLeft, FileJson2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
@@ -192,7 +192,9 @@ export default function SubscriptionsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('subscriptions.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('subscriptions.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="subscriptions.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canManageSubscriptions}>
           <VerificationGate>
@@ -312,7 +314,7 @@ export default function SubscriptionsPage() {
                 <TableHead className="text-xs">{t('subscriptions.status')}</TableHead>
                 <TableHead className="text-xs">{t('subscriptions.ordering')}</TableHead>
                 <TableHead className="text-xs">{t('subscriptions.created')}</TableHead>
-                {canManageSubscriptions && <TableHead className="w-[80px]"></TableHead>}
+                {canManageSubscriptions && <TableHead className="w-[80px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -366,10 +368,10 @@ export default function SubscriptionsPage() {
                   {canManageSubscriptions && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title={t('common.edit')}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(subscription)} title={t('common.edit')} aria-label={t('common.edit')}>
                           <Settings className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title={t('common.delete')} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(subscription.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>

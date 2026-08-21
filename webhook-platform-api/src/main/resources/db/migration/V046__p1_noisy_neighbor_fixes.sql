@@ -1,4 +1,4 @@
--- P1-2: Add project_id to outbox_messages for per-project fair scheduling.
+-- Add project_id to outbox_messages for per-project fair scheduling.
 -- Nullable because existing rows and some low-volume paths (replay, DLQ retry) may not set it.
 ALTER TABLE outbox_messages ADD COLUMN project_id UUID;
 

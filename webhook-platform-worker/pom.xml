@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.webhook.platform</groupId>
         <artifactId>webhook-platform</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>2.2.1</version>
     </parent>
 
     <artifactId>webhook-platform-worker</artifactId>
@@ -52,7 +52,7 @@
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
-            <version>3.24.3</version>
+            <version>3.52.0</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -126,6 +126,42 @@
             <version>1.21.4</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- No dedicated Testcontainers Redis module is used anywhere in this repo yet;
+                 a plain GenericContainer("redis:7-alpine") (matching docker-compose.yml's
+                 default REDIS_IMAGE) is used instead, so no extra Testcontainers artifact is
+                 needed here beyond the generic "testcontainers" one already above. -->
+            <!-- "wiremock" (not -standalone) has no bundled HTTP server implementation
+                 (Jetty), so it fails at startup with "no suitable HttpServerFactory
+                 extension was found" - wiremock-standalone bundles a shaded Jetty 11. -->
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.13.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- wiremock-standalone:3.13.1 transitively pulls httpclient5:5.2.1, which is
+                 missing RequestConfig.Builder#setProtocolUpgradeEnabled that WireMock's own
+                 (non-shaded) admin/proxy client calls (NoSuchMethodError at startup) - pin
+                 explicitly to a version that has it, along with the matching
+                 httpcore5/httpcore5-h2 versions it needs. -->
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents.core5</groupId>
+            <artifactId>httpcore5-h2</artifactId>
+            <version>5.4.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -143,8 +179,73 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!-- P1-19: see webhook-platform-api/pom.xml for why this was bumped. -->
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.2</version>
+                <version>3.5.6</version>
+            </plugin>
+            <!--
+              P1-28: see the matching comment in webhook-platform-common's
+              pom.xml for the shared rationale (merged exec file, `verify`
+              phase choice). Two rules here, not one:
+
+              1. BUNDLE - project floor for this module. Baseline measured
+                 2026-08-21 (unit + integration merged): INSTRUCTION 73.0%
+                 (9332/12779).
+              2. CLASS - P1-28's actual point, not the BUNDLE number above:
+                 this module's overall percentage could stay high while the
+                 delivery path itself regresses, because it also contains a
+                 lot of easy-to-cover CRUD/config code. Pins a floor
+                 specifically to the classes P1-21/P1-22 added delivery-path
+                 tests for (WebhookDeliveryService 73.2%, RetrySchedulerService
+                 82.7%, OrderingBufferService 95.3%, DeliveryConsumer 95.8%
+                 - all measured 2026-08-21), so those cannot silently erode
+                 while the module-wide number keeps climbing elsewhere. 65%
+                 leaves a margin under the lowest of the four
+                 (WebhookDeliveryService).
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>com.webhook.platform.worker.service.WebhookDeliveryService</include>
+                                        <include>com.webhook.platform.worker.service.RetrySchedulerService</include>
+                                        <include>com.webhook.platform.worker.service.OrderingBufferService</include>
+                                        <include>com.webhook.platform.worker.consumer.DeliveryConsumer</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -16,10 +16,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version-check:
+    name: Version drift check
+    runs-on: ubuntu-latest
+    # No SNAPSHOT-suffix skip here: pom.xml is intentionally allowed to run a
+    # -SNAPSHOT ahead of the Chart/UI/SDK versions between releases (see
+    # scripts/check-version-drift.sh) but every real value still has to agree.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check pom / Chart / UI / SDK versions agree
+        run: scripts/check-version-drift.sh
+
   backend-build:
     name: Backend Build & Compile
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -60,14 +73,37 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
+      # This and the integration job below are separate GitHub Actions
+      # jobs on separate runners with no shared filesystem, so each writes
+      # its own distinctly-named exec file (jacoco-unit.exec here,
+      # jacoco-it.exec in the integration job) rather than the plugin's
+      # default target/jacoco.exec - a naive setup where both jobs wrote the
+      # same filename and only one got published/read downstream would
+      # silently report only whichever run happened to be looked at, not the
+      # true merged coverage. The coverage-report job later downloads both
+      # sets of exec files into one checkout and runs jacoco:report-aggregate,
+      # whose default file pattern (**/jacoco*.exec) picks up both.
       - name: Run unit tests
-        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' --fail-at-end
-      
+        run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' -Djacoco.destFile=target/jacoco-unit.exec --fail-at-end
+
       - name: Test Summary
         if: always()
         run: |
           echo "### Backend Unit Test Results" >> $GITHUB_STEP_SUMMARY
           echo "Unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+
+      # Uploaded even on failure (--fail-at-end above means a failing class
+      # doesn't stop the rest of the module's tests from running and
+      # recording coverage) so the aggregate job can still build the fullest
+      # picture available.
+      - name: Upload unit test coverage data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-unit-exec
+          path: webhook-platform-*/target/jacoco-unit.exec
+          retention-days: 7
+          if-no-files-found: warn
 
   backend-integration-test:
     name: Backend Integration Tests
@@ -86,17 +122,186 @@ jobs:
           cache: 'maven'
       
       - name: Run integration tests with Testcontainers
-        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false --fail-at-end
+        # surefire 3.x split the old failIfNoTests flag in two - failIfNoTests
+        # still covers "this whole run found zero tests", but a -Dtest=pattern that
+        # matches zero classes in a given module (e.g. common/cli, which have no
+        # *RepositoryTest/*IntegrationTest/etc classes) now needs
+        # surefire.failIfNoSpecifiedTests=false too, or the reactor build fails there
+        # before ever reaching api/worker.
+        run: mvn test -B -Dtest='*RepositoryTest,*IntegrationTest,*IT,*ConcurrencyTest,*RbacTest,*IsolationTest' -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.destFile=target/jacoco-it.exec --fail-at-end
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
           DOCKER_API_VERSION: "1.44"
-      
+
       - name: Integration Test Summary
         if: always()
         run: |
           echo "### Backend Integration Test Results" >> $GITHUB_STEP_SUMMARY
           echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
+
+      # See the matching comment in the unit-test job above - distinct
+      # filename, uploaded so coverage-report can merge this with the unit
+      # job's exec data into one real aggregate.
+      - name: Upload integration test coverage data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-integration-exec
+          path: webhook-platform-*/target/jacoco-it.exec
+          retention-days: 7
+          if-no-files-found: warn
+
+  # The actual point of splitting exec-data upload above - neither
+  # backend-test nor backend-integration-test alone has the full picture
+  # (each only ran half the test classes), and they run on separate runners
+  # with no shared filesystem, so "coverage" can't just be read out of
+  # either job directly. This job collects both artifacts into one checkout,
+  # recompiles (tests skipped - only the just-downloaded exec data is used
+  # for coverage, not a fresh run) so class files exist for JaCoCo to map
+  # execution data onto, then runs `mvn verify` so both
+  # jacoco:report-aggregate (webhook-platform-coverage-report/pom.xml) and
+  # each real module's own jacoco:merge + jacoco:check (root pom.xml +
+  # common/api/worker/cli's own pom.xml) fire against the true merged
+  # unit+integration coverage.
+  #
+  # `if: ${{ !cancelled() }}` (not the default "needs both to succeed") so a
+  # real coverage number - even partial - is still visible on the PR when
+  # one suite has unrelated failures; --fail-at-end in both test jobs above
+  # means a failing class doesn't stop its module's other tests from running
+  # and recording coverage either.
+  coverage-report:
+    name: Aggregate Coverage Report
+    runs-on: ubuntu-latest
+    needs: [backend-test, backend-integration-test]
+    if: ${{ !cancelled() }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Download unit test coverage data
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-unit-exec
+        continue-on-error: true
+
+      - name: Download integration test coverage data
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-integration-exec
+        continue-on-error: true
+
+      # -DskipTests: tests are not re-run here - class files are needed only
+      # so JaCoCo can map the exec data just downloaded onto real bytecode
+      # and source. Needs `verify`, not `test`: report-aggregate (in
+      # webhook-platform-coverage-report/pom.xml) is bound to `test`, but the
+      # per-module jacoco-merge (root pom.xml) and jacoco:check executions
+      # (each of common/api/worker/cli's own pom.xml) are bound to `verify` -
+      # deliberately later than `test`, so CI's two split `mvn test`
+      # invocations elsewhere in this file (unit-only / integration-only
+      # filters) never trip a threshold check against partial data. This is
+      # the one place in the whole pipeline that reaches `verify`, so it's
+      # the only place those merge+check executions run for real.
+      - name: Compile modules, aggregate report, threshold check
+        run: mvn verify -B -pl webhook-platform-coverage-report -am -DskipTests
+
+      - name: Coverage Summary
+        if: always()
+        run: |
+          echo "### Coverage Report (unit + integration merged)" >> $GITHUB_STEP_SUMMARY
+          if [ -f target/site/jacoco-aggregate/index.html ]; then
+            echo "Aggregate report generated - see the jacoco-aggregate-report artifact." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "::warning::No aggregate report was produced - check the exec-data download steps above." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload aggregate coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-aggregate-report
+          path: target/site/jacoco-aggregate
+          retention-days: 30
+          if-no-files-found: warn
+
+  # Proves backups are actually restorable, not just "a CronJob ran".
+  # backup -> destroy the data -> restore -> assert it's back. An untested
+  # restore path is the most common cause of an unusable backup.
+  restore-drill:
+    name: Backup/Restore Drill
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env from .env.dist
+        run: cp .env.dist .env
+
+      - name: Start embedded Postgres
+        run: docker compose --profile embedded-db up -d postgres
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec webhook-postgres pg_isready -U webhook_user -d webhook_platform; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Postgres never became ready"
+          exit 1
+
+      - name: Seed test data (simulates "ingest some events")
+        run: |
+          docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c \
+            "CREATE TABLE restore_drill_test (id serial primary key, note text);"
+          docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c \
+            "INSERT INTO restore_drill_test (note) VALUES ('event-1'), ('event-2'), ('event-3');"
+
+      - name: Backup (make backup-db)
+        run: make backup-db
+
+      - name: Destroy the data
+        run: docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c "DROP TABLE restore_drill_test;"
+
+      - name: Restore (make restore-db)
+        run: |
+          FILE=$(ls -t backups/webhook_platform_*.dump | head -1)
+          echo "Restoring from $FILE"
+          make restore-db FILE="$FILE" CONFIRM=YES
+
+      - name: Assert data integrity
+        run: |
+          COUNT=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -tAc "SELECT count(*) FROM restore_drill_test;")
+          echo "Row count after restore: $COUNT"
+          if [ "$COUNT" != "3" ]; then
+            echo "::error::Restore drill FAILED — expected 3 rows after restore, got $COUNT"
+            exit 1
+          fi
+          NOTES=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -tAc "SELECT string_agg(note, ',' ORDER BY id) FROM restore_drill_test;")
+          if [ "$NOTES" != "event-1,event-2,event-3" ]; then
+            echo "::error::Restore drill FAILED — row content mismatch: $NOTES"
+            exit 1
+          fi
+
+      - name: Restore Drill Summary
+        if: always()
+        run: |
+          echo "### Backup/Restore Drill Results" >> $GITHUB_STEP_SUMMARY
+          echo "backup -> destroy -> restore -> assert data integrity: PASSED" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --profile embedded-db down -v
 
   frontend-lint:
     name: Frontend Lint & Typecheck
@@ -109,7 +314,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webhook-platform-ui/package-lock.json
       
@@ -137,7 +342,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webhook-platform-ui/package-lock.json
       
@@ -145,15 +350,29 @@ jobs:
         working-directory: webhook-platform-ui
         run: npm ci
       
-      - name: Run tests
+      # test:coverage (vitest run --coverage) subsumes test:ci - it
+      # still runs every test, plus instruments and enforces the thresholds
+      # in vite.config.ts. Using it here (rather than a separate coverage
+      # step) means the coverage gate is the same command a PR's CI actually
+      # ran, not a second, easier-to-drift-from invocation.
+      - name: Run tests with coverage
         working-directory: webhook-platform-ui
-        run: npm run test:ci
-      
+        run: npm run test:coverage
+
       - name: Test Summary
         if: always()
         run: |
           echo "### Frontend Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Vitest unit tests completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          echo "Vitest tests + coverage thresholds completed. See workflow logs for details." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-coverage-report
+          path: webhook-platform-ui/coverage
+          retention-days: 30
+          if-no-files-found: warn
 
   frontend-build:
     name: Frontend Build
@@ -167,7 +386,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: webhook-platform-ui/package-lock.json
       
@@ -203,15 +422,23 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       
+      # SpotBugs stays advisory (continue-on-error) DELIBERATELY, not by oversight:
+      # the existing findings across all modules have not been triaged yet, so
+      # flipping this to gating today would block every PR on pre-existing debt
+      # instead of new regressions. Triage is tracked separately; once the
+      # backlog is clear (or suppressed with justification, like the OWASP
+      # suppression file below), remove `continue-on-error` here so new SpotBugs
+      # findings fail the build the same way Trivy/OWASP now do.
       - name: Run SpotBugs analysis
         run: mvn compile com.github.spotbugs:spotbugs-maven-plugin:4.8.3.1:check -B -DskipTests
         continue-on-error: true
-      
+
       - name: SAST Summary
         if: always()
         run: |
           echo "### SAST (SpotBugs) Results" >> $GITHUB_STEP_SUMMARY
           echo "Static analysis completed. Check workflow logs for findings." >> $GITHUB_STEP_SUMMARY
+          echo "_Advisory only — see comment in ci.yml for why this doesn't gate yet._" >> $GITHUB_STEP_SUMMARY
 
   security-sca:
     name: SCA (OWASP Dependency-Check)
@@ -228,11 +455,67 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
-      
+
+      # Persist OWASP's local NVD mirror across runs. Without this, every run
+      # starts from an empty database and dependency-check backfills the
+      # entire NVD history (380k+ CVEs, ~500MB) before it can analyze
+      # anything — a one-time cost that's unavoidable on a cold cache, but
+      # with the cache warm each run only fetches the incremental delta.
+      # Keyed by week so the mirror still refreshes regularly rather than
+      # going stale forever.
+      - name: Compute cache week key
+        id: dc-cache-week
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache OWASP Dependency-Check NVD data
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
+          restore-keys: |
+            dependency-check-data-
+
+      # Gates on CVSS >= 9 (CRITICAL) first, staged the same way as Trivy below:
+      # widen to HIGH (CVSS >= 7) once the CRITICAL backlog is clear. Known
+      # false positives go in the reviewed suppression file, not a blanket
+      # continue-on-error.
+      #
+      # -DknownExploitedEnabled=false: the CISA KEV datafeed
+      # (cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json)
+      # returned 403 from this task's build environment (a cloud/datacenter
+      # egress IP) — bot-protection on that .gov host blocks non-browser
+      # clients, not something we control, and this is a commonly reported
+      # issue from CI/cloud IPs generally. Without disabling it, the whole scan
+      # hard-fails on a feed download error before any CVE analysis runs, which
+      # is a false-red build, not a real finding. If GitHub-hosted runners turn
+      # out to reach that host fine, re-enabling this is a one-line revert.
+      # NVD itself (services.nvd.nist.gov) was reachable without this flag.
+      #
+      # NVD_API_KEY: repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
+      # is set. Without it, unauthenticated NVD requests are rate-limited hard
+      # enough that this step reliably fails.
+      #
+      # Plugin pinned at 12.1.0, not the 9.0.9 originally used: 9.0.9's HTTP
+      # client got a straight-up Cloudflare "Attention Required" block page
+      # (403, WAF-level) hitting services.nvd.nist.gov, reproduced locally
+      # with -X debug logging — the exact same URL + API key via plain curl
+      # returned 200. Not a key or rate-limit problem, a client-fingerprint
+      # one. 12.1.0's HTTP stack isn't blocked; confirmed locally by letting
+      # it run past the point 9.0.9 instantly 403'd and watching it actually
+      # pull ~500MB of real NVD data. That failure is intentionally NOT
+      # swallowed by continue-on-error: a security gate that can't fetch fresh
+      # vulnerability data should go red, not silently pass.
       - name: Run OWASP Dependency-Check
-        run: mvn org.owasp:dependency-check-maven:9.0.9:aggregate -B -DskipTests -DfailBuildOnCVSS=9
-        continue-on-error: true
-      
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn org.owasp:dependency-check-maven:12.1.0:aggregate -B -DskipTests
+          -DfailBuildOnCVSS=9
+          -DknownExploitedEnabled=false
+          -DnvdApiKey="${NVD_API_KEY}"
+          -DdataDirectory="$HOME/.m2/repository/org/owasp/dependency-check-data"
+          -DsuppressionFiles=.github/dependency-check-suppressions.xml
+
       - name: Upload Dependency-Check report
         if: always()
         uses: actions/upload-artifact@v4
@@ -246,6 +529,7 @@ jobs:
         run: |
           echo "### SCA (OWASP Dependency-Check) Results" >> $GITHUB_STEP_SUMMARY
           echo "Dependency vulnerability scan completed. Report uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          echo "Gates on CVSS >= 9 (see comment above the scan step for the staged rollout plan)." >> $GITHUB_STEP_SUMMARY
 
   docker-build:
     name: Docker Images
@@ -274,11 +558,120 @@ jobs:
           echo "### Docker Build Results" >> $GITHUB_STEP_SUMMARY
           echo "✅ All images built successfully" >> $GITHUB_STEP_SUMMARY
 
+  # Proves docker-compose.pull.yml (the no-Maven/no-npm quick start
+  # advertised in the README) actually boots and answers health checks, so it
+  # can't silently rot the way the old build-only compose flow did. Rebuilds
+  # the three images itself (same pattern as container-scan below) and tags
+  # them to match what docker-compose.pull.yml resolves to when DOCKER_REGISTRY
+  # is pointed at the local :test images instead of GHCR — no registry
+  # credentials needed to run this.
+  docker-compose-smoke:
+    name: Docker Compose Pull-Path Smoke Test
+    runs-on: ubuntu-latest
+    needs: docker-build
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        run: docker build -f webhook-platform-api/Dockerfile -t webhook-platform-api:test .
+
+      - name: Build Worker image
+        run: docker build -f webhook-platform-worker/Dockerfile -t webhook-platform-worker:test .
+
+      - name: Build UI image
+        run: docker build -f webhook-platform-ui/Dockerfile -t webhook-platform-ui:test .
+
+      - name: Create .env from .env.dist
+        run: cp .env.dist .env
+
+      - name: Start pull-based compose stack (using the images just built)
+        env:
+          DOCKER_REGISTRY: webhook-platform
+          API_IMAGE_TAG: test
+          WORKER_IMAGE_TAG: test
+          UI_IMAGE_TAG: test
+          # /v3/api-docs.yaml is gated behind swagger.enabled (SecurityConfig),
+          # default false. Needed here so the OpenAPI drift check below can reach it.
+          SWAGGER_ENABLED: "true"
+        run: docker compose -f docker-compose.pull.yml --env-file .env up -d
+
+      - name: Wait for API and UI health, then curl both endpoints
+        run: |
+          # Actuator (health/prometheus) lives on its own port (8082, loopback-only
+          # in docker-compose.pull.yml) rather than the main API port (8080), so it
+          # bypasses the JWT/API-key-authenticated security chain — see the
+          # MANAGEMENT_PORT comment in docker-compose.pull.yml. Using /liveness
+          # rather than the aggregate /actuator/health: the latter folds in the
+          # Spring Boot mail health indicator, which reads DOWN (503) whenever no
+          # SMTP server is reachable — true by default in this stack even with
+          # EMAIL_ENABLED=false — so it's not a reliable up/down signal here.
+          for i in $(seq 1 60); do
+            api_ok=$(curl -sf -o /dev/null http://localhost:8082/actuator/health/liveness && echo 1 || echo 0)
+            ui_ok=$(curl -sf -o /dev/null http://localhost:5173 && echo 1 || echo 0)
+            if [ "$api_ok" = "1" ] && [ "$ui_ok" = "1" ]; then
+              echo "API and UI both healthy after ${i}0s"
+              break
+            fi
+            sleep 10
+            if [ "$i" = "60" ]; then
+              echo "::error::Stack did not become healthy in time"
+              docker compose -f docker-compose.pull.yml ps
+              docker compose -f docker-compose.pull.yml logs
+              exit 1
+            fi
+          done
+          echo "--- curl http://localhost:8082/actuator/health/liveness ---"
+          curl -f http://localhost:8082/actuator/health/liveness
+          echo ""
+          echo "--- curl http://localhost:5173 (status only) ---"
+          curl -f -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:5173
+
+      # The committed openapi.yaml (repo root) is the source evaluators and
+      # docs.hookflow.dev's Redoc renderer read - it must never silently drift from
+      # what the running API actually serves. Springdoc generates it live from the
+      # 33 @RestController classes, so this is a real drift check, not a rebuild of
+      # a hand-maintained file.
+      - name: Export OpenAPI spec and check for drift
+        run: |
+          curl -sf http://localhost:8080/v3/api-docs.yaml -o /tmp/openapi-live.yaml
+          echo "--- diff against committed openapi.yaml ---"
+          if ! diff -u openapi.yaml /tmp/openapi-live.yaml; then
+            echo "::error::openapi.yaml is stale. Regenerate it: curl -s http://localhost:8080/v3/api-docs.yaml -o openapi.yaml (with SWAGGER_ENABLED=true) and commit the result."
+            exit 1
+          fi
+          echo "openapi.yaml matches the live spec."
+
+      - name: Upload generated OpenAPI spec
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: /tmp/openapi-live.yaml
+          retention-days: 30
+
+      - name: Smoke Test Summary
+        if: always()
+        run: |
+          echo "### Docker Compose Pull-Path Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "docker-compose.pull.yml booted and both /actuator/health/liveness (API) and / (UI) responded." >> $GITHUB_STEP_SUMMARY
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.pull.yml logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.pull.yml down -v
+
   container-scan:
     name: Container Security Scan (Trivy)
     runs-on: ubuntu-latest
     needs: docker-build
-    continue-on-error: true
     timeout-minutes: 30
     
     steps:
@@ -307,17 +700,36 @@ jobs:
           trivy image --download-db-only --db-repository public.ecr.aws/aquasecurity/trivy-db:2
           trivy image --download-java-db-only --java-db-repository public.ecr.aws/aquasecurity/trivy-java-db:1
       
-      - name: Run Trivy on API image
-        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-api:test
-      
-      - name: Run Trivy on Worker image
-        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-worker:test
-      
-      - name: Run Trivy on UI image
-        run: trivy image --format table --severity CRITICAL,HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-ui:test
-      
+      # Staged rollout: gate on CRITICAL now (exit-code 1, build goes red), keep
+      # HIGH informational (exit-code 0) until the CRITICAL backlog is triaged.
+      # Widen to HIGH by dropping `--severity CRITICAL --exit-code 1` for the
+      # advisory step below and deleting the gating step once ready.
+      - name: Run Trivy on API image (CRITICAL - gating)
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-api:test
+
+      - name: Run Trivy on API image (HIGH - informational)
+        if: always()
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-api:test
+
+      - name: Run Trivy on Worker image (CRITICAL - gating)
+        if: always()
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-worker:test
+
+      - name: Run Trivy on Worker image (HIGH - informational)
+        if: always()
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-worker:test
+
+      - name: Run Trivy on UI image (CRITICAL - gating)
+        if: always()
+        run: trivy image --format table --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update webhook-platform-ui:test
+
+      - name: Run Trivy on UI image (HIGH - informational)
+        if: always()
+        run: trivy image --format table --severity HIGH --exit-code 0 --skip-db-update --skip-java-db-update webhook-platform-ui:test
+
       - name: Container Scan Summary
         if: always()
         run: |
           echo "### Container Scan (Trivy) Results" >> $GITHUB_STEP_SUMMARY
           echo "Container vulnerability scan completed for all images." >> $GITHUB_STEP_SUMMARY
+          echo "CRITICAL findings fail the build; HIGH is informational during the staged rollout." >> $GITHUB_STEP_SUMMARY

@@ -107,39 +107,14 @@ public class DataRetentionService {
         updateMetrics();
     }
     
-    @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
-    @SchedulerLock(name = "cleanupOldDeliveryAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
-    @Transactional
-    public void cleanupOldDeliveryAttempts() {
-        Instant cutoffTime = Instant.now().minusSeconds(deliveryAttemptsRetentionDays * 86400L);
-        
-        log.info("Starting ALL delivery attempts cleanup (errors + edge cases) for attempts older than {}", cutoffTime);
-        
-        int totalDeleted = 0;
-        int deletedInBatch;
-        
-        do {
-            deletedInBatch = deliveryAttemptRepository.deleteOldAttempts(cutoffTime, batchSize);
-            totalDeleted += deletedInBatch;
-            
-            if (deletedInBatch > 0) {
-                log.debug("Deleted {} delivery attempts in batch", deletedInBatch);
-            }
-        } while (deletedInBatch >= batchSize);
-        
-        if (totalDeleted > 0) {
-            Counter.builder("delivery_attempts_cleanup_total")
-                    .tag("type", "age_based")
-                    .register(meterRegistry)
-                    .increment(totalDeleted);
-            log.info("Age-based cleanup: deleted {} delivery attempts (older than {}d)", totalDeleted, deliveryAttemptsRetentionDays);
-        } else {
-            log.debug("Delivery attempts cleanup: no old attempts to delete");
-        }
-        
-        updateMetrics();
-    }
-    
+    // REMOVED: cleanupOldDeliveryAttempts() used to DELETE every attempt
+    // (success or failure) older than deliveryAttemptsRetentionDays — an O(rows) scan
+    // of the whole table on every run. delivery_attempts is now partitioned monthly
+    // (V052) and PartitionMaintenanceService.dropExpiredPartitions() achieves the same
+    // global cutoff in O(1) via DROP TABLE on whole expired partitions instead. The
+    // underlying deliveryAttemptRepository.deleteOldAttempts() query is left in place
+    // for manual/ad-hoc use but is no longer scheduled.
+
     @Scheduled(cron = "${data-retention.limit-enforcement-cron:0 */30 * * * *}")
     @SchedulerLock(name = "enforcePerDeliveryAttemptLimits", lockAtMostFor = "29m", lockAtLeastFor = "1m")
     @Transactional
@@ -237,19 +212,11 @@ public class DataRetentionService {
         updateMetrics();
     }
 
-    @Scheduled(cron = "${data-retention.tunnel-log-cleanup-cron:0 30 2 * * *}")
-    @SchedulerLock(name = "cleanupTunnelRequestLog", lockAtMostFor = "9m", lockAtLeastFor = "1m")
-    @Transactional
-    public void cleanupTunnelRequestLog() {
-        Instant cutoff = Instant.now().minusSeconds(tunnelRequestLogRetentionDays * 86400L);
-        int deleted = tunnelRequestLogRepository.deleteByCreatedAtBefore(cutoff);
-        if (deleted > 0) {
-            Counter.builder("tunnel_request_log_cleanup_total")
-                    .register(meterRegistry)
-                    .increment(deleted);
-            log.info("Tunnel request log cleanup: deleted {} entries older than {}d", deleted, tunnelRequestLogRetentionDays);
-        }
-    }
+    // REMOVED: cleanupTunnelRequestLog() used to DELETE every row older than
+    // tunnelRequestLogRetentionDays in one unbounded statement. tunnel_request_log is
+    // now partitioned weekly (V053) and PartitionMaintenanceService.dropExpiredPartitions()
+    // drops whole expired partitions instead. tunnelRequestLogRepository.deleteByCreatedAtBefore()
+    // is left in place for manual/ad-hoc use but is no longer scheduled.
 
     private void updateMetrics() {
         try {

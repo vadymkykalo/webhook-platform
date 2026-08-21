@@ -105,6 +105,47 @@ services:
       - webhook-network
     restart: unless-stopped
 
+  # P1-20: scheduled backups for the embedded-DB Compose path, mirroring
+  # deploy/helm/hookflow/templates/db-backup-cronjob.yaml (the only prior
+  # scheduled backup, Kubernetes-only). Runs deploy/scripts/db-backup.sh on a
+  # fixed interval instead of a cron daemon — simplest thing that can't silently
+  # stop firing. Retention is handled inside the script (BACKUP_RETENTION_DAYS).
+  db-backup:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: webhook-db-backup
+    profiles:
+      - embedded-db
+    entrypoint: ["bash"]
+    command: ["/scripts/db-backup-loop.sh"]
+    environment:
+      # "direct" mode: this container has its own pg_dump (same postgres:16-alpine
+      # image as the DB itself) and reaches Postgres over webhook-network, so it
+      # never needs docker exec / the docker socket to back up a sibling container.
+      DB_MODE: direct
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-webhook_platform}
+      DB_USER: ${POSTGRES_USER:-webhook_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      DB_BACKUP_INTERVAL_SECONDS: ${DB_BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+      - ./deploy/scripts/db-backup.sh:/scripts/db-backup.sh:ro
+      - ./deploy/scripts/db-backup-loop.sh:/scripts/db-backup-loop.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - webhook-network
+    restart: unless-stopped
+
   minio:
     image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-01-16T16-07-38Z}
     container_name: webhook-minio
@@ -144,8 +185,21 @@ services:
       context: .
       dockerfile: ./webhook-platform-api/Dockerfile
     image: webhook-platform-api:${API_IMAGE_TAG:-latest}
+    # P1-20: API_PORT uses `${API_PORT-8080}` (single dash — default applies only
+    # when the var is completely UNSET, not when it's set-but-empty) rather than
+    # the usual `${API_PORT:-8080}`. This is what makes `make scale-api N=3`
+    # possible: it runs with API_PORT explicitly set to "", which collapses this
+    # mapping to "<bind>::8080" — Compose's syntax for "publish on an
+    # auto-assigned ephemeral host port per replica" — instead of every replica
+    # fighting over the same fixed 8080. (A Compose multi-file overlay can't do
+    # this: `ports:` lists get concatenated across `-f` files, not replaced, in
+    # the Compose versions this was tested against, so a second file adding an
+    # ephemeral mapping left the fixed one still bound and scaling still failed.)
+    # Traffic doesn't need this fixed port anyway — the UI's nginx proxies to
+    # `api:8080` over the internal Compose network regardless of what's
+    # published to the host; this port exists for host-level `curl`/debugging.
     ports:
-      - "${API_BIND:-127.0.0.1}:${API_PORT:-8080}:8080"
+      - "${API_BIND:-127.0.0.1}:${API_PORT-8080}:8080"
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -159,6 +213,14 @@ services:
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SERVER_PORT: 8080
+      # P1-20: actuator (incl. /actuator/prometheus) is split onto its own port so
+      # Prometheus can scrape it without going through the JWT/API-key-authenticated
+      # SecurityConfig filter chain on 8080 (see SecurityConfig.java and
+      # monitoring/README.md "Metrics-scrape auth"). Not published to the host —
+      # only reachable from other containers on the webhook-network, same trust
+      # boundary as postgres/kafka/redis.
+      MANAGEMENT_PORT: 8082
+      MANAGEMENT_ADDRESS: ${MANAGEMENT_ADDRESS:-0.0.0.0}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       WEBHOOK_ENCRYPTION_KEYS: ${WEBHOOK_ENCRYPTION_KEYS:-}
@@ -270,7 +332,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health/liveness"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health/liveness"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -304,13 +366,25 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       DB_JDBC_URL: ${DB_JDBC_URL:-}
-      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-30}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-15}
+      # P1-26: deliberately a DIFFERENT host-level env var from the API's DB_POOL_MAX_SIZE/
+      # DB_POOL_MIN_IDLE (see .env.dist). Both used to read the exact same shared
+      # DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE names -- .env.dist sets those once, so `make up`
+      # silently gave the worker the API's smaller pool (20/10) instead of its own tuned
+      # 40/20, no matter what default this fallback below claimed. The two must stay named
+      # distinctly or they will drift back into colliding again.
+      DB_POOL_MAX_SIZE: ${WORKER_DB_POOL_MAX_SIZE:-40}
+      DB_POOL_MIN_IDLE: ${WORKER_DB_POOL_MIN_IDLE:-20}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       MANAGEMENT_PORT: 8081
-      MANAGEMENT_ADDRESS: ${MANAGEMENT_ADDRESS:-127.0.0.1}
+      # P1-20: was 127.0.0.1 (loopback-inside-container), which made this port
+      # unreachable from any other container — including Prometheus trying to
+      # scrape "worker:8081" and, in the Helm/K8s deployment, kubelet's own
+      # liveness/readiness httpGet probes (which also connect from outside the
+      # container's network namespace). Not published to the host — only
+      # reachable from other containers on webhook-network.
+      MANAGEMENT_ADDRESS: ${MANAGEMENT_ADDRESS:-0.0.0.0}
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       WEBHOOK_ENCRYPTION_KEYS: ${WEBHOOK_ENCRYPTION_KEYS:-}
       WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:-0}

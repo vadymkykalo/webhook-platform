@@ -1,5 +1,5 @@
 {
-    "name": "webhook-platform/php",
+    "name": "hookflow/php",
     "description": "Official PHP SDK for Hookflow — reliable webhook infrastructure",
     "type": "library",
     "license": "MIT",
@@ -32,6 +32,7 @@
     },
     "scripts": {
         "test": "phpunit",
+        "test:contract": "phpunit -c phpunit.contract.xml",
         "analyse": "phpstan analyse src"
     },
     "config": {

@@ -6,7 +6,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * P0-14c: ProductionSafetyValidator previously had no tests at all — ironic for the
+ * ProductionSafetyValidator previously had no tests at all — ironic for the
  * component that gates unsafe production config. These cover: dev-default secrets
  * rejected, low-entropy secrets rejected, secrets left unchanged from .env.dist
  * rejected, and a genuinely valid production config accepted.
@@ -167,7 +167,7 @@ class ProductionSafetyValidatorTest {
     }
 
     // -----------------------------------------------------------------
-    // Other production-only checks retained from before P0-14c
+    // Other production-only checks
     // -----------------------------------------------------------------
 
     @Test

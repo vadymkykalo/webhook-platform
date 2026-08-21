@@ -243,7 +243,7 @@ function WorkflowBuilderInner() {
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-card gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)}>
+          <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)} title={t('workflows.builder.back')} aria-label={t('workflows.builder.back')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">
@@ -365,7 +365,7 @@ function WorkflowBuilderInner() {
         <div className="border-t bg-card max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between px-4 py-2 border-b sticky top-0 bg-card z-10">
             <h3 className="text-xs font-semibold">{t('workflows.builder.executionHistory')}</h3>
-            <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)}>
+            <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)} title={t('workflows.builder.closeHistory')} aria-label={t('workflows.builder.closeHistory')}>
               <ChevronDown className="h-4 w-4" />
             </Button>
           </div>
@@ -383,35 +383,35 @@ function WorkflowBuilderInner() {
                 <div className="flex items-center gap-1.5">
                   <Activity className="h-3 w-3 text-blue-500" />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">Total</div>
+                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsTotal')}</div>
                     <div className="text-xs font-bold">{total}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="h-3 w-3 text-green-500" />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">Success</div>
+                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsSuccess')}</div>
                     <div className="text-xs font-bold text-green-600">{success}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <XCircle className="h-3 w-3 text-red-500" />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">Failed</div>
+                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsFailed')}</div>
                     <div className="text-xs font-bold text-red-600">{failed}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <BarChart3 className="h-3 w-3 text-primary" />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">Rate</div>
+                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsRate')}</div>
                     <div className="text-xs font-bold">{rate}%</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">Avg</div>
+                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsAvg')}</div>
                     <div className="text-xs font-bold">{avgMs}ms</div>
                   </div>
                 </div>
@@ -472,6 +472,7 @@ function WorkflowBuilderInner() {
 }
 
 function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
@@ -505,7 +506,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
         onClick={() => setExpanded(!expanded)}
       >
         {statusIcon}
-        <span className="font-medium">{exec.status}</span>
+        <span className="font-medium">{t(`workflows.execStatus.${exec.status}`)}</span>
         <span className="text-muted-foreground">{exec.startedAt ? new Date(exec.startedAt).toLocaleString() : ''}</span>
         {exec.durationMs != null && <span className="text-muted-foreground">{exec.durationMs}ms</span>}
         {exec.errorMessage && <span className="text-red-500 truncate flex-1">{exec.errorMessage}</span>}
@@ -525,7 +526,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stepStatusCls[step.status] || 'bg-gray-300'}`} />
                     <span className="font-semibold">{step.nodeType}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${stepStatusBadge[step.status] || ''}`}>
-                      {step.status}
+                      {t(`workflows.stepStatus.${step.status}`)}
                     </span>
                     {step.durationMs != null && <span className="text-muted-foreground">{step.durationMs}ms</span>}
                     {step.errorMessage && <span className="text-red-500 truncate flex-1">{step.errorMessage}</span>}
@@ -535,7 +536,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
                     <div className="px-2.5 pb-2 space-y-1.5 border-t">
                       {step.outputData != null && (
                         <div className="pt-1.5">
-                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Output</span>
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">{t('workflows.builder.stepOutput')}</span>
                           <pre className="text-[9px] font-mono bg-background rounded p-1.5 mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all border">
                             {typeof step.outputData === 'string' ? step.outputData : JSON.stringify(step.outputData, null, 2)}
                           </pre>
@@ -543,7 +544,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
                       )}
                       {step.inputData != null && (
                         <div>
-                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">Input</span>
+                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">{t('workflows.builder.stepInput')}</span>
                           <pre className="text-[9px] font-mono bg-background rounded p-1.5 mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all border">
                             {typeof step.inputData === 'string' ? step.inputData : JSON.stringify(step.inputData, null, 2)}
                           </pre>
@@ -551,7 +552,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
                       )}
                       {step.errorMessage && (
                         <div>
-                          <span className="text-[9px] font-semibold uppercase text-red-500">Error</span>
+                          <span className="text-[9px] font-semibold uppercase text-red-500">{t('workflows.builder.stepError')}</span>
                           <pre className="text-[9px] font-mono bg-red-500/5 text-red-600 rounded p-1.5 mt-0.5 border border-red-500/20 break-all">
                             {step.errorMessage}
                           </pre>
@@ -563,7 +564,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground italic px-2 py-1">No step data available</p>
+            <p className="text-[10px] text-muted-foreground italic px-2 py-1">{t('workflows.builder.noStepData')}</p>
           )}
         </div>
       )}

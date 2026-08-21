@@ -54,6 +54,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+# vitest --coverage output (webhook-platform-ui/coverage/, and any SDK's)
+coverage/
 
 # === Local override configs ===
 application-local.yml
@@ -81,3 +83,15 @@ sdks/node/coverage/
 
 # === Backups ===
 backups/
+
+# === Helm ===
+# Bitnami subchart deps fetched by `helm dependency build` — not vendored,
+# CI (docker-publish.yml) fetches them fresh before packaging/linting.
+deploy/helm/**/charts/
+deploy/helm/**/Chart.lock
+*.tgz
+
+# === Agent task-board scratch space ===
+# Working files for coordinating parallel coding-agent runs — not project
+# documentation, not meant to be published in the repo.
+.claude/features/

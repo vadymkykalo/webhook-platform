@@ -158,7 +158,7 @@ public class WebhookDeliveryService {
      * Called by DeliveryConsumer when the async executor pool is full and this record
      * can't even be submitted. With MANUAL acks a non-ack does not get redelivered until
      * a rebalance/restart, and now that KafkaConsumerConfig defers commits until every
-     * lower offset is acked (P0-03), leaving this record unacked would stall the whole
+     * lower offset is acked, leaving this record unacked would stall the whole
      * partition forever instead of just delaying it. Kafka's job for this record is done
      * either way — the retry ladder (RetrySchedulerService), not Kafka redelivery, is
      * what actually drives reprocessing, so reschedule the DB row explicitly and let the
@@ -272,7 +272,7 @@ public class WebhookDeliveryService {
 
         // Project-level rate limit — prevent noisy-neighbor
         if (!projectRateLimiterService.tryAcquire(endpoint.getProjectId())) {
-            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 1, 30);
+            long delaySec = RetryPolicy.backoffWithJitter(delivery.getAttemptCount(), 1, 30);
             log.warn("Project rate limit exceeded for project {}, rescheduling delivery {} in {}s",
                     endpoint.getProjectId(), delivery.getId(), delaySec);
             rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
@@ -289,7 +289,7 @@ public class WebhookDeliveryService {
 
         Integer rateLimit = endpoint.getRateLimitPerSecond();
         if (rateLimit != null && !rateLimiterService.tryAcquire(endpoint.getId(), rateLimit)) {
-            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 2, 60);
+            long delaySec = RetryPolicy.backoffWithJitter(delivery.getAttemptCount(), 2, 60);
             log.warn("Rate limited for endpoint {}, rescheduling delivery {} in {}s",
                     endpoint.getId(), delivery.getId(), delaySec);
             rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
@@ -297,7 +297,7 @@ public class WebhookDeliveryService {
         }
 
         if (!concurrencyControlService.tryAcquire(endpoint.getId())) {
-            long delaySec = backoffWithJitter(delivery.getAttemptCount(), 2, 60);
+            long delaySec = RetryPolicy.backoffWithJitter(delivery.getAttemptCount(), 2, 60);
             log.warn("Max concurrency reached for endpoint {}, rescheduling delivery {} in {}s",
                     endpoint.getId(), delivery.getId(), delaySec);
             rescheduleDelivery(delivery.getId(), Instant.now().plusSeconds(delaySec));
@@ -308,7 +308,7 @@ public class WebhookDeliveryService {
         // exceptions thrown before the HTTP call itself (decryptSecret on a key that got
         // rotated away, the mTLS client factory on a bad cert, ...) — must go through the
         // finally below, or a single bad endpoint config burns a permit per attempt until
-        // the endpoint is throttled to zero for the full key TTL (P0-04).
+        // the endpoint is throttled to zero for the full key TTL.
         String requestHeaders = null;
         String body = null;
         try {
@@ -364,7 +364,7 @@ public class WebhookDeliveryService {
             // call itself. Previously handleResponse ran inside .map, so a slow markAsSuccess
             // could trip .timeout AFTER a 200 was already received, and the resulting
             // TimeoutException drove scheduleRetry to overwrite the just-written SUCCESS row
-            // back to PENDING — a duplicate delivery of an already-successful webhook (P0-05).
+            // back to PENDING — a duplicate delivery of an already-successful webhook.
             ResponseOutcome outcome = requestSpec.bodyValue(body)
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
@@ -388,7 +388,7 @@ public class WebhookDeliveryService {
                     (int) (System.currentTimeMillis() - startTime));
             markAsFailed(delivery, "SSRF_PROTECTION: " + e.getMessage());
         } catch (PayloadTransformException e) {
-            // P0-07: a configured transformation that fails to apply must never result in the
+            // A configured transformation that fails to apply must never result in the
             // raw payload leaving the platform. Fail this attempt as retryable (same as an
             // HTTP-level failure) so it goes through the normal retry ladder and eventually
             // DLQs if the template stays broken — see scheduleRetry/handleError below.
@@ -424,7 +424,7 @@ public class WebhookDeliveryService {
         if (statusCode >= 200 && statusCode < 300) {
             circuitBreakerService.recordSuccess(delivery.getEndpointId(), durationMs);
             markAsSuccess(delivery);
-        } else if (isRetryable(statusCode)) {
+        } else if (RetryPolicy.isRetryable(statusCode)) {
             circuitBreakerService.recordFailure(delivery.getEndpointId(),
                     new RuntimeException("HTTP " + statusCode));
             scheduleRetry(delivery);
@@ -452,10 +452,6 @@ public class WebhookDeliveryService {
         return deliveryLatency5xx;
     }
 
-    private boolean isRetryable(int statusCode) {
-        return statusCode == 408 || statusCode == 429 || (statusCode >= 500 && statusCode < 600);
-    }
-
     private void scheduleRetry(Delivery delivery) {
         // Use transactionTemplate.execute to return whether DLQ was triggered
         Delivery dlqDelivery = transactionTemplate.execute(tx -> {
@@ -468,7 +464,7 @@ public class WebhookDeliveryService {
 
             // A terminal state reached via another path (e.g. markAsSuccess already committed
             // SUCCESS) must never be clobbered back to PENDING/DLQ by a late-arriving error
-            // handler (P0-05).
+            // handler.
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping retry scheduling " +
                         "— already reached a terminal state via another path", fresh.getId(), fresh.getStatus());
@@ -484,7 +480,7 @@ public class WebhookDeliveryService {
                 return fresh;
             } else {
                 fresh.setStatus(Delivery.DeliveryStatus.PENDING);
-                fresh.setNextRetryAt(calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
+                fresh.setNextRetryAt(RetryPolicy.calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
                 log.info("Scheduled retry {} for delivery {} at {}",
                         fresh.getAttemptCount(), fresh.getId(), fresh.getNextRetryAt());
                 fresh.setUpdatedAt(Instant.now());
@@ -495,7 +491,7 @@ public class WebhookDeliveryService {
 
         // Outside the transaction: ordering-buffer release and the DLQ Kafka notification are
         // both fire-and-forget — a Kafka/Redis failure here must not roll back the DLQ write
-        // that already committed above (P0-05).
+        // that already committed above.
         if (dlqDelivery != null) {
             if (Boolean.TRUE.equals(dlqDelivery.getOrderingEnabled()) && dlqDelivery.getSequenceNumber() != null) {
                 try {
@@ -532,43 +528,6 @@ public class WebhookDeliveryService {
         }
     }
 
-    private Instant calculateNextRetry(int attemptCount, String retryDelaysStr) {
-        long[] delays = parseRetryDelays(retryDelaysStr);
-        int index = Math.min(attemptCount - 1, delays.length - 1);
-        long baseDelay = delays[index];
-        // Full jitter: 50%-150% of base delay to prevent thundering herd
-        double jitterMultiplier = 0.5 + java.util.concurrent.ThreadLocalRandom.current().nextDouble(1.0);
-        long jitteredDelay = (long) (baseDelay * jitterMultiplier);
-        return Instant.now().plusSeconds(jitteredDelay);
-    }
-
-    private long[] parseRetryDelays(String retryDelaysStr) {
-        if (retryDelaysStr == null || retryDelaysStr.isEmpty()) {
-            return new long[] { 60, 300, 900, 3600, 21600, 86400 };
-        }
-        try {
-            String[] parts = retryDelaysStr.split(",");
-            long[] delays = new long[parts.length];
-            for (int i = 0; i < parts.length; i++) {
-                delays[i] = Long.parseLong(parts[i].trim());
-            }
-            return delays;
-        } catch (NumberFormatException e) {
-            log.warn("Invalid retry delays format: {}, using defaults", retryDelaysStr);
-            return new long[] { 60, 300, 900, 3600, 21600, 86400 };
-        }
-    }
-
-    /**
-     * Exponential backoff with ±25% jitter.
-     * base * 2^attempt capped at maxSeconds.
-     */
-    private static long backoffWithJitter(int attempt, long baseSeconds, long maxSeconds) {
-        long delay = Math.min(baseSeconds * (1L << Math.min(attempt, 10)), maxSeconds);
-        long jitter = (long) (delay * 0.25);
-        return delay - jitter + ThreadLocalRandom.current().nextLong(2 * jitter + 1);
-    }
-
     private void rescheduleDelivery(UUID deliveryId, Instant nextRetryAt) {
         transactionTemplate.executeWithoutResult(tx -> {
             Delivery fresh = deliveryRepository.findById(deliveryId).orElse(null);
@@ -593,7 +552,7 @@ public class WebhookDeliveryService {
                 return;
             }
             // A late writer for this same delivery (e.g. a retry/failure path that lost the
-            // race) must never clobber a terminal state that's already been written (P0-05).
+            // race) must never clobber a terminal state that's already been written.
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping success marking",
                         fresh.getId(), fresh.getStatus());
@@ -612,7 +571,7 @@ public class WebhookDeliveryService {
         }
 
         // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
-        // not roll back the SUCCESS write that already committed above (P0-05).
+        // not roll back the SUCCESS write that already committed above.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
             try {
                 orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
@@ -636,20 +595,48 @@ public class WebhookDeliveryService {
             return true;
         }
 
-        // Check if we should proceed due to gap timeout
-        Instant oldestPending = deliveryRepository.findOldestPendingCreatedAt(
-                endpointId, sequenceNumber - 1);
+        // Check the *whole* missing range, not just sequenceNumber - 1: a
+        // single-sequence check meant a delivery several sequences ahead of an outstanding
+        // one would sail through the moment the immediately-preceding sequence happened to
+        // already be terminal, even though something further back in the gap was still
+        // genuinely outstanding.
+        Long lastDelivered = orderingBufferService.getLastDeliveredSequence(endpointId);
+        long rangeStart = (lastDelivered == null ? 0 : lastDelivered) + 1;
+        long rangeEnd = sequenceNumber - 1;
 
-        if (orderingBufferService.isGapTimedOut(oldestPending)) {
-            log.warn("Gap timeout for endpoint {}, proceeding with seq={} without seq={}",
-                    endpointId, sequenceNumber, sequenceNumber - 1);
+        Instant oldestPendingInRange = rangeStart <= rangeEnd
+                ? deliveryRepository.findOldestPendingCreatedAt(endpointId, rangeStart, rangeEnd)
+                : null;
+
+        if (oldestPendingInRange == null) {
+            // Nothing left outstanding in the gap (already delivered/terminal, or a sequence
+            // number that will simply never arrive, e.g. one burned by a rolled-back ingest) —
+            // no reason to wait at all.
+            log.info("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
+                    rangeStart, rangeEnd, endpointId, sequenceNumber);
+            return true;
+        }
+
+        // Something in the gap is genuinely still outstanding. How long has *this* delivery
+        // been waiting on it? Measured from when it was first buffered, not from the blocking
+        // row's ingest createdAt — that timestamp is unrelated to how long we've
+        // actually been stuck, and using it made isGapTimedOut trivially true for an entire
+        // backlog older than the timeout.
+        if (orderingBufferService.isGapTimedOut(delivery.getOrderingFirstBufferedAt())) {
+            log.warn("Gap timeout for endpoint {}, proceeding with seq={} despite outstanding range [{}, {}]",
+                    endpointId, sequenceNumber, rangeStart, rangeEnd);
+            // Single counting site for webhook_ordering_gap_timeout_total -- OrderingBufferService
+            // no longer increments it too.
             orderingGapTimeoutCounter.increment();
             return true;
         }
 
-        // Buffer the delivery and reschedule
-        log.info("Buffering delivery {} (seq={}) waiting for seq={}",
-                delivery.getId(), sequenceNumber, sequenceNumber - 1);
+        // Buffer the delivery and reschedule; stamp when we first started waiting.
+        if (delivery.getOrderingFirstBufferedAt() == null) {
+            delivery.setOrderingFirstBufferedAt(Instant.now());
+        }
+        log.info("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
+                delivery.getId(), sequenceNumber, rangeStart, rangeEnd);
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
         delivery.setStatus(Delivery.DeliveryStatus.PENDING);
@@ -700,7 +687,7 @@ public class WebhookDeliveryService {
                 return;
             }
             // A late writer for this same delivery must never clobber a terminal state that's
-            // already been written (P0-05).
+            // already been written.
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping failure marking",
                         fresh.getId(), fresh.getStatus());
@@ -719,7 +706,7 @@ public class WebhookDeliveryService {
         }
 
         // Outside the transaction: a Kafka/Redis failure releasing the ordering buffer must
-        // not roll back the FAILED write that already committed above (P0-05).
+        // not roll back the FAILED write that already committed above.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
             try {
                 orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
@@ -827,7 +814,7 @@ public class WebhookDeliveryService {
             // configuration failure, not "no transform configured". Falling back to whatever
             // the inline payloadTemplate happens to be (often null, i.e. raw payload) would
             // silently ship data the customer configured a transform specifically to strip
-            // (P0-07), so this must fail the attempt instead of falling through.
+            // so this must fail the attempt instead of falling through.
             String template = transformationCacheService.findEnabledTemplate(delivery.getTransformationId());
             if (template == null) {
                 throw new PayloadTransformException(

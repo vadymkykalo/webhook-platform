@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -80,7 +80,14 @@ export default function RegisterPage() {
 
           <div className="space-y-8">
             <div>
-              <h2 className="text-4xl font-bold leading-tight mb-4" dangerouslySetInnerHTML={{ __html: t('auth.register.brandTitle').replace('\n', '<br />') }} />
+              <h2 className="text-4xl font-bold leading-tight mb-4">
+                {t('auth.register.brandTitle').split('\n').map((line, i, arr) => (
+                  <span key={i}>
+                    {line}
+                    {i < arr.length - 1 && <br />}
+                  </span>
+                ))}
+              </h2>
               <p className="text-white/70 text-lg max-w-md">
                 {t('auth.register.brandSubtitle')}
               </p>
@@ -119,7 +126,9 @@ export default function RegisterPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.register.checkEmail')}</h1>
-                <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: t('auth.register.verificationSent', { email }) }} />
+                <p className="text-muted-foreground">
+                  <Trans i18nKey="auth.register.verificationSent" values={{ email }} components={{ strong: <strong /> }} />
+                </p>
               </div>
               <div className="space-y-3">
                 <Button onClick={() => setShowIntent(true)} className="w-full">

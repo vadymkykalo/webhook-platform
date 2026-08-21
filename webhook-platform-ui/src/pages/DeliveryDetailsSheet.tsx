@@ -187,7 +187,7 @@ export default function DeliveryDetailsSheet({
     return (
       <Badge variant={config.variant} className="gap-1">
         <Icon className="h-3 w-3" />
-        {status}
+        {t(`deliveries.status.${status}`)}
       </Badge>
     );
   };
@@ -350,7 +350,7 @@ export default function DeliveryDetailsSheet({
                         <div className="flex items-center gap-1.5 min-w-0">
                           <code className="text-xs font-mono truncate" title={value}>{value}</code>
                           {link && (
-                            <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')}>
+                            <Link to={link} onClick={onClose} className="shrink-0 text-primary hover:text-primary/80 transition-colors" title={t('deliveryDetails.goTo')} aria-label={t('deliveryDetails.goTo')}>
                               <ExternalLink className="h-3 w-3" />
                             </Link>
                           )}
@@ -359,6 +359,8 @@ export default function DeliveryDetailsSheet({
                             size="icon"
                             className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={() => copyToClipboard(value, label)}
+                            title={t('deliveryDetails.copyValue')}
+                            aria-label={t('deliveryDetails.copyValue')}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>

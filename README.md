@@ -5,16 +5,21 @@
 **Self-hosted webhook infrastructure. Outgoing delivery + incoming ingress.**
 
 [![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
+[![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/webhook-platform?label=release)](https://github.com/vadymkykalo/webhook-platform/releases/latest)
+[![Coverage](https://img.shields.io/badge/coverage-52%25_lines-yellow)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17](https://img.shields.io/badge/Java-17-orange)]()
-[![Spring Boot 3.2](https://img.shields.io/badge/Spring%20Boot-3.2-green)]()
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-green)]()
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Fhookflow-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
 
 ```bash
-git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform && make up
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+docker compose -f docker-compose.pull.yml up -d
 ```
 
-**Dashboard** → http://localhost:5173 &nbsp;|&nbsp; **API Docs** → http://localhost:8080/swagger-ui.html
+No Maven, no npm, no clone — two files and Docker. **Dashboard** → http://localhost:5173 &nbsp;|&nbsp; **API Docs** → http://localhost:8080/swagger-ui.html
 
 </div>
 
@@ -22,16 +27,30 @@ git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-plat
   <img src="docs/img.png" alt="Hookflow Dashboard" width="100%">
 </div>
 
+<div align="center">
+
+*Live public demo: not deployed yet — see [`docs/DEMO.md`](docs/DEMO.md) for the scoped plan (seeded, read-only, isolation-verified) and why it's deferred rather than faked.*
+
+</div>
+
 ---
 
 ## Quick Start
 
-**Prerequisites:** Docker 20.10+, Docker Compose v2+, `make`
+**Prerequisites:** Docker 20.10+, Docker Compose v2+. That's it — the commands below
+pull pre-built [multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
+(amd64 + arm64) images from GHCR, so nothing gets compiled on your machine.
 
 ```bash
-make up                   # Start everything
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+# Edit .env: set WEBHOOK_ENCRYPTION_KEY / WEBHOOK_ENCRYPTION_SALT / JWT_SECRET
+# (dev defaults work out of the box for a local trial run)
+
+docker compose -f docker-compose.pull.yml up -d
+curl -f http://localhost:8082/actuator/health/liveness   # actuator is split onto its own port — see below
 # Open http://localhost:5173, register, create project, get API key
-make verify-link          # Get email verification link from logs
+docker compose -f docker-compose.pull.yml logs api | grep "Verify URL:" | tail -1
 ```
 
 ```bash
@@ -42,6 +61,39 @@ curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
   -d '{"type": "user.signup", "payload": {"userId": "usr_42"}}'
 ```
 
+> Actuator (`/actuator/health`, `/actuator/prometheus`) runs on its own port (8082,
+> loopback-only) rather than the main API port (8080) — it never passes through the
+> JWT/API-key-authenticated security chain, so it stays reachable for health checks
+> and Prometheus even if auth config is broken. The main platform API (events,
+> projects, ingress) is on 8080 as usual.
+
+### Building from source (contributors)
+
+If you're changing code rather than just running the platform, clone the repo and
+build locally instead — this path needs Maven + npm (or just `make`, which shells
+out to both via Docker build contexts):
+
+```bash
+git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
+make up                   # Start everything (builds all 3 images from source)
+make verify-link          # Get email verification link from logs
+```
+
+**Coverage.** Backend (JaCoCo, unit + integration merged):
+
+```bash
+mvn clean test jacoco:report
+open target/site/jacoco-aggregate/index.html   # or target/site/jacoco-aggregate/jacoco.csv
+```
+
+Frontend (Vitest + v8):
+
+```bash
+cd webhook-platform-ui && npm run test:coverage
+```
+
+CI publishes both as workflow artifacts (`jacoco-aggregate-report`, `vitest-coverage-report`) on every run — see `.github/workflows/ci.yml`. The Coverage badge above is a static shields.io badge (no Codecov/similar integration wired up), so it only reflects reality if it's updated by hand alongside the numbers in `.claude/features/P1-28-coverage-tooling.md`'s Progress log.
+
 ---
 
 ## Features
@@ -49,7 +101,8 @@ curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
 ### Outgoing Delivery
 - **Transactional outbox → Kafka** — at-least-once, zero event loss
 - **FIFO ordering** per endpoint (Redis ordering buffer + sequence numbers)
-- **6-tier retry** — 1m, 5m, 15m, 1h, 6h, 24h
+- **6-tier retry** — 1m, 5m, 15m, 1h, 6h, 24h (up to 7 attempts, ~55h expected / ~83h worst-case
+  span with jitter, before the 96h hard-cap escalates an unresponded delivery to DLQ — see P1-24a)
 - **DLQ** with one-click reprocess · **Circuit breaker** per endpoint
 - **HMAC-SHA256** signatures · **mTLS** · **Endpoint verification** (challenge-response)
 
@@ -252,9 +305,43 @@ sequenceDiagram
 
 ---
 
+## API Reference & SDKs
+
+- **In-app docs** — the dashboard's [Documentation page](webhook-platform-ui/src/pages/DocumentationPage.tsx) has prose, concepts and per-language quick-start samples for every endpoint (visit `/docs` after logging in, or run the UI locally).
+- **OpenAPI spec** — [`openapi.yaml`](./openapi.yaml), committed at the repo root and regenerated from the live `springdoc-openapi` output on every push to `main` (see `.github/workflows/ci.yml`'s `docker-compose-smoke` job, which fails the build if the checked-in spec drifts from what the running API actually serves). Browse it rendered at [`docs/api-reference.html`](docs/api-reference.html) (Redoc) — served live at the project's GitHub Pages site once `Settings → Pages → Source = GitHub Actions` is enabled, or open it locally: `python3 -m http.server 8000` from the repo root, then visit `http://localhost:8000/docs/api-reference.html`.
+- **Swagger UI** — `http://localhost:8080/swagger-ui.html` against a running instance (`SWAGGER_ENABLED=true`).
+
+### SDK coverage
+
+The official SDKs ([`sdks/node`](sdks/node), [`sdks/python`](sdks/python), [`sdks/php`](sdks/php) — package names are mid-rename to the `hookflow` brand, check each `README.md` for the exact current install command) cover the "send an event / manage endpoints / verify a signature" workflow, not the full dashboard surface. As of this writing that's **7 of the platform's 33 REST controllers**:
+
+| Covered by the SDKs | REST-only (use `openapi.yaml` / the dashboard) |
+|---|---|
+| Events (send, list) | Auth, Device Authentication |
+| Endpoints (CRUD) | Organizations, Projects, Members, API Keys |
+| Subscriptions | Dashboard, Usage, Billing |
+| Deliveries (status, replay) | Rules, Workflows, Schema Registry |
+| Incoming Sources | Transformations, Transform Preview |
+| Incoming Destinations | Alerts, Incidents, Audit Log |
+| Incoming Events | DLQ, Encryption Admin, PII Masking |
+| Signature verification (client-side helper, not a controller) | Tunnels, Tunnel Ingress, Ingress, Webhook Capture, Debug Links, Test Endpoints |
+
+If you need something from the right-hand column, call the REST API directly (each SDK exposes a generic authenticated-request escape hatch for this — see its README) or use the dashboard.
+
+---
+
 ## Deployment
 
-### Development
+### Pull pre-built images (no toolchain)
+
+```bash
+make up-pull          # Pull ghcr.io/vadymkykalo/hookflow-* and start (needs repo clone for `make`)
+# or, with no clone at all:
+docker compose -f docker-compose.pull.yml up -d
+make down-pull         # Stop (data preserved)
+```
+
+### Development (build from source)
 
 ```bash
 make up              # Start all (embedded PostgreSQL)
@@ -307,12 +394,16 @@ make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
 ### CLI Commands
 
 ```bash
-# Install CLI (auto-installs Java 17 if missing)
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash
+# Install CLI (verifies a published SHA256 checksum; add --with-java to let it
+# install Java 17 via sudo if you don't already have it — see -h for all flags)
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --with-java
+
+# Uninstall
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --uninstall
 
 # Or build from source (optional)
 # mvn clean package -pl webhook-platform-cli -am -DskipTests
-# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-1.0.0-SNAPSHOT.jar'
+# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-2.2.1.jar'
 
 # Auth
 hookflow login                             # Device code flow (browser approve)
@@ -356,9 +447,9 @@ hookflow config profile delete staging      # Remove profile
 | **Dashboard** | http://localhost:5173 | — |
 | **Grafana** | http://localhost:3001 | `hookflow` / `hookflow_monitor_2024` |
 | **Prometheus** | http://localhost:9090 | — |
-| **API Health** | http://localhost:8080/actuator/health | — |
-| **Worker Health** | http://localhost:8081/actuator/health | — |
-| **Metrics** | http://localhost:8080/actuator/prometheus | — |
+| **API Health** | `make health`, or http://localhost:8082/actuator/health/liveness with `docker-compose.pull.yml` (not published by `make up`) | — |
+| **Worker Health** | `make health` (internal-only, not published to host) | — |
+| **Metrics** | `/actuator/prometheus` on the same internal port as health above | — |
 
 ### Common Issues
 
@@ -461,4 +552,9 @@ openssl rand -base64 18   # For DB/Redis passwords
 
 ## License
 
-[MIT](./LICENSE) © Vadym Kykalo
+[MIT](./LICENSE) © Vadym Kykalo — see [`NOTICE`](./NOTICE) for third-party
+attributions and [`docs/licenses/`](docs/licenses/) for the generated
+dependency license report and SBOM (backend: 230 Maven dependencies scanned,
+0 copyleft; frontend: 654 npm packages scanned, 0 copyleft), plus the
+recorded decisions on MinIO's AGPL-3.0 license and the Helm chart's Bitnami
+subchart pins.

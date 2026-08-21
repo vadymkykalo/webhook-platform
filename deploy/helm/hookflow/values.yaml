@@ -9,7 +9,9 @@ global:
 api:
   replicaCount: 2
   image:
-    repository: hookflow/api
+    # Published by .github/workflows/docker-publish.yml on every version tag
+    # (multi-arch: linux/amd64, linux/arm64).
+    repository: ghcr.io/vadymkykalo/hookflow-api
     tag: latest
     pullPolicy: IfNotPresent
   
@@ -65,7 +67,9 @@ api:
 worker:
   replicaCount: 2
   image:
-    repository: hookflow/worker
+    # Published by .github/workflows/docker-publish.yml on every version tag
+    # (multi-arch: linux/amd64, linux/arm64).
+    repository: ghcr.io/vadymkykalo/hookflow-worker
     tag: latest
     pullPolicy: IfNotPresent
   
@@ -116,7 +120,9 @@ worker:
 ui:
   replicaCount: 2
   image:
-    repository: hookflow/ui
+    # Published by .github/workflows/docker-publish.yml on every version tag
+    # (multi-arch: linux/amd64, linux/arm64).
+    repository: ghcr.io/vadymkykalo/hookflow-ui
     tag: latest
     pullPolicy: IfNotPresent
   
@@ -162,27 +168,26 @@ ui:
         hosts:
           - app.hookflow.dev
 
-# PostgreSQL configuration (embedded or external)
+# PostgreSQL configuration
+# This chart no longer ships a PostgreSQL subchart (was Bitnami,
+# removed - see Chart.yaml). `enabled` now only selects which host/port
+# templates.tpl reads (see hookflow.postgresql.* in templates/_helpers.tpl);
+# it does not deploy a database. Point `external` at your own instance -
+# managed (RDS/Cloud SQL/etc.) for production, or your own StatefulSet/
+# Docker container (postgres:16-alpine is what docker-compose.yml and CI
+# test against) for a self-managed cluster.
 postgresql:
-  enabled: false  # Set to true to deploy PostgreSQL subchart
+  enabled: false
+  # auth.* is read by templates/db-backup-cronjob.yaml as the primary
+  # source for the backup job's DB name/user/secret (falling back to
+  # external.* below) - kept even with the subchart gone.
   auth:
     username: webhook_user
     password: ""  # Use existingSecret instead
     database: hookflow
     existingSecret: hookflow-postgresql-secret
-  primary:
-    resources:
-      requests:
-        cpu: 250m
-        memory: 512Mi
-      limits:
-        cpu: 1000m
-        memory: 1Gi
-    persistence:
-      enabled: true
-      size: 20Gi
-  
-  # External PostgreSQL configuration
+
+  # Bring-your-own PostgreSQL configuration (required - see the note above).
   external:
     host: ""  # e.g., postgres.example.com
     port: 5432
@@ -191,54 +196,42 @@ postgresql:
     existingSecret: hookflow-postgresql-secret
     existingSecretPasswordKey: password
 
-# Kafka configuration (embedded or external)
+# Kafka configuration
+# This chart no longer ships a Kafka subchart (was Bitnami, removed -
+# see Chart.yaml; Bitnami had already dropped Kafka from its free catalog
+# entirely). Point `external` at your own cluster - managed (MSK/Confluent
+# Cloud/etc.) for production, or your own StatefulSet/Docker container
+# (apache/kafka:3.7.0 is what docker-compose.yml and CI test against, and is
+# also the image templates/kafka-topics-job.yaml itself uses to create
+# topics) for a self-managed cluster.
 kafka:
-  enabled: false  # Set to true to deploy Kafka subchart
-  replicaCount: 1
-  kraft:
-    enabled: true
-  listeners:
-    client:
-      protocol: PLAINTEXT
-  persistence:
-    enabled: true
-    size: 10Gi
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 2000m
-      memory: 2Gi
-  
-  # Topic configuration
+  enabled: false
+  # Topic configuration - read by templates/kafka-topics-job.yaml regardless
+  # of `enabled`.
   topicPartitions: 12  # Number of partitions for delivery topics
   topicReplicationFactor: 1  # Set to 3 for production multi-broker clusters
-  
-  # External Kafka configuration
+
+  # Bring-your-own Kafka configuration (required - see the note above).
   external:
     bootstrapServers: ""  # e.g., kafka-1:9092,kafka-2:9092,kafka-3:9092
 
-# Redis configuration (embedded or external)
+# Redis configuration
+# This chart no longer ships a Redis subchart (was Bitnami, removed -
+# see Chart.yaml) - `enabled` therefore now defaults to false (it defaulted
+# to true when a subchart still backed it). Point `external` at your own
+# instance - managed (ElastiCache/Memorystore/etc.) for production, or your
+# own StatefulSet/Docker container (redis:7-alpine is what
+# docker-compose.yml and CI test against) for a self-managed cluster.
 redis:
-  enabled: true
+  enabled: false
+  # auth.existingSecret* is read wherever Redis credentials are needed
+  # regardless of `enabled` - kept even with the subchart gone.
   auth:
     enabled: true
     existingSecret: hookflow-redis-secret
     existingSecretPasswordKey: password
-  master:
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 500m
-        memory: 256Mi
-    persistence:
-      enabled: true
-      size: 2Gi
-  
-  # External Redis configuration
+
+  # Bring-your-own Redis configuration (required - see the note above).
   external:
     host: ""  # e.g., redis.example.com
     port: 6379

@@ -159,7 +159,11 @@ public class IncomingForwardService {
         //     attempt_number = attemptCount.  We claim it the same way as first dispatch.
         //   Retry (attemptCount > 0, replay == false): IncomingForwardRetryScheduler
         //     already claimed the existing row (set PROCESSING) and published
-        //     attemptCount = attemptNumber.  No re-claim needed.
+        //     attemptCount = attemptNumber, plus a started_at fencing token. We CAS on
+        //     that token below rather than trusting status=PROCESSING alone --
+        //     Kafka is at-least-once, so the same retry message can be redelivered (a
+        //     rebalance loses the offset commit after this consumer already dispatched
+        //     once) and both copies would otherwise see PROCESSING and double-POST.
         boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
         boolean isReplay = message.isReplay();
 
@@ -178,6 +182,29 @@ public class IncomingForwardService {
             // Retry path: scheduler already set the row to PROCESSING.
             // attemptCount IS the current attempt number (not previous).
             attemptNumber = message.getAttemptCount();
+            Instant expectedStartedAt = message.getStartedAt();
+            if (expectedStartedAt != null) {
+                // CAS on the fencing token: only the first delivery of this exact
+                // Kafka message can still see the token the scheduler stamped, so only it
+                // proceeds to dispatch. A redelivered duplicate finds the token already
+                // consumed and is dropped here instead of double-POSTing.
+                final int an = attemptNumber;
+                Integer claimed = transactionTemplate.execute(tx ->
+                        attemptRepository.claimRetryForProcessing(eventId, destinationId, an, expectedStartedAt));
+                if (claimed == null || claimed == 0) {
+                    log.debug("Retry attempt already claimed by a prior delivery of this Kafka message "
+                                    + "(duplicate redelivery): eventId={}, destId={}, attempt={}",
+                            eventId, destinationId, attemptNumber);
+                    return;
+                }
+            } else {
+                // No fencing token on the message -- an older producer (rolling deploy
+                // skew) published it before this field existed. Fall back to the
+                // pre-existing behavior rather than dropping every in-flight retry.
+                log.debug("Retry message has no fencing token (older producer?), proceeding without CAS: "
+                                + "eventId={}, destId={}, attempt={}",
+                        eventId, destinationId, attemptNumber);
+            }
         } else {
             // First dispatch: claim the PENDING row created by IngressService
             attemptNumber = 1;
@@ -313,7 +340,7 @@ public class IncomingForwardService {
                     .block();
 
         } catch (PayloadTransformException e) {
-            // P0-07: a configured transformation that fails to apply must never result in the
+            // A configured transformation that fails to apply must never result in the
             // raw payload leaving the platform. Fail this attempt as retryable (same as an
             // HTTP-level failure) so it goes through the normal retry ladder and eventually
             // DLQs if the template stays broken.
@@ -576,7 +603,7 @@ public class IncomingForwardService {
      *
      * <p>"No transformation configured" (neither a transformationId nor an inline
      * payloadTransform) is fine — the body is forwarded as-is. But once either is
-     * configured, a failure to apply it must fail the attempt (P0-07): it must never
+     * configured, a failure to apply it must fail the attempt: it must never
      * silently forward the raw body, since transformations are how customers strip PII
      * before an incoming payload gets relayed to a destination.
      */

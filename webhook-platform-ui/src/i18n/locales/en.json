@@ -41,6 +41,7 @@
     "viewAll": "View all",
     "manage": "Manage",
     "copyId": "Copy ID",
+    "copy": "Copy",
     "copied": "Copied to clipboard",
     "enable": "Enable",
     "disable": "Disable",
@@ -54,9 +55,13 @@
     "noResults": "No results found",
     "error": "An unexpected error occurred",
     "retry": "Retry",
+    "retrying": "Retrying...",
+    "loadErrorTitle": "Couldn't load this page",
     "backToHome": "Back to home",
     "learnMore": "Learn more",
-    "optional": "optional"
+    "optional": "optional",
+    "pageSize": "Rows per page",
+    "actions": "Actions"
   },
   "passwordStrength": {
     "weak": "Weak",
@@ -140,7 +145,10 @@
     "automation": "Automation",
     "workflows": "Workflows",
     "showAdvanced": "Show Advanced Features",
-    "hideAdvanced": "Hide Advanced Features"
+    "hideAdvanced": "Hide Advanced Features",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "skipToContent": "Skip to main content"
   },
   "auth": {
     "login": {
@@ -372,6 +380,9 @@
       "dlq": "Failed Messages",
       "incomingSources": "Sources",
       "incomingEvents": "Received"
+    },
+    "toast": {
+      "loadFailed": "Failed to load dashboard data"
     }
   },
   "endpoints": {
@@ -622,11 +633,25 @@
     "toast": {
       "idCopied": "Event ID copied to clipboard",
       "noSubscriptionMatch": "Event sent, but no active subscriptions match '{{eventType}}'. No deliveries were created.",
-      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions."
+      "zeroDeliveries": "Event sent, but 0 deliveries were created. Check your subscriptions.",
+      "loadFailed": "Failed to load events"
     },
     "sendModal": {
       "noMatchWarning": "No active subscriptions match this event type. The event will be saved but no deliveries will be created.",
-      "matchInfo": "{{count}} subscription(s) will receive this event."
+      "matchInfo": "{{count}} subscription(s) will receive this event.",
+      "title": "Send Test Event",
+      "description": "Send a webhook event to trigger deliveries to subscribed endpoints",
+      "eventType": "Event Type",
+      "eventTypeHint": "Use dot notation (e.g., user.created, order.updated)",
+      "payload": "Event Payload (JSON)",
+      "payloadHint": "Must be valid JSON. This data will be sent to webhook endpoints.",
+      "invalidJson": "Invalid JSON format",
+      "fixJsonBeforeSubmit": "Please fix JSON errors before submitting",
+      "sentSuccess": "Event sent successfully! Created {{count}} deliveries.",
+      "noteLabel": "Note:",
+      "noteBody": "This event will create deliveries for all active subscriptions matching this event type. Check the Deliveries page to see processing results.",
+      "sending": "Sending...",
+      "send": "Send Event"
     },
     "details": {
       "title": "Event Details",
@@ -639,8 +664,47 @@
       "noDeliveriesNoSub": "No active subscriptions match event type <strong>{{eventType}}</strong>. Create a subscription for this event type to start receiving deliveries.",
       "noDeliveriesHint": "Events are only delivered to endpoints that have a matching subscription.",
       "openFull": "Open Full Details",
-      "notFound": "Event not found"
+      "notFound": "Event not found",
+      "replay": "Replay"
     }
+  },
+  "eventDetail": {
+    "back": "Back to events",
+    "copyLink": "Copy link",
+    "tabs": {
+      "raw": "Raw Payload",
+      "sanitized": "Sanitized",
+      "schema": "Schema",
+      "deliveries": "Deliveries",
+      "debug": "Debug Links"
+    },
+    "share": "Share Debug",
+    "replayFailed": "Replay {{count}} Failed",
+    "replayedFailed": "Replayed {{count}} failed deliveries",
+    "debugLinkCreated": "Debug link copied to clipboard",
+    "eventType": "Event Type",
+    "deliveriesCount": "Deliveries",
+    "payloadSize": "Payload Size",
+    "project": "Project",
+    "rawPayload": "Raw Payload",
+    "sanitized": "PII-Sanitized Payload",
+    "sanitizedHint": "This is the payload with PII masking rules applied — safe to share externally",
+    "sanitizedUseDebug": "Use \"Share Debug\" to create a PII-safe shareable link. The sanitized view is generated server-side with your project's PII rules.",
+    "existingLinks": "Existing debug links (PII-safe):",
+    "schemaInfo": "Schema Information",
+    "viewSchemaRegistry": "View in Schema Registry",
+    "noSchema": "No schema registered for event type \"{{type}}\"",
+    "linkedDeliveries": "Linked Deliveries",
+    "createLink": "Create Link",
+    "noDebugLinks": "No debug links created yet",
+    "views": "{{count}} views",
+    "expires": "Expires {{time}}",
+    "eventIdCopied": "Event ID copied",
+    "curlCopied": "cURL copied",
+    "payloadCopied": "Payload copied",
+    "linkCopied": "Link copied",
+    "debugLinkCopied": "Debug link copied",
+    "replayed": "Replayed"
   },
   "deliveries": {
     "title": "Deliveries",
@@ -672,7 +736,8 @@
       "endpoint": "Endpoint",
       "attempts": "Attempts",
       "nextRetry": "Next Retry",
-      "lastError": "Last Error"
+      "lastError": "Last Error",
+      "time": "Time"
     },
     "status": {
       "SUCCESS": "Success",
@@ -701,7 +766,12 @@
       "description": "This will re-send {{count}} deliveries with status {{status}}. Each delivery will be attempted again from scratch.",
       "warning": "Bulk replay may cause duplicate deliveries if the destination is not idempotent. Make sure your consumers can handle repeated events.",
       "confirm": "Replay All"
-    }
+    },
+    "toast": {
+      "loadFailed": "Failed to load deliveries",
+      "replayFailed": "Failed to replay delivery"
+    },
+    "goToEvents": "View Events"
   },
   "apiKeys": {
     "title": "API Keys",
@@ -1165,7 +1235,9 @@
       "eventType": "Event type",
       "endpoint": "Endpoint",
       "allTypes": "All types",
-      "allEndpoints": "All endpoints"
+      "allEndpoints": "All endpoints",
+      "expandDetails": "Expand details",
+      "collapseDetails": "Collapse details"
     },
     "status": {
       "PENDING": "Pending",
@@ -1211,6 +1283,7 @@
     "filterEndpoint": "Filter by Endpoint",
     "allEndpoints": "All endpoints",
     "searchPlaceholder": "Search by event type or ID...",
+    "clearSearch": "Clear search",
     "filterFrom": "From Date",
     "filterTo": "To Date",
     "activeFilters": "Active filters",
@@ -1218,6 +1291,10 @@
     "endpointFiltered": "Endpoint",
     "dateFiltered": "Date range",
     "clearFilters": "Clear all",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "selectItem": "Select row",
+    "deselectItem": "Deselect row",
     "columns": {
       "eventType": "Event Type",
       "endpoint": "Endpoint",
@@ -2310,6 +2387,24 @@
       "updateFailed": "Failed to update destination",
       "deleted": "Destination deleted",
       "deleteFailed": "Failed to delete destination"
+    },
+    "retryPresets": {
+      "aggressive": {
+        "label": "Aggressive",
+        "desc": "10s → 30s → 1m → 2m"
+      },
+      "standard": {
+        "label": "Standard",
+        "desc": "1m → 5m → 15m → 1h"
+      },
+      "patient": {
+        "label": "Patient",
+        "desc": "5m → 15m → 1h → 6h → 24h"
+      },
+      "none": {
+        "label": "No retry",
+        "desc": "Single attempt only"
+      }
     }
   },
   "incomingEvents": {
@@ -2401,6 +2496,7 @@
     "endpointId": "Endpoint ID",
     "subscriptionId": "Subscription ID",
     "goTo": "Navigate to resource",
+    "copyValue": "Copy value",
     "latencyTrend": "Latency Trend",
     "later": "later",
     "created": "Created",
@@ -2598,7 +2694,8 @@
     "response": "Response",
     "requestHeaders": "Request Headers",
     "requestBody": "Request Body",
-    "responseHeaders": "Response Headers"
+    "responseHeaders": "Response Headers",
+    "copyContent": "Copy {{label}}"
   },
   "connectionSetup": {
     "title": "Connection Setup",
@@ -2696,6 +2793,11 @@
       "deleteFailed": "Failed to delete rule",
       "seeded": "Default rules added",
       "seedFailed": "Failed to seed defaults"
+    },
+    "maskStyles": {
+      "PARTIAL": "Partial",
+      "FULL": "Full",
+      "HASH": "Hash (SHA-256)"
     }
   },
   "sharedDebug": {
@@ -2833,6 +2935,8 @@
     "title": "Getting Started",
     "subtitle": "Complete these steps to set up your webhook infrastructure",
     "dismiss": "Dismiss",
+    "expand": "Expand checklist",
+    "collapse": "Collapse checklist",
     "collapsed": "{{completed}} of {{total}} completed",
     "steps": {
       "createProject": "Create a project",
@@ -2984,6 +3088,9 @@
     "noRules": "No alert rules",
     "noRulesDesc": "Create your first alert rule to monitor delivery health",
     "muted": "Muted",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "deleteRule": "Delete rule",
     "snoozed": "Snoozed",
     "threshold": "Threshold",
     "window": "Window",
@@ -2996,7 +3103,9 @@
       "severity": "Severity",
       "value": "Value",
       "time": "Time",
-      "status": "Status"
+      "status": "Status",
+      "severityIcon": "Severity icon",
+      "details": "Details"
     },
     "createDialog": {
       "title": "Create Alert Rule",
@@ -3200,7 +3309,21 @@
       "selectEndpoint": "Select endpoint…",
       "selectTransformation": "Select transformation…",
       "tagPlaceholder": "Tag name, e.g. high-priority",
-      "dropHint": "Matching events will be silently dropped — no deliveries created."
+      "dropHint": "Matching events will be silently dropped — no deliveries created.",
+      "removeAction": "Remove action",
+      "conditionTree": {
+        "cycleOperator": "Click to cycle: AND → OR → NOT",
+        "addCondition": "Add condition",
+        "addGroup": "Add nested group",
+        "removeGroup": "Remove group",
+        "removeCondition": "Remove condition"
+      }
+    },
+    "actionTypes": {
+      "ROUTE": "Route to endpoint",
+      "TRANSFORM": "Transform payload",
+      "DROP": "Drop event",
+      "TAG": "Tag event"
     }
   },
   "transformations": {
@@ -3250,6 +3373,35 @@
       "validJson": "Valid JSON",
       "expression": "expression",
       "expressions": "expressions"
+    },
+    "howItWorks": {
+      "title": "How Transformations Work",
+      "incomingEvent": "Incoming Event",
+      "incomingEventDesc": "Original payload from your API",
+      "templateStep": "Template",
+      "templateStepDesc": "Your transformation reshapes the data",
+      "deliveredPayload": "Delivered Payload",
+      "deliveredPayloadDesc": "What your endpoint receives",
+      "hint": "Use <code>${$.field}</code> to reference fields from the original event. Assign this transformation to a subscription to apply it automatically."
+    },
+    "nameHint": "A short name to identify this transformation (e.g. \"Slack Format\", \"Stripe Normalize\")",
+    "descriptionHint": "Describe what this transformation does and when to use it",
+    "expressionsAvailable": "Available expressions:",
+    "expressionEventId": "Event ID",
+    "expressionEventType": "Event type",
+    "expressionFullPayload": "Full payload object",
+    "expressionNestedField": "Nested field",
+    "expressionTimestamp": "Timestamp",
+    "livePreview": "Live Preview",
+    "sampleInputEvent": "Sample Input Event",
+    "outputPreview": "Output (what endpoint receives)",
+    "previewFixJson": "Fix the template JSON to see the preview",
+    "previewEmpty": "Write a template to see the live output preview",
+    "enabledHint": "This transformation can be assigned to subscriptions",
+    "disabledHint": "Disabled — won't be available for new subscriptions",
+    "howToApply": {
+      "title": "How to apply this transformation",
+      "body": "After saving, go to <strong>Subscriptions</strong> → edit or create a subscription → under <strong>Advanced Settings</strong>, select this transformation from the dropdown. Every delivery for that subscription will use this template instead of the original payload."
     }
   },
   "transform": {
@@ -3361,6 +3513,8 @@
     },
     "builder": {
       "notFound": "Workflow not found",
+      "back": "Back to workflows",
+      "closeHistory": "Close history",
       "unsaved": "Unsaved",
       "enabled": "Enabled",
       "disabled": "Disabled",
@@ -3374,7 +3528,16 @@
       "testRunHint": "Provide a JSON payload to manually trigger this workflow",
       "runNow": "Run Now",
       "executionHistory": "Execution History",
-      "noExecutions": "No executions yet"
+      "noExecutions": "No executions yet",
+      "statsTotal": "Total",
+      "statsSuccess": "Success",
+      "statsFailed": "Failed",
+      "statsRate": "Rate",
+      "statsAvg": "Avg",
+      "stepOutput": "Output",
+      "stepInput": "Input",
+      "stepError": "Error",
+      "noStepData": "No step data available"
     },
     "nodeTypes": {
       "webhookTrigger": {
@@ -3487,7 +3650,26 @@
       "notConfigured": "Not configured",
       "webhookConfigured": "Webhook configured",
       "delaySeconds": "{{count}}s delay"
+    },
+    "execStatus": {
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "RUNNING": "Running",
+      "PENDING": "Pending"
+    },
+    "stepStatus": {
+      "SUCCESS": "Success",
+      "FAILED": "Failed",
+      "SKIPPED": "Skipped",
+      "RUNNING": "Running",
+      "PENDING": "Pending"
     }
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Reloading usually fixes it — if it keeps happening, share the details below with your team.",
+    "reloadPage": "Reload page",
+    "goToDashboard": "Go to Dashboard"
   }
 }
 

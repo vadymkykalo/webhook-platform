@@ -128,7 +128,7 @@ export default function MembersPage() {
                 <TableHead className="text-xs">{t('members.role')}</TableHead>
                 <TableHead className="text-xs">{t('members.status')}</TableHead>
                 <TableHead className="text-xs">{t('members.joined')}</TableHead>
-                {canManageMembers && <TableHead className="w-[80px]"></TableHead>}
+                {canManageMembers && <TableHead className="w-[80px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -171,7 +171,7 @@ export default function MembersPage() {
                   {canManageMembers && (
                     <TableCell>
                       {member.userId !== user?.user?.id && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => setRemoveUserId(member.userId)} title={t('members.remove')} className="text-muted-foreground hover:text-destructive">
+                        <Button variant="ghost" size="icon-sm" onClick={() => setRemoveUserId(member.userId)} title={t('members.remove')} aria-label={t('members.remove')} className="text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}

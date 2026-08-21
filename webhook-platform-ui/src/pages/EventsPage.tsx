@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Radio, Plus, Copy, Share2, Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
-import { useEvents } from '../api/queries';
+import { useEvents, useProject } from '../api/queries';
 import { formatRelativeTime, formatDateTime } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { projectsApi } from '../api/projects.api';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
@@ -34,16 +33,18 @@ export default function EventsPage() {
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
-  const { data: project } = useQuery({
-    queryKey: ['projects', projectId],
-    queryFn: () => projectsApi.get(projectId!),
-    enabled: !!projectId,
-  });
+  const { data: project, isError: projectIsError, error: projectError, refetch: refetchProject } = useProject(projectId);
 
-  const { data: eventsData, isLoading: loading } = useEvents(projectId, page, pageSize, sortParam);
+  const {
+    data: eventsData, isLoading: eventsLoading, isError: eventsIsError, error: eventsError, refetch: refetchEvents,
+  } = useEvents(projectId, page, pageSize, sortParam);
   const events = eventsData?.content ?? [];
   const totalElements = eventsData?.totalElements ?? 0;
   const totalPages = eventsData?.totalPages ?? 0;
+
+  const loading = eventsLoading;
+  const isError = projectIsError || eventsIsError;
+  const retry = () => { refetchProject(); refetchEvents(); };
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -69,6 +70,14 @@ export default function EventsPage() {
     return <PageSkeleton maxWidth="max-w-7xl" />;
   }
 
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <ErrorState error={projectError ?? eventsError} fallbackKey="events.toast.loadFailed" onRetry={retry} />
+      </div>
+    );
+  }
+
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -82,7 +91,9 @@ export default function EventsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('events.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('events.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="events.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canSendEvents}>
           <VerificationGate>
@@ -119,7 +130,7 @@ export default function EventsPage() {
                   <TableHead className="text-xs">{t('events.eventId')}</TableHead>
                   <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
                   <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('events.created')}</SortableTableHead>
-                  <TableHead className="w-[80px]"></TableHead>
+                  <TableHead className="w-[80px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -131,7 +142,7 @@ export default function EventsPage() {
                     <TableCell>
                       <div className="flex items-center gap-1.5 group">
                         <code className="text-[13px] font-mono text-muted-foreground">{event.id.substring(0, 8)}...</code>
-                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }}>
+                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }} title={t('common.copyId')} aria-label={t('common.copyId')}>
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
@@ -165,6 +176,7 @@ export default function EventsPage() {
                             onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
                             disabled={sharingEventId === event.id}
                             title={t('debugLinks.share')}
+                            aria-label={t('debugLinks.share')}
                           >
                             {sharingEventId === event.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -178,6 +190,7 @@ export default function EventsPage() {
                           size="icon-sm"
                           onClick={() => navigate(`/admin/projects/${projectId}/deliveries?eventId=${event.id}`)}
                           title={t('events.viewDeliveries')}
+                          aria-label={t('events.viewDeliveries')}
                         >
                           <Send className="h-3.5 w-3.5" />
                         </Button>

@@ -16,7 +16,7 @@ import java.util.Set;
  * In production mode (APP_ENV=production), placeholder secrets and unsafe settings
  * cause a startup failure to prevent accidental misconfigurations.
  *
- * Runs from {@link PostConstruct} (P0-14c) rather than {@code ApplicationReadyEvent}:
+ * Runs from {@link PostConstruct} rather than {@code ApplicationReadyEvent}:
  * the latter fires after the embedded connector is already bound and serving traffic,
  * leaving a live window where an insecure config is reachable before the check throws.
  * {@link SecurityConfigValidator} already uses this pattern; this class now matches it.
@@ -37,7 +37,7 @@ public class ProductionSafetyValidator {
 
     // The exact values .env.dist ships for each secret. A production deployment that
     // still has one of these means the operator copied .env.dist -> .env and never
-    // rotated the secret (P0-14c) -- a fixed substring denylist alone lets values like
+    // rotated the secret -- a fixed substring denylist alone lets values like
     // "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" through, so this is checked in addition to it.
     private static final Map<String, String> SHIPPED_DEFAULTS = Map.ofEntries(
             Map.entry("JWT_SECRET", "dev_jwt_secret_key_32_chars_minimum"),
@@ -76,7 +76,7 @@ public class ProductionSafetyValidator {
     private String redisPassword;
 
     // Not yet consumed by the app itself (MinIO integration is optional/future, see
-    // .env.dist) but still validated per P0-14c so a shipped default doesn't sit
+    // .env.dist) but still validated so a shipped default doesn't sit
     // unnoticed in a production .env — see docker-compose.yml, which now forwards it
     // to the api container purely for this check.
     @Value("${MINIO_ROOT_PASSWORD:}")

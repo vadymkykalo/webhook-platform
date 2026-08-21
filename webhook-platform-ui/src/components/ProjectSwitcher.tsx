@@ -50,6 +50,7 @@ export default function ProjectSwitcher({ currentProjectId, collapsed }: Project
           onClick={() => setOpen(!open)}
           className="w-full h-9 rounded-lg bg-accent/50 flex items-center justify-center hover:bg-accent transition-colors"
           title={currentProject?.name || t('nav.project')}
+          aria-label={currentProject?.name || t('nav.project')}
         >
           <FolderKanban className="h-4 w-4 text-muted-foreground" />
         </button>

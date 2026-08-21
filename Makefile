@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker test-ui monitoring-up monitoring-down monitoring-logs
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -79,6 +79,38 @@ up-prod-external: init ## Start services (external DB, production mode)
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
+
+# P1-15: pulls this project's own published images (ghcr.io/vadymkykalo/hookflow-*)
+# instead of building from source — no Maven/npm toolchain required. Uses
+# docker-compose.pull.yml, which is fully standalone (unlike docker-compose.prod.yml,
+# it doesn't need docker-compose.yml present) — see the comment at the top of
+# that file for why there are two.
+DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE) -f docker-compose.pull.yml
+
+up-pull: ## Start services from pre-built GHCR images (no build toolchain required)
+	@if [ ! -f .env ]; then \
+		echo "$(GREEN)Creating .env from .env.dist...$(NC)"; \
+		cp .env.dist .env; \
+		echo "$(YELLOW)  Using development defaults. CHANGE SECRETS FOR PRODUCTION!$(NC)"; \
+	fi
+	@echo "$(GREEN)Pulling pre-built images...$(NC)"
+	@$(DOCKER_COMPOSE_PULL) pull
+	@echo "$(GREEN)Starting services (pull-based, embedded DB/Kafka/Redis)...$(NC)"
+	@$(DOCKER_COMPOSE_PULL) up -d
+	@echo "$(GREEN)Waiting for API and UI to answer health checks...$(NC)"
+	@elapsed=0; \
+	while [ $$elapsed -lt 150 ]; do \
+		api_ok=$$(curl -sf -o /dev/null http://localhost:8082/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
+		ui_ok=$$(curl -sf -o /dev/null http://localhost:$${UI_PORT:-5173} 2>/dev/null && echo 1 || echo 0); \
+		if [ "$$api_ok" = "1" ] && [ "$$ui_ok" = "1" ]; then break; fi; \
+		sleep 5; elapsed=$$((elapsed + 5)); \
+	done
+	@echo "$(GREEN)Services started — dashboard: http://localhost:$${UI_PORT:-5173}$(NC)"
+
+down-pull: ## Stop pull-based services (keeps data)
+	@echo "$(YELLOW)Stopping pull-based services...$(NC)"
+	@$(DOCKER_COMPOSE_PULL) down
+	@echo "$(GREEN)Services stopped$(NC)"
 
 down: ## Stop services (keeps data)
 	@echo "$(YELLOW)Stopping services...$(NC)"
@@ -186,6 +218,33 @@ scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 	@$(DOCKER_COMPOSE) up -d --scale worker=$(N) --no-recreate
 	@echo "$(GREEN)Worker scaled to $(N) instances$(NC)"
 
+# api normally binds a single fixed host port (127.0.0.1:${API_PORT}:8080) so a
+# human can curl it directly — Compose refuses to scale a service past 1 replica
+# while that fixed host port is bound (P1-20). Passing API_PORT= (empty, not
+# unset) collapses that mapping to an auto-assigned ephemeral port per replica
+# instead — see the API_PORT comment in docker-compose.yml for why this is an
+# env var trick rather than a `-f docker-compose.scale.yml` overlay (Compose
+# concatenates `ports:` lists across -f files instead of replacing them, so an
+# overlay can't actually remove the fixed mapping). Traffic still reaches every
+# replica because the UI's nginx proxies to `api:8080` by Compose DNS, which
+# round-robins across all replicas on its own.
+scale-api: ## Scale API instances (usage: make scale-api N=3)
+	@if [ -z "$(N)" ]; then \
+		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Scaling api to $(N) instances (each replica gets its own ephemeral host port)...$(NC)"
+	@API_PORT= $(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
+	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' shows each replica's assigned port$(NC)"
+
+##@ Release
+version-check: ## Fail if pom/Chart/UI/SDK versions disagree (same check CI runs)
+	@scripts/check-version-drift.sh
+
+version-set: ## Set the version everywhere (usage: make version-set VERSION=2.3.0)
+	@if [ -z "$(VERSION)" ]; then echo "$(RED)Usage: make version-set VERSION=2.3.0$(NC)"; exit 1; fi
+	@scripts/set-version.sh $(VERSION)
+
 ##@ Kafka
 KAFKA_PARTITIONS ?= 12
 create-topics: ## Create Kafka topics (idempotent)
@@ -230,7 +289,7 @@ wait-healthy: ## Wait until API and Worker are healthy (max WAIT_TIMEOUT seconds
 	@echo "$(GREEN)Waiting for services to become healthy (timeout: $(WAIT_TIMEOUT)s)...$(NC)"
 	@elapsed=0; \
 	while [ $$elapsed -lt $(WAIT_TIMEOUT) ]; do \
-		api_ok=$$(curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
+		api_ok=$$($(DOCKER_COMPOSE) exec -T api wget -q --spider http://localhost:8082/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
 		worker_ok=$$($(DOCKER_COMPOSE) exec -T worker wget -q --spider http://localhost:8081/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
 		if [ "$$api_ok" = "1" ] && [ "$$worker_ok" = "1" ]; then \
 			echo ""; \
@@ -250,14 +309,16 @@ health: ## Check health of all services
 	@echo "Postgres: $$(docker exec webhook-postgres pg_isready -U webhook_user 2>/dev/null && echo 'UP' || echo 'DOWN')"
 	@echo "Kafka:    $$(docker exec webhook-kafka nc -z localhost 9092 2>/dev/null && echo 'UP' || echo 'DOWN')"
 	@echo "Redis:    $$(docker exec webhook-redis redis-cli -a $${REDIS_PASSWORD:-webhook_redis_pass} ping 2>/dev/null | grep -q PONG && echo 'UP' || echo 'DOWN')"
-	@echo "API:      $$(curl -sf http://localhost:8080/actuator/health/liveness | jq -r .status 2>/dev/null || echo 'DOWN')"
+	@echo "API:      $$($(DOCKER_COMPOSE) exec -T api wget -q -O - http://localhost:8082/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
 	@echo "Worker:   $$($(DOCKER_COMPOSE) exec -T worker wget -q -O - http://localhost:8081/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
 	@echo "UI:       $$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null || echo 'DOWN')"
 
-##@ Database (Embedded Mode Only)
-POSTGRES_USER ?= webhook_user
-POSTGRES_DB   ?= webhook_platform
-BACKUP_DIR    ?= ./backups
+##@ Database
+POSTGRES_USER         ?= webhook_user
+POSTGRES_DB           ?= webhook_platform
+BACKUP_DIR            ?= ./backups
+BACKUP_RETENTION_DAYS ?= 30
+DB_MODE               ?= embedded
 
 shell-db: ## Open psql shell in embedded database
 	@if [ "$(DB_MODE)" != "embedded" ]; then \
@@ -266,35 +327,38 @@ shell-db: ## Open psql shell in embedded database
 	fi
 	@docker exec -it webhook-postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-backup-db: ## Backup embedded database to ./backups/
-	@if [ "$(DB_MODE)" != "embedded" ]; then \
-		echo "$(RED)ERROR: This command only works in embedded DB mode$(NC)"; \
-		exit 1; \
-	fi
-	@echo "$(GREEN)Creating database backup...$(NC)"
-	@mkdir -p $(BACKUP_DIR)
-	@docker exec webhook-postgres pg_dump -U $(POSTGRES_USER) $(POSTGRES_DB) | gzip > $(BACKUP_DIR)/webhook_platform_$$(date +%Y%m%d_%H%M%S).sql.gz
-	@echo "$(GREEN)Backup created in $(BACKUP_DIR)/$(NC)"
-	@ls -lh $(BACKUP_DIR)/ | tail -1
+# backup-db / restore-db delegate to deploy/scripts/db-{backup,restore}.sh (P1-20),
+# the same script the Compose `db-backup` sidecar runs on a schedule. That script
+# supports DB_MODE=embedded (docker exec against webhook-postgres, the default)
+# and DB_MODE=external (pg_dump/pg_restore against DB_HOST via a throwaway
+# postgres:16-alpine container — no local pg_dump/pg_restore binary required).
+# Set DB_MODE=external and DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD to target
+# a managed/remote Postgres instance.
+backup-db: ## Backup database to ./backups/ (embedded or external — see DB_MODE)
+	@echo "$(GREEN)Creating database backup (DB_MODE=$(DB_MODE))...$(NC)"
+	@DB_MODE="$(DB_MODE)" BACKUP_DIR="$(BACKUP_DIR)" BACKUP_RETENTION_DAYS="$(BACKUP_RETENTION_DAYS)" \
+		POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_DB="$(POSTGRES_DB)" \
+		DB_HOST="$(DB_HOST)" DB_PORT="$(DB_PORT)" DB_NAME="$(DB_NAME)" DB_USER="$(DB_USER)" DB_PASSWORD="$(DB_PASSWORD)" \
+		./deploy/scripts/db-backup.sh
 
-restore-db: ## Restore embedded database from backup (usage: make restore-db FILE=backups/webhook_platform_20241217_120000.sql.gz)
-	@if [ "$(DB_MODE)" != "embedded" ]; then \
-		echo "$(RED)ERROR: This command only works in embedded DB mode$(NC)"; \
-		exit 1; \
-	fi
+restore-db: ## Restore database from backup (usage: make restore-db FILE=backups/webhook_platform_20241217_120000.dump [CONFIRM=YES])
 	@if [ -z "$(FILE)" ]; then \
-		echo "$(RED)ERROR: Please specify FILE=path/to/backup.sql.gz$(NC)"; \
+		echo "$(RED)ERROR: Please specify FILE=path/to/backup.dump$(NC)"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(FILE)" ]; then \
 		echo "$(RED)ERROR: File $(FILE) not found$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(YELLOW)  WARNING: This will DROP and recreate the database$(NC)"
-	@echo "$(YELLOW)Press Ctrl+C to cancel, or Enter to continue...$(NC)"
-	@read confirm
-	@echo "$(GREEN)Restoring database from $(FILE)...$(NC)"
-	@gunzip -c $(FILE) | docker exec -i webhook-postgres psql -U $(POSTGRES_USER) $(POSTGRES_DB)
+	@if [ "$(CONFIRM)" != "YES" ]; then \
+		echo "$(YELLOW)  WARNING: This will DROP and recreate data in the target database$(NC)"; \
+		echo "$(YELLOW)Press Ctrl+C to cancel, or Enter to continue (pass CONFIRM=YES to skip this prompt, e.g. in CI)...$(NC)"; \
+		read confirm; \
+	fi
+	@echo "$(GREEN)Restoring database from $(FILE) (DB_MODE=$(DB_MODE))...$(NC)"
+	@DB_MODE="$(DB_MODE)" FILE="$(FILE)" POSTGRES_USER="$(POSTGRES_USER)" POSTGRES_DB="$(POSTGRES_DB)" \
+		DB_HOST="$(DB_HOST)" DB_PORT="$(DB_PORT)" DB_NAME="$(DB_NAME)" DB_USER="$(DB_USER)" DB_PASSWORD="$(DB_PASSWORD)" \
+		./deploy/scripts/db-restore.sh
 	@echo "$(GREEN)Database restored$(NC)"
 
 ##@ Diagnostics

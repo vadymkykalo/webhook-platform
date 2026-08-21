@@ -1,5 +1,5 @@
 {
-  "name": "@webhook-platform/node",
+  "name": "@hookflow/node",
   "version": "2.2.1",
   "description": "Official Node.js SDK for Hookflow — reliable webhook infrastructure",
   "main": "dist/index.js",
@@ -7,9 +7,13 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "test:contract": "jest --config jest.contract.config.js",
     "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build"
   },

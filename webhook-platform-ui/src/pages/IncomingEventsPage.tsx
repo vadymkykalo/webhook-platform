@@ -1,21 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Activity, Loader2, Copy, ChevronLeft, ChevronRight, CheckCircle, XCircle, MinusCircle,
   RotateCcw, Clock, AlertTriangle, Calendar, ArrowDownToLine
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { incomingEventsApi } from '../api/incomingEvents.api';
-import { incomingSourcesApi } from '../api/incomingSources.api';
-import { projectsApi } from '../api/projects.api';
-import type {
-  IncomingEventResponse, IncomingForwardAttemptResponse, IncomingSourceResponse,
-  ProjectResponse, PageResponse,
-} from '../types/api.types';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import {
+  useProject, useIncomingSources, useIncomingEvents, useIncomingEventAttempts, useReplayIncomingEvent,
+} from '../api/queries';
+import type { IncomingEventResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Select } from '../components/ui/select';
@@ -36,81 +33,53 @@ export default function IncomingEventsPage() {
   const navigate = useNavigate();
   const { canReplayIncomingEvents } = usePermissions();
 
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [events, setEvents] = useState<IncomingEventResponse[]>([]);
-  const [sources, setSources] = useState<IncomingSourceResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pageInfo, setPageInfo] = useState<PageResponse<IncomingEventResponse> | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [filterSourceId, setFilterSourceId] = useState<string>('');
 
   // Detail sheet
-  const [selectedEvent, setSelectedEvent] = useState<IncomingEventResponse | null>(null);
-  const [attempts, setAttempts] = useState<IncomingForwardAttemptResponse[]>([]);
-  const [loadingAttempts, setLoadingAttempts] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   // Replay
   const [replayEventId, setReplayEventId] = useState<string | null>(null);
-  const [replaying, setReplaying] = useState(false);
 
-  useEffect(() => {
-    if (projectId) loadData();
-  }, [projectId, currentPage, filterSourceId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {
+    data: project, isLoading: projectLoading, isError: projectIsError, error: projectError, refetch: refetchProject,
+  } = useProject(projectId);
+  const {
+    data: sourcesPage, isError: sourcesIsError, error: sourcesError, refetch: refetchSources,
+  } = useIncomingSources(projectId, 0, 100);
+  const sources = sourcesPage?.content ?? [];
+  const {
+    data: eventsPage, isLoading: eventsLoading, isError: eventsIsError, error: eventsError, refetch: refetchEvents,
+  } = useIncomingEvents(projectId, { sourceId: filterSourceId || undefined, page: currentPage, size: PAGE_SIZE });
+  const events = eventsPage?.content ?? [];
+  const pageInfo = eventsPage;
 
-  const loadData = async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      const [proj, eventsData, sourcesData] = await Promise.all([
-        projectsApi.get(projectId),
-        incomingEventsApi.list(projectId, {
-          sourceId: filterSourceId || undefined,
-          page: currentPage,
-          size: PAGE_SIZE,
-        }),
-        incomingSourcesApi.list(projectId, 0, 100),
-      ]);
-      setProject(proj);
-      setEvents(eventsData.content);
-      setPageInfo(eventsData);
-      setSources(sourcesData.content);
-    } catch (err) {
-      showApiError(err, 'incomingEvents.toast.loadFailed', { retry: loadData });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
+  const {
+    data: attemptsPage, isLoading: loadingAttempts,
+  } = useIncomingEventAttempts(projectId, selectedEventId ?? undefined);
+  const attempts = attemptsPage?.content ?? [];
 
-  const openEventDetail = async (event: IncomingEventResponse) => {
-    setSelectedEvent(event);
-    setAttempts([]);
-    if (!projectId) return;
-    setLoadingAttempts(true);
-    try {
-      const data = await incomingEventsApi.getAttempts(projectId, event.id);
-      setAttempts(data.content);
-    } catch (err) {
-      showApiError(err, 'incomingEvents.toast.loadFailed');
-    } finally {
-      setLoadingAttempts(false);
-    }
+  const loading = projectLoading || eventsLoading;
+  const isError = projectIsError || eventsIsError || sourcesIsError;
+  const retry = () => { refetchProject(); refetchEvents(); refetchSources(); };
+
+  const replayMutation = useReplayIncomingEvent(projectId!);
+  const replaying = replayMutation.isPending;
+
+  const openEventDetail = (event: IncomingEventResponse) => {
+    setSelectedEventId(event.id);
   };
 
   const handleReplay = async () => {
     if (!replayEventId || !projectId) return;
-    setReplaying(true);
     try {
-      const result = await incomingEventsApi.replay(projectId, replayEventId);
+      const result = await replayMutation.mutateAsync(replayEventId);
       showSuccess(t('incomingEvents.toast.replayed', { count: result.destinationsCount }));
       setReplayEventId(null);
-      loadData();
-      if (selectedEvent?.id === replayEventId) {
-        openEventDetail(selectedEvent);
-      }
     } catch (err) {
       showApiError(err, 'incomingEvents.toast.replayFailed');
-    } finally {
-      setReplaying(false);
     }
   };
 
@@ -160,6 +129,14 @@ export default function IncomingEventsPage() {
     return <PageSkeleton><SkeletonRows count={5} height="h-16" /></PageSkeleton>;
   }
 
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+        <ErrorState error={projectError ?? eventsError ?? sourcesError} fallbackKey="incomingEvents.toast.loadFailed" onRetry={retry} />
+      </div>
+    );
+  }
+
   if (!project) {
     return (
       <div className="p-6 lg:p-8 max-w-6xl mx-auto">
@@ -173,10 +150,17 @@ export default function IncomingEventsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-title tracking-tight">{t('incomingEvents.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('incomingEvents.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="incomingEvents.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select className="w-[200px]" value={filterSourceId} onChange={(e) => { setFilterSourceId(e.target.value); setCurrentPage(0); }}>
+          <Select
+            className="w-[200px]"
+            value={filterSourceId}
+            onChange={(e) => { setFilterSourceId(e.target.value); setCurrentPage(0); }}
+            aria-label={t('incomingEvents.filters.source')}
+          >
             <option value="">{t('incomingEvents.filters.allSources')}</option>
             {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
@@ -216,11 +200,11 @@ export default function IncomingEventsPage() {
                       <Calendar className="h-3 w-3" /> {formatRelativeTime(event.receivedAt)}
                     </span>
                     {canReplayIncomingEvents && (
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setReplayEventId(event.id); }} title={t('incomingEvents.replay.submit')}>
+                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setReplayEventId(event.id); }} title={t('incomingEvents.replay.submit')} aria-label={t('incomingEvents.replay.submit')}>
                         <RotateCcw className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyRequestId(event.requestId); }} title={t('common.copyId')}>
+                    <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyRequestId(event.requestId); }} title={t('common.copyId')} aria-label={t('common.copyId')}>
                       <Copy className="h-3 w-3" />
                     </Button>
                   </div>
@@ -249,7 +233,7 @@ export default function IncomingEventsPage() {
       )}
 
       {/* Event Detail Sheet */}
-      <Sheet open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
+      <Sheet open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEventId(null)}>
         <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{t('incomingEvents.detail.title')}</SheetTitle>

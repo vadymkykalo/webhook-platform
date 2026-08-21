@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Regression coverage for P0-08: TestEndpointController had no tenancy check at
+ * Regression coverage: TestEndpointController had no tenancy check at
  * all, so any authenticated user from any organization could list, read, or
  * delete another organization's test endpoints and their captured webhook
  * traffic (headers, bodies, including Authorization/signature headers).

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useProjects, useDashboardStats, useEndpoints, useOnboardingStatus, useAnalytics } from '../api/queries';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import OnboardingWizard, { hasSeenWizard } from '../components/OnboardingWizard';
 import Sparkline from '../components/Sparkline';
@@ -60,7 +60,7 @@ function SkeletonDashboard() {
 export default function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: projects = [], isLoading: loading } = useProjects();
+  const { data: projects = [], isLoading: loading, isError: projectsIsError, error: projectsError, refetch: refetchProjects } = useProjects();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   // Auto-select first project when loaded
@@ -70,9 +70,12 @@ export default function DashboardPage() {
     }
   }, [projects, selectedProjectId]);
 
-  const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats(
-    selectedProjectId || undefined
-  );
+  const {
+    data: dashboardStats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats,
+  } = useDashboardStats(selectedProjectId || undefined);
+
+  const isError = projectsIsError || statsIsError;
+  const retry = () => { refetchProjects(); refetchStats(); };
 
   const { data: analytics } = useAnalytics(selectedProjectId || undefined, '7d');
 
@@ -89,6 +92,14 @@ export default function DashboardPage() {
   const [showWizard, setShowWizard] = useState(() => !hasSeenWizard());
 
   if (loading) return <SkeletonDashboard />;
+
+  if (isError) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+        <ErrorState error={projectsError ?? statsError} fallbackKey="dashboard.toast.loadFailed" onRetry={retry} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">

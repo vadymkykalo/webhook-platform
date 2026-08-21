@@ -6,9 +6,21 @@ Self-hosted webhook infrastructure platform for Kubernetes.
 
 - Kubernetes 1.24+
 - Helm 3.8+
-- PostgreSQL 16+ (external or subchart)
-- Kafka 3.7+ (external or subchart)
-- Redis 7+ (subchart enabled by default)
+- PostgreSQL 16+, Kafka 3.7+, and Redis 7+ - **you must supply all three**
+
+  This chart does not bundle PostgreSQL/Kafka/Redis subcharts. It used to
+  depend on Bitnami's, but Bitnami moved its free chart/image catalog to a
+  restricted "Legacy" tier in August 2025 (dropping Kafka from the catalog
+  entirely) and is retiring its AWS-hosted mirror of the same content in
+  June 2026 - repinning to a newer Bitnami version would just be betting on
+  a catalog that keeps shrinking. Point `postgresql.external`,
+  `kafka.external`, and `redis.external` in `values.yaml` at your own
+  instances: managed services (RDS/Cloud SQL, MSK/Confluent Cloud,
+  ElastiCache/Memorystore, etc.) for production, or your own
+  StatefulSets/containers for a self-managed cluster - `postgres:16-alpine`,
+  `apache/kafka:3.7.0`, and `redis:7-alpine` are the exact images this
+  project's `docker-compose.yml` and CI test against, so they're a
+  reasonable starting point if you're standing up your own.
 
 ## Quick Start
 
@@ -35,7 +47,7 @@ kubectl create secret generic hookflow-redis-secret \
 
 ### 2. Configure external services
 
-Edit `values.yaml` to point to your external PostgreSQL and Kafka:
+Edit `values.yaml` to point to your external PostgreSQL, Kafka, and Redis (all three are required - see Prerequisites):
 
 ```yaml
 postgresql:
@@ -51,18 +63,31 @@ kafka:
   enabled: false
   external:
     bootstrapServers: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+
+redis:
+  enabled: false
+  external:
+    host: "redis.example.com"
+    port: 6379
+    existingSecret: hookflow-redis-secret
 ```
 
 ### 3. Install chart
 
 ```bash
-# Development (embedded DB and Kafka)
-helm install hookflow ./hookflow
+# Both dev and production need external.* set for postgresql/kafka/redis -
+# see "Configure external services" above and Prerequisites for why there's
+# no embedded/subchart option.
+helm install hookflow ./hookflow \
+  --set postgresql.external.host=postgres.local \
+  --set kafka.external.bootstrapServers=kafka.local:9092 \
+  --set redis.external.host=redis.local
 
-# Production (external services)
+# Production
 helm install hookflow ./hookflow -f values-production.yaml \
   --set postgresql.external.host=postgres.prod.local \
   --set kafka.external.bootstrapServers=kafka.prod.local:9092 \
+  --set redis.external.host=redis.prod.local \
   --set ui.ingress.hosts[0].host=app.hookflow.yourdomain.com
 ```
 

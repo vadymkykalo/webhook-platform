@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight, Shield, Clock } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
@@ -159,7 +159,9 @@ export default function ApiKeysPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('apiKeys.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('apiKeys.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="apiKeys.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         {canManageApiKeys && (
           <Button onClick={() => setShowCreateDialog(true)}>
@@ -211,7 +213,7 @@ export default function ApiKeysPage() {
                     </div>
                   </div>
                   {canManageApiKeys && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title={t('apiKeys.revoke')} className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title={t('apiKeys.revoke')} aria-label={t('apiKeys.revoke')} className="text-muted-foreground hover:text-destructive flex-shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
@@ -361,6 +363,7 @@ export default function ApiKeysPage() {
                     size="icon"
                     onClick={() => setShowKey(!showKey)}
                     title={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
+                    aria-label={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
                   >
                     {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -369,6 +372,7 @@ export default function ApiKeysPage() {
                     size="icon"
                     onClick={() => newApiKey?.key && handleCopyKey(newApiKey.key)}
                     title={t('apiKeys.keyDialog.copyKey')}
+                    aria-label={t('apiKeys.keyDialog.copyKey')}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>

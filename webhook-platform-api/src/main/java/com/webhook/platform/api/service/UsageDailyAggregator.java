@@ -1,7 +1,6 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.domain.entity.Project;
-import com.webhook.platform.api.domain.entity.UsageDaily;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import java.util.UUID;
@@ -10,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -28,6 +27,11 @@ public class UsageDailyAggregator {
     private final UsageDailyRepository usageDailyRepository;
     private final IncomingEventRepository incomingEventRepository;
     private final IncomingForwardAttemptRepository incomingForwardAttemptRepository;
+    // aggregateForProject is invoked via `this` from aggregateYesterday, which bypasses
+    // the Spring proxy, so @Transactional silently does nothing there. TransactionTemplate is
+    // driven explicitly instead, matching the pattern used by OutboxPublisherService /
+    // EventIngestService / EncryptionKeyRotationService in this codebase.
+    private final TransactionTemplate transactionTemplate;
 
     @Scheduled(cron = "0 5 0 * * *")
     @SchedulerLock(name = "usage-daily-aggregator", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
@@ -50,8 +54,11 @@ public class UsageDailyAggregator {
         log.info("Daily usage aggregation complete: {} projects processed for {}", count, yesterday);
     }
 
-    @Transactional
     public void aggregateForProject(UUID projectId, LocalDate date) {
+        transactionTemplate.executeWithoutResult(status -> aggregateForProjectInTransaction(projectId, date));
+    }
+
+    private void aggregateForProjectInTransaction(UUID projectId, LocalDate date) {
         if (usageDailyRepository.findByProjectIdAndDate(projectId, date).isPresent()) {
             return;
         }
@@ -67,19 +74,17 @@ public class UsageDailyAggregator {
         long incomingEventsCount = incomingEventRepository.countByProjectAndDateRange(projectId, dayStart, dayEnd);
         long incomingForwardsCount = incomingForwardAttemptRepository.countSuccessfulByProjectAndDateRange(projectId, dayStart, dayEnd);
 
-        UsageDaily usage = UsageDaily.builder()
-                .projectId(projectId)
-                .date(date)
-                .eventsCount(eventsCount)
-                .deliveriesCount(deliveriesCount)
-                .successfulDeliveries(successCount)
-                .failedDeliveries(failedCount)
-                .dlqCount(dlqCount)
-                .incomingEventsCount(incomingEventsCount)
-                .incomingForwardsCount(incomingForwardsCount)
-                .build();
+        // Atomic check-then-insert via the DB's UNIQUE (project_id, date) constraint (see
+        // V020__alerts_and_usage.sql) instead of the prior findByProjectIdAndDate-then-save,
+        // which raced under concurrent/duplicate runs and depended on ShedLock alone for safety.
+        int inserted = usageDailyRepository.upsertIfAbsent(
+                projectId, date, eventsCount, deliveriesCount, successCount, failedCount,
+                dlqCount, incomingEventsCount, incomingForwardsCount);
 
-        usageDailyRepository.save(usage);
-        log.debug("Aggregated usage for project {} on {}: events={}, deliveries={}", projectId, date, eventsCount, deliveriesCount);
+        if (inserted == 0) {
+            log.debug("Usage row for project {} on {} already exists (concurrent aggregation), skipping", projectId, date);
+        } else {
+            log.debug("Aggregated usage for project {} on {}: events={}, deliveries={}", projectId, date, eventsCount, deliveriesCount);
+        }
     }
 }

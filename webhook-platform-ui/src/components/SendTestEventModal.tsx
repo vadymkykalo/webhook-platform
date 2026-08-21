@@ -71,7 +71,7 @@ export default function SendTestEventModal({
       setJsonError('');
       return true;
     } catch (e) {
-      setJsonError('Invalid JSON format');
+      setJsonError(t('events.sendModal.invalidJson'));
       return false;
     }
   };
@@ -89,7 +89,7 @@ export default function SendTestEventModal({
     e.preventDefault();
 
     if (!validateJson(payload)) {
-      showWarning('Please fix JSON errors before submitting');
+      showWarning(t('events.sendModal.fixJsonBeforeSubmit'));
       return;
     }
 
@@ -107,7 +107,7 @@ export default function SendTestEventModal({
         showWarning(t('events.toast.noSubscriptionMatch', { eventType }), { duration: 8000 });
       } else {
         showSuccess(
-          `Event sent successfully! Created ${count} deliveries.`,
+          t('events.sendModal.sentSuccess', { count }),
           { duration: 5000 }
         );
       }
@@ -127,16 +127,16 @@ export default function SendTestEventModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Send Test Event</DialogTitle>
+          <DialogTitle>{t('events.sendModal.title')}</DialogTitle>
           <DialogDescription>
-            Send a webhook event to trigger deliveries to subscribed endpoints
+            {t('events.sendModal.description')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="eventType">Event Type</Label>
+              <Label htmlFor="eventType">{t('events.sendModal.eventType')}</Label>
               <Input
                 id="eventType"
                 placeholder="user.created"
@@ -147,12 +147,12 @@ export default function SendTestEventModal({
                 autoFocus
               />
               <p className="text-xs text-muted-foreground">
-                Use dot notation (e.g., user.created, order.updated)
+                {t('events.sendModal.eventTypeHint')}
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="payload">Event Payload (JSON)</Label>
+              <Label htmlFor="payload">{t('events.sendModal.payload')}</Label>
               <Textarea
                 id="payload"
                 value={payload}
@@ -166,7 +166,7 @@ export default function SendTestEventModal({
                 <p className="text-sm text-destructive">{jsonError}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Must be valid JSON. This data will be sent to webhook endpoints.
+                {t('events.sendModal.payloadHint')}
               </p>
             </div>
 
@@ -191,8 +191,7 @@ export default function SendTestEventModal({
             {!eventType.trim() && (
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Note:</strong> This event will create deliveries for all active subscriptions 
-                  matching this event type. Check the Deliveries page to see processing results.
+                  <strong>{t('events.sendModal.noteLabel')}</strong> {t('events.sendModal.noteBody')}
                 </p>
               </div>
             )}
@@ -205,14 +204,14 @@ export default function SendTestEventModal({
               onClick={onClose}
               disabled={sending}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={sending || !!jsonError}>
               {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {sending ? 'Sending...' : (
+              {sending ? t('events.sendModal.sending') : (
                 <>
                   <Send className="mr-2 h-4 w-4" />
-                  Send Event
+                  {t('events.sendModal.send')}
                 </>
               )}
             </Button>

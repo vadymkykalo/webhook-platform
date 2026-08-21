@@ -129,4 +129,37 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     @Query("DELETE FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")
     void deleteDlqByProjectId(@Param("projectId") UUID projectId);
 
+    /**
+     * Highest sequence number ever generated (and persisted) for an endpoint. Used by
+     * {@code SequenceGeneratorService} to reseed its Redis counter after a cache miss (e.g.
+     * a Redis flush) instead of restarting from zero and permanently desyncing from
+     * {@code ordering_cursors}.
+     */
+    @Query("SELECT MAX(d.sequenceNumber) FROM Delivery d WHERE d.endpointId = :endpointId")
+    Long findMaxSequenceNumber(@Param("endpointId") UUID endpointId);
+
+    /**
+     * Per-endpoint high-water mark of generated sequence numbers, restricted to endpoints
+     * with ordering-enabled activity since {@code since}. Used by the periodic sequence/cursor
+     * reconciliation job — bounded to recently-active endpoints so it stays
+     * cheap regardless of total endpoint count.
+     */
+    @Query(value = """
+        SELECT d.endpoint_id, MAX(d.sequence_number)
+        FROM deliveries d
+        WHERE d.ordering_enabled = true AND d.sequence_number IS NOT NULL AND d.created_at >= :since
+        GROUP BY d.endpoint_id
+        """, nativeQuery = true)
+    List<Object[]> findMaxSequenceNumberPerEndpointSince(@Param("since") Instant since);
+
+    /**
+     * Backfills the sequence number generated after commit for an ordering-enabled delivery
+     * (see {@code EventIngestService#assignSequenceNumbersPostCommit}). A separate, tiny,
+     * auto-committing statement — not part of the ingest transaction — so a later rollback in
+     * that transaction can never be the reason a generated sequence number goes unused.
+     */
+    @Modifying
+    @Query("UPDATE Delivery d SET d.sequenceNumber = :sequenceNumber WHERE d.id = :id")
+    int updateSequenceNumber(@Param("id") UUID id, @Param("sequenceNumber") long sequenceNumber);
+
 }

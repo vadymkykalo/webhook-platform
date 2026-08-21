@@ -77,10 +77,20 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             "WHERE id = :id", nativeQuery = true)
     int incrementAttemptCount(@Param("id") UUID id);
 
-    @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId AND d.sequenceNumber = :sequenceNumber AND d.status IN ('PENDING', 'PROCESSING')")
+    /**
+     * Finds the oldest createdAt among deliveries still PENDING/PROCESSING for this endpoint
+     * whose sequence number falls in the missing range {@code [rangeStart, rangeEnd]}
+     * (inclusive). Used only to decide whether *anything* is still outstanding in the gap —
+     * the actual timeout decision is driven by when the blocked successor was first buffered
+     * (see {@code OrderingBufferService#isGapTimedOut}), not by this timestamp. An empty range
+     * (rangeStart &gt; rangeEnd) or a range with nothing pending both return null.
+     */
+    @Query("SELECT MIN(d.createdAt) FROM Delivery d WHERE d.endpointId = :endpointId " +
+            "AND d.sequenceNumber BETWEEN :rangeStart AND :rangeEnd AND d.status IN ('PENDING', 'PROCESSING')")
     Instant findOldestPendingCreatedAt(
             @Param("endpointId") UUID endpointId,
-            @Param("sequenceNumber") Long sequenceNumber
+            @Param("rangeStart") long rangeStart,
+            @Param("rangeEnd") long rangeEnd
     );
 
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'PENDING' AND d.createdAt > :since")
@@ -91,6 +101,17 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
 
     @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ' AND d.createdAt > :since")
     long countDlq(@Param("since") Instant since);
+
+    /**
+     * All-time count of deliveries still sitting in {@code DeliveryStatus.DLQ} -- i.e. the
+     * actionable backlog: deliveries that have not yet been retried (back to PENDING) or
+     * purged via {@code DlqService}. Used by {@code DlqMonitoringService} as the
+     * source of truth for the "needs manual intervention" gauge, in place of a Kafka
+     * latest-earliest offset computation that could only ever measure topic retention, not
+     * whether anything had actually been remediated.
+     */
+    @Query("SELECT COUNT(d) FROM Delivery d WHERE d.status = 'DLQ'")
+    long countDlqTotal();
 
     /**
      * Finds the oldest pending delivery's createdAt timestamp (globally).

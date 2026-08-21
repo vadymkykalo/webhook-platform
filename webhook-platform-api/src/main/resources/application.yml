@@ -6,7 +6,7 @@ spring:
   task:
     scheduling:
       pool:
-        # P0-06: Spring Boot defaults this to 1, so a single slow @Scheduled job (e.g. the
+        # Spring Boot defaults this to 1, so a single slow @Scheduled job (e.g. the
         # materialized-view REFRESH) blocks every other cron on the JVM, including
         # OutboxPublisherService's 1s dispatch poll - no event reaches Kafka while it runs.
         size: ${SCHEDULING_POOL_SIZE:8}
@@ -85,6 +85,18 @@ management:
       enabled: true
     readinessState:
       enabled: true
+  server:
+    # Defaults to the same port as `server.port` (i.e. no split — actuator
+    # stays behind SecurityConfig's JWT/API-key auth on the main port, same as
+    # before). The Compose deployment overrides MANAGEMENT_PORT to a dedicated
+    # port not exposed to the host, so Prometheus can scrape /actuator/prometheus
+    # without authenticating (see monitoring/README.md "Metrics-scrape auth" and
+    # docker-compose.yml). When management.server.port differs from server.port,
+    # Spring Boot serves actuator from a separate embedded web server that never
+    # passes through the main SecurityFilterChain — do not point this at a port
+    # reachable from outside the trusted docker network.
+    port: ${MANAGEMENT_PORT:${SERVER_PORT:8080}}
+    address: ${MANAGEMENT_ADDRESS:0.0.0.0}
 
 outbox:
   publisher:
@@ -112,6 +124,17 @@ data-retention:
   tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
   tunnel-log-cleanup-cron: ${TUNNEL_LOG_CLEANUP_CRON:0 30 2 * * *}
 
+# Partition maintenance for the declaratively-partitioned high-volume tables
+# (delivery_attempts, tunnel_request_log — see V052/V053 migrations and
+# PartitionMaintenanceService). Creates future partitions ahead of need and drops
+# partitions once fully past the corresponding data-retention.*-retention-days above,
+# replacing DELETE-based retention with O(1) DROP TABLE for those two tables.
+partition-maintenance:
+  enabled: ${PARTITION_MAINTENANCE_ENABLED:true}
+  delivery-attempts-lookahead-months: ${PARTITION_MAINTENANCE_DELIVERY_ATTEMPTS_LOOKAHEAD_MONTHS:3}
+  tunnel-request-log-lookahead-weeks: ${PARTITION_MAINTENANCE_TUNNEL_LOG_LOOKAHEAD_WEEKS:3}
+  cron: ${PARTITION_MAINTENANCE_CRON:0 45 1 * * *}
+
 replay:
   batch-size: ${REPLAY_BATCH_SIZE:200}
   batch-delay-ms: ${REPLAY_BATCH_DELAY_MS:50}
@@ -133,7 +156,7 @@ event:
 
 platform:
   admin:
-    # P0-09: cluster-operator credential for /api/v1/admin/** (e.g. encryption key rotation).
+    # Cluster-operator credential for /api/v1/admin/** (e.g. encryption key rotation).
     # Independent of org membership/JWT — see PlatformAdminAuthenticationFilter. Leave unset to
     # keep these endpoints unreachable (fail closed) until an operator explicitly needs them.
     token: ${PLATFORM_ADMIN_TOKEN:}
@@ -231,6 +254,12 @@ entitlement:
   defaults:
     rate-limit-per-second: ${ENTITLEMENT_DEFAULT_RATE_LIMIT:100}
     max-fanout-per-event: ${ENTITLEMENT_DEFAULT_MAX_FANOUT:50}
+
+ordering:
+  # How far back SequenceReconciliationService looks for "recently active" ordering-enabled
+  # endpoints when comparing the Redis sequence counter against the durable high-water mark.
+  sequence-reconciliation-lookback-hours: ${ORDERING_SEQUENCE_RECONCILIATION_LOOKBACK_HOURS:48}
+  sequence-reconciliation-interval-ms: ${ORDERING_SEQUENCE_RECONCILIATION_INTERVAL_MS:900000}
 
 billing:
   enabled: ${BILLING_ENABLED:false}

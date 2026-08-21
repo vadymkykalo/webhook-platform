@@ -25,6 +25,8 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
     ports:
       - "127.0.0.1:9090:9090"
+    depends_on:
+      - alertmanager
     networks:
       - monitoring
       - hookflow
@@ -33,6 +35,46 @@ services:
       resources:
         limits:
           memory: 512m
+
+  # The 14 rules in prometheus/alerts.yml evaluate correctly but, without
+  # this, route nowhere — no receiver, just a red square on a dashboard nobody
+  # is watching. See monitoring/README.md "Alerting" for receiver setup
+  # (ALERTMANAGER_* in .env) and the routing/grouping/inhibition design.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: hookflow-alertmanager
+    volumes:
+      - ./alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
+      - alertmanager_data:/alertmanager
+    environment:
+      ALERTMANAGER_SLACK_WEBHOOK_URL: ${ALERTMANAGER_SLACK_WEBHOOK_URL:-}
+      ALERTMANAGER_SLACK_CHANNEL: ${ALERTMANAGER_SLACK_CHANNEL:-#hookflow-alerts}
+      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-}
+      ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO:-}
+      ALERTMANAGER_EMAIL_FROM: ${ALERTMANAGER_EMAIL_FROM:-alerts@hookflow.dev}
+      ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST:-localhost}
+      ALERTMANAGER_SMTP_PORT: ${ALERTMANAGER_SMTP_PORT:-1025}
+    entrypoint: ["/bin/sh", "-c"]
+    # render-config.sh writes /etc/alertmanager/alertmanager.yml from the
+    # ALERTMANAGER_* env vars above (busybox image — no envsubst, see the
+    # script's header for why it's POSIX sh instead of a static file).
+    command:
+      - >-
+        sh /etc/alertmanager/render-config.sh &&
+        exec /bin/alertmanager
+        --config.file=/etc/alertmanager/alertmanager.yml
+        --storage.path=/alertmanager
+        --web.listen-address=:9093
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - monitoring
+      - hookflow
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -54,15 +96,75 @@ services:
       - hookflow
     depends_on:
       - prometheus
+      - loki
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 256m
 
+  # Log aggregation. api/worker already populate MDC with correlationId /
+  # organizationId / userId / projectId (JwtAuthenticationFilter, ApiKeyAuthenticationFilter,
+  # CorrelationIdFilter) and emit structured JSON logs in production
+  # (LogstashEncoder — see each module's logback-spring.xml), but until now nothing
+  # shipped or indexed them: docker-compose.prod.yml just sets LOG_LEVEL and logs go
+  # to stdout with no collector, so a restarted/rescheduled container's history was
+  # simply gone. Loki + Promtail is the natural fit next to the Prometheus/Grafana
+  # already here. See docs/runbooks/trace-webhook-logs.md.
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: hookflow-loki
+    command:
+      - "-config.file=/etc/loki/loki-config.yml"
+      - "-config.expand-env=true"
+    environment:
+      LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:-336h}
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks:
+      - monitoring
+      - hookflow
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: hookflow-promtail
+    command:
+      - "-config.file=/etc/promtail/promtail-config.yml"
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - promtail_positions:/var/lib/promtail
+      # Read-only access to the Docker log files + daemon socket (service discovery) —
+      # this is why promtail runs outside the `monitoring` network's isolation the same
+      # way prometheus/grafana do: it needs the `hookflow` network to reach `loki`, and
+      # the host's Docker socket to discover api/worker containers regardless of which
+      # compose project (directory name) they were started from.
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - monitoring
+      - hookflow
+    depends_on:
+      - loki
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
 volumes:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
+  loki_data:
+  promtail_positions:
 
 networks:
   monitoring:

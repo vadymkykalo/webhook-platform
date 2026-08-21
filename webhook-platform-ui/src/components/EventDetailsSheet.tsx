@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Copy, Radio, Send, Clock, FileJson, Shield, ExternalLink,
@@ -125,6 +125,8 @@ export default function EventDetailsSheet({
                     size="icon-sm"
                     className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                     onClick={() => handleCopy(event.id, 'Event ID')}
+                    title={t('common.copyId')}
+                    aria-label={t('common.copyId')}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
@@ -225,7 +227,9 @@ export default function EventDetailsSheet({
                   <div className="py-8 text-center space-y-2">
                     <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
                     {event.eventType && (
-                      <p className="text-xs text-muted-foreground max-w-sm mx-auto" dangerouslySetInnerHTML={{ __html: t('events.details.noDeliveriesNoSub', { eventType: event.eventType }) }} />
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
+                      </p>
                     )}
                     <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
                   </div>
@@ -245,7 +249,7 @@ export default function EventDetailsSheet({
                         </div>
                       </div>
                       {(d.status === 'FAILED' || d.status === 'DLQ') && (
-                        <Button variant="ghost" size="icon-sm" title="Replay" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed')).catch(e => showApiError(e, 'deliveries.replayFailed'))}>
+                        <Button variant="ghost" size="icon-sm" title={t('events.details.replay')} aria-label={t('events.details.replay')} onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed')).catch(e => showApiError(e, 'deliveries.replayFailed'))}>
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
                       )}

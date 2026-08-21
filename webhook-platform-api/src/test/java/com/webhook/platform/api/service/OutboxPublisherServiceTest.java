@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -177,6 +178,118 @@ class OutboxPublisherServiceTest {
         verify(outboxMessageRepository, never()).batchMarkFailed(anyList(), anyString(), any(Instant.class));
         // Message remains SENDING (set during claim phase)
         assertThat(message.getStatus()).isEqualTo(OutboxStatus.SENDING);
+    }
+
+    @Test
+    void findPendingBatchForUpdate_outerQuery_ordersByCreatedAt() throws Exception {
+        // Regression test: the outer "SELECT * FROM outbox_messages WHERE id IN
+        // (...) FOR UPDATE SKIP LOCKED" had no ORDER BY, so Postgres could return the
+        // id-filtered rows in plan order even though the inner subquery computed the correct
+        // rn_proj/rn_key ranking — up to maxPerKey=10 messages for one endpoint could reach
+        // publishBatchAsync (and therefore Kafka) out of order. Assert the outer query (the
+        // part after the inner subquery's closing paren) carries its own ORDER BY created_at.
+        assertOuterQueryOrdersByCreatedAt("findPendingBatchForUpdate",
+                String.class, int.class, int.class, int.class);
+        assertOuterQueryOrdersByCreatedAt("findFailedMessagesForRetry",
+                String.class, int.class, int.class, int.class, int.class);
+    }
+
+    private void assertOuterQueryOrdersByCreatedAt(String methodName, Class<?>... paramTypes) throws Exception {
+        var method = OutboxMessageRepository.class.getMethod(methodName, paramTypes);
+        org.springframework.data.jpa.repository.Query queryAnnotation =
+                method.getAnnotation(org.springframework.data.jpa.repository.Query.class);
+        String sql = queryAnnotation.value();
+
+        int forUpdateIdx = sql.lastIndexOf("FOR UPDATE");
+        assertThat(forUpdateIdx).as("query must use FOR UPDATE SKIP LOCKED: %s", sql).isPositive();
+
+        int subqueryCloseIdx = sql.lastIndexOf(')', forUpdateIdx);
+        String outerTail = sql.substring(subqueryCloseIdx, forUpdateIdx);
+
+        assertThat(outerTail)
+                .as("outer claim query for %s must ORDER BY created_at so the batch handed to " +
+                        "publishBatchAsync is deterministic, not plan order: %s", methodName, sql)
+                .containsIgnoringCase("ORDER BY created_at");
+    }
+
+    @Test
+    void publishPendingMessages_sendsMessagesInRepositoryReturnOrder() throws Exception {
+        // With findPendingBatchForUpdate now ordering by created_at, verify
+        // publishBatchAsync itself preserves that order end-to-end instead of reshuffling it
+        // (e.g. via a parallel stream or a Map keyed collection) on the way to Kafka.
+        OutboxMessage m1 = createTestMessage();
+        m1.setKafkaKey("key-1");
+        OutboxMessage m2 = createTestMessage();
+        m2.setKafkaKey("key-2");
+        OutboxMessage m3 = createTestMessage();
+        m3.setKafkaKey("key-3");
+        List<OutboxMessage> inCreatedAtOrder = List.of(m1, m2, m3);
+
+        when(outboxMessageRepository.findPendingBatchForUpdate(anyString(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(inCreatedAtOrder);
+        when(outboxMessageRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(objectMapper.readValue(anyString(), eq(DeliveryMessage.class)))
+                .thenReturn(DeliveryMessage.builder().deliveryId(UUID.randomUUID()).build());
+
+        @SuppressWarnings("unchecked")
+        SendResult<String, Object> sendResult = mock(SendResult.class);
+        when(kafkaTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.completedFuture(sendResult));
+
+        service.publishPendingMessages();
+
+        ArgumentCaptor<ProducerRecord<String, Object>> captor = ArgumentCaptor.forClass(ProducerRecord.class);
+        verify(kafkaTemplate, times(3)).send(captor.capture());
+        List<Object> keysSentInOrder = captor.getAllValues().stream()
+                .map(ProducerRecord::key)
+                .collect(java.util.stream.Collectors.toList());
+        assertThat(keysSentInOrder).containsExactly("key-1", "key-2", "key-3");
+    }
+
+    @Test
+    void retryFailedMessages_recoversStuckSendingMessages_onThe30sCycle() {
+        // Regression test: recoverStuckSendingMessages() used to run only inside
+        // the hourly cleanupOldMessages() job, so a message stuck SENDING after a transient
+        // broker hiccup could wait up to ~59 extra minutes to be reclaimed. It must now run on
+        // every retryFailedMessages() poll (the 30s retry-interval-ms cycle).
+        when(outboxMessageRepository.findFailedMessagesForRetry(
+                anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(outboxMessageRepository.recoverStuckSendingMessages(any(Instant.class)))
+                .thenReturn(0);
+
+        service.retryFailedMessages();
+
+        verify(outboxMessageRepository).recoverStuckSendingMessages(any(Instant.class));
+    }
+
+    @Test
+    void retryFailedMessages_recoveredSendingMessages_areLoggedAndCountedAtZeroCost() {
+        // A non-zero recovery result must not blow up the retry cycle (best-effort, same
+        // pattern the old cleanupOldMessages() call used).
+        when(outboxMessageRepository.findFailedMessagesForRetry(
+                anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(outboxMessageRepository.recoverStuckSendingMessages(any(Instant.class)))
+                .thenReturn(3);
+
+        assertThatCode(() -> service.retryFailedMessages()).doesNotThrowAnyException();
+
+        verify(outboxMessageRepository).recoverStuckSendingMessages(any(Instant.class));
+    }
+
+    @Test
+    void cleanupOldMessages_noLongerRecoversStuckSendingMessages() {
+        // Recovery moved to the 30s retryFailedMessages() cycle; cleanupOldMessages()
+        // (hourly) must not also call it — that would just be redundant, not wrong, but this
+        // pins the "moved" (not "also called") decision explicitly.
+        when(outboxMessageRepository.deleteOldPublishedMessages(anyString(), any(Instant.class), anyInt()))
+                .thenReturn(0);
+        when(outboxMessageRepository.countByStatus(any())).thenReturn(0L);
+
+        service.cleanupOldMessages();
+
+        verify(outboxMessageRepository, never()).recoverStuckSendingMessages(any(Instant.class));
     }
 
     private OutboxMessage createTestMessage() {

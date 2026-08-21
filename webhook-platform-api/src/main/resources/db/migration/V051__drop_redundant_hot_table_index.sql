@@ -1,0 +1,17 @@
+-- Index audit on the hottest tables (deliveries, delivery_attempts, ...).
+--
+-- idx_deliveries_next_retry_at (next_retry_at) WHERE next_retry_at IS NOT NULL
+-- is strictly dominated by idx_deliveries_retry_query (status, next_retry_at) WHERE
+-- next_retry_at IS NOT NULL, added in the same original migration (V001). Every read
+-- path that touches next_retry_at (RetrySchedulerService / DeliveryRepository in the
+-- worker) always filters on status first:
+--   WHERE status = ? AND next_retry_at IS NOT NULL AND next_retry_at <= ?
+-- and the one query that sorts by next_retry_at without a status predicate
+-- (`SELECT * FROM deliveries WHERE id IN :ids ORDER BY next_retry_at ASC FOR UPDATE
+-- SKIP LOCKED`) is driven by the primary key list, not this index — the ORDER BY is
+-- over an already-small in-memory row set. No query plan can prefer the narrower,
+-- status-less index over the composite one for the hot retry-scan path, so it exists
+-- purely as extra write cost (every insert/update touching next_retry_at maintains a
+-- second btree entry) with no read ever able to prefer it. Confirmed by grepping both
+-- api and worker for `next_retry_at`.
+DROP INDEX IF EXISTS idx_deliveries_next_retry_at;

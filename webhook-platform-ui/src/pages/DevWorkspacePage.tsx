@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Send, ShieldCheck, RefreshCw, Loader2, Copy, CheckCircle2, XCircle, Terminal } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
 import { eventsApi } from '../api/events.api';
 import { deliveriesApi } from '../api/deliveries.api';
@@ -104,7 +104,7 @@ function SendEventTab({ projectId }: { projectId: string }) {
                 <span className="text-muted-foreground">{t('devWorkspace.send.eventId')}</span>
                 <div className="flex items-center gap-1 mt-0.5">
                   <code className="font-mono text-xs">{result.eventId.substring(0, 12)}...</code>
-                  <button onClick={() => { navigator.clipboard.writeText(result.eventId); showSuccess(t('common.copied')); }}>
+                  <button onClick={() => { navigator.clipboard.writeText(result.eventId); showSuccess(t('common.copied')); }} aria-label={t('common.copyId')}>
                     <Copy className="h-3 w-3 text-muted-foreground hover:text-foreground" />
                   </button>
                 </div>
@@ -337,7 +337,9 @@ export default function DevWorkspacePage() {
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-title tracking-tight">{t('devWorkspace.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('devWorkspace.subtitle', { project: project.name }) }} />
+        <p className="text-sm text-muted-foreground mt-1">
+          <Trans i18nKey="devWorkspace.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+        </p>
       </div>
 
       <Card>

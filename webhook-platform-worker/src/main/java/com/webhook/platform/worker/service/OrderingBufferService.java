@@ -1,22 +1,29 @@
 package com.webhook.platform.worker.service;
 
-import com.webhook.platform.worker.domain.entity.OrderingCursor;
 import com.webhook.platform.worker.domain.repository.OrderingCursorRepository;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
 import org.redisson.api.RScoredSortedSet;
+import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.LongCodec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manages ordering buffer for FIFO delivery guarantees.
@@ -29,6 +36,7 @@ public class OrderingBufferService {
 
     private static final String DELIVERED_SEQ_KEY_PREFIX = "seq:delivered:";
     private static final String BUFFER_KEY_PREFIX = "seq:buffer:";
+    private static final String BUFFER_KEY_PATTERN = BUFFER_KEY_PREFIX + "*";
 
     private final RedissonClient redissonClient;
     private final OrderingCursorRepository cursorRepository;
@@ -36,6 +44,18 @@ public class OrderingBufferService {
     private final Duration gapTimeout;
     private final Duration deliveredSeqTtl;
     private final Duration bufferTtl;
+    private final String cursorCasScript;
+    // webhook_ordering_buffer_size used to be registered with meterRegistry.gauge(...)
+    // (no tags) on every single bufferDelivery() call. Micrometer silently keeps only the
+    // first-registered meter for a given unregistered-tag name, so every call after the very
+    // first endpoint's first buffered delivery was a no-op -- the gauge permanently reported
+    // whichever endpoint's RScoredSortedSet got there first, no matter how many other
+    // endpoints buffered deliveries afterward. Registered exactly once here instead, backed by
+    // a periodically Redis-truth-resynced aggregate (see resyncBufferSizeGauge) rather than a
+    // manually incremented/decremented counter -- buffer entries can also disappear via TTL
+    // expiry or the gap-timeout "proceed anyway" path without an explicit remove call, so only
+    // a resync against Redis itself stays honest.
+    private final AtomicLong totalBufferedDeliveries = new AtomicLong(0);
 
     public OrderingBufferService(
             RedissonClient redissonClient,
@@ -50,6 +70,41 @@ public class OrderingBufferService {
         this.gapTimeout = Duration.ofSeconds(gapTimeoutSeconds);
         this.deliveredSeqTtl = Duration.ofHours(deliveredSeqTtlHours);
         this.bufferTtl = Duration.ofMinutes(bufferTtlMinutes);
+        this.cursorCasScript = loadLuaScript("lua/ordering_cursor_cas.lua");
+
+        Gauge.builder("webhook_ordering_buffer_size", totalBufferedDeliveries, AtomicLong::get)
+                .description("Total deliveries currently buffered awaiting their predecessor sequence, summed across all endpoints")
+                .register(meterRegistry);
+    }
+
+    /**
+     * Recomputes {@code webhook_ordering_buffer_size} from Redis directly, by summing the
+     * size of every per-endpoint buffer key. Deliberately aggregated rather than tagged by
+     * endpoint -- endpoint UUIDs are unbounded cardinality, and an untagged-but-still-per-
+     * endpoint gauge is exactly the bug this replaces (see the class-level comment on {@code
+     * totalBufferedDeliveries}). {@code getKeysByPattern} is SCAN-based (non-blocking), so this
+     * is safe to run periodically even against a large keyspace.
+     */
+    @Scheduled(fixedDelayString = "${ordering.buffer-gauge-resync-ms:30000}")
+    public void resyncBufferSizeGauge() {
+        try {
+            long total = 0;
+            for (String key : redissonClient.getKeys().getKeysByPattern(BUFFER_KEY_PATTERN)) {
+                total += redissonClient.getScoredSortedSet(key).size();
+            }
+            totalBufferedDeliveries.set(total);
+        } catch (Exception e) {
+            log.warn("Failed to resync webhook_ordering_buffer_size gauge: {}", e.getMessage());
+        }
+    }
+
+    private String loadLuaScript(String path) {
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load Lua script: " + path, e);
+        }
     }
 
     /**
@@ -81,7 +136,11 @@ public class OrderingBufferService {
      */
     public Long getLastDeliveredSequence(UUID endpointId) {
         String key = DELIVERED_SEQ_KEY_PREFIX + endpointId;
-        RBucket<Long> bucket = redissonClient.getBucket(key);
+        // LongCodec so this key's value on the wire is a plain decimal string -- exactly what
+        // the CAS Lua script in markDelivered() writes via a raw Redis SET. Reading it back
+        // with Redisson's default (Kryo) codec would fail to decode a value the script wrote,
+        // and vice versa; every accessor of this key must agree on one codec.
+        RBucket<Long> bucket = redissonClient.getBucket(key, LongCodec.INSTANCE);
         Long fromRedis = bucket.get();
         
         if (fromRedis != null) {
@@ -109,32 +168,55 @@ public class OrderingBufferService {
 
     /**
      * Marks a sequence as successfully delivered.
-     * This advances the "cursor" for the endpoint in both Redis (cache) and Postgres (durable).
+     * This advances the "cursor" for the endpoint in both Postgres (durable, authoritative)
+     * and Redis (cache).
+     *
+     * <p>Postgres is authoritative: the upsert always applies {@code GREATEST} and always
+     * returns the resulting row via {@code RETURNING} (see {@link OrderingCursorRepository
+     * #upsertCursor}), so it can never regress. Redis is then updated from that authoritative
+     * value — never from the raw {@code sequenceNumber} argument — via a Lua CAS script that
+     * only advances the key if the candidate is strictly greater than whatever is currently
+     * cached. That combination is what makes this regression-proof: even if Redis was flushed
+     * or its TTL lapsed and some other caller raced a smaller value in first, the cache can
+     * only ever converge upward towards Postgres's value, never fall behind it.
      *
      * @param endpointId the endpoint ID
      * @param sequenceNumber the delivered sequence number
      */
     @Transactional
     public void markDelivered(UUID endpointId, long sequenceNumber) {
+        long authoritative;
+        boolean postgresWriteFailed = false;
+        try {
+            authoritative = cursorRepository.upsertCursor(endpointId, sequenceNumber);
+        } catch (Exception e) {
+            log.error("Failed to persist ordering cursor to DB for endpoint {}, seq={}: {}",
+                    endpointId, sequenceNumber, e.getMessage());
+            // Postgres is authoritative; if we can't reach it, fall back to advancing Redis
+            // from the raw sequence number as a best-effort measure so the endpoint doesn't
+            // stall completely, but this window is where a regression could theoretically
+            // still occur — hence the loud log above rather than a silent swallow.
+            authoritative = sequenceNumber;
+            postgresWriteFailed = true;
+        }
+
         String key = DELIVERED_SEQ_KEY_PREFIX + endpointId;
-        RBucket<Long> bucket = redissonClient.getBucket(key);
-        
-        Long current = bucket.get();
-        if (current == null || sequenceNumber > current) {
-            // Update Redis cache
-            bucket.set(sequenceNumber, deliveredSeqTtl);
-            
-            // Persist to Postgres (atomic upsert, only if sequence advances)
-            try {
-                cursorRepository.upsertCursor(endpointId, sequenceNumber);
-            } catch (Exception e) {
-                log.error("Failed to persist ordering cursor to DB for endpoint {}, seq={}: {}", 
-                        endpointId, sequenceNumber, e.getMessage());
-                // Redis update succeeded, log error but don't fail delivery
-            }
-            
-            log.debug("Marked sequence {} as delivered for endpoint {}", sequenceNumber, endpointId);
+        RScript script = redissonClient.getScript(LongCodec.INSTANCE);
+        Long advanced = script.eval(
+                RScript.Mode.READ_WRITE,
+                cursorCasScript,
+                RScript.ReturnType.INTEGER,
+                Collections.singletonList(key),
+                authoritative,
+                deliveredSeqTtl.toMillis());
+
+        if (advanced != null && advanced == 1L) {
+            log.debug("Marked sequence {} as delivered for endpoint {} (authoritative={})",
+                    sequenceNumber, endpointId, authoritative);
             meterRegistry.counter("webhook_ordering_sequence_advanced").increment();
+        }
+        if (postgresWriteFailed) {
+            meterRegistry.counter("webhook_ordering_cursor_db_write_failed_total").increment();
         }
     }
 
@@ -158,7 +240,6 @@ public class OrderingBufferService {
             log.warn("Ordering buffer growing large for endpoint {}: {} deliveries buffered", endpointId, bufferSize);
         }
         meterRegistry.counter("webhook_ordering_buffered_total").increment();
-        meterRegistry.gauge("webhook_ordering_buffer_size", buffer, RScoredSortedSet::size);
     }
 
     /**
@@ -193,22 +274,29 @@ public class OrderingBufferService {
     }
 
     /**
-     * Checks if the gap timeout has been exceeded for a missing sequence.
-     * If timeout exceeded, we should proceed with delivery and log a warning.
+     * Checks if the gap timeout has been exceeded for a delivery blocked on a missing
+     * predecessor sequence.
      *
-     * @param oldestPendingCreatedAt when the oldest pending delivery was created
-     * @return true if gap timeout exceeded
+     * <p>Measured from when the blocked delivery was <em>first buffered</em> (see {@code
+     * Delivery#orderingFirstBufferedAt}), not from an unrelated row's ingest {@code
+     * createdAt}. That distinction matters: measuring from {@code createdAt} meant any
+     * backlog older than the timeout made this unconditionally {@code true} for every
+     * delivery — silently turning ordering off during a fan-out burst or Kafka lag spike,
+     * exactly when it matters most.
+     *
+     * <p>Callers do not increment a metric here — see {@code
+     * WebhookDeliveryService#canDeliverWithOrdering} for the single counting site, to avoid
+     * double-counting {@code webhook_ordering_gap_timeout_total}.
+     *
+     * @param firstBufferedAt when this delivery first entered the ordering buffer, or null if
+     *                        it has never been buffered (i.e. we haven't started waiting yet)
+     * @return true if the delivery has been waiting longer than the configured gap timeout
      */
-    public boolean isGapTimedOut(Instant oldestPendingCreatedAt) {
-        if (oldestPendingCreatedAt == null) {
-            return true; // No pending deliveries, proceed
+    public boolean isGapTimedOut(Instant firstBufferedAt) {
+        if (firstBufferedAt == null) {
+            return false; // Never buffered before -- we haven't started waiting yet.
         }
-        
-        boolean timedOut = Duration.between(oldestPendingCreatedAt, Instant.now()).compareTo(gapTimeout) > 0;
-        if (timedOut) {
-            meterRegistry.counter("webhook_ordering_gap_timeout_total").increment();
-        }
-        return timedOut;
+        return Duration.between(firstBufferedAt, Instant.now()).compareTo(gapTimeout) > 0;
     }
 
     /**

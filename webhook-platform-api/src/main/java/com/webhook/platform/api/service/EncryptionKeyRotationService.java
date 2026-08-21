@@ -54,7 +54,7 @@ public class EncryptionKeyRotationService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.transactionTemplate = transactionTemplate;
         this.lockingTaskExecutor = lockingTaskExecutor;
-        // P0-09: a partial rotation failure can leave some tenants' secrets encrypted under a
+        // A partial rotation failure can leave some tenants' secrets encrypted under a
         // key version other records no longer carry — that must never be silently tolerated.
         // This counter is the alertable signal (paired with a non-200 response to the caller).
         this.partialFailureCounter = Counter.builder("encryption_rotation_partial_failures_total")

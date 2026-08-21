@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * P0-13 — API-key project scoping was enforced by an opt-in, per-handler call
+ * API-key project scoping was enforced by an opt-in, per-handler call
  * ({@code AuthContext.validateProjectAccess}) that roughly a third of
  * {@code {projectId}} routes never made. Because {@code AuthContext.organizationId}
  * is derived from an API key's own project, the service-layer check that only
@@ -73,7 +73,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>The remaining {@code @Test} methods are behavioural, end-to-end
  *       reproductions against the previously-uncovered controllers (Schema,
  *       IncomingDestination), a re-verification of TestEndpointController
- *       (already fixed directly by P0-08's per-handler calls; this asserts the
+ *       (already fixed directly by TestEndpointController's own per-handler calls; this asserts the
  *       interceptor now also covers it), and the rotate-secret worst case.</li>
  * </ul>
  */
@@ -103,7 +103,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
     @BeforeEach
     void setup() throws Exception {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        jwt = registerAndGetJwt("p013-" + suffix + "@test.com", "P0-13 Test Org " + suffix);
+        jwt = registerAndGetJwt("cross-project-" + suffix + "@test.com", "Cross-Project Test Org " + suffix);
 
         projectAId = createProject(jwt, "Project A " + suffix);
         projectBId = createProject(jwt, "Project B " + suffix);
@@ -112,7 +112,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
                         .header("Authorization", "Bearer " + jwt)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(ApiKeyRequest.builder()
-                                .name("p013-key")
+                                .name("cross-project-key")
                                 .scope(ApiKeyScope.READ_WRITE)
                                 .build())))
                 .andExpect(status().isCreated())
@@ -398,7 +398,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         return UUID.fromString(objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
 
-    // ── TestEndpoint (was 0/6, fixed directly by P0-08; re-verify the
+    // ── TestEndpoint (was 0/6, fixed directly by its own per-handler calls; re-verify the
     //    interceptor also covers it now, redundantly with those per-handler
     //    calls — full coverage lives in TestEndpointIsolationTest) ──
 
@@ -438,8 +438,8 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
         JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
         assertEquals(endpointAId.toString(), json.get("id").asText());
         assertFalse(json.get("secret").asText().isBlank(),
-                "Rotating your OWN endpoint's secret should still return it — see the P0-13 progress "
-                        + "log for the separate discussion of whether the plaintext response itself is sound.");
+                "Rotating your OWN endpoint's secret should still return it — whether the plaintext "
+                        + "response itself is sound is a separate discussion from project scoping.");
     }
 
     private UUID createEndpoint(UUID projectId, String url) throws Exception {

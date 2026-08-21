@@ -2,7 +2,7 @@ import { ArrowRight, CheckCircle2, Code, Copy, Book, Key, Zap, Shield, RefreshCw
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
@@ -30,7 +30,7 @@ export default function DocumentationPage() {
         <Sidebar activeSection={activeSection} setActiveSection={(s) => { setActiveSection(s); setMobileNavOpen(false); }} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
         <main className="flex-1 lg:pl-64">
           <div className="sticky top-0 z-30 lg:hidden h-14 border-b border-border/50 bg-card/80 glass flex items-center px-4 gap-3">
-            <button onClick={() => setMobileNavOpen(true)} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
+            <button onClick={() => setMobileNavOpen(true)} aria-label={t('nav.openMenu')} className="p-1.5 rounded-lg hover:bg-accent"><Menu className="h-5 w-5" /></button>
             <span className="text-sm font-semibold flex-1">{t('docsPage.mobileTitle')}</span>
             <LanguageSwitcher />
             <ThemeToggle variant="icon" />
@@ -130,7 +130,7 @@ function Sidebar({ activeSection, setActiveSection, mobileOpen, onMobileClose }:
           <aside className="fixed inset-y-0 left-0 w-72 bg-card border-r shadow-elevated animate-slide-in-left">
             <div className="flex items-center justify-between p-4 border-b border-border/50">
               <span className="text-sm font-semibold">{t('docsPage.sidebar.navigation')}</span>
-              <button onClick={onMobileClose} className="p-1.5 rounded-lg hover:bg-accent"><X className="h-4 w-4" /></button>
+              <button onClick={onMobileClose} aria-label={t('nav.closeMenu')} className="p-1.5 rounded-lg hover:bg-accent"><X className="h-4 w-4" /></button>
             </div>
             {navContent}
           </aside>
@@ -986,7 +986,9 @@ function WebhookSecurity({ activeLanguage, setActiveLanguage }: LanguageTabsProp
         </p>
 
         <h3 className="text-lg font-semibold text-foreground mb-3">{t('docsPage.security.challengeRequest')}</h3>
-        <p className="text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('docsPage.security.challengeRequestDesc') }} />
+        <p className="text-muted-foreground mb-4">
+          <Trans i18nKey="docsPage.security.challengeRequestDesc" components={{ code: <code /> }} />
+        </p>
         <ResponseBlock>
 {`POST https://your-endpoint.com/webhooks
 Content-Type: application/json
@@ -999,7 +1001,9 @@ Content-Type: application/json
         </ResponseBlock>
 
         <h3 className="text-lg font-semibold text-foreground mb-3 mt-6">{t('docsPage.security.expectedResponse')}</h3>
-        <p className="text-muted-foreground mb-4" dangerouslySetInnerHTML={{ __html: t('docsPage.security.expectedResponseDesc') }} />
+        <p className="text-muted-foreground mb-4">
+          <Trans i18nKey="docsPage.security.expectedResponseDesc" components={{ code: <code /> }} />
+        </p>
         <ResponseBlock>
 {`HTTP/1.1 200 OK
 Content-Type: application/json
@@ -1912,6 +1916,7 @@ function HTTPMethod({ method, path }: { method: string; path: string }) {
 }
 
 function CodeBlock({ language, setLanguage, children }: { language: 'curl' | 'node' | 'python'; setLanguage: (lang: 'curl' | 'node' | 'python') => void; children: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -1940,6 +1945,7 @@ function CodeBlock({ language, setLanguage, children }: { language: 'curl' | 'no
         </div>
         <button
           onClick={handleCopy}
+          aria-label={t('common.copy')}
           className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
           {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
@@ -2787,6 +2793,7 @@ function PhpIcon({ className }: { className?: string }) {
 }
 
 function SdkCodeBlock({ label, children, copyText }: { label: string; children: React.ReactNode; copyText?: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     navigator.clipboard.writeText(copyText || '');
@@ -2798,7 +2805,7 @@ function SdkCodeBlock({ label, children, copyText }: { label: string; children: 
       <div className="px-4 py-2 border-b border-white/[0.06] flex items-center justify-between">
         <span className="text-[11px] font-mono text-white/30">{label}</span>
         {copyText && (
-          <button onClick={handleCopy} className="text-white/30 hover:text-white/60 transition-colors">
+          <button onClick={handleCopy} aria-label={t('common.copy')} className="text-white/30 hover:text-white/60 transition-colors">
             {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
         )}

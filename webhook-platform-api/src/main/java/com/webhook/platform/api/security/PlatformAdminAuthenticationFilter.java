@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /**
- * Authenticates the platform-admin operator credential (P0-09).
+ * Authenticates the platform-admin operator credential.
  *
  * <p>This is a cluster-operator credential, not a tenant credential: it is a single shared
  * secret ({@code platform.admin.token}, env {@code PLATFORM_ADMIN_TOKEN}) presented via the

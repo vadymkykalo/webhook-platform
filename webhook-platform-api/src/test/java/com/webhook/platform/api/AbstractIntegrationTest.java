@@ -5,6 +5,7 @@ import com.webhook.platform.api.service.OutboxPublisherService;
 import com.webhook.platform.api.service.RedisTunnelCoordinator;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.SequenceGeneratorService;
+import com.webhook.platform.api.service.SequenceReconciliationService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
 import com.webhook.platform.api.service.TokenBlacklistService;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,9 @@ public abstract class AbstractIntegrationTest {
     protected SequenceGeneratorService sequenceGeneratorService;
 
     @MockBean
+    protected SequenceReconciliationService sequenceReconciliationService;
+
+    @MockBean
     protected RedisRateLimiterService redisRateLimiterService;
 
     @MockBean
@@ -66,7 +70,7 @@ public abstract class AbstractIntegrationTest {
         // /auth/reset-password's IP+token check — without stubbing it, an unstubbed
         // Mockito boolean mock defaults to false and every reset-password call gets a
         // spurious 429 (pre-existing gap here since allowTokenAction was added; not
-        // related to P0-14a, just needed so PasswordResetIntegrationTest can run at all).
+        // related to password-reset hashing, just needed so PasswordResetIntegrationTest can run at all).
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(any())).thenReturn(false);
         when(tokenBlacklistService.isTokenRevokedByEpoch(any(), any())).thenReturn(false);
@@ -93,7 +97,7 @@ public abstract class AbstractIntegrationTest {
     }
 
     /**
-     * Shared platform-admin operator credential for integration tests (P0-09).
+     * Shared platform-admin operator credential for integration tests.
      * Any test wanting to authenticate as the platform admin sends this value in the
      * {@code X-Platform-Admin-Token} header.
      */

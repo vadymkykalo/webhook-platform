@@ -13,6 +13,30 @@
 #   - circuit_breaker_state_transitions_total
 #   - circuit_breaker_rejected_total
 #   - http_server_requests_seconds_count{status=~"5.."}
+#   - outbox_queue_depth{status=pending|sending|failed|dead}  (OutboxPublisherService, API)
+
+groups:
+  # ── Outbox ───────────────────────────────────────────────────
+  - name: hookflow.outbox
+    rules:
+      # SENDING rows are recovered on the 30s retry cycle after
+      # outbox.publisher.sending-recovery-seconds (default 300s). Sustained SENDING depth means
+      # recovery isn't keeping up (or is failing outright) — those messages are undelivered
+      # webhooks sitting invisibly until recovered.
+      - alert: OutboxSendingStuck
+        expr: |
+          outbox_queue_depth{status="sending"} > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} outbox messages stuck SENDING for >10m"
+          description: |
+            Outbox messages have been SENDING for longer than
+            outbox.publisher.sending-recovery-seconds (default 300s) plus the 30s retry-cycle
+            poll — recovery back to PENDING should already have happened. Check API logs for
+            recoverStuckSendingMessages() and Kafka broker health.
 
 groups:
   # ── Retry Backlog ────────────────────────────────────────────
@@ -58,7 +82,8 @@ groups:
           summary: "CRITICAL: Delivery pending backlog above 20000"
           description: |
             {{ $value | printf "%.0f" }} deliveries pending.
-            Hard-cap auto-DLQ escalation may trigger. Immediate investigation required.
+            Hard-cap auto-DLQ escalation (DELIVERY_ESCALATION_HARD_CAP_HOURS, default 96h) may
+            trigger for the oldest of these. Immediate investigation required.
 
       # Incoming forward pending backlog
       - alert: IncomingForwardPendingBacklogHigh
@@ -218,15 +243,21 @@ groups:
             A delivery has been pending for over 1 hour.
             This may indicate a stuck delivery or scheduler issue.
 
+      # Threshold tracks DELIVERY_ESCALATION_HARD_CAP_HOURS (default 96h) plus a margin
+      # for the 5-minute escalation poll interval — below the cap, a PENDING delivery may
+      # legitimately still be working through the retry ladder (worst case ~83h with jitter),
+      # so alerting at 24h as before would fire on healthy in-flight retries.
       - alert: OldestPendingDeliveryCritical
         expr: |
-          delivery_oldest_pending_age_seconds > 86400
+          delivery_oldest_pending_age_seconds > 349200
         for: 5m
         labels:
           severity: critical
           component: worker
         annotations:
-          summary: "CRITICAL: Pending delivery stuck for >24h"
+          summary: "CRITICAL: Pending delivery stuck for >97h"
           description: |
-            A delivery has been in PENDING state for {{ $value | printf "%.0f" }}s.
-            Hard-cap escalation should have moved this to DLQ. Investigate immediately.
+            A delivery has been in PENDING state for {{ $value | printf "%.0f" }}s, past
+            DELIVERY_ESCALATION_HARD_CAP_HOURS (default 96h) plus escalation-poll margin.
+            Hard-cap escalation should have moved this to DLQ by now — investigate immediately
+            (e.g. StaleDeliveryEscalationService not running, or stuck on an error).

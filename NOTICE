@@ -1,0 +1,31 @@
+Hookflow
+Copyright (c) 2026 Vadym Kykalo
+
+This product is licensed under the MIT License (see LICENSE). Hookflow itself
+contains no third-party source code that requires reproduction of a separate
+NOTICE beyond what is listed below.
+
+Hookflow depends on, and its Docker images / Helm chart pull in, a number of
+third-party open-source components under their own licenses. A generated,
+versioned inventory of every direct and transitive dependency and its license
+is committed at docs/licenses/ (see docs/licenses/README.md) and regenerated
+in CI (`.github/workflows/license-report.yml`) so it never drifts silently
+out of date with the poms/package.json/composer.json it was built from.
+
+Notable licenses among bundled/runtime components, called out here because
+they are not MIT/Apache-2.0/BSD/ISC (the common case for the rest of the
+stack — see the full report for the complete list):
+
+  - MinIO (docker-compose.yml's optional `minio` service, used only for local
+    object storage in the embedded-DB Compose profile) is licensed under the
+    GNU AGPLv3, not MIT/Apache-2.0. See docs/licenses/DECISIONS.md for the
+    project's position on why this does not affect Hookflow's own MIT license
+    and what operators should know before relying on it in production.
+
+  - The Bitnami subcharts referenced as optional dependencies of the Helm
+    chart (deploy/helm/hookflow/Chart.yaml) carry their own upstream licenses
+    (predominantly Apache-2.0); see docs/licenses/DECISIONS.md for the pinned
+    versions and how to swap them.
+
+This NOTICE file is informational and does not modify the terms of the MIT
+LICENSE that governs Hookflow's own source code.

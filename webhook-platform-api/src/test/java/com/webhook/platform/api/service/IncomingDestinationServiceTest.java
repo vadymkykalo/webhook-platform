@@ -214,7 +214,7 @@ class IncomingDestinationServiceTest {
         assertThat(response.getMaxAttempts()).isEqualTo(10);
     }
 
-    // ── P0-8: Transformation project ownership ──
+    // ── Transformation project ownership ──
 
     @Test
     void createDestination_foreignTransformation_throwsForbidden() {

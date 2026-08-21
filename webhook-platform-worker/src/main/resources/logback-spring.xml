@@ -16,11 +16,16 @@
 
     <springProfile name="production">
         <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                <includeMdcKeyName>correlationId</includeMdcKeyName>
-                <includeMdcKeyName>deliveryId</includeMdcKeyName>
-                <includeMdcKeyName>endpointId</includeMdcKeyName>
-            </encoder>
+            <!-- P3-36b: no <includeMdcKeyName> here — that element switches
+                 LogstashEncoder from "include the whole MDC map" to an allow-list.
+                 The previous list (correlationId/deliveryId/endpointId) didn't even
+                 match what this module's code actually puts into MDC — DeliveryConsumer
+                 only sets correlationId, and IncomingForwardConsumer sets correlationId
+                 plus incomingEventId/destinationId (see MDC.put call sites) — so
+                 incomingEventId/destinationId were being silently dropped from every
+                 production log line. With no include/exclude configured, the encoder
+                 emits the entire MDC context map instead. -->
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
         </appender>
         <root level="INFO">
             <appender-ref ref="CONSOLE_JSON"/>

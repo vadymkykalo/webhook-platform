@@ -4,7 +4,7 @@ import {
   History, Play, Square, Loader2, AlertTriangle, CheckCircle2, XCircle,
   Clock, RefreshCw, Plus, ChevronDown, ChevronUp,
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
@@ -254,7 +254,9 @@ export default function ReplayPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-title tracking-tight">{t('replay.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1" dangerouslySetInnerHTML={{ __html: t('replay.subtitle', { project: project.name }) }} />
+          <p className="text-sm text-muted-foreground mt-1">
+            <Trans i18nKey="replay.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
+          </p>
         </div>
         <PermissionGate allowed={canReplayDeliveries}>
           <VerificationGate>
@@ -495,7 +497,13 @@ function SessionCard({
                 {t('replay.cancel')}
               </Button>
             )}
-            <Button variant="ghost" size="icon-sm" onClick={() => setExpanded(!expanded)}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setExpanded(!expanded)}
+              title={t(expanded ? 'replay.session.collapseDetails' : 'replay.session.expandDetails')}
+              aria-label={t(expanded ? 'replay.session.collapseDetails' : 'replay.session.expandDetails')}
+            >
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </Button>
           </div>

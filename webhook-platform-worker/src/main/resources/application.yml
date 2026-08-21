@@ -9,7 +9,7 @@ spring:
   task:
     scheduling:
       pool:
-        # P0-06: Spring Boot defaults this to 1, so a single slow @Scheduled job blocks every
+        # Spring Boot defaults this to 1, so a single slow @Scheduled job blocks every
         # other cron on this JVM (e.g. StuckDeliveryRecoveryService waiting behind DlqMonitoringService).
         size: ${SCHEDULING_POOL_SIZE:8}
 
@@ -112,11 +112,18 @@ retry:
     high-watermark: ${RETRY_SCHEDULER_HIGH_WATERMARK:5000}
     send-timeout-seconds: ${RETRY_SCHEDULER_SEND_TIMEOUT_SECONDS:30}
     reschedule-delay-seconds: ${RETRY_SCHEDULER_RESCHEDULE_DELAY_SECONDS:60}
+  ladder:
+    # Mirrors the default Subscription/Delivery retry ladder created by the API
+    # (EventIngestService/SubscriptionService et al) — used only to validate at startup that
+    # the ladder's worst-case span fits inside delivery.escalation.hard-cap-hours below.
+    # Keep in sync if the API-side defaults ever change.
+    default-delays-seconds: ${RETRY_LADDER_DEFAULT_DELAYS_SECONDS:60,300,900,3600,21600,86400}
+    default-max-attempts: ${RETRY_LADDER_DEFAULT_MAX_ATTEMPTS:7}
 
 dlq:
   monitoring:
     interval-ms: ${DLQ_MONITORING_INTERVAL_MS:60000}
-    # P0-06: bounds the AdminClient describeTopics/listOffsets calls so a slow/unreachable
+    # Bounds the AdminClient describeTopics/listOffsets calls so a slow/unreachable
     # broker can't block this scheduler thread indefinitely.
     admin-client-timeout-seconds: ${DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS:10}
 
@@ -124,6 +131,9 @@ ordering:
   gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}
   delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
   buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
+  # How often webhook_ordering_buffer_size is resynced against Redis (ms). A SCAN over
+  # seq:buffer:* keys, not a per-call increment -- see OrderingBufferService#resyncBufferSizeGauge.
+  buffer-gauge-resync-ms: ${ORDERING_BUFFER_GAUGE_RESYNC_MS:30000}
 
 circuit-breaker:
   failure-rate-threshold: ${CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}
@@ -149,7 +159,11 @@ stuck-forward:
 
 delivery:
   escalation:
-    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:48}
+    # Raised from 48h to 96h so the hard cap comfortably covers the retry ladder's
+    # worst-case span (~83h with full jitter across the default 7 attempts/6 tiers) — at 48h
+    # the last two retry tiers (the "6h" and "24h" README advertises) never got a chance to
+    # fire before escalation to DLQ. RetrySchedulerService validates this pair fits at startup.
+    hard-cap-hours: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:96}
     batch-size: ${DELIVERY_ESCALATION_BATCH_SIZE:100}
     interval-ms: ${DELIVERY_ESCALATION_INTERVAL_MS:300000}
 

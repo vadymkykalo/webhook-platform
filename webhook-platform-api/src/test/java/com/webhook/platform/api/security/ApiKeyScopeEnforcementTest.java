@@ -125,9 +125,9 @@ class ApiKeyScopeEnforcementTest {
                 () -> RbacUtil.requireWriteAccess(MembershipRole.DEVELOPER, null));
     }
 
-    // ── P0-13: EndpointController.rotateSecret cross-project reproduction ──
+    // ── EndpointController.rotateSecret cross-project reproduction ──
     //
-    // Worst concrete case from the P0-13 task: EndpointController.rotateSecret
+    // Worst concrete case: EndpointController.rotateSecret
     // never called AuthContext.validateProjectAccess, and EndpointService
     // .rotateSecret checks only organizationId — which AuthContext derives from
     // the API key's own project, so it's the same for every project in an org.
@@ -135,7 +135,7 @@ class ApiKeyScopeEnforcementTest {
     // secret and get it back in plaintext. AuthContext-level unit tests above
     // can't reproduce this: the bug was that the handler never called
     // validateProjectAccess at all, not that the method behaves wrong. The fix
-    // (P0-13) moved the check into ScopeEnforcementInterceptor, which now runs
+    // moved the check into ScopeEnforcementInterceptor, which now runs
     // unconditionally against the actual EndpointController.rotateSecret
     // HandlerMethod, independent of what the handler itself does.
     //

@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Switch } from '../components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import {
   useProject, useUpdateProject,
@@ -818,19 +819,12 @@ function ValidationSettingsCard({ projectId }: { projectId: string }) {
               </div>
             )}
 
-            <button
-              onClick={handleToggle}
+            <Switch
+              checked={project.schemaValidationEnabled}
+              onCheckedChange={handleToggle}
               disabled={updateMutation.isPending}
-              className={cn(
-                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                project.schemaValidationEnabled ? "bg-green-600" : "bg-muted-foreground/30"
-              )}
-            >
-              <span className={cn(
-                "inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform",
-                project.schemaValidationEnabled ? "translate-x-6" : "translate-x-1"
-              )} />
-            </button>
+              aria-label={t('schemas.validation.title')}
+            />
           </div>
         </div>
       </CardContent>

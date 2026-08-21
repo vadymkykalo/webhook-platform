@@ -687,6 +687,169 @@ class IngressServiceTest {
         assertThat(HeaderSanitizer.isSensitiveHeader("Host")).isFalse();
     }
 
+    // -- transaction scope must cover only the writes, and a replay marker must not
+    // survive a persist that never committed. --
+
+    @Test
+    void receiveWebhook_invalidToken_rejectedWithoutOpeningTransaction() {
+        when(sourceRepository.findByIngressPathToken("invalid")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.receiveWebhook("invalid", "{}", httpRequest))
+                .isInstanceOf(SourceNotFoundException.class);
+
+        // An invalid-token request must never hold a Hikari connection -- no transaction
+        // should have been opened for it at all.
+        verify(transactionManager, never()).getTransaction(any());
+    }
+
+    @Test
+    void receiveWebhook_disabledSource_rejectedWithoutOpeningTransaction() {
+        IncomingSource source = buildActiveSource();
+        source.setStatus(IncomingSourceStatus.DISABLED);
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{}", httpRequest))
+                .isInstanceOf(SourceDisabledException.class);
+
+        verify(transactionManager, never()).getTransaction(any());
+    }
+
+    @Test
+    void receiveWebhook_signatureMismatch_rejectedWithoutOpeningTransaction() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn("wrong-signature");
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", "{\"test\":true}", httpRequest))
+                .isInstanceOf(SignatureVerificationFailedException.class);
+
+        // Verification (and its Redis round trips) must complete before any DB transaction for
+        // the write is opened -- a burst of these must not exhaust the connection pool.
+        verify(transactionManager, never()).getTransaction(any());
+    }
+
+    @Test
+    void receiveWebhook_failedPersistWithNoExistingRow_releasesReplayMarker() {
+        // Reproduces: isReplay marks the signature as seen the moment it's checked
+        // (before persisting anything). If the write that follows never commits and there's no
+        // existing row to fall back to, the event is genuinely lost -- the marker must be
+        // released, or the provider's legitimate resend of the exact same webhook is rejected
+        // as a replay attack for the rest of the 5-minute TTL window instead of being retried.
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"test\":true}";
+        String validHmac = computeHmac(secret, body);
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        // First time seeing this signature -- isReplay marks it and returns false (not a replay).
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
+        // No provider event ID header, so there is no dedup row to recover through, and the
+        // persist fails outright (e.g. an unrelated constraint violation).
+        when(eventRepository.save(any(IncomingEvent.class)))
+                .thenThrow(new DataIntegrityViolationException("some other constraint violation"));
+
+        assertThatThrownBy(() -> service.receiveWebhook("validtoken", body, httpRequest))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        // The marker this exact request set must be released -- not burned for an event that
+        // never made it to disk.
+        verify(replayDetectionService).unmark(sourceId.toString(), validHmac);
+    }
+
+    @Test
+    void receiveWebhook_duplicateRaceResolvedToExistingRow_doesNotReleaseReplayMarker() {
+        // Counterpart to the above: when the race resolves to an existing row (the concurrent
+        // winning request's own transaction already committed), the marker correctly belongs to
+        // that persisted event and must NOT be released.
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"data\":1}";
+        String validHmac = computeHmac(secret, body);
+
+        IncomingEvent existing = IncomingEvent.builder()
+                .id(eventId).incomingSourceId(sourceId)
+                .requestId("first-req").method("POST")
+                .providerEventId("evt_race")
+                .receivedAt(Instant.now())
+                .build();
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(httpRequest.getHeader("X-Webhook-Id")).thenReturn("evt_race");
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
+        when(eventRepository.findByIncomingSourceIdAndProviderEventId(sourceId, "evt_race"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existing));
+        when(eventRepository.save(any(IncomingEvent.class)))
+                .thenThrow(new DataIntegrityViolationException("Unique index violation"));
+
+        IncomingEvent result = service.receiveWebhook("validtoken", body, httpRequest);
+
+        assertThat(result.getId()).isEqualTo(eventId);
+        verify(replayDetectionService, never()).unmark(any(), any());
+    }
+
+    @Test
+    void receiveWebhook_successfulPersist_doesNotReleaseReplayMarker() {
+        String secret = "my-hmac-secret";
+        CryptoUtils.EncryptedData encrypted = CryptoUtils.encryptSecret(secret, ENCRYPTION_KEY, ENCRYPTION_SALT);
+
+        IncomingSource source = buildActiveSource();
+        source.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        source.setHmacSecretEncrypted(encrypted.getCiphertext());
+        source.setHmacSecretIv(encrypted.getIv());
+        source.setHmacHeaderName("X-Signature");
+        source.setHmacSignaturePrefix("");
+
+        String body = "{\"test\":true}";
+        String validHmac = computeHmac(secret, body);
+
+        when(sourceRepository.findByIngressPathToken("validtoken")).thenReturn(Optional.of(source));
+        when(eventRepository.save(any(IncomingEvent.class))).thenAnswer(inv -> {
+            IncomingEvent e = inv.getArgument(0);
+            e.setId(eventId);
+            return e;
+        });
+        when(destinationRepository.findByIncomingSourceIdAndEnabledTrue(sourceId)).thenReturn(List.of());
+        stubHttpRequest();
+        when(httpRequest.getHeader("X-Signature")).thenReturn(validHmac);
+        when(replayDetectionService.isReplay(eq(sourceId.toString()), eq(validHmac))).thenReturn(false);
+
+        IncomingEvent event = service.receiveWebhook("validtoken", body, httpRequest);
+
+        assertThat(event.getId()).isEqualTo(eventId);
+        verify(replayDetectionService, never()).unmark(any(), any());
+    }
+
     private String computeHmac(String secret, String body) {
         try {
             javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");

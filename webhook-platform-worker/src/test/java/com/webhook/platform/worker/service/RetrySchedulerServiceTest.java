@@ -54,8 +54,10 @@ class RetrySchedulerServiceTest {
 
         @BeforeEach
         void setUp() {
-                // Make TransactionTemplate execute the callbacks directly
-                when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+                // Make TransactionTemplate execute the callbacks directly. Lenient: the
+                // constructor/validation-only tests below build the service without ever
+                // calling scheduleRetries(), so this stub goes unused there.
+                lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
                         var callback = invocation.getArgument(0, org.springframework.transaction.support.TransactionCallback.class);
                         return callback.doInTransaction(null);
                 });
@@ -72,7 +74,13 @@ class RetrySchedulerServiceTest {
                 // Circuit breaker should allow all calls by default in tests
                 lenient().when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
 
-                retrySchedulerService = new RetrySchedulerService(
+                retrySchedulerService = newRetrySchedulerService(
+                                "60,300,900,3600,21600,86400", 7, 96L);
+        }
+
+        private RetrySchedulerService newRetrySchedulerService(
+                        String defaultRetryDelays, int defaultMaxAttempts, long escalationHardCapHours) {
+                return new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
                                 transactionTemplate,
@@ -84,7 +92,10 @@ class RetrySchedulerServiceTest {
                                 sendTimeoutSeconds,
                                 rescheduleDelaySeconds,
                                 5000L,   // highWatermark
-                                10000L); // defaultPollIntervalMs
+                                10000L,  // defaultPollIntervalMs
+                                defaultRetryDelays,
+                                defaultMaxAttempts,
+                                escalationHardCapHours);
         }
 
         @Test
@@ -400,6 +411,39 @@ class RetrySchedulerServiceTest {
                 verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
                 List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
                 assertTrue(allSaves.get(1).contains(delivery));
+        }
+
+        @Test
+        void getRetryTopic_fullLadder_totalSpanFitsInsideProductionHardCap() {
+                // Ties the tier-selection mapping (getRetryTopic, exercised below via the
+                // attemptCount table) together with the actual worst-case span math and the
+                // production default hard-cap (96h, application.yml
+                // delivery.escalation.hard-cap-hours) — the two must agree by construction.
+                long worstCaseSeconds = RetryPolicy.worstCaseSpanSeconds(
+                                RetryPolicy.parseRetryDelays("60,300,900,3600,21600,86400"), 7);
+                long hardCapSeconds = 96L * 3600;
+                assertTrue(worstCaseSeconds <= hardCapSeconds,
+                                "ladder worst-case span (" + worstCaseSeconds + "s) must fit inside the " +
+                                                "escalation hard cap (" + hardCapSeconds + "s)");
+        }
+
+        @Test
+        void constructor_ladderWorstCaseExceedsHardCap_throwsAtStartup() {
+                // Regression test: the original defaults (retry ladder worst-case
+                // ~83h) against the original 48h escalation hard-cap must fail fast at startup
+                // instead of silently letting StaleDeliveryEscalationService DLQ deliveries
+                // before the last retry tiers (6h, 24h) ever get a chance to fire.
+                IllegalStateException ex = assertThrows(IllegalStateException.class,
+                                () -> newRetrySchedulerService("60,300,900,3600,21600,86400", 7, 48L));
+                assertTrue(ex.getMessage().contains("hard-cap-hours"),
+                                "expected the failure to name the mismatched config, was: " + ex.getMessage());
+        }
+
+        @Test
+        void constructor_ladderFitsInsideHardCap_doesNotThrow() {
+                // The current, agreed-upon default pairing (raise the cap to
+                // 96h rather than shorten the advertised 6-tier ladder) must not throw.
+                assertDoesNotThrow(() -> newRetrySchedulerService("60,300,900,3600,21600,86400", 7, 96L));
         }
 
         private Delivery createDelivery(UUID id, int attemptCount, Instant nextRetryAt) {

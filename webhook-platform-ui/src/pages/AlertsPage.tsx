@@ -238,13 +238,13 @@ export default function AlertsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
+                    <TableHead className="w-[40px]"><span className="sr-only">{t('alerts.columns.severityIcon')}</span></TableHead>
                     <TableHead>{t('alerts.columns.title', 'Alert')}</TableHead>
                     <TableHead className="w-[100px]">{t('alerts.columns.severity', 'Severity')}</TableHead>
                     <TableHead>{t('alerts.columns.value', 'Value')}</TableHead>
                     <TableHead className="w-[160px]">{t('alerts.columns.time', 'Time')}</TableHead>
                     <TableHead className="w-[80px]">{t('alerts.columns.status', 'Status')}</TableHead>
-                    <TableHead className="w-[60px]"></TableHead>
+                    <TableHead className="w-[60px]"><span className="sr-only">{t('alerts.columns.details')}</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -401,11 +401,11 @@ export default function AlertsPage() {
                     <span className="text-[11px] text-muted-foreground">{formatRelativeTime(rule.createdAt)}</span>
                     <div className="flex items-center gap-1">
                       {canManageEndpoints && (<>
-                        <Button variant="ghost" size="icon-sm" onClick={() => handleMuteRule(rule.id, !rule.muted)} title={rule.muted ? 'Unmute' : 'Mute'}>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleMuteRule(rule.id, !rule.muted)} title={t(rule.muted ? 'alerts.unmute' : 'alerts.mute')} aria-label={t(rule.muted ? 'alerts.unmute' : 'alerts.mute')}>
                           <VolumeX className={`h-3.5 w-3.5 ${rule.muted ? 'text-muted-foreground' : ''}`} />
                         </Button>
                         <div className="relative">
-                          <Button variant="ghost" size="icon-sm" onClick={() => setSnoozeDropdownId(snoozeDropdownId === rule.id ? null : rule.id)} title={t('alerts.snooze', 'Snooze')}>
+                          <Button variant="ghost" size="icon-sm" onClick={() => setSnoozeDropdownId(snoozeDropdownId === rule.id ? null : rule.id)} title={t('alerts.snooze', 'Snooze')} aria-label={t('alerts.snooze', 'Snooze')}>
                             <Clock className="h-3.5 w-3.5" />
                           </Button>
                           {snoozeDropdownId === rule.id && (
@@ -422,7 +422,7 @@ export default function AlertsPage() {
                             </div>
                           )}
                         </div>
-                        <Button variant="ghost" size="icon-sm" className="text-destructive" onClick={() => setDeleteRuleId(rule.id)}>
+                        <Button variant="ghost" size="icon-sm" className="text-destructive" onClick={() => setDeleteRuleId(rule.id)} title={t('alerts.deleteRule')} aria-label={t('alerts.deleteRule')}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </>)}
