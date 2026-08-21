@@ -142,7 +142,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P2-32 | P2 | TODO | Stored XSS via dangerouslySetInnerHTML + i18n |
 | P2-33 | P2 | TODO | OSS metadata, docs site, demo, committed OpenAPI |
 | P3-34 | P3 | TODO | Workflow engine and CLI command tests |
-| P3-35 | P3 | TODO | Load/soak harness + SDK contract tests |
+| P3-35 | P3 | DONE (harness + contract tests done; real numbers/soak run pending a live-stack run) | Load/soak harness + SDK contract tests |
 | P3-36 | P3 | TODO | Table partitioning + log aggregation |
 | P0-37 | P0 | DONE | Outbox publisher never publishes (Hibernate mangles `::` cast in native query) |
 | P0-38 | P0 | DONE | Never-attempted deliveries routed to the 24h retry tier |

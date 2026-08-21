@@ -1,0 +1,112 @@
+// Contract tests: run the node SDK against a REAL API instance and assert
+// its request/response shapes still match what the API actually does. The
+// 56 cases in src/__tests__/ stub the HTTP layer entirely — they'd stay
+// green even if the API renamed a field out from under this SDK. These
+// exist to catch that drift instead of a user finding it in production.
+//
+// Run with: npm run test:contract (requires CONTRACT_API_BASE_URL reachable
+// — defaults to http://localhost:8080, i.e. `make up`). See
+// tests/contract/README.md.
+//
+// P2-33 (not yet done — see .claude/features/) tracks committing an OpenAPI
+// spec; once that lands, generating these expectations from the spec is
+// preferable to hand-asserting field-by-field, since it catches drift at
+// build time rather than only when this suite happens to run. Until then,
+// this is the fallback the P3-35 task explicitly allows.
+import { Hookflow } from '../../src/index';
+import { bootstrapContractProject, isApiReachable, BASE_URL, ContractContext } from './support';
+
+let apiReachable = false;
+let ctx: ContractContext;
+let client: Hookflow;
+
+beforeAll(async () => {
+  apiReachable = await isApiReachable();
+  if (!apiReachable) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[contract] ${BASE_URL} is not reachable (tried /v3/api-docs) — ` +
+        'skipping contract assertions. Run `make up && make wait-healthy` first. See tests/contract/README.md.'
+    );
+    return;
+  }
+  ctx = await bootstrapContractProject('sdk-client');
+  client = new Hookflow({ apiKey: ctx.apiKey, baseUrl: BASE_URL });
+});
+
+describe('Hookflow client contract', () => {
+  test('endpoints.create returns the shape Endpoint declares', async () => {
+    if (!apiReachable) return;
+    const endpoint = await client.endpoints.create(ctx.projectId, {
+      url: 'https://example.com/webhook',
+      description: 'contract test endpoint',
+      enabled: true,
+    });
+
+    expect(typeof endpoint.id).toBe('string');
+    expect(endpoint.projectId).toBe(ctx.projectId);
+    expect(endpoint.url).toBe('https://example.com/webhook');
+    expect(typeof endpoint.enabled).toBe('boolean');
+    expect(typeof endpoint.createdAt).toBe('string');
+  });
+
+  test('subscriptions.create returns the shape Subscription declares', async () => {
+    if (!apiReachable) return;
+    const endpoint = await client.endpoints.create(ctx.projectId, {
+      url: 'https://example.com/webhook2',
+    });
+    const subscription = await client.subscriptions.create(ctx.projectId, {
+      endpointId: endpoint.id,
+      eventType: 'contract.test.created',
+      orderingEnabled: false,
+    });
+
+    expect(typeof subscription.id).toBe('string');
+    expect(subscription.endpointId).toBe(endpoint.id);
+    expect(subscription.eventType).toBe('contract.test.created');
+    expect(typeof subscription.enabled).toBe('boolean');
+    expect(typeof subscription.orderingEnabled).toBe('boolean');
+    expect(typeof subscription.maxAttempts).toBe('number');
+    // Field the API sends that the SDK's Subscription type does not declare
+    // (see SubscriptionResponse.java) — documented drift, not a bug this
+    // test should fail on. Recorded here so it doesn't silently regress
+    // into a *worse* drift (e.g. the field disappearing or changing type)
+    // without a human noticing.
+    expect((subscription as unknown as Record<string, unknown>).transformationId).not.toBeUndefined();
+  });
+
+  test('events.send accepted and fans out to the subscribed endpoint (deliveriesCreated=1)', async () => {
+    if (!apiReachable) return;
+    const endpoint = await client.endpoints.create(ctx.projectId, {
+      url: 'https://example.com/webhook3',
+    });
+    await client.subscriptions.create(ctx.projectId, {
+      endpointId: endpoint.id,
+      eventType: 'contract.test.event_send',
+    });
+
+    const response = await client.events.send({
+      type: 'contract.test.event_send',
+      data: { hello: 'world' },
+    });
+
+    expect(typeof response.eventId).toBe('string');
+    expect(response.type).toBe('contract.test.event_send');
+    expect(response.deliveriesCreated).toBe(1);
+  });
+
+  test('deliveries.list returns a paginated response for the project', async () => {
+    if (!apiReachable) return;
+    const page = await client.deliveries.list(ctx.projectId, { size: 5 });
+    expect(Array.isArray(page.content)).toBe(true);
+    expect(typeof page.totalElements).toBe('number');
+  });
+
+  test('an invalid API key is rejected with a 401-shaped AuthenticationError', async () => {
+    if (!apiReachable) return;
+    const badClient = new Hookflow({ apiKey: 'not-a-real-key', baseUrl: BASE_URL });
+    await expect(
+      badClient.events.send({ type: 'contract.test.bad_key', data: {} })
+    ).rejects.toMatchObject({ status: 401, name: 'AuthenticationError' });
+  });
+});
