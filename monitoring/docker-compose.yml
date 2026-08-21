@@ -25,6 +25,8 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
     ports:
       - "127.0.0.1:9090:9090"
+    depends_on:
+      - alertmanager
     networks:
       - monitoring
       - hookflow
@@ -33,6 +35,46 @@ services:
       resources:
         limits:
           memory: 512m
+
+  # P1-20: the 14 rules in prometheus/alerts.yml evaluate correctly but, without
+  # this, route nowhere — no receiver, just a red square on a dashboard nobody
+  # is watching. See monitoring/README.md "Alerting" for receiver setup
+  # (ALERTMANAGER_* in .env) and the routing/grouping/inhibition design.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: hookflow-alertmanager
+    volumes:
+      - ./alertmanager/render-config.sh:/etc/alertmanager/render-config.sh:ro
+      - alertmanager_data:/alertmanager
+    environment:
+      ALERTMANAGER_SLACK_WEBHOOK_URL: ${ALERTMANAGER_SLACK_WEBHOOK_URL:-}
+      ALERTMANAGER_SLACK_CHANNEL: ${ALERTMANAGER_SLACK_CHANNEL:-#hookflow-alerts}
+      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-}
+      ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO:-}
+      ALERTMANAGER_EMAIL_FROM: ${ALERTMANAGER_EMAIL_FROM:-alerts@hookflow.dev}
+      ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST:-localhost}
+      ALERTMANAGER_SMTP_PORT: ${ALERTMANAGER_SMTP_PORT:-1025}
+    entrypoint: ["/bin/sh", "-c"]
+    # render-config.sh writes /etc/alertmanager/alertmanager.yml from the
+    # ALERTMANAGER_* env vars above (busybox image — no envsubst, see the
+    # script's header for why it's POSIX sh instead of a static file).
+    command:
+      - >-
+        sh /etc/alertmanager/render-config.sh &&
+        exec /bin/alertmanager
+        --config.file=/etc/alertmanager/alertmanager.yml
+        --storage.path=/alertmanager
+        --web.listen-address=:9093
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - monitoring
+      - hookflow
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   grafana:
     image: grafana/grafana:10.4.2
@@ -63,6 +105,7 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
 
 networks:
   monitoring:

@@ -98,6 +98,77 @@ jobs:
           echo "Integration tests with Testcontainers completed." >> $GITHUB_STEP_SUMMARY
           echo "- PostgreSQL: Testcontainers" >> $GITHUB_STEP_SUMMARY
 
+  # P1-20: proves backups are actually restorable, not just "a CronJob ran".
+  # backup -> destroy the data -> restore -> assert it's back. An untested
+  # restore path is the most common cause of an unusable backup.
+  restore-drill:
+    name: Backup/Restore Drill
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env from .env.dist
+        run: cp .env.dist .env
+
+      - name: Start embedded Postgres
+        run: docker compose --profile embedded-db up -d postgres
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec webhook-postgres pg_isready -U webhook_user -d webhook_platform; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Postgres never became ready"
+          exit 1
+
+      - name: Seed test data (simulates "ingest some events")
+        run: |
+          docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c \
+            "CREATE TABLE restore_drill_test (id serial primary key, note text);"
+          docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c \
+            "INSERT INTO restore_drill_test (note) VALUES ('event-1'), ('event-2'), ('event-3');"
+
+      - name: Backup (make backup-db)
+        run: make backup-db
+
+      - name: Destroy the data
+        run: docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c "DROP TABLE restore_drill_test;"
+
+      - name: Restore (make restore-db)
+        run: |
+          FILE=$(ls -t backups/webhook_platform_*.dump | head -1)
+          echo "Restoring from $FILE"
+          make restore-db FILE="$FILE" CONFIRM=YES
+
+      - name: Assert data integrity
+        run: |
+          COUNT=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -tAc "SELECT count(*) FROM restore_drill_test;")
+          echo "Row count after restore: $COUNT"
+          if [ "$COUNT" != "3" ]; then
+            echo "::error::Restore drill FAILED — expected 3 rows after restore, got $COUNT"
+            exit 1
+          fi
+          NOTES=$(docker exec webhook-postgres psql -U webhook_user -d webhook_platform -tAc "SELECT string_agg(note, ',' ORDER BY id) FROM restore_drill_test;")
+          if [ "$NOTES" != "event-1,event-2,event-3" ]; then
+            echo "::error::Restore drill FAILED — row content mismatch: $NOTES"
+            exit 1
+          fi
+
+      - name: Restore Drill Summary
+        if: always()
+        run: |
+          echo "### Backup/Restore Drill Results" >> $GITHUB_STEP_SUMMARY
+          echo "backup -> destroy -> restore -> assert data integrity: PASSED" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --profile embedded-db down -v
+
   frontend-lint:
     name: Frontend Lint & Typecheck
     runs-on: ubuntu-latest
