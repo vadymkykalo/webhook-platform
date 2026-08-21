@@ -232,8 +232,15 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!--
+                  P1-19: 2.22.2 predates JUnit 5.9+'s OutputDirectoryProvider
+                  API. With Spring Boot 3.5.16's newer managed JUnit Jupiter
+                  version, that old surefire silently discovered zero tests
+                  ("unaligned versions of the junit-platform-engine and
+                  junit-platform-launcher jars") instead of failing loudly.
+                -->
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.2</version>
+                <version>3.5.6</version>
             </plugin>
             <!--
               P1-28: see the matching comment in webhook-platform-common's

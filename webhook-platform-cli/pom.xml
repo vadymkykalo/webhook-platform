@@ -141,8 +141,9 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!-- P1-19: see webhook-platform-api/pom.xml for why this was bumped. -->
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.2</version>
+                <version>3.5.6</version>
             </plugin>
             <!--
               P1-28: see the matching comment in webhook-platform-common's
