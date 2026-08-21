@@ -35,7 +35,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
     private UserRepository userRepository;
 
     // Mocked so tests can capture the plaintext reset token EmailService would have
-    // emailed to the user (P0-14a: the DB column now holds only CryptoUtils.hashApiKey(token),
+    // emailed to the user (the DB column now holds only CryptoUtils.hashApiKey(token),
     // so the raw token is no longer recoverable by reading the row back).
     @MockBean
     private EmailService emailService;
@@ -90,7 +90,7 @@ public class PasswordResetIntegrationTest extends AbstractIntegrationTest {
         // 1. Request password reset, capturing the plaintext token that would be emailed
         String resetToken = requestResetAndCaptureToken();
 
-        // 2. Verify only a HASH of the token was saved in DB (P0-14a) — never the plaintext
+        // 2. Verify only a HASH of the token was saved in DB — never the plaintext
         User user = userRepository.findByEmail(EMAIL).orElseThrow();
         assertThat(user.getPasswordResetToken()).isNotNull();
         assertThat(user.getPasswordResetToken()).isNotEqualTo(resetToken);

@@ -25,14 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * context, which runs Flyway, which applies V052/V053 — so a broken partitioning
  * migration fails every integration test class, not just this one. These tests then
  * check the actual partition-drop / partition-create behavior PartitionMaintenanceService
- * is responsible for (P3-36a).
+ * is responsible for.
  * <p>
  * All methods here share one Testcontainers Postgres database
  * (@DirtiesContext(AFTER_CLASS) on AbstractIntegrationTest), so this class is ordered
  * explicitly: {@link #dropExpiredPartitionsRemovesOnlyPartitionsFullyPastRetention()}
  * drops the real, migration-created legacy partition to prove the mechanism end to end
- * (this is exactly what the P3-36 verification block asks for — "a retention run
- * dropping a partition"), and every other test that assumes that partition still
+ * (proving a retention run actually drops a partition end to end), and every other test that assumes that partition still
  * exists is ordered before it.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

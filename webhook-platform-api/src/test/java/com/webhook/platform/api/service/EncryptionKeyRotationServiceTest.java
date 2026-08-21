@@ -358,7 +358,7 @@ class EncryptionKeyRotationServiceTest {
         }
 
         @Test
-        @DisplayName("P0-09: partial failure increments the observability counter, not just the count field")
+        @DisplayName("partial failure increments the observability counter, not just the count field")
         void partialFailureIncrementsCounter() {
             Endpoint badEndpoint = Endpoint.builder()
                     .id(UUID.randomUUID())

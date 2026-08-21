@@ -203,7 +203,7 @@ class EventIngestServiceTest {
         when(transactionManager.getTransaction(any())).thenReturn(mock(org.springframework.transaction.TransactionStatus.class));
     }
 
-    // ── P1-23 / 23c: sequence generation deferred to after commit ──────
+    // ── sequence generation deferred to after commit ──────
 
     @Test
     void ingestEvent_orderingEnabledSubscription_savesDeliveryWithoutSequence_thenBackfillsAfterCommit() {
@@ -264,7 +264,7 @@ class EventIngestServiceTest {
 
     @Test
     void ingestEvent_transactionRollsBackAfterDeliverySave_neverGeneratesSequence() {
-        // Regression test for P1-23 / 23c: generating the sequence *inside* the ingest
+        // Regression test: generating the sequence *inside* the ingest
         // transaction meant a rollback after the delivery was created (e.g. an outbox save
         // failure) burned a sequence number that no delivery would ever carry. Reproduced here
         // by making the outbox save throw right after the ordering-enabled delivery is saved.

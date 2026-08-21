@@ -19,7 +19,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * P1-19: {@link JwtUtil} caches parsed claims in a static
+ * {@link JwtUtil} caches parsed claims in a static
  * {@code ThreadLocal<Map<String, Claims>>} (REQUEST_CACHE) to avoid
  * re-verifying the same token's HMAC signature multiple times within one
  * request. That is only safe because {@link JwtAuthenticationFilter}

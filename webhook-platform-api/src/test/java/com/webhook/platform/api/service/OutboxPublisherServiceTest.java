@@ -182,7 +182,7 @@ class OutboxPublisherServiceTest {
 
     @Test
     void findPendingBatchForUpdate_outerQuery_ordersByCreatedAt() throws Exception {
-        // Regression test for P1-24b: the outer "SELECT * FROM outbox_messages WHERE id IN
+        // Regression test: the outer "SELECT * FROM outbox_messages WHERE id IN
         // (...) FOR UPDATE SKIP LOCKED" had no ORDER BY, so Postgres could return the
         // id-filtered rows in plan order even though the inner subquery computed the correct
         // rn_proj/rn_key ranking — up to maxPerKey=10 messages for one endpoint could reach
@@ -214,7 +214,7 @@ class OutboxPublisherServiceTest {
 
     @Test
     void publishPendingMessages_sendsMessagesInRepositoryReturnOrder() throws Exception {
-        // With findPendingBatchForUpdate now ordering by created_at (P1-24b), verify
+        // With findPendingBatchForUpdate now ordering by created_at, verify
         // publishBatchAsync itself preserves that order end-to-end instead of reshuffling it
         // (e.g. via a parallel stream or a Map keyed collection) on the way to Kafka.
         OutboxMessage m1 = createTestMessage();
@@ -248,7 +248,7 @@ class OutboxPublisherServiceTest {
 
     @Test
     void retryFailedMessages_recoversStuckSendingMessages_onThe30sCycle() {
-        // Regression test for P1-24c: recoverStuckSendingMessages() used to run only inside
+        // Regression test: recoverStuckSendingMessages() used to run only inside
         // the hourly cleanupOldMessages() job, so a message stuck SENDING after a transient
         // broker hiccup could wait up to ~59 extra minutes to be reclaimed. It must now run on
         // every retryFailedMessages() poll (the 30s retry-interval-ms cycle).
@@ -280,7 +280,7 @@ class OutboxPublisherServiceTest {
 
     @Test
     void cleanupOldMessages_noLongerRecoversStuckSendingMessages() {
-        // P1-24c moved recovery to the 30s retryFailedMessages() cycle; cleanupOldMessages()
+        // Recovery moved to the 30s retryFailedMessages() cycle; cleanupOldMessages()
         // (hourly) must not also call it — that would just be redundant, not wrong, but this
         // pins the "moved" (not "also called") decision explicitly.
         when(outboxMessageRepository.deleteOldPublishedMessages(anyString(), any(Instant.class), anyInt()))

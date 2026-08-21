@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 /**
- * Regression coverage for P0-11: X-Forwarded-For was trusted verbatim with no
+ * Regression coverage: X-Forwarded-For was trusted verbatim with no
  * proxy gate, and the naive left-most-hop parsing picked the most
  * attacker-controlled entry in a multi-hop chain.
  */

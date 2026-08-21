@@ -158,7 +158,7 @@ public class ShedLockConcurrencyTest {
 
 
     /**
-     * P0-06: AuditLogRetentionJob went from unguarded to @SchedulerLock-wrapped because it's a
+     * AuditLogRetentionJob went from unguarded to @SchedulerLock-wrapped because it's a
      * cron (not fixedDelay) that could now genuinely overlap itself/across replicas once the
      * scheduler pool is wider than 1 thread. This just proves the job still purges correctly
      * when invoked through the ShedLock-wrapped Spring proxy - a true concurrent-overlap race

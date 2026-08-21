@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P0-06 regression guard: Spring Boot defaults spring.task.scheduling.pool.size to 1, which
+ * Regression guard: Spring Boot defaults spring.task.scheduling.pool.size to 1, which
  * means a single slow @Scheduled job (e.g. MaterializedViewRefreshService's REFRESH MATERIALIZED
  * VIEW, which can run for 90s+ on a large table) blocks every other cron sharing the JVM,
  * including OutboxPublisherService's 1s dispatch poll - no event reaches Kafka for any tenant
@@ -51,7 +51,7 @@ class SchedulingPoolSizeTest {
                             "spring.task.scheduling.pool.size resolved to " + poolSize +
                                     " - a pool of 1 means a single slow @Scheduled job (e.g. the " +
                                     "materialized-view refresh) starves every other cron on this " +
-                                    "JVM, including outbox dispatch (P0-06)");
+                                    "JVM, including outbox dispatch");
                 });
     }
 

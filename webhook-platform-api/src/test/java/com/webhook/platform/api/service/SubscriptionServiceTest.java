@@ -88,7 +88,7 @@ class SubscriptionServiceTest {
                 .eventType("order.created");
     }
 
-    // ── P0-1: Endpoint ownership in createSubscription ──
+    // ── Endpoint ownership in createSubscription ──
 
     @Test
     void createSubscription_sameProjectEndpoint_succeeds() {
@@ -126,7 +126,7 @@ class SubscriptionServiceTest {
                 .hasMessageContaining("Endpoint not found");
     }
 
-    // ── P0-2: Transformation ownership in createSubscription ──
+    // ── Transformation ownership in createSubscription ──
 
     @Test
     void createSubscription_sameProjectTransformation_succeeds() {
@@ -169,7 +169,7 @@ class SubscriptionServiceTest {
         assertThat(response).isNotNull();
     }
 
-    // ── P0-1: Endpoint ownership in updateSubscription ──
+    // ── Endpoint ownership in updateSubscription ──
 
     @Test
     void updateSubscription_foreignEndpoint_throwsForbidden() {
@@ -188,7 +188,7 @@ class SubscriptionServiceTest {
                 .hasMessageContaining("Endpoint does not belong to this project");
     }
 
-    // ── P0-2: Transformation ownership in updateSubscription ──
+    // ── Transformation ownership in updateSubscription ──
 
     @Test
     void updateSubscription_foreignTransformation_throwsForbidden() {

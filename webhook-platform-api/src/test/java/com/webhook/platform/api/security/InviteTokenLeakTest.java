@@ -101,7 +101,7 @@ class InviteTokenLeakTest {
     }
 
     // -----------------------------------------------------------------
-    // P0-14b: the temp password generated for a brand-new invited user must
+    // The temp password generated for a brand-new invited user must
     // never reach the logs, and must be delivered exclusively via EmailService.
     // -----------------------------------------------------------------
 
