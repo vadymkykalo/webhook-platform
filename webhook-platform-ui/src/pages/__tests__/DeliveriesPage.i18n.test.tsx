@@ -4,7 +4,7 @@ import i18n from '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
 import type { ProjectResponse, EndpointResponse } from '../../types/api.types';
 
-// Regression test for P2-31: DeliveriesPage used to render its status-filter
+// Regression test: DeliveriesPage used to render its status-filter
 // options and status badges as raw hardcoded English (`{ value: '', label:
 // 'All Statuses' }`, `{status}`) instead of going through i18n — so switching
 // the dashboard to Ukrainian left this page half-translated. This asserts a
