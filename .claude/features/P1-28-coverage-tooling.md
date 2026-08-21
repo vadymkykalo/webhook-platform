@@ -1,6 +1,6 @@
 # P1-28 — Coverage tooling (JaCoCo + vitest)
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P1 — small, and it makes P1-22 and P3-34 measurable
 - **Branch:** `feature/P1-28-coverage-tooling`
 - **Depends on:** nothing (but most useful before the big test tasks)
