@@ -95,6 +95,7 @@ class WebhookDeliveryServiceTest {
     private TransformationCacheService transformationCacheService;
 
     private WebhookDeliveryService service;
+    private MeterRegistry meterRegistry;
 
     @SuppressWarnings("unchecked")
     @BeforeEach
@@ -114,7 +115,7 @@ class WebhookDeliveryServiceTest {
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(mockWebClient);
 
-        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        meterRegistry = new SimpleMeterRegistry();
         service = new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
@@ -973,5 +974,156 @@ class WebhookDeliveryServiceTest {
         assertTrue(attemptCaptor.getValue().getErrorMessage() != null
                         && attemptCaptor.getValue().getErrorMessage().contains("SSRF_PROTECTION"),
                 "attempt must record the SSRF rejection, not silently drop it");
+    }
+
+    // ── P1-23 / 23b: gap check spans the full missing range, not just seq-1 ────
+
+    private Delivery orderedDelivery(UUID id, UUID eventId, UUID endpointId, long sequenceNumber,
+            Instant orderingFirstBufferedAt) {
+        return Delivery.builder()
+                .id(id).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0).maxAttempts(5).timeoutSeconds(5)
+                .orderingEnabled(true).sequenceNumber(sequenceNumber)
+                .orderingFirstBufferedAt(orderingFirstBufferedAt)
+                .updatedAt(Instant.now())
+                .build();
+    }
+
+    /**
+     * Reproduces P1-23 / 23b Scenario A: cursor is at 5, sequence 6 is genuinely still
+     * outstanding (retrying), and sequence 10 arrives. The old code only checked sequence 9
+     * (already SUCCESS, so absent from PENDING/PROCESSING) via findOldestPendingCreatedAt(...,
+     * 9), got null back, and isGapTimedOut(null) used to mean "proceed" -- so 10 was delivered
+     * ahead of 6, breaking FIFO without ever waiting out the gap timeout. The fixed range query
+     * covers the whole gap [6, 9] and finds 6 still outstanding, so this must buffer instead.
+     */
+    @Test
+    void canDeliverWithOrdering_somethingElseInGapStillPending_buffersInsteadOfSkippingAhead() {
+        MeterRegistry meterRegistry = new SimpleMeterRegistry();
+        WebhookDeliveryService localService = serviceWithMockWebClient(mock(WebClient.class), meterRegistry);
+
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Delivery delivery = orderedDelivery(deliveryId, eventId, endpointId, 10L, null);
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+        when(orderingBufferService.canDeliver(endpointId, 10L)).thenReturn(false);
+        when(orderingBufferService.getLastDeliveredSequence(endpointId)).thenReturn(5L);
+        // Sequence 6 (somewhere in [6, 9]) is still PENDING/PROCESSING.
+        when(deliveryRepository.findOldestPendingCreatedAt(endpointId, 6L, 9L))
+                .thenReturn(Instant.now().minusSeconds(5));
+        when(orderingBufferService.isGapTimedOut(any())).thenReturn(false);
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        localService.processDelivery(message, true);
+
+        verifyNoInteractions(endpointRepository); // never even looked up -- buffered before that
+        verify(orderingBufferService).bufferDelivery(endpointId, deliveryId, 10L);
+
+        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(captor.capture());
+        assertEquals(Delivery.DeliveryStatus.PENDING, captor.getValue().getStatus());
+        assertTrue(captor.getValue().getOrderingFirstBufferedAt() != null,
+                "must stamp when this delivery first started waiting, for the gap timeout clock");
+    }
+
+    /**
+     * Mirror of the case above but with nothing left outstanding anywhere in the gap (e.g. the
+     * missing sequence was burned by a rolled-back ingest and will never arrive) -- must
+     * proceed immediately rather than waiting out a timeout for something that isn't there.
+     */
+    @Test
+    void canDeliverWithOrdering_nothingOutstandingInGap_proceedsImmediately() throws Exception {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/hook", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+        });
+        httpServer.start();
+        try {
+            UUID endpointId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+
+            Endpoint endpoint = verifiedEndpoint(endpointId,
+                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+            Event event = stubEvent(eventId, endpoint.getProjectId());
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            stubHappyPathPrerequisites(endpoint);
+
+            Delivery delivery = orderedDelivery(deliveryId, eventId, endpointId, 10L, null);
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            when(orderingBufferService.canDeliver(endpointId, 10L)).thenReturn(false);
+            when(orderingBufferService.getLastDeliveredSequence(endpointId)).thenReturn(5L);
+            when(deliveryRepository.findOldestPendingCreatedAt(endpointId, 6L, 9L)).thenReturn(null);
+            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of());
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+            service.processDelivery(message, true);
+
+            verify(endpointRepository).findById(endpointId); // proceeded past the ordering check
+            verify(orderingBufferService, never()).bufferDelivery(any(), any(), anyLong());
+        } finally {
+            httpServer.stop(0);
+        }
+    }
+
+    /**
+     * P1-23 / 23b: webhook_ordering_gap_timeout_total used to be incremented in both
+     * OrderingBufferService.isGapTimedOut and WebhookDeliveryService.canDeliverWithOrdering.
+     * With OrderingBufferService fully mocked here (its own increment can't fire), a count of
+     * exactly 1 confirms WebhookDeliveryService's own increment is the only one left.
+     */
+    @Test
+    void canDeliverWithOrdering_gapTimedOut_countsMetricExactlyOnce() throws Exception {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        httpServer.createContext("/hook", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+        });
+        httpServer.start();
+        try {
+            UUID endpointId = UUID.randomUUID();
+            UUID eventId = UUID.randomUUID();
+            UUID deliveryId = UUID.randomUUID();
+
+            Endpoint endpoint = verifiedEndpoint(endpointId,
+                    "http://127.0.0.1:" + httpServer.getAddress().getPort() + "/hook");
+            when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+            Event event = stubEvent(eventId, endpoint.getProjectId());
+            when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+            stubHappyPathPrerequisites(endpoint);
+
+            // Already buffered a while ago -- long enough to have timed out.
+            Instant firstBufferedAt = Instant.now().minusSeconds(120);
+            Delivery delivery = orderedDelivery(deliveryId, eventId, endpointId, 10L, firstBufferedAt);
+            when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+            when(orderingBufferService.canDeliver(endpointId, 10L)).thenReturn(false);
+            when(orderingBufferService.getLastDeliveredSequence(endpointId)).thenReturn(5L);
+            when(deliveryRepository.findOldestPendingCreatedAt(endpointId, 6L, 9L))
+                    .thenReturn(Instant.now().minusSeconds(200)); // still "pending" in DB, but we've waited long enough
+            when(orderingBufferService.isGapTimedOut(firstBufferedAt)).thenReturn(true);
+            when(orderingBufferService.getReadyDeliveries(endpointId)).thenReturn(List.of());
+
+            DeliveryMessage message = DeliveryMessage.builder()
+                    .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+            service.processDelivery(message, true);
+
+            verify(endpointRepository).findById(endpointId); // proceeded despite the gap
+            assertEquals(1.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
+        } finally {
+            httpServer.stop(0);
+        }
     }
 }

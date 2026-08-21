@@ -11,31 +11,48 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.redisson.api.RBucket;
-import org.redisson.api.RScoredSortedSet;
+import org.redisson.api.RScript;
 import org.redisson.api.RedissonClient;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit coverage for OrderingBufferService (P1-22): buffering, cursor advance (Redis
- * cache + Postgres durable fallback), gap timeout, and buffer release ordering.
+ * Unit coverage for OrderingBufferService (P1-23 / 23a, 23b) -- previously had no tests at
+ * all despite gating FIFO delivery ordering.
+ *
+ * <p>23a: markDelivered() now upserts Postgres first (authoritative, GREATEST-guarded) and
+ * only ever advances the Redis cache from that returned value via a Lua CAS script, so the
+ * cache can never regress below what Postgres already knows -- not even after a Redis TTL
+ * expiry/flush that resets the "current" value the naive read-modify-write used to trust.
+ * The real Lua script runs inside Redis in production (see
+ * src/main/resources/lua/ordering_cursor_cas.lua); here RScript.eval is faked with a small
+ * in-memory CAS implementation that mirrors the script's documented contract, so these tests
+ * exercise OrderingBufferService's own logic (what it sends the script, what it does with the
+ * result) against a *correct* CAS, not Lua itself.
+ *
+ * <p>23b: isGapTimedOut() now measures from "when this delivery was first buffered", not from
+ * an unrelated row's ingest createdAt -- and no longer double-counts the gap-timeout metric
+ * (that counting now lives solely in WebhookDeliveryService).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -45,227 +62,212 @@ class OrderingBufferServiceTest {
     private RedissonClient redissonClient;
     @Mock
     private OrderingCursorRepository cursorRepository;
+    @Mock
+    private RScript rScript;
 
+    private SimpleMeterRegistry meterRegistry;
     private OrderingBufferService service;
+
+    /** In-memory fake of the Redis key this test's endpoint maps to. */
+    private final ConcurrentHashMap<String, Long> fakeRedisState = new ConcurrentHashMap<>();
 
     private static final int GAP_TIMEOUT_SECONDS = 60;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
-        service = new OrderingBufferService(redissonClient, cursorRepository, new SimpleMeterRegistry(),
+        meterRegistry = new SimpleMeterRegistry();
+        fakeRedisState.clear();
+
+        when(redissonClient.getScript(any())).thenReturn(rScript);
+        // Faithfully mirrors lua/ordering_cursor_cas.lua: SET only if newVal > current
+        // (missing key treated as "current == false"), atomically (synchronized -- this test
+        // fake is what stands in for Redis's single-threaded Lua execution guarantee).
+        when(rScript.eval(eq(RScript.Mode.READ_WRITE), any(String.class), eq(RScript.ReturnType.INTEGER),
+                any(List.class), any(), any())).thenAnswer(invocation -> {
+            List<String> keys = invocation.getArgument(3);
+            String key = keys.get(0);
+            long newVal = ((Number) invocation.getArgument(4)).longValue();
+            synchronized (fakeRedisState) {
+                Long current = fakeRedisState.get(key);
+                if (current == null || newVal > current) {
+                    fakeRedisState.put(key, newVal);
+                    return 1L;
+                }
+                return 0L;
+            }
+        });
+
+        service = new OrderingBufferService(redissonClient, cursorRepository, meterRegistry,
                 GAP_TIMEOUT_SECONDS, 24, 10);
     }
 
+    private UUID endpointId() {
+        return UUID.randomUUID();
+    }
+
+    // ── 23a: cursor cannot regress ──────────────────────────────────────
+
+    @Test
+    void markDelivered_advancesRedisFromAuthoritativePostgresValue_notFromRawArgument() {
+        UUID endpointId = endpointId();
+        // Postgres already at 100; a straggler for sequence 5 arrives (e.g. after a Redis
+        // flush wiped the cache and a slow retry finally lands). The upsert's GREATEST clause
+        // means the authoritative return value stays 100, not 5.
+        when(cursorRepository.upsertCursor(endpointId, 5L)).thenReturn(100L);
+
+        service.markDelivered(endpointId, 5L);
+
+        assertEquals(100L, fakeRedisState.get("seq:delivered:" + endpointId),
+                "Redis must converge to the authoritative Postgres value, never regress to the raw arg");
+    }
+
+    @Test
+    void markDelivered_neverRegressesRedisCache_evenAfterSimulatedFlush() {
+        UUID endpointId = endpointId();
+        String key = "seq:delivered:" + endpointId;
+
+        // Cursor reaches 100 in both stores.
+        when(cursorRepository.upsertCursor(endpointId, 100L)).thenReturn(100L);
+        service.markDelivered(endpointId, 100L);
+        assertEquals(100L, fakeRedisState.get(key));
+
+        // Simulate a Redis flush/TTL expiry: the key disappears, but Postgres still holds 100.
+        fakeRedisState.remove(key);
+
+        // A straggler for a stale, already-superseded sequence (5) finally succeeds. Postgres's
+        // upsert is GREATEST-guarded so it still authoritatively reports 100.
+        when(cursorRepository.upsertCursor(endpointId, 5L)).thenReturn(100L);
+        service.markDelivered(endpointId, 5L);
+
+        assertEquals(100L, fakeRedisState.get(key),
+                "Cursor must not regress to 5 after the Redis flush -- this was the P1-23 / 23a bug");
+    }
+
+    @Test
+    void markDelivered_concurrentCallsOutOfOrder_convergeToHighestValue() throws InterruptedException {
+        UUID endpointId = endpointId();
+        String key = "seq:delivered:" + endpointId;
+
+        // Postgres upsert is GREATEST-guarded regardless of call order/interleaving.
+        AtomicLong postgresCursor = new AtomicLong(0);
+        when(cursorRepository.upsertCursor(eq(endpointId), anyLong())).thenAnswer(invocation -> {
+            long candidate = invocation.getArgument(1);
+            return postgresCursor.accumulateAndGet(candidate, Math::max);
+        });
+
+        int threadCount = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch ready = new CountDownLatch(threadCount);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            for (int i = 1; i <= threadCount; i++) {
+                long seq = i;
+                pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        go.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                    }
+                    service.markDelivered(endpointId, seq);
+                });
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            go.countDown();
+        } finally {
+            pool.shutdown();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+
+        assertEquals(threadCount, fakeRedisState.get(key),
+                "Concurrent out-of-order markDelivered calls must converge to the max sequence, never a lower one");
+    }
+
+    @Test
+    void markDelivered_postgresWriteFails_stillAdvancesRedisBestEffortAndCountsFailure() {
+        UUID endpointId = endpointId();
+        when(cursorRepository.upsertCursor(endpointId, 7L)).thenThrow(new RuntimeException("db unavailable"));
+
+        service.markDelivered(endpointId, 7L);
+
+        assertEquals(7L, fakeRedisState.get("seq:delivered:" + endpointId));
+        assertEquals(1.0, meterRegistry.counter("webhook_ordering_cursor_db_write_failed_total").count());
+    }
+
+    // ── getLastDeliveredSequence / canDeliver ───────────────────────────
+
+    @Test
+    void getLastDeliveredSequence_warmsRedisFromPostgresOnCacheMiss() {
+        UUID endpointId = endpointId();
+        RBucket<Long> bucket = mockBucket(endpointId);
+        when(bucket.get()).thenReturn(null);
+        when(cursorRepository.findById(endpointId)).thenReturn(Optional.of(
+                OrderingCursor.builder().endpointId(endpointId).lastDeliveredSequence(42L).build()));
+
+        Long result = service.getLastDeliveredSequence(endpointId);
+
+        assertEquals(42L, result);
+        verify(bucket).set(eq(42L), any(Duration.class));
+        assertEquals(1.0, meterRegistry.counter("webhook_ordering_cache_miss_total").count());
+    }
+
+    @Test
+    void canDeliver_firstDeliveryForEndpoint_onlyAllowsSequenceOne() {
+        UUID endpointId = endpointId();
+        RBucket<Long> bucket = mockBucket(endpointId);
+        when(bucket.get()).thenReturn(null);
+        when(cursorRepository.findById(endpointId)).thenReturn(Optional.empty());
+
+        assertTrue(service.canDeliver(endpointId, 1L));
+        assertFalse(service.canDeliver(endpointId, 2L));
+    }
+
+    @Test
+    void canDeliver_allowsOnlyImmediateNextSequence() {
+        UUID endpointId = endpointId();
+        RBucket<Long> bucket = mockBucket(endpointId);
+        when(bucket.get()).thenReturn(5L);
+
+        assertTrue(service.canDeliver(endpointId, 6L));
+        assertFalse(service.canDeliver(endpointId, 7L));
+        assertFalse(service.canDeliver(endpointId, 5L));
+    }
+
     @SuppressWarnings("unchecked")
-    private RBucket<Long> bucketFor(UUID endpointId) {
+    private RBucket<Long> mockBucket(UUID endpointId) {
         RBucket<Long> bucket = mock(RBucket.class);
         when(redissonClient.<Long>getBucket(eq("seq:delivered:" + endpointId))).thenReturn(bucket);
         return bucket;
     }
 
-    @SuppressWarnings("unchecked")
-    private RScoredSortedSet<String> bufferFor(UUID endpointId) {
-        RScoredSortedSet<String> buffer = mock(RScoredSortedSet.class);
-        when(redissonClient.<String>getScoredSortedSet(eq("seq:buffer:" + endpointId))).thenReturn(buffer);
-        return buffer;
-    }
-
-    // --- canDeliver ----------------------------------------------------------------------
+    // ── 23b: gap timeout measured from first-buffered, not an unrelated createdAt ──
 
     @Test
-    void canDeliver_noPriorDelivery_onlyAllowsSequenceOne() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null);
-        when(cursorRepository.findById(endpointId)).thenReturn(Optional.empty());
-
-        assertTrue(service.canDeliver(endpointId, 1));
-        assertFalse(service.canDeliver(endpointId, 2));
+    void isGapTimedOut_neverBufferedBefore_isNotTimedOut() {
+        assertFalse(service.isGapTimedOut(null),
+                "A delivery that has never been buffered hasn't started waiting yet");
     }
 
     @Test
-    void canDeliver_afterSequenceFive_onlyAllowsSix() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(5L);
-
-        assertTrue(service.canDeliver(endpointId, 6));
-        assertFalse(service.canDeliver(endpointId, 7));
-        assertFalse(service.canDeliver(endpointId, 5));
-    }
-
-    // --- getLastDeliveredSequence: Redis cache vs Postgres fallback ------------------------
-
-    @Test
-    void getLastDeliveredSequence_redisHit_doesNotTouchPostgres() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(42L);
-
-        Long result = service.getLastDeliveredSequence(endpointId);
-
-        assertEquals(42L, result);
-        verify(cursorRepository, never()).findById(any());
+    void isGapTimedOut_bufferedRecently_isNotTimedOut() {
+        Instant justBuffered = Instant.now().minusSeconds(5);
+        assertFalse(service.isGapTimedOut(justBuffered));
     }
 
     @Test
-    void getLastDeliveredSequence_redisMiss_fallsBackToPostgresAndWarmsCache() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null);
-        OrderingCursor cursor = OrderingCursor.builder()
-                .endpointId(endpointId).lastDeliveredSequence(7L).updatedAt(Instant.now()).build();
-        when(cursorRepository.findById(endpointId)).thenReturn(Optional.of(cursor));
-
-        Long result = service.getLastDeliveredSequence(endpointId);
-
-        assertEquals(7L, result);
-        verify(bucket).set(eq(7L), eq(Duration.ofHours(24)));
+    void isGapTimedOut_bufferedLongerThanTimeout_isTimedOut() {
+        Instant longAgo = Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5);
+        assertTrue(service.isGapTimedOut(longAgo));
     }
 
     @Test
-    void getLastDeliveredSequence_redisMissAndNoCursorRow_returnsNull() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null);
-        when(cursorRepository.findById(endpointId)).thenReturn(Optional.empty());
-
-        assertEquals(null, service.getLastDeliveredSequence(endpointId));
-    }
-
-    @Test
-    void getLastDeliveredSequence_postgresThrows_failsOpenReturningNull() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null);
-        when(cursorRepository.findById(endpointId)).thenThrow(new RuntimeException("DB unavailable"));
-
-        assertEquals(null, service.getLastDeliveredSequence(endpointId));
-    }
-
-    // --- markDelivered: only advances forward ----------------------------------------------
-
-    @Test
-    void markDelivered_noPriorValue_setsRedisAndPersistsCursor() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null);
-
-        service.markDelivered(endpointId, 3L);
-
-        verify(bucket).set(eq(3L), eq(Duration.ofHours(24)));
-        verify(cursorRepository).upsertCursor(endpointId, 3L);
-    }
-
-    @Test
-    void markDelivered_sequenceAdvances_updatesBoth() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(3L);
-
-        service.markDelivered(endpointId, 4L);
-
-        verify(bucket).set(eq(4L), eq(Duration.ofHours(24)));
-        verify(cursorRepository).upsertCursor(endpointId, 4L);
-    }
-
-    @Test
-    void markDelivered_sequenceDoesNotAdvance_isNoOp() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(5L);
-
-        service.markDelivered(endpointId, 5L);
-        service.markDelivered(endpointId, 4L);
-
-        verify(bucket, never()).set(any(), any());
-        verify(cursorRepository, never()).upsertCursor(any(), org.mockito.ArgumentMatchers.anyLong());
-    }
-
-    @Test
-    void markDelivered_postgresUpsertFails_redisStillUpdated_doesNotThrow() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null);
-        org.mockito.Mockito.doThrow(new RuntimeException("DB down")).when(cursorRepository)
-                .upsertCursor(any(), org.mockito.ArgumentMatchers.anyLong());
-
-        // Must not throw even though the durable write failed -- Redis is the fast path,
-        // Postgres failure here is best-effort and logged.
-        service.markDelivered(endpointId, 1L);
-
-        verify(bucket).set(eq(1L), eq(Duration.ofHours(24)));
-    }
-
-    // --- bufferDelivery / getReadyDeliveries ------------------------------------------------
-
-    @Test
-    void bufferDelivery_addsToScoredSet() {
-        UUID endpointId = UUID.randomUUID();
-        UUID deliveryId = UUID.randomUUID();
-        RScoredSortedSet<String> buffer = bufferFor(endpointId);
-        when(buffer.size()).thenReturn(1);
-
-        service.bufferDelivery(endpointId, deliveryId, 5L);
-
-        verify(buffer).add(5.0, deliveryId.toString());
-        verify(buffer).expire(Duration.ofMinutes(10));
-    }
-
-    @Test
-    void getReadyDeliveries_releasesOnlyNextExpectedSequence() {
-        UUID endpointId = UUID.randomUUID();
-        UUID readyId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(3L); // last delivered = 3, next expected = 4
-        RScoredSortedSet<String> buffer = bufferFor(endpointId);
-        when(buffer.valueRange(4L, true, 4L, true)).thenReturn(List.of(readyId.toString()));
-
-        List<UUID> ready = service.getReadyDeliveries(endpointId);
-
-        assertEquals(List.of(readyId), ready);
-        verify(buffer).remove(readyId.toString());
-    }
-
-    @Test
-    void getReadyDeliveries_nothingBuffered_returnsEmpty() {
-        UUID endpointId = UUID.randomUUID();
-        RBucket<Long> bucket = bucketFor(endpointId);
-        when(bucket.get()).thenReturn(null); // next expected = 1
-        RScoredSortedSet<String> buffer = bufferFor(endpointId);
-        when(buffer.valueRange(1L, true, 1L, true)).thenReturn(List.<String>of());
-
-        List<UUID> ready = service.getReadyDeliveries(endpointId);
-
-        assertTrue(ready.isEmpty());
-        verify(buffer, never()).remove(any());
-    }
-
-    @Test
-    void removeFromBuffer_removesGivenDeliveryId() {
-        UUID endpointId = UUID.randomUUID();
-        UUID deliveryId = UUID.randomUUID();
-        RScoredSortedSet<String> buffer = bufferFor(endpointId);
-
-        service.removeFromBuffer(endpointId, deliveryId);
-
-        verify(buffer).remove(deliveryId.toString());
-    }
-
-    // --- isGapTimedOut -----------------------------------------------------------------------
-
-    @Test
-    void isGapTimedOut_noOldestPending_treatedAsTimedOut() {
-        assertTrue(service.isGapTimedOut(null));
-    }
-
-    @Test
-    void isGapTimedOut_recentPending_notTimedOut() {
-        assertFalse(service.isGapTimedOut(Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS - 30)));
-    }
-
-    @Test
-    void isGapTimedOut_oldPending_isTimedOut() {
-        assertTrue(service.isGapTimedOut(Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 30)));
+    void isGapTimedOut_doesNotIncrementMetric_countingMovedToCaller() {
+        // P1-23 / 23b fixed a double-count: webhook_ordering_gap_timeout_total used to be
+        // incremented both here and in WebhookDeliveryService. It must now only be
+        // incremented by the caller (WebhookDeliveryService.canDeliverWithOrdering).
+        Instant longAgo = Instant.now().minusSeconds(GAP_TIMEOUT_SECONDS + 5);
+        assertTrue(service.isGapTimedOut(longAgo));
+        assertEquals(0.0, meterRegistry.counter("webhook_ordering_gap_timeout_total").count());
     }
 }

@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Subscription;
@@ -200,5 +201,107 @@ class EventIngestServiceTest {
      */
     private void stubTransactionTemplate() {
         when(transactionManager.getTransaction(any())).thenReturn(mock(org.springframework.transaction.TransactionStatus.class));
+    }
+
+    // ── P1-23 / 23c: sequence generation deferred to after commit ──────
+
+    @Test
+    void ingestEvent_orderingEnabledSubscription_savesDeliveryWithoutSequence_thenBackfillsAfterCommit() {
+        EventIngestRequest request = buildRequest("order.created");
+        UUID endpointId = UUID.randomUUID();
+        Subscription subscription = Subscription.builder()
+                .id(UUID.randomUUID())
+                .projectId(projectId)
+                .endpointId(endpointId)
+                .eventType("order.created")
+                .orderingEnabled(true)
+                .build();
+
+        when(subscriptionMatchingCache.findMatching(any(), any())).thenReturn(List.of(subscription));
+        when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
+            Event e = inv.getArgument(0);
+            e.setId(eventId);
+            e.setCreatedAt(Instant.now());
+            return e;
+        });
+
+        List<Delivery> capturedAtSaveTime = new java.util.ArrayList<>();
+        UUID deliveryId = UUID.randomUUID();
+        when(deliveryRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<Delivery> deliveries = inv.getArgument(0);
+            for (Delivery d : deliveries) {
+                d.setId(deliveryId);
+                capturedAtSaveTime.add(cloneForAssertion(d));
+            }
+            return deliveries;
+        });
+        when(sequenceGeneratorService.nextSequence(endpointId)).thenReturn(1L);
+        when(deliveryRepository.updateSequenceNumber(deliveryId, 1L)).thenReturn(1);
+
+        stubTransactionTemplate();
+
+        service.ingestEvent(projectId, request, null);
+
+        // The delivery was saved (inside the transaction) with no sequence number yet.
+        assertThat(capturedAtSaveTime).hasSize(1);
+        assertThat(capturedAtSaveTime.get(0).getSequenceNumber()).isNull();
+        assertThat(capturedAtSaveTime.get(0).getOrderingEnabled()).isTrue();
+
+        // Only after ingestEvent() returns (i.e. after the transaction committed) is a
+        // sequence generated and backfilled onto the already-saved row.
+        verify(sequenceGeneratorService).nextSequence(endpointId);
+        verify(deliveryRepository).updateSequenceNumber(deliveryId, 1L);
+    }
+
+    /** Shallow copy sufficient for asserting the pre-mutation snapshot in the test above. */
+    private Delivery cloneForAssertion(Delivery d) {
+        return Delivery.builder()
+                .id(d.getId())
+                .sequenceNumber(d.getSequenceNumber())
+                .orderingEnabled(d.getOrderingEnabled())
+                .build();
+    }
+
+    @Test
+    void ingestEvent_transactionRollsBackAfterDeliverySave_neverGeneratesSequence() {
+        // Regression test for P1-23 / 23c: generating the sequence *inside* the ingest
+        // transaction meant a rollback after the delivery was created (e.g. an outbox save
+        // failure) burned a sequence number that no delivery would ever carry. Reproduced here
+        // by making the outbox save throw right after the ordering-enabled delivery is saved.
+        EventIngestRequest request = buildRequest("order.created");
+        UUID endpointId = UUID.randomUUID();
+        Subscription subscription = Subscription.builder()
+                .id(UUID.randomUUID())
+                .projectId(projectId)
+                .endpointId(endpointId)
+                .eventType("order.created")
+                .orderingEnabled(true)
+                .build();
+
+        when(subscriptionMatchingCache.findMatching(any(), any())).thenReturn(List.of(subscription));
+        when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
+            Event e = inv.getArgument(0);
+            e.setId(eventId);
+            e.setCreatedAt(Instant.now());
+            return e;
+        });
+        when(deliveryRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<Delivery> deliveries = inv.getArgument(0);
+            for (Delivery d : deliveries) {
+                d.setId(UUID.randomUUID());
+            }
+            return deliveries;
+        });
+        when(outboxMessageRepository.saveAll(anyList()))
+                .thenThrow(new RuntimeException("simulated failure after delivery was saved"));
+
+        stubTransactionTemplate();
+
+        assertThatThrownBy(() -> service.ingestEvent(projectId, request, null))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("simulated failure");
+
+        verify(sequenceGeneratorService, never()).nextSequence(any());
+        verify(deliveryRepository, never()).updateSequenceNumber(any(), anyLong());
     }
 }

@@ -595,20 +595,48 @@ public class WebhookDeliveryService {
             return true;
         }
 
-        // Check if we should proceed due to gap timeout
-        Instant oldestPending = deliveryRepository.findOldestPendingCreatedAt(
-                endpointId, sequenceNumber - 1);
+        // Check the *whole* missing range, not just sequenceNumber - 1 (P1-23 / 23b): a
+        // single-sequence check meant a delivery several sequences ahead of an outstanding
+        // one would sail through the moment the immediately-preceding sequence happened to
+        // already be terminal, even though something further back in the gap was still
+        // genuinely outstanding.
+        Long lastDelivered = orderingBufferService.getLastDeliveredSequence(endpointId);
+        long rangeStart = (lastDelivered == null ? 0 : lastDelivered) + 1;
+        long rangeEnd = sequenceNumber - 1;
 
-        if (orderingBufferService.isGapTimedOut(oldestPending)) {
-            log.warn("Gap timeout for endpoint {}, proceeding with seq={} without seq={}",
-                    endpointId, sequenceNumber, sequenceNumber - 1);
+        Instant oldestPendingInRange = rangeStart <= rangeEnd
+                ? deliveryRepository.findOldestPendingCreatedAt(endpointId, rangeStart, rangeEnd)
+                : null;
+
+        if (oldestPendingInRange == null) {
+            // Nothing left outstanding in the gap (already delivered/terminal, or a sequence
+            // number that will simply never arrive, e.g. one burned by a rolled-back ingest) —
+            // no reason to wait at all.
+            log.info("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
+                    rangeStart, rangeEnd, endpointId, sequenceNumber);
+            return true;
+        }
+
+        // Something in the gap is genuinely still outstanding. How long has *this* delivery
+        // been waiting on it? Measured from when it was first buffered, not from the blocking
+        // row's ingest createdAt (P1-23 / 23b) — that timestamp is unrelated to how long we've
+        // actually been stuck, and using it made isGapTimedOut trivially true for an entire
+        // backlog older than the timeout.
+        if (orderingBufferService.isGapTimedOut(delivery.getOrderingFirstBufferedAt())) {
+            log.warn("Gap timeout for endpoint {}, proceeding with seq={} despite outstanding range [{}, {}]",
+                    endpointId, sequenceNumber, rangeStart, rangeEnd);
+            // Single counting site for webhook_ordering_gap_timeout_total -- OrderingBufferService
+            // no longer increments it too (P1-23 / 23b fixed a double-count here).
             orderingGapTimeoutCounter.increment();
             return true;
         }
 
-        // Buffer the delivery and reschedule
-        log.info("Buffering delivery {} (seq={}) waiting for seq={}",
-                delivery.getId(), sequenceNumber, sequenceNumber - 1);
+        // Buffer the delivery and reschedule; stamp when we first started waiting.
+        if (delivery.getOrderingFirstBufferedAt() == null) {
+            delivery.setOrderingFirstBufferedAt(Instant.now());
+        }
+        log.info("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
+                delivery.getId(), sequenceNumber, rangeStart, rangeEnd);
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
         delivery.setStatus(Delivery.DeliveryStatus.PENDING);
