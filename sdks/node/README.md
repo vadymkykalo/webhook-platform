@@ -1,17 +1,37 @@
-# @webhook-platform/node
+# @hookflow/node
 
 Official Node.js SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
+
+> Renamed from `@webhook-platform/node`. The old package still works — it now
+> re-exports this one and prints a deprecation notice. See
+> [`@webhook-platform/node` on npm](https://www.npmjs.com/package/@webhook-platform/node)
+> for the migration note, or just switch your import to `@hookflow/node`.
+
+**Zero runtime dependencies.** This SDK talks to the API using Node's built-in
+`node:https` module — no third-party HTTP client, no transitive dependency
+tree to audit. `npm ls --prod` on this package prints nothing.
+
+## Scope
+
+This SDK covers the **send + verify** surface of the API: Events, Endpoints,
+Subscriptions, Deliveries, Incoming Sources, Incoming Events, and webhook
+signature verification — roughly 6 of the platform's 35 API controllers. It
+does **not** wrap Transformations, Rules, Workflows, Schemas, DLQ, Analytics,
+Usage, Alerts, Incidents, PII rules, Audit Log, Tunnels, API keys, Members,
+or Projects. Those are dashboard/API-only today; use the [Generic
+Requests](#generic-requests) escape hatch below to call them directly if you
+need them before the SDK grows to cover them.
 
 ## Installation
 
 ```bash
-npm install @webhook-platform/node
+npm install @hookflow/node
 ```
 
 ## Quick Start
 
 ```typescript
-import { Hookflow } from '@webhook-platform/node';
+import { Hookflow } from '@hookflow/node';
 
 const client = new Hookflow({
   apiKey: 'wh_live_your_api_key',
@@ -200,7 +220,7 @@ console.log(`Replayed to ${result.destinationsCount} destinations`);
 Verify incoming webhooks in your endpoint:
 
 ```typescript
-import { verifySignature, constructEvent } from '@webhook-platform/node';
+import { verifySignature, constructEvent } from '@hookflow/node';
 
 app.post('/webhooks', (req, res) => {
   const payload = req.body; // raw body string
@@ -235,7 +255,7 @@ app.post('/webhooks', (req, res) => {
 
 ```typescript
 import express from 'express';
-import { constructEvent } from '@webhook-platform/node';
+import { constructEvent } from '@hookflow/node';
 
 const app = express();
 
@@ -260,7 +280,7 @@ import {
   RateLimitError, 
   AuthenticationError,
   ValidationError 
-} from '@webhook-platform/node';
+} from '@hookflow/node';
 
 try {
   await client.events.send({ type: 'test', data: {} });
@@ -358,7 +378,7 @@ import type {
   Endpoint, 
   Delivery,
   DeliveryStatus 
-} from '@webhook-platform/node';
+} from '@hookflow/node';
 ```
 
 ## Development

@@ -66,6 +66,8 @@ application-prod.yml
 sdks/php/vendor/
 sdks/php/.phpunit.cache/
 sdks/php/composer.lock
+sdks/php-legacy/vendor/
+sdks/php-legacy/composer.lock
 
 # === Python SDK ===
 __pycache__/

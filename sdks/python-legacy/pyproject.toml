@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webhook-platform"
+version = "2.2.2"
+description = "Deprecated — renamed to hookflow-sdk. This is now a pure dependency shim; install hookflow-sdk directly."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Vadym Kykalo", email = "vadymkykalo@gmail.com"}
+]
+keywords = ["webhook", "webhooks", "api", "events", "delivery", "deprecated"]
+classifiers = [
+    "Development Status :: 7 - Inactive",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    # Pulls in the real SDK. The `hookflow` module you import doesn't change —
+    # only the PyPI distribution name does.
+    "hookflow-sdk>=2.2.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/vadymkykalo/webhook-platform"
+Repository = "https://github.com/vadymkykalo/webhook-platform"
+Documentation = "https://github.com/vadymkykalo/webhook-platform#readme"
+
+[tool.setuptools]
+# No code of its own — this distribution exists solely to depend on
+# hookflow-sdk, which already provides the `hookflow` importable module.
+packages = []

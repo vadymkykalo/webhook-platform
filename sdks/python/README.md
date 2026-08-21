@@ -1,11 +1,27 @@
-# webhook-platform
+# hookflow-sdk
 
 Official Python SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
+
+> Renamed from `webhook-platform` on PyPI (the importable module was always
+> called `hookflow` — that part doesn't change). The old `webhook-platform`
+> distribution still installs — it now depends on this package and prints a
+> deprecation notice. Switch your `pip install` / `requirements.txt` to
+> `hookflow-sdk`; your `from hookflow import ...` code doesn't need to change.
+> (The bare name `hookflow` was already taken on PyPI by an unrelated
+> project, hence `hookflow-sdk`.)
+
+**Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
+Incoming Sources, Incoming Events, and webhook signature verification —
+about 6 of the platform's 35 API controllers. It does not wrap
+Transformations, Rules, Workflows, Schemas, DLQ, Analytics, Usage, Alerts,
+Incidents, PII rules, Audit Log, Tunnels, API keys, Members, or Projects —
+use the [Generic Requests](#generic-requests) helpers for those until the
+SDK grows to cover them.
 
 ## Installation
 
 ```bash
-pip install webhook-platform
+pip install hookflow-sdk
 ```
 
 ## Quick Start

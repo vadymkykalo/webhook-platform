@@ -1,0 +1,36 @@
+{
+  "name": "@webhook-platform/node",
+  "version": "2.2.2",
+  "description": "Deprecated — renamed to @hookflow/node. This package now only re-exports @hookflow/node; please migrate.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "webhook",
+    "webhooks",
+    "api",
+    "events",
+    "delivery",
+    "deprecated"
+  ],
+  "author": "Vadym Kykalo <vadymkykalo@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vadymkykalo/webhook-platform.git",
+    "directory": "sdks/node-legacy"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "@hookflow/node": "^2.2.1"
+  },
+  "deprecated": "Renamed to @hookflow/node. Run `npm install @hookflow/node` and update your imports; this package now just re-exports it."
+}

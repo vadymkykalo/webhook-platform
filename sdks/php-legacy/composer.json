@@ -1,0 +1,16 @@
+{
+    "name": "webhook-platform/php",
+    "description": "Deprecated — renamed to hookflow/php. This is now a pure dependency shim; require hookflow/php directly.",
+    "type": "metapackage",
+    "license": "MIT",
+    "keywords": ["webhook", "webhooks", "api", "events", "delivery", "deprecated"],
+    "authors": [
+        {
+            "name": "Vadym Kykalo",
+            "email": "vadymkykalo@gmail.com"
+        }
+    ],
+    "require": {
+        "hookflow/php": "^2.2.1"
+    }
+}
