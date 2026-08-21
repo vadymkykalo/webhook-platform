@@ -146,6 +146,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P3-36 | P3 | DONE | Table partitioning + log aggregation |
 | P0-37 | P0 | DONE | Outbox publisher never publishes (Hibernate mangles `::` cast in native query) |
 | P0-38 | P0 | DONE | Never-attempted deliveries routed to the 24h retry tier |
+| P4-39 | P4 | TODO | Strip task-ID references from code comments (~150 files) |
 
 Keep this table in sync with each file's `Status:` line — it is the only
 place to see the board at a glance.
