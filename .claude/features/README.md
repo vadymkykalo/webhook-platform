@@ -122,7 +122,7 @@ without Docker. See the `backend-tests` skill for the full contract.
 | P0-12 | P0 | DONE | Device-code flow grants the wrong org role |
 | P0-13 | P0 | DONE | API-key project scoping enforced inconsistently |
 | P0-14 | P0 | DONE | Plaintext reset tokens, logged temp password, unsafe defaults |
-| P1-15 | P1 | TODO | Publish Docker images — product is uninstallable today |
+| P1-15 | P1 | DONE | Publish Docker images — product is uninstallable today |
 | P1-16 | P1 | TODO | Reconcile versions, backfill CHANGELOG, UPGRADING.md |
 | P1-17 | P1 | DONE | Make CI security gates actually fail; add Dependabot |
 | P1-18 | P1 | TODO | Fix and harden install.sh |

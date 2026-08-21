@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external down stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs
 
 # Default target
 .DEFAULT_GOAL := help
@@ -79,6 +79,38 @@ up-prod-external: init ## Start services (external DB, production mode)
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
+
+# P1-15: pulls this project's own published images (ghcr.io/vadymkykalo/hookflow-*)
+# instead of building from source — no Maven/npm toolchain required. Uses
+# docker-compose.pull.yml, which is fully standalone (unlike docker-compose.prod.yml,
+# it doesn't need docker-compose.yml present) — see the comment at the top of
+# that file for why there are two.
+DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE) -f docker-compose.pull.yml
+
+up-pull: ## Start services from pre-built GHCR images (no build toolchain required)
+	@if [ ! -f .env ]; then \
+		echo "$(GREEN)Creating .env from .env.dist...$(NC)"; \
+		cp .env.dist .env; \
+		echo "$(YELLOW)  Using development defaults. CHANGE SECRETS FOR PRODUCTION!$(NC)"; \
+	fi
+	@echo "$(GREEN)Pulling pre-built images...$(NC)"
+	@$(DOCKER_COMPOSE_PULL) pull
+	@echo "$(GREEN)Starting services (pull-based, embedded DB/Kafka/Redis)...$(NC)"
+	@$(DOCKER_COMPOSE_PULL) up -d
+	@echo "$(GREEN)Waiting for API and UI to answer health checks...$(NC)"
+	@elapsed=0; \
+	while [ $$elapsed -lt 150 ]; do \
+		api_ok=$$(curl -sf -o /dev/null http://localhost:8082/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
+		ui_ok=$$(curl -sf -o /dev/null http://localhost:$${UI_PORT:-5173} 2>/dev/null && echo 1 || echo 0); \
+		if [ "$$api_ok" = "1" ] && [ "$$ui_ok" = "1" ]; then break; fi; \
+		sleep 5; elapsed=$$((elapsed + 5)); \
+	done
+	@echo "$(GREEN)Services started — dashboard: http://localhost:$${UI_PORT:-5173}$(NC)"
+
+down-pull: ## Stop pull-based services (keeps data)
+	@echo "$(YELLOW)Stopping pull-based services...$(NC)"
+	@$(DOCKER_COMPOSE_PULL) down
+	@echo "$(GREEN)Services stopped$(NC)"
 
 down: ## Stop services (keeps data)
 	@echo "$(YELLOW)Stopping services...$(NC)"

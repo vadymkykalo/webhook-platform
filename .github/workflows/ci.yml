@@ -383,6 +383,91 @@ jobs:
           echo "### Docker Build Results" >> $GITHUB_STEP_SUMMARY
           echo "✅ All images built successfully" >> $GITHUB_STEP_SUMMARY
 
+  # P1-15: proves docker-compose.pull.yml (the no-Maven/no-npm quick start
+  # advertised in the README) actually boots and answers health checks, so it
+  # can't silently rot the way the old build-only compose flow did. Rebuilds
+  # the three images itself (same pattern as container-scan below) and tags
+  # them to match what docker-compose.pull.yml resolves to when DOCKER_REGISTRY
+  # is pointed at the local :test images instead of GHCR — no registry
+  # credentials needed to run this.
+  docker-compose-smoke:
+    name: Docker Compose Pull-Path Smoke Test
+    runs-on: ubuntu-latest
+    needs: docker-build
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        run: docker build -f webhook-platform-api/Dockerfile -t webhook-platform-api:test .
+
+      - name: Build Worker image
+        run: docker build -f webhook-platform-worker/Dockerfile -t webhook-platform-worker:test .
+
+      - name: Build UI image
+        run: docker build -f webhook-platform-ui/Dockerfile -t webhook-platform-ui:test .
+
+      - name: Create .env from .env.dist
+        run: cp .env.dist .env
+
+      - name: Start pull-based compose stack (using the images just built)
+        env:
+          DOCKER_REGISTRY: webhook-platform
+          API_IMAGE_TAG: test
+          WORKER_IMAGE_TAG: test
+          UI_IMAGE_TAG: test
+        run: docker compose -f docker-compose.pull.yml --env-file .env up -d
+
+      - name: Wait for API and UI health, then curl both endpoints
+        run: |
+          # Actuator (health/prometheus) lives on its own port (8082, loopback-only
+          # in docker-compose.pull.yml) rather than the main API port (8080), so it
+          # bypasses the JWT/API-key-authenticated security chain — see the
+          # MANAGEMENT_PORT comment in docker-compose.pull.yml. Using /liveness
+          # rather than the aggregate /actuator/health: the latter folds in the
+          # Spring Boot mail health indicator, which reads DOWN (503) whenever no
+          # SMTP server is reachable — true by default in this stack even with
+          # EMAIL_ENABLED=false — so it's not a reliable up/down signal here.
+          for i in $(seq 1 60); do
+            api_ok=$(curl -sf -o /dev/null http://localhost:8082/actuator/health/liveness && echo 1 || echo 0)
+            ui_ok=$(curl -sf -o /dev/null http://localhost:5173 && echo 1 || echo 0)
+            if [ "$api_ok" = "1" ] && [ "$ui_ok" = "1" ]; then
+              echo "API and UI both healthy after ${i}0s"
+              break
+            fi
+            sleep 10
+            if [ "$i" = "60" ]; then
+              echo "::error::Stack did not become healthy in time"
+              docker compose -f docker-compose.pull.yml ps
+              docker compose -f docker-compose.pull.yml logs
+              exit 1
+            fi
+          done
+          echo "--- curl http://localhost:8082/actuator/health/liveness ---"
+          curl -f http://localhost:8082/actuator/health/liveness
+          echo ""
+          echo "--- curl http://localhost:5173 (status only) ---"
+          curl -f -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:5173
+
+      - name: Smoke Test Summary
+        if: always()
+        run: |
+          echo "### Docker Compose Pull-Path Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "docker-compose.pull.yml booted and both /actuator/health/liveness (API) and / (UI) responded." >> $GITHUB_STEP_SUMMARY
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.pull.yml logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.pull.yml down -v
+
   container-scan:
     name: Container Security Scan (Trivy)
     runs-on: ubuntu-latest

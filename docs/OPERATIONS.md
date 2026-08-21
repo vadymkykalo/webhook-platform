@@ -3,19 +3,18 @@
 ## Quick Start (Docker Compose)
 
 ```bash
-# Clone and start
-git clone https://github.com/vadymkykalo/webhook-platform.git
-cd webhook-platform
-make up
+# Pull pre-built images — no clone, no Maven/npm (see docker-compose.pull.yml)
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+docker compose -f docker-compose.pull.yml up -d
 
-# Check health
-make health
-
-# View logs
-make logs
-make logs-api
-make logs-worker
+# Check health — actuator is on its own port (8082), not the main API port (8080)
+curl -f http://localhost:8082/actuator/health/liveness
 ```
+
+Building from source instead (`git clone ... && make up`) is documented in the
+[README](../README.md#building-from-source-contributors); `make health`,
+`make logs`, `make logs-api`, `make logs-worker` work against either path.
 
 ## Production Deployment (Kubernetes)
 
@@ -31,11 +30,17 @@ kubectl create secret generic hookflow-postgresql-secret \
 kubectl create secret generic hookflow-redis-secret \
   --from-literal=password="$(openssl rand -base64 32)"
 
-# Install Helm chart (topics created automatically)
-helm install hookflow ./deploy/helm/hookflow -f ./deploy/helm/hookflow/values-production.yaml \
+# Install the published chart directly — no repo clone required (P1-15):
+helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <version> \
   --set postgresql.external.host=your-postgres-host \
   --set kafka.external.bootstrapServers=your-kafka:9092 \
   --set ui.ingress.hosts[0].host=app.yourdomain.com
+
+# Or, from a clone, with the local chart + production values file:
+# helm install hookflow ./deploy/helm/hookflow -f ./deploy/helm/hookflow/values-production.yaml \
+#   --set postgresql.external.host=your-postgres-host \
+#   --set kafka.external.bootstrapServers=your-kafka:9092 \
+#   --set ui.ingress.hosts[0].host=app.yourdomain.com
 
 # Topics are auto-created via post-install hook:
 # deliveries.dispatch, deliveries.retry.{1m,5m,15m,1h,6h,24h}, deliveries.dlq
@@ -61,7 +66,7 @@ helm install hookflow ./deploy/helm/hookflow -f ./deploy/helm/hookflow/values-pr
 ## Monitoring
 
 Health endpoints:
-- API: `http://localhost:8080/actuator/health`
+- API: `http://localhost:8082/actuator/health/liveness` (separate port from the main 8080 — see below; the aggregate `/actuator/health` also factors in the mail health indicator, which reads DOWN whenever no SMTP server is reachable even with `EMAIL_ENABLED=false`, so prefer `/liveness` for an up/down check)
 - Worker: `http://localhost:8081/actuator/health` (internal)
 
 Metrics (Prometheus): `/actuator/prometheus` — on port **8082** for the API,
