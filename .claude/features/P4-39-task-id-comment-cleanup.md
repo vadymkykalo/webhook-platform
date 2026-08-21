@@ -1,6 +1,6 @@
 # P4-39 — Strip task-ID references from code comments
 
-- **Status:** TODO
+- **Status:** IN PROGRESS
 - **Priority:** P4 — cosmetic/hygiene, no functional risk, do last
 - **Branch:** `feature/P4-39-task-id-comment-cleanup`
 - **Depends on:** nothing functionally, but do it after every other board task
