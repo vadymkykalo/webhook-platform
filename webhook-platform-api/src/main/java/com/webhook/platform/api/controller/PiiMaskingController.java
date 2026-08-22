@@ -29,7 +29,7 @@ public class PiiMaskingController {
 
     private final PiiMaskingService piiMaskingService;
 
-    @Operation(summary = "List PII masking rules", description = "Returns all masking rules for the project")
+    @Operation(operationId = "listPiiRules", summary = "List PII masking rules", description = "Returns all masking rules for the project")
     @GetMapping
     public ResponseEntity<List<PiiMaskingRuleResponse>> listRules(
             @PathVariable("projectId") UUID projectId,
@@ -38,7 +38,7 @@ public class PiiMaskingController {
         return ResponseEntity.ok(piiMaskingService.listRules(projectId, auth.organizationId()));
     }
 
-    @Operation(summary = "Create PII masking rule", description = "Creates a new masking rule for the project")
+    @Operation(operationId = "createPiiRule", summary = "Create PII masking rule", description = "Creates a new masking rule for the project")
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
@@ -52,7 +52,7 @@ public class PiiMaskingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Update PII masking rule", description = "Updates an existing masking rule")
+    @Operation(operationId = "updatePiiRule", summary = "Update PII masking rule", description = "Updates an existing masking rule")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{ruleId}")
     public ResponseEntity<PiiMaskingRuleResponse> updateRule(
@@ -65,7 +65,7 @@ public class PiiMaskingController {
         return ResponseEntity.ok(piiMaskingService.updateRule(projectId, ruleId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Delete PII masking rule", description = "Deletes a masking rule")
+    @Operation(operationId = "deletePiiRule", summary = "Delete PII masking rule", description = "Deletes a masking rule")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{ruleId}")

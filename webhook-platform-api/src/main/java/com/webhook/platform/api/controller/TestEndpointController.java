@@ -31,7 +31,7 @@ public class TestEndpointController {
 
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
-    @Operation(summary = "Create a test endpoint", description = "Creates a temporary endpoint to capture webhook requests")
+    @Operation(operationId = "createTestEndpoint", summary = "Create a test endpoint", description = "Creates a temporary endpoint to capture webhook requests")
     public ResponseEntity<TestEndpointResponse> create(
             @PathVariable("projectId") UUID projectId,
             @RequestBody(required = false) TestEndpointRequest request,
@@ -45,7 +45,7 @@ public class TestEndpointController {
     }
 
     @GetMapping
-    @Operation(summary = "List test endpoints", description = "Lists all test endpoints for a project")
+    @Operation(operationId = "listTestEndpoints", summary = "List test endpoints", description = "Lists all test endpoints for a project")
     public ResponseEntity<List<TestEndpointResponse>> list(
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
@@ -54,7 +54,7 @@ public class TestEndpointController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get test endpoint", description = "Gets a specific test endpoint by ID")
+    @Operation(operationId = "getTestEndpoint", summary = "Get test endpoint", description = "Gets a specific test endpoint by ID")
     public ResponseEntity<TestEndpointResponse> get(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -65,7 +65,7 @@ public class TestEndpointController {
 
     @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete test endpoint", description = "Deletes a test endpoint and all captured requests")
+    @Operation(operationId = "deleteTestEndpoint", summary = "Delete test endpoint", description = "Deletes a test endpoint and all captured requests")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,

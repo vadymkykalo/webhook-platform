@@ -41,7 +41,7 @@ public class ProjectEventsController {
         this.piiMaskingService = piiMaskingService;
     }
 
-    @Operation(summary = "List events", description = "Returns paginated event history for the project")
+    @Operation(operationId = "listEvents", summary = "List events", description = "Returns paginated event history for the project")
     @GetMapping
     public ResponseEntity<Page<EventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
@@ -53,7 +53,7 @@ public class ProjectEventsController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Get event", description = "Returns event details by ID")
+    @Operation(operationId = "getEvent", summary = "Get event", description = "Returns event details by ID")
     @GetMapping("/{id}")
     public ResponseEntity<EventResponse> getEvent(
             @PathVariable("projectId") UUID projectId,

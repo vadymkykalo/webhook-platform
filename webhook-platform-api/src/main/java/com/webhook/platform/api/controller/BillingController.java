@@ -115,7 +115,7 @@ public class BillingController {
 
     // ── Usage ──────────────────────────────────────────────────────
 
-    @Operation(summary = "Get detailed usage", description = "Returns current resource usage vs plan limits for all quota types")
+    @Operation(operationId = "getBillingUsage", summary = "Get detailed usage", description = "Returns current resource usage vs plan limits for all quota types")
     @GetMapping("/usage")
     public ResponseEntity<UsageResponse> getUsage(AuthContext auth) {
         auth.requireJwt();

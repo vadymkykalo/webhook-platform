@@ -29,7 +29,7 @@ public class TransformationController {
 
     private final TransformationService transformationService;
 
-    @Operation(summary = "Create transformation", description = "Creates a reusable payload transformation template")
+    @Operation(operationId = "createTransformation", summary = "Create transformation", description = "Creates a reusable payload transformation template")
     @ApiResponse(responseCode = "201", description = "Transformation created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
@@ -43,7 +43,7 @@ public class TransformationController {
                 .body(transformationService.create(projectId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Get transformation", description = "Returns transformation details")
+    @Operation(operationId = "getTransformation", summary = "Get transformation", description = "Returns transformation details")
     @GetMapping("/{id}")
     public ResponseEntity<TransformationResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -53,7 +53,7 @@ public class TransformationController {
         return ResponseEntity.ok(transformationService.get(id, auth.organizationId()));
     }
 
-    @Operation(summary = "List transformations", description = "Returns all transformations for the project")
+    @Operation(operationId = "listTransformations", summary = "List transformations", description = "Returns all transformations for the project")
     @GetMapping
     public ResponseEntity<List<TransformationResponse>> list(
             @PathVariable("projectId") UUID projectId,
@@ -62,7 +62,7 @@ public class TransformationController {
         return ResponseEntity.ok(transformationService.list(projectId, auth.organizationId()));
     }
 
-    @Operation(summary = "Update transformation", description = "Updates transformation (auto-increments version when template changes)")
+    @Operation(operationId = "updateTransformation", summary = "Update transformation", description = "Updates transformation (auto-increments version when template changes)")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{id}")
     public ResponseEntity<TransformationResponse> update(
@@ -75,7 +75,7 @@ public class TransformationController {
         return ResponseEntity.ok(transformationService.update(id, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Delete transformation", description = "Removes a transformation (subscriptions/destinations referencing it will have transformation_id set to NULL)")
+    @Operation(operationId = "deleteTransformation", summary = "Delete transformation", description = "Removes a transformation (subscriptions/destinations referencing it will have transformation_id set to NULL)")
     @ApiResponse(responseCode = "204", description = "Transformation deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")

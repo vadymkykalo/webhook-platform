@@ -115,7 +115,7 @@ paths:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest
+      operationId: captureRequestGet
       parameters:
       - name: slug
         in: path
@@ -139,7 +139,7 @@ paths:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_2
+      operationId: captureRequestPut
       parameters:
       - name: slug
         in: path
@@ -163,7 +163,7 @@ paths:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_1
+      operationId: captureRequestPost
       parameters:
       - name: slug
         in: path
@@ -187,7 +187,7 @@ paths:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_3
+      operationId: captureRequestDelete
       parameters:
       - name: slug
         in: path
@@ -211,7 +211,7 @@ paths:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_4
+      operationId: captureRequestPatch
       parameters:
       - name: slug
         in: path
@@ -236,7 +236,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest
+      operationId: handleTunnelRequestGet
       parameters:
       - name: slug
         in: path
@@ -260,7 +260,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_2
+      operationId: handleTunnelRequestPut
       parameters:
       - name: slug
         in: path
@@ -284,7 +284,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_1
+      operationId: handleTunnelRequestPost
       parameters:
       - name: slug
         in: path
@@ -308,7 +308,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_3
+      operationId: handleTunnelRequestDelete
       parameters:
       - name: slug
         in: path
@@ -332,7 +332,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_6
+      operationId: handleTunnelRequestOptions
       parameters:
       - name: slug
         in: path
@@ -356,7 +356,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_5
+      operationId: handleTunnelRequestHead
       parameters:
       - name: slug
         in: path
@@ -380,7 +380,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_4
+      operationId: handleTunnelRequestPatch
       parameters:
       - name: slug
         in: path
@@ -491,7 +491,7 @@ paths:
       tags:
       - Workflows
       summary: Get workflow
-      operationId: get
+      operationId: getWorkflow
       parameters:
       - name: projectId
         in: path
@@ -524,7 +524,7 @@ paths:
       tags:
       - Workflows
       summary: Update workflow
-      operationId: update
+      operationId: updateWorkflow
       parameters:
       - name: projectId
         in: path
@@ -563,7 +563,7 @@ paths:
       tags:
       - Workflows
       summary: Delete workflow
-      operationId: delete
+      operationId: deleteWorkflow
       parameters:
       - name: projectId
         in: path
@@ -594,7 +594,7 @@ paths:
       - Transformations
       summary: Get transformation
       description: Returns transformation details
-      operationId: get_1
+      operationId: getTransformation
       parameters:
       - name: projectId
         in: path
@@ -628,7 +628,7 @@ paths:
       - Transformations
       summary: Update transformation
       description: Updates transformation (auto-increments version when template changes)
-      operationId: update_1
+      operationId: updateTransformation
       parameters:
       - name: projectId
         in: path
@@ -669,7 +669,7 @@ paths:
       summary: Delete transformation
       description: Removes a transformation (subscriptions/destinations referencing
         it will have transformation_id set to NULL)
-      operationId: delete_1
+      operationId: deleteTransformation
       parameters:
       - name: projectId
         in: path
@@ -926,7 +926,7 @@ paths:
       - Rules
       summary: Get rule
       description: "Returns rule details with conditions, actions, and execution stats"
-      operationId: get_2
+      operationId: getRule
       parameters:
       - name: projectId
         in: path
@@ -960,7 +960,7 @@ paths:
       - Rules
       summary: Update rule
       description: "Updates rule conditions, actions, and settings"
-      operationId: update_2
+      operationId: updateRule
       parameters:
       - name: projectId
         in: path
@@ -1000,7 +1000,7 @@ paths:
       - Rules
       summary: Delete rule
       description: Removes a rule and all its actions
-      operationId: delete_2
+      operationId: deleteRule
       parameters:
       - name: projectId
         in: path
@@ -1031,7 +1031,7 @@ paths:
       - PII Masking
       summary: Update PII masking rule
       description: Updates an existing masking rule
-      operationId: updateRule
+      operationId: updatePiiRule
       parameters:
       - name: projectId
         in: path
@@ -1071,7 +1071,7 @@ paths:
       - PII Masking
       summary: Delete PII masking rule
       description: Deletes a masking rule
-      operationId: deleteRule
+      operationId: deletePiiRule
       parameters:
       - name: projectId
         in: path
@@ -1299,7 +1299,7 @@ paths:
       tags:
       - Incidents
       summary: Get incident with timeline
-      operationId: get_3
+      operationId: getIncident
       parameters:
       - name: projectId
         in: path
@@ -1332,7 +1332,7 @@ paths:
       tags:
       - Incidents
       summary: "Update incident (status, RCA notes, severity)"
-      operationId: update_3
+      operationId: updateIncident
       parameters:
       - name: projectId
         in: path
@@ -1459,7 +1459,7 @@ paths:
       tags:
       - Alerts
       summary: Update alert rule
-      operationId: updateRule_1
+      operationId: updateAlertRule
       parameters:
       - name: projectId
         in: path
@@ -1498,7 +1498,7 @@ paths:
       tags:
       - Alerts
       summary: Delete alert rule
-      operationId: deleteRule_1
+      operationId: deleteAlertRule
       parameters:
       - name: projectId
         in: path
@@ -1786,7 +1786,7 @@ paths:
       summary: List active tunnels
       description: "Lists all active tunnel sessions for the organization, optionally\
         \ filtered by project"
-      operationId: list
+      operationId: listTunnels
       parameters:
       - name: projectId
         in: query
@@ -1816,7 +1816,7 @@ paths:
       summary: Create tunnel session
       description: Creates a new tunnel session for CLI use. The tunnelToken is returned
         only once.
-      operationId: create
+      operationId: createTunnel
       parameters:
       - name: localPort
         in: query
@@ -1907,7 +1907,7 @@ paths:
       tags:
       - Workflows
       summary: List workflows
-      operationId: list_1
+      operationId: listWorkflows
       parameters:
       - name: projectId
         in: path
@@ -1936,7 +1936,7 @@ paths:
       tags:
       - Workflows
       summary: Create workflow
-      operationId: create_1
+      operationId: createWorkflow
       parameters:
       - name: projectId
         in: path
@@ -2011,7 +2011,7 @@ paths:
       - Transformations
       summary: List transformations
       description: Returns all transformations for the project
-      operationId: list_2
+      operationId: listTransformations
       parameters:
       - name: projectId
         in: path
@@ -2041,7 +2041,7 @@ paths:
       - Transformations
       summary: Create transformation
       description: Creates a reusable payload transformation template
-      operationId: create_2
+      operationId: createTransformation
       parameters:
       - name: projectId
         in: path
@@ -2147,7 +2147,7 @@ paths:
       - Test Endpoints
       summary: List test endpoints
       description: Lists all test endpoints for a project
-      operationId: list_3
+      operationId: listTestEndpoints
       parameters:
       - name: projectId
         in: path
@@ -2177,7 +2177,7 @@ paths:
       - Test Endpoints
       summary: Create a test endpoint
       description: Creates a temporary endpoint to capture webhook requests
-      operationId: create_3
+      operationId: createTestEndpoint
       parameters:
       - name: projectId
         in: path
@@ -2501,7 +2501,7 @@ paths:
       - Rules
       summary: List rules
       description: Returns all rules for the project ordered by priority
-      operationId: list_4
+      operationId: listRules
       parameters:
       - name: projectId
         in: path
@@ -2531,7 +2531,7 @@ paths:
       - Rules
       summary: Create rule
       description: Creates a new event processing rule with conditions and actions
-      operationId: create_4
+      operationId: createRule
       parameters:
       - name: projectId
         in: path
@@ -2566,7 +2566,7 @@ paths:
       - Event Time Machine
       summary: List replay sessions
       description: Returns paginated history of replay sessions for the project
-      operationId: list_5
+      operationId: listReplaySessions
       parameters:
       - name: projectId
         in: path
@@ -2608,7 +2608,7 @@ paths:
       - Event Time Machine
       summary: Create replay session
       description: Start async replay of events matching the criteria
-      operationId: create_5
+      operationId: createReplaySession
       parameters:
       - name: projectId
         in: path
@@ -2714,7 +2714,7 @@ paths:
       - PII Masking
       summary: List PII masking rules
       description: Returns all masking rules for the project
-      operationId: listRules
+      operationId: listPiiRules
       parameters:
       - name: projectId
         in: path
@@ -2744,7 +2744,7 @@ paths:
       - PII Masking
       summary: Create PII masking rule
       description: Creates a new masking rule for the project
-      operationId: createRule
+      operationId: createPiiRule
       parameters:
       - name: projectId
         in: path
@@ -3057,7 +3057,7 @@ paths:
       tags:
       - Incidents
       summary: List incidents
-      operationId: list_6
+      operationId: listIncidents
       parameters:
       - name: projectId
         in: path
@@ -3104,7 +3104,7 @@ paths:
       tags:
       - Incidents
       summary: Create incident
-      operationId: create_6
+      operationId: createIncident
       parameters:
       - name: projectId
         in: path
@@ -3705,7 +3705,7 @@ paths:
       tags:
       - Alerts
       summary: List alert rules
-      operationId: listRules_1
+      operationId: listAlertRules
       parameters:
       - name: projectId
         in: path
@@ -3734,7 +3734,7 @@ paths:
       tags:
       - Alerts
       summary: Create alert rule
-      operationId: createRule_1
+      operationId: createAlertRule
       parameters:
       - name: projectId
         in: path
@@ -4475,7 +4475,7 @@ paths:
       tags:
       - Workflows
       summary: Toggle workflow enabled/disabled
-      operationId: toggle
+      operationId: toggleWorkflow
       parameters:
       - name: projectId
         in: path
@@ -4517,7 +4517,7 @@ paths:
       tags:
       - Rules
       summary: Toggle rule enabled/disabled
-      operationId: toggle_1
+      operationId: toggleRule
       parameters:
       - name: projectId
         in: path
@@ -4805,7 +4805,7 @@ paths:
       - Usage
       summary: Get usage stats
       description: Returns live usage counts and daily history for the project
-      operationId: getUsage
+      operationId: getProjectUsage
       parameters:
       - name: projectId
         in: path
@@ -4841,7 +4841,7 @@ paths:
       - Test Endpoints
       summary: Get test endpoint
       description: Gets a specific test endpoint by ID
-      operationId: get_4
+      operationId: getTestEndpoint
       parameters:
       - name: projectId
         in: path
@@ -4875,7 +4875,7 @@ paths:
       - Test Endpoints
       summary: Delete test endpoint
       description: Deletes a test endpoint and all captured requests
-      operationId: delete_3
+      operationId: deleteTestEndpoint
       parameters:
       - name: projectId
         in: path
@@ -5085,7 +5085,7 @@ paths:
       - Event Time Machine
       summary: Get replay session
       description: Returns current status and progress of a replay session
-      operationId: get_5
+      operationId: getReplaySession
       parameters:
       - name: projectId
         in: path
@@ -5120,7 +5120,7 @@ paths:
       - Incoming Events
       summary: List incoming events
       description: Returns paginated incoming events for the project
-      operationId: listEvents
+      operationId: listIncomingEvents
       parameters:
       - name: projectId
         in: path
@@ -5161,7 +5161,7 @@ paths:
       - Incoming Events
       summary: Get incoming event
       description: Returns incoming event details by ID
-      operationId: getEvent
+      operationId: getIncomingEvent
       parameters:
       - name: id
         in: path
@@ -5267,7 +5267,7 @@ paths:
       - Events
       summary: List events
       description: Returns paginated event history for the project
-      operationId: listEvents_1
+      operationId: listEvents
       parameters:
       - name: projectId
         in: path
@@ -5306,7 +5306,7 @@ paths:
       - Events
       summary: Get event
       description: Returns event details by ID
-      operationId: getEvent_1
+      operationId: getEvent
       parameters:
       - name: projectId
         in: path
@@ -5563,7 +5563,7 @@ paths:
       tags:
       - Alerts
       summary: List alert events (fired alerts)
-      operationId: listEvents_2
+      operationId: listAlertEvents
       parameters:
       - name: projectId
         in: path
@@ -5962,7 +5962,7 @@ paths:
       - Billing
       summary: Get detailed usage
       description: Returns current resource usage vs plan limits for all quota types
-      operationId: getUsage_1
+      operationId: getBillingUsage
       parameters:
       - name: auth
         in: query
@@ -6053,7 +6053,10 @@ paths:
     get:
       tags:
       - audit-log-controller
-      operationId: list_7
+      summary: List audit log entries
+      description: "Returns the organization's audit log, newest first, filterable\
+        \ by action and actor"
+      operationId: listAuditLog
       parameters:
       - name: auth
         in: query
@@ -8453,12 +8456,12 @@ components:
       properties:
         unpaged:
           type: boolean
-        pageSize:
-          type: integer
-          format: int32
         paged:
           type: boolean
         pageNumber:
+          type: integer
+          format: int32
+        pageSize:
           type: integer
           format: int32
         offset:
