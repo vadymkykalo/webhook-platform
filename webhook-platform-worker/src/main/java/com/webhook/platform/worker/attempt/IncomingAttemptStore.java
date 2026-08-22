@@ -2,6 +2,7 @@ package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
+import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
@@ -15,6 +16,7 @@ import com.webhook.platform.worker.service.PayloadTransformException;
 import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -57,6 +59,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final ObjectMapper objectMapper;
     private final WebClient webClient;
+    private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
 
     private final IncomingForwardMessage message;
     private final IncomingEvent event;
@@ -70,6 +73,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             EncryptionKeyRegistry encryptionKeyRegistry,
             ObjectMapper objectMapper,
             WebClient webClient,
+            KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate,
             IncomingForwardMessage message,
             IncomingEvent event,
             IncomingDestination destination) {
@@ -80,6 +84,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.objectMapper = objectMapper;
         this.webClient = webClient;
+        this.kafkaTemplate = kafkaTemplate;
         this.message = message;
         this.event = event;
         this.destination = destination;
@@ -306,9 +311,36 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return Boolean.TRUE.equals(applied);
     }
 
-    /** No DLQ notification is published for Incoming today — see ADR-0011's known gaps. */
+    /**
+     * Publishes the DLQ notification for a Forward whose Retry Ladder is exhausted.
+     *
+     * <p>Called only after an {@link Finalization.Abandoned} that actually applied, and
+     * deliberately outside that transaction: a Kafka failure here must not roll back the DLQ
+     * write that already committed. The database is the source of truth; this is a
+     * notification.
+     *
+     * <p>{@code incoming.forward.dlq} is also the listener container's poison-record topic, so
+     * it carries a mix of records the container routed there and business notifications like
+     * this one. That mirrors {@code deliveries.dlq}, which has always worked the same way.
+     * Anything consuming either topic has to tolerate both shapes; the actionable count is the
+     * DB-backed {@code incoming_forward_dlq_depth} gauge rather than the topic's depth.
+     */
     @Override
     public void onAbandoned(Claim claim) {
+        try {
+            kafkaTemplate.send(KafkaTopics.INCOMING_FORWARD_DLQ, claim.destinationId().toString(),
+                    IncomingForwardMessage.builder()
+                            .incomingEventId(claim.eventId())
+                            .destinationId(claim.destinationId())
+                            .incomingSourceId(event.getIncomingSourceId())
+                            .attemptCount(claim.attemptNumber())
+                            .build());
+            log.info("Published DLQ event for forward eventId={}, destId={}",
+                    claim.eventId(), claim.destinationId());
+        } catch (Exception e) {
+            log.error("Failed to publish DLQ event for forward eventId={}, destId={}: {}",
+                    claim.eventId(), claim.destinationId(), e.getMessage(), e);
+        }
     }
 
     /** Incoming enforces no ordering, so nothing has to be released on success. */

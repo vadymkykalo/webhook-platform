@@ -92,7 +92,8 @@ class RetrySchedulerServiceTest {
                                 rescheduleDelaySeconds,
                                 5000L,   // highWatermark
                                 10000L,  // defaultPollIntervalMs
-                                escalationHardCapHours);
+                                escalationHardCapHours,
+                                24L);    // forwardEscalationHardCapHours
         }
 
         @Test

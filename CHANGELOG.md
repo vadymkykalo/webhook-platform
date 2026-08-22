@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Forwards can now be given up on.** `StaleForwardEscalationService` escalates an Incoming
+  Forward outstanding past `FORWARD_ESCALATION_HARD_CAP_HOURS` (default 24h) to DLQ,
+  mirroring what `StaleDeliveryEscalationService` does for Outgoing. Until now the Incoming
+  direction had only a stuck-PROCESSING reset and never wrote a terminal state for a Forward
+  whose Destination simply stayed unreachable. The age is measured from when the webhook
+  arrived, not from the newest attempt row — Incoming inserts a row per Attempt, so that row
+  is freshly stamped even for a Forward that has been retrying since yesterday.
+- A Forward that exhausts its Retry Ladder, or is escalated, now publishes a DLQ notification
+  to `incoming.forward.dlq`. That topic existed and was created by the Makefile, but nothing
+  ever produced a business notification to it.
+
 ### Fixed
+- **`docker-compose.yml` and `docker-compose.pull.yml` defaulted
+  `DELIVERY_ESCALATION_HARD_CAP_HOURS` to 48, which prevents the worker from starting.** The
+  outgoing retry ladder's worst case with full jitter is 83h and `RetrySchedulerService`
+  refuses to boot when it does not fit inside the cap, so any deployment that did not
+  override the variable failed at startup. The 48 predated the ladder gaining its 24h tier.
+  Both files now default to 96, matching `.env.dist` and `application.yml`. **If your own
+  `.env` still sets 48, change it to 96 — it is not managed by this repository.**
 - **A rolled-back ingest no longer consumes quota.** The Redis quota counter was
   incremented inside the ingest transaction, and it is not transactional, so an ingest
   that saved its Event and then aborted — a fanout limit, a downstream failure — kept

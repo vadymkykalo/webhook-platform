@@ -18,8 +18,10 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -60,6 +62,7 @@ public class IncomingForwardService {
     private final TransactionTemplate transactionTemplate;
     private final AttemptRunner attemptRunner;
     private final WebClient webClient;
+    private final KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
     private final AttemptMetrics metrics;
@@ -78,7 +81,9 @@ public class IncomingForwardService {
             MeterRegistry meterRegistry,
             TransactionTemplate transactionTemplate,
             ConnectionProvider webhookConnectionProvider,
-            AttemptRunner attemptRunner) {
+            AttemptRunner attemptRunner,
+            @Qualifier("incomingForwardKafkaTemplate")
+            KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate) {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
@@ -88,6 +93,7 @@ public class IncomingForwardService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.transactionTemplate = transactionTemplate;
         this.attemptRunner = attemptRunner;
+        this.kafkaTemplate = kafkaTemplate;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
 
@@ -183,7 +189,7 @@ public class IncomingForwardService {
                 new IncomingAttemptStore(
                         attemptRepository, transactionTemplate, transformationCacheService,
                         payloadTransformService, encryptionKeyRegistry, objectMapper, webClient,
-                        message, event, destination),
+                        kafkaTemplate, message, event, destination),
                 metrics);
     }
 

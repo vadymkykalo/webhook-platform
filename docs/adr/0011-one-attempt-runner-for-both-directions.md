@@ -172,15 +172,29 @@ group and its `OutboxSendingStuck` alert — was silently discarded by every YAM
 read it. The alert had never fired, despite the `outbox_queue_depth{status="sending"}` gauge
 having been added specifically to feed it.
 
-Still open, and still deliberately out of scope: **Forwards have no age-based escalation.**
-Outgoing has `StaleDeliveryEscalationService` hard-capping any PENDING Delivery past
-`DELIVERY_ESCALATION_HARD_CAP_HOURS`; Incoming has only a stuck-PROCESSING reset, so a Forward
-stranded in PENDING has nothing to give up on it.
+Both have since been closed, on `feature/forward-escalation-and-dlq`:
 
-Also unchanged: nothing produces a *business* DLQ notification to `incoming.forward.dlq`. That
-topic is created by the Makefile and docker-compose but serves only as the listener
-container's poison-record topic. (`deliveries.dlq` serves both roles, so it carries a mix of
-poison records and `DeliveryMessage` notifications.)
+- **Forwards now have an age-based escalation.** `StaleForwardEscalationService` hard-caps a
+  Forward outstanding past `FORWARD_ESCALATION_HARD_CAP_HOURS`. Its own cap rather than the
+  Delivery one, because the Incoming ladder is deliberately shorter — ~11h worst case against
+  Outgoing's ~83h — so borrowing the 96h Delivery cap would have left a dead Forward sitting
+  for three days past ladder exhaustion. `RetrySchedulerService` now validates each ladder
+  against its own cap; checking the Incoming ladder against the Outgoing cap, as it briefly
+  did, passes trivially and tells nobody anything.
+
+  The age is measured from `incoming_events.received_at`, not the Attempt row's `created_at`:
+  Incoming inserts a row per Attempt, so the newest row is freshly stamped even for a Forward
+  that has been grinding since yesterday.
+
+- **A DLQ'd Forward now announces itself.** `IncomingAttemptStore.onAbandoned` publishes to
+  `incoming.forward.dlq`, and the escalation service does the same for what it gives up on.
+
+`incoming.forward.dlq` is also the listener container's poison-record topic, so it now carries
+a mix of routed records and business notifications. That was a decision, not an oversight:
+`deliveries.dlq` has always worked exactly that way, and a separate topic would have meant
+Makefile, docker-compose and Helm changes for a distinction nothing currently consumes. The
+actionable signal is the DB-backed `incoming_forward_dlq_depth` gauge rather than either
+topic's depth.
 
 ## Alternatives rejected
 

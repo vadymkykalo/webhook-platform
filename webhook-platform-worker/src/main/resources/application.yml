@@ -166,6 +166,17 @@ delivery:
     batch-size: ${DELIVERY_ESCALATION_BATCH_SIZE:100}
     interval-ms: ${DELIVERY_ESCALATION_INTERVAL_MS:300000}
 
+forward:
+  escalation:
+    # Forwards outstanding longer than this are escalated to DLQ regardless of attempt count —
+    # the Incoming counterpart of delivery.escalation above. Its own cap rather than the
+    # delivery one: the incoming retry ladder is deliberately shorter (5 attempts to 6h, ~11h
+    # worst case with jitter), so borrowing the 96h delivery cap would leave a dead Forward
+    # sitting for three days after its ladder was exhausted.
+    hard-cap-hours: ${FORWARD_ESCALATION_HARD_CAP_HOURS:24}
+    batch-size: ${FORWARD_ESCALATION_BATCH_SIZE:100}
+    interval-ms: ${FORWARD_ESCALATION_INTERVAL_MS:300000}
+
 incoming-forward:
   retry:
     poll-interval-ms: ${INCOMING_FORWARD_RETRY_POLL_INTERVAL_MS:10000}

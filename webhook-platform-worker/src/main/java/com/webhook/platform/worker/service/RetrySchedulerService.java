@@ -60,7 +60,8 @@ public class RetrySchedulerService {
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
             @Value("${retry.scheduler.high-watermark:5000}") long highWatermark,
             @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs,
-            @Value("${delivery.escalation.hard-cap-hours:96}") long escalationHardCapHours) {
+            @Value("${delivery.escalation.hard-cap-hours:96}") long escalationHardCapHours,
+            @Value("${forward.escalation.hard-cap-hours:24}") long forwardEscalationHardCapHours) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
@@ -86,12 +87,16 @@ public class RetrySchedulerService {
         // check compared against, so lowering one made the check pass while live rows still
         // carried the long ladder. They are gone; see UPGRADING.md.
         //
-        // Both directions are checked. The incoming ladder was never validated at all,
-        // even though StaleDeliveryEscalationService's cap is a worker-wide setting.
+        // Each direction against its OWN cap. They are different services with different
+        // promises: StaleDeliveryEscalationService hard-caps a Delivery at 96h to clear the
+        // outgoing ladder's ~83h worst case, while StaleForwardEscalationService caps a
+        // Forward at 24h against the incoming ladder's ~11h. Checking the incoming ladder
+        // against the outgoing cap, as this briefly did, passes trivially and tells nobody
+        // anything.
         RetryLadderDefaults.outgoing().requireFitsWithin(
                 escalationHardCapHours * 3600L, "outgoing default", "delivery.escalation.hard-cap-hours");
         RetryLadderDefaults.incoming().requireFitsWithin(
-                escalationHardCapHours * 3600L, "incoming default", "delivery.escalation.hard-cap-hours");
+                forwardEscalationHardCapHours * 3600L, "incoming default", "forward.escalation.hard-cap-hours");
     }
 
     @PostConstruct
