@@ -53,6 +53,21 @@ Rules that follow from the table and are easy to get wrong:
 
 Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. See `CONTRIBUTING.md` for the full policy.
 
+## Working notes and decisions
+
+Two places, with different lifetimes — do not conflate them:
+
+- **`docs/adr/`** is tracked and permanent. An ADR records a decision that is load-bearing:
+  one a future reader would otherwise re-litigate, because the code shows *what* was built
+  and not *why the obvious alternative was rejected*. `docs/adr/README.md` has the index and
+  the format. Do not re-open a decision an ADR settles without saying so in the ADR.
+- **`.claude/features/`** is gitignored scratch: one file per piece of work that spans
+  sessions or needs decisions settled before code. It says what we're doing and where we are;
+  the ADR says why. **A feature doc is deleted when its work lands** — whatever is still true
+  moves into the ADR first. `.claude/features/README.md` has the flow and `TEMPLATE.md` the
+  shape. Being gitignored, those two exist only in a working copy that has them; this
+  paragraph is what makes the convention discoverable at all.
+
 ## Architecture
 
 Five modules: `common` (shared DTOs, `KafkaTopics`, crypto/signature/PII utils), `api` (REST + ingress + tunnel hub + outbox publisher, **owns all Flyway migrations**), `worker` (Kafka consumers, HTTP delivery/forwarding, retries), `cli` (picocli), `ui`.
