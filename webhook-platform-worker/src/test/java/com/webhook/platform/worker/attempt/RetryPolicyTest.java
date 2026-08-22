@@ -1,4 +1,4 @@
-package com.webhook.platform.worker.service;
+package com.webhook.platform.worker.attempt;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

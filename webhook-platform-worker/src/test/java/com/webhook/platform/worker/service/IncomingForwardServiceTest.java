@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
@@ -35,6 +36,15 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+/**
+ * Covers the Incoming {@link com.webhook.platform.worker.attempt.IncomingAttemptStore} through
+ * the service that drives it: the three claim paths and their {@code started_at} fence, the
+ * per-attempt row model, successor insertion, and the transformation resolution.
+ *
+ * <p>As with the Outgoing suite, the attempt policy itself lives in
+ * {@link com.webhook.platform.worker.attempt.AttemptRunner} and is pinned by
+ * {@code AttemptRunnerTest}. What is here is adapter coverage and has nowhere else to live.
+ */
 
 /**
  * Tests for the claim-based idempotency logic in IncomingForwardService.
@@ -73,6 +83,11 @@ class IncomingForwardServiceTest {
     private CircuitBreakerService circuitBreakerService;
     @Mock
     private ProjectRateLimiterService projectRateLimiterService;
+
+    // Incoming Destinations carry no per-target rate limit, so the Runner never consults
+    // this one for this direction. Present only to satisfy its constructor.
+    @Mock
+    private RedisRateLimiterService redisRateLimiterService;
 
     private IncomingForwardService service;
 
@@ -116,8 +131,19 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true));
+    }
+
+
+    /**
+     * A real AttemptRunner over the same mocks the service used to hold directly. The attempt
+     * lifecycle these tests describe now lives in the Runner, so exercising it through the
+     * service means wiring a real one rather than a mock.
+     */
+    private AttemptRunner newAttemptRunner(boolean allowPrivateIps) {
+        return new AttemptRunner(
+                projectRateLimiterService, redisRateLimiterService, concurrencyControlService,
+                circuitBreakerService, new ObjectMapper(), allowPrivateIps, List.of());
     }
 
     private IncomingEvent buildEvent() {
@@ -283,8 +309,7 @@ class IncomingForwardServiceTest {
                 false, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(false));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -370,8 +395,7 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true));
 
         // Retry dispatch: scheduler already claimed the row, no re-claim needed.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -433,8 +457,7 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true));
 
         // attemptCount == maxAttempts -- this is the last attempt.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -481,8 +504,7 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)

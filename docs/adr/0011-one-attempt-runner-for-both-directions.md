@@ -1,6 +1,6 @@
 # 0011 — One Attempt Runner owns the attempt lifecycle for both directions
 
-**Status:** Accepted — not yet implemented
+**Status:** Accepted, implemented
 
 ## Context
 
@@ -58,8 +58,15 @@ The Attempt Store owns:
 - **admission**, expressed as a third Claim outcome: `Claimed | NotClaimed | Deferred`.
 
 Request construction stays in the adapter — signing, mTLS client selection and Destination
-auth headers are honestly different — except the payload transformation itself, which the
-Runner performs from a raw payload and template the adapter supplies.
+auth headers are honestly different. So does building the body, because the two directions
+resolve a transformation differently: Outgoing picks between a reusable Transformation and an
+inline template, Incoming between a reusable one and an inline JSONPath expression. What does
+*not* move is the rule for a transformation that fails: the Runner catches it and makes the
+Attempt retryable, so no adapter is ever in a position to decide to send the raw payload.
+
+`buildRequest` takes the finished body rather than transforming again, because Outgoing signs
+exactly the bytes that go out — handing the store the body is what makes it impossible for the
+signature and the payload to disagree.
 
 The Kafka consumers keep their own `@KafkaListener` declarations (topics, factory and
 group differ) and delegate the backpressure decision to one shared collaborator. The two
@@ -107,6 +114,29 @@ row two owners of its claimed state.
 - Both directions land in one pull request. A strangler migration would leave two
   implementations alive, and their coexistence is the defect being repaired.
 
+## What the implementation settled that the design did not
+
+Three things only became visible once the code existed, and all three sharpened the seam:
+
+- **The body is built by the store, not the Runner.** The design had the Runner transforming
+  from a raw payload and a template supplied by the adapter. That does not fit Incoming, whose
+  inline transformation is a JSONPath expression rather than a template. `buildBody` moved to
+  the store; the retryable-and-never-raw rule stayed in the Runner, which is the half that
+  mattered.
+- **`buildRequest` needs the finished body.** Outgoing's HMAC is computed over the bytes sent,
+  so building the request before the body existed meant transforming twice and risking a
+  signature that did not match the payload.
+- **The Endpoint and Event are resolved inside `claim()`, after the ordering gate.** Resolving
+  them in the service first meant a Delivery parked behind an outstanding sequence read both
+  rows on every re-poll only to discover it was still blocked — two reads per poll on the
+  ordering hot path. Moving them behind the gate also put the "endpoint deleted / disabled /
+  unverified" terminal failures under the fencing token, where every other finalisation
+  already lived.
+
+The one behavioural improvement worth naming: URL validation now runs *before* admission, so a
+Delivery the platform is not allowed to send no longer spends a concurrency permit and a
+rate-limit token on being rejected.
+
 ## Implemented ahead of the Runner
 
 The Retry Ladder was pulled out first, because it is self-contained and because the
@@ -125,19 +155,32 @@ inspection above turned up defects that had nothing to do with the Runner:
 - `SchemaRetryLadderDefaultsTest` fails the build if a Flyway column default drifts from the
   Java constant it mirrors.
 
-## Known gaps this decision deliberately does not close
+## Known gaps — closed separately
 
-Both are real and both belong in their own change, because they alter what operators see:
+Both were closed on their own branch, because they alter what operators see and had no
+business inside a refactor:
 
-- **Incoming is un-alerted.** `incoming_forward_attempts_total` and
-  `incoming_forward_latency_ms` appear in no rule in `deploy/prometheus/alerts.yml`,
-  `monitoring/prometheus/alerts.yml` or `prometheusrule.yaml`.
-- **Incoming DLQ is invisible.** `DlqMonitoringService` counts only `deliveries` DLQ rows
-  and only watches the `deliveries.dlq` topic. A DLQ'd Forward writes its row status and
-  nothing else. `KafkaTopics.INCOMING_FORWARD_DLQ` exists and is created by the Makefile
-  and docker-compose, but nothing produces a business notification to it — it serves only
-  as the listener container's poison-record topic. (`deliveries.dlq` serves both roles, so
-  it carries a mix of poison records and `DeliveryMessage` notifications.)
+- **Incoming was un-alerted.** `incoming_forward_attempts_total` and
+  `incoming_forward_latency_ms` appeared in no rule anywhere. Mirrored failure-rate and DLQ
+  rules now exist in all three alert files.
+- **Incoming DLQ was invisible.** `DlqMonitoringService` counted only `deliveries` DLQ rows
+  and watched only the `deliveries.dlq` topic; it now covers both directions.
+
+That work also turned up a defect neither ADR predicted: `deploy/prometheus/alerts.yml`
+declared `groups:` twice at the top level, so the entire first block — the `hookflow.outbox`
+group and its `OutboxSendingStuck` alert — was silently discarded by every YAML parser that
+read it. The alert had never fired, despite the `outbox_queue_depth{status="sending"}` gauge
+having been added specifically to feed it.
+
+Still open, and still deliberately out of scope: **Forwards have no age-based escalation.**
+Outgoing has `StaleDeliveryEscalationService` hard-capping any PENDING Delivery past
+`DELIVERY_ESCALATION_HARD_CAP_HOURS`; Incoming has only a stuck-PROCESSING reset, so a Forward
+stranded in PENDING has nothing to give up on it.
+
+Also unchanged: nothing produces a *business* DLQ notification to `incoming.forward.dlq`. That
+topic is created by the Makefile and docker-compose but serves only as the listener
+container's poison-record topic. (`deliveries.dlq` serves both roles, so it carries a mix of
+poison records and `DeliveryMessage` notifications.)
 
 ## Alternatives rejected
 

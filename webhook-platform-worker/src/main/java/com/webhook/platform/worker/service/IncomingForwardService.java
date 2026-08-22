@@ -1,15 +1,12 @@
 package com.webhook.platform.worker.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.JsonPath;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
-import com.webhook.platform.common.enums.IncomingAuthType;
-import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.security.UrlValidator;
-import com.webhook.platform.common.util.CryptoUtils;
-import com.webhook.platform.common.util.HeaderSanitizer;
+import com.webhook.platform.worker.attempt.AttemptMetrics;
+import com.webhook.platform.worker.attempt.AttemptRunner;
+import com.webhook.platform.worker.attempt.IncomingAttemptStore;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
@@ -19,25 +16,35 @@ import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepos
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import java.util.concurrent.ThreadLocalRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * The Incoming half of the pipeline: resolve the Event and the Destination, then hand the
+ * Attempt to {@link AttemptRunner}.
+ *
+ * <p>Everything about how an Attempt is claimed, admitted, sent, classified and finalised
+ * moved to the Runner and {@link IncomingAttemptStore}. What is left here is what is
+ * genuinely this direction's own: loading the pair of rows, and deciding when a Forward
+ * should not be attempted at all.
+ *
+ * <p>Before that move this class and {@link WebhookDeliveryService} were near-copies, and
+ * commit {@code 2070d30} had to hand-port four separate fixes from one to the other. See
+ * {@code docs/adr/0011-one-attempt-runner-for-both-directions.md}.
+ */
 @Service
 @Slf4j
 public class IncomingForwardService {
@@ -47,22 +54,14 @@ public class IncomingForwardService {
     private final IncomingForwardAttemptRepository attemptRepository;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
-    private final WebClient webClient;
-    private final ObjectMapper objectMapper;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
+    private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final AttemptRunner attemptRunner;
+    private final WebClient webClient;
     private final boolean allowPrivateIps;
     private final List<String> allowedHosts;
-    private final MeterRegistry meterRegistry;
-    private final TransactionTemplate transactionTemplate;
-    private final RedisConcurrencyControlService concurrencyControlService;
-    private final CircuitBreakerService circuitBreakerService;
-    private final ProjectRateLimiterService projectRateLimiterService;
-
-    private final Counter forwardSuccessCounter;
-    private final Counter forwardFailureCounter;
-    private final Counter forwardErrorCounter;
-    private final Counter transformFailedCounter;
-    private final Timer forwardLatency;
+    private final AttemptMetrics metrics;
 
     public IncomingForwardService(
             IncomingEventRepository eventRepository,
@@ -78,39 +77,74 @@ public class IncomingForwardService {
             MeterRegistry meterRegistry,
             TransactionTemplate transactionTemplate,
             ConnectionProvider webhookConnectionProvider,
-            RedisConcurrencyControlService concurrencyControlService,
-            CircuitBreakerService circuitBreakerService,
-            ProjectRateLimiterService projectRateLimiterService) {
+            AttemptRunner attemptRunner) {
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
         this.attemptRepository = attemptRepository;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
-        HttpClient ssrfSafeHttpClient = SsrfProtectionCustomizer.createHttpClient(webhookConnectionProvider, allowPrivateIps);
-        this.webClient = webClientBuilder
-                .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
-                .defaultHeader("User-Agent", "WebhookPlatform/1.0-IncomingForward")
-                .build();
         this.objectMapper = objectMapper;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
+        this.transactionTemplate = transactionTemplate;
+        this.attemptRunner = attemptRunner;
         this.allowPrivateIps = allowPrivateIps;
         this.allowedHosts = allowedHosts;
-        this.meterRegistry = meterRegistry;
-        this.transactionTemplate = transactionTemplate;
-        this.concurrencyControlService = concurrencyControlService;
-        this.circuitBreakerService = circuitBreakerService;
-        this.projectRateLimiterService = projectRateLimiterService;
 
-        this.forwardSuccessCounter = Counter.builder("incoming_forward_attempts_total")
-                .tag("result", "success").register(meterRegistry);
-        this.forwardFailureCounter = Counter.builder("incoming_forward_attempts_total")
-                .tag("result", "failure").register(meterRegistry);
-        this.forwardErrorCounter = Counter.builder("incoming_forward_attempts_total")
-                .tag("result", "error").register(meterRegistry);
-        this.transformFailedCounter = Counter.builder("transform_failed_total")
-                .tag("component", "incoming_forward").register(meterRegistry);
-        this.forwardLatency = Timer.builder("incoming_forward_latency_ms")
-                .register(meterRegistry);
+        HttpClient ssrfSafeHttpClient =
+                SsrfProtectionCustomizer.createHttpClient(webhookConnectionProvider, allowPrivateIps);
+        this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(ssrfSafeHttpClient))
+                .build();
+
+        this.metrics = new ForwardMetrics(meterRegistry);
+    }
+
+    /**
+     * Metric names are unchanged from before the Runner existed. Renaming a family inside a
+     * refactor would break dashboards and alert rules, which is the one place a refactor must
+     * not surprise an operator — so the names stay here and the Runner reaches them through
+     * {@link AttemptMetrics}.
+     */
+    private static final class ForwardMetrics implements AttemptMetrics {
+        private final Counter successCounter;
+        private final Counter failureCounter;
+        private final Counter errorCounter;
+        private final Counter transformFailedCounter;
+        private final Timer latency;
+
+        ForwardMetrics(MeterRegistry registry) {
+            this.successCounter = Counter.builder("incoming_forward_attempts_total")
+                    .tag("result", "success").register(registry);
+            this.failureCounter = Counter.builder("incoming_forward_attempts_total")
+                    .tag("result", "failure").register(registry);
+            this.errorCounter = Counter.builder("incoming_forward_attempts_total")
+                    .tag("result", "error").register(registry);
+            this.transformFailedCounter = Counter.builder("transform_failed_total")
+                    .tag("component", "incoming_forward").register(registry);
+            this.latency = Timer.builder("incoming_forward_latency_ms").register(registry);
+        }
+
+        @Override
+        public void success(int statusCode, int durationMs) {
+            successCounter.increment();
+            latency.record(Duration.ofMillis(durationMs));
+        }
+
+        @Override
+        public void failure(int statusCode, int durationMs) {
+            failureCounter.increment();
+            latency.record(Duration.ofMillis(durationMs));
+        }
+
+        @Override
+        public void error(int durationMs) {
+            errorCounter.increment();
+        }
+
+        @Override
+        public void transformFailed() {
+            transformFailedCounter.increment();
+        }
     }
 
     public void processForward(IncomingForwardMessage message) {
@@ -141,115 +175,31 @@ public class IncomingForwardService {
             return;
         }
 
-        // SSRF protection
-        try {
-            UrlValidator.validateWebhookUrl(destination.getUrl(), allowPrivateIps, allowedHosts);
-        } catch (UrlValidator.InvalidUrlException e) {
-            log.error("SSRF protection: invalid destination URL for forward eventId={}, destId={}: {}",
-                    eventId, destinationId, e.getMessage());
-            saveFailedAttempt(eventId, destinationId, "SSRF_PROTECTION: " + e.getMessage(), 0);
-            return;
-        }
-
-        // --- Atomic claim: prevent duplicate HTTP sends ---
-        //
-        // Contract:
-        //   First dispatch (attemptCount == 0): IngressService already created a PENDING
-        //     row with attempt_number=1.  We claim it via atomic UPDATE … SET PROCESSING.
-        //   Replay (replay == true, attemptCount > 0): API created a PENDING row with
-        //     attempt_number = attemptCount.  We claim it the same way as first dispatch.
-        //   Retry (attemptCount > 0, replay == false): IncomingForwardRetryScheduler
-        //     already claimed the existing row (set PROCESSING) and published
-        //     attemptCount = attemptNumber, plus a started_at fencing token. We CAS on
-        //     that token below rather than trusting status=PROCESSING alone --
-        //     Kafka is at-least-once, so the same retry message can be redelivered (a
-        //     rebalance loses the offset commit after this consumer already dispatched
-        //     once) and both copies would otherwise see PROCESSING and double-POST.
-        boolean isRetry = message.getAttemptCount() != null && message.getAttemptCount() > 0;
-        boolean isReplay = message.isReplay();
-
-        if (isReplay && isRetry) {
-            // Replay path: API created a PENDING row — claim it
-            attemptNumber = message.getAttemptCount();
-            final int an = attemptNumber;
-            Integer claimed = transactionTemplate
-                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, an));
-            if (claimed == null || claimed == 0) {
-                log.debug("Replay attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
-                        eventId, destinationId, attemptNumber);
-                return;
-            }
-        } else if (isRetry) {
-            // Retry path: scheduler already set the row to PROCESSING.
-            // attemptCount IS the current attempt number (not previous).
-            attemptNumber = message.getAttemptCount();
-            Instant expectedStartedAt = message.getStartedAt();
-            if (expectedStartedAt != null) {
-                // CAS on the fencing token: only the first delivery of this exact
-                // Kafka message can still see the token the scheduler stamped, so only it
-                // proceeds to dispatch. A redelivered duplicate finds the token already
-                // consumed and is dropped here instead of double-POSTing.
-                final int an = attemptNumber;
-                Integer claimed = transactionTemplate.execute(tx ->
-                        attemptRepository.claimRetryForProcessing(eventId, destinationId, an, expectedStartedAt));
-                if (claimed == null || claimed == 0) {
-                    log.debug("Retry attempt already claimed by a prior delivery of this Kafka message "
-                                    + "(duplicate redelivery): eventId={}, destId={}, attempt={}",
-                            eventId, destinationId, attemptNumber);
-                    return;
-                }
-            } else {
-                // No fencing token on the message -- an older producer (rolling deploy
-                // skew) published it before this field existed. Fall back to the
-                // pre-existing behavior rather than dropping every in-flight retry.
-                log.debug("Retry message has no fencing token (older producer?), proceeding without CAS: "
-                                + "eventId={}, destId={}, attempt={}",
-                        eventId, destinationId, attemptNumber);
-            }
-        } else {
-            // First dispatch: claim the PENDING row created by IngressService
-            attemptNumber = 1;
-            Integer claimed = transactionTemplate
-                    .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, 1));
-            if (claimed == null || claimed == 0) {
-                log.debug("Forward attempt already claimed or not PENDING: eventId={}, destId={}, attempt={}",
-                        eventId, destinationId, attemptNumber);
-                return;
-            }
-        }
-
-        int maxAttempts = destination.getMaxAttempts();
-
-        // Same rule as the outgoing side: an unusable ladder is terminal, not retryable.
-        // Checked after the claim so the row this fails is the one we own. See
-        // WebhookDeliveryService.processDelivery for why this cannot be left to throw later.
-        try {
-            RetryLadder.parse(destination.getRetryDelays(), maxAttempts);
-        } catch (IllegalArgumentException e) {
-            log.error("Destination {} carries an unusable retry ladder: {}", destinationId, e.getMessage());
-            markAttemptFailedIfExists(eventId, destinationId, attemptNumber,
-                    "INVALID_RETRY_LADDER: " + e.getMessage());
-            return;
-        }
-
-        attemptForward(event, destination, attemptNumber, maxAttempts);
+        // URL validation is the Runner's, deliberately. Doing it here would mark the row
+        // FAILED without holding a Claim on it, which is looser than every other terminal
+        // path; the Runner validates after claiming and finalises under the fence.
+        attemptRunner.run(
+                new IncomingAttemptStore(
+                        attemptRepository, transactionTemplate, transformationCacheService,
+                        payloadTransformService, encryptionKeyRegistry, objectMapper, webClient,
+                        message, event, destination),
+                metrics);
     }
 
     /**
-     * Hands a forward attempt back to the retry ladder when the executor pool is full,
-     * so the consumer can ack instead of leaving the record unacked.
+     * Hands a forward attempt back to the retry ladder when the executor pool is full, so the
+     * consumer can ack instead of leaving the record unacked.
      *
      * <p>The incoming listener factory sets {@code asyncAcks(true)}, under which an unacked
-     * record does not get redelivered until a rebalance or restart, and — because a later
-     * offset may already be acked — it blocks this partition's offset commits rather than
-     * merely delaying one message. Kafka's job for this record is done either way:
-     * IncomingForwardRetryScheduler, not Kafka redelivery, drives reprocessing.
+     * record is not redelivered until a rebalance and — because a later offset may already be
+     * acked — blocks this partition's offset commits rather than merely delaying one message.
+     * Kafka's job for this record is done either way: IncomingForwardRetryScheduler, not Kafka
+     * redelivery, drives reprocessing.
      *
-     * <p>Both entry states are handed back the same way: a dispatch row is still PENDING
-     * (claimed only inside processForward) and a retry row is already PROCESSING. Either
-     * way next_retry_at must be set — the scheduler's claim query ignores rows where it is
-     * null, so acking a fresh dispatch row without stamping it would strand the forward.
-     * Mirrors WebhookDeliveryService.rescheduleForBackpressure on the outgoing side.
+     * <p>Both entry states are handed back the same way: a dispatch row is still PENDING and a
+     * retry row is already PROCESSING. Either way {@code next_retry_at} must be set — the
+     * scheduler's claim query ignores rows where it is null, so acking a fresh dispatch row
+     * without stamping it would strand the forward.
      */
     public void rescheduleForBackpressure(IncomingForwardMessage message) {
         UUID eventId = message.getIncomingEventId();
@@ -257,12 +207,7 @@ public class IncomingForwardService {
         int attemptNumber = resolveAttemptNumber(message);
 
         transactionTemplate.executeWithoutResult(tx -> {
-            List<IncomingForwardAttempt> attempts = attemptRepository
-                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
-            IncomingForwardAttempt attempt = attempts.stream()
-                    .filter(a -> a.getAttemptNumber() == attemptNumber)
-                    .findFirst()
-                    .orElse(null);
+            IncomingForwardAttempt attempt = findAttempt(eventId, destinationId, attemptNumber);
             if (attempt == null) {
                 log.debug("Forward attempt {} for eventId={}, destId={} disappeared before backpressure reschedule",
                         attemptNumber, eventId, destinationId);
@@ -280,8 +225,7 @@ public class IncomingForwardService {
             attempt.setNextRetryAt(Instant.now().plusSeconds(delaySec));
             attemptRepository.save(attempt);
             log.warn("Executor pool full, rescheduled forward eventId={}, destId={} via retry ladder in {}s "
-                            + "instead of leaving it unacked",
-                    eventId, destinationId, delaySec);
+                    + "instead of leaving it unacked", eventId, destinationId, delaySec);
         });
     }
 
@@ -291,8 +235,7 @@ public class IncomingForwardService {
                 : 1;
     }
 
-    private void markAttemptFailedIfExists(UUID eventId, UUID destinationId, int attemptNumber,
-            String reason) {
+    private void markAttemptFailedIfExists(UUID eventId, UUID destinationId, int attemptNumber, String reason) {
         transactionTemplate.executeWithoutResult(tx -> {
             List<IncomingForwardAttempt> attempts = attemptRepository
                     .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
@@ -320,440 +263,12 @@ public class IncomingForwardService {
         });
     }
 
-    private void attemptForward(IncomingEvent event, IncomingDestination destination,
-            int attemptNumber, int maxAttempts) {
-        long startTime = System.currentTimeMillis();
-        UUID eventId = event.getId();
-        UUID destinationId = destination.getId();
-        UUID sourceId = event.getIncomingSourceId();
-
-        log.info("Forwarding incoming event {} to destination {} (attempt {}/{})",
-                eventId, destinationId, attemptNumber, maxAttempts);
-
-        // --- Tenant isolation guards (mirrors outgoing WebhookDeliveryService) ---
-
-        // 1. Per-source rate limit — prevents noisy-neighbor at source/project level
-        if (!projectRateLimiterService.tryAcquire(sourceId)) {
-            long delaySec = backoffSeconds(attemptNumber, 1, 30);
-            log.warn("Source rate limit exceeded for source {}, rescheduling forward eventId={}, destId={} in {}s",
-                    sourceId, eventId, destinationId, delaySec);
-            revertToPending(eventId, destinationId, attemptNumber, delaySec);
-            return;
-        }
-
-        // 2. Per-destination circuit breaker
-        if (!circuitBreakerService.isCallPermitted(destinationId)) {
-            log.warn("CircuitBreaker OPEN for destination {}, rescheduling forward eventId={}",
-                    destinationId, eventId);
-            revertToPending(eventId, destinationId, attemptNumber, 30);
-            return;
-        }
-
-        // 3. Per-destination concurrency limit
-        if (!concurrencyControlService.tryAcquire(destinationId)) {
-            long delaySec = backoffSeconds(attemptNumber, 2, 60);
-            log.warn("Max concurrency reached for destination {}, rescheduling forward eventId={} in {}s",
-                    destinationId, eventId, delaySec);
-            revertToPending(eventId, destinationId, attemptNumber, delaySec);
-            return;
-        }
-
-        try {
-            // Build request body — apply payload transformation if configured
-            String body = resolveAndTransformPayload(event.getBodyRaw(), destination);
-            String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
-
-            // Idempotency key for downstream dedup
-            String idempotencyKey = eventId + "-" + destinationId;
-
-            var requestSpec = webClient.post()
-                    .uri(destination.getUrl())
-                    .header("Content-Type", contentType)
-                    .header("X-Incoming-Event-Id", eventId.toString())
-                    .header("X-Incoming-Request-Id", event.getRequestId())
-                    .header("X-Forward-Attempt", String.valueOf(attemptNumber))
-                    .header("Idempotency-Key", idempotencyKey);
-
-            // Add auth headers
-            addAuthHeaders(requestSpec, destination);
-
-            // Add custom headers
-            addCustomHeaders(requestSpec, destination.getCustomHeadersJson());
-
-            int timeoutSeconds = Math.max(1, Math.min(60, destination.getTimeoutSeconds()));
-
-            // The mono only ever produces the raw HTTP outcome — no DB work happens inside
-            // .map/.timeout. handleResponse (the attempt-row writes via updateAttempt/
-            // createPendingRetryAttempt) runs below, after block() returns, on this calling
-            // thread — never on the reactor-netty event-loop thread, and never racing the
-            // .timeout that guards the HTTP call itself. Previously handleResponse ran inside
-            // .map, so a slow updateAttempt could trip .timeout AFTER a 2xx was already
-            // received, and the resulting TimeoutException drove handleError to overwrite the
-            // just-written SUCCESS row and schedule a duplicate forward. Mirrors the same
-            // fix on the outgoing side in WebhookDeliveryService.attemptDelivery.
-            ForwardOutcome outcome = requestSpec.bodyValue(body != null ? body : "")
-                    .exchangeToMono(response -> {
-                        int status = response.statusCode().value();
-                        String responseHeaders = serializeHeaders(response.headers().asHttpHeaders());
-
-                        return response.bodyToMono(String.class)
-                                .defaultIfEmpty("")
-                                .map(responseBody -> new ForwardOutcome(status, responseBody, responseHeaders));
-                    })
-                    .timeout(Duration.ofSeconds(timeoutSeconds))
-                    .block();
-
-            if (outcome != null) {
-                int durationMs = (int) (System.currentTimeMillis() - startTime);
-                forwardLatency.record(Duration.ofMillis(durationMs));
-                handleResponse(eventId, destinationId, attemptNumber, maxAttempts,
-                        outcome.status(), truncate(outcome.responseBody(), 10240),
-                        outcome.responseHeaders(), null, durationMs,
-                        destination.getRetryDelays());
-            }
-
-        } catch (PayloadTransformException e) {
-            // A configured transformation that fails to apply must never result in the
-            // raw payload leaving the platform. Fail this attempt as retryable (same as an
-            // HTTP-level failure) so it goes through the normal retry ladder and eventually
-            // DLQs if the template stays broken.
-            int durationMs = (int) (System.currentTimeMillis() - startTime);
-            transformFailedCounter.increment();
-            String message = "TRANSFORM_FAILED: " + e.getMessage();
-            log.error("Payload transform failed for event {} to destination {}, refusing to forward the raw payload: {}",
-                    eventId, destinationId, message);
-            handleError(eventId, destinationId, attemptNumber, maxAttempts,
-                    message, durationMs, destination.getRetryDelays());
-        } catch (Exception e) {
-            int durationMs = (int) (System.currentTimeMillis() - startTime);
-            log.error("Forward HTTP request failed for event {} to destination {}: {}",
-                    eventId, destinationId, e.getMessage());
-            handleError(eventId, destinationId, attemptNumber, maxAttempts,
-                    e.getMessage(), durationMs, destination.getRetryDelays());
-        } finally {
-            concurrencyControlService.release(destinationId);
-        }
-    }
-
-    private record ForwardOutcome(int status, String responseBody, String responseHeaders) {
-    }
-
-    private void handleResponse(UUID eventId, UUID destinationId, int attemptNumber, int maxAttempts,
-            int statusCode, String responseBody, String responseHeaders,
-            String errorMessage, int durationMs, String retryDelays) {
-        boolean success = statusCode >= 200 && statusCode < 300;
-
-        if (success) {
-            forwardSuccessCounter.increment();
-            circuitBreakerService.recordSuccess(destinationId, durationMs);
-            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.SUCCESS,
-                    statusCode, responseHeaders, responseBody, null, durationMs, null);
-            log.info("Forward succeeded: eventId={}, destId={}, attempt={}, status={}",
-                    eventId, destinationId, attemptNumber, statusCode);
-        } else if (isRetryable(statusCode)) {
-            forwardFailureCounter.increment();
-            circuitBreakerService.recordFailure(destinationId,
-                    new RuntimeException("HTTP " + statusCode));
-            if (attemptNumber >= maxAttempts) {
-                updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
-                        statusCode, responseHeaders, responseBody,
-                        "Max attempts reached (HTTP " + statusCode + ")", durationMs, null);
-                log.warn("Forward DLQ: eventId={}, destId={}, maxAttempts reached", eventId, destinationId);
-            } else {
-                // Schedule retry: update current attempt to final state, create next PENDING
-                // attempt
-                Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays, maxAttempts);
-                // Only schedule the next attempt if we actually finalized this one. If the
-                // row had already reached a terminal state, someone else owns this forward
-                // and creating a PENDING successor here would duplicate it.
-                if (updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
-                        statusCode, responseHeaders, responseBody,
-                        "Retryable HTTP " + statusCode, durationMs, null)) {
-                    createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
-                    log.info("Forward retry scheduled: eventId={}, destId={}, attempt={}, nextRetry={}",
-                            eventId, destinationId, attemptNumber, nextRetry);
-                }
-            }
-        } else {
-            forwardFailureCounter.increment();
-            circuitBreakerService.recordFailure(destinationId,
-                    new RuntimeException("Non-retryable HTTP " + statusCode));
-            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
-                    statusCode, responseHeaders, responseBody,
-                    "Non-retryable HTTP " + statusCode, durationMs, null);
-            log.error("Forward failed (non-retryable): eventId={}, destId={}, status={}",
-                    eventId, destinationId, statusCode);
-        }
-    }
-
-    private void handleError(UUID eventId, UUID destinationId, int attemptNumber, int maxAttempts,
-            String errorMessage, int durationMs, String retryDelays) {
-        forwardErrorCounter.increment();
-        circuitBreakerService.recordFailure(destinationId, new RuntimeException(errorMessage));
-        if (attemptNumber >= maxAttempts) {
-            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.DLQ,
-                    null, null, null,
-                    "Max attempts reached: " + errorMessage, durationMs, null);
-            log.warn("Forward DLQ (error): eventId={}, destId={}", eventId, destinationId);
-        } else {
-            Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays, maxAttempts);
-            // Same rule as the retryable-HTTP branch above: no successor row unless this
-            // attempt was actually the one that finalized.
-            if (updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
-                    null, null, null,
-                    errorMessage, durationMs, null)) {
-                createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
-                log.info("Forward retry scheduled (error): eventId={}, destId={}, nextRetry={}",
-                        eventId, destinationId, nextRetry);
-            }
-        }
-    }
-
-    /**
-     * Updates the existing PROCESSING attempt row with the final result.
-     * The row was created/claimed atomically before the HTTP call.
-     */
-    private boolean updateAttempt(UUID eventId, UUID destinationId, int attemptNumber, ForwardAttemptStatus status,
-            Integer responseCode, String responseHeaders, String responseBody,
-            String errorMessage, int durationMs, Instant nextRetryAt) {
-        Boolean applied = transactionTemplate.execute(tx -> {
-            List<IncomingForwardAttempt> attempts = attemptRepository
-                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
-            IncomingForwardAttempt attempt = attempts.stream()
-                    .filter(a -> a.getAttemptNumber() == attemptNumber)
-                    .findFirst()
-                    .orElse(null);
-            if (attempt == null) {
-                log.error("Attempt row not found for update: eventId={}, destId={}, attempt={}",
-                        eventId, destinationId, attemptNumber);
-                return false;
-            }
-            // Only the holder of the PROCESSING row may finalize it. Without this guard a
-            // late writer — a timed-out call whose 2xx already landed, or a duplicate Kafka
-            // redelivery — silently overwrote a terminal row and, via the FAILED branch,
-            // scheduled a duplicate forward. Terminal states are final: whoever got here
-            // first won. Mirrors the status fence on the outgoing finalizers.
-            if (attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
-                log.warn("Attempt {} for eventId={}, destId={} is already {} — refusing to overwrite with {}",
-                        attemptNumber, eventId, destinationId, attempt.getStatus(), status);
-                return false;
-            }
-            attempt.setStatus(status);
-            attempt.setFinishedAt(Instant.now());
-            attempt.setResponseCode(responseCode);
-            attempt.setResponseHeadersJson(responseHeaders);
-            attempt.setResponseBodySnippet(responseBody);
-            attempt.setErrorMessage(errorMessage);
-            attempt.setNextRetryAt(nextRetryAt);
-            attemptRepository.save(attempt);
-            return true;
-        });
-        return Boolean.TRUE.equals(applied);
-    }
-
-    /**
-     * Creates a new PENDING attempt row for the next retry.
-     * This row will be picked up by IncomingForwardRetryScheduler.
-     */
-    private void createPendingRetryAttempt(UUID eventId, UUID destinationId,
-            int nextAttemptNumber, Instant nextRetryAt) {
-        transactionTemplate.executeWithoutResult(tx -> {
-            IncomingForwardAttempt nextAttempt = IncomingForwardAttempt.builder()
-                    .incomingEventId(eventId)
-                    .destinationId(destinationId)
-                    .attemptNumber(nextAttemptNumber)
-                    .status(ForwardAttemptStatus.PENDING)
-                    .nextRetryAt(nextRetryAt)
-                    .build();
-            attemptRepository.save(nextAttempt);
-        });
-    }
-
-    private void saveFailedAttempt(UUID eventId, UUID destinationId, String errorMessage, int durationMs) {
-        // Claim the existing PENDING row (created by IngressService) and mark FAILED
-        Integer claimed = transactionTemplate
-                .execute(tx -> attemptRepository.claimForProcessing(eventId, destinationId, 1));
-        if (claimed != null && claimed > 0) {
-            updateAttempt(eventId, destinationId, 1, ForwardAttemptStatus.FAILED,
-                    null, null, null, errorMessage, durationMs, null);
-        } else {
-            log.warn("Could not claim attempt row for early failure: eventId={}, destId={}",
-                    eventId, destinationId);
-        }
-    }
-
-    private boolean isRetryable(int statusCode) {
-        return RetryPolicy.isRetryable(statusCode);
-    }
-
-    /**
-     * The next attempt's due time, from the ladder this Destination carries.
-     *
-     * <p>No fallback: {@code incoming_destinations.retry_delays} is NOT NULL with a column
-     * default, and the api validates the value on create and update, so a Destination always
-     * has a usable ladder. The private copy this replaced answered a malformed value by
-     * substituting a hardcoded five-tier array — one that did not match the outgoing side's
-     * six-tier array, so the two directions silently disagreed about a value neither was
-     * supposed to be choosing.
-     */
-    private Instant calculateNextRetry(int attemptNumber, String retryDelaysStr, int maxAttempts) {
-        return RetryLadder.parse(retryDelaysStr, maxAttempts).nextRetryAt(attemptNumber);
-    }
-
-    @SuppressWarnings("unchecked")
-    private void addAuthHeaders(WebClient.RequestBodySpec requestSpec, IncomingDestination destination) {
-        if (destination.getAuthType() == IncomingAuthType.NONE || destination.getAuthConfigEncrypted() == null) {
-            return;
-        }
-        try {
-            String authConfig = encryptionKeyRegistry.decryptWithFallback(
-                    destination.getAuthConfigEncrypted(),
-                    destination.getAuthConfigIv(),
-                    destination.getEncryptionKeyVersion());
-
-            Map<String, String> config = objectMapper.readValue(authConfig, Map.class);
-
-            switch (destination.getAuthType()) {
-                case BEARER -> {
-                    String token = config.get("token");
-                    if (token != null) {
-                        requestSpec.header("Authorization", "Bearer " + token);
-                    }
-                }
-                case BASIC -> {
-                    String username = config.getOrDefault("username", "");
-                    String password = config.getOrDefault("password", "");
-                    String encoded = java.util.Base64.getEncoder()
-                            .encodeToString((username + ":" + password).getBytes());
-                    requestSpec.header("Authorization", "Basic " + encoded);
-                }
-                case CUSTOM_HEADER -> {
-                    String headerName = config.get("headerName");
-                    String headerValue = config.get("headerValue");
-                    if (headerName != null && headerValue != null) {
-                        requestSpec.header(headerName, headerValue);
-                    }
-                }
-                default -> {
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to apply auth headers for destination {}: {}", destination.getId(), e.getMessage());
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void addCustomHeaders(WebClient.RequestBodySpec requestSpec, String customHeadersJson) {
-        if (customHeadersJson == null || customHeadersJson.isBlank()) {
-            return;
-        }
-        try {
-            Map<String, String> headers = objectMapper.readValue(customHeadersJson, Map.class);
-            headers.forEach((key, value) -> {
-                if (key != null && value != null && !key.isBlank()) {
-                    String keyLower = key.toLowerCase();
-                    if (!keyLower.equals("host") && !keyLower.equals("content-length")
-                            && !keyLower.equals("transfer-encoding")) {
-                        requestSpec.header(key, value);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            log.warn("Failed to parse custom headers: {}", e.getMessage());
-        }
-    }
-
-    private String serializeHeaders(HttpHeaders headers) {
-        try {
-            Map<String, String> headerMap = new HashMap<>();
-            headers.forEach((key, values) -> {
-                if (values != null && !values.isEmpty()) {
-                    headerMap.put(key, values.get(0));
-                }
-            });
-            Map<String, String> sanitized = HeaderSanitizer.sanitize(headerMap);
-            return objectMapper.writeValueAsString(sanitized);
-        } catch (Exception e) {
-            return "{}";
-        }
-    }
-
-    /**
-     * Resolves the transformation template (from reusable Transformation entity or inline payloadTransform)
-     * and applies it to the payload.
-     * Priority: transformationId > inline payloadTransform > passthrough.
-     *
-     * <p>"No transformation configured" (neither a transformationId nor an inline
-     * payloadTransform) is fine — the body is forwarded as-is. But once either is
-     * configured, a failure to apply it must fail the attempt: it must never
-     * silently forward the raw body, since transformations are how customers strip PII
-     * before an incoming payload gets relayed to a destination.
-     */
-    private String resolveAndTransformPayload(String body, IncomingDestination destination) {
-        if (body == null || body.isBlank()) {
-            return body;
-        }
-
-        // 1. Reusable transformation by ID — an explicit choice. Missing/disabled is a
-        // configuration failure, not "no transform configured", so it must not silently
-        // fall through to the inline JSONPath expression (or to no transform at all).
-        if (destination.getTransformationId() != null) {
-            String template = transformationCacheService.findEnabledTemplate(destination.getTransformationId());
-            if (template == null) {
-                throw new PayloadTransformException(
-                        "Configured transformation " + destination.getTransformationId()
-                                + " not found or disabled for destination " + destination.getId());
-            }
-            return payloadTransformService.transform(body, template);
-        }
-
-        // 2. Inline JSONPath expression (only consulted when no reusable transformation is set)
-        String payloadTransform = destination.getPayloadTransform();
-        if (payloadTransform == null || payloadTransform.isBlank()) {
-            return body;
-        }
-        try {
-            Object result = JsonPath.read(body, payloadTransform);
-            if (result instanceof String) {
-                return (String) result;
-            }
-            return objectMapper.writeValueAsString(result);
-        } catch (Exception e) {
-            throw new PayloadTransformException(
-                    "Inline payload transform '" + payloadTransform + "' failed for destination "
-                            + destination.getId() + ": " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Reverts a PROCESSING attempt back to PENDING with a retry delay.
-     * Used when rate limit / circuit breaker / concurrency limit prevents the HTTP call.
-     * This does NOT consume an attempt — the same attempt number will be retried.
-     */
-    private void revertToPending(UUID eventId, UUID destinationId, int attemptNumber, long delaySeconds) {
-        transactionTemplate.executeWithoutResult(tx -> {
-            List<IncomingForwardAttempt> attempts = attemptRepository
-                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
-            attempts.stream()
-                    .filter(a -> a.getAttemptNumber() == attemptNumber
-                            && a.getStatus() == ForwardAttemptStatus.PROCESSING)
-                    .findFirst()
-                    .ifPresent(a -> {
-                        a.setStatus(ForwardAttemptStatus.PENDING);
-                        a.setNextRetryAt(Instant.now().plusSeconds(delaySeconds));
-                        attemptRepository.save(a);
-                    });
-        });
-    }
-
-    private long backoffSeconds(int attemptNumber, long min, long max) {
-        return RetryPolicy.backoffWithJitter(attemptNumber, min, max);
-    }
-
-    private String truncate(String str, int maxLength) {
-        if (str == null || str.length() <= maxLength) {
-            return str;
-        }
-        return str.substring(0, maxLength) + "\n...[truncated]";
+    private IncomingForwardAttempt findAttempt(UUID eventId, UUID destinationId, int attemptNumber) {
+        return attemptRepository
+                .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId)
+                .stream()
+                .filter(a -> a.getAttemptNumber() == attemptNumber)
+                .findFirst()
+                .orElse(null);
     }
 }

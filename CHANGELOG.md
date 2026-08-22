@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Both delivery pipelines now run one shared attempt lifecycle.** The Incoming forward
+  pipeline had been created by copying the Outgoing one, and commit `2070d30` had to
+  hand-port four separate fixes from one to the other — landing in the HTTP send, the
+  finalisation, the retry scheduler and the Kafka consumer, because the duplication was of
+  the whole lifecycle rather than of one method. `AttemptRunner` now owns the order of
+  operations and the fences; each direction supplies an `AttemptStore` adapter for how it
+  records Attempts. `WebhookDeliveryService` went from 922 lines to 263 and
+  `IncomingForwardService` from 760 to 275. See
+  `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+- A Delivery whose URL the platform is not allowed to send to no longer spends a
+  concurrency permit and a rate-limit token on being rejected: URL validation moved ahead
+  of admission. The permit accounting for failures that happen after admission — a
+  decryption failure on a rotated key, a bad client certificate — is unchanged.
+- "Endpoint deleted / disabled / unverified" and "Event not found" are now written under
+  the delivery's fencing token, like every other finalisation, instead of before the row is
+  claimed. A Delivery parked behind an outstanding sequence also stops reading the Endpoint
+  and Event on every re-poll just to discover it is still blocked.
+- Both Kafka consumers share one collaborator for the executor-full decision. Getting it
+  wrong stalls a partition until a restart, and it had been wrong on the Incoming side for
+  as long as the Outgoing side had it right.
+
 ### Added
 - `RetryLadder` and `RetryLadderDefaults` (`webhook-platform-common`): one shared
   implementation of the retry ladder — parsing, tier clamping, jitter, exhaustion,

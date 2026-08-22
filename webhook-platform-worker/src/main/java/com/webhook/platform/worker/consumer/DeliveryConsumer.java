@@ -31,6 +31,7 @@ public class DeliveryConsumer {
 
     private final WebhookDeliveryService webhookDeliveryService;
     private final BoundedAsyncExecutor asyncExecutor;
+    private final BackpressureDispatch backpressureDispatch;
     private final KafkaListenerEndpointRegistry registry;
 
     public DeliveryConsumer(WebhookDeliveryService webhookDeliveryService,
@@ -38,6 +39,7 @@ public class DeliveryConsumer {
                             KafkaListenerEndpointRegistry registry) {
         this.webhookDeliveryService = webhookDeliveryService;
         this.asyncExecutor = asyncExecutor;
+        this.backpressureDispatch = new BackpressureDispatch(asyncExecutor);
         this.registry = registry;
     }
 
@@ -70,19 +72,11 @@ public class DeliveryConsumer {
 
         rejectIfShuttingDown(message.getDeliveryId());
 
-        if (!asyncExecutor.trySubmit(
+        backpressureDispatch.dispatch(
                 () -> webhookDeliveryService.processDelivery(message, false),
                 acknowledgment,
-                message.getDeliveryId().toString())) {
-            // Executor full — containers paused automatically to stop further polling,
-            // but this record has already been handed to us. Don't leave it unacked: a
-            // non-ack does not get redelivered until a rebalance/restart, and with
-            // asyncAcks it would block this partition's offset commits forever.
-            // Reschedule explicitly via the retry ladder instead and ack.
-            log.debug("Outgoing executor full, rescheduling deliveryId={} via retry ladder", message.getDeliveryId());
-            webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), false);
-            acknowledgment.acknowledge();
-        }
+                "delivery " + message.getDeliveryId(),
+                () -> webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), false));
     }
 
     @KafkaListener(
@@ -113,16 +107,11 @@ public class DeliveryConsumer {
 
         rejectIfShuttingDown(message.getDeliveryId());
 
-        if (!asyncExecutor.trySubmit(
+        backpressureDispatch.dispatch(
                 () -> webhookDeliveryService.processDelivery(message, true),
                 acknowledgment,
-                message.getDeliveryId().toString())) {
-            // Same reasoning as consumeDispatch above — reschedule explicitly and ack
-            // rather than relying on a non-ack to trigger redelivery.
-            log.debug("Outgoing executor full, rescheduling retry deliveryId={} via retry ladder", message.getDeliveryId());
-            webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), true);
-            acknowledgment.acknowledge();
-        }
+                "retry delivery " + message.getDeliveryId(),
+                () -> webhookDeliveryService.rescheduleForBackpressure(message.getDeliveryId(), true));
     }
 
     /**

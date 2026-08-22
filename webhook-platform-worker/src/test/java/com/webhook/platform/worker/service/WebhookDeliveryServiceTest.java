@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -51,6 +52,17 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
+/**
+ * Covers the Outgoing {@link com.webhook.platform.worker.attempt.OutgoingAttemptStore} through
+ * the service that drives it: the {@code claim_token} fence, the FIFO ordering gate, the row
+ * transitions, the {@code delivery_attempts} log and the DLQ notification.
+ *
+ * <p>The attempt <em>policy</em> — what order things happen in, when a successor is queued,
+ * what a deferral means — moved to {@link com.webhook.platform.worker.attempt.AttemptRunner}
+ * and is pinned by {@code AttemptRunnerTest} against a fake store, with no infrastructure. The
+ * two suites therefore overlap in what they assert and not in what they cover: delete a case
+ * here and the store loses its only test.
+ */
 
 /**
  * Covers WebhookDeliveryService.rescheduleForBackpressure — the fix for
@@ -124,12 +136,11 @@ class WebhookDeliveryServiceTest {
         service = new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, List.of(),
-                rateLimiterService, concurrencyControlService, projectRateLimiterService,
-                circuitBreakerService, meterRegistry, new ObjectMapper(),
+                true, meterRegistry, new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
                 ConnectionProvider.newConnection(),
+                newAttemptRunner(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
     }
 
@@ -238,15 +249,19 @@ class WebhookDeliveryServiceTest {
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(mockWebClient);
 
+        // A real concurrency control, so the permit accounting this test is about is real.
+        AttemptRunner runnerWithRealPermits = new AttemptRunner(
+                projectRateLimiterService, rateLimiterService, realConcurrencyControl,
+                circuitBreakerService, new ObjectMapper(), true, List.of());
+
         WebhookDeliveryService localService = new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, List.of(),
-                rateLimiterService, realConcurrencyControl, projectRateLimiterService,
-                circuitBreakerService, new SimpleMeterRegistry(), new ObjectMapper(),
+                true, new SimpleMeterRegistry(), new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
                 ConnectionProvider.newConnection(),
+                runnerWithRealPermits,
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
 
         UUID endpointId = UUID.randomUUID();
@@ -353,6 +368,19 @@ class WebhookDeliveryServiceTest {
         when(payloadTransformService.transform(anyString(), any())).thenReturn("{}");
     }
 
+
+    /**
+     * A real AttemptRunner over the same mocks the service used to hold directly. The lifecycle
+     * these tests describe now lives in the Runner, so exercising it through the service means
+     * wiring a real one rather than a mock — which is also what keeps these tests honest about
+     * the seam: they assert observable outcomes, not who called whom.
+     */
+    private AttemptRunner newAttemptRunner() {
+        return new AttemptRunner(
+                projectRateLimiterService, rateLimiterService, concurrencyControlService,
+                circuitBreakerService, new ObjectMapper(), true, List.of());
+    }
+
     private WebhookDeliveryService serviceWithMockWebClient(WebClient mockWebClient, MeterRegistry meterRegistry) {
         when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
@@ -360,12 +388,11 @@ class WebhookDeliveryServiceTest {
         return new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, List.of(),
-                rateLimiterService, concurrencyControlService, projectRateLimiterService,
-                circuitBreakerService, meterRegistry, new ObjectMapper(),
+                true, meterRegistry, new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
                 ConnectionProvider.newConnection(),
+                newAttemptRunner(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
     }
 
@@ -940,7 +967,7 @@ class WebhookDeliveryServiceTest {
     }
 
     @Test
-    void attemptDelivery_ssrfBlockedUrl_marksFailed_releasesPermit_noHttpCall() {
+    void attemptDelivery_ssrfBlockedUrl_marksFailed_takesNoPermit_noHttpCall() {
         WebClient mockWebClient = mock(WebClient.class);
         MeterRegistry meterRegistry = new SimpleMeterRegistry();
         WebhookDeliveryService localService = serviceWithMockWebClient(mockWebClient, meterRegistry);
@@ -969,9 +996,14 @@ class WebhookDeliveryServiceTest {
         localService.processDelivery(message, true);
 
         verifyNoInteractions(mockWebClient);
-        // The permit WAS acquired before the URL validation ran, so it must be released
-        // in the finally regardless of which exception path was taken.
-        verify(concurrencyControlService).release(endpointId);
+        // URL validation now runs BEFORE admission, so a Delivery the platform is not allowed
+        // to send never spends a concurrency permit or a rate-limit token on being rejected.
+        // Previously the permit was taken first and released in the finally; the permit
+        // accounting for the paths that DO take one — a decryption failure on a rotated key, a
+        // bad client certificate — is covered by
+        // attemptDelivery_decryptSecretThrows_releasesPermitEveryTime_soEndpointNeverBlocks.
+        verify(concurrencyControlService, never()).tryAcquire(endpointId);
+        verify(concurrencyControlService, never()).release(endpointId);
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());

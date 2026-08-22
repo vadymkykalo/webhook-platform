@@ -26,6 +26,7 @@ public class IncomingForwardConsumer {
 
     private final IncomingForwardService forwardService;
     private final BoundedAsyncExecutor asyncExecutor;
+    private final BackpressureDispatch backpressureDispatch;
     private final KafkaListenerEndpointRegistry registry;
 
     public IncomingForwardConsumer(IncomingForwardService forwardService,
@@ -33,6 +34,7 @@ public class IncomingForwardConsumer {
                                    KafkaListenerEndpointRegistry registry) {
         this.forwardService = forwardService;
         this.asyncExecutor = asyncExecutor;
+        this.backpressureDispatch = new BackpressureDispatch(asyncExecutor);
         this.registry = registry;
     }
 
@@ -60,20 +62,11 @@ public class IncomingForwardConsumer {
                 message.getIncomingEventId(), message.getDestinationId(),
                 record.topic(), message.isReplay());
 
-        if (!asyncExecutor.trySubmit(
+        backpressureDispatch.dispatch(
                 () -> forwardService.processForward(message),
                 ack,
-                message.getIncomingEventId().toString())) {
-            // Executor full — containers paused automatically to stop further polling,
-            // but this record has already been handed to us. Don't leave it unacked: a
-            // non-ack does not get redelivered until a rebalance/restart, and with
-            // asyncAcks it would block this partition's offset commits forever.
-            // Reschedule explicitly via the retry ladder instead and ack.
-            log.debug("Incoming executor full, rescheduling eventId={} via retry ladder",
-                    message.getIncomingEventId());
-            forwardService.rescheduleForBackpressure(message);
-            ack.acknowledge();
-        }
+                "forward eventId=" + message.getIncomingEventId(),
+                () -> forwardService.rescheduleForBackpressure(message));
     }
 
     private String extractCorrelationId(ConsumerRecord<String, IncomingForwardMessage> record) {

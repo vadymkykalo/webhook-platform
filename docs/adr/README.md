@@ -19,7 +19,7 @@ the class and its Javadoc, it does not need an ADR.
 | [0008](0008-test-class-names-route-ci-jobs.md) | CI splits backend tests purely by class-name suffix | Accepted |
 | [0009](0009-openapi-spec-is-committed-and-drift-checked.md) | `openapi.yaml` is committed and semantically diffed by a test | Accepted |
 | [0010](0010-secrets-encrypted-with-versioned-keys.md) | Secrets at rest use AES-256-GCM with versioned keys | Accepted |
-| [0011](0011-one-attempt-runner-for-both-directions.md) | One Attempt Runner owns the attempt lifecycle for both directions | Accepted, not yet implemented |
+| [0011](0011-one-attempt-runner-for-both-directions.md) | One Attempt Runner owns the attempt lifecycle for both directions | Accepted, implemented |
 
 ## Format
 
