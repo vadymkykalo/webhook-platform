@@ -4,9 +4,12 @@
 # (Node/npm, Python/pip, PHP/composer), and the GitHub Actions used in
 # .github/workflows/.
 #
-# Patch AND minor updates are grouped into one PR per ecosystem; only majors
-# land individually, since those are the ones that actually need a look. This
-# was previously patch-only grouping with a limit of 10 per ecosystem, which
+# Patch AND minor updates are grouped into one PR per ecosystem; majors land
+# individually, since those are the ones that actually need a look. The one
+# exception is github-actions, where majors are grouped too — the reasoning is
+# at that ecosystem's entry below.
+#
+# This was previously patch-only grouping with a limit of 10 per ecosystem, which
 # meant a refresh could open ~30 PRs at once — each dragging a full CI run
 # including the then-per-push OWASP scan that took up to 104 minutes. That is
 # what led to this file being renamed to .paused rather than tuned.
@@ -103,6 +106,26 @@ updates:
       - "sdk"
 
   # --- github-actions: workflow action versions ---
+  # --- GitHub Actions used in .github/workflows/ ---
+  #
+  # The only ecosystem where majors are grouped too, and deliberately the exception
+  # to the rule stated above.
+  #
+  # A major bump of a first-party action — actions/checkout, docker/setup-buildx-action,
+  # azure/setup-helm — is almost always a runner or Node version change on their side,
+  # not a change in what the step does for us. Reviewing five of those individually costs
+  # five CI runs and five context switches and produces the same answer every time: does
+  # CI still pass. Grouped, that question is asked once.
+  #
+  # This is not a claim that action majors never break anything. It is that when one does,
+  # the workflow file is where it shows, CI is what shows it, and a five-line group diff is
+  # no harder to bisect than five separate ones. The ecosystems where a major genuinely
+  # needs its own PR — Spring Boot, Testcontainers, jsdom — keep the split.
+  #
+  # Concretely: the refresh on 2026-08-22 opened 16 PRs, of which 5 were action majors
+  # (actions/upload-pages-artifact 3->5, docker/setup-buildx-action 3->4, azure/setup-helm
+  # 4->5, softprops/action-gh-release 2->3, docker/metadata-action 5->6). Under this
+  # grouping they would have been one.
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "develop"
@@ -110,10 +133,11 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     groups:
-      actions-patch:
+      actions:
         update-types:
           - "patch"
           - "minor"
+          - "major"
     labels:
       - "dependencies"
       - "github-actions"
