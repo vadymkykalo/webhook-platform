@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Event intake decides before it writes. `IntakePlanner` is a pure function turning the
+  matching Subscriptions, the rules that fired and the project's fanout entitlement into an
+  `IntakePlan`; `EventIngestService` then carries that plan out. The routing rules — a DROP
+  short-circuiting everything, a rule ROUTE to an endpoint a Subscription already covers not
+  being a second Delivery, a rule TRANSFORM overriding the Subscription's own, the fanout
+  limit counting both sources after deduplication — were previously interleaved with their
+  own writes across ~180 lines and fifteen collaborators, so asserting any of them meant
+  standing up Postgres, Kafka and Redis. None of them had a test; all of them do now.
+
 ### Added
 - **A handler now says who may call it.** `@RequireAccess(AccessLevel)` declares the level a
   state-changing handler requires and `ScopeEnforcementInterceptor` enforces it before the
