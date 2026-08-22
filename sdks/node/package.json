@@ -1,6 +1,6 @@
 {
   "name": "@hookflow/node",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Official Node.js SDK for Hookflow — reliable webhook infrastructure",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
