@@ -70,6 +70,40 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
                         @Param("attemptNumber") int attemptNumber,
                         @Param("expectedStartedAt") Instant expectedStartedAt);
 
+        /**
+         * Age of the Forward obligation that has been outstanding longest, measured from when
+         * the webhook arrived.
+         *
+         * <p>Not from the attempt row's own {@code created_at}: Incoming inserts a new row per
+         * Attempt, so the newest row is freshly created even for a Forward that has been
+         * grinding since yesterday. {@code incoming_events.received_at} is when the obligation
+         * was actually taken on, and is the analogue of {@code deliveries.created_at} on the
+         * Outgoing side.
+         */
+        @Query(value = """
+                        SELECT MIN(e.received_at) FROM incoming_forward_attempts a
+                        JOIN incoming_events e ON e.id = a.incoming_event_id
+                        WHERE a.status = 'PENDING'
+                        """, nativeQuery = true)
+        Instant findOldestPendingReceivedAt();
+
+        /**
+         * PENDING Attempts whose Incoming Event arrived before the cutoff, oldest first.
+         *
+         * <p>{@code FOR UPDATE OF a SKIP LOCKED} because the caller publishes a DLQ
+         * notification per row: without it two worker replicas would select the same rows and
+         * each emit a duplicate notification for the same Forward. See ADR-0005.
+         */
+        @Query(value = """
+                        SELECT a.id FROM incoming_forward_attempts a
+                        JOIN incoming_events e ON e.id = a.incoming_event_id
+                        WHERE a.status = 'PENDING' AND e.received_at < :cutoff
+                        ORDER BY e.received_at ASC
+                        LIMIT :limit
+                        FOR UPDATE OF a SKIP LOCKED
+                        """, nativeQuery = true)
+        List<UUID> findStaleForwardAttemptIds(@Param("cutoff") Instant cutoff, @Param("limit") int limit);
+
         @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'PENDING' AND a.createdAt > :since")
         long countPending(@Param("since") Instant since);
 
@@ -78,4 +112,15 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
 
         @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since")
         long countDlq(@Param("since") Instant since);
+
+        /**
+         * All-time count of Forwards abandoned into DLQ -- i.e. the actionable Incoming
+         * backlog, the counterpart of {@code DeliveryRepository#countDlqTotal()}. Used by
+         * {@code DlqMonitoringService}. Unlike {@link #countDlq(Instant)} this is not windowed
+         * by {@code createdAt}: a Forward that exhausted its retry ladder a week ago still
+         * needs a human to decide about it, and a windowed count would quietly drop it out of
+         * sight while it was still waiting.
+         */
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ'")
+        long countDlqTotal();
 }

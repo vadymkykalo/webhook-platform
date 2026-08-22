@@ -1,9 +1,12 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.worker.attempt.AttemptRunner;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.util.PayloadCompressionUtil;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
@@ -49,6 +52,17 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
+/**
+ * Covers the Outgoing {@link com.webhook.platform.worker.attempt.OutgoingAttemptStore} through
+ * the service that drives it: the {@code claim_token} fence, the FIFO ordering gate, the row
+ * transitions, the {@code delivery_attempts} log and the DLQ notification.
+ *
+ * <p>The attempt <em>policy</em> — what order things happen in, when a successor is queued,
+ * what a deferral means — moved to {@link com.webhook.platform.worker.attempt.AttemptRunner}
+ * and is pinned by {@code AttemptRunnerTest} against a fake store, with no infrastructure. The
+ * two suites therefore overlap in what they assert and not in what they cover: delete a case
+ * here and the store loses its only test.
+ */
 
 /**
  * Covers WebhookDeliveryService.rescheduleForBackpressure — the fix for
@@ -122,12 +136,11 @@ class WebhookDeliveryServiceTest {
         service = new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, List.of(),
-                rateLimiterService, concurrencyControlService, projectRateLimiterService,
-                circuitBreakerService, meterRegistry, new ObjectMapper(),
+                true, meterRegistry, new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
                 ConnectionProvider.newConnection(),
+                newAttemptRunner(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
     }
 
@@ -236,15 +249,19 @@ class WebhookDeliveryServiceTest {
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
         when(webClientBuilder.build()).thenReturn(mockWebClient);
 
+        // A real concurrency control, so the permit accounting this test is about is real.
+        AttemptRunner runnerWithRealPermits = new AttemptRunner(
+                projectRateLimiterService, rateLimiterService, realConcurrencyControl,
+                circuitBreakerService, new ObjectMapper(), true, List.of());
+
         WebhookDeliveryService localService = new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, List.of(),
-                rateLimiterService, realConcurrencyControl, projectRateLimiterService,
-                circuitBreakerService, new SimpleMeterRegistry(), new ObjectMapper(),
+                true, new SimpleMeterRegistry(), new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
                 ConnectionProvider.newConnection(),
+                runnerWithRealPermits,
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
 
         UUID endpointId = UUID.randomUUID();
@@ -351,6 +368,19 @@ class WebhookDeliveryServiceTest {
         when(payloadTransformService.transform(anyString(), any())).thenReturn("{}");
     }
 
+
+    /**
+     * A real AttemptRunner over the same mocks the service used to hold directly. The lifecycle
+     * these tests describe now lives in the Runner, so exercising it through the service means
+     * wiring a real one rather than a mock — which is also what keeps these tests honest about
+     * the seam: they assert observable outcomes, not who called whom.
+     */
+    private AttemptRunner newAttemptRunner() {
+        return new AttemptRunner(
+                projectRateLimiterService, rateLimiterService, concurrencyControlService,
+                circuitBreakerService, new ObjectMapper(), true, List.of());
+    }
+
     private WebhookDeliveryService serviceWithMockWebClient(WebClient mockWebClient, MeterRegistry meterRegistry) {
         when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
         when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
@@ -358,12 +388,11 @@ class WebhookDeliveryServiceTest {
         return new WebhookDeliveryService(
                 deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
                 webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, List.of(),
-                rateLimiterService, concurrencyControlService, projectRateLimiterService,
-                circuitBreakerService, meterRegistry, new ObjectMapper(),
+                true, meterRegistry, new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
                 ConnectionProvider.newConnection(),
+                newAttemptRunner(),
                 ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
     }
 
@@ -938,7 +967,7 @@ class WebhookDeliveryServiceTest {
     }
 
     @Test
-    void attemptDelivery_ssrfBlockedUrl_marksFailed_releasesPermit_noHttpCall() {
+    void attemptDelivery_ssrfBlockedUrl_marksFailed_takesNoPermit_noHttpCall() {
         WebClient mockWebClient = mock(WebClient.class);
         MeterRegistry meterRegistry = new SimpleMeterRegistry();
         WebhookDeliveryService localService = serviceWithMockWebClient(mockWebClient, meterRegistry);
@@ -967,9 +996,14 @@ class WebhookDeliveryServiceTest {
         localService.processDelivery(message, true);
 
         verifyNoInteractions(mockWebClient);
-        // The permit WAS acquired before the URL validation ran, so it must be released
-        // in the finally regardless of which exception path was taken.
-        verify(concurrencyControlService).release(endpointId);
+        // URL validation now runs BEFORE admission, so a Delivery the platform is not allowed
+        // to send never spends a concurrency permit or a rate-limit token on being rejected.
+        // Previously the permit was taken first and released in the finally; the permit
+        // accounting for the paths that DO take one — a decryption failure on a rotated key, a
+        // bad client certificate — is covered by
+        // attemptDelivery_decryptSecretThrows_releasesPermitEveryTime_soEndpointNeverBlocks.
+        verify(concurrencyControlService, never()).tryAcquire(endpointId);
+        verify(concurrencyControlService, never()).release(endpointId);
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
@@ -1131,5 +1165,150 @@ class WebhookDeliveryServiceTest {
         } finally {
             httpServer.stop(0);
         }
+    }
+
+    /**
+     * The api compresses payloads above WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES (1 KB by
+     * default) and reads them back through getDecompressedPayload(). The worker Event entity
+     * did not map payload_compressed at all, so it read the stored column directly and sent --
+     * and signed -- the gzip+Base64 blob as the webhook body for every event at or above the
+     * threshold.
+     */
+    @Test
+    void processDelivery_compressedEventPayload_isDecompressedBeforeTransformAndSend() throws Exception {
+        UUID deliveryId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID endpointId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+
+        String realJson = "{\"order\":\"" + "x".repeat(2000) + "\"}";
+        PayloadCompressionUtil.CompressionResult compressed = PayloadCompressionUtil.compress(realJson, 1024);
+        assertTrue(compressed.compressed(),
+                "fixture must actually be compressed, otherwise the test proves nothing");
+
+        Event event = Event.builder()
+                .id(eventId).projectId(projectId).eventType("order.created")
+                .payload(compressed.payload())
+                .payloadCompressed(true)
+                .createdAt(Instant.now())
+                .build();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, projectId);
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
+                .updatedAt(Instant.now())
+                .build();
+
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+        stubHappyPathPrerequisites(endpoint);
+
+        service.processDelivery(DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(payloadTransformService).transform(payloadCaptor.capture(), any());
+        assertEquals(realJson, payloadCaptor.getValue(),
+                "the transform (and therefore the body and the signature) must see real JSON");
+    }
+
+    /**
+     * deleteEndpoint is a soft delete: it stamps deleted_at and leaves `enabled` alone, and
+     * every api-side query filters on deleted_at IS NULL. The worker entity did not map the
+     * column, so already-queued deliveries kept being sent to a deleted endpoint for as long
+     * as the retry ladder ran -- up to the 24h rung.
+     */
+    @Test
+    void processDelivery_softDeletedEndpoint_failsWithoutSending() throws Exception {
+        UUID deliveryId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID endpointId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+
+        Endpoint deleted = verifiedEndpoint(endpointId, projectId);
+        deleted.setDeletedAt(Instant.now());
+
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
+                .updatedAt(Instant.now())
+                .build();
+
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(deleted));
+        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.processDelivery(DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+
+        verify(eventRepository, never()).findById(any());
+        verifyNoInteractions(payloadTransformService);
+        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository, atLeastOnce()).save(captor.capture());
+        assertTrue(captor.getAllValues().stream()
+                        .anyMatch(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED),
+                "a soft-deleted endpoint must terminally fail the delivery");
+    }
+
+    // --- an unusable retry ladder is a terminal configuration failure, not a retry ---
+
+    @Test
+    void processDelivery_malformedRetryLadder_failsTerminallyWithoutSending() {
+        // Retrying cannot fix a ladder that does not parse, and letting RetryLadder throw
+        // from inside scheduleRetry would leave the row PROCESSING for StuckDeliveryRecovery
+        // to hand back, failing the same way forever. It must terminate on the first pass.
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
+
+        Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
+        delivery.setRetryDelays("60,oops,900");
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        service.processDelivery(message, true);
+
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(saved.capture());
+        assertEquals(Delivery.DeliveryStatus.FAILED, saved.getValue().getStatus(),
+                "an unusable ladder must terminate the delivery, not schedule another attempt");
+
+        // Nothing was sent, and no permit was ever taken: the check runs before admission.
+        verify(concurrencyControlService, never()).tryAcquire(endpointId);
+        verify(deliveryRepository, never()).incrementAttemptCount(any());
+    }
+
+    @Test
+    void processDelivery_validRetryLadder_proceedsPastTheLadderCheck() {
+        // Companion to the above: the guard must not reject the ladders the platform ships.
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
+        when(projectRateLimiterService.tryAcquire(any())).thenReturn(false); // stop right after the check
+
+        Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
+        delivery.setRetryDelays(RetryLadderDefaults.OUTGOING_DELAYS);
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        service.processDelivery(message, true);
+
+        verify(projectRateLimiterService).tryAcquire(endpoint.getProjectId());
     }
 }

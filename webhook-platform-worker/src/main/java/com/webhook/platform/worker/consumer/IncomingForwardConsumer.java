@@ -26,6 +26,7 @@ public class IncomingForwardConsumer {
 
     private final IncomingForwardService forwardService;
     private final BoundedAsyncExecutor asyncExecutor;
+    private final BackpressureDispatch backpressureDispatch;
     private final KafkaListenerEndpointRegistry registry;
 
     public IncomingForwardConsumer(IncomingForwardService forwardService,
@@ -33,6 +34,7 @@ public class IncomingForwardConsumer {
                                    KafkaListenerEndpointRegistry registry) {
         this.forwardService = forwardService;
         this.asyncExecutor = asyncExecutor;
+        this.backpressureDispatch = new BackpressureDispatch(asyncExecutor);
         this.registry = registry;
     }
 
@@ -60,12 +62,11 @@ public class IncomingForwardConsumer {
                 message.getIncomingEventId(), message.getDestinationId(),
                 record.topic(), message.isReplay());
 
-        if (!asyncExecutor.trySubmit(
+        backpressureDispatch.dispatch(
                 () -> forwardService.processForward(message),
                 ack,
-                message.getIncomingEventId().toString())) {
-            log.debug("Incoming executor full, not acking eventId={}", message.getIncomingEventId());
-        }
+                "forward eventId=" + message.getIncomingEventId(),
+                () -> forwardService.rescheduleForBackpressure(message));
     }
 
     private String extractCorrelationId(ConsumerRecord<String, IncomingForwardMessage> record) {

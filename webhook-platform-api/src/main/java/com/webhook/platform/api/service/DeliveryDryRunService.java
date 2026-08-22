@@ -15,10 +15,9 @@ import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.DeliveryDryRunRequest;
 import com.webhook.platform.api.dto.DeliveryDryRunResponse;
-import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -32,8 +31,7 @@ public class DeliveryDryRunService {
     private final TransformationRepository transformationRepository;
     private final EndpointRepository endpointRepository;
     private final ObjectMapper objectMapper;
-    private final String encryptionKey;
-    private final String encryptionSalt;
+    private final EncryptionKeyRegistry encryptionKeyRegistry;
 
     private static final Pattern JSONPATH_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
@@ -47,13 +45,11 @@ public class DeliveryDryRunService {
             TransformationRepository transformationRepository,
             EndpointRepository endpointRepository,
             ObjectMapper objectMapper,
-            @Value("${webhook.encryption-key:development_master_key_32_chars}") String encryptionKey,
-            @Value("${webhook.encryption-salt}") String encryptionSalt) {
+            EncryptionKeyRegistry encryptionKeyRegistry) {
         this.transformationRepository = transformationRepository;
         this.endpointRepository = endpointRepository;
         this.objectMapper = objectMapper;
-        this.encryptionKey = encryptionKey;
-        this.encryptionSalt = encryptionSalt;
+        this.encryptionKeyRegistry = encryptionKeyRegistry;
     }
 
     public DeliveryDryRunResponse dryRun(DeliveryDryRunRequest request, UUID organizationId) {
@@ -136,11 +132,15 @@ public class DeliveryDryRunService {
                 Endpoint endpoint = endpointOpt.get();
                 endpointUrl = endpoint.getUrl();
                 try {
-                    String secret = CryptoUtils.decryptSecret(
+                    // Go through the registry, not CryptoUtils directly: the dry-run must
+                    // resolve the endpoint's own key version and fall back across a rotation
+                    // exactly as real delivery does. Reading a single raw key here made the
+                    // dry-run report "Failed to compute signature" for any endpoint still
+                    // encrypted under a previous version while delivery kept working.
+                    String secret = encryptionKeyRegistry.decryptWithFallback(
                             endpoint.getSecretEncrypted(),
                             endpoint.getSecretIv(),
-                            encryptionKey,
-                            encryptionSalt);
+                            endpoint.getEncryptionKeyVersion());
                     String body = transformedPayload != null ? transformedPayload : request.getPayload();
                     signature = WebhookSignatureUtils.buildSignatureHeader(secret, timestamp, body);
                     requestHeaders.put("X-Signature", signature);

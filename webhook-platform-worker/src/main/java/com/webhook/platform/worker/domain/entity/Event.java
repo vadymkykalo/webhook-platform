@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.entity;
 
+import com.webhook.platform.common.util.PayloadCompressionUtil;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -33,6 +34,27 @@ public class Event {
     @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;
 
+    /**
+     * Whether {@link #payload} holds a gzip+Base64 blob rather than the JSON itself.
+     *
+     * <p>The api compresses on ingest above {@code WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES}
+     * (1 KB by default) and reads back through {@code getDecompressedPayload()}. This column
+     * was not mapped here, so the worker read the stored column directly and delivered — and
+     * signed — the Base64 blob as the webhook body for every event at or above the threshold.
+     */
+    @Builder.Default
+    @Column(name = "payload_compressed", nullable = false)
+    private boolean payloadCompressed = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /**
+     * The payload as callers expect it: decompressed when stored compressed.
+     * Always use this rather than {@link #getPayload()} when building a request body,
+     * computing a signature, or applying a transform.
+     */
+    public String getDecompressedPayload() {
+        return PayloadCompressionUtil.decompress(payload, payloadCompressed);
+    }
 }

@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.PiiMaskingRuleRequest;
 import com.webhook.platform.api.dto.PiiMaskingRuleResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.PiiMaskingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,7 +43,8 @@ public class PiiMaskingController {
     @Operation(operationId = "createPiiRule", summary = "Create PII masking rule", description = "Creates a new masking rule for the project")
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<PiiMaskingRuleResponse> createRule(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody PiiMaskingRuleRequest request,
@@ -54,7 +57,8 @@ public class PiiMaskingController {
 
     @Operation(operationId = "updatePiiRule", summary = "Update PII masking rule", description = "Updates an existing masking rule")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/{ruleId}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{ruleId}")
     public ResponseEntity<PiiMaskingRuleResponse> updateRule(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("ruleId") UUID ruleId,
@@ -68,7 +72,8 @@ public class PiiMaskingController {
     @Operation(operationId = "deletePiiRule", summary = "Delete PII masking rule", description = "Deletes a masking rule")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{ruleId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{ruleId}")
     public ResponseEntity<Void> deleteRule(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("ruleId") UUID ruleId,
@@ -82,7 +87,8 @@ public class PiiMaskingController {
     @Operation(summary = "Seed default rules", description = "Creates default built-in PII masking rules (email, phone, card)")
     @ApiResponse(responseCode = "200", description = "Default rules seeded")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/seed-defaults")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/seed-defaults")
     public ResponseEntity<List<PiiMaskingRuleResponse>> seedDefaults(
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {

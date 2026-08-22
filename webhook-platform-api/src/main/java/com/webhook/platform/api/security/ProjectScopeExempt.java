@@ -26,10 +26,10 @@ import java.lang.annotation.Target;
  * deliberate, reviewable decision in a diff and in a `grep`, never a silent
  * omission.
  *
- * <p>As of this task, no production controller needs this exemption — every
+ * <p>No production controller needs this exemption today — every
  * {@code {projectId}} route is a genuine per-project resource. The mechanism
  * exists so a future, real exception has a sanctioned way to opt out instead
- * of reviving the ad-hoc-coverage problem this task fixes.
+ * of reviving the ad-hoc-coverage problem this mechanism replaced.
  */
 @Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)

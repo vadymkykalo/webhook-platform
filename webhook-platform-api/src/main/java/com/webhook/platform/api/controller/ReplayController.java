@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.ReplayEstimateResponse;
 import com.webhook.platform.api.dto.ReplayRequest;
 import com.webhook.platform.api.dto.ReplaySessionResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.ReplayService;
 import com.webhook.platform.api.service.billing.RequireFeature;
@@ -55,7 +57,8 @@ public class ReplayController {
     @ApiResponse(responseCode = "201", description = "Replay session created and processing started")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("replay")
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<ReplaySessionResponse> create(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody ReplayRequest request,
@@ -92,7 +95,8 @@ public class ReplayController {
 
     @Operation(summary = "Cancel replay session", description = "Requests cancellation of a running replay session")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{sessionId}/cancel")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{sessionId}/cancel")
     public ResponseEntity<ReplaySessionResponse> cancel(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("sessionId") UUID sessionId,

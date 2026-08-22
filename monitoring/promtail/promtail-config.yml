@@ -25,7 +25,7 @@ scrape_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 15s
     relabel_configs:
-      # Only ship logs for the two services this task's correlation-ID tracing cares
+      # Only ship logs for the two services correlation-ID tracing cares
       # about — api and worker. (Postgres/Kafka/Redis/etc. logs aren't structured with
       # the correlationId/organizationId MDC fields and would just add noise+cardinality
       # for no query value; add more values to the regex here if that changes.)

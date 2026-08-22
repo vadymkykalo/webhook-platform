@@ -1,5 +1,8 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.constants.KafkaTopics;
+import org.springframework.kafka.core.KafkaTemplate;
+import com.webhook.platform.worker.attempt.AttemptRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
@@ -35,6 +38,15 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+/**
+ * Covers the Incoming {@link com.webhook.platform.worker.attempt.IncomingAttemptStore} through
+ * the service that drives it: the three claim paths and their {@code started_at} fence, the
+ * per-attempt row model, successor insertion, and the transformation resolution.
+ *
+ * <p>As with the Outgoing suite, the attempt policy itself lives in
+ * {@link com.webhook.platform.worker.attempt.AttemptRunner} and is pinned by
+ * {@code AttemptRunnerTest}. What is here is adapter coverage and has nowhere else to live.
+ */
 
 /**
  * Tests for the claim-based idempotency logic in IncomingForwardService.
@@ -73,6 +85,14 @@ class IncomingForwardServiceTest {
     private CircuitBreakerService circuitBreakerService;
     @Mock
     private ProjectRateLimiterService projectRateLimiterService;
+
+    @Mock
+    private KafkaTemplate<String, IncomingForwardMessage> kafkaTemplate;
+
+    // Incoming Destinations carry no per-target rate limit, so the Runner never consults
+    // this one for this direction. Present only to satisfy its constructor.
+    @Mock
+    private RedisRateLimiterService redisRateLimiterService;
 
     private IncomingForwardService service;
 
@@ -116,8 +136,19 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true), kafkaTemplate);
+    }
+
+
+    /**
+     * A real AttemptRunner over the same mocks the service used to hold directly. The attempt
+     * lifecycle these tests describe now lives in the Runner, so exercising it through the
+     * service means wiring a real one rather than a mock.
+     */
+    private AttemptRunner newAttemptRunner(boolean allowPrivateIps) {
+        return new AttemptRunner(
+                projectRateLimiterService, redisRateLimiterService, concurrencyControlService,
+                circuitBreakerService, new ObjectMapper(), allowPrivateIps, List.of());
     }
 
     private IncomingEvent buildEvent() {
@@ -283,8 +314,7 @@ class IncomingForwardServiceTest {
                 false, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(false), kafkaTemplate);
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -370,8 +400,7 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true), kafkaTemplate);
 
         // Retry dispatch: scheduler already claimed the row, no re-claim needed.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -433,8 +462,7 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true), kafkaTemplate);
 
         // attemptCount == maxAttempts -- this is the last attempt.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -481,8 +509,7 @@ class IncomingForwardServiceTest {
                 true, List.of(),
                 meterRegistry, transactionTemplate,
                 ConnectionProvider.newConnection(),
-                concurrencyControlService, circuitBreakerService, projectRateLimiterService
-        );
+                newAttemptRunner(true), kafkaTemplate);
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -500,5 +527,200 @@ class IncomingForwardServiceTest {
                 .filter(a -> a.getStatus() == ForwardAttemptStatus.FAILED)
                 .findFirst().orElseThrow();
         assertThat(failedUpdate.getErrorMessage()).contains("TRANSFORM_FAILED");
+    }
+
+    /**
+     * The finalizers must refuse a row that is no longer PROCESSING. Before the guard, a
+     * late writer -- a timed-out call whose 2xx had already landed, or a duplicate Kafka
+     * redelivery -- overwrote the terminal row AND created a PENDING successor, forwarding
+     * the same event twice.
+     */
+    @Test
+    void updateAttempt_rowAlreadyTerminal_doesNotOverwriteAndDoesNotScheduleSuccessor() {
+        IncomingForwardAttempt alreadySucceeded = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID())
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1)
+                .status(ForwardAttemptStatus.SUCCESS)
+                .build();
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(alreadySucceeded));
+        when(transformationCacheService.findById(any())).thenReturn(Optional.empty());
+        when(payloadTransformService.transform(anyString(), any()))
+                .thenThrow(new PayloadTransformException("boom"));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        service.processForward(message);
+
+        // Neither the overwrite nor the duplicate successor row.
+        verify(attemptRepository, never()).save(any(IncomingForwardAttempt.class));
+        assertThat(alreadySucceeded.getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
+    }
+
+    /**
+     * Backpressure hand-back. next_retry_at must be stamped even for a first-dispatch row
+     * that was still PENDING: the scheduler's claim query ignores rows where it is null, so
+     * acking without stamping would strand the forward entirely.
+     */
+    @Test
+    void rescheduleForBackpressure_stampsNextRetryAtAndClearsFencingToken() {
+        IncomingForwardAttempt inFlight = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID())
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1)
+                .status(ForwardAttemptStatus.PROCESSING)
+                .startedAt(Instant.now())
+                .build();
+
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(inFlight));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(1).replay(false)
+                .build();
+
+        service.rescheduleForBackpressure(message);
+
+        ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository).save(captor.capture());
+        IncomingForwardAttempt saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
+        assertThat(saved.getNextRetryAt()).isNotNull();
+        assertThat(saved.getStartedAt()).isNull();
+    }
+
+    @Test
+    void rescheduleForBackpressure_rowAlreadyTerminal_isLeftAlone() {
+        IncomingForwardAttempt done = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID())
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1)
+                .status(ForwardAttemptStatus.SUCCESS)
+                .build();
+
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(done));
+
+        service.rescheduleForBackpressure(IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(1).replay(false)
+                .build());
+
+        verify(attemptRepository, never()).save(any(IncomingForwardAttempt.class));
+    }
+
+    // -- an unusable retry ladder is a terminal configuration failure, not a retry --
+
+    @Test
+    void malformedRetryLadder_failsTerminallyWithoutForwarding() {
+        // Mirrors WebhookDeliveryServiceTest: retrying cannot fix a ladder that does not
+        // parse, and letting RetryLadder throw from calculateNextRetry after the HTTP call
+        // would leave the row PROCESSING for StuckForwardRecovery to hand back, forever.
+        IncomingDestination destination = buildDestination();
+        destination.setRetryDelays("60,oops,900");
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+
+        IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
+                eventId, destinationId)).thenReturn(List.of(claimed));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        service.processForward(message);
+
+        ArgumentCaptor<IncomingForwardAttempt> saved = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository).save(saved.capture());
+        assertThat(saved.getValue().getStatus())
+                .as("an unusable ladder must terminate the forward")
+                .isEqualTo(ForwardAttemptStatus.FAILED);
+        assertThat(saved.getValue().getErrorMessage())
+                .as("the attempt row must say why")
+                .contains("INVALID_RETRY_LADDER");
+
+        // Checked after the claim but before admission: no permit taken, nothing sent.
+        verify(concurrencyControlService, never()).tryAcquire(destinationId);
+    }
+
+    // -- a Forward whose ladder is exhausted announces itself --
+
+    @Test
+    void ladderExhausted_publishesDlqNotification() {
+        // Before this, a DLQ'd Forward wrote its row status and nothing else: incoming.forward.dlq
+        // existed and was created by the Makefile, but nothing ever produced a business
+        // notification to it. See ADR-0011.
+        IncomingDestination destination = buildDestination();
+        destination.setMaxAttempts(1); // exhausted by the first failure
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+
+        IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
+                eventId, destinationId)).thenReturn(List.of(claimed));
+        // Nothing is listening on the destination URL, so the attempt errors and, with
+        // maxAttempts=1, is abandoned rather than retried.
+        destination.setUrl("http://127.0.0.1:1/hook");
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        service.processForward(message);
+
+        assertThat(claimed.getStatus()).isEqualTo(ForwardAttemptStatus.DLQ);
+
+        ArgumentCaptor<IncomingForwardMessage> published = ArgumentCaptor.forClass(IncomingForwardMessage.class);
+        verify(kafkaTemplate).send(eq(KafkaTopics.INCOMING_FORWARD_DLQ), eq(destinationId.toString()),
+                published.capture());
+        assertThat(published.getValue().getIncomingEventId()).isEqualTo(eventId);
+        assertThat(published.getValue().getIncomingSourceId()).isEqualTo(sourceId);
+    }
+
+    @Test
+    void ladderNotExhausted_publishesNothing() {
+        IncomingDestination destination = buildDestination();
+        destination.setMaxAttempts(5);
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+        destination.setUrl("http://127.0.0.1:1/hook");
+
+        IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
+                eventId, destinationId)).thenReturn(List.of(claimed));
+
+        service.processForward(IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false).build());
+
+        verify(kafkaTemplate, never()).send(any(String.class), any(String.class),
+                any(IncomingForwardMessage.class));
     }
 }

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,7 +57,7 @@ public class IncomingDestination {
 
     @Column(name = "retry_delays", nullable = false, columnDefinition = "TEXT")
     @Builder.Default
-    private String retryDelays = "60,300,900,3600,21600";
+    private String retryDelays = RetryLadderDefaults.INCOMING_DELAYS;
 
     @Column(name = "encryption_key_version", nullable = false)
     @Builder.Default

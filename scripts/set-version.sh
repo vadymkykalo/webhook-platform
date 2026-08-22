@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # This replaces the old release process step ("2. Update version numbers",
 # CONTRIBUTING.md), which meant hand-editing six files and was the direct
-# cause of the drift P1-16 found: root pom.xml stuck at 1.0.0-SNAPSHOT while
+# cause of the drift that followed: root pom.xml stuck at 1.0.0-SNAPSHOT while
 # eight releases were tagged and Chart.yaml/ui/package.json never moved.
 #
 # Usage:

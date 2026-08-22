@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.EndpointRequest;
 import com.webhook.platform.api.dto.EndpointResponse;
 import com.webhook.platform.api.dto.EndpointTestResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.EndpointService;
 import com.webhook.platform.api.service.billing.QuotaType;
@@ -46,7 +48,8 @@ public class EndpointController {
     @ApiResponse(responseCode = "201", description = "Endpoint created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireQuota(QuotaType.ENDPOINTS_PER_PROJECT)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<EndpointResponse> createEndpoint(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody EndpointRequest request,
@@ -84,7 +87,8 @@ public class EndpointController {
 
     @Operation(summary = "Update endpoint", description = "Updates endpoint configuration")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{id}")
     public ResponseEntity<EndpointResponse> updateEndpoint(
             @PathVariable("id") UUID id,
             @Valid @RequestBody EndpointRequest request,
@@ -97,7 +101,8 @@ public class EndpointController {
     @Operation(summary = "Delete endpoint", description = "Deletes an endpoint")
     @ApiResponse(responseCode = "204", description = "Endpoint deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEndpoint(
             @PathVariable("id") UUID id,
             AuthContext auth) {
@@ -108,7 +113,8 @@ public class EndpointController {
 
     @Operation(summary = "Rotate secret", description = "Generates a new webhook signing secret")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{id}/rotate-secret")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/rotate-secret")
     public ResponseEntity<EndpointResponse> rotateSecret(
             @PathVariable("id") UUID id,
             AuthContext auth) {
@@ -118,11 +124,20 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
+    // Fires a real outbound request from the platform, signed with the endpoint's own
+    // secret — the same capability rotate-secret above is guarded for. Tenancy was already
+    // safe (endpointService.testEndpoint validates project ownership), but scope and role
+    // were not checked at all, so a Viewer or a READ_ONLY key could drive it.
     @Operation(summary = "Test endpoint", description = "Sends a test webhook to verify endpoint connectivity")
-    @PostMapping("/{id}/test")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/test")
     public ResponseEntity<EndpointTestResponse> testEndpoint(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         EndpointTestResponse response = endpointService.testEndpoint(id, auth.organizationId());
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
@@ -131,7 +146,8 @@ public class EndpointController {
     @Operation(summary = "Configure mTLS", description = "Configures mutual TLS for the endpoint")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("mTLS")
-    @PostMapping("/{id}/mtls")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/mtls")
     public ResponseEntity<EndpointResponse> configureMtls(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -147,7 +163,8 @@ public class EndpointController {
     @Operation(summary = "Disable mTLS", description = "Disables mutual TLS for the endpoint")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("mTLS")
-    @DeleteMapping("/{id}/mtls")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}/mtls")
     public ResponseEntity<EndpointResponse> disableMtls(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -161,11 +178,14 @@ public class EndpointController {
 
     @Operation(summary = "Verify endpoint", description = "Sends a verification challenge to the endpoint")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{id}/verify")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/verify")
     public ResponseEntity<VerificationResponse> verifyEndpoint(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
+        // Mutates verification_status, exactly like skip-verification below.
+        auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         var result = verificationService.verify(id);
         log.info("Verification attempt for endpoint {}: success={}", id, result.success());
@@ -179,7 +199,8 @@ public class EndpointController {
 
     @Operation(summary = "Skip verification", description = "Skips verification for trusted endpoints (admin only)")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{id}/skip-verification")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/skip-verification")
     public ResponseEntity<EndpointResponse> skipVerification(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,

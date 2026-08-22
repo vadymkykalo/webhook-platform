@@ -80,7 +80,7 @@ up-prod-external: init ## Start services (external DB, production mode)
 	@echo "$(GREEN)Production services started$(NC)"
 	@$(MAKE) health
 
-# P1-15: pulls this project's own published images (ghcr.io/vadymkykalo/hookflow-*)
+# Pulls this project's own published images (ghcr.io/vadymkykalo/hookflow-*)
 # instead of building from source — no Maven/npm toolchain required. Uses
 # docker-compose.pull.yml, which is fully standalone (unlike docker-compose.prod.yml,
 # it doesn't need docker-compose.yml present) — see the comment at the top of
@@ -220,7 +220,7 @@ scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 
 # api normally binds a single fixed host port (127.0.0.1:${API_PORT}:8080) so a
 # human can curl it directly — Compose refuses to scale a service past 1 replica
-# while that fixed host port is bound (P1-20). Passing API_PORT= (empty, not
+# while that fixed host port is bound. Passing API_PORT= (empty, not
 # unset) collapses that mapping to an auto-assigned ephemeral port per replica
 # instead — see the API_PORT comment in docker-compose.yml for why this is an
 # env var trick rather than a `-f docker-compose.scale.yml` overlay (Compose
@@ -327,7 +327,7 @@ shell-db: ## Open psql shell in embedded database
 	fi
 	@docker exec -it webhook-postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-# backup-db / restore-db delegate to deploy/scripts/db-{backup,restore}.sh (P1-20),
+# backup-db / restore-db delegate to deploy/scripts/db-{backup,restore}.sh,
 # the same script the Compose `db-backup` sidecar runs on a schedule. That script
 # supports DB_MODE=embedded (docker exec against webhook-postgres, the default)
 # and DB_MODE=external (pg_dump/pg_restore against DB_HOST via a throwaway

@@ -14,7 +14,7 @@
        entire dependency's CVEs with a blanket regex unless the finding
        explains why that's necessary.
 
-  Empty today: as of this task (P1-17), the CI runner could not complete a
+  Empty today: the CI runner cannot complete a
   full NVD data sync locally without an NVD API key (NVD rate-limits/blocks
   unauthenticated and datacenter-IP requests — see the comment on the
   "Run OWASP Dependency-Check" step in .github/workflows/ci.yml), so no

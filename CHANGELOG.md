@@ -7,6 +7,170 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A handler now says who may call it.** `@RequireAccess(AccessLevel)` declares the level a
+  state-changing handler requires and `ScopeEnforcementInterceptor` enforces it before the
+  handler runs, for JWT and API-key callers alike. 79 handlers carry it (72 `WRITE`,
+  7 `OWNER`), derived from the imperative `auth.requireWriteAccess()` /
+  `requireOwnerAccess()` calls they already made — which stay, as defence in depth.
+
+  The level is `READ | WRITE | OWNER` rather than a minimum `MembershipRole`, because the
+  roles are not a line: `OWNER`, `DEVELOPER` and `VIEWER` order naturally but `API_KEY` sits
+  outside that order entirely, and a minimum-role annotation would have had to invent a
+  position for it.
+
+  Three handlers once shipped reachable by a `VIEWER` JWT and a `READ_ONLY` API key — one
+  returned a real HMAC signature computed with an Endpoint's signing secret — because the
+  guard was a call somebody had not written and nothing said it was missing.
+  `MutatingHandlerAccessDeclarationTest` now fails the build on a new handler that declares
+  nothing, and `AccessLevelEnforcementTest` drives the interceptor directly so a ratchet over
+  annotations cannot pass while the thing reading them is unregistered or reordered. See
+  ADR-0006.
+
+### Removed
+- The worker's `IncomingSource` entity and `IncomingSourceRepository`. Neither was injected
+  anywhere in the worker — the Forward path resolves a Destination directly and never loads
+  a Source — and keeping them meant keeping a half-mapped secret: the worker mapped the
+  Source's encrypted HMAC secret without the key version it was encrypted under, so the
+  first worker-side `decryptWithFallback` for a Source would have used the wrong one.
+  `incoming_sources` is no longer a shared table.
+
+### Changed
+- The api coverage floors were re-measured and raised. BUNDLE 0.30 → **0.37** against a
+  measured 40.2% (was 33.1%), and `SequenceGeneratorService` joins `OutboxPublisherService`
+  in the CLASS rule at **0.70** — it was deliberately left out at 6.8% with a note to add it
+  "once the class is actually tested", and it now measures 77.8%.
+
+### Added
+- **Forwards can now be given up on.** `StaleForwardEscalationService` escalates an Incoming
+  Forward outstanding past `FORWARD_ESCALATION_HARD_CAP_HOURS` (default 24h) to DLQ,
+  mirroring what `StaleDeliveryEscalationService` does for Outgoing. Until now the Incoming
+  direction had only a stuck-PROCESSING reset and never wrote a terminal state for a Forward
+  whose Destination simply stayed unreachable. The age is measured from when the webhook
+  arrived, not from the newest attempt row — Incoming inserts a row per Attempt, so that row
+  is freshly stamped even for a Forward that has been retrying since yesterday.
+- A Forward that exhausts its Retry Ladder, or is escalated, now publishes a DLQ notification
+  to `incoming.forward.dlq`. That topic existed and was created by the Makefile, but nothing
+  ever produced a business notification to it.
+
+### Fixed
+- **`docker-compose.yml` and `docker-compose.pull.yml` defaulted
+  `DELIVERY_ESCALATION_HARD_CAP_HOURS` to 48, which prevents the worker from starting.** The
+  outgoing retry ladder's worst case with full jitter is 83h and `RetrySchedulerService`
+  refuses to boot when it does not fit inside the cap, so any deployment that did not
+  override the variable failed at startup. The 48 predated the ladder gaining its 24h tier.
+  Both files now default to 96, matching `.env.dist` and `application.yml`. **If your own
+  `.env` still sets 48, change it to 96 — it is not managed by this repository.**
+- **A rolled-back ingest no longer consumes quota.** The Redis quota counter was
+  incremented inside the ingest transaction, and it is not transactional, so an ingest
+  that saved its Event and then aborted — a fanout limit, a downstream failure — kept
+  whatever it had added. The customer was charged for an event that does not exist. The
+  charge now happens after the commit, the way sequence numbers already did, and a Redis
+  outage can no longer fail an ingest the caller has already been told was accepted.
+
+### Changed
+- `SsrfProtectionCustomizer` lives once, in `webhook-platform-common`, next to the
+  `UrlValidator` it validates against. It had been byte-identical in the api and the worker
+  apart from its package line, so an SSRF fix had to be applied in two places and nothing
+  said so. Reactor Netty is a `provided` dependency of common on purpose: the api and worker
+  already have it through webflux, and the CLI depends on common too and ships as a
+  standalone binary with no netty in it — verified unchanged at 0 netty classes.
+- **Both delivery pipelines now run one shared attempt lifecycle.** The Incoming forward
+  pipeline had been created by copying the Outgoing one, and commit `2070d30` had to
+  hand-port four separate fixes from one to the other — landing in the HTTP send, the
+  finalisation, the retry scheduler and the Kafka consumer, because the duplication was of
+  the whole lifecycle rather than of one method. `AttemptRunner` now owns the order of
+  operations and the fences; each direction supplies an `AttemptStore` adapter for how it
+  records Attempts. `WebhookDeliveryService` went from 922 lines to 263 and
+  `IncomingForwardService` from 760 to 275. See
+  `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+- A Delivery whose URL the platform is not allowed to send to no longer spends a
+  concurrency permit and a rate-limit token on being rejected: URL validation moved ahead
+  of admission. The permit accounting for failures that happen after admission — a
+  decryption failure on a rotated key, a bad client certificate — is unchanged.
+- "Endpoint deleted / disabled / unverified" and "Event not found" are now written under
+  the delivery's fencing token, like every other finalisation, instead of before the row is
+  claimed. A Delivery parked behind an outstanding sequence also stops reading the Endpoint
+  and Event on every re-poll just to discover it is still blocked.
+- Both Kafka consumers share one collaborator for the executor-full decision. Getting it
+  wrong stalls a partition until a restart, and it had been wrong on the Incoming side for
+  as long as the Outgoing side had it right.
+
+### Added
+- **The Incoming direction is now alerted and its DLQ is now visible.** Two independent
+  blind spots, both of which meant an Incoming outage could run indefinitely without
+  anything paging anyone:
+  - `incoming_forward_attempts_total` appeared in no alert rule in any of the three
+    rule files, so a destination failing every Forward looked identical to one receiving
+    none. `IncomingForwardFailureRateHigh` mirrors the existing `DlqRateHigh` — same
+    expression shape, same 10% threshold, same 10m window — in
+    `deploy/prometheus/alerts.yml`, `monitoring/prometheus/alerts.yml` and the Helm
+    `prometheusrule.yaml`.
+  - A Forward that exhausted its Retry Ladder wrote `status = DLQ` on its
+    `incoming_forward_attempts` row and nothing else. `DlqMonitoringService` now counts
+    that backlog as `incoming_forward_dlq_depth` and watches the
+    `incoming.forward.dlq` topic as `incoming_forward_dlq_topic_retained_total`, the
+    counterparts of the existing `webhook_dlq_depth` and
+    `webhook_dlq_topic_retained_total`. The row count is the actionable one and has an
+    alert; the topic gauge is informational, as on the Outgoing side.
+- `RetryLadder` and `RetryLadderDefaults` (`webhook-platform-common`): one shared
+  implementation of the retry ladder — parsing, tier clamping, jitter, exhaustion,
+  and the worst-case fit against the escalation hard cap. The two directions'
+  defaults are now declared once, and stay deliberately different: outgoing gets
+  `60,300,900,3600,21600,86400` over 7 attempts, incoming `60,300,900,3600,21600`
+  over 5. See `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+- Retry ladders are validated when written. `POST`/`PUT` on a subscription or an
+  incoming destination now returns `400` for a malformed `retryDelays` or an out
+  of range `maxAttempts`, with a message naming the field and the offending tier.
+- `SchemaRetryLadderDefaultsTest` fails the build when a Flyway column default for
+  `retry_delays` or `max_attempts` drifts from the Java constant it mirrors. SQL
+  cannot reference a Java constant, so nothing else kept the two in agreement.
+
+### Changed
+- **A malformed retry ladder is no longer silently replaced.** Both pipelines used
+  to answer an unparseable `retry_delays` by logging a warning and substituting a
+  hardcoded array of their own — and the two arrays did not agree with each other,
+  so a typo bought the customer a retry policy that was neither theirs nor
+  documented anywhere. Malformed values are now rejected at write time, and a stored
+  ladder that still does not parse — only reachable by writing to the column outside
+  the api — fails its delivery or forward terminally with `INVALID_RETRY_LADDER`
+  before anything is sent, rather than being retried forever on a substituted ladder.
+- Both directions share one deferral backoff — the wait applied when an attempt is
+  turned away by a rate limit, a concurrency cap or an open circuit breaker rather
+  than made. The incoming pipeline had its own copy that shifted to `1<<6` instead
+  of `1<<10` and jittered 50%–150% instead of ±25%, so an incoming forward and an
+  outgoing delivery turned away by the same kind of limit backed off on visibly
+  different curves.
+- The startup check that a retry ladder fits inside
+  `DELIVERY_ESCALATION_HARD_CAP_HOURS` now covers **both** directions and validates
+  the ladders actually handed out, rather than a config value that could drift from
+  them. The incoming ladder was never checked at all.
+- OpenAPI drift is now checked by `OpenApiDriftIntegrationTest` rather than by
+  booting the whole Compose stack with `SWAGGER_ENABLED=true` and diffing with a
+  Python script. The check runs in the existing backend integration job, and an
+  intentional API change is regenerated with
+  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
+  The `servers` block is now excluded from the comparison: springdoc derives it
+  from the request, so it describes where an instance is reachable, not the API.
+- Dropped task-tracker ids (`P0-…`/`P1-…`/`P2-…`) and links to the gitignored
+  `.claude/features/` directory from code comments and docs. The technical
+  rationale stays inline; only the dangling references are gone.
+
+### Removed
+- `RETRY_LADDER_DEFAULT_DELAYS_SECONDS` and `RETRY_LADDER_DEFAULT_MAX_ATTEMPTS`.
+  They read as though they set the default retry ladder. They never did — the real
+  defaults are the Flyway column defaults and the api services that create the
+  rows, and all these variables could change was what the startup cap check
+  compared against. Lowering one made the check pass while live rows still carried
+  the long ladder; raising one failed startup over a ladder nobody used. No action
+  is needed on upgrade; see `UPGRADING.md`.
+- `scripts/check-openapi-drift.py`, superseded by `OpenApiDriftIntegrationTest`.
+
+### Fixed
+- `deploy/prometheus/alerts.yml` declared `groups:` twice at the top level. Prometheus
+  rejects a duplicate mapping key, so the whole file failed to load — the
+  `hookflow.outbox` group and every rule after it included. The two are now one mapping.
+
 ## [2.3.0] - 2026-08-22
 
 ### Added
@@ -46,8 +210,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across restarts.
 - **Spring Boot upgraded 3.2.0 → 3.5.16** (the 3.2.x line went OSS-EOL in
   2024; 3.5.16 was the final OSS release of the 3.5.x line before it too
-  went EOL 2026-06-30 - see `docs`/the P1-19 task record for why this stops
-  short of the current Spring Boot 4.x line). Along with it: jjwt 0.12.3 →
+  went EOL 2026-06-30 - see the comment on `spring-boot.version` in the root
+  `pom.xml` for why this stops short of the current Spring Boot 4.x line). Along with it: jjwt 0.12.3 →
   0.13.0, redisson-spring-boot-starter 3.24.3 → 3.52.0, ShedLock 5.10.0 →
   5.16.0, springdoc-openapi 2.3.0 → 2.9.0, stripe-java 28.2.0 → 28.4.0,
   maven-surefire-plugin 2.22.2 → 3.5.6 (required - the old version silently

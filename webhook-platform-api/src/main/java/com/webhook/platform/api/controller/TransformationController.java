@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.TransformationRequest;
 import com.webhook.platform.api.dto.TransformationResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.TransformationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,7 +34,8 @@ public class TransformationController {
     @Operation(operationId = "createTransformation", summary = "Create transformation", description = "Creates a reusable payload transformation template")
     @ApiResponse(responseCode = "201", description = "Transformation created")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<TransformationResponse> create(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody TransformationRequest request,
@@ -64,7 +67,8 @@ public class TransformationController {
 
     @Operation(operationId = "updateTransformation", summary = "Update transformation", description = "Updates transformation (auto-increments version when template changes)")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{id}")
     public ResponseEntity<TransformationResponse> update(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -78,7 +82,8 @@ public class TransformationController {
     @Operation(operationId = "deleteTransformation", summary = "Delete transformation", description = "Removes a transformation (subscriptions/destinations referencing it will have transformation_id set to NULL)")
     @ApiResponse(responseCode = "204", description = "Transformation deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,

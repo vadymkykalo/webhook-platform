@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;

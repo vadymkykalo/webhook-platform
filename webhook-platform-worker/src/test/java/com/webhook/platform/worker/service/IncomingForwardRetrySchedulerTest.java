@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -123,13 +124,17 @@ class IncomingForwardRetrySchedulerTest {
                 com.webhook.platform.common.constants.KafkaTopics.INCOMING_FORWARD_RETRY),
                 anyString(), any(IncomingForwardMessage.class));
 
+        // Exactly ONE saveAll: the Phase 1 claim. A successfully dispatched row is owned by
+        // the consumer from that moment on, so Phase 3 must not write it back. Re-saving the
+        // Phase 1 snapshot overwrote whatever the consumer had already recorded -- silently,
+        // because IncomingForwardAttempt carries no @Version -- and reset started_at, the
+        // fencing token claimRetryForProcessing CASes on to reject duplicate redeliveries.
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<IncomingForwardAttempt>> captor = ArgumentCaptor.forClass(List.class);
-        verify(attemptRepository, times(2)).saveAll(captor.capture());
-        // Phase 1 claim marks PROCESSING; Phase 3 keeps it PROCESSING on success (consumer finalizes).
-        List<List<IncomingForwardAttempt>> allSaves = captor.getAllValues();
-        assertEquals(ForwardAttemptStatus.PROCESSING, allSaves.get(0).get(0).getStatus());
-        assertEquals(ForwardAttemptStatus.PROCESSING, allSaves.get(1).get(0).getStatus());
+        verify(attemptRepository, times(1)).saveAll(captor.capture());
+        List<IncomingForwardAttempt> claimSave = captor.getValue();
+        assertEquals(ForwardAttemptStatus.PROCESSING, claimSave.get(0).getStatus());
+        assertNotNull(claimSave.get(0).getStartedAt(), "Phase 1 must stamp the fencing token");
     }
 
     @Test

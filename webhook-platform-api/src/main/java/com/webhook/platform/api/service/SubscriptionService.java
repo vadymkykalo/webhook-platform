@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.retry.RetryLadder;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 
 import java.util.List;
 import java.util.UUID;
@@ -87,15 +89,26 @@ public class SubscriptionService {
             throw new ConflictException("Subscription for this endpoint and event type already exists");
         }
 
+        // Reject a malformed ladder here rather than letting the worker meet it. Before this
+        // check both pipelines answered an unparseable retry_delays by logging a warning and
+        // substituting a hardcoded array of their own, so a typo silently bought the customer
+        // a retry policy that was neither theirs nor documented.
+        RetryLadder.validate(
+                request.getRetryDelays() != null ? request.getRetryDelays() : RetryLadderDefaults.OUTGOING_DELAYS,
+                "retryDelays",
+                request.getMaxAttempts(), "maxAttempts");
+
         Subscription subscription = Subscription.builder()
                 .projectId(projectId)
                 .endpointId(request.getEndpointId())
                 .eventType(request.getEventType())
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
                 .orderingEnabled(request.getOrderingEnabled() != null ? request.getOrderingEnabled() : false)
-                .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts() : 7)
+                .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts()
+                        : RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
-                .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600,86400")
+                .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays()
+                        : RetryLadderDefaults.OUTGOING_DELAYS)
                 .payloadTemplate(request.getPayloadTemplate())
                 .customHeaders(request.getCustomHeaders())
                 .transformationId(request.getTransformationId())
@@ -141,12 +154,15 @@ public class SubscriptionService {
             subscription.setOrderingEnabled(request.getOrderingEnabled());
         }
         if (request.getMaxAttempts() != null) {
+            RetryLadder.validate(subscription.getRetryDelays(), "retryDelays",
+                    request.getMaxAttempts(), "maxAttempts");
             subscription.setMaxAttempts(request.getMaxAttempts());
         }
         if (request.getTimeoutSeconds() != null) {
             subscription.setTimeoutSeconds(request.getTimeoutSeconds());
         }
         if (request.getRetryDelays() != null) {
+            RetryLadder.validate(request.getRetryDelays(), "retryDelays");
             subscription.setRetryDelays(request.getRetryDelays());
         }
         if (request.getPayloadTemplate() != null) {

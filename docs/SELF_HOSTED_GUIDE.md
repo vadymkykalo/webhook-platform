@@ -219,7 +219,7 @@ make up-prod-external  # External managed services (provide connection strings i
 
 ### 4.2 Kubernetes + Helm (Medium / Large / Production)
 
-The chart is published as an OCI artifact to GHCR on every release (P1-15), so
+The chart is published as an OCI artifact to GHCR on every release, so
 `helm install` works against a clean cluster with **no repo clone**:
 
 ```bash
@@ -363,7 +363,7 @@ helm install hookflow ./hookflow -n hookflow -f values-mycompany.yaml
 | `WEBHOOK_ALLOW_PRIVATE_IPS` | `false` (prod) | Allow delivery to private IPs |
 | `WEBHOOK_ALLOWED_HOSTS` | (empty) | Comma-separated internal hosts allowlist |
 | `WEBHOOK_TRUSTED_PROXIES` | (empty — trust nothing) | Comma-separated trusted reverse-proxy IPs/CIDRs; gates `X-Forwarded-For` (see §2) |
-| `DB_POOL_MAX_SIZE` (API) / `WORKER_DB_POOL_MAX_SIZE` (Worker) | `20` (API), `40` (Worker) | HikariCP max connections. Distinct names on purpose (P1-26) — a single shared `DB_POOL_MAX_SIZE` in Docker Compose used to silently give the worker the API's smaller pool |
+| `DB_POOL_MAX_SIZE` (API) / `WORKER_DB_POOL_MAX_SIZE` (Worker) | `20` (API), `40` (Worker) | HikariCP max connections. Distinct names on purpose — a single shared `DB_POOL_MAX_SIZE` in Docker Compose used to silently give the worker the API's smaller pool |
 | `KAFKA_DELIVERY_CONCURRENCY` | `8` | Worker Kafka consumer threads |
 | `SWAGGER_ENABLED` | `false` (prod) | Enable Swagger UI |
 | `BILLING_ENABLED` | `false` | Enable billing/quotas (SaaS mode) |

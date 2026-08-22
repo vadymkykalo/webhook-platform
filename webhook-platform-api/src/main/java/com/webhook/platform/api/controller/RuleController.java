@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.RuleRequest;
 import com.webhook.platform.api.dto.RuleResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.RuleService;
 import com.webhook.platform.api.service.billing.RequireFeature;
@@ -35,7 +37,8 @@ public class RuleController {
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("rules")
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<RuleResponse> create(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody RuleRequest request,
@@ -68,7 +71,8 @@ public class RuleController {
     @Operation(operationId = "updateRule", summary = "Update rule", description = "Updates rule conditions, actions, and settings")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("rules")
-    @PutMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{id}")
     public ResponseEntity<RuleResponse> update(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -82,7 +86,8 @@ public class RuleController {
     @Operation(operationId = "deleteRule", summary = "Delete rule", description = "Removes a rule and all its actions")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -95,7 +100,8 @@ public class RuleController {
 
     @Operation(operationId = "toggleRule", summary = "Toggle rule enabled/disabled")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PatchMapping("/{id}/toggle")
+    @RequireAccess(AccessLevel.WRITE)
+@PatchMapping("/{id}/toggle")
     public ResponseEntity<RuleResponse> toggle(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,

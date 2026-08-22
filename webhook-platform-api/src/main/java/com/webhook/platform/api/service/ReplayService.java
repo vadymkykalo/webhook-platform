@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
@@ -368,7 +369,8 @@ public class ReplayService {
                             .sequenceNumber(sequenceNumber)
                             .orderingEnabled(orderingEnabled)
                             .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                            .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
+                            .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
+                                    : RetryLadderDefaults.OUTGOING_DELAYS)
                             .payloadTemplate(subscription.getPayloadTemplate())
                             .customHeaders(subscription.getCustomHeaders())
                             .transformationId(subscription.getTransformationId())

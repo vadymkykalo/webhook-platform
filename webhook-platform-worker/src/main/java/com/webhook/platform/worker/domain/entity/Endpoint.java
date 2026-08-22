@@ -65,6 +65,16 @@ public class Endpoint {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /**
+     * Soft-delete marker. {@code EndpointService.deleteEndpoint} only stamps this column —
+     * it does not clear {@code enabled} — and every api-side query filters on
+     * {@code deleted_at IS NULL}. Unmapped here, the worker could not see a deletion at all
+     * and kept delivering already-queued events to a deleted endpoint for as long as the
+     * retry ladder ran.
+     */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false, length = 32)

@@ -178,7 +178,9 @@ public class IncomingForwardRetryScheduler {
             }
 
             // ── Phase 3: Short transaction — update results ──
-            List<IncomingForwardAttempt> successful = new ArrayList<>();
+            // Only rows handed BACK to PENDING are written here; successfully dispatched
+            // rows are owned by the consumer from the moment the send completes.
+            int sentCount = 0;
             List<IncomingForwardAttempt> failed = new ArrayList<>();
 
             for (IncomingForwardAttempt attempt : claimed) {
@@ -202,8 +204,19 @@ public class IncomingForwardRetryScheduler {
                         continue;
                     }
                     future.get(); // throws if failed
-                    // Successfully sent — leave as PROCESSING (consumer will finalize)
-                    successful.add(attempt);
+                    // Status stays PROCESSING (set and committed in Phase 1) — the consumer
+                    // finalizes it once it picks up the retry message. Deliberately NOT
+                    // collected for saving: there is nothing to write, and writing it back is
+                    // actively harmful. The consumer often picks the message up within
+                    // milliseconds of the send, so by the time this sweep runs it may already
+                    // have advanced the row to a terminal state. Re-saving the Phase 1
+                    // snapshot then overwrites that result — and because
+                    // IncomingForwardAttempt carries no @Version there is no optimistic-lock
+                    // failure to notice it, so the loser is silently the consumer. It also
+                    // resets started_at, the fencing token claimRetryForProcessing depends on,
+                    // re-opening the duplicate-redelivery window that token exists to close.
+                    // Mirrors RetrySchedulerService Phase 3 on the outgoing side.
+                    sentCount++;
                     retryScheduledCounter.increment();
 
                     log.debug("Scheduled incoming forward retry: eventId={}, destId={}, attempt={}",
@@ -221,19 +234,16 @@ public class IncomingForwardRetryScheduler {
 
             // Persist results in a short transaction
             transactionTemplate.executeWithoutResult(tx -> {
-                if (!successful.isEmpty()) {
-                    attemptRepository.saveAll(successful);
-                }
                 if (!failed.isEmpty()) {
                     attemptRepository.saveAll(failed);
                 }
             });
 
             // ── Governor feedback ──
-            governor.recordResult(successful.size(), failed.size());
+            governor.recordResult(sentCount, failed.size());
 
             log.info("Incoming forward retry scheduling complete: {} dispatched, {} rescheduled (governor batch={})",
-                    successful.size(), failed.size(), effectiveBatch);
+                    sentCount, failed.size(), effectiveBatch);
 
         } catch (Exception e) {
             log.error("Error polling incoming forward retries: {}", e.getMessage(), e);

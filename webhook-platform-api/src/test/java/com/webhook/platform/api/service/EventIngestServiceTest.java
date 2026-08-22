@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
+import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Subscription;
 import com.webhook.platform.api.domain.repository.*;
@@ -303,5 +304,114 @@ class EventIngestServiceTest {
 
         verify(sequenceGeneratorService, never()).nextSequence(any());
         verify(deliveryRepository, never()).updateSequenceNumber(any(), anyLong());
+    }
+
+    // ── quota is charged only for an ingest that actually committed ────────────────
+    //
+    // The counter lives in Redis and is not rolled back with the transaction, so
+    // incrementing it inside the transaction meant every abort still consumed quota.
+
+    @Test
+    void ingestEvent_committed_chargesQuotaOnce() {
+        UUID organizationId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
+            Event e = inv.getArgument(0);
+            e.setId(eventId);
+            e.setCreatedAt(Instant.now());
+            return e;
+        });
+        stubTransactionTemplate();
+
+        service.ingestEvent(projectId, buildRequest("order.created"), null);
+
+        verify(quotaCounterService).increment(organizationId);
+    }
+
+    @Test
+    void ingestEvent_abortsAfterTheEventWasSaved_doesNotChargeQuota() {
+        // THE regression case. The Event is saved, and only then does the fanout limit abort
+        // the transaction — so the row is rolled back while the Redis counter, which is not
+        // transactional, keeps whatever was added to it. Charging inside the transaction meant
+        // every ingest that failed this way still cost the customer an event.
+        UUID organizationId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
+            Event e = inv.getArgument(0);
+            e.setId(eventId);
+            e.setCreatedAt(Instant.now());
+            return e;
+        });
+        when(entitlementService.getMaxFanoutForProject(any())).thenReturn(1);
+        when(subscriptionMatchingCache.findMatching(any(), any())).thenReturn(List.of(
+                Subscription.builder().id(UUID.randomUUID()).projectId(projectId)
+                        .endpointId(UUID.randomUUID()).eventType("order.created").build(),
+                Subscription.builder().id(UUID.randomUUID()).projectId(projectId)
+                        .endpointId(UUID.randomUUID()).eventType("order.created").build()));
+        stubTransactionTemplate();
+
+        assertThatThrownBy(() -> service.ingestEvent(projectId, buildRequest("order.created"), null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Fanout limit exceeded");
+
+        verify(quotaCounterService, never()).increment(any());
+    }
+
+    @Test
+    void ingestEvent_idempotencyRaceRollsBack_doesNotChargeQuota() {
+        UUID organizationId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+        // The other thread won the insert: this transaction aborts and the caller is handed
+        // the event that already exists. Nothing was stored here, so nothing may be charged.
+        Event existing = buildEvent("order.created", "idem-race");
+        when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "idem-race"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existing));
+        when(eventRepository.saveAndFlush(any(Event.class)))
+                .thenThrow(new DataIntegrityViolationException("unique constraint violation"));
+        stubTransactionTemplate();
+
+        service.ingestEvent(projectId, buildRequest("order.created"), "idem-race");
+
+        verify(quotaCounterService, never()).increment(any());
+    }
+
+    @Test
+    void ingestEvent_duplicateResolvedByIdempotency_doesNotChargeQuota() {
+        UUID organizationId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(eventRepository.findByProjectIdAndIdempotencyKey(projectId, "idem-123"))
+                .thenReturn(Optional.of(buildEvent("order.created", "idem-123")));
+        stubTransactionTemplate();
+
+        service.ingestEvent(projectId, buildRequest("order.created"), "idem-123");
+
+        verify(quotaCounterService, never()).increment(any());
+    }
+
+    @Test
+    void ingestEvent_quotaCounterUnavailable_doesNotFailAnAcceptedIngest() {
+        UUID organizationId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).organizationId(organizationId).build();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(eventRepository.saveAndFlush(any(Event.class))).thenAnswer(inv -> {
+            Event e = inv.getArgument(0);
+            e.setId(eventId);
+            e.setCreatedAt(Instant.now());
+            return e;
+        });
+        doThrow(new RuntimeException("Redis unavailable")).when(quotaCounterService).increment(any());
+        stubTransactionTemplate();
+
+        // The Event is already committed and the caller has been told it was accepted;
+        // failing here would turn an approximate counter into a delivery outage.
+        EventIngestResponse response = service.ingestEvent(projectId, buildRequest("order.created"), null);
+
+        assertThat(response.getEventId()).isEqualTo(eventId);
     }
 }

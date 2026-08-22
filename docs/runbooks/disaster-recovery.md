@@ -107,7 +107,7 @@ psql -h new-primary -c "SELECT pg_is_in_recovery();"
 
 ### 1.4 After restoring Postgres: outbox, Kafka and Redis consistency
 
-**This is the question the rest of this runbook doesn't answer (P1-20).**
+**This is the question the rest of this runbook doesn't answer.**
 Restoring Postgres — full restore or point-in-time — rolls back *only*
 Postgres. Kafka keeps every message it already has and every consumer offset
 it already committed; Redis keeps every key it already holds. Neither one

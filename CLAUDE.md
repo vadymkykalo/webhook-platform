@@ -4,9 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-`make help` lists every target. Non-obvious bit: `make up` also creates `.env` from `.env.dist` and creates the Kafka topics — don't do either by hand.
+Java 17 + Spring Boot 3.5 (Maven reactor), React + Vite + TypeScript in `webhook-platform-ui`.
 
-For running or writing Java tests, use the `backend-tests` skill — test class names decide which CI job a test lands in.
+`make help` lists every target. Non-obvious bits: `make up` also creates `.env` from `.env.dist` and creates the Kafka topics — don't do either by hand; `make dev-api` / `dev-worker` / `dev-ui` rebuild one service with cache and restart it, which is the fast inner loop once the stack is up.
+
+```bash
+mvn clean compile -B                # what CI compiles with
+mvn package -DskipTests -B          # build all module jars
+make test-ui                        # frontend unit tests (Vitest)
+npm run lint && npm run typecheck    # in webhook-platform-ui/, both gate CI
+```
+
+For running or writing Java tests, use the `backend-tests` skill — test class names decide which CI job a test lands in, and `scripts/check-test-routing.sh` fails the build when a Docker-dependent test is named so it routes to the no-Docker unit job.
+
+### Two checks that fail CI for reasons that aren't in the diff
+
+- **`openapi.yaml` is committed and semantically diffed** against the spec springdoc serves, by `OpenApiDriftIntegrationTest`. After an intentional API change, regenerate rather than hand-edit:
+  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`, then review and commit the file.
+- **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version *and* appVersion), `webhook-platform-ui/package.json`, and all three SDK manifests under `sdks/`. Never bump one by hand: `make version-set VERSION=2.4.0`, and `make version-check` runs the same drift check CI does.
 
 ## Git workflow (GitFlow)
 
@@ -25,7 +40,15 @@ Rules that follow from the table and are easy to get wrong:
 - Start work from an up-to-date `develop` (`git checkout develop && git pull`), branch as `feature/<short-kebab-description>`.
 - Anything merged to `main` must also be merged back into `develop`, or the fix silently disappears at the next release.
 - A hotfix branches from `main`, not from `develop` — branching it from `develop` drags unreleased work into production.
-- PRs need at least one approval and green CI; squash merge is preferred.
+- PRs need at least one approval and green CI.
+- **Merge style depends on the target.** `feature/*` → `develop`: squash, so a
+  feature's work-in-progress commits land as one. `release/*` and `hotfix/*` →
+  `main`: **a merge commit, never squash or rebase.** Squashing collapses the
+  branch into a new SHA with no shared ancestry, so `main` and `develop` stop
+  having a common base — the back-merge then conflicts on every file either side
+  has touched, including files that are byte-identical. Release 2.3.0 hit exactly
+  this: PR #100 was squash-merged, and the next release's merge reported 19
+  conflicts of which 12 were between identical files.
 - Release: `release/1.x.0` from `develop` → bump versions → PR to `main` → tag `v1.x.0` after merge → merge back to `develop`.
 
 Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. See `CONTRIBUTING.md` for the full policy.
@@ -34,7 +57,7 @@ Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `r
 
 Five modules: `common` (shared DTOs, `KafkaTopics`, crypto/signature/PII utils), `api` (REST + ingress + tunnel hub + outbox publisher, **owns all Flyway migrations**), `worker` (Kafka consumers, HTTP delivery/forwarding, retries), `cli` (picocli), `ui`.
 
-API and worker each keep **their own JPA entity + repository copies** of the shared tables (`Event`, `Delivery`, `Endpoint`, `IncomingEvent`, …). Any schema change touches both sides plus a migration — see the `db-migration` skill before editing an entity or `db/migration`.
+API and worker each keep **their own JPA entity + repository copies** of the shared tables (`Event`, `Delivery`, `Endpoint`, `IncomingEvent`, …). Any schema change touches both sides plus a migration — see the `db-migration` skill before editing an entity or `db/migration`. `EntityMappingParityIntegrationTest` fails the build when a column of a shared table goes unmapped by either side; a deliberate omission goes in its `DELIBERATELY_UNMAPPED` list with a reason. ADR-0002 has the rationale.
 
 ### Two delivery pipelines
 

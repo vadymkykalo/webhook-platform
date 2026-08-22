@@ -25,9 +25,14 @@ import static org.mockito.Mockito.when;
 
 /**
  * Unit coverage for IncomingForwardConsumer -- the incoming-forward analogue of
- * DeliveryConsumerTest. Unlike the outgoing consumer, this one does not reschedule via a
- * retry ladder when the executor is full: it simply leaves the record unacked so the
- * container's own backpressure (pause on full pool) causes redelivery.
+ * DeliveryConsumerTest. Like the outgoing consumer, this one hands the attempt back to the
+ * retry ladder and acks when the executor is full.
+ *
+ * <p>An earlier revision deliberately did the opposite and left the record unacked, on the
+ * belief that the container's own backpressure would cause redelivery. It does not: the
+ * listener factory sets asyncAcks(true), under which an unacked record is not redelivered
+ * until a rebalance or restart and blocks this partition's offset commits in the meantime --
+ * the failure mode DeliveryConsumer documents as fatal.
  */
 class IncomingForwardConsumerTest {
 
@@ -61,7 +66,7 @@ class IncomingForwardConsumerTest {
     }
 
     @Test
-    void consume_executorFull_doesNotAck_leavesRecordForRedelivery() throws Exception {
+    void consume_executorFull_reschedulesViaRetryLadderAndAcks() throws Exception {
         fillExecutorPool();
 
         IncomingForwardMessage message = forwardMessage();
@@ -70,8 +75,11 @@ class IncomingForwardConsumerTest {
 
         consumer.consume(record, ack);
 
-        verify(ack, never()).acknowledge();
+        // Not processed now -- but handed to the retry ladder and acked, so the partition
+        // keeps committing instead of stalling until the next rebalance.
         verify(forwardService, never()).processForward(any());
+        verify(forwardService).rescheduleForBackpressure(message);
+        verify(ack).acknowledge();
     }
 
     private void fillExecutorPool() throws InterruptedException {

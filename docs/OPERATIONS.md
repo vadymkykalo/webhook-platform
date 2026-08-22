@@ -30,7 +30,7 @@ kubectl create secret generic hookflow-postgresql-secret \
 kubectl create secret generic hookflow-redis-secret \
   --from-literal=password="$(openssl rand -base64 32)"
 
-# Install the published chart directly — no repo clone required (P1-15):
+# Install the published chart directly — no repo clone required:
 helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <version> \
   --set postgresql.external.host=your-postgres-host \
   --set kafka.external.bootstrapServers=your-kafka:9092 \
@@ -46,7 +46,7 @@ helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <versi
 # deliveries.dispatch, deliveries.retry.{1m,5m,15m,1h,6h,24h}, deliveries.dlq
 ```
 
-### Retry ladder vs. DLQ hard-cap (P1-24a)
+### Retry ladder vs. DLQ hard-cap
 
 Outgoing deliveries retry through the 6 tiers above (1m, 5m, 15m, 1h, 6h, 24h) over up to 7
 attempts — an expected span of ~55h and a worst case of ~83h once full jitter (0.5x-1.5x per
@@ -55,10 +55,21 @@ tier) is factored in. Independently, `StaleDeliveryEscalationService` force-esca
 DLQ, regardless of how many attempts it has left — it's a safety net against unbounded backlog
 growth, not part of the retry ladder itself. The default hard-cap is set above the ladder's
 worst case on purpose, so a delivery genuinely gets to run through all 6 tiers before the safety
-net kicks in. If you ever change `RETRY_LADDER_DEFAULT_DELAYS_SECONDS`/
-`RETRY_LADDER_DEFAULT_MAX_ATTEMPTS` or `DELIVERY_ESCALATION_HARD_CAP_HOURS`, the worker fails to
-start if the ladder's worst case no longer fits inside the cap (`RetryPolicy.validateLadderFitsCap`,
-called from `RetrySchedulerService`) — so they cannot silently drift apart again.
+net kicks in.
+
+The worker fails to start if either default ladder's worst case no longer fits inside the cap
+(`RetryLadder.requireFitsWithin`, called from `RetrySchedulerService` for both directions), so
+they cannot silently drift apart. **The ladder itself is not an environment variable.** The two
+defaults are declared in `RetryLadderDefaults` and mirrored by the Flyway column defaults, and
+they differ by direction on purpose — incoming forwards give up after 5 attempts over 5 tiers
+(6h) rather than 7 over 6 (24h), because relaying somebody else's webhook is a different promise
+from delivering the customer's own event. `DELIVERY_ESCALATION_HARD_CAP_HOURS` is the knob to
+move if the startup check fails.
+
+Per-subscription and per-destination ladders are set through the API and stored on the row. A
+malformed `retryDelays` is rejected with a `400` at write time; a stored one that somehow does
+not parse fails its delivery terminally with `INVALID_RETRY_LADDER` rather than being retried on
+a substituted ladder.
 
 ## Common Issues
 
@@ -70,7 +81,7 @@ called from `RetrySchedulerService`) — so they cannot silently drift apart aga
 ### Database issues
 - Backup: `make backup-db` (docker-compose only)
 - Check connections: `docker exec webhook-postgres pg_isready`
-- Connection pool exhausted: increase `DB_POOL_MAX_SIZE` (API) or `WORKER_DB_POOL_MAX_SIZE` (Worker) — separately named as of P1-26, see `.env.dist`
+- Connection pool exhausted: increase `DB_POOL_MAX_SIZE` (API) or `WORKER_DB_POOL_MAX_SIZE` (Worker) — separately named on purpose, see `.env.dist`
 
 ### Failed deliveries spike
 - Check DLQ: Navigate to UI → Failed Messages
@@ -95,7 +106,7 @@ Alerting: `make monitoring-up` also starts Alertmanager (`:9093`), which routes
 the 14 rules in `deploy/prometheus/alerts.yml` to Slack/webhook/email via the
 `ALERTMANAGER_*` env vars (`.env.dist`). See `monitoring/README.md` "Alerting".
 
-**Kubernetes gap (open, P1-20):** `deploy/helm/hookflow/templates/servicemonitor.yaml`
+**Kubernetes gap (open):** `deploy/helm/hookflow/templates/servicemonitor.yaml`
 scrapes the API's `/actuator/prometheus` on its main authenticated port — that
 scrape 401s today. Fixing it means adding a management port to
 `api-deployment.yaml` / `api-service.yaml` / `servicemonitor.yaml` /
@@ -105,7 +116,7 @@ cluster to validate before shipping; the app itself already supports it via the
 path uses), the chart templates just don't set them yet. The worker's
 ServiceMonitor is unaffected (worker has no auth on its actuator at all) but
 was separately broken by `MANAGEMENT_ADDRESS` defaulting to `127.0.0.1` —
-fixed in P1-20 (default is now `0.0.0.0`; not published to any host port).
+since fixed (default is now `0.0.0.0`; not published to any host port).
 
 ## Backup & Restore
 
@@ -113,7 +124,7 @@ Both `backup-db` and `restore-db` work against the embedded Compose DB
 (`docker exec`) or any external/managed Postgres (`DB_MODE=external`, via a
 throwaway `postgres:16-alpine` container — no local `pg_dump`/`pg_restore`
 needed). Backups are custom-format `.dump` files (`pg_dump -Fc`), restorable
-with `pg_restore`; the pre-P1-20 plain-SQL `.sql.gz` format is still readable
+with `pg_restore`; the older plain-SQL `.sql.gz` format is still readable
 by `restore-db` for anyone restoring an older backup.
 
 ```bash
@@ -153,7 +164,7 @@ counters that no longer agree with the restored DB.
 ```bash
 # Docker Compose
 make scale-worker N=5
-make scale-api N=3     # P1-20: the base compose files bind the API to a fixed
+make scale-api N=3     # The base compose files bind the API to a fixed
                         # host port (127.0.0.1:8080) for direct `curl
                         # localhost:8080` access, which blocks `--scale api=N`
                         # outright — every replica would fight over the same
@@ -202,7 +213,7 @@ Production must have:
 Key settings:
 - `APP_ENV=production` - enables production mode
 - `LOG_LEVEL=WARN` - reduces log verbosity
-- `DB_POOL_MAX_SIZE=20` (API); `WORKER_DB_POOL_MAX_SIZE=40` (Worker — a separately-named var as of P1-26, not a shared `DB_POOL_MAX_SIZE`)
+- `DB_POOL_MAX_SIZE=20` (API); `WORKER_DB_POOL_MAX_SIZE=40` (Worker — a separately-named var on purpose, not a shared `DB_POOL_MAX_SIZE`)
 - `KAFKA_DELIVERY_CONCURRENCY=8` - parallel deliveries per worker
 
 ## Detailed Documentation

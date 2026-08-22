@@ -14,7 +14,7 @@
     <packaging>pom</packaging>
     <name>Webhook Platform Coverage Report</name>
     <description>
-        P1-28: not a real module - it ships no code of its own. It exists only
+        Not a real module - it ships no code of its own. It exists only
         so jacoco-maven-plugin's report-aggregate goal has a project whose
         *dependencies* are the four real modules, which is how JaCoCo
         discovers their target/classes and target/jacoco*.exec at reactor
@@ -27,11 +27,8 @@
         `dataFile` against ITS OWN project's compiled classes - it has no
         equivalent of report-aggregate's dependency-walking, so binding it in
         a pom-packaging module with no classes of its own just silently skips
-        ("missing execution data file:.../webhook-platform-coverage-report/target/jacoco.exec"),
-        which was tried and confirmed dead-on-arrival during this task's own
-        verification (see the Progress log in
-        .claude/features/P1-28-coverage-tooling.md). Each of
-        common/api/worker/cli therefore declares its own `check` execution
+        ("missing execution data file:.../webhook-platform-coverage-report/target/jacoco.exec").
+        Each of common/api/worker/cli therefore declares its own `check` execution
         against its own merged coverage instead - see the jacoco-merge
         execution in the root pom for how that per-module merged file gets
         built, and each module's own pom.xml for its threshold rules.
@@ -92,9 +89,8 @@
 
                       outputDirectory is pinned to <repo-root>/target instead
                       of this module's own target/, purely so
-                      "target/site/jacoco-aggregate/index.html" (as named in
-                      the task file's verification block) resolves from the
-                      repo root without an extra subdirectory hop.
+                      "target/site/jacoco-aggregate/index.html" resolves from
+                      the repo root without an extra subdirectory hop.
                     -->
                     <execution>
                         <id>report-aggregate</id>

@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.TestEndpointRequest;
 import com.webhook.platform.api.dto.TestEndpointResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.TestEndpointService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +32,8 @@ public class TestEndpointController {
     private final TestEndpointService testEndpointService;
 
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     @Operation(operationId = "createTestEndpoint", summary = "Create a test endpoint", description = "Creates a temporary endpoint to capture webhook requests")
     public ResponseEntity<TestEndpointResponse> create(
             @PathVariable("projectId") UUID projectId,
@@ -64,7 +67,8 @@ public class TestEndpointController {
     }
 
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}")
     @Operation(operationId = "deleteTestEndpoint", summary = "Delete test endpoint", description = "Deletes a test endpoint and all captured requests")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,
@@ -88,7 +92,8 @@ public class TestEndpointController {
     }
 
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}/requests")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}/requests")
     @Operation(summary = "Clear captured requests", description = "Deletes all requests captured by a test endpoint")
     public ResponseEntity<Void> clearRequests(
             @PathVariable("projectId") UUID projectId,

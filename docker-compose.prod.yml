@@ -8,7 +8,7 @@
 # Manual usage:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
 #
-# Pre-built images (P1-15):
+# Pre-built images:
 #   Defaults to this project's own published images — ghcr.io/vadymkykalo/hookflow-*
 #   (built + pushed by .github/workflows/docker-publish.yml on every version tag).
 #   Point DOCKER_REGISTRY at your own mirror/fork instead if you rebuild and

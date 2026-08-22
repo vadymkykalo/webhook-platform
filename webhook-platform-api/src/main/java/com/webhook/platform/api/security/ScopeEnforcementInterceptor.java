@@ -17,8 +17,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Enforces {@link RequireScope} annotations on controller methods for API key requests,
- * and — separately — the structural {@code {projectId}} tenancy guard described below.
+ * Enforces three things before a handler runs: the {@link RequireAccess} level, the
+ * {@link RequireScope} annotation for API-key requests, and the structural
+ * {@code {projectId}} tenancy guard described below.
  *
  * <h2>API-key read/write scope ({@link RequireScope})</h2>
  * <p>Resolution order:
@@ -53,6 +54,52 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
     private static final String PROJECT_ID_PATH_VAR = "projectId";
 
+    /**
+     * Enforces {@link RequireAccess}, for both JWT and API-key callers.
+     *
+     * <p>Runs before the scope check below, not after: scope is an API-key concept and that
+     * check returns early for a JWT, so a role requirement placed after it would silently not
+     * apply to dashboard callers — which are exactly the ones a VIEWER is.
+     *
+     * <p>The role is read straight off the authentication token. Unlike
+     * {@code AuthContextArgumentResolver}, which resolves an API key's Project to find its
+     * Organization, nothing here needs a database lookup.
+     *
+     * <p>A platform-admin token is not a tenant identity and carries no membership role;
+     * {@code /api/v1/admin/**} is gated on the PLATFORM_ADMIN authority in
+     * {@code SecurityConfig} instead, so those requests pass through untouched.
+     */
+    private void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
+        RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);
+        if (required == null) {
+            required = handlerMethod.getBeanType().getAnnotation(RequireAccess.class);
+        }
+        if (required == null || required.value() == AccessLevel.READ) {
+            return;
+        }
+
+        MembershipRole role;
+        ApiKeyScope scope = null;
+        if (authentication instanceof JwtAuthenticationToken jwt) {
+            role = jwt.getRole();
+        } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
+            role = MembershipRole.API_KEY;
+            scope = apiKey.getScope();
+        } else {
+            return;
+        }
+
+        // Deliberately the same RbacUtil the handlers call, rather than a second implementation
+        // of "what write access means". Two implementations would be two things to keep in
+        // step, and the whole point of this annotation is that there is one answer.
+        if (required.value() == AccessLevel.OWNER) {
+            RbacUtil.requireOwnerAccess(role);
+        } else {
+            RbacUtil.requireWriteAccess(role, scope);
+        }
+    }
+
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
@@ -62,6 +109,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         enforceProjectScope(request, handlerMethod, authentication);
+        enforceAccessLevel(handlerMethod, authentication);
 
         if (!(authentication instanceof ApiKeyAuthenticationToken apiKeyAuth)) {
             return true;

@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.WorkflowExecutionResponse;
 import com.webhook.platform.api.dto.WorkflowRequest;
 import com.webhook.platform.api.dto.WorkflowResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.WorkflowService;
 import com.webhook.platform.api.service.billing.RequireFeature;
@@ -37,7 +39,8 @@ public class WorkflowController {
     @ApiResponse(responseCode = "201", description = "Workflow created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<WorkflowResponse> create(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody WorkflowRequest request,
@@ -70,7 +73,8 @@ public class WorkflowController {
     @Operation(operationId = "updateWorkflow", summary = "Update workflow")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
-    @PutMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{id}")
     public ResponseEntity<WorkflowResponse> update(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -84,7 +88,8 @@ public class WorkflowController {
     @Operation(operationId = "deleteWorkflow", summary = "Delete workflow")
     @ApiResponse(responseCode = "204", description = "Workflow deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{id}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -97,7 +102,8 @@ public class WorkflowController {
 
     @Operation(operationId = "toggleWorkflow", summary = "Toggle workflow enabled/disabled")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PatchMapping("/{id}/toggle")
+    @RequireAccess(AccessLevel.WRITE)
+@PatchMapping("/{id}/toggle")
     public ResponseEntity<WorkflowResponse> toggle(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
@@ -113,7 +119,8 @@ public class WorkflowController {
     @ApiResponse(responseCode = "200", description = "Workflow executed")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
-    @PostMapping("/{id}/trigger")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/trigger")
     public ResponseEntity<WorkflowExecutionResponse> trigger(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,

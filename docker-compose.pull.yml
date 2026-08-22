@@ -178,7 +178,7 @@ services:
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SERVER_PORT: 8080
-      # P1-20: actuator (incl. /actuator/prometheus) is split onto its own port so
+      # Actuator (incl. /actuator/prometheus) is split onto its own port so
       # Prometheus can scrape it without going through the JWT/API-key-authenticated
       # SecurityConfig filter chain on 8080. Not published to the host — only
       # reachable from other containers on webhook-network, same trust boundary
@@ -326,7 +326,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       DB_JDBC_URL: ${DB_JDBC_URL:-}
-      # P1-26: see docker-compose.yml's worker block -- WORKER_DB_POOL_MAX_SIZE/MIN_IDLE are
+      # See docker-compose.yml's worker block -- WORKER_DB_POOL_MAX_SIZE/MIN_IDLE are
       # deliberately distinct from the API's DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE (.env.dist), or
       # a single shared .env value silently overrides both services' independently-tuned pools.
       DB_POOL_MAX_SIZE: ${WORKER_DB_POOL_MAX_SIZE:-40}
@@ -391,7 +391,14 @@ services:
       WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:-5}
       DLQ_MONITORING_INTERVAL_MS: ${DLQ_MONITORING_INTERVAL_MS:-60000}
       DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS: ${DLQ_MONITORING_ADMIN_CLIENT_TIMEOUT_SECONDS:-10}
-      DELIVERY_ESCALATION_HARD_CAP_HOURS: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:-48}
+      DELIVERY_ESCALATION_HARD_CAP_HOURS: ${DELIVERY_ESCALATION_HARD_CAP_HOURS:-96}
+      # 96, not 48: the outgoing retry ladder's worst case with full jitter is 83h and
+      # RetrySchedulerService refuses to start when it does not fit inside the cap. The 48
+      # here predated the ladder gaining its 24h tier and would fail every boot that did
+      # not override it.
+      FORWARD_ESCALATION_HARD_CAP_HOURS: ${FORWARD_ESCALATION_HARD_CAP_HOURS:-24}
+      FORWARD_ESCALATION_BATCH_SIZE: ${FORWARD_ESCALATION_BATCH_SIZE:-100}
+      FORWARD_ESCALATION_INTERVAL_MS: ${FORWARD_ESCALATION_INTERVAL_MS:-300000}
       DELIVERY_ESCALATION_BATCH_SIZE: ${DELIVERY_ESCALATION_BATCH_SIZE:-100}
       DELIVERY_ESCALATION_INTERVAL_MS: ${DELIVERY_ESCALATION_INTERVAL_MS:-300000}
       JAVA_OPTS: ${WORKER_JAVA_OPTS:-}

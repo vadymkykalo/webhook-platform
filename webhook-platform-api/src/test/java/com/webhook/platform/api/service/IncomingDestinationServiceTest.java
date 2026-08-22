@@ -12,6 +12,7 @@ import com.webhook.platform.api.dto.IncomingDestinationResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.enums.IncomingAuthType;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
@@ -312,5 +313,73 @@ class IncomingDestinationServiceTest {
         Field f = obj.getClass().getDeclaredField(fieldName);
         f.setAccessible(true);
         f.set(obj, value);
+    }
+
+    // ── Retry ladder validation ──
+    //
+    // Mirrors SubscriptionServiceTest: a malformed ladder is rejected at write time, not met
+    // by the worker and silently replaced with a hardcoded array.
+
+    @Test
+    void createDestination_malformedRetryDelays_throwsWithActionableMessage() {
+        stubOwnership();
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .retryDelays("60,oops,900")
+                .build();
+
+        assertThatThrownBy(() -> service.createDestination(sourceId, request, orgId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryDelays")
+                .hasMessageContaining("tier 2");
+
+        verify(destinationRepository, never()).saveAndFlush(any(IncomingDestination.class));
+    }
+
+    @Test
+    void createDestination_zeroMaxAttempts_throws() {
+        stubOwnership();
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .maxAttempts(0)
+                .build();
+
+        assertThatThrownBy(() -> service.createDestination(sourceId, request, orgId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxAttempts");
+    }
+
+    @Test
+    void createDestination_omittedRetryDelays_getsTheDeclaredIncomingDefault() {
+        stubOwnership();
+        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> {
+            IncomingDestination d = inv.getArgument(0);
+            d.setId(destId);
+            d.setCreatedAt(Instant.now());
+            d.setUpdatedAt(Instant.now());
+            return d;
+        });
+
+        IncomingDestinationRequest request = IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .build();
+
+        service.createDestination(sourceId, request, orgId);
+
+        ArgumentCaptor<IncomingDestination> saved = ArgumentCaptor.forClass(IncomingDestination.class);
+        verify(destinationRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getRetryDelays()).isEqualTo(RetryLadderDefaults.INCOMING_DELAYS);
+        assertThat(saved.getValue().getMaxAttempts()).isEqualTo(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS);
+    }
+
+    @Test
+    void incomingDefaultLadder_deliberatelyShorterThanOutgoing() {
+        // Guards the decision recorded in RetryLadderDefaults and ADR-0011: the two directions
+        // differ on purpose. A future "tidy-up" that aligns them should fail here first and go
+        // read why.
+        assertThat(RetryLadderDefaults.INCOMING_DELAYS).isNotEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
+        assertThat(RetryLadderDefaults.INCOMING_MAX_ATTEMPTS).isLessThan(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
     }
 }

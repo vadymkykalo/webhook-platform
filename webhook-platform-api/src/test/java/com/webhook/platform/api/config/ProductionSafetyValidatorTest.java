@@ -105,7 +105,7 @@ class ProductionSafetyValidatorTest {
     }
 
     // -----------------------------------------------------------------
-    // Low-entropy secrets rejected — the exact footgun this task calls out:
+    // Low-entropy secrets rejected — the exact footgun:
     // a fixed substring denylist lets a repeated-character value through.
     // -----------------------------------------------------------------
 

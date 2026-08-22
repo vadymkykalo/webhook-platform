@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.domain.entity;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -77,7 +78,7 @@ public class Delivery {
 
     @Builder.Default
     @Column(name = "retry_delays", columnDefinition = "TEXT")
-    private String retryDelays = "60,300,900,3600,21600,86400";
+    private String retryDelays = RetryLadderDefaults.OUTGOING_DELAYS;
 
     @Column(name = "payload_template", columnDefinition = "TEXT")
     private String payloadTemplate;

@@ -40,6 +40,6 @@ per test run:
 ## Why not generate this from OpenAPI
 
 See `sdks/node/tests/contract/README.md`'s "Why not generate this from
-OpenAPI" — same reasoning: P2-33 (not yet done) would make spec-generated
+OpenAPI" — same reasoning: a spec-generated
 contract tests possible; until then this hand-written suite against a live
-instance is the documented fallback (see P3-35's task file).
+instance is the documented fallback.

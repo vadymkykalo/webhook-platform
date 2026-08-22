@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
@@ -34,6 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 @Slf4j
@@ -98,10 +100,18 @@ public class EventIngestService {
         // rollback here -- including the DataIntegrityViolationException idempotency-race path
         // below -- can never burn a sequence number that no delivery ends up carrying.
         List<Delivery> pendingSequenceAssignment = new ArrayList<>();
+        // Set by doIngestEvent() to the Organization that should be charged for this Event,
+        // and left null when nothing new was stored — a duplicate resolved by idempotency
+        // must not be charged twice. Applied only after the commit, for exactly the reason
+        // the sequence numbers are: this counter lives in Redis and is not rolled back with
+        // the transaction, so incrementing it inside meant a rolled-back ingest still
+        // consumed quota. Every abort did it, including the idempotency-race path below.
+        AtomicReference<UUID> organizationToCharge = new AtomicReference<>();
         EventIngestResponse response;
         try {
             response = transactionTemplate.execute(status ->
-                    doIngestEvent(projectId, request, idempotencyKey, pendingSequenceAssignment));
+                    doIngestEvent(projectId, request, idempotencyKey, pendingSequenceAssignment,
+                            organizationToCharge));
         } catch (DataIntegrityViolationException e) {
             if (idempotencyKey != null) {
                 var existingEvent = eventRepository.findByProjectIdAndIdempotencyKey(projectId, idempotencyKey);
@@ -113,8 +123,29 @@ public class EventIngestService {
             }
             throw e;
         }
+        chargeQuotaPostCommit(organizationToCharge.get());
         assignSequenceNumbersPostCommit(pendingSequenceAssignment);
         return response;
+    }
+
+    /**
+     * Charges the Organization for the Event the transaction just committed.
+     *
+     * <p>Deliberately fire-and-forget and deliberately after the commit: the counter is an
+     * approximate Redis value, so failing to charge is better than failing an ingest that has
+     * already been accepted — but charging for one that never happened is a customer-visible
+     * defect, which is what running this inside the transaction produced.
+     */
+    private void chargeQuotaPostCommit(UUID organizationId) {
+        if (organizationId == null) {
+            return;
+        }
+        try {
+            quotaCounterService.increment(organizationId);
+        } catch (Exception e) {
+            log.error("Failed to charge quota for organization {} after a committed ingest: {}",
+                    organizationId, e.getMessage(), e);
+        }
     }
 
     /**
@@ -146,7 +177,7 @@ public class EventIngestService {
     }
 
     private EventIngestResponse doIngestEvent(UUID projectId, EventIngestRequest request, String idempotencyKey,
-            List<Delivery> pendingSequenceAssignment) {
+            List<Delivery> pendingSequenceAssignment, AtomicReference<UUID> organizationToCharge) {
         // Enforce idempotency policy
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project != null && project.getIdempotencyPolicy() == IdempotencyPolicy.REQUIRED && idempotencyKey == null) {
@@ -194,13 +225,9 @@ public class EventIngestService {
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);
         Counter.builder("events_ingested_total").register(meterRegistry).increment();
-        // Increment Redis quota counter (fire-and-forget, approximate is OK)
-        // NOTE (known bug, not fixed here): like the old sequence
-        // generator, this runs *inside* the ingest transaction and is not rolled back if the
-        // transaction later aborts -- a rolled-back ingest still consumes quota. A
-        // non-ordering bug, out of scope here.
+        // Recorded here, charged after the commit — see chargeQuotaPostCommit.
         if (project != null) {
-            quotaCounterService.increment(project.getOrganizationId());
+            organizationToCharge.set(project.getOrganizationId());
         }
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
@@ -376,7 +403,8 @@ public class EventIngestService {
                 .sequenceNumber(sequenceNumber)
                 .orderingEnabled(orderingEnabled)
                 .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
+                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
+                        : RetryLadderDefaults.OUTGOING_DELAYS)
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
                 .transformationId(subscription.getTransformationId())
@@ -398,7 +426,7 @@ public class EventIngestService {
                 .maxAttempts(7)
                 .orderingEnabled(false)
                 .timeoutSeconds(30)
-                .retryDelays("60,300,900,3600,21600,86400")
+                .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
                 .transformationId(transformationId)
                 .idempotencyKey(deliveryIdempotencyKey)
                 .build();

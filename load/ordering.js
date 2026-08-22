@@ -1,7 +1,7 @@
 // Scenario: ordered deliveries under backlog.
 //
-// This is the black-box reproduction of the condition P1-23 documents as
-// silently disengaging FIFO ordering: a subscription with orderingEnabled
+// This is the black-box reproduction of the condition that silently
+// disengages FIFO ordering: a subscription with orderingEnabled
 // forces one delivery to retry (by having load-receiver fail exactly once),
 // then fires a burst of successor events immediately behind it. If ordering
 // holds, load-receiver should see them arrive in seq order once the retried
@@ -26,7 +26,7 @@ import { bootstrapProject, createSubscribedEndpoint } from './lib/setup.js';
 
 // A non-zero count here after teardown means FIFO ordering broke down under
 // the induced-retry backlog — the regression this whole scenario exists to
-// catch (P1-23). The threshold below turns that into a non-zero `k6 run`
+// catch. The threshold below turns that into a non-zero `k6 run`
 // exit code so this is CI-checkable, not just eyeballed from log output.
 const orderingViolations = new Counter('ordering_violations');
 

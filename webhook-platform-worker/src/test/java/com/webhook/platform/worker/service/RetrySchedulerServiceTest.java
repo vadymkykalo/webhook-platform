@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
@@ -74,12 +75,10 @@ class RetrySchedulerServiceTest {
                 // Circuit breaker should allow all calls by default in tests
                 lenient().when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
 
-                retrySchedulerService = newRetrySchedulerService(
-                                "60,300,900,3600,21600,86400", 7, 96L);
+                retrySchedulerService = newRetrySchedulerService(96L);
         }
 
-        private RetrySchedulerService newRetrySchedulerService(
-                        String defaultRetryDelays, int defaultMaxAttempts, long escalationHardCapHours) {
+        private RetrySchedulerService newRetrySchedulerService(long escalationHardCapHours) {
                 return new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
@@ -93,9 +92,8 @@ class RetrySchedulerServiceTest {
                                 rescheduleDelaySeconds,
                                 5000L,   // highWatermark
                                 10000L,  // defaultPollIntervalMs
-                                defaultRetryDelays,
-                                defaultMaxAttempts,
-                                escalationHardCapHours);
+                                escalationHardCapHours,
+                                24L);    // forwardEscalationHardCapHours
         }
 
         @Test
@@ -423,8 +421,7 @@ class RetrySchedulerServiceTest {
                 // attemptCount table) together with the actual worst-case span math and the
                 // production default hard-cap (96h, application.yml
                 // delivery.escalation.hard-cap-hours) — the two must agree by construction.
-                long worstCaseSeconds = RetryPolicy.worstCaseSpanSeconds(
-                                RetryPolicy.parseRetryDelays("60,300,900,3600,21600,86400"), 7);
+                long worstCaseSeconds = RetryLadderDefaults.outgoing().worstCaseSpanSeconds();
                 long hardCapSeconds = 96L * 3600;
                 assertTrue(worstCaseSeconds <= hardCapSeconds,
                                 "ladder worst-case span (" + worstCaseSeconds + "s) must fit inside the " +
@@ -438,7 +435,7 @@ class RetrySchedulerServiceTest {
                 // instead of silently letting StaleDeliveryEscalationService DLQ deliveries
                 // before the last retry tiers (6h, 24h) ever get a chance to fire.
                 IllegalStateException ex = assertThrows(IllegalStateException.class,
-                                () -> newRetrySchedulerService("60,300,900,3600,21600,86400", 7, 48L));
+                                () -> newRetrySchedulerService(48L));
                 assertTrue(ex.getMessage().contains("hard-cap-hours"),
                                 "expected the failure to name the mismatched config, was: " + ex.getMessage());
         }
@@ -447,7 +444,7 @@ class RetrySchedulerServiceTest {
         void constructor_ladderFitsInsideHardCap_doesNotThrow() {
                 // The current, agreed-upon default pairing (raise the cap to
                 // 96h rather than shorten the advertised 6-tier ladder) must not throw.
-                assertDoesNotThrow(() -> newRetrySchedulerService("60,300,900,3600,21600,86400", 7, 96L));
+                assertDoesNotThrow(() -> newRetrySchedulerService(96L));
         }
 
         private Delivery createDelivery(UUID id, int attemptCount, Instant nextRetryAt) {

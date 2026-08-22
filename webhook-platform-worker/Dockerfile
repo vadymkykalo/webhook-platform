@@ -11,8 +11,15 @@ WORKDIR /workspace
 # Copy entire project (needed for multi-module Maven build)
 COPY . .
 
-# Build only common and worker modules
-RUN mvn -pl webhook-platform-common,webhook-platform-worker -am clean package -DskipTests
+# Build only common and worker modules.
+#
+# The cache mount keeps ~/.m2 across builds instead of re-downloading every
+# dependency into a fresh layer each time. That is not just slow: with three
+# images built per CI job, Maven Central started answering
+# "429 Too Many Requests" and the build failed on unresolvable POMs. The mount
+# is BuildKit-only, which CI already uses via buildx.
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    mvn -pl webhook-platform-common,webhook-platform-worker -am clean package -DskipTests
 
 # Runtime stage
 #
