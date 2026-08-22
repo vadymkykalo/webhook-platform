@@ -175,21 +175,31 @@ public class RetryGovernor {
      * Recommends poll interval in milliseconds based on pending queue depth.
      * Allows aggressive polling when backlog is high, backs off when queue is empty.
      *
-     * @param pendingCount current pending retries count
+     * <p>Expressed as a multiple of the caller's configured poll interval rather than as
+     * absolute constants. It used to return hardcoded 30s/10s/5s/2s, which silently
+     * overrode {@code retry.scheduler.poll-interval-ms} on the very first poll — the
+     * setting only ever applied to the startup poll and to the error path, so tuning it
+     * (or lowering it in a test) did nothing. The multipliers below reproduce the old
+     * numbers exactly at the production default of 10s, so this changes what the setting
+     * does, not how a default deployment behaves.
+     *
+     * @param pendingCount        current pending retries count
+     * @param basePollIntervalMs  the caller's configured poll interval, the 1x reference
      * @return recommended poll interval in milliseconds
      */
-    public long getRecommendedPollIntervalMs(long pendingCount) {
+    public long getRecommendedPollIntervalMs(long pendingCount, long basePollIntervalMs) {
+        long base = Math.max(1, basePollIntervalMs);
         long interval;
         if (pendingCount < 0) {
-            interval = 10_000; // Unknown queue depth, use default
+            interval = base; // Unknown queue depth, use the configured interval
         } else if (pendingCount == 0) {
-            interval = 30_000; // Empty queue, back off to 30s
+            interval = base * 3; // Empty queue, back off (30s at the 10s default)
         } else if (pendingCount < 100) {
-            interval = 10_000; // Light load, 10s
+            interval = base; // Light load (10s at the 10s default)
         } else if (pendingCount < 1000) {
-            interval = 5_000; // Medium load, 5s
+            interval = Math.max(1, base / 2); // Medium load (5s at the 10s default)
         } else {
-            interval = 2_000; // Heavy backlog, aggressive 2s polling
+            interval = Math.max(1, base / 5); // Heavy backlog, aggressive (2s at the 10s default)
         }
         recommendedPollIntervalMs.set(interval);
         return interval;

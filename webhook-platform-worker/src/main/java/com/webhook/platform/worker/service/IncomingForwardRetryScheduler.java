@@ -91,7 +91,7 @@ public class IncomingForwardRetryScheduler {
         try {
             long pendingCount = countPendingRetries();
             pollPendingRetries(pendingCount);
-            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount);
+            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount, defaultPollIntervalMs);
         } catch (Exception e) {
             log.error("Incoming forward retry scheduler poll failed: {}", e.getMessage(), e);
         } finally {
