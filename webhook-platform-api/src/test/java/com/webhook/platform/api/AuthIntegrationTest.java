@@ -134,7 +134,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     public void testAccessTokenRejectedByRefreshEndpoint() throws Exception {
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
 
-        AuthResponse tokens = registerAndCaptureTokens("p0-10-access-as-refresh@example.com");
+        AuthResponse tokens = registerAndCaptureTokens("jwt-token-type-access-as-refresh@example.com");
 
         RefreshTokenRequest refreshRequest = new RefreshTokenRequest(tokens.getAccessToken());
         mockMvc.perform(post("/api/v1/auth/refresh")
@@ -149,7 +149,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
      */
     @Test
     public void testRefreshTokenRejectedAsBearerCredential() throws Exception {
-        AuthResponse tokens = registerAndCaptureTokens("p0-10-refresh-as-bearer@example.com");
+        AuthResponse tokens = registerAndCaptureTokens("jwt-token-type-refresh-as-bearer@example.com");
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .header("Authorization", "Bearer " + tokens.getRefreshToken()))
@@ -164,7 +164,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     public void testLoginRefreshAccessCycleStillWorks() throws Exception {
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
 
-        AuthResponse tokens = registerAndCaptureTokens("p0-10-happy-path@example.com");
+        AuthResponse tokens = registerAndCaptureTokens("jwt-token-type-happy-path@example.com");
 
         MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refresh_token", tokens.getRefreshToken())))
@@ -180,7 +180,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/me")
                         .header("Authorization", "Bearer " + refreshed.getAccessToken()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.email").value("p0-10-happy-path@example.com"));
+                .andExpect(jsonPath("$.user.email").value("jwt-token-type-happy-path@example.com"));
     }
 
     /**
@@ -193,7 +193,7 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     public void testReplayingRotatedRefreshTokenRevokesTokenFamily() throws Exception {
         when(authRateLimiterService.allowTokenAction(anyString(), any())).thenReturn(true);
 
-        AuthResponse tokens = registerAndCaptureTokens("p0-10-reuse-detection@example.com");
+        AuthResponse tokens = registerAndCaptureTokens("jwt-token-type-reuse-detection@example.com");
         String rotatedAwayRefreshToken = tokens.getRefreshToken();
         var userId = jwtUtil.getUserIdFromToken(rotatedAwayRefreshToken);
 

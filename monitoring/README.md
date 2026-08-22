@@ -28,7 +28,7 @@ make monitoring-up
 
 Routes the 15 `alerts.yml` rules to a real receiver — Prometheus firing an alert
 with nowhere to send it is a red square on a dashboard nobody is watching during
-the incident, which was the state of this repo before P1-20.
+the incident, which was the state of this repo before Alertmanager was wired up.
 
 - **Port:** 9093 (localhost only) — UI at http://localhost:9093
 - **Config:** rendered at container start by `alertmanager/render-config.sh` from
@@ -46,12 +46,12 @@ the incident, which was the state of this repo before P1-20.
   `*High`/`*Growing`/`*Stale` warning for the same `component` — 15 rules firing
   ungrouped at 3am is its own failure mode. See `alertmanager/render-config.sh`
   for the exact rules.
-- **Verified live** (P1-20): a synthetic `DeliveryPendingBacklogCritical` alert
+- **Verified live**: a synthetic `DeliveryPendingBacklogCritical` alert
   was POSTed to Alertmanager's `/api/v2/alerts`, routed to the `hookflow-critical`
   receiver, and delivered as a webhook POST to a throwaway HTTP listener —
   payload received, 200 OK. A paired `DeliveryPendingBacklogHigh` (warning, same
   component) was correctly suppressed (`"state":"suppressed","inhibitedBy":[...]`
-  in `/api/v2/alerts`). See the P1-20 task's Progress log for the full transcript.
+  in `/api/v2/alerts`).
 
 ### Metrics-scrape auth
 
@@ -77,12 +77,12 @@ scrapes `/actuator/prometheus` on the API's main `http` port (8080), which is
 still behind SecurityConfig's auth there — that scrape target 401s today. The
 worker's ServiceMonitor is fine (worker has no `spring-security` dependency at
 all — its actuator was just unreachable, see below). This wasn't fixed in
-P1-20: doing it properly means adding a management port to
+Doing it properly means adding a management port to
 `api-deployment.yaml`/`api-service.yaml`/`servicemonitor.yaml`/`values.yaml`
 and re-pointing `livenessProbe`/`readinessProbe`, which needs a real cluster to
 validate before shipping. Tracked in `docs/OPERATIONS.md`.
 
-**Bonus fix, not just Compose (P1-20):** `MANAGEMENT_ADDRESS` defaulted to
+**Bonus fix, not just Compose:** `MANAGEMENT_ADDRESS` defaulted to
 `127.0.0.1` — loopback *inside* the worker's own container — which silently
 made `worker:8081` unreachable from any other container, including this
 Prometheus (scrape always failed) and, in the Helm/K8s deployment, **kubelet's
@@ -218,7 +218,7 @@ curl -s http://localhost:9093/api/v2/alerts | jq .
 
 Monitoring connects to the platform's existing Docker network as an
 **external** network — no changes needed there. The main `docker-compose.yml`
-*was* changed (P1-20): the API gained a dedicated `MANAGEMENT_PORT` (8082) so
+*was* changed: the API gained a dedicated `MANAGEMENT_PORT` (8082) so
 Prometheus can scrape it without authenticating, and the worker's
 `MANAGEMENT_ADDRESS` default changed from `127.0.0.1` to `0.0.0.0` so it's
 reachable at all. See "Metrics-scrape auth" above.

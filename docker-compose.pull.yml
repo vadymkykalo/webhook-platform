@@ -178,7 +178,7 @@ services:
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SERVER_PORT: 8080
-      # P1-20: actuator (incl. /actuator/prometheus) is split onto its own port so
+      # Actuator (incl. /actuator/prometheus) is split onto its own port so
       # Prometheus can scrape it without going through the JWT/API-key-authenticated
       # SecurityConfig filter chain on 8080. Not published to the host — only
       # reachable from other containers on webhook-network, same trust boundary
@@ -326,7 +326,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       DB_JDBC_URL: ${DB_JDBC_URL:-}
-      # P1-26: see docker-compose.yml's worker block -- WORKER_DB_POOL_MAX_SIZE/MIN_IDLE are
+      # See docker-compose.yml's worker block -- WORKER_DB_POOL_MAX_SIZE/MIN_IDLE are
       # deliberately distinct from the API's DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE (.env.dist), or
       # a single shared .env value silently overrides both services' independently-tuned pools.
       DB_POOL_MAX_SIZE: ${WORKER_DB_POOL_MAX_SIZE:-40}

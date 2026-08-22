@@ -43,12 +43,12 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <!-- P1-19: see webhook-platform-api/pom.xml for why this was bumped. -->
+                <!-- See webhook-platform-api/pom.xml for why this was bumped. -->
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.6</version>
             </plugin>
             <!--
-              P1-28: threshold gate against this module's own merged
+              Threshold gate against this module's own merged
               unit+integration coverage (target/jacoco-merged.exec, built by
               the jacoco-merge execution in the root pom). Bound to `verify`
               deliberately - see the root pom's jacoco-merge comment and
@@ -67,12 +67,11 @@
               counts common's classes (e.g. simple enums) getting
               incidentally exercised while api/worker/cli run THEIR OWN
               tests, which a per-module check scoped to this module's own
-              exec data correctly does not see. Confirmed the hard way: this
-              rule was first set at 0.55 (matching the aggregate figure) and
-              failed immediately with "instructions covered ratio is 0.45" -
-              see this task's Progress log. Set a few points below the real
-              45.51%, not at it, per the same "don't repeat P1-17" reasoning
-              documented on every rule in this task.
+              exec data correctly does not see - setting this rule to the
+              aggregate 0.55 fails immediately with "instructions covered
+              ratio is 0.45". Set a few points below the real 45.51%, not at
+              it: a gate pinned exactly at the current number goes red on
+              ordinary measurement jitter.
             -->
             <plugin>
                 <groupId>org.jacoco</groupId>

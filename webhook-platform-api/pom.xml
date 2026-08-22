@@ -71,7 +71,7 @@
             <artifactId>flyway-core</artifactId>
         </dependency>
         <!--
-          P1-19: required as of Flyway 10 (bundled from Spring Boot 3.3+) -
+          Required as of Flyway 10 (bundled from Spring Boot 3.3+) -
           database support was split out of flyway-core into per-database
           modules. Without this, Flyway fails at startup with
           "Unsupported Database: PostgreSQL".
@@ -102,7 +102,7 @@
             <version>0.13.0</version>
             <scope>runtime</scope>
         </dependency>
-        <!-- P1-19: 8.10.1 checked against Maven Central - already the latest
+        <!-- 8.10.1 checked against Maven Central - already the latest
              release under the com.bucket4j coordinates; no bump needed. The
              project has since started publishing newer 8.x releases under
              io.github.bucket4j instead, which is a groupId/artifactId rename,
@@ -122,7 +122,7 @@
             <artifactId>caffeine</artifactId>
         </dependency>
         <!--
-          P1-19: bumped to 28.4.0, the last version before stripe-java 29.0.0
+          Bumped to 28.4.0, the last version before stripe-java 29.0.0
           (2025-04-01, Stripe API "basil" 2025-03-31) removed
           Subscription#getCurrentPeriodStart/End() and Invoice#getSubscription()
           / #getPaymentIntent() in favor of SubscriptionItem-level periods and
@@ -163,7 +163,7 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
         <!--
-          P1-19: bumped within the 5.x line only (latest is 5.16.0). ShedLock
+          Bumped within the 5.x line only (latest is 5.16.0). ShedLock
           6.0.0 (2025) restructured lock-provider internals - e.g. multiple
           LockProvider support - and 7.0.0-RC1 moved DatabaseProduct to a new
           package and tightened SQL-provider error handling; neither release's
@@ -188,7 +188,7 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- P1-19: 1.21.4 is already the latest 1.x release (matches Spring
+        <!-- 1.21.4 is already the latest 1.x release (matches Spring
              Boot 3.5's own managed Testcontainers baseline of 1.21.x).
              Testcontainers 2.0.0 is a new major line published in 2026 -
              out of scope here; left for a separate, dedicated change. -->
@@ -233,7 +233,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <!--
-                  P1-19: 2.22.2 predates JUnit 5.9+'s OutputDirectoryProvider
+                  2.22.2 predates JUnit 5.9+'s OutputDirectoryProvider
                   API. With Spring Boot 3.5.16's newer managed JUnit Jupiter
                   version, that old surefire silently discovered zero tests
                   ("unaligned versions of the junit-platform-engine and
@@ -243,7 +243,7 @@
                 <version>3.5.6</version>
             </plugin>
             <!--
-              P1-28: see the matching comment in webhook-platform-common's
+              See the matching comment in webhook-platform-common's
               pom.xml for the shared rationale (merged exec file, `verify`
               phase choice). Two rules here, not one:
 
@@ -255,7 +255,7 @@
                  covered.
               2. CLASS - floor on OutboxPublisherService specifically
                  (measured 56.5% 2026-08-21), the outbox-side half of the
-                 delivery path this task was asked to call out (the other
+                 delivery path (the other
                  half - WebhookDeliveryService, RetrySchedulerService,
                  OrderingBufferService, DeliveryConsumer - lives in
                  webhook-platform-worker and has its own CLASS rule there).
@@ -265,9 +265,9 @@
                  is deliberately NOT included here despite also being part of
                  the ordering/delivery path: measured at 6.8% today,
                  essentially untested. Setting a floor near its actual value
-                 would just rubber-stamp the gap instead of flagging it - left
-                 for P1-23 (FIFO ordering fixes) to raise for real and add to
-                 this rule.
+                 would just rubber-stamp the gap instead of flagging it -
+                 raise it for real and add it to this rule once the class is
+                 actually tested.
             -->
             <plugin>
                 <groupId>org.jacoco</groupId>

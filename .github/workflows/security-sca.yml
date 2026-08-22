@@ -80,7 +80,7 @@ jobs:
       #
       # -DknownExploitedEnabled=false: the CISA KEV datafeed
       # (cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json)
-      # returned 403 from this task's build environment (a cloud/datacenter
+      # returned 403 from a cloud/datacenter
       # egress IP) — bot-protection on that .gov host blocks non-browser
       # clients, not something we control, and this is a commonly reported
       # issue from CI/cloud IPs generally. Without disabling it, the whole scan

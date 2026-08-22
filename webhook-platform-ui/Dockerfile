@@ -1,5 +1,5 @@
 # Build stage
-# P1-19: node:18-alpine went EOL April 2025. 22-alpine is the current
+# Node:18-alpine went EOL April 2025. 22-alpine is the current
 # Maintenance LTS line (actively rebuilt/patched as of 2026-08).
 FROM node:22-alpine AS build
 
@@ -18,7 +18,7 @@ COPY webhook-platform-ui/ .
 RUN npm run build
 
 # Runtime stage
-# P1-19: bumped from the 1.25 stable branch (past EOL) to the current 1.30
+# Bumped from the 1.25 stable branch (past EOL) to the current 1.30
 # stable branch.
 FROM nginx:1.30-alpine
 

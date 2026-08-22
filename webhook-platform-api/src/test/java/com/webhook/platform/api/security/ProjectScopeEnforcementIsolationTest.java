@@ -154,7 +154,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Structural test — the actual point of this task.
+    // Structural test — the actual point of this class.
     // ─────────────────────────────────────────────────────────────────────
 
     private record RouteHandler(Class<?> controller, Method method, String fullPath) {
@@ -218,7 +218,7 @@ public class ProjectScopeEnforcementIsolationTest extends AbstractIntegrationTes
 
         // Pin down that specific, previously-vulnerable handlers are actually
         // found by the scan and are not exempt — this ties the structural
-        // guarantee back to the concrete defects this task fixes.
+        // guarantee back to the concrete defects it protects against.
         Set<String> mustBeCoveredAndUnexempt = Set.of(
                 "EndpointController.rotateSecret",
                 "SchemaController.listEventTypes",

@@ -1,8 +1,8 @@
 # License decisions
 
 Hookflow itself is [MIT](../../LICENSE). This records the two license
-questions an evaluating company's legal team is most likely to raise, per
-P2-33, plus how they were checked.
+questions an evaluating company's legal team is most likely to raise,
+plus how they were checked.
 
 ## MinIO is AGPL-3.0 — decision: keep it, but it is opt-in and undeployed by default
 
@@ -66,11 +66,10 @@ PostgreSQL/Redis/Kafka, all permissively licensed). The relevant risk here
 isn't license, it's *availability*: Bitnami's free container registry
 retention/tagging policy has changed unfavorably before, and the exact image
 tags these subchart versions resolve to are outside this repo's control —
-that's tracked as an infrastructure/supply-chain concern under **P1-19**
-(Spring Boot + base image upgrade), which is running concurrently with this
-task. This task does not block on P1-19 landing; it only records that the
-pins exist and are Apache-2.0, so there is no license exception to write up
-for them, only an availability one to watch.
+that's tracked separately as an infrastructure/supply-chain concern, not a
+license one. This document only records that the pins exist and are
+Apache-2.0, so there is no license exception to write up for them — only an
+availability one to watch.
 
 ## How this was verified (not just asserted)
 

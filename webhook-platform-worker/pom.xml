@@ -179,24 +179,25 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <!-- P1-19: see webhook-platform-api/pom.xml for why this was bumped. -->
+                <!-- See webhook-platform-api/pom.xml for why this was bumped. -->
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.6</version>
             </plugin>
             <!--
-              P1-28: see the matching comment in webhook-platform-common's
+              See the matching comment in webhook-platform-common's
               pom.xml for the shared rationale (merged exec file, `verify`
               phase choice). Two rules here, not one:
 
               1. BUNDLE - project floor for this module. Baseline measured
                  2026-08-21 (unit + integration merged): INSTRUCTION 73.0%
                  (9332/12779).
-              2. CLASS - P1-28's actual point, not the BUNDLE number above:
+              2. CLASS - the actual point of this gate, not the BUNDLE
+                 number above:
                  this module's overall percentage could stay high while the
                  delivery path itself regresses, because it also contains a
                  lot of easy-to-cover CRUD/config code. Pins a floor
-                 specifically to the classes P1-21/P1-22 added delivery-path
-                 tests for (WebhookDeliveryService 73.2%, RetrySchedulerService
+                 specifically to the classes carrying dedicated delivery-path
+                 tests (WebhookDeliveryService 73.2%, RetrySchedulerService
                  82.7%, OrderingBufferService 95.3%, DeliveryConsumer 95.8%
                  - all measured 2026-08-21), so those cannot silently erode
                  while the module-wide number keeps climbing elsewhere. 65%

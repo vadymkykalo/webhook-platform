@@ -37,11 +37,9 @@ tests don't share state or need fixtures:
 
 ## Why not generate this from OpenAPI
 
-P2-33 ("OSS metadata, docs site, demo, committed OpenAPI") is a separate,
-not-yet-done task that would commit a versioned OpenAPI spec to the repo.
-Once that exists, generating these expectations from the spec (or running a
+Generating these expectations from the committed OpenAPI spec (or running a
 contract-diff tool against it) is strictly better than this file's
 hand-written assertions — it catches drift at spec-review time instead of
 only when this suite happens to run, and it stays in sync automatically as
 the API's DTOs change. Until then, this hand-written suite against a live
-instance is the documented fallback (see P3-35's task file).
+instance is the documented fallback.

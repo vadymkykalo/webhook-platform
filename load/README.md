@@ -1,8 +1,7 @@
 # Load & soak harness (k6)
 
 Nothing measured this platform's throughput or failure behaviour before this
-directory existed — see `.claude/features/P3-35-load-and-contract-tests.md`.
-These scripts fill that gap: four scenarios plus a soak runner, all driving
+directory existed. These scripts fill that gap: four scenarios plus a soak runner, all driving
 the real ingestion API (`POST /api/v1/events`) and a controllable mock
 "customer server" (`load/receiver`) standing in for the far end of a webhook
 delivery.
@@ -18,7 +17,7 @@ load/
   ingest.js                  sustained ingestion at target RPS
   fanout.js                  1 event -> N deliveries
   failure-recovery.js        endpoint goes slow -> down -> recovers, under live traffic
-  ordering.js                ordered deliveries under an induced-retry backlog (P1-23)
+  ordering.js                ordered deliveries under an induced-retry backlog
   soak.js                    hours-long moderate ingestion, for leak-hunting
   scripts/monitor-soak.sh    polls connection pool / JVM memory / outbox depth / Redis size
   scripts/outbox-depth.sh    one-shot outbox backlog snapshot
@@ -88,7 +87,7 @@ and the comment block at the top of each scenario file.
 - **Ordering**: `load/ordering.js`'s own threshold (`ordering_violations ==
   0`) fails the `k6 run` (non-zero exit) if the receiver saw sequence numbers
   arrive out of order — see `load/ordering.js`'s header comment for exactly
-  how it reproduces the P1-23 backlog condition.
+  how it reproduces the backlog condition.
 
 ## Soak run
 
@@ -148,9 +147,8 @@ the repo, throwaway) plus the real `load/receiver/server.js`. This confirmed:
   and reported out-of-order arrivals and **failed the k6 run** (`exit 99`,
   `thresholds on metrics 'ordering_violations' have been crossed`) — i.e. the
   scenario is a real regression check, not just a log line. It has not yet
-  been run against the actual `OrderingBufferService` — see P1-23's own
-  verification section for the Redis-flush drill that exercises that code
-  directly.
+  been run against the actual `OrderingBufferService`; the Redis-flush drill
+  in `DeliveryEndToEndIntegrationTest` exercises that code directly instead.
 - `soak.js` runs under `constant-arrival-rate` and reports a receiver summary
   in teardown; the 4-hour run itself was not executed here (a few hours is
   a few hours regardless of sandbox time budget).

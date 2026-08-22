@@ -559,7 +559,7 @@ class DeliveryEndToEndIntegrationTest {
      * <p><b>Honesty note</b>: this test only makes the HTTP response itself slow (via WireMock's
      * fixed delay), not the bookkeeping step that actually raced the timeout pre-fix - there is
      * no test-only seam into that DB write's timing without adding one to production code, which
-     * this task deliberately avoids. The margin here (1s timeout, ~950ms response) is tightened
+     * is deliberately avoided here. The margin here (1s timeout, ~950ms response) is tightened
      * as far as reasonably possible so that ordinary Testcontainers-Postgres write latency has a
      * real chance of tipping a reverted build over the boundary, but unlike
      * {@link #retryClaimedThenAbandoned_isRecoveredNotStranded()} (which deterministically proves
@@ -726,10 +726,10 @@ class DeliveryEndToEndIntegrationTest {
      * <p>Deliberately deletes only the {@code seq:*} ordering keys rather than issuing a real
      * {@code FLUSHALL} against the whole Redis instance: a full flush also wipes {@code
      * RedisConcurrencyControlService}'s per-endpoint semaphore keys out from under its local
-     * "already initialized" cache (a separate, pre-existing issue unrelated to ordering -- see
-     * this task's Progress log), which stalls delivery entirely and would make this test fail
-     * for a reason that has nothing to do with 23a/23c. Deleting only {@code seq:*} is also a
-     * more faithful simulation of the actual bug scenario described in the task
+     * "already initialized" cache (a separate, pre-existing issue unrelated to ordering),
+     * which stalls delivery entirely and would make this test fail for a reason that has
+     * nothing to do with ordering. Deleting only {@code seq:*} is also a more faithful
+     * simulation of the real scenario
      * ("the 24h delivered-seq-ttl-hours lapses, or Redis is flushed") than a full flush would
      * be, since a TTL lapse naturally only ever removes these specific keys.
      *

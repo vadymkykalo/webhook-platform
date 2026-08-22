@@ -29,23 +29,22 @@ module.exports = {
     'react-hooks/exhaustive-deps': 'warn',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'off',
-    // P2-32: i18next is configured with interpolation.escapeValue: false (correct
+    // I18next is configured with interpolation.escapeValue: false (correct
     // for normal React rendering, since React already escapes text children).
     // That setting becomes a stored-XSS hole the moment translated, interpolated
     // text is piped into dangerouslySetInnerHTML instead — an unescaped
     // user-controlled value (project name, event type, email, …) gets injected
     // as raw HTML. Use react-i18next's <Trans> component for "bold a word in a
     // translated sentence" instead; it renders markup as real React elements and
-    // escapes interpolated values. See .claude/features/P2-32-dangerously-set-inner-html.md.
+    // escapes interpolated values.
     'react/no-danger': 'error',
   },
   overrides: [
     {
-      // P2-31: these are the "core operational" pages an audit found leaking
+      // These are the "core operational" pages an audit found leaking
       // raw hardcoded English JSX text instead of going through t() — status
-      // filters, workflow node labels, rule action badges, etc. (see
-      // .claude/features/P2-31-i18n-and-bundle.md). Scoped here rather than
-      // project-wide because the rest of the app (Landing/Docs marketing
+      // filters, workflow node labels, rule action badges, etc. Scoped here
+      // rather than project-wide because the rest of the app (Landing/Docs marketing
       // copy, code samples, other untouched pages) hasn't been audited for
       // this and would need its own pass of exclusions to avoid drowning in
       // false positives on legitimate literal content.

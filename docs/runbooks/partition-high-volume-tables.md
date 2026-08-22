@@ -300,8 +300,8 @@ Both are named in the original task alongside `delivery_attempts` and
   deliveries(id, created_at)`) and update the JPA entity + repository in
   **both** `api` and `worker` (the two-entity rule) — a materially bigger,
   cross-module change than the two tables done here, on the exact tables this
-  codebase's own P0 history (P0-01 through P0-05, P0-37, P0-38) shows are the
-  easiest place to introduce a subtle, hard-to-catch correctness regression.
+  codebase's own bug history shows are the easiest place to introduce a
+  subtle, hard-to-catch correctness regression.
 - `deliveries` retention isn't a single global cutoff to begin with:
   `RetentionCleanupScheduler` deletes based on each organization's **plan**
   (`plans.max_retention_days`, currently 7/30/90/365/unlimited across the five
@@ -366,7 +366,7 @@ traffic data** (documented here rather than acted on blind):
   (endpoint_id, sequence_number, created_at) WHERE status = 'PENDING' AND
   ordering_enabled = true` — overlapping but not identical predicates
   (`PROCESSING` rows and non-ordering `PENDING` rows are each covered by only
-  one of the two). Given this codebase's FIFO-ordering bug history (P1-23),
+  one of the two). Given this codebase's FIFO-ordering bug history,
   don't touch either without a dedicated look at `OrderingBufferService`'s
   query patterns.
 - `idx_events_project_id (project_id)` vs. the wider `idx_events_project_id_id

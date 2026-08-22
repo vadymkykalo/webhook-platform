@@ -16,19 +16,14 @@ doing all the persuasion. But a public demo with live cross-tenant data
 leakage would actively damage trust rather than build it, so this plan does
 not proceed until two preconditions are both true:
 
-1. **P0-08 and P0-13 (tenancy/IDOR fixes) must be merged to `develop`.**
-   Verified: both are `DONE` on the task board
-   (`.claude/features/README.md`), and this branch was cut from `develop` at
-   commit `6b3e28a`, which already contains both merges
-   (`f7d2623 Merge feature/P0-13-project-scope-interceptor into develop` and
-   the P0-08 merge before it in `git log --oneline`). Confirmed present:
+1. **The tenancy/IDOR fixes must be in the tree.** Confirmed present:
    `AuthContext.validateProjectAccess`, the `@RequireOrgAccess` /
    `OrgAccessAspect` org-scoping check, and the API-key project-scope
-   interceptor from P0-13 are all in this tree.
+   interceptor.
 2. **The demo must be read-only and seeded, not a live shared write surface.**
    A demo where two anonymous visitors can see or modify each other's data is
-   a *new* tenancy bug even with P0-08/P0-13 fixed, if it isn't designed for
-   isolation from the start (see "Isolation model" below).
+   a *new* tenancy bug even with tenancy scoping fixed, if it isn't designed
+   for isolation from the start (see "Isolation model" below).
 
 ## Proposed design
 
@@ -61,7 +56,7 @@ not proceed until two preconditions are both true:
 - Demo data lives in its own organization/project, exactly like any other
   tenant — no code path bypasses the standard org/project scoping to serve
   it. This is deliberate: the demo should exercise the *real* isolation
-  guarantees (P0-08/P0-13's fixes), not a special-cased read path that could
+  guarantees, not a special-cased read path that could
   drift out of sync with them.
 - A scheduled job resets demo data on an interval (e.g. every 30–60 minutes):
   truncate and re-seed, so no visitor can leave graffiti for the next one and

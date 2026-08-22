@@ -5,10 +5,9 @@ set -euo pipefail
 # Helm chart, the UI package.json, any of the three SDK manifests, or (when
 # HEAD sits exactly on a release tag) the tag itself.
 #
-# This exists because P1-16 found five sources of truth silently drifting
-# apart for months: root pom.xml frozen at 1.0.0-SNAPSHOT while eight tags
-# were cut, Chart.yaml and ui/package.json never touched at all. See
-# .claude/features/P1-16-version-and-changelog.md and CHANGELOG.md.
+# This exists because five sources of truth silently drifted apart for
+# months: root pom.xml frozen at 1.0.0-SNAPSHOT while eight tags were cut,
+# Chart.yaml and ui/package.json never touched at all.
 #
 # Usage:
 #   scripts/check-version-drift.sh

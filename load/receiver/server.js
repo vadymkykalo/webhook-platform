@@ -9,7 +9,7 @@
  * so a k6 scenario can flip it between healthy / slow / down mid-run (for
  * the failure-recovery scenario) or make it fail the first N attempts for a
  * given delivery (to force the retries that back up an ordered subscription
- * in the ordering scenario — see load/ordering.js and P1-23).
+ * in the ordering scenario — see load/ordering.js).
  *
  * Zero npm dependencies on purpose: it runs as `node load/receiver/server.js`
  * inside a plain `node:*-alpine` container (see load/docker-compose.load.yml)
