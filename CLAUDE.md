@@ -4,9 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-`make help` lists every target. Non-obvious bit: `make up` also creates `.env` from `.env.dist` and creates the Kafka topics — don't do either by hand.
+Java 17 + Spring Boot 3.5 (Maven reactor), React + Vite + TypeScript in `webhook-platform-ui`.
 
-For running or writing Java tests, use the `backend-tests` skill — test class names decide which CI job a test lands in.
+`make help` lists every target. Non-obvious bits: `make up` also creates `.env` from `.env.dist` and creates the Kafka topics — don't do either by hand; `make dev-api` / `dev-worker` / `dev-ui` rebuild one service with cache and restart it, which is the fast inner loop once the stack is up.
+
+```bash
+mvn clean compile -B                # what CI compiles with
+mvn package -DskipTests -B          # build all module jars
+make test-ui                        # frontend unit tests (Vitest)
+npm run lint && npm run typecheck    # in webhook-platform-ui/, both gate CI
+```
+
+For running or writing Java tests, use the `backend-tests` skill — test class names decide which CI job a test lands in, and `scripts/check-test-routing.sh` fails the build when a Docker-dependent test is named so it routes to the no-Docker unit job.
+
+### Two checks that fail CI for reasons that aren't in the diff
+
+- **`openapi.yaml` is committed and semantically diffed** against the spec springdoc serves, by `OpenApiDriftIntegrationTest`. After an intentional API change, regenerate rather than hand-edit:
+  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`, then review and commit the file.
+- **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version *and* appVersion), `webhook-platform-ui/package.json`, and all three SDK manifests under `sdks/`. Never bump one by hand: `make version-set VERSION=2.4.0`, and `make version-check` runs the same drift check CI does.
 
 ## Git workflow (GitFlow)
 
