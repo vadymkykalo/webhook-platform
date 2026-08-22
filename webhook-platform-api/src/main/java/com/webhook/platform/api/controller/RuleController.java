@@ -31,7 +31,7 @@ public class RuleController {
 
     private final RuleService ruleService;
 
-    @Operation(summary = "Create rule", description = "Creates a new event processing rule with conditions and actions")
+    @Operation(operationId = "createRule", summary = "Create rule", description = "Creates a new event processing rule with conditions and actions")
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("rules")
@@ -46,7 +46,7 @@ public class RuleController {
                 .body(ruleService.create(projectId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Get rule", description = "Returns rule details with conditions, actions, and execution stats")
+    @Operation(operationId = "getRule", summary = "Get rule", description = "Returns rule details with conditions, actions, and execution stats")
     @GetMapping("/{id}")
     public ResponseEntity<RuleResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -56,7 +56,7 @@ public class RuleController {
         return ResponseEntity.ok(ruleService.get(id, auth.organizationId()));
     }
 
-    @Operation(summary = "List rules", description = "Returns all rules for the project ordered by priority")
+    @Operation(operationId = "listRules", summary = "List rules", description = "Returns all rules for the project ordered by priority")
     @GetMapping
     public ResponseEntity<List<RuleResponse>> list(
             @PathVariable("projectId") UUID projectId,
@@ -65,7 +65,7 @@ public class RuleController {
         return ResponseEntity.ok(ruleService.list(projectId, auth.organizationId()));
     }
 
-    @Operation(summary = "Update rule", description = "Updates rule conditions, actions, and settings")
+    @Operation(operationId = "updateRule", summary = "Update rule", description = "Updates rule conditions, actions, and settings")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("rules")
     @PutMapping("/{id}")
@@ -79,7 +79,7 @@ public class RuleController {
         return ResponseEntity.ok(ruleService.update(id, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Delete rule", description = "Removes a rule and all its actions")
+    @Operation(operationId = "deleteRule", summary = "Delete rule", description = "Removes a rule and all its actions")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
@@ -93,7 +93,7 @@ public class RuleController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Toggle rule enabled/disabled")
+    @Operation(operationId = "toggleRule", summary = "Toggle rule enabled/disabled")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<RuleResponse> toggle(

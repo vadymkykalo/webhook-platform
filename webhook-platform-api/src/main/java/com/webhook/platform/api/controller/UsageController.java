@@ -22,7 +22,7 @@ public class UsageController {
 
     private final UsageService usageService;
 
-    @Operation(summary = "Get usage stats", description = "Returns live usage counts and daily history for the project")
+    @Operation(operationId = "getProjectUsage", summary = "Get usage stats", description = "Returns live usage counts and daily history for the project")
     @GetMapping
     public ResponseEntity<UsageStatsResponse> getUsage(
             @PathVariable("projectId") UUID projectId,

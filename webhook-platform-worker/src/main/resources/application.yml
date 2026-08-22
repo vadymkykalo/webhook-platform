@@ -129,6 +129,12 @@ dlq:
 
 ordering:
   gap-timeout-seconds: ${ORDERING_GAP_TIMEOUT_SECONDS:60}
+  # Fallback poll interval for a delivery parked behind an outstanding sequence. The fast
+  # path is WebhookDeliveryService#triggerBufferedDeliveries, which republishes buffered
+  # deliveries as soon as the sequence ahead completes; this only covers the case where a
+  # delivery reaches the buffer after that trigger already fired. Lower drains an
+  # out-of-order burst faster at the cost of more DB polling.
+  buffer-reschedule-delay-seconds: ${ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS:5}
   delivered-seq-ttl-hours: ${ORDERING_DELIVERED_SEQ_TTL_HOURS:24}
   buffer-ttl-minutes: ${ORDERING_BUFFER_TTL_MINUTES:10}
   # How often webhook_ordering_buffer_size is resynced against Redis (ms). A SCAN over

@@ -61,6 +61,9 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WebhookDeliveryServiceTest {
 
+    /** Production default for {@code ordering.buffer-reschedule-delay-seconds}. */
+    private static final int ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS = 5;
+
     @Mock
     private DeliveryRepository deliveryRepository;
     @Mock
@@ -124,7 +127,8 @@ class WebhookDeliveryServiceTest {
                 circuitBreakerService, meterRegistry, new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
-                ConnectionProvider.newConnection());
+                ConnectionProvider.newConnection(),
+                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
     }
 
     private Delivery pendingDelivery(UUID id) {
@@ -240,7 +244,8 @@ class WebhookDeliveryServiceTest {
                 circuitBreakerService, new SimpleMeterRegistry(), new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
-                ConnectionProvider.newConnection());
+                ConnectionProvider.newConnection(),
+                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
 
         UUID endpointId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
@@ -358,7 +363,8 @@ class WebhookDeliveryServiceTest {
                 circuitBreakerService, meterRegistry, new ObjectMapper(),
                 orderingBufferService, kafkaTemplate, payloadTransformService,
                 transactionTemplate, transformationCacheService,
-                ConnectionProvider.newConnection());
+                ConnectionProvider.newConnection(),
+                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
     }
 
     /**

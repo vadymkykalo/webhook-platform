@@ -1,0 +1,145 @@
+name: Security SCA
+
+# OWASP Dependency-Check used to run as a job inside CI, on every push and every
+# pull request. Measured over recent runs that cost 6-7 minutes with a warm NVD
+# cache and 60-104 minutes without one — and "without one" was the common case,
+# because `actions/cache` skips its save step when the job fails, so a red scan
+# guaranteed the next run started cold too. Dependabot opening ~30 PRs at once
+# then multiplied that, which is what led to Dependabot being paused entirely.
+#
+# It is not a per-push gate for two reasons beyond cost. Its input is the NVD
+# feed, which changes on its own schedule rather than with the diff, so running
+# it per commit re-asks a question the commit did not change; and CI's Trivy
+# image scan (`container-scan`) already inspects the same Maven artifacts inside
+# the built images on every push, so pull requests keep dependency-CVE coverage.
+# What this adds on top is OWASP's own matching and the reviewed suppression
+# file, which is worth having nightly and before a release, not per commit.
+on:
+  schedule:
+    # 04:00 UTC daily — after the load/contract workflow's 03:30 slot.
+    - cron: '0 4 * * *'
+  push:
+    branches:
+      - 'release/**'
+      - 'hotfix/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-sca:
+    name: SCA (OWASP Dependency-Check)
+    runs-on: ubuntu-latest
+    # A cold NVD backfill legitimately takes ~45 minutes; anything past an hour
+    # is a hung download, not a slow one. Without this the job has run for
+    # 1h44m before failing.
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Compute cache week key
+        id: dc-cache-week
+        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      # Persist OWASP's local NVD mirror across runs. Without it every run
+      # backfills the entire NVD history (380k+ CVEs, ~500MB) before it can
+      # analyze anything. Keyed by week so the mirror still refreshes regularly
+      # rather than going stale forever.
+      #
+      # Split into restore + save (rather than the combined `actions/cache`)
+      # specifically so the save runs `if: always()`. The combined action skips
+      # its save step when the job fails, which is exactly backwards here: a scan
+      # that fails on a real CVE has still downloaded the 500MB mirror, and
+      # throwing it away means the next run pays the cold-start cost again and is
+      # far more likely to fail on a timeout — the failure mode that kept this
+      # job red.
+      - name: Restore OWASP Dependency-Check NVD data
+        id: dc-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
+          restore-keys: |
+            dependency-check-data-
+
+      # Gates on CVSS >= 9 (CRITICAL) first, staged the same way as CI's Trivy
+      # scan: widen to HIGH (CVSS >= 7) once the CRITICAL backlog is clear. Known
+      # false positives go in the reviewed suppression file, not a blanket
+      # continue-on-error.
+      #
+      # -DknownExploitedEnabled=false: the CISA KEV datafeed
+      # (cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json)
+      # returned 403 from this task's build environment (a cloud/datacenter
+      # egress IP) — bot-protection on that .gov host blocks non-browser
+      # clients, not something we control, and this is a commonly reported
+      # issue from CI/cloud IPs generally. Without disabling it, the whole scan
+      # hard-fails on a feed download error before any CVE analysis runs, which
+      # is a false-red build, not a real finding. If GitHub-hosted runners turn
+      # out to reach that host fine, re-enabling this is a one-line revert.
+      # NVD itself (services.nvd.nist.gov) was reachable without this flag.
+      #
+      # NVD_API_KEY: repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
+      # is set. Without it, unauthenticated NVD requests are rate-limited hard
+      # enough that this step reliably fails.
+      #
+      # Plugin pinned at 12.1.0, not the 9.0.9 originally used: 9.0.9's HTTP
+      # client got a straight-up Cloudflare "Attention Required" block page
+      # (403, WAF-level) hitting services.nvd.nist.gov, reproduced locally
+      # with -X debug logging — the exact same URL + API key via plain curl
+      # returned 200. Not a key or rate-limit problem, a client-fingerprint
+      # one. 12.1.0's HTTP stack isn't blocked; confirmed locally by letting
+      # it run past the point 9.0.9 instantly 403'd and watching it actually
+      # pull ~500MB of real NVD data. That failure is intentionally NOT
+      # swallowed by continue-on-error: a security gate that can't fetch fresh
+      # vulnerability data should go red, not silently pass.
+      # ossindexAnalyzerEnabled=false: Sonatype's OSS Index component-report
+      # API started returning 401 Unauthorized for unauthenticated requests
+      # (it's a supplementary enrichment source, not the primary one - NVD,
+      # fetched above with an API key, is). Without an OSS Index account/token
+      # this analyzer can't run at all, and unlike the NVD fetch it isn't
+      # worth gating the build on: disable it rather than let an optional
+      # analyzer's auth requirement take down an otherwise-working scan.
+      - name: Run OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn org.owasp:dependency-check-maven:12.1.0:aggregate -B -DskipTests
+          -DfailBuildOnCVSS=9
+          -DknownExploitedEnabled=false
+          -DossindexAnalyzerEnabled=false
+          -DnvdApiKey="${NVD_API_KEY}"
+          -DdataDirectory="$HOME/.m2/repository/org/owasp/dependency-check-data"
+          -DsuppressionFiles=.github/dependency-check-suppressions.xml
+
+      - name: Save OWASP Dependency-Check NVD data
+        if: always() && steps.dc-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
+
+      - name: Upload Dependency-Check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.html
+          retention-days: 14
+
+      - name: SCA Summary
+        if: always()
+        run: |
+          echo "### SCA (OWASP Dependency-Check) Results" >> $GITHUB_STEP_SUMMARY
+          echo "Dependency vulnerability scan completed. Report uploaded as artifact." >> $GITHUB_STEP_SUMMARY
+          echo "Gates on CVSS >= 9 (see the comment above the scan step for the staged rollout plan)." >> $GITHUB_STEP_SUMMARY

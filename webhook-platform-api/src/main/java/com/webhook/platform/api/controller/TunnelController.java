@@ -37,7 +37,7 @@ public class TunnelController {
     private final TunnelRequestLogRepository requestLogRepository;
     private final TunnelBandwidthService bandwidthService;
 
-    @Operation(summary = "Create tunnel session",
+    @Operation(operationId = "createTunnel", summary = "Create tunnel session",
             description = "Creates a new tunnel session for CLI use. The tunnelToken is returned only once.")
     @RequireQuota(QuotaType.TUNNELS)
     @PostMapping
@@ -67,7 +67,7 @@ public class TunnelController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "List active tunnels", description = "Lists all active tunnel sessions for the organization, optionally filtered by project")
+    @Operation(operationId = "listTunnels", summary = "List active tunnels", description = "Lists all active tunnel sessions for the organization, optionally filtered by project")
     @GetMapping
     public ResponseEntity<List<TunnelSessionResponse>> list(
             @RequestParam(value = "projectId", required = false) UUID projectId,

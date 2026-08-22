@@ -34,7 +34,7 @@ public class AlertController {
 
     // ─── Rules ──────────────────────────────────────────────────────────
 
-    @Operation(summary = "List alert rules")
+    @Operation(operationId = "listAlertRules", summary = "List alert rules")
     @GetMapping("/rules")
     public ResponseEntity<List<AlertRuleResponse>> listRules(
             @PathVariable("projectId") UUID projectId,
@@ -43,7 +43,7 @@ public class AlertController {
         return ResponseEntity.ok(alertService.listRules(projectId, auth.organizationId()));
     }
 
-    @Operation(summary = "Create alert rule")
+    @Operation(operationId = "createAlertRule", summary = "Create alert rule")
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/rules")
@@ -57,7 +57,7 @@ public class AlertController {
                 .body(alertService.createRule(projectId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Update alert rule")
+    @Operation(operationId = "updateAlertRule", summary = "Update alert rule")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/rules/{ruleId}")
     public ResponseEntity<AlertRuleResponse> updateRule(
@@ -70,7 +70,7 @@ public class AlertController {
         return ResponseEntity.ok(alertService.updateRule(projectId, ruleId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Delete alert rule")
+    @Operation(operationId = "deleteAlertRule", summary = "Delete alert rule")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/rules/{ruleId}")
@@ -86,7 +86,7 @@ public class AlertController {
 
     // ─── Events ─────────────────────────────────────────────────────────
 
-    @Operation(summary = "List alert events (fired alerts)")
+    @Operation(operationId = "listAlertEvents", summary = "List alert events (fired alerts)")
     @GetMapping("/events")
     public ResponseEntity<Page<AlertEventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
