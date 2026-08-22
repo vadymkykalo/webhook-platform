@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The Incoming direction is now alerted and its DLQ is now visible.** Two independent
+  blind spots, both of which meant an Incoming outage could run indefinitely without
+  anything paging anyone:
+  - `incoming_forward_attempts_total` appeared in no alert rule in any of the three
+    rule files, so a destination failing every Forward looked identical to one receiving
+    none. `IncomingForwardFailureRateHigh` mirrors the existing `DlqRateHigh` — same
+    expression shape, same 10% threshold, same 10m window — in
+    `deploy/prometheus/alerts.yml`, `monitoring/prometheus/alerts.yml` and the Helm
+    `prometheusrule.yaml`.
+  - A Forward that exhausted its Retry Ladder wrote `status = DLQ` on its
+    `incoming_forward_attempts` row and nothing else. `DlqMonitoringService` now counts
+    that backlog as `incoming_forward_dlq_depth` and watches the
+    `incoming.forward.dlq` topic as `incoming_forward_dlq_topic_retained_total`, the
+    counterparts of the existing `webhook_dlq_depth` and
+    `webhook_dlq_topic_retained_total`. The row count is the actionable one and has an
+    alert; the topic gauge is informational, as on the Outgoing side.
 - `RetryLadder` and `RetryLadderDefaults` (`webhook-platform-common`): one shared
   implementation of the retry ladder — parsing, tier clamping, jitter, exhaustion,
   and the worst-case fit against the escalation hard cap. The two directions'
@@ -60,6 +76,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the long ladder; raising one failed startup over a ladder nobody used. No action
   is needed on upgrade; see `UPGRADING.md`.
 - `scripts/check-openapi-drift.py`, superseded by `OpenApiDriftIntegrationTest`.
+
+### Fixed
+- `deploy/prometheus/alerts.yml` declared `groups:` twice at the top level. Prometheus
+  rejects a duplicate mapping key, so the whole file failed to load — the
+  `hookflow.outbox` group and every rule after it included. The two are now one mapping.
 
 ## [2.3.0] - 2026-08-22
 

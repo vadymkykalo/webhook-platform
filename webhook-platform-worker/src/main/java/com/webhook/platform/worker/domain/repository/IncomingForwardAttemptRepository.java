@@ -78,4 +78,15 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
 
         @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ' AND a.createdAt > :since")
         long countDlq(@Param("since") Instant since);
+
+        /**
+         * All-time count of Forwards abandoned into DLQ -- i.e. the actionable Incoming
+         * backlog, the counterpart of {@code DeliveryRepository#countDlqTotal()}. Used by
+         * {@code DlqMonitoringService}. Unlike {@link #countDlq(Instant)} this is not windowed
+         * by {@code createdAt}: a Forward that exhausted its retry ladder a week ago still
+         * needs a human to decide about it, and a windowed count would quietly drop it out of
+         * sight while it was still waiting.
+         */
+        @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a WHERE a.status = 'DLQ'")
+        long countDlqTotal();
 }
