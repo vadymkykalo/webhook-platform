@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.HeaderSanitizer;
@@ -280,6 +281,23 @@ public class WebhookDeliveryService {
 
         Event event = eventOpt.get();
 
+        // Parse the ladder once, here, before anything is sent. A malformed retry_delays is a
+        // configuration error that no number of retries can resolve, and letting RetryLadder
+        // throw further down — inside scheduleRetry, after the HTTP call — would leave the row
+        // PROCESSING, have StuckDeliveryRecoveryService hand it back to the ladder, and fail
+        // the same way forever. Fail it terminally instead, with the parser's own message so
+        // the operator can see which tier is wrong.
+        //
+        // The api rejects a malformed ladder on write, so reaching this branch means the row
+        // was written by something other than the api. See UPGRADING.md.
+        try {
+            RetryLadder.parse(delivery.getRetryDelays(), delivery.getMaxAttempts());
+        } catch (IllegalArgumentException e) {
+            log.error("Delivery {} carries an unusable retry ladder: {}", delivery.getId(), e.getMessage());
+            markAsFailed(delivery, "INVALID_RETRY_LADDER: " + e.getMessage());
+            return;
+        }
+
         inFlightCount.incrementAndGet();
         try {
             attemptDelivery(delivery, endpoint, event);
@@ -539,7 +557,8 @@ public class WebhookDeliveryService {
             } else {
                 fresh.setStatus(Delivery.DeliveryStatus.PENDING);
                 fresh.setClaimToken(null);
-                fresh.setNextRetryAt(RetryPolicy.calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
+                fresh.setNextRetryAt(RetryLadder.parse(fresh.getRetryDelays(), fresh.getMaxAttempts())
+                        .nextRetryAt(fresh.getAttemptCount()));
                 log.info("Scheduled retry {} for delivery {} at {}",
                         fresh.getAttemptCount(), fresh.getId(), fresh.getNextRetryAt());
                 fresh.setUpdatedAt(Instant.now());

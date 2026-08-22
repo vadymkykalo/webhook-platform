@@ -2,6 +2,7 @@ package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -59,8 +60,6 @@ public class RetrySchedulerService {
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
             @Value("${retry.scheduler.high-watermark:5000}") long highWatermark,
             @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs,
-            @Value("${retry.ladder.default-delays-seconds:60,300,900,3600,21600,86400}") String defaultRetryDelays,
-            @Value("${retry.ladder.default-max-attempts:7}") int defaultMaxAttempts,
             @Value("${delivery.escalation.hard-cap-hours:96}") long escalationHardCapHours) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
@@ -75,9 +74,24 @@ public class RetrySchedulerService {
                 "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
 
-        // Fail fast at startup rather than silently DLQ-ing the last retry tiers —
-        // see RetryPolicy.validateLadderFitsCap for the full explanation.
-        RetryPolicy.validateLadderFitsCap(defaultRetryDelays, defaultMaxAttempts, escalationHardCapHours * 3600L);
+        // Fail fast at startup rather than silently DLQ-ing the last retry tiers — see
+        // RetryLadder.requireFitsWithin for the full explanation.
+        //
+        // Validated against the ladders this platform actually hands out
+        // (RetryLadderDefaults), not against a config value. The pair of environment
+        // variables that used to feed this check — RETRY_LADDER_DEFAULT_DELAYS_SECONDS and
+        // RETRY_LADDER_DEFAULT_MAX_ATTEMPTS — read as though they set the default ladder.
+        // They never did: the real defaults are the Flyway column defaults and the api
+        // services that create the rows. All those variables could do was change what this
+        // check compared against, so lowering one made the check pass while live rows still
+        // carried the long ladder. They are gone; see UPGRADING.md.
+        //
+        // Both directions are checked. The incoming ladder was never validated at all,
+        // even though StaleDeliveryEscalationService's cap is a worker-wide setting.
+        RetryLadderDefaults.outgoing().requireFitsWithin(
+                escalationHardCapHours * 3600L, "outgoing default", "delivery.escalation.hard-cap-hours");
+        RetryLadderDefaults.incoming().requireFitsWithin(
+                escalationHardCapHours * 3600L, "incoming default", "delivery.escalation.hard-cap-hours");
     }
 
     @PostConstruct

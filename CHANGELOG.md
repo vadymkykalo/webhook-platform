@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `RetryLadder` and `RetryLadderDefaults` (`webhook-platform-common`): one shared
+  implementation of the retry ladder — parsing, tier clamping, jitter, exhaustion,
+  and the worst-case fit against the escalation hard cap. The two directions'
+  defaults are now declared once, and stay deliberately different: outgoing gets
+  `60,300,900,3600,21600,86400` over 7 attempts, incoming `60,300,900,3600,21600`
+  over 5. See `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+- Retry ladders are validated when written. `POST`/`PUT` on a subscription or an
+  incoming destination now returns `400` for a malformed `retryDelays` or an out
+  of range `maxAttempts`, with a message naming the field and the offending tier.
+- `SchemaRetryLadderDefaultsTest` fails the build when a Flyway column default for
+  `retry_delays` or `max_attempts` drifts from the Java constant it mirrors. SQL
+  cannot reference a Java constant, so nothing else kept the two in agreement.
+
 ### Changed
+- **A malformed retry ladder is no longer silently replaced.** Both pipelines used
+  to answer an unparseable `retry_delays` by logging a warning and substituting a
+  hardcoded array of their own — and the two arrays did not agree with each other,
+  so a typo bought the customer a retry policy that was neither theirs nor
+  documented anywhere. Malformed values are now rejected at write time, and a stored
+  ladder that still does not parse — only reachable by writing to the column outside
+  the api — fails its delivery or forward terminally with `INVALID_RETRY_LADDER`
+  before anything is sent, rather than being retried forever on a substituted ladder.
+- Both directions share one deferral backoff — the wait applied when an attempt is
+  turned away by a rate limit, a concurrency cap or an open circuit breaker rather
+  than made. The incoming pipeline had its own copy that shifted to `1<<6` instead
+  of `1<<10` and jittered 50%–150% instead of ±25%, so an incoming forward and an
+  outgoing delivery turned away by the same kind of limit backed off on visibly
+  different curves.
+- The startup check that a retry ladder fits inside
+  `DELIVERY_ESCALATION_HARD_CAP_HOURS` now covers **both** directions and validates
+  the ladders actually handed out, rather than a config value that could drift from
+  them. The incoming ladder was never checked at all.
 - OpenAPI drift is now checked by `OpenApiDriftIntegrationTest` rather than by
   booting the whole Compose stack with `SWAGGER_ENABLED=true` and diffing with a
   Python script. The check runs in the existing backend integration job, and an
@@ -20,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rationale stays inline; only the dangling references are gone.
 
 ### Removed
+- `RETRY_LADDER_DEFAULT_DELAYS_SECONDS` and `RETRY_LADDER_DEFAULT_MAX_ATTEMPTS`.
+  They read as though they set the default retry ladder. They never did — the real
+  defaults are the Flyway column defaults and the api services that create the
+  rows, and all these variables could change was what the startup cap check
+  compared against. Lowering one made the check pass while live rows still carried
+  the long ladder; raising one failed startup over a ladder nobody used. No action
+  is needed on upgrade; see `UPGRADING.md`.
 - `scripts/check-openapi-drift.py`, superseded by `OpenApiDriftIntegrationTest`.
 
 ## [2.3.0] - 2026-08-22

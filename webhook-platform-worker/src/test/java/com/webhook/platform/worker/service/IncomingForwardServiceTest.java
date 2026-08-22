@@ -590,4 +590,45 @@ class IncomingForwardServiceTest {
 
         verify(attemptRepository, never()).save(any(IncomingForwardAttempt.class));
     }
+
+    // -- an unusable retry ladder is a terminal configuration failure, not a retry --
+
+    @Test
+    void malformedRetryLadder_failsTerminallyWithoutForwarding() {
+        // Mirrors WebhookDeliveryServiceTest: retrying cannot fix a ladder that does not
+        // parse, and letting RetryLadder throw from calculateNextRetry after the HTTP call
+        // would leave the row PROCESSING for StuckForwardRecovery to hand back, forever.
+        IncomingDestination destination = buildDestination();
+        destination.setRetryDelays("60,oops,900");
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(destination));
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+
+        IncomingForwardAttempt claimed = IncomingForwardAttempt.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1).status(ForwardAttemptStatus.PROCESSING)
+                .build();
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(
+                eventId, destinationId)).thenReturn(List.of(claimed));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        service.processForward(message);
+
+        ArgumentCaptor<IncomingForwardAttempt> saved = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository).save(saved.capture());
+        assertThat(saved.getValue().getStatus())
+                .as("an unusable ladder must terminate the forward")
+                .isEqualTo(ForwardAttemptStatus.FAILED);
+        assertThat(saved.getValue().getErrorMessage())
+                .as("the attempt row must say why")
+                .contains("INVALID_RETRY_LADDER");
+
+        // Checked after the claim but before admission: no permit taken, nothing sent.
+        verify(concurrencyControlService, never()).tryAcquire(destinationId);
+    }
 }

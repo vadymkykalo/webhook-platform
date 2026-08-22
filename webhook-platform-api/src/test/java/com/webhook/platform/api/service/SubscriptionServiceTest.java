@@ -13,6 +13,8 @@ import com.webhook.platform.api.dto.SubscriptionRequest;
 import com.webhook.platform.api.dto.SubscriptionResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -205,5 +207,79 @@ class SubscriptionServiceTest {
         assertThatThrownBy(() -> service.updateSubscription(subId, request, orgId))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
+    }
+
+    // ── Retry ladder validation ──
+    //
+    // The ladder is rejected here rather than at delivery time. Before this the worker met a
+    // malformed value and quietly substituted a hardcoded array of its own, so a typo bought
+    // the customer a retry policy that was neither theirs nor documented anywhere.
+
+    @Test
+    void createSubscription_malformedRetryDelays_throwsWithActionableMessage() {
+        SubscriptionRequest request = baseRequest().retryDelays("60,oops,900").build();
+
+        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryDelays")
+                .hasMessageContaining("tier 2");
+
+        verify(subscriptionRepository, never()).saveAndFlush(any(Subscription.class));
+    }
+
+    @Test
+    void createSubscription_nonPositiveRetryDelay_throws() {
+        SubscriptionRequest request = baseRequest().retryDelays("60,0,900").build();
+
+        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("greater than zero");
+    }
+
+    @Test
+    void createSubscription_zeroMaxAttempts_throws() {
+        SubscriptionRequest request = baseRequest().maxAttempts(0).build();
+
+        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxAttempts");
+    }
+
+    @Test
+    void createSubscription_omittedRetryDelays_getsTheDeclaredOutgoingDefault() {
+        when(subscriptionRepository.existsByEndpointIdAndEventType(any(), any())).thenReturn(false);
+        when(subscriptionRepository.saveAndFlush(any(Subscription.class))).thenAnswer(inv -> {
+            Subscription sub = inv.getArgument(0);
+            sub.setId(UUID.randomUUID());
+            sub.setCreatedAt(Instant.now());
+            sub.setUpdatedAt(Instant.now());
+            return sub;
+        });
+
+        service.createSubscription(projectId, baseRequest().build(), orgId);
+
+        ArgumentCaptor<Subscription> saved = ArgumentCaptor.forClass(Subscription.class);
+        verify(subscriptionRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getRetryDelays()).isEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
+        assertThat(saved.getValue().getMaxAttempts()).isEqualTo(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS);
+    }
+
+    @Test
+    void updateSubscription_malformedRetryDelays_throwsAndLeavesTheRowAlone() {
+        UUID subId = UUID.randomUUID();
+        Subscription existing = Subscription.builder()
+                .id(subId).projectId(projectId).endpointId(endpointId).eventType("order.created")
+                .enabled(true).orderingEnabled(false).maxAttempts(7).timeoutSeconds(30)
+                .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
+                .createdAt(Instant.now()).updatedAt(Instant.now()).build();
+        when(subscriptionRepository.findById(subId)).thenReturn(Optional.of(existing));
+
+        SubscriptionRequest request = SubscriptionRequest.builder().retryDelays("not,a,ladder").build();
+
+        assertThatThrownBy(() -> service.updateSubscription(subId, request, orgId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("retryDelays");
+
+        assertThat(existing.getRetryDelays()).isEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);
     }
 }

@@ -1,5 +1,6 @@
 package com.webhook.platform.worker.service;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.constants.KafkaTopics;
@@ -1219,5 +1220,63 @@ class WebhookDeliveryServiceTest {
         assertTrue(captor.getAllValues().stream()
                         .anyMatch(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED),
                 "a soft-deleted endpoint must terminally fail the delivery");
+    }
+
+    // --- an unusable retry ladder is a terminal configuration failure, not a retry ---
+
+    @Test
+    void processDelivery_malformedRetryLadder_failsTerminallyWithoutSending() {
+        // Retrying cannot fix a ladder that does not parse, and letting RetryLadder throw
+        // from inside scheduleRetry would leave the row PROCESSING for StuckDeliveryRecovery
+        // to hand back, failing the same way forever. It must terminate on the first pass.
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
+
+        Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
+        delivery.setRetryDelays("60,oops,900");
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        service.processDelivery(message, true);
+
+        ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository).save(saved.capture());
+        assertEquals(Delivery.DeliveryStatus.FAILED, saved.getValue().getStatus(),
+                "an unusable ladder must terminate the delivery, not schedule another attempt");
+
+        // Nothing was sent, and no permit was ever taken: the check runs before admission.
+        verify(concurrencyControlService, never()).tryAcquire(endpointId);
+        verify(deliveryRepository, never()).incrementAttemptCount(any());
+    }
+
+    @Test
+    void processDelivery_validRetryLadder_proceedsPastTheLadderCheck() {
+        // Companion to the above: the guard must not reject the ladders the platform ships.
+        UUID endpointId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
+        when(projectRateLimiterService.tryAcquire(any())).thenReturn(false); // stop right after the check
+
+        Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
+        delivery.setRetryDelays(RetryLadderDefaults.OUTGOING_DELAYS);
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+
+        DeliveryMessage message = DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build();
+
+        service.processDelivery(message, true);
+
+        verify(projectRateLimiterService).tryAcquire(endpoint.getProjectId());
     }
 }

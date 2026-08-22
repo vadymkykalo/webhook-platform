@@ -46,7 +46,7 @@ helm install hookflow oci://ghcr.io/vadymkykalo/charts/hookflow --version <versi
 # deliveries.dispatch, deliveries.retry.{1m,5m,15m,1h,6h,24h}, deliveries.dlq
 ```
 
-### Retry ladder vs. DLQ hard-cap (P1-24a)
+### Retry ladder vs. DLQ hard-cap
 
 Outgoing deliveries retry through the 6 tiers above (1m, 5m, 15m, 1h, 6h, 24h) over up to 7
 attempts — an expected span of ~55h and a worst case of ~83h once full jitter (0.5x-1.5x per
@@ -55,10 +55,21 @@ tier) is factored in. Independently, `StaleDeliveryEscalationService` force-esca
 DLQ, regardless of how many attempts it has left — it's a safety net against unbounded backlog
 growth, not part of the retry ladder itself. The default hard-cap is set above the ladder's
 worst case on purpose, so a delivery genuinely gets to run through all 6 tiers before the safety
-net kicks in. If you ever change `RETRY_LADDER_DEFAULT_DELAYS_SECONDS`/
-`RETRY_LADDER_DEFAULT_MAX_ATTEMPTS` or `DELIVERY_ESCALATION_HARD_CAP_HOURS`, the worker fails to
-start if the ladder's worst case no longer fits inside the cap (`RetryPolicy.validateLadderFitsCap`,
-called from `RetrySchedulerService`) — so they cannot silently drift apart again.
+net kicks in.
+
+The worker fails to start if either default ladder's worst case no longer fits inside the cap
+(`RetryLadder.requireFitsWithin`, called from `RetrySchedulerService` for both directions), so
+they cannot silently drift apart. **The ladder itself is not an environment variable.** The two
+defaults are declared in `RetryLadderDefaults` and mirrored by the Flyway column defaults, and
+they differ by direction on purpose — incoming forwards give up after 5 attempts over 5 tiers
+(6h) rather than 7 over 6 (24h), because relaying somebody else's webhook is a different promise
+from delivering the customer's own event. `DELIVERY_ESCALATION_HARD_CAP_HOURS` is the knob to
+move if the startup check fails.
+
+Per-subscription and per-destination ladders are set through the API and stored on the row. A
+malformed `retryDelays` is rejected with a `400` at write time; a stored one that somehow does
+not parse fails its delivery terminally with `INVALID_RETRY_LADDER` rather than being retried on
+a substituted ladder.
 
 ## Common Issues
 

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
@@ -376,7 +377,8 @@ public class EventIngestService {
                 .sequenceNumber(sequenceNumber)
                 .orderingEnabled(orderingEnabled)
                 .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays() : "60,300,900,3600,21600,86400")
+                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
+                        : RetryLadderDefaults.OUTGOING_DELAYS)
                 .payloadTemplate(subscription.getPayloadTemplate())
                 .customHeaders(subscription.getCustomHeaders())
                 .transformationId(subscription.getTransformationId())
@@ -398,7 +400,7 @@ public class EventIngestService {
                 .maxAttempts(7)
                 .orderingEnabled(false)
                 .timeoutSeconds(30)
-                .retryDelays("60,300,900,3600,21600,86400")
+                .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
                 .transformationId(transformationId)
                 .idempotencyKey(deliveryIdempotencyKey)
                 .build();

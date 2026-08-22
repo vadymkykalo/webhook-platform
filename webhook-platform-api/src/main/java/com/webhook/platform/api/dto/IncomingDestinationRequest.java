@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -42,7 +43,7 @@ public class IncomingDestinationRequest {
     @Schema(description = "HTTP request timeout in seconds", example = "30")
     private Integer timeoutSeconds;
 
-    @Schema(description = "Comma-separated retry delays in seconds", example = "60,300,900,3600,21600")
+    @Schema(description = "Comma-separated retry delays in seconds", example = RetryLadderDefaults.INCOMING_DELAYS)
     @Size(max = 255, message = "Retry delays must be at most 255 characters")
     private String retryDelays;
 

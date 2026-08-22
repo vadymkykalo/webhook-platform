@@ -5,6 +5,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
+import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.util.CryptoUtils;
@@ -218,6 +219,19 @@ public class IncomingForwardService {
         }
 
         int maxAttempts = destination.getMaxAttempts();
+
+        // Same rule as the outgoing side: an unusable ladder is terminal, not retryable.
+        // Checked after the claim so the row this fails is the one we own. See
+        // WebhookDeliveryService.processDelivery for why this cannot be left to throw later.
+        try {
+            RetryLadder.parse(destination.getRetryDelays(), maxAttempts);
+        } catch (IllegalArgumentException e) {
+            log.error("Destination {} carries an unusable retry ladder: {}", destinationId, e.getMessage());
+            markAttemptFailedIfExists(eventId, destinationId, attemptNumber,
+                    "INVALID_RETRY_LADDER: " + e.getMessage());
+            return;
+        }
+
         attemptForward(event, destination, attemptNumber, maxAttempts);
     }
 
@@ -448,7 +462,7 @@ public class IncomingForwardService {
             } else {
                 // Schedule retry: update current attempt to final state, create next PENDING
                 // attempt
-                Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays);
+                Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays, maxAttempts);
                 // Only schedule the next attempt if we actually finalized this one. If the
                 // row had already reached a terminal state, someone else owns this forward
                 // and creating a PENDING successor here would duplicate it.
@@ -482,7 +496,7 @@ public class IncomingForwardService {
                     "Max attempts reached: " + errorMessage, durationMs, null);
             log.warn("Forward DLQ (error): eventId={}, destId={}", eventId, destinationId);
         } else {
-            Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays);
+            Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays, maxAttempts);
             // Same rule as the retryable-HTTP branch above: no successor row unless this
             // attempt was actually the one that finalized.
             if (updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
@@ -569,34 +583,21 @@ public class IncomingForwardService {
     }
 
     private boolean isRetryable(int statusCode) {
-        return statusCode == 408 || statusCode == 429 || (statusCode >= 500 && statusCode < 600);
+        return RetryPolicy.isRetryable(statusCode);
     }
 
-    private Instant calculateNextRetry(int attemptNumber, String retryDelaysStr) {
-        long[] delays = parseRetryDelays(retryDelaysStr);
-        int index = Math.min(attemptNumber - 1, delays.length - 1);
-        long baseDelay = delays[index];
-        // Full jitter: 50%-150% of base delay to prevent thundering herd
-        double jitterMultiplier = 0.5 + ThreadLocalRandom.current().nextDouble(1.0);
-        long jitteredDelay = (long) (baseDelay * jitterMultiplier);
-        return Instant.now().plusSeconds(jitteredDelay);
-    }
-
-    private long[] parseRetryDelays(String retryDelaysStr) {
-        if (retryDelaysStr == null || retryDelaysStr.isEmpty()) {
-            return new long[] { 60, 300, 900, 3600, 21600 };
-        }
-        try {
-            String[] parts = retryDelaysStr.split(",");
-            long[] delays = new long[parts.length];
-            for (int i = 0; i < parts.length; i++) {
-                delays[i] = Long.parseLong(parts[i].trim());
-            }
-            return delays;
-        } catch (NumberFormatException e) {
-            log.warn("Invalid retry delays format: {}, using defaults", retryDelaysStr);
-            return new long[] { 60, 300, 900, 3600, 21600 };
-        }
+    /**
+     * The next attempt's due time, from the ladder this Destination carries.
+     *
+     * <p>No fallback: {@code incoming_destinations.retry_delays} is NOT NULL with a column
+     * default, and the api validates the value on create and update, so a Destination always
+     * has a usable ladder. The private copy this replaced answered a malformed value by
+     * substituting a hardcoded five-tier array — one that did not match the outgoing side's
+     * six-tier array, so the two directions silently disagreed about a value neither was
+     * supposed to be choosing.
+     */
+    private Instant calculateNextRetry(int attemptNumber, String retryDelaysStr, int maxAttempts) {
+        return RetryLadder.parse(retryDelaysStr, maxAttempts).nextRetryAt(attemptNumber);
     }
 
     @SuppressWarnings("unchecked")
@@ -746,9 +747,7 @@ public class IncomingForwardService {
     }
 
     private long backoffSeconds(int attemptNumber, long min, long max) {
-        long base = Math.min(min * (1L << Math.min(attemptNumber, 6)), max);
-        double jitter = 0.5 + ThreadLocalRandom.current().nextDouble(1.0);
-        return Math.max(min, Math.min((long) (base * jitter), max));
+        return RetryPolicy.backoffWithJitter(attemptNumber, min, max);
     }
 
     private String truncate(String str, int maxLength) {

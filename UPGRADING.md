@@ -1,5 +1,46 @@
 # Upgrading
 
+## Unreleased
+
+### `RETRY_LADDER_DEFAULT_*` removed — no action required
+
+`RETRY_LADDER_DEFAULT_DELAYS_SECONDS` and `RETRY_LADDER_DEFAULT_MAX_ATTEMPTS` are
+gone. If your `.env` still sets them they are ignored, and you can delete the lines.
+
+They never set the default retry ladder, despite reading as though they did. The
+actual defaults live in the Flyway column defaults for
+`subscriptions.retry_delays` / `incoming_destinations.retry_delays` and in the api
+services that create those rows; these two variables only fed the startup check
+that the ladder fits inside `DELIVERY_ESCALATION_HARD_CAP_HOURS`. Setting them
+therefore changed what that check compared against and nothing else — lowering one
+made the check pass while live rows still carried the long ladder.
+
+The check now validates the ladders the platform actually hands out (declared in
+`RetryLadderDefaults`), for both directions. `DELIVERY_ESCALATION_HARD_CAP_HOURS`
+is unchanged and still the knob to move if the check fails.
+
+### Malformed retry ladders are now rejected at write time
+
+`POST`/`PUT` on a subscription or an incoming destination returns `400` when
+`retryDelays` is not a comma-separated list of positive whole seconds, or when
+`maxAttempts` is outside 1–100. Previously such a value was accepted and then
+silently replaced at delivery time by a hardcoded ladder in the worker.
+
+Existing rows are not migrated and are not validated on read. Both columns have
+`NOT NULL`/`DEFAULT` declarations and the api was the only writer, so a stored
+malformed ladder can only have come from direct SQL. If you have written to these
+columns by hand, check them before upgrading:
+
+```sql
+SELECT id, retry_delays FROM subscriptions
+ WHERE retry_delays !~ '^[0-9]+(\s*,\s*[0-9]+)*$';
+SELECT id, retry_delays FROM incoming_destinations
+ WHERE retry_delays !~ '^[0-9]+(\s*,\s*[0-9]+)*$';
+```
+
+A row that matches will now fail its attempt instead of being delivered on a
+substituted ladder.
+
 ## Upgrading from v1.x to v2.x
 
 v2.0.0 is a breaking release. Read this whole section before upgrading a

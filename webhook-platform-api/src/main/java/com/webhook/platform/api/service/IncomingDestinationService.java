@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.common.retry.RetryLadder;
+import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
@@ -90,15 +92,24 @@ public class IncomingDestinationService {
             validateTransformationBelongsToProject(request.getTransformationId(), resolveProjectIdForSource(sourceId));
         }
 
+        // Same rule as the outgoing side: a malformed ladder is rejected where it is written,
+        // not silently replaced with somebody else's policy at forward time.
+        RetryLadder.validate(
+                request.getRetryDelays() != null ? request.getRetryDelays() : RetryLadderDefaults.INCOMING_DELAYS,
+                "retryDelays",
+                request.getMaxAttempts(), "maxAttempts");
+
         IncomingDestination destination = IncomingDestination.builder()
                 .incomingSourceId(sourceId)
                 .url(request.getUrl())
                 .authType(request.getAuthType() != null ? request.getAuthType() : IncomingAuthType.NONE)
                 .customHeadersJson(request.getCustomHeadersJson())
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
-                .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts() : 5)
+                .maxAttempts(request.getMaxAttempts() != null ? request.getMaxAttempts()
+                        : RetryLadderDefaults.INCOMING_MAX_ATTEMPTS)
                 .timeoutSeconds(request.getTimeoutSeconds() != null ? request.getTimeoutSeconds() : 30)
-                .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays() : "60,300,900,3600,21600")
+                .retryDelays(request.getRetryDelays() != null ? request.getRetryDelays()
+                        : RetryLadderDefaults.INCOMING_DELAYS)
                 .payloadTransform(request.getPayloadTransform())
                 .transformationId(request.getTransformationId())
                 .build();
@@ -156,12 +167,15 @@ public class IncomingDestinationService {
             destination.setEnabled(request.getEnabled());
         }
         if (request.getMaxAttempts() != null) {
+            RetryLadder.validate(destination.getRetryDelays(), "retryDelays",
+                    request.getMaxAttempts(), "maxAttempts");
             destination.setMaxAttempts(request.getMaxAttempts());
         }
         if (request.getTimeoutSeconds() != null) {
             destination.setTimeoutSeconds(request.getTimeoutSeconds());
         }
         if (request.getRetryDelays() != null) {
+            RetryLadder.validate(request.getRetryDelays(), "retryDelays");
             destination.setRetryDelays(request.getRetryDelays());
         }
         if (request.getPayloadTransform() != null) {
