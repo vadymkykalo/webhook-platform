@@ -32,6 +32,18 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
         </dependency>
+
+        <!--
+          Needed only by SsrfProtectionCustomizer. Deliberately `provided`: the api and worker
+          both already have reactor-netty through spring-boot-starter-webflux, while the CLI
+          depends on this module too and is shipped as a standalone binary with no netty in it.
+          Compile scope would put netty into that binary for a class the CLI never calls.
+        -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

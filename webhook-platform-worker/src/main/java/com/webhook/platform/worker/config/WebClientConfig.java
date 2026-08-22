@@ -1,6 +1,6 @@
 package com.webhook.platform.worker.config;
 
-import com.webhook.platform.worker.service.SsrfProtectionCustomizer;
+import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

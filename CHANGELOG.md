@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A rolled-back ingest no longer consumes quota.** The Redis quota counter was
+  incremented inside the ingest transaction, and it is not transactional, so an ingest
+  that saved its Event and then aborted — a fanout limit, a downstream failure — kept
+  whatever it had added. The customer was charged for an event that does not exist. The
+  charge now happens after the commit, the way sequence numbers already did, and a Redis
+  outage can no longer fail an ingest the caller has already been told was accepted.
+
 ### Changed
+- `SsrfProtectionCustomizer` lives once, in `webhook-platform-common`, next to the
+  `UrlValidator` it validates against. It had been byte-identical in the api and the worker
+  apart from its package line, so an SSRF fix had to be applied in two places and nothing
+  said so. Reactor Netty is a `provided` dependency of common on purpose: the api and worker
+  already have it through webflux, and the CLI depends on common too and ships as a
+  standalone binary with no netty in it — verified unchanged at 0 netty classes.
 - **Both delivery pipelines now run one shared attempt lifecycle.** The Incoming forward
   pipeline had been created by copying the Outgoing one, and commit `2070d30` had to
   hand-port four separate fixes from one to the other — landing in the HTTP send, the

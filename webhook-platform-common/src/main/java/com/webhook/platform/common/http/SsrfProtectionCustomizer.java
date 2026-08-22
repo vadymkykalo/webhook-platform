@@ -1,4 +1,4 @@
-package com.webhook.platform.api.service;
+package com.webhook.platform.common.http;
 
 import com.webhook.platform.common.security.UrlValidator;
 import io.netty.channel.ChannelOption;
@@ -14,6 +14,18 @@ import java.time.Duration;
  * Applies post-connect SSRF protection to Reactor Netty HttpClient.
  * Validates the actual resolved IP after TCP connection, closing the TOCTOU
  * window between DNS validation and HTTP request (DNS rebinding mitigation).
+ *
+ * <p>Lives here, next to {@link UrlValidator} — the thing it validates against — rather than
+ * once in api and once in worker. It was byte-identical in both apart from the package line,
+ * so an SSRF fix had to be applied twice and nothing said so.
+ *
+ * <p>Reactor Netty is a {@code provided} dependency of this module on purpose. Both modules
+ * that use this class already have it through {@code spring-boot-starter-webflux}, and the CLI
+ * — which also depends on common and is shipped as a standalone binary — has no netty at all.
+ * Making it {@code compile} would put netty in that binary for a class the CLI never calls.
+ * The trade-off is the usual one for {@code provided}: a future consumer of common that uses
+ * this class without webflux gets a NoClassDefFoundError at runtime rather than a compile
+ * error.
  */
 @Slf4j
 public final class SsrfProtectionCustomizer {
