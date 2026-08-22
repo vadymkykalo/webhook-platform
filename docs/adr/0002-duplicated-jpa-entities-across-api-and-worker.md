@@ -57,8 +57,34 @@ version was rejected below for reasons that have not changed.
   cost is paid on every change; the drift bugs, so far, have been rarer than that.
 - **Generating both entities from the migration.** Adds a code generator to the build for
   a schema that changes a few times per release.
-- **Enforcing parity with a test that reflects over both entity sets.** Genuinely
-  attractive and *not* rejected — it just doesn't exist yet. A test comparing each shared
-  table's `information_schema` columns against both `@Entity` mappings, with an explicit
-  allowlist for deliberately-unmapped columns, would turn this ADR's failure mode from
-  silent to loud. See ADR-0006 for the same ratchet pattern applied to authorization.
+- **Enforcing parity with a test that compares both entity sets against the schema.**
+  Genuinely attractive and *not* rejected. This now exists — see "The parity ratchet"
+  below. See ADR-0006 for the same ratchet pattern applied to authorization.
+
+## The parity ratchet
+
+`EntityMappingParityIntegrationTest` (in `webhook-platform-api`) is the test the section
+above asked for. Flyway migrates the real schema into a throwaway Postgres, and for every
+table an entity in *both* modules maps, each `information_schema` column must be mapped by
+both sides or carry a stated reason in the test's `DELIBERATELY_UNMAPPED` list. It turns
+this ADR's failure mode from silent to loud without touching the decision itself.
+
+Three things about it are deliberate:
+
+- **The shared-table list is derived, not written down.** It is the intersection of the two
+  entity package directories, so a tenth shared entity is covered the day it is added.
+- **The schema comes from a real database, not from reading the SQL.** 55 migrations deep,
+  with V052/V053 rebuilding `delivery_attempts` and `tunnel_request_log` as partitioned
+  tables through dynamic SQL, a hand-written DDL interpreter would be one more thing that
+  can be quietly wrong — which is the failure mode being removed. This is why the test is
+  named `*IntegrationTest` and runs in the Docker job (ADR-0008).
+- **Both `@Entity` sets are read from source, not reflection.** `api` and `worker` are
+  reactor siblings and neither depends on the other, so no test classpath can hold both.
+  A test-scoped edge was rejected because both modules ship an `application.yml` and a
+  `logback-spring.xml` at the classpath root. The source parser refuses to guess at any
+  JPA construct it was not written for, and is checked against reflection over the api
+  classes, which *are* on its classpath.
+
+The list stands at 25 columns, all of them unmapped by the worker; `api` maps all 143
+columns of the nine shared tables. The revisit trigger above is unchanged — this test makes
+a third drift bug loud, it does not make one less likely.
