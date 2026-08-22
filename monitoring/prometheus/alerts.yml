@@ -13,7 +13,12 @@
 #     this used to be a Kafka latest-earliest offset count that never returned to 0;
 #     see webhook_dlq_topic_retained_total below for that raw, non-actionable signal)
 #   - webhook_dlq_topic_retained_total{topic=deliveries.dlq}  (informational only, do not alert)
+#   - incoming_forward_dlq_depth{topic=incoming.forward.dlq}  (DlqMonitoringService; the
+#     incoming counterpart -- Forwards still in ForwardAttemptStatus.DLQ)
+#   - incoming_forward_dlq_topic_retained_total{topic=incoming.forward.dlq}  (informational
+#     only, do not alert)
 #   - webhook_delivery_attempts_total{result=success|failure|error}
+#   - incoming_forward_attempts_total{result=success|failure|error}
 #   - circuit_breaker_state_transitions_total
 #   - circuit_breaker_rejected_total
 #   - http_server_requests_seconds_count{status=~"5.."}
@@ -112,6 +117,28 @@ groups:
           description: |
             {{ $value | printf "%.1f" }}% failure rate. SLO target: <5% DLQ rate.
 
+      # The incoming counterpart of DlqRateHigh. Same expression shape, same threshold and
+      # the same 10m window -- a Forward failing repeatedly ends up in DLQ exactly as a
+      # Delivery does, and until this rule existed nothing watched
+      # incoming_forward_attempts_total at all.
+      - alert: IncomingForwardFailureRateHigh
+        expr: |
+          (
+            rate(incoming_forward_attempts_total{result="error"}[1h])
+            + rate(incoming_forward_attempts_total{result="failure"}[1h])
+          )
+          /
+          rate(incoming_forward_attempts_total[1h])
+          > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "Incoming forward failure rate above 10% for >10 min"
+          description: |
+            {{ $value | printf "%.1f" }}% failure rate. SLO target: <5% DLQ rate.
+
       # Actionable DLQ backlog (deliveries still in DeliveryStatus.DLQ -- this is
       # DB-backed and genuinely returns to 0 once retried/purged via DlqService, unlike the
       # old Kafka-offset-based computation it replaced)
@@ -127,6 +154,22 @@ groups:
           description: |
             Deliveries awaiting manual retry or purge via DlqService. Not tied to Kafka
             topic retention -- see webhook_dlq_topic_retained_total for raw topic volume.
+
+      # The incoming counterpart of DlqActionableBacklog. A Forward that exhausts its retry
+      # ladder used to write status = DLQ on its incoming_forward_attempts row and nothing
+      # else, so no number an operator could see ever moved.
+      - alert: IncomingForwardDlqActionableBacklog
+        expr: |
+          incoming_forward_dlq_depth > 0
+        for: 30m
+        labels:
+          severity: info
+          component: worker
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} forwards in DLQ status"
+          description: |
+            Forwards awaiting manual retry or purge. Not tied to Kafka topic retention --
+            see incoming_forward_dlq_topic_retained_total for raw topic volume.
 
   # ── Retry Governor ───────────────────────────────────────────
   - name: hookflow.retry_governor

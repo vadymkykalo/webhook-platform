@@ -60,6 +60,16 @@ spec:
             component: worker
           annotations:
             summary: "Delivery failure rate above 10%"
+        - alert: IncomingForwardFailureRateHigh
+          expr: |
+            (rate(incoming_forward_attempts_total{result="error"}[1h]) + rate(incoming_forward_attempts_total{result="failure"}[1h]))
+            / rate(incoming_forward_attempts_total[1h]) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Incoming forward failure rate above 10%"
 
     - name: hookflow.circuit_breaker
       rules:
