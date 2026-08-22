@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
@@ -33,6 +34,7 @@ public class UsageDailyAggregator {
     // EventIngestService / EncryptionKeyRotationService in this codebase.
     private final TransactionTemplate transactionTemplate;
 
+    @SystemTenant
     @Scheduled(cron = "0 5 0 * * *")
     @SchedulerLock(name = "usage-daily-aggregator", lockAtLeastFor = "PT1M", lockAtMostFor = "PT30M")
     public void aggregateYesterday() {

@@ -4,6 +4,7 @@ import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.TenantId;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -20,6 +21,15 @@ public class IncomingForwardAttempt {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    /**
+     * Tenant discriminator (ADR-0006): Hibernate adds {@code organization_id = <current tenant>}
+     * to every query against this entity and populates it on insert from the current scope.
+     */
+    @TenantId
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
 
     @Column(name = "incoming_event_id", nullable = false)
     private UUID incomingEventId;

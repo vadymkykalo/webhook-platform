@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
+import com.webhook.platform.api.tenancy.TenantContext;
 import java.time.Instant;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
@@ -114,7 +115,6 @@ public class DeliveryService {
 
     public Page<DeliveryResponse> listDeliveriesByProject(
             UUID projectId,
-            UUID organizationId,
             DeliveryStatus status,
             UUID endpointId,
             UUID eventId,
@@ -123,6 +123,7 @@ public class DeliveryService {
             Instant toDate,
             Pageable pageable
     ) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 

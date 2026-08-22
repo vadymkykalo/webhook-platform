@@ -37,12 +37,21 @@ public class TransformationService {
 
     private static final Pattern EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^}]*)\\}");
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     private void validateTemplate(String template) {
@@ -69,8 +78,8 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Transformation")
     @Transactional
-    public TransformationResponse create(UUID projectId, TransformationRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public TransformationResponse create(UUID projectId, TransformationRequest request) {
+        validateProjectOwnership(projectId);
         validateTemplate(request.getTemplate());
 
         if (transformationRepository.existsByProjectIdAndName(projectId, request.getName())) {
@@ -91,15 +100,15 @@ public class TransformationService {
         return mapToResponse(transformation);
     }
 
-    public TransformationResponse get(UUID id, UUID organizationId) {
+    public TransformationResponse get(UUID id) {
         Transformation transformation = transformationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId(), organizationId);
+        validateProjectOwnership(transformation.getProjectId());
         return mapToResponse(transformation);
     }
 
-    public List<TransformationResponse> list(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<TransformationResponse> list(UUID projectId) {
+        validateProjectOwnership(projectId);
         return transformationRepository.findByProjectIdOrderByNameAsc(projectId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -107,10 +116,10 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Transformation")
     @Transactional
-    public TransformationResponse update(UUID id, TransformationRequest request, UUID organizationId) {
+    public TransformationResponse update(UUID id, TransformationRequest request) {
         Transformation transformation = transformationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId(), organizationId);
+        validateProjectOwnership(transformation.getProjectId());
 
         if (request.getName() != null && !request.getName().isBlank()) {
             if (transformationRepository.existsByProjectIdAndNameAndIdNot(
@@ -138,10 +147,10 @@ public class TransformationService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Transformation")
     @Transactional
-    public void delete(UUID id, UUID organizationId) {
+    public void delete(UUID id) {
         Transformation transformation = transformationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Transformation not found"));
-        validateProjectOwnership(transformation.getProjectId(), organizationId);
+        validateProjectOwnership(transformation.getProjectId());
 
         long subCount = subscriptionRepository.countByTransformationId(id);
         long destCount = incomingDestinationRepository.countByTransformationId(id);

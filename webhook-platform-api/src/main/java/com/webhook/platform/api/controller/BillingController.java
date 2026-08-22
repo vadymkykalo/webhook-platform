@@ -67,7 +67,7 @@ public class BillingController {
         UUID orgId = auth.organizationId();
         Organization org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
-        Plan plan = entitlementService.getPlan(orgId);
+        Plan plan = entitlementService.getPlan();
 
         YearMonth ym = YearMonth.now(ZoneOffset.UTC);
         Instant monthStart = ym.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -113,7 +113,7 @@ public class BillingController {
             @Valid @RequestBody ChangePlanRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        billingService.assignPlan(auth.organizationId(), request.getPlanName());
+        billingService.assignPlan( request.getPlanName());
         return getOrganizationBilling(auth);
     }
 
@@ -124,7 +124,7 @@ public class BillingController {
     public ResponseEntity<UsageResponse> getUsage(AuthContext auth) {
         auth.requireJwt();
         UUID orgId = auth.organizationId();
-        Plan plan = entitlementService.getPlan(orgId);
+        Plan plan = entitlementService.getPlan();
 
         YearMonth ym = YearMonth.now(ZoneOffset.UTC);
         Instant monthStart = ym.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -156,7 +156,7 @@ public class BillingController {
     public ResponseEntity<List<InvoiceResponse>> listInvoices(AuthContext auth) {
         auth.requireJwt();
         // Invoices come from billing provider — delegated via BillingService
-        List<InvoiceResponse> invoices = billingService.listInvoices(auth.organizationId());
+        List<InvoiceResponse> invoices = billingService.listInvoices();
         return ResponseEntity.ok(invoices);
     }
 
@@ -170,8 +170,7 @@ public class BillingController {
             @Valid @RequestBody CheckoutRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        String url = billingService.createCheckoutSession(
-                auth.organizationId(), request.getPlanName(),
+        String url = billingService.createCheckoutSession( request.getPlanName(),
                 request.getProviderCode(), request.getBillingInterval(),
                 request.getSuccessUrl(), request.getCancelUrl());
         return ResponseEntity.ok(Map.of("url", url));
@@ -184,7 +183,7 @@ public class BillingController {
             @RequestParam("returnUrl") String returnUrl,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        String url = billingService.createPortalSession(auth.organizationId(), returnUrl);
+        String url = billingService.createPortalSession( returnUrl);
         return ResponseEntity.ok(Map.of("url", url));
     }
 
@@ -193,7 +192,7 @@ public class BillingController {
 @PostMapping("/cancel")
     public ResponseEntity<Void> cancelSubscription(AuthContext auth) {
         auth.requireOwnerAccess();
-        billingService.cancelSubscription(auth.organizationId());
+        billingService.cancelSubscription();
         return ResponseEntity.noContent().build();
     }
 

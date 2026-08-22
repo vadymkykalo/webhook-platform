@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.rules;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.RuleExecutionLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class RuleExecutionLogCleanupService {
     @Value("${rules.execution-log-retention-days:7}")
     private int retentionDays;
 
+    @SystemTenant
     @Scheduled(cron = "0 30 2 * * *") // daily at 2:30 AM
     @SchedulerLock(name = "ruleExecutionLogCleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional

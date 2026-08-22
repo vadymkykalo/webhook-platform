@@ -73,23 +73,32 @@ public class IncomingEventService {
         this.txTemplate = new TransactionTemplate(txManager);
     }
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     private void validateEventAccess(IncomingEvent event, AuthContext auth) {
         IncomingSource source = sourceRepository.findById(event.getIncomingSourceId())
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId(), auth.organizationId());
+        validateProjectOwnership(source.getProjectId());
         auth.validateProjectAccess(source.getProjectId());
     }
 
-    public Page<IncomingEventResponse> listEvents(UUID projectId, UUID organizationId, UUID sourceId, Pageable pageable) {
-        validateProjectOwnership(projectId, organizationId);
+    public Page<IncomingEventResponse> listEvents(UUID projectId, UUID sourceId, Pageable pageable) {
+        validateProjectOwnership(projectId);
 
         Page<IncomingEvent> events;
         if (sourceId != null) {
@@ -199,8 +208,8 @@ public class IncomingEventService {
         return replayed;
     }
 
-    public IncomingBulkReplayResponse bulkReplay(UUID projectId, IncomingBulkReplayRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public IncomingBulkReplayResponse bulkReplay(UUID projectId, IncomingBulkReplayRequest request) {
+        validateProjectOwnership(projectId);
 
         // Validate source belongs to project
         IncomingSource source = sourceRepository.findById(request.getSourceId())

@@ -53,6 +53,21 @@ Rules that follow from the table and are easy to get wrong:
 
 Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. See `CONTRIBUTING.md` for the full policy.
 
+## Working notes and decisions
+
+Two places, with different lifetimes — do not conflate them:
+
+- **`docs/adr/`** is tracked and permanent. An ADR records a decision that is load-bearing:
+  one a future reader would otherwise re-litigate, because the code shows *what* was built
+  and not *why the obvious alternative was rejected*. `docs/adr/README.md` has the index and
+  the format. Do not re-open a decision an ADR settles without saying so in the ADR.
+- **`.claude/features/`** is gitignored scratch: one file per piece of work that spans
+  sessions or needs decisions settled before code. It says what we're doing and where we are;
+  the ADR says why. **A feature doc is deleted when its work lands** — whatever is still true
+  moves into the ADR first. `.claude/features/README.md` has the flow and `TEMPLATE.md` the
+  shape. Being gitignored, those two exist only in a working copy that has them; this
+  paragraph is what makes the convention discoverable at all.
+
 ## Architecture
 
 Five modules: `common` (shared DTOs, `KafkaTopics`, crypto/signature/PII utils), `api` (REST + ingress + tunnel hub + outbox publisher, **owns all Flyway migrations**), `worker` (Kafka consumers, HTTP delivery/forwarding, retries), `cli` (picocli), `ui`.
@@ -80,7 +95,13 @@ Requests carry either a JWT (dashboard/CLI) or `X-API-Key` (server-to-server); `
 - `@RequireOrgAccess` — `OrgAccessAspect` compares the `{orgId}` path variable against the token's org and throws 403 on mismatch.
 - `AuthContext.validateProjectAccess(projectId)` — an API key may only touch its own project.
 
-New tenant-scoped endpoints must go through these; don't hand-roll org checks. Public paths are whitelisted in `SecurityConfig` (`/ingress/**`, `/tunnel/**`, `/hook/**`, `/ws/tunnel`, auth + billing webhooks).
+Org ownership is **not** on that list, because it is no longer something an endpoint does. `TenantContextFilter` puts the caller's organization into `TenantContext`, and `@TenantId` makes Hibernate add `organization_id = <current tenant>` to every query — `findById` included. A service method that takes an `organizationId` fails `ServiceTenantParameterTest`. ADR-0006 has the whole shape; three things follow from it that are easy to trip over:
+
+- **Anything without a request needs a scope of its own.** `@SystemTenant` on a scheduler or consumer; `TenantContext.runAs(orgId, …)` on a public path after it resolves whose data it is handling. No scope is a 500, deliberately.
+- **Enter the scope outside the transaction.** Hibernate reads the tenant when it opens the session, so a scope entered inside one is too late and the row gets the wrong organization stamped on it.
+- **Native queries are exempt from the filter** and must carry their own `organization_id` predicate unless they are system paths — see the repository package's `package-info.java`.
+
+New tenant-scoped endpoints must go through the checks above; don't hand-roll org checks. Public paths are whitelisted in `SecurityConfig` (`/ingress/**`, `/tunnel/**`, `/hook/**`, `/ws/tunnel`, auth + billing webhooks).
 
 Errors: throw `NotFoundException` / `ForbiddenException` / `ConflictException` / `UnauthorizedException` / `QuotaExceededException` — `GlobalExceptionHandler` maps them to the shared `ErrorResponse`.
 

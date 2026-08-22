@@ -27,8 +27,7 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     @Query(value = """
         SELECT COUNT(*) FROM events e
-        JOIN projects p ON p.id = e.project_id
-        WHERE p.organization_id = :orgId AND e.created_at >= :from AND e.created_at < :to
+        WHERE e.organization_id = :orgId AND e.created_at >= :from AND e.created_at < :to
         """, nativeQuery = true)
     long countByOrganizationIdAndCreatedAtBetween(@Param("orgId") UUID organizationId, @Param("from") Instant from, @Param("to") Instant to);
 
@@ -40,12 +39,13 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             COUNT(d.id) as delivery_count
         FROM events e
         LEFT JOIN deliveries d ON d.event_id = e.id
-        WHERE e.project_id = :projectId
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId
         GROUP BY e.id, e.event_type, e.created_at
         ORDER BY e.created_at DESC
         LIMIT 10
         """, nativeQuery = true)
-    List<Object[]> findRecentEventsWithDeliveryCount(@Param("projectId") UUID projectId);
+    List<Object[]> findRecentEventsWithDeliveryCount(
+ @Param("organizationId") UUID organizationId,@Param("projectId") UUID projectId);
 
     @Query(value = """
         SELECT 
@@ -54,12 +54,13 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
             COUNT(*) FILTER (WHERE d.status = 'SUCCESS') as success_count
         FROM events e
         LEFT JOIN deliveries d ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND e.created_at BETWEEN :from AND :to
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId AND e.created_at BETWEEN :from AND :to
         GROUP BY e.event_type
         ORDER BY event_count DESC
         LIMIT 10
         """, nativeQuery = true)
     List<Object[]> findEventTypeBreakdownByProjectId(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
@@ -68,13 +69,14 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     @Query(value = """
         SELECT e.* FROM events e
-        WHERE e.project_id = :projectId
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId
           AND e.created_at >= :fromDate AND e.created_at <= :toDate
           AND (e.created_at, e.id) > (:cursorCreatedAt, :cursorId)
         ORDER BY e.created_at, e.id
         LIMIT :batchSize
         """, nativeQuery = true)
     List<Event> findByCursorForReplay(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate,
@@ -84,7 +86,7 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     @Query(value = """
         SELECT e.* FROM events e
-        WHERE e.project_id = :projectId
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId
           AND e.created_at >= :fromDate AND e.created_at <= :toDate
           AND e.event_type = :eventType
           AND (e.created_at, e.id) > (:cursorCreatedAt, :cursorId)
@@ -92,6 +94,7 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
         LIMIT :batchSize
         """, nativeQuery = true)
     List<Event> findByCursorForReplayWithEventType(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate,
@@ -102,21 +105,23 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     @Query(value = """
         SELECT COUNT(*) FROM events e
-        WHERE e.project_id = :projectId
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId
           AND e.created_at >= :fromDate AND e.created_at <= :toDate
         """, nativeQuery = true)
     long countForReplay(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate);
 
     @Query(value = """
         SELECT COUNT(*) FROM events e
-        WHERE e.project_id = :projectId
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId
           AND e.created_at >= :fromDate AND e.created_at <= :toDate
           AND e.event_type = :eventType
         """, nativeQuery = true)
     long countForReplayWithEventType(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate,

@@ -196,6 +196,35 @@ helm upgrade hookflow ./deploy/helm/hookflow
 kubectl rollout undo deployment hookflow-api
 ```
 
+### V056 — the tenant column is not an instant migration
+
+`V056__tenant_organization_id.sql` adds `organization_id` to 31 tables, backfills each one from
+its parent, and sets `NOT NULL`. `ADD COLUMN` is O(1) in Postgres, but the backfill `UPDATE` and
+the `SET NOT NULL` scan are not, and two of the tables — `delivery_attempts` and
+`tunnel_request_log` — are partitioned, so the statement touches every partition. On an
+installation with data, run the upgrade in a window rather than during peak ingest, and expect the
+API pod's startup probe to wait on Flyway.
+
+`SET NOT NULL` fails outright if any row could not be backfilled — an orphan whose parent row is
+already gone. On a database that has been running a while, check before upgrading:
+
+```sql
+SELECT count(*) FROM deliveries d LEFT JOIN endpoints e ON e.id = d.endpoint_id
+WHERE e.id IS NULL;
+```
+
+Nothing in this repository does a rolling upgrade across the column's introduction: it is
+`NOT NULL` from the first release that has it, because there was no earlier release in production
+writing rows without it.
+
+### Open Session In View is off
+
+`spring.jpa.open-in-view: false` since the same release, because OSIV opens a database session
+before a request has established which organization it belongs to (ADR-0006). A handler that
+returns an entity with a lazy association now has to fetch it inside the transaction; the symptom
+if one is missed is `LazyInitializationException: could not initialize proxy — no session` in the
+API log, surfacing as a 500.
+
 ## Security Checklist
 
 Production must have:

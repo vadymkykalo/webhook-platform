@@ -49,7 +49,7 @@ public class ReplayController {
             @Valid @RequestBody ReplayRequest request,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        ReplayEstimateResponse estimate = replayService.estimate(projectId, request, auth.organizationId());
+        ReplayEstimateResponse estimate = replayService.estimate(projectId, request);
         return ResponseEntity.ok(estimate);
     }
 
@@ -65,7 +65,7 @@ public class ReplayController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        ReplaySessionResponse session = replayService.create(projectId, request, auth.organizationId(), auth.userId());
+        ReplaySessionResponse session = replayService.create(projectId, request, auth.userId());
         return ResponseEntity.status(HttpStatus.CREATED).body(session);
     }
 
@@ -76,7 +76,7 @@ public class ReplayController {
             @PathVariable("sessionId") UUID sessionId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        ReplaySessionResponse session = replayService.get(projectId, sessionId, auth.organizationId());
+        ReplaySessionResponse session = replayService.get(projectId, sessionId);
         return ResponseEntity.ok(session);
     }
 
@@ -89,7 +89,7 @@ public class ReplayController {
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<ReplaySessionResponse> sessions = replayService.list(projectId, auth.organizationId(), pageable);
+        Page<ReplaySessionResponse> sessions = replayService.list(projectId, pageable);
         return ResponseEntity.ok(sessions);
     }
 
@@ -103,7 +103,7 @@ public class ReplayController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        ReplaySessionResponse session = replayService.cancel(projectId, sessionId, auth.organizationId());
+        ReplaySessionResponse session = replayService.cancel(projectId, sessionId);
         return ResponseEntity.ok(session);
     }
 }

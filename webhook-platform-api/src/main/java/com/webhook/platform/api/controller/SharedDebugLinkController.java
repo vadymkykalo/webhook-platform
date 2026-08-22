@@ -44,7 +44,7 @@ public class SharedDebugLinkController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         SharedDebugLinkResponse response = debugLinkService.createLink(
-                projectId, eventId, request, auth.userId(), auth.organizationId());
+                projectId, eventId, request, auth.userId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -57,7 +57,7 @@ public class SharedDebugLinkController {
             @PathVariable("eventId") UUID eventId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(debugLinkService.listLinksForEvent(projectId, eventId, auth.organizationId()));
+        return ResponseEntity.ok(debugLinkService.listLinksForEvent(projectId, eventId));
     }
 
     @Operation(summary = "Delete debug link", description = "Revokes a shared debug link")
@@ -73,7 +73,7 @@ public class SharedDebugLinkController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        debugLinkService.deleteLink(projectId, linkId, auth.organizationId());
+        debugLinkService.deleteLink(projectId, linkId);
         return ResponseEntity.noContent().build();
     }
 

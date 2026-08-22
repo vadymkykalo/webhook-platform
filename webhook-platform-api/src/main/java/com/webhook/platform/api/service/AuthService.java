@@ -14,6 +14,8 @@ import com.webhook.platform.api.domain.repository.PlanRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,6 +68,7 @@ public class AuthService {
         this.billingEnabled = billingEnabled;
     }
 
+    @SystemTenant("creates the Organization it then belongs to, so there is no tenant to run in yet; the Membership it inserts sets organizationId explicitly")
     @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -118,6 +121,7 @@ public class AuthService {
                 .build();
     }
 
+    @SystemTenant("reads memberships to find which organization to issue a token for -- the answer is what a tenant scope would need as input")
     @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
@@ -144,6 +148,8 @@ public class AuthService {
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
                 .build();
     }
+
+    @SystemTenant("same as login: the membership read decides the organization the new token names")
 
     public AuthResponse refreshToken(String refreshToken) {
         if (!jwtUtil.validateToken(refreshToken)) {
@@ -208,6 +214,7 @@ public class AuthService {
         }
     }
 
+    @SystemTenant("acts on a User by emailed token, before any organization is established")
     @Transactional
     public void verifyEmail(String token) {
         User user = userRepository.findByVerificationToken(CryptoUtils.hashApiKey(token))
@@ -226,6 +233,7 @@ public class AuthService {
         log.info("Email verified for user {}", user.getEmail());
     }
 
+    @SystemTenant("acts on a User by email address, with no authenticated caller")
     @Transactional
     public void resendVerification(String email) {
         User user = userRepository.findByEmail(email)
@@ -269,6 +277,7 @@ public class AuthService {
         log.info("Password changed for user {}", userId);
     }
 
+    @SystemTenant("acts on a User by email address, with no authenticated caller")
     @Auditable(action = AuditAction.PASSWORD_RESET_REQUESTED, resourceType = "Auth")
     @Transactional
     public void forgotPassword(String email) {
@@ -291,6 +300,7 @@ public class AuthService {
         log.info("Password reset token generated for user {}", user.getEmail());
     }
 
+    @SystemTenant("acts on a User by emailed token, with no authenticated caller")
     @Auditable(action = AuditAction.PASSWORD_RESET, resourceType = "Auth")
     @Transactional
     public void resetPassword(String token, String newPassword) {
@@ -329,7 +339,8 @@ public class AuthService {
                 .build();
     }
 
-    public CurrentUserResponse getCurrentUser(UUID userId, UUID organizationId, MembershipRole role) {
+    public CurrentUserResponse getCurrentUser(UUID userId, MembershipRole role) {
+        UUID organizationId = TenantContext.require();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 

@@ -48,7 +48,7 @@ public class WorkflowController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(workflowService.create(projectId, request, auth.organizationId()));
+                .body(workflowService.create(projectId, request));
     }
 
     @Operation(operationId = "getWorkflow", summary = "Get workflow")
@@ -58,7 +58,7 @@ public class WorkflowController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.get(id, auth.organizationId()));
+        return ResponseEntity.ok(workflowService.get(id));
     }
 
     @Operation(operationId = "listWorkflows", summary = "List workflows")
@@ -67,7 +67,7 @@ public class WorkflowController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.list(projectId, auth.organizationId()));
+        return ResponseEntity.ok(workflowService.list(projectId));
     }
 
     @Operation(operationId = "updateWorkflow", summary = "Update workflow")
@@ -82,7 +82,7 @@ public class WorkflowController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.update(id, request, auth.organizationId()));
+        return ResponseEntity.ok(workflowService.update(id, request));
     }
 
     @Operation(operationId = "deleteWorkflow", summary = "Delete workflow")
@@ -96,7 +96,7 @@ public class WorkflowController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        workflowService.delete(id, auth.organizationId());
+        workflowService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -112,7 +112,7 @@ public class WorkflowController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         boolean enabled = body.getOrDefault("enabled", true);
-        return ResponseEntity.ok(workflowService.toggleEnabled(id, enabled, auth.organizationId()));
+        return ResponseEntity.ok(workflowService.toggleEnabled(id, enabled));
     }
 
     @Operation(summary = "Manually trigger workflow with test payload")
@@ -128,7 +128,7 @@ public class WorkflowController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.manualTrigger(id, auth.organizationId(), testPayload));
+        return ResponseEntity.ok(workflowService.manualTrigger(id, testPayload));
     }
 
     // ── Executions ──────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ public class WorkflowController {
             @RequestParam(defaultValue = "20") int size,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.listExecutions(id, auth.organizationId(), page, size));
+        return ResponseEntity.ok(workflowService.listExecutions(id, page, size));
     }
 
     @Operation(summary = "Get execution details with step results")
@@ -153,6 +153,6 @@ public class WorkflowController {
             @PathVariable("executionId") UUID executionId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(workflowService.getExecution(executionId, auth.organizationId()));
+        return ResponseEntity.ok(workflowService.getExecution(executionId));
     }
 }

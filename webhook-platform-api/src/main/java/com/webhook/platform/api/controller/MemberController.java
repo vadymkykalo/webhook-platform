@@ -42,7 +42,7 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             AuthContext auth) {
         auth.requireJwt();
-        List<MemberResponse> response = membershipService.getOrganizationMembers(orgId);
+        List<MemberResponse> response = membershipService.getOrganizationMembers();
         return ResponseEntity.ok(response);
     }
 
@@ -57,7 +57,6 @@ public class MemberController {
             AuthContext auth) {
         auth.requireJwt();
         MemberResponse response = membershipService.addMember(
-                orgId,
                 request,
                 auth.role());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -73,7 +72,6 @@ public class MemberController {
             AuthContext auth) {
         auth.requireJwt();
         MemberResponse response = membershipService.changeMemberRole(
-                orgId,
                 userId,
                 request.getRole(),
                 auth.role());
@@ -89,7 +87,7 @@ public class MemberController {
             @PathVariable("userId") UUID userId,
             AuthContext auth) {
         auth.requireJwt();
-        membershipService.removeMember(orgId, userId, auth.role());
+        membershipService.removeMember( userId, auth.role());
         return ResponseEntity.noContent().build();
     }
 
@@ -100,7 +98,7 @@ public class MemberController {
             @PathVariable("orgId") UUID orgId,
             @RequestParam("token") String token,
             AuthContext auth) {
-        MemberResponse response = membershipService.acceptInvite(token, orgId, auth.requireUserId());
+        MemberResponse response = membershipService.acceptInvite(orgId, token, auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 }

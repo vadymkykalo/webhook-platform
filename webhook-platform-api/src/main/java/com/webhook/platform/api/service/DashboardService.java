@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.DashboardStatsResponse;
 import com.webhook.platform.api.dto.OnboardingStatusResponse;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -52,7 +53,8 @@ public class DashboardService {
         this.materializedViewRepository = materializedViewRepository;
     }
     
-    public OnboardingStatusResponse getOnboardingStatus(UUID projectId, UUID organizationId) {
+    public OnboardingStatusResponse getOnboardingStatus(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
@@ -69,7 +71,8 @@ public class DashboardService {
                 .build();
     }
 
-    public DashboardStatsResponse getProjectStats(UUID projectId, UUID organizationId) {
+    public DashboardStatsResponse getProjectStats(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         
@@ -114,7 +117,7 @@ public class DashboardService {
     }
     
     private List<DashboardStatsResponse.RecentEventSummary> getRecentEvents(UUID projectId) {
-        List<Object[]> rows = eventRepository.findRecentEventsWithDeliveryCount(projectId);
+        List<Object[]> rows = eventRepository.findRecentEventsWithDeliveryCount(TenantContext.require(), projectId);
         
         return rows.stream()
                 .map(row -> new DashboardStatsResponse.RecentEventSummary(
@@ -135,7 +138,7 @@ public class DashboardService {
         }
         
         List<UUID> endpointIds = endpoints.stream().map(Endpoint::getId).collect(Collectors.toList());
-        List<Object[]> stats = deliveryRepository.countByEndpointIdsGroupByEndpointAndStatus(endpointIds, since);
+        List<Object[]> stats = deliveryRepository.countByEndpointIdsGroupByEndpointAndStatus(TenantContext.require(), endpointIds, since);
         
         // Build lookup: endpointId -> {status -> count}
         Map<UUID, Map<String, Long>> statsMap = new HashMap<>();

@@ -1,8 +1,6 @@
 package com.webhook.platform.api.security;
 
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.MembershipRole;
-import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.exception.UnauthorizedException;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
@@ -15,12 +13,6 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
 public class AuthContextArgumentResolver implements HandlerMethodArgumentResolver {
-
-    private final ProjectRepository projectRepository;
-
-    public AuthContextArgumentResolver(ProjectRepository projectRepository) {
-        this.projectRepository = projectRepository;
-    }
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
@@ -46,12 +38,12 @@ public class AuthContextArgumentResolver implements HandlerMethodArgumentResolve
         }
 
         if (auth instanceof ApiKeyAuthenticationToken apiKey) {
-            Project project = projectRepository.findById(apiKey.getProjectId())
-                    .orElseThrow(() -> new UnauthorizedException("Invalid API key: project not found"));
-
+            // The organization was resolved during authentication, where the tenant-less lookup
+            // belongs. A key that reaches here always has one: ApiKeyAuthenticationFilter leaves
+            // the request unauthenticated when the project is missing.
             return new AuthContext(
                     null,
-                    project.getOrganizationId(),
+                    apiKey.getOrganizationId(),
                     MembershipRole.API_KEY,
                     apiKey.getProjectId(),
                     apiKey.getScope()

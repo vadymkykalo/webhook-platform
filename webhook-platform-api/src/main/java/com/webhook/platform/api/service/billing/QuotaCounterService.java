@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service.billing;
 
 import com.webhook.platform.api.domain.repository.EventRepository;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RAtomicLong;
@@ -39,9 +40,10 @@ public class QuotaCounterService {
      * Increment event counter for organization. Called after event is persisted.
      * Fire-and-forget — if Redis is down, we just skip.
      */
-    public void increment(UUID organizationId) {
+    public void increment() {
+        UUID organizationId = TenantContext.require();
         try {
-            String key = currentKey(organizationId);
+            String key = currentKey();
             RAtomicLong counter = redissonClient.getAtomicLong(key);
             long val = counter.incrementAndGet();
             // Set TTL on first increment (when counter transitions from 0→1)
@@ -59,16 +61,17 @@ public class QuotaCounterService {
      * seeds from DB and caches in Redis.
      * If Redis is fully down, falls back to DB COUNT.
      */
-    public long getCurrentCount(UUID organizationId) {
+    public long getCurrentCount() {
+        UUID organizationId = TenantContext.require();
         try {
-            String key = currentKey(organizationId);
+            String key = currentKey();
             RAtomicLong counter = redissonClient.getAtomicLong(key);
             long val = counter.get();
             if (val > 0) {
                 return val;
             }
             // Key missing or zero — seed from DB
-            long dbCount = countEventsFromDb(organizationId);
+            long dbCount = countEventsFromDb();
             if (dbCount > 0) {
                 counter.set(dbCount);
                 counter.expire(ttlForCurrentMonth());
@@ -76,18 +79,20 @@ public class QuotaCounterService {
             return dbCount;
         } catch (Exception e) {
             log.debug("Redis quota read failed for org={}, falling back to DB: {}", organizationId, e.getMessage());
-            return countEventsFromDb(organizationId);
+            return countEventsFromDb();
         }
     }
 
-    private long countEventsFromDb(UUID organizationId) {
+    private long countEventsFromDb() {
+        UUID organizationId = TenantContext.require();
         YearMonth ym = YearMonth.now(ZoneOffset.UTC);
         Instant monthStart = ym.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
         Instant monthEnd = ym.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
         return eventRepository.countByOrganizationIdAndCreatedAtBetween(organizationId, monthStart, monthEnd);
     }
 
-    private String currentKey(UUID organizationId) {
+    private String currentKey() {
+        UUID organizationId = TenantContext.require();
         YearMonth ym = YearMonth.now(ZoneOffset.UTC);
         return KEY_PREFIX + organizationId + ":" + ym;
     }

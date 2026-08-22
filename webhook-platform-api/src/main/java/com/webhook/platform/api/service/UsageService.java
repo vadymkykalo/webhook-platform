@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.UsageStatsResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +35,8 @@ public class UsageService {
     private final MaterializedViewRepository materializedViewRepository;
 
     @Transactional(readOnly = true)
-    public UsageStatsResponse getUsage(UUID projectId, UUID organizationId, int historyDays) {
+    public UsageStatsResponse getUsage(UUID projectId, int historyDays) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));

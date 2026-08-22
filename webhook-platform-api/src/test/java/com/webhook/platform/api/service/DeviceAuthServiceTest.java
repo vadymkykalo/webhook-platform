@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
@@ -32,6 +34,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DeviceAuthServiceTest {
 
+    private final UUID tenantOrgId = UUID.randomUUID();
+
     @Mock
     private DeviceAuthCodeRepository deviceAuthCodeRepository;
 
@@ -47,6 +51,22 @@ class DeviceAuthServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(deviceAuthService, "appBaseUrl", "http://localhost:5173");
+    }
+
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(tenantOrgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
     }
 
     @Test
@@ -75,7 +95,6 @@ class DeviceAuthServiceTest {
     @Test
     void shouldApproveDeviceCode() {
         UUID userId = UUID.randomUUID();
-        UUID orgId = UUID.randomUUID();
         String userCode = "ABCD-1234";
 
         DeviceAuthCode code = DeviceAuthCode.builder()
@@ -90,13 +109,13 @@ class DeviceAuthServiceTest {
                 .thenReturn(Optional.of(code));
         when(deviceAuthCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        deviceAuthService.approveDeviceCode(userCode, userId, orgId);
+        deviceAuthService.approveDeviceCode(userCode, userId);
 
         ArgumentCaptor<DeviceAuthCode> captor = ArgumentCaptor.forClass(DeviceAuthCode.class);
         verify(deviceAuthCodeRepository).save(captor.capture());
         assertEquals(DeviceAuthStatus.APPROVED, captor.getValue().getStatus());
         assertEquals(userId, captor.getValue().getUserId());
-        assertEquals(orgId, captor.getValue().getOrganizationId());
+        assertEquals(tenantOrgId, captor.getValue().getOrganizationId());
         assertNotNull(captor.getValue().getApprovedAt());
     }
 
@@ -106,7 +125,7 @@ class DeviceAuthServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.approveDeviceCode("ZZZZ-9999", UUID.randomUUID(), UUID.randomUUID()));
+                deviceAuthService.approveDeviceCode("ZZZZ-9999", UUID.randomUUID()));
     }
 
     @Test
@@ -124,13 +143,12 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.approveDeviceCode(userCode, UUID.randomUUID(), UUID.randomUUID()));
+                deviceAuthService.approveDeviceCode(userCode, UUID.randomUUID()));
     }
 
     @Test
     void shouldReturnTokensWhenPollingApprovedCode() {
         UUID userId = UUID.randomUUID();
-        UUID orgId = UUID.randomUUID();
         String deviceCode = "dev-approved";
         UUID codeId = UUID.randomUUID();
 
@@ -140,7 +158,7 @@ class DeviceAuthServiceTest {
                 .userCode("APPR-0001")
                 .status(DeviceAuthStatus.APPROVED)
                 .userId(userId)
-                .organizationId(orgId)
+                .organizationId(tenantOrgId)
                 .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
                 .build();
 
@@ -148,9 +166,9 @@ class DeviceAuthServiceTest {
         membership.setRole(MembershipRole.OWNER);
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-        when(membershipRepository.findByUserIdAndOrganizationId(userId, orgId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.of(membership));
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
-        when(jwtUtil.generateAccessToken(userId, orgId, MembershipRole.OWNER)).thenReturn("access-token-123");
+        when(jwtUtil.generateAccessToken(userId, tenantOrgId, MembershipRole.OWNER)).thenReturn("access-token-123");
         when(jwtUtil.generateRefreshToken(userId)).thenReturn("refresh-token-456");
 
         AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode);
@@ -210,7 +228,6 @@ class DeviceAuthServiceTest {
     @Test
     void shouldFailClosedWhenUserHasNoMembershipInApprovedOrg() {
         UUID userId = UUID.randomUUID();
-        UUID orgId = UUID.randomUUID();
         String deviceCode = "dev-no-membership";
 
         DeviceAuthCode code = DeviceAuthCode.builder()
@@ -219,12 +236,12 @@ class DeviceAuthServiceTest {
                 .userCode("NOMB-0001")
                 .status(DeviceAuthStatus.APPROVED)
                 .userId(userId)
-                .organizationId(orgId)
+                .organizationId(tenantOrgId)
                 .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
                 .build();
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-        when(membershipRepository.findByUserIdAndOrganizationId(userId, orgId)).thenReturn(Optional.empty());
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
                 deviceAuthService.pollDeviceToken(deviceCode));
@@ -257,7 +274,6 @@ class DeviceAuthServiceTest {
         // valid APPROVED row as read), but markConsumedIfApproved reports 0 rows
         // because another thread already flipped it to CONSUMED first.
         UUID userId = UUID.randomUUID();
-        UUID orgId = UUID.randomUUID();
         String deviceCode = "dev-race";
         UUID codeId = UUID.randomUUID();
 
@@ -266,7 +282,7 @@ class DeviceAuthServiceTest {
                 .deviceCode(deviceCode)
                 .status(DeviceAuthStatus.APPROVED)
                 .userId(userId)
-                .organizationId(orgId)
+                .organizationId(tenantOrgId)
                 .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
                 .build();
 
@@ -274,7 +290,7 @@ class DeviceAuthServiceTest {
         membership.setRole(MembershipRole.DEVELOPER);
 
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
-        when(membershipRepository.findByUserIdAndOrganizationId(userId, orgId)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.of(membership));
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(0);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->

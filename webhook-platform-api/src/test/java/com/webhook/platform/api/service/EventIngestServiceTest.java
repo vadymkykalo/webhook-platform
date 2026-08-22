@@ -326,7 +326,7 @@ class EventIngestServiceTest {
 
         service.ingestEvent(projectId, buildRequest("order.created"), null);
 
-        verify(quotaCounterService).increment(organizationId);
+        verify(quotaCounterService).increment();
     }
 
     @Test
@@ -356,7 +356,7 @@ class EventIngestServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Fanout limit exceeded");
 
-        verify(quotaCounterService, never()).increment(any());
+        verify(quotaCounterService, never()).increment();
     }
 
     @Test
@@ -377,7 +377,7 @@ class EventIngestServiceTest {
 
         service.ingestEvent(projectId, buildRequest("order.created"), "idem-race");
 
-        verify(quotaCounterService, never()).increment(any());
+        verify(quotaCounterService, never()).increment();
     }
 
     @Test
@@ -391,7 +391,7 @@ class EventIngestServiceTest {
 
         service.ingestEvent(projectId, buildRequest("order.created"), "idem-123");
 
-        verify(quotaCounterService, never()).increment(any());
+        verify(quotaCounterService, never()).increment();
     }
 
     @Test
@@ -405,7 +405,7 @@ class EventIngestServiceTest {
             e.setCreatedAt(Instant.now());
             return e;
         });
-        doThrow(new RuntimeException("Redis unavailable")).when(quotaCounterService).increment(any());
+        doThrow(new RuntimeException("Redis unavailable")).when(quotaCounterService).increment();
         stubTransactionTemplate();
 
         // The Event is already committed and the caller has been told it was accepted;

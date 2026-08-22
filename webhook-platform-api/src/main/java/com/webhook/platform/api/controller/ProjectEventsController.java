@@ -51,7 +51,7 @@ public class ProjectEventsController {
             Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        Page<EventResponse> response = eventService.listEvents(projectId, auth.organizationId(), eventType, pageable);
+        Page<EventResponse> response = eventService.listEvents(projectId, eventType, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -62,7 +62,7 @@ public class ProjectEventsController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        EventResponse response = eventService.getEvent(projectId, id, auth.organizationId());
+        EventResponse response = eventService.getEvent(projectId, id);
         return ResponseEntity.ok(response);
     }
 
@@ -73,7 +73,7 @@ public class ProjectEventsController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        EventResponse response = eventService.getEvent(projectId, id, auth.organizationId());
+        EventResponse response = eventService.getEvent(projectId, id);
         String sanitized = piiMaskingService.sanitizePayload(projectId, response.getPayload());
         response.setPayload(sanitized);
         return ResponseEntity.ok(response);
@@ -88,7 +88,7 @@ public class ProjectEventsController {
             @RequestParam(value = "sanitize", defaultValue = "true") boolean sanitize,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        EventDiffResponse response = eventDiffService.diff(projectId, leftEventId, rightEventId, sanitize, auth.organizationId());
+        EventDiffResponse response = eventDiffService.diff(projectId, leftEventId, rightEventId, sanitize);
         return ResponseEntity.ok(response);
     }
 
@@ -104,7 +104,7 @@ public class ProjectEventsController {
         auth.validateProjectAccess(projectId);
         
         log.info("Sending test event type: {} for project: {}", request.getType(), projectId);
-        EventResponse response = eventService.sendTestEvent(projectId, request, auth.organizationId());
+        EventResponse response = eventService.sendTestEvent(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

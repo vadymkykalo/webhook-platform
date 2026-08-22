@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ public class TunnelRequestLog {
     @Column(name = "tunnel_session_id", nullable = false)
     private UUID tunnelSessionId;
 
+    @TenantId
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 

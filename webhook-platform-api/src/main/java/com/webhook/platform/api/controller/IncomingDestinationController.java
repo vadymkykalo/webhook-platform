@@ -48,7 +48,7 @@ public class IncomingDestinationController {
             @Valid @RequestBody IncomingDestinationRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        IncomingDestinationResponse response = destinationService.createDestination(sourceId, request, auth.organizationId());
+        IncomingDestinationResponse response = destinationService.createDestination(sourceId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -61,7 +61,7 @@ public class IncomingDestinationController {
     public ResponseEntity<IncomingDestinationResponse> getDestination(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        IncomingDestinationResponse response = destinationService.getDestination(id, auth.organizationId());
+        IncomingDestinationResponse response = destinationService.getDestination(id);
         return ResponseEntity.ok(response);
     }
 
@@ -71,7 +71,7 @@ public class IncomingDestinationController {
             @PathVariable("sourceId") UUID sourceId,
             @PageableDefault(size = 20) Pageable pageable,
             AuthContext auth) {
-        Page<IncomingDestinationResponse> response = destinationService.listDestinations(sourceId, auth.organizationId(), pageable);
+        Page<IncomingDestinationResponse> response = destinationService.listDestinations(sourceId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -88,7 +88,7 @@ public class IncomingDestinationController {
             @Valid @RequestBody IncomingDestinationRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        IncomingDestinationResponse response = destinationService.updateDestination(id, request, auth.organizationId());
+        IncomingDestinationResponse response = destinationService.updateDestination(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -101,7 +101,7 @@ public class IncomingDestinationController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        destinationService.deleteDestination(id, auth.organizationId());
+        destinationService.deleteDestination(id);
         return ResponseEntity.noContent().build();
     }
 }

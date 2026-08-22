@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.billing;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
@@ -41,6 +42,7 @@ public class BillingSchedulerService {
 
     // ── Merchant-initiated renewals (WayForPay) ─────────────────────
 
+    @SystemTenant
     @Scheduled(cron = "0 0 */1 * * *")
     @SchedulerLock(name = "billing_renewals", lockAtMostFor = "PT50M", lockAtLeastFor = "PT5M")
     public void processRenewals() {
@@ -143,6 +145,7 @@ public class BillingSchedulerService {
 
     // ── Grace period expiry ─────────────────────────────────────────
 
+    @SystemTenant
     @Scheduled(cron = "0 30 */1 * * *")
     @SchedulerLock(name = "billing_grace_expiry", lockAtMostFor = "PT10M", lockAtLeastFor = "PT2M")
     public void processGracePeriodExpiry() {
@@ -166,6 +169,7 @@ public class BillingSchedulerService {
 
     // ── PAST_DUE → GRACE_PERIOD transition ──────────────────────────
 
+    @SystemTenant
     @Scheduled(cron = "0 15 */2 * * *")
     @SchedulerLock(name = "billing_past_due_to_grace", lockAtMostFor = "PT10M", lockAtLeastFor = "PT2M")
     public void processPastDueToGrace() {
@@ -190,6 +194,7 @@ public class BillingSchedulerService {
 
     // ── Scheduled plan changes ──────────────────────────────────────
 
+    @SystemTenant
     @Scheduled(cron = "0 0 0 * * *")
     @SchedulerLock(name = "billing_scheduled_changes", lockAtMostFor = "PT10M", lockAtLeastFor = "PT2M")
     @Transactional

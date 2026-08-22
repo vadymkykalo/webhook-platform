@@ -104,7 +104,7 @@ class IncomingSourceServiceTest {
                 .hmacSignaturePrefix("sha256=")
                 .build();
 
-        IncomingSourceResponse response = service.createSource(projectId, request, orgId);
+        IncomingSourceResponse response = service.createSource(projectId, request);
 
         assertThat(response.getId()).isEqualTo(sourceId);
         assertThat(response.getName()).isEqualTo("GitHub Webhooks");
@@ -141,7 +141,7 @@ class IncomingSourceServiceTest {
                 .name("My Source")
                 .build();
 
-        IncomingSourceResponse response = service.createSource(projectId, request, orgId);
+        IncomingSourceResponse response = service.createSource(projectId, request);
 
         assertThat(response.getProviderType()).isEqualTo(ProviderType.GENERIC);
         assertThat(response.getVerificationMode()).isEqualTo(VerificationMode.NONE);
@@ -158,23 +158,11 @@ class IncomingSourceServiceTest {
                 .slug("github-webhooks")
                 .build();
 
-        assertThatThrownBy(() -> service.createSource(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSource(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("already exists");
     }
 
-    @Test
-    void createSource_wrongOrg_forbidden() {
-        UUID wrongOrg = UUID.randomUUID();
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-
-        IncomingSourceRequest request = IncomingSourceRequest.builder()
-                .name("Test")
-                .build();
-
-        assertThatThrownBy(() -> service.createSource(projectId, request, wrongOrg))
-                .isInstanceOf(ForbiddenException.class);
-    }
 
     @Test
     void getSource_success() {
@@ -182,7 +170,7 @@ class IncomingSourceServiceTest {
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-        IncomingSourceResponse response = service.getSource(sourceId, orgId);
+        IncomingSourceResponse response = service.getSource(sourceId);
 
         assertThat(response.getId()).isEqualTo(sourceId);
         assertThat(response.getName()).isEqualTo("GitHub Webhooks");
@@ -192,7 +180,7 @@ class IncomingSourceServiceTest {
     void getSource_notFound() {
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getSource(sourceId, orgId))
+        assertThatThrownBy(() -> service.getSource(sourceId))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -203,7 +191,7 @@ class IncomingSourceServiceTest {
         when(sourceRepository.findByProjectId(eq(projectId), any()))
                 .thenReturn(new PageImpl<>(List.of(source)));
 
-        Page<IncomingSourceResponse> page = service.listSources(projectId, orgId, PageRequest.of(0, 20));
+        Page<IncomingSourceResponse> page = service.listSources(projectId, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1);
         assertThat(page.getContent().get(0).getName()).isEqualTo("GitHub Webhooks");
@@ -222,7 +210,7 @@ class IncomingSourceServiceTest {
                 .status(IncomingSourceStatus.DISABLED)
                 .build();
 
-        IncomingSourceResponse response = service.updateSource(sourceId, request, orgId);
+        IncomingSourceResponse response = service.updateSource(sourceId, request);
 
         assertThat(response.getName()).isEqualTo("Updated Name");
         assertThat(response.getProviderType()).isEqualTo(ProviderType.STRIPE);
@@ -235,7 +223,7 @@ class IncomingSourceServiceTest {
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-        service.deleteSource(sourceId, orgId);
+        service.deleteSource(sourceId);
 
         assertThat(source.getStatus()).isEqualTo(IncomingSourceStatus.DISABLED);
         verify(sourceRepository).save(source);

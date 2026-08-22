@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.rules;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Rule;
@@ -127,6 +128,7 @@ public class RuleEngineService {
     /**
      * Periodic refresh — reload all cached projects every 30 seconds.
      */
+    @SystemTenant
     @Scheduled(fixedDelayString = "${rules.cache-refresh-ms:30000}")
     public void refreshAll() {
         for (UUID projectId : planCache.keySet()) {

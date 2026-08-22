@@ -29,6 +29,6 @@ public class UsageController {
             @RequestParam(defaultValue = "30") int days,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(usageService.getUsage(projectId, auth.organizationId(), days));
+        return ResponseEntity.ok(usageService.getUsage(projectId, days));
     }
 }

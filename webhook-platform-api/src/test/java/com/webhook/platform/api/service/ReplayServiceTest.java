@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Event;
@@ -88,20 +90,37 @@ class ReplayServiceTest {
 
     // ─── estimate ────────────────────────────────────────────────────────
 
-    @Test
-    void estimate_wrongOrg_throwsForbidden() {
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
 
-        assertThatThrownBy(() -> replayService.estimate(projectId, validRequest(), orgId))
-                .isInstanceOf(ForbiddenException.class);
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(orgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
+    @Test
+    void estimate_projectOutsideTenant_throwsNotFound() {
+        // A project in another organization is invisible to this tenant, so the
+        // repository returns nothing rather than a row with a mismatched org.
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> replayService.estimate(projectId, validRequest()))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
     void estimate_projectNotFound_throwsNotFound() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> replayService.estimate(projectId, validRequest(), orgId))
+        assertThatThrownBy(() -> replayService.estimate(projectId, validRequest()))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -111,7 +130,7 @@ class ReplayServiceTest {
         ReplayRequest request = ReplayRequest.builder()
                 .fromDate(Instant.now()).toDate(Instant.now().minus(1, ChronoUnit.DAYS)).build();
 
-        assertThatThrownBy(() -> replayService.estimate(projectId, request, orgId))
+        assertThatThrownBy(() -> replayService.estimate(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -121,7 +140,7 @@ class ReplayServiceTest {
         ReplayRequest request = ReplayRequest.builder()
                 .fromDate(Instant.now().minus(120, ChronoUnit.DAYS)).toDate(Instant.now()).build();
 
-        assertThatThrownBy(() -> replayService.estimate(projectId, request, orgId))
+        assertThatThrownBy(() -> replayService.estimate(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -129,12 +148,12 @@ class ReplayServiceTest {
     void estimate_computesEventCountTimesActiveSubscriptions() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         ReplayRequest request = validRequest();
-        when(eventRepository.countForReplay(eq(projectId), any(), any())).thenReturn(10L);
+        when(eventRepository.countForReplay(any(), eq(projectId), any(), any())).thenReturn(10L);
         when(subscriptionRepository.findByProjectIdAndEnabledTrue(projectId))
                 .thenReturn(List.of(Subscription.builder().id(UUID.randomUUID()).build(),
                         Subscription.builder().id(UUID.randomUUID()).build()));
 
-        ReplayEstimateResponse response = replayService.estimate(projectId, request, orgId);
+        ReplayEstimateResponse response = replayService.estimate(projectId, request);
 
         assertThat(response.getTotalEvents()).isEqualTo(10L);
         assertThat(response.getActiveSubscriptions()).isEqualTo(2);
@@ -146,10 +165,10 @@ class ReplayServiceTest {
     void estimate_exceedsMaxEvents_includesWarning() {
         ReflectionTestUtils.setField(replayService, "maxEventsPerSession", 5L);
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
-        when(eventRepository.countForReplay(eq(projectId), any(), any())).thenReturn(10L);
+        when(eventRepository.countForReplay(any(), eq(projectId), any(), any())).thenReturn(10L);
         when(subscriptionRepository.findByProjectIdAndEnabledTrue(projectId)).thenReturn(List.of());
 
-        ReplayEstimateResponse response = replayService.estimate(projectId, validRequest(), orgId);
+        ReplayEstimateResponse response = replayService.estimate(projectId, validRequest());
 
         assertThat(response.getWarning()).contains("exceeds maximum");
     }
@@ -160,15 +179,15 @@ class ReplayServiceTest {
         ReplayRequest request = ReplayRequest.builder()
                 .fromDate(Instant.now().minus(1, ChronoUnit.DAYS)).toDate(Instant.now())
                 .eventType("order.created").build();
-        when(eventRepository.countForReplayWithEventType(eq(projectId), any(), any(), eq("order.created")))
+        when(eventRepository.countForReplayWithEventType(any(), eq(projectId), any(), any(), eq("order.created")))
                 .thenReturn(3L);
         when(subscriptionRepository.findByProjectIdAndEventTypeAndEnabledTrue(projectId, "order.created"))
                 .thenReturn(List.of(Subscription.builder().id(UUID.randomUUID()).build()));
 
-        ReplayEstimateResponse response = replayService.estimate(projectId, request, orgId);
+        ReplayEstimateResponse response = replayService.estimate(projectId, request);
 
         assertThat(response.getTotalEvents()).isEqualTo(3L);
-        verify(eventRepository, never()).countForReplay(any(), any(), any());
+        verify(eventRepository, never()).countForReplay(any(), any(), any(), any());
     }
 
     // ─── create ──────────────────────────────────────────────────────────
@@ -178,7 +197,7 @@ class ReplayServiceTest {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(replaySessionRepository.countByProjectIdAndStatusIn(eq(projectId), anyList())).thenReturn(2L);
 
-        assertThatThrownBy(() -> replayService.create(projectId, validRequest(), orgId, userId))
+        assertThatThrownBy(() -> replayService.create(projectId, validRequest(), userId))
                 .isInstanceOf(ConflictException.class);
         verify(replaySessionRepository, never()).saveAndFlush(any());
     }
@@ -187,9 +206,9 @@ class ReplayServiceTest {
     void create_zeroMatchingEvents_throwsNotFound() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(replaySessionRepository.countByProjectIdAndStatusIn(eq(projectId), anyList())).thenReturn(0L);
-        when(eventRepository.countForReplay(eq(projectId), any(), any())).thenReturn(0L);
+        when(eventRepository.countForReplay(any(), eq(projectId), any(), any())).thenReturn(0L);
 
-        assertThatThrownBy(() -> replayService.create(projectId, validRequest(), orgId, userId))
+        assertThatThrownBy(() -> replayService.create(projectId, validRequest(), userId))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -198,9 +217,9 @@ class ReplayServiceTest {
         ReflectionTestUtils.setField(replayService, "maxEventsPerSession", 5L);
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(replaySessionRepository.countByProjectIdAndStatusIn(eq(projectId), anyList())).thenReturn(0L);
-        when(eventRepository.countForReplay(eq(projectId), any(), any())).thenReturn(10L);
+        when(eventRepository.countForReplay(any(), eq(projectId), any(), any())).thenReturn(10L);
 
-        assertThatThrownBy(() -> replayService.create(projectId, validRequest(), orgId, userId))
+        assertThatThrownBy(() -> replayService.create(projectId, validRequest(), userId))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -212,14 +231,14 @@ class ReplayServiceTest {
 
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(ownedProject()));
         when(replaySessionRepository.countByProjectIdAndStatusIn(eq(projectId), anyList())).thenReturn(0L);
-        when(eventRepository.countForReplay(eq(projectId), any(), any())).thenReturn(5L);
+        when(eventRepository.countForReplay(any(), eq(projectId), any(), any())).thenReturn(5L);
         when(replaySessionRepository.saveAndFlush(any(ReplaySession.class))).thenAnswer(inv -> {
             ReplaySession s = inv.getArgument(0);
             if (s.getId() == null) s.setId(UUID.randomUUID());
             return s;
         });
 
-        ReplaySessionResponse response = spyService.create(projectId, validRequest(), orgId, userId);
+        ReplaySessionResponse response = spyService.create(projectId, validRequest(), userId);
 
         assertThat(response.getStatus()).isEqualTo(ReplaySessionStatus.PENDING);
         assertThat(response.getTotalEvents()).isEqualTo(5);
@@ -240,18 +259,19 @@ class ReplayServiceTest {
         UUID sessionId = UUID.randomUUID();
         when(replaySessionRepository.findByIdAndProjectId(sessionId, projectId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> replayService.get(projectId, sessionId, orgId))
+        assertThatThrownBy(() -> replayService.get(projectId, sessionId))
                 .isInstanceOf(NotFoundException.class);
     }
 
     @Test
-    void get_wrongOrg_throwsForbiddenBeforeLookingUpSession() {
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
+    void get_projectOutsideTenant_throwsNotFoundBeforeLookingUpSession() {
+        // A project in another organization is invisible to this tenant, so the
+        // repository returns nothing rather than a row with a mismatched org.
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
         UUID sessionId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> replayService.get(projectId, sessionId, orgId))
-                .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> replayService.get(projectId, sessionId))
+                .isInstanceOf(NotFoundException.class);
         verify(replaySessionRepository, never()).findByIdAndProjectId(any(), any());
     }
 
@@ -263,7 +283,7 @@ class ReplayServiceTest {
                 .status(ReplaySessionStatus.RUNNING).totalEvents(200).processedEvents(50).build();
         when(replaySessionRepository.findByIdAndProjectId(sessionId, projectId)).thenReturn(Optional.of(session));
 
-        ReplaySessionResponse response = replayService.get(projectId, sessionId, orgId);
+        ReplaySessionResponse response = replayService.get(projectId, sessionId);
 
         assertThat(response.getProgressPercent()).isEqualTo(25.0);
     }
@@ -274,7 +294,7 @@ class ReplayServiceTest {
         when(replaySessionRepository.findByProjectIdOrderByCreatedAtDesc(eq(projectId), any()))
                 .thenReturn(new PageImpl<>(List.of()));
 
-        Page<ReplaySessionResponse> result = replayService.list(projectId, orgId, PageRequest.of(0, 20));
+        Page<ReplaySessionResponse> result = replayService.list(projectId, PageRequest.of(0, 20));
 
         assertThat(result.getContent()).isEmpty();
     }
@@ -289,7 +309,7 @@ class ReplayServiceTest {
                 .status(ReplaySessionStatus.COMPLETED).build();
         when(replaySessionRepository.findByIdAndProjectId(sessionId, projectId)).thenReturn(Optional.of(session));
 
-        assertThatThrownBy(() -> replayService.cancel(projectId, sessionId, orgId))
+        assertThatThrownBy(() -> replayService.cancel(projectId, sessionId))
                 .isInstanceOf(ConflictException.class);
         verify(replaySessionRepository, never()).cancelSession(any(), any(), any());
     }
@@ -304,7 +324,7 @@ class ReplayServiceTest {
         when(replaySessionRepository.cancelSession(eq(sessionId), eq(ReplaySessionStatus.CANCELLING), anyList()))
                 .thenReturn(1);
 
-        ReplaySessionResponse response = replayService.cancel(projectId, sessionId, orgId);
+        ReplaySessionResponse response = replayService.cancel(projectId, sessionId);
 
         assertThat(response).isNotNull();
         verify(replaySessionRepository).cancelSession(eq(sessionId), eq(ReplaySessionStatus.CANCELLING), anyList());
@@ -321,7 +341,7 @@ class ReplayServiceTest {
         when(replaySessionRepository.cancelSession(eq(sessionId), eq(ReplaySessionStatus.CANCELLING), anyList()))
                 .thenReturn(0);
 
-        assertThatThrownBy(() -> replayService.cancel(projectId, sessionId, orgId))
+        assertThatThrownBy(() -> replayService.cancel(projectId, sessionId))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -342,7 +362,7 @@ class ReplayServiceTest {
 
         assertThat(session.getStatus()).isEqualTo(ReplaySessionStatus.COMPLETED);
         assertThat(session.getErrorMessage()).contains("No active subscriptions");
-        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), anyInt());
+        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -364,7 +384,7 @@ class ReplayServiceTest {
                 .createdAt(Instant.now().minusSeconds(10)).build();
         Event e2 = Event.builder().id(UUID.randomUUID()).projectId(projectId).eventType("order.created")
                 .createdAt(Instant.now().minusSeconds(5)).build();
-        when(eventRepository.findByCursorForReplay(eq(projectId), any(), any(), any(), any(), anyInt()))
+        when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(e1, e2), List.of());
 
         when(deliveryRepository.saveAll(anyList())).thenAnswer(inv -> {
@@ -417,7 +437,7 @@ class ReplayServiceTest {
 
         Event e1 = Event.builder().id(UUID.randomUUID()).projectId(projectId).eventType("order.created")
                 .createdAt(Instant.now()).build();
-        when(eventRepository.findByCursorForReplay(eq(projectId), any(), any(), any(), any(), anyInt()))
+        when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(e1), List.of());
         when(deliveryRepository.saveAll(anyList())).thenAnswer(inv -> {
             List<Delivery> in = inv.getArgument(0);
@@ -458,7 +478,7 @@ class ReplayServiceTest {
         assertThat(cancelling.getStatus()).isEqualTo(ReplaySessionStatus.CANCELLED);
         assertThat(cancelling.getCancelledAt()).isNotNull();
         // Never even fetches a batch once cancellation is observed.
-        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), anyInt());
+        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -478,7 +498,7 @@ class ReplayServiceTest {
         // "deleted" (empty), the ifPresent no-ops; this must not throw.
         replayService.executeReplayAsync(sessionId);
 
-        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), anyInt());
+        verify(eventRepository, never()).findByCursorForReplay(any(), any(), any(), any(), any(), any(), anyInt());
     }
 
     @Test
@@ -507,7 +527,7 @@ class ReplayServiceTest {
 
         Event e1 = Event.builder().id(UUID.randomUUID()).projectId(projectId).eventType("order.created")
                 .createdAt(Instant.now()).build();
-        when(eventRepository.findByCursorForReplay(eq(projectId), any(), any(), any(), any(), anyInt()))
+        when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of(e1), List.of());
         when(deliveryRepository.saveAll(anyList())).thenThrow(new RuntimeException("db unavailable"));
 
@@ -548,7 +568,7 @@ class ReplayServiceTest {
                 .eventType("order.created").createdAt(lastEventCreatedAt).build();
         when(eventRepository.findById(lastProcessedId)).thenReturn(Optional.of(lastEvent));
         // No more events past the resume point — loop ends immediately after the resume lookup.
-        when(eventRepository.findByCursorForReplay(eq(projectId), any(), any(), any(), any(), anyInt()))
+        when(eventRepository.findByCursorForReplay(any(), eq(projectId), any(), any(), any(), any(), anyInt()))
                 .thenReturn(List.of());
 
         replayService.executeReplayAsync(sessionId);

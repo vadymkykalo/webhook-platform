@@ -45,7 +45,7 @@ public class ProjectController {
             @Valid @RequestBody ProjectRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        ProjectResponse response = projectService.createProject(request, auth.organizationId());
+        ProjectResponse response = projectService.createProject(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -54,14 +54,14 @@ public class ProjectController {
     public ResponseEntity<ProjectResponse> getProject(
             @PathVariable("projectId") UUID id,
             AuthContext auth) {
-        ProjectResponse response = projectService.getProject(id, auth.organizationId());
+        ProjectResponse response = projectService.getProject(id);
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "List projects", description = "Returns all projects in the organization")
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> listProjects(AuthContext auth) {
-        List<ProjectResponse> response = projectService.listProjects(auth.organizationId());
+        List<ProjectResponse> response = projectService.listProjects();
         return ResponseEntity.ok(response);
     }
 
@@ -74,7 +74,7 @@ public class ProjectController {
             @Valid @RequestBody ProjectRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        ProjectResponse response = projectService.updateProject(id, request, auth.organizationId());
+        ProjectResponse response = projectService.updateProject(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -87,7 +87,7 @@ public class ProjectController {
             @PathVariable("projectId") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        projectService.deleteProject(id, auth.organizationId());
+        projectService.deleteProject(id);
         return ResponseEntity.noContent().build();
     }
 }

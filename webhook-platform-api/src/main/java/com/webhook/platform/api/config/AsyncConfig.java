@@ -1,5 +1,6 @@
 package com.webhook.platform.api.config;
 
+import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Slf4j
 public class AsyncConfig {
 
+    /**
+     * Async work inherits the tenant scope of whoever submitted it — see
+     * {@link TenantPropagatingTaskDecorator}. Every executor here gets it: a pool whose tasks
+     * started with no scope would fail on its first query.
+     */
+    private static final TenantPropagatingTaskDecorator TENANT_DECORATOR = new TenantPropagatingTaskDecorator();
+
     @Bean(name = "replayTaskExecutor")
     public Executor replayTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -25,6 +33,7 @@ public class AsyncConfig {
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("replay-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setTaskDecorator(TENANT_DECORATOR);
         executor.initialize();
         return executor;
     }
@@ -59,6 +68,7 @@ public class AsyncConfig {
         });
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(awaitSeconds);
+        executor.setTaskDecorator(TENANT_DECORATOR);
         executor.initialize();
         return executor;
     }
@@ -80,6 +90,7 @@ public class AsyncConfig {
         });
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(10);
+        executor.setTaskDecorator(TENANT_DECORATOR);
         executor.initialize();
         return executor;
     }

@@ -39,7 +39,7 @@ public class DashboardController {
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         log.info("Dashboard stats request for projectId: {}", projectId);
-        DashboardStatsResponse stats = dashboardService.getProjectStats(projectId, auth.organizationId());
+        DashboardStatsResponse stats = dashboardService.getProjectStats(projectId);
         return ResponseEntity.ok(stats);
     }
 
@@ -49,7 +49,7 @@ public class DashboardController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        OnboardingStatusResponse status = dashboardService.getOnboardingStatus(projectId, auth.organizationId());
+        OnboardingStatusResponse status = dashboardService.getOnboardingStatus(projectId);
         return ResponseEntity.ok(status);
     }
 
@@ -61,7 +61,7 @@ public class DashboardController {
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         log.info("Analytics request for projectId: {}, period: {}", projectId, period);
-        AnalyticsResponse analytics = analyticsService.getAnalytics(projectId, auth.organizationId(), period);
+        AnalyticsResponse analytics = analyticsService.getAnalytics(projectId, period);
         return ResponseEntity.ok(analytics);
     }
 }

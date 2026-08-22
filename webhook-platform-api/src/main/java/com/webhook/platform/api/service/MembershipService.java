@@ -11,6 +11,8 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
+import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -52,7 +54,8 @@ public class MembershipService {
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    public List<MemberResponse> getOrganizationMembers(UUID organizationId) {
+    public List<MemberResponse> getOrganizationMembers() {
+        UUID organizationId = TenantContext.require();
         List<Object[]> rows = membershipRepository.findMembersWithUsers(organizationId);
 
         return rows.stream()
@@ -72,7 +75,8 @@ public class MembershipService {
 
     @Auditable(action = AuditAction.MEMBER_INVITED, resourceType = "Member")
     @Transactional
-    public MemberResponse addMember(UUID organizationId, AddMemberRequest request, MembershipRole requestingRole) {
+    public MemberResponse addMember(AddMemberRequest request, MembershipRole requestingRole) {
+        UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
             throw new ForbiddenException("Only owners can add members");
         }
@@ -129,9 +133,21 @@ public class MembershipService {
                 .build();
     }
 
+    /**
+     * Accepting an invite crosses organizations by construction, which is why this one keeps an
+     * explicit organization parameter and runs as the system tenant.
+     *
+     * <p>The invitee arrives holding a token for an organization they are <em>already</em> in —
+     * their own — while the Membership row being accepted belongs to the inviting organization.
+     * Reading the tenant from the ambient scope would look for the invite in the wrong place and
+     * find nothing, and confining the lookup to that scope would make a valid invite a 404. So
+     * {@code organizationId} here is the {@code {orgId}} path variable, and the checks below are
+     * what enforce that the token, the organization and the caller all agree.
+     */
+    @SystemTenant("an invite is accepted by a user whose current tenant is a different organization")
     @Auditable(action = AuditAction.INVITE_ACCEPTED, resourceType = "Member")
     @Transactional
-    public MemberResponse acceptInvite(String inviteToken, UUID organizationId, UUID authenticatedUserId) {
+    public MemberResponse acceptInvite(UUID organizationId, String inviteToken, UUID authenticatedUserId) {
         String tokenHash = CryptoUtils.hashApiKey(inviteToken);
         Membership membership = membershipRepository.findByInviteTokenHash(tokenHash)
                 .orElseThrow(() -> new NotFoundException("Invalid or expired invite token"));
@@ -188,8 +204,9 @@ public class MembershipService {
 
     @Auditable(action = AuditAction.MEMBER_ROLE_CHANGED, resourceType = "Member")
     @Transactional
-    public MemberResponse changeMemberRole(UUID organizationId, UUID userId, MembershipRole newRole,
+    public MemberResponse changeMemberRole(UUID userId, MembershipRole newRole,
             MembershipRole requestingRole) {
+        UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can change member roles");
         }
@@ -225,7 +242,8 @@ public class MembershipService {
 
     @Auditable(action = AuditAction.MEMBER_REMOVED, resourceType = "Member")
     @Transactional
-    public void removeMember(UUID organizationId, UUID userId, MembershipRole requestingRole) {
+    public void removeMember(UUID userId, MembershipRole requestingRole) {
+        UUID organizationId = TenantContext.require();
         if (requestingRole != MembershipRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can remove members");
         }

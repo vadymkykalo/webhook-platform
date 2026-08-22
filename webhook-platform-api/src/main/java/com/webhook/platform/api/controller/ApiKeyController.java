@@ -48,7 +48,7 @@ public class ApiKeyController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        ApiKeyResponse response = apiKeyService.createApiKey(projectId, request, auth.organizationId());
+        ApiKeyResponse response = apiKeyService.createApiKey(projectId, request);
         log.info("Created API key {} for project {}", response.getId(), projectId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -60,7 +60,7 @@ public class ApiKeyController {
             @PageableDefault(size = 20) Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, auth.organizationId(), pageable);
+        Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -75,7 +75,7 @@ public class ApiKeyController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        apiKeyService.revokeApiKey(projectId, apiKeyId, auth.organizationId());
+        apiKeyService.revokeApiKey(projectId, apiKeyId);
         log.info("Revoked API key {} for project {}", apiKeyId, projectId);
         return ResponseEntity.noContent().build();
     }

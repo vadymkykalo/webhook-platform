@@ -356,6 +356,9 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 && record.statusCode() >= 200 && record.statusCode() < 300;
         deliveryAttemptRepository.save(DeliveryAttempt.builder()
                 .deliveryId(claim.deliveryId())
+                // Carried across from the Delivery: the api filters delivery_attempts on it and
+                // the worker has no tenant of its own to derive it from (ADR-0006).
+                .organizationId(claim.delivery().getOrganizationId())
                 .attemptNumber(claim.delivery().getAttemptCount())
                 .requestHeaders(record.requestHeaders())
                 .requestBody(truncate(record.requestBody(), 10240))

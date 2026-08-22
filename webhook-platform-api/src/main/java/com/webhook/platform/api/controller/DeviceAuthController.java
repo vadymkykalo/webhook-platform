@@ -87,7 +87,7 @@ public class DeviceAuthController {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
         deviceAuthService.approveDeviceCode(
-                request.getUserCode(), auth.requireUserId(), auth.organizationId());
+                request.getUserCode(), auth.requireUserId());
         return ResponseEntity.ok().build();
     }
 

@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.GdprExportDto;
 import com.webhook.platform.api.dto.GdprExportDto.*;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -58,10 +59,11 @@ public class GdprExportService {
     }
 
     @Transactional(readOnly = true)
-    public GdprExportDto exportOrganizationData(UUID orgId) {
-        log.info("GDPR EXPORT: starting data export for organization {}", orgId);
+    public GdprExportDto exportOrganizationData() {
+        UUID organizationId = TenantContext.require();
+        log.info("GDPR EXPORT: starting data export for organization {}", organizationId);
 
-        Organization org = organizationRepository.findById(orgId)
+        Organization org = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         OrganizationData orgData = OrganizationData.builder()
@@ -73,12 +75,12 @@ public class GdprExportService {
                 .createdAt(org.getCreatedAt())
                 .build();
 
-        List<MemberData> members = exportMembers(orgId);
-        List<ProjectData> projects = exportProjects(orgId);
-        List<AuditLogData> auditLogs = exportAuditLogs(orgId);
+        List<MemberData> members = exportMembers();
+        List<ProjectData> projects = exportProjects();
+        List<AuditLogData> auditLogs = exportAuditLogs();
 
         log.info("GDPR EXPORT: completed for organization {} — {} members, {} projects, {} audit logs",
-                orgId, members.size(), projects.size(), auditLogs.size());
+                organizationId, members.size(), projects.size(), auditLogs.size());
 
         return GdprExportDto.builder()
                 .exportVersion(EXPORT_VERSION)
@@ -90,8 +92,9 @@ public class GdprExportService {
                 .build();
     }
 
-    private List<MemberData> exportMembers(UUID orgId) {
-        List<Object[]> membersWithUsers = membershipRepository.findMembersWithUsers(orgId);
+    private List<MemberData> exportMembers() {
+        UUID organizationId = TenantContext.require();
+        List<Object[]> membersWithUsers = membershipRepository.findMembersWithUsers(organizationId);
         List<MemberData> result = new ArrayList<>();
 
         for (Object[] row : membersWithUsers) {
@@ -109,8 +112,9 @@ public class GdprExportService {
         return result;
     }
 
-    private List<ProjectData> exportProjects(UUID orgId) {
-        List<Project> projects = projectRepository.findByOrganizationIdAndDeletedAtIsNull(orgId);
+    private List<ProjectData> exportProjects() {
+        UUID organizationId = TenantContext.require();
+        List<Project> projects = projectRepository.findByOrganizationIdAndDeletedAtIsNull(organizationId);
         List<ProjectData> result = new ArrayList<>();
 
         for (Project project : projects) {
@@ -202,9 +206,10 @@ public class GdprExportService {
                 .toList();
     }
 
-    private List<AuditLogData> exportAuditLogs(UUID orgId) {
+    private List<AuditLogData> exportAuditLogs() {
+        UUID organizationId = TenantContext.require();
         Pageable limit = PageRequest.of(0, AUDIT_LOG_LIMIT);
-        return auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(orgId, limit).getContent().stream()
+        return auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId, limit).getContent().stream()
                 .map(a -> AuditLogData.builder()
                         .action(a.getAction())
                         .resourceType(a.getResourceType())

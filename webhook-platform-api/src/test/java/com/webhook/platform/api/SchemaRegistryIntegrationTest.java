@@ -450,7 +450,10 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get(schemasUrl())
                         .header("Authorization", "Bearer " + otherToken))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     // ── Project schema validation settings ──

@@ -222,7 +222,6 @@ public class AuthController {
     public ResponseEntity<CurrentUserResponse> getCurrentUser(AuthContext auth) {
         CurrentUserResponse response = authService.getCurrentUser(
                 auth.requireUserId(),
-                auth.organizationId(),
                 auth.role());
         return ResponseEntity.ok(response);
     }

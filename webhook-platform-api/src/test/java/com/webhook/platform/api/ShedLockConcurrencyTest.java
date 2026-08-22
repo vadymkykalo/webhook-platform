@@ -1,5 +1,7 @@
 package com.webhook.platform.api;
 
+import org.junit.jupiter.api.AfterEach;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.api.audit.AuditLogRetentionJob;
 import com.webhook.platform.api.domain.entity.AuditLog;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
@@ -51,6 +53,16 @@ import org.springframework.test.annotation.DirtiesContext;
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class ShedLockConcurrencyTest {
+
+    /**
+     * Fixture tenant for rows inserted straight through JDBC.
+     *
+     * <p>These fixtures bypass the entity mapping (and the FK checks, via
+     * {@code session_replication_role = replica}) that would normally stamp
+     * {@code organization_id}, so they name one themselves. The value only has to be non-null and
+     * consistent — nothing here asserts on tenant confinement.
+     */
+    private static final UUID FIXTURE_ORG = UUID.randomUUID();
 
     @MockBean
     private RedissonClient redissonClient;
@@ -120,6 +132,23 @@ public class ShedLockConcurrencyTest {
     private TransactionTemplate transactionTemplate;
 
     private AtomicInteger executionCount = new AtomicInteger(0);
+
+
+    /**
+     * These two build their own {@code @SpringBootTest} rather than extending
+     * {@code AbstractIntegrationTest}, so they enter the system tenant scope themselves. They read
+     * and delete rows across organizations directly, which is exactly what that scope means
+     * (ADR-0006).
+     */
+    @BeforeEach
+    void enterSystemTenantScope() {
+        TenantContext.set(TenantContext.SYSTEM);
+    }
+
+    @AfterEach
+    void leaveSystemTenantScope() {
+        TenantContext.clear();
+    }
 
     @BeforeEach
     void cleanup() {
@@ -195,8 +224,8 @@ public class ShedLockConcurrencyTest {
         
         jdbcTemplate.execute("SET session_replication_role = replica");
         jdbcTemplate.update(
-            "INSERT INTO deliveries (id, event_id, endpoint_id, subscription_id, status, attempt_count, max_attempts, ordering_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            deliveryId, eventId, endpointId, subscriptionId, "PENDING", 0, 5, false, now, now
+            "INSERT INTO deliveries (id, event_id, endpoint_id, subscription_id, organization_id, status, attempt_count, max_attempts, ordering_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            deliveryId, eventId, endpointId, subscriptionId, FIXTURE_ORG, "PENDING", 0, 5, false, now, now
         );
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
         
@@ -206,8 +235,8 @@ public class ShedLockConcurrencyTest {
     private void createAttempt(UUID deliveryId, int attemptNumber) {
         jdbcTemplate.execute("SET session_replication_role = replica");
         jdbcTemplate.update(
-            "INSERT INTO delivery_attempts (id, delivery_id, attempt_number, http_status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            UUID.randomUUID(), deliveryId, attemptNumber, 200, 100, Timestamp.from(Instant.now())
+            "INSERT INTO delivery_attempts (id, delivery_id, organization_id, attempt_number, http_status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            UUID.randomUUID(), deliveryId, FIXTURE_ORG, attemptNumber, 200, 100, Timestamp.from(Instant.now())
         );
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
     }

@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
@@ -28,6 +30,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TunnelServiceTest {
 
+    private final UUID tenantOrgId = UUID.randomUUID();
+
     @Mock
     private TunnelSessionRepository tunnelSessionRepository;
 
@@ -43,14 +47,29 @@ class TunnelServiceTest {
         ReflectionTestUtils.setField(tunnelService, "heartbeatTimeoutSeconds", 120);
     }
 
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(tenantOrgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
     @Test
     void shouldCreateSession() {
         UUID userId = UUID.randomUUID();
-        UUID orgId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
 
         // Mock project belongs to the same org
-        Project project = Project.builder().id(projectId).organizationId(orgId).build();
+        Project project = Project.builder().id(projectId).organizationId(tenantOrgId).build();
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
         when(tunnelSessionRepository.save(any(TunnelSession.class)))
@@ -61,11 +80,11 @@ class TunnelServiceTest {
                     return s;
                 });
 
-        TunnelSession session = tunnelService.createSession(userId, orgId, projectId, 3000, "cli/1.0");
+        TunnelSession session = tunnelService.createSession(userId, projectId, 3000, "cli/1.0");
 
         assertNotNull(session);
         assertEquals(userId, session.getUserId());
-        assertEquals(orgId, session.getOrganizationId());
+        assertEquals(tenantOrgId, session.getOrganizationId());
         assertEquals(projectId, session.getProjectId());
         assertEquals(3000, session.getLocalPort());
         assertEquals(TunnelStatus.ACTIVE, session.getStatus());
@@ -168,10 +187,9 @@ class TunnelServiceTest {
 
     @Test
     void shouldListActiveTunnels() {
-        UUID orgId = UUID.randomUUID();
         TunnelSession session = TunnelSession.builder()
                 .id(UUID.randomUUID())
-                .organizationId(orgId)
+                .organizationId(tenantOrgId)
                 .userId(UUID.randomUUID())
                 .publicSlug("tun-list1")
                 .localPort(3000)
@@ -179,10 +197,10 @@ class TunnelServiceTest {
                 .createdAt(Instant.now())
                 .build();
 
-        when(tunnelSessionRepository.findByOrganizationIdAndStatus(orgId, TunnelStatus.ACTIVE))
+        when(tunnelSessionRepository.findByOrganizationIdAndStatus(tenantOrgId, TunnelStatus.ACTIVE))
                 .thenReturn(List.of(session));
 
-        List<TunnelSessionResponse> results = tunnelService.listActive(orgId);
+        List<TunnelSessionResponse> results = tunnelService.listActive();
         assertEquals(1, results.size());
         assertEquals("tun-list1", results.get(0).getPublicSlug());
         assertTrue(results.get(0).getPublicUrl().contains("tun-list1"));

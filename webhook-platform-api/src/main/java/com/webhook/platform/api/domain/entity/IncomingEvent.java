@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import lombok.*;
 
 import java.time.Instant;
@@ -18,6 +19,15 @@ public class IncomingEvent {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    /**
+     * Tenant discriminator (ADR-0006): Hibernate adds {@code organization_id = <current tenant>}
+     * to every query against this entity and populates it on insert from the current scope.
+     */
+    @TenantId
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
 
     @Column(name = "incoming_source_id", nullable = false)
     private UUID incomingSourceId;

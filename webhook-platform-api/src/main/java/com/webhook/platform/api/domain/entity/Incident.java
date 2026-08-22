@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.enums.IncidentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
@@ -22,6 +23,15 @@ public class Incident {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    /**
+     * Tenant discriminator (ADR-0006): Hibernate adds {@code organization_id = <current tenant>}
+     * to every query against this entity and populates it on insert from the current scope.
+     */
+    @TenantId
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
+
 
     @Column(name = "project_id", nullable = false)
     private UUID projectId;

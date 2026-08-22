@@ -195,6 +195,6 @@ class ApiKeyScopeEnforcementTest {
 
     private static void authenticateAsApiKey(UUID keyProjectId) {
         SecurityContextHolder.getContext().setAuthentication(
-                new ApiKeyAuthenticationToken("test-key", keyProjectId, ApiKeyScope.READ_WRITE, List.of()));
+                new ApiKeyAuthenticationToken("test-key", keyProjectId, UUID.randomUUID(), ApiKeyScope.READ_WRITE, List.of()));
     }
 }

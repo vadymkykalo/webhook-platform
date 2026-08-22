@@ -39,17 +39,26 @@ public class WorkflowService {
     private final ObjectMapper objectMapper;
     private final WorkflowEngine workflowEngine;
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     @Transactional
-    public WorkflowResponse create(UUID projectId, WorkflowRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public WorkflowResponse create(UUID projectId, WorkflowRequest request) {
+        validateProjectOwnership(projectId);
 
         if (workflowRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new ConflictException("Workflow with this name already exists");
@@ -70,25 +79,25 @@ public class WorkflowService {
         return mapToResponse(workflow);
     }
 
-    public WorkflowResponse get(UUID id, UUID organizationId) {
+    public WorkflowResponse get(UUID id) {
         Workflow workflow = workflowRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
         return mapToResponse(workflow);
     }
 
-    public List<WorkflowResponse> list(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<WorkflowResponse> list(UUID projectId) {
+        validateProjectOwnership(projectId);
         return workflowRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public WorkflowResponse update(UUID id, WorkflowRequest request, UUID organizationId) {
+    public WorkflowResponse update(UUID id, WorkflowRequest request) {
         Workflow workflow = workflowRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
 
         // Check name uniqueness if changed
         if (!workflow.getName().equals(request.getName()) &&
@@ -118,19 +127,19 @@ public class WorkflowService {
     }
 
     @Transactional
-    public void delete(UUID id, UUID organizationId) {
+    public void delete(UUID id) {
         Workflow workflow = workflowRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
         workflowRepository.delete(workflow);
         log.info("Deleted workflow '{}'", workflow.getName());
     }
 
     @Transactional
-    public WorkflowResponse toggleEnabled(UUID id, boolean enabled, UUID organizationId) {
+    public WorkflowResponse toggleEnabled(UUID id, boolean enabled) {
         Workflow workflow = workflowRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
         workflow.setEnabled(enabled);
         workflow = workflowRepository.save(workflow);
         log.info("Workflow '{}' {}", workflow.getName(), enabled ? "enabled" : "disabled");
@@ -139,10 +148,10 @@ public class WorkflowService {
 
     // ── Manual trigger ───────────────────────────────────────────────────
 
-    public WorkflowExecutionResponse manualTrigger(UUID workflowId, UUID organizationId, Object testPayload) {
+    public WorkflowExecutionResponse manualTrigger(UUID workflowId, Object testPayload) {
         Workflow workflow = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
 
         String payloadStr;
         JsonNode payloadJson;
@@ -169,15 +178,15 @@ public class WorkflowService {
 
         // Re-fetch to get updated status
         execution = executionRepository.findById(execution.getId()).orElse(execution);
-        return getExecution(execution.getId(), organizationId);
+        return getExecution(execution.getId());
     }
 
     // ── Executions ──────────────────────────────────────────────────────
 
-    public Page<WorkflowExecutionResponse> listExecutions(UUID workflowId, UUID organizationId, int page, int size) {
+    public Page<WorkflowExecutionResponse> listExecutions(UUID workflowId, int page, int size) {
         Workflow workflow = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
 
         return executionRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId, PageRequest.of(page, size))
                 .map(exec -> {
@@ -188,13 +197,13 @@ public class WorkflowService {
                 });
     }
 
-    public WorkflowExecutionResponse getExecution(UUID executionId, UUID organizationId) {
+    public WorkflowExecutionResponse getExecution(UUID executionId) {
         WorkflowExecution execution = executionRepository.findById(executionId)
                 .orElseThrow(() -> new NotFoundException("Execution not found"));
 
         Workflow workflow = workflowRepository.findById(execution.getWorkflowId())
                 .orElseThrow(() -> new NotFoundException("Workflow not found"));
-        validateProjectOwnership(workflow.getProjectId(), organizationId);
+        validateProjectOwnership(workflow.getProjectId());
 
         WorkflowExecutionResponse response = mapExecutionToResponse(execution);
         List<WorkflowStepExecution> steps = stepExecutionRepository.findByExecutionIdOrderByCreatedAtAsc(executionId);

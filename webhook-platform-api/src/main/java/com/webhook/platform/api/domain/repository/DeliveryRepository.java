@@ -38,11 +38,13 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed
         FROM deliveries d
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
+        WHERE d.organization_id = :organizationId
+          AND e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
         GROUP BY DATE_TRUNC('hour', d.created_at)
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findDeliveryTimeSeriesByHour(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
@@ -55,11 +57,13 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
             COUNT(*) FILTER (WHERE d.status IN ('FAILED', 'DLQ')) as failed
         FROM deliveries d
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
+        WHERE d.organization_id = :organizationId
+          AND e.project_id = :projectId AND d.created_at BETWEEN :from AND :to
         GROUP BY DATE_TRUNC('day', d.created_at)
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findDeliveryTimeSeriesByDay(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
@@ -79,12 +83,13 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
         LEFT JOIN subscriptions s ON s.endpoint_id = e.id
         LEFT JOIN deliveries d ON d.endpoint_id = e.id AND d.created_at BETWEEN :from AND :to
         LEFT JOIN delivery_attempts da ON da.delivery_id = d.id
-        WHERE e.project_id = :projectId
+        WHERE e.organization_id = :organizationId AND e.project_id = :projectId
         GROUP BY e.id, e.url, e.enabled
         ORDER BY total_deliveries DESC
         LIMIT 10
         """, nativeQuery = true)
     List<Object[]> findEndpointPerformanceByProjectId(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
@@ -112,18 +117,22 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
         SELECT CAST(d.status AS text), COUNT(*)
         FROM deliveries d
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND d.created_at >= :since
+        WHERE d.organization_id = :organizationId
+          AND e.project_id = :projectId AND d.created_at >= :since
         GROUP BY d.status
         """, nativeQuery = true)
-    List<Object[]> countByProjectIdGroupByStatus(@Param("projectId") UUID projectId, @Param("since") Instant since);
+    List<Object[]> countByProjectIdGroupByStatus(
+ @Param("organizationId") UUID organizationId,@Param("projectId") UUID projectId, @Param("since") Instant since);
 
     @Query(value = """
         SELECT d.endpoint_id, CAST(d.status AS text), COUNT(*)
         FROM deliveries d
-        WHERE d.endpoint_id IN :endpointIds AND d.created_at >= :since
+        WHERE d.organization_id = :organizationId
+          AND d.endpoint_id IN :endpointIds AND d.created_at >= :since
         GROUP BY d.endpoint_id, d.status
         """, nativeQuery = true)
-    List<Object[]> countByEndpointIdsGroupByEndpointAndStatus(@Param("endpointIds") List<UUID> endpointIds, @Param("since") Instant since);
+    List<Object[]> countByEndpointIdsGroupByEndpointAndStatus(
+ @Param("organizationId") UUID organizationId,@Param("endpointIds") List<UUID> endpointIds, @Param("since") Instant since);
 
     @Modifying
     @Query("DELETE FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")

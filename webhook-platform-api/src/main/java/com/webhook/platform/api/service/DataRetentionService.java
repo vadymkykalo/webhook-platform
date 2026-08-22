@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
@@ -74,6 +75,7 @@ public class DataRetentionService {
     // to avoid duplicate cleanup logic. DataRetentionService focuses on delivery_attempts,
     // incoming_events, and tunnel_request_log tables.
 
+    @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     @Transactional
@@ -115,6 +117,7 @@ public class DataRetentionService {
     // underlying deliveryAttemptRepository.deleteOldAttempts() query is left in place
     // for manual/ad-hoc use but is no longer scheduled.
 
+    @SystemTenant
     @Scheduled(cron = "${data-retention.limit-enforcement-cron:0 */30 * * * *}")
     @SchedulerLock(name = "enforcePerDeliveryAttemptLimits", lockAtMostFor = "29m", lockAtLeastFor = "1m")
     @Transactional
@@ -147,6 +150,7 @@ public class DataRetentionService {
         updateMetrics();
     }
     
+    @SystemTenant
     @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
     @SchedulerLock(name = "cleanupOldIncomingEvents", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     @Transactional
@@ -177,6 +181,7 @@ public class DataRetentionService {
         }
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${data-retention.table-metrics-interval-ms:900000}")
     public void refreshTableSizeMetrics() {
         try {
@@ -190,6 +195,7 @@ public class DataRetentionService {
         }
     }
 
+    @SystemTenant
     @Scheduled(cron = "${data-retention.burst-cleanup-cron:0 0 */4 * * *}")
     @SchedulerLock(name = "burstCleanupSuccessfulAttempts", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     @Transactional

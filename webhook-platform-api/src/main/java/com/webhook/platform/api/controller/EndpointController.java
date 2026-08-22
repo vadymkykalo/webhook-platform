@@ -57,7 +57,7 @@ public class EndpointController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         try {
-            EndpointResponse response = endpointService.createEndpoint(projectId, request, auth.organizationId());
+            EndpointResponse response = endpointService.createEndpoint(projectId, request);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
             log.error("Failed to create endpoint for project {}: {}", projectId, e.getMessage(), e);
@@ -70,7 +70,7 @@ public class EndpointController {
     public ResponseEntity<EndpointResponse> getEndpoint(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        EndpointResponse response = endpointService.getEndpoint(id, auth.organizationId());
+        EndpointResponse response = endpointService.getEndpoint(id);
         return ResponseEntity.ok(response);
     }
 
@@ -81,7 +81,7 @@ public class EndpointController {
             @PageableDefault(size = 20) Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        Page<EndpointResponse> response = endpointService.listEndpoints(projectId, auth.organizationId(), pageable);
+        Page<EndpointResponse> response = endpointService.listEndpoints(projectId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -94,7 +94,7 @@ public class EndpointController {
             @Valid @RequestBody EndpointRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        EndpointResponse response = endpointService.updateEndpoint(id, request, auth.organizationId());
+        EndpointResponse response = endpointService.updateEndpoint(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -107,7 +107,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        endpointService.deleteEndpoint(id, auth.organizationId());
+        endpointService.deleteEndpoint(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -119,7 +119,7 @@ public class EndpointController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        EndpointResponse response = endpointService.rotateSecret(id, auth.organizationId());
+        EndpointResponse response = endpointService.rotateSecret(id);
         log.info("Rotated secret for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
@@ -138,7 +138,7 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        EndpointTestResponse response = endpointService.testEndpoint(id, auth.organizationId());
+        EndpointTestResponse response = endpointService.testEndpoint(id);
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
     }
@@ -155,7 +155,7 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        EndpointResponse response = endpointService.configureMtls(projectId, id, request, auth.organizationId());
+        EndpointResponse response = endpointService.configureMtls(projectId, id, request);
         log.info("Configured mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
@@ -171,7 +171,7 @@ public class EndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        EndpointResponse response = endpointService.disableMtls(projectId, id, auth.organizationId());
+        EndpointResponse response = endpointService.disableMtls(projectId, id);
         log.info("Disabled mTLS for endpoint {}", id);
         return ResponseEntity.ok(response);
     }
@@ -213,7 +213,7 @@ public class EndpointController {
         var endpoint = verificationService.skipVerification(id, reason);
         log.info("Skipped verification for endpoint {}: {}", id, reason);
         
-        return ResponseEntity.ok(endpointService.getEndpoint(id, auth.organizationId()));
+        return ResponseEntity.ok(endpointService.getEndpoint(id));
     }
 
     public record VerificationResponse(boolean success, String message, String status) {}

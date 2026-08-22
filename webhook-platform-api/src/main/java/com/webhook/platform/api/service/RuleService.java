@@ -38,18 +38,27 @@ public class RuleService {
     private final RuleEngineService ruleEngineService;
     private final ObjectMapper objectMapper;
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Rule")
     @Transactional
-    public RuleResponse create(UUID projectId, RuleRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public RuleResponse create(UUID projectId, RuleRequest request) {
+        validateProjectOwnership(projectId);
 
         if (ruleRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new ConflictException("Rule with this name already exists");
@@ -84,15 +93,15 @@ public class RuleService {
         return mapToResponse(rule);
     }
 
-    public RuleResponse get(UUID id, UUID organizationId) {
+    public RuleResponse get(UUID id) {
         Rule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId(), organizationId);
+        validateProjectOwnership(rule.getProjectId());
         return mapToResponse(rule);
     }
 
-    public List<RuleResponse> list(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<RuleResponse> list(UUID projectId) {
+        validateProjectOwnership(projectId);
         return ruleRepository.findByProjectIdOrderByPriorityDescCreatedAtDesc(projectId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -100,10 +109,10 @@ public class RuleService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Rule")
     @Transactional
-    public RuleResponse update(UUID id, RuleRequest request, UUID organizationId) {
+    public RuleResponse update(UUID id, RuleRequest request) {
         Rule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId(), organizationId);
+        validateProjectOwnership(rule.getProjectId());
 
         if (request.getName() != null) {
             if (!rule.getName().equals(request.getName()) &&
@@ -147,10 +156,10 @@ public class RuleService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Rule")
     @Transactional
-    public void delete(UUID id, UUID organizationId) {
+    public void delete(UUID id) {
         Rule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId(), organizationId);
+        validateProjectOwnership(rule.getProjectId());
 
         UUID projectId = rule.getProjectId();
         ruleRepository.deleteById(id);
@@ -159,10 +168,10 @@ public class RuleService {
     }
 
     @Transactional
-    public RuleResponse toggleEnabled(UUID id, boolean enabled, UUID organizationId) {
+    public RuleResponse toggleEnabled(UUID id, boolean enabled) {
         Rule rule = ruleRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Rule not found"));
-        validateProjectOwnership(rule.getProjectId(), organizationId);
+        validateProjectOwnership(rule.getProjectId());
 
         rule.setEnabled(enabled);
         rule = ruleRepository.saveAndFlush(rule);

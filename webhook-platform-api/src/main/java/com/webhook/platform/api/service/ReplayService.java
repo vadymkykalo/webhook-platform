@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
@@ -98,8 +99,8 @@ public class ReplayService {
 
     // ========== Public API ==========
 
-    public ReplayEstimateResponse estimate(UUID projectId, ReplayRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public ReplayEstimateResponse estimate(UUID projectId, ReplayRequest request) {
+        validateProjectOwnership(projectId);
         validateRequest(request);
 
         long eventCount = countEvents(projectId, request);
@@ -121,8 +122,8 @@ public class ReplayService {
     }
 
     @Transactional
-    public ReplaySessionResponse create(UUID projectId, ReplayRequest request, UUID organizationId, UUID userId) {
-        validateProjectOwnership(projectId, organizationId);
+    public ReplaySessionResponse create(UUID projectId, ReplayRequest request, UUID userId) {
+        validateProjectOwnership(projectId);
         validateRequest(request);
 
         long running = replaySessionRepository.countByProjectIdAndStatusIn(
@@ -162,22 +163,22 @@ public class ReplayService {
         return mapToResponse(session);
     }
 
-    public ReplaySessionResponse get(UUID projectId, UUID sessionId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public ReplaySessionResponse get(UUID projectId, UUID sessionId) {
+        validateProjectOwnership(projectId);
         ReplaySession session = replaySessionRepository.findByIdAndProjectId(sessionId, projectId)
                 .orElseThrow(() -> new NotFoundException("Replay session not found"));
         return mapToResponse(session);
     }
 
-    public Page<ReplaySessionResponse> list(UUID projectId, UUID organizationId, Pageable pageable) {
-        validateProjectOwnership(projectId, organizationId);
+    public Page<ReplaySessionResponse> list(UUID projectId, Pageable pageable) {
+        validateProjectOwnership(projectId);
         return replaySessionRepository.findByProjectIdOrderByCreatedAtDesc(projectId, pageable)
                 .map(this::mapToResponse);
     }
 
     @Transactional
-    public ReplaySessionResponse cancel(UUID projectId, UUID sessionId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public ReplaySessionResponse cancel(UUID projectId, UUID sessionId) {
+        validateProjectOwnership(projectId);
         ReplaySession session = replaySessionRepository.findByIdAndProjectId(sessionId, projectId)
                 .orElseThrow(() -> new NotFoundException("Replay session not found"));
 
@@ -197,7 +198,7 @@ public class ReplayService {
         }
 
         log.info("Cancelling replay session {} for project {}", sessionId, projectId);
-        return get(projectId, sessionId, organizationId);
+        return get(projectId, sessionId);
     }
 
     // ========== Async execution ==========
@@ -411,21 +412,21 @@ public class ReplayService {
 
     private List<Event> fetchBatch(UUID projectId, ReplaySession session, Instant cursorCreatedAt, UUID cursorId) {
         if (session.getEventType() != null && !session.getEventType().isBlank()) {
-            return eventRepository.findByCursorForReplayWithEventType(
+            return eventRepository.findByCursorForReplayWithEventType(TenantContext.require(), 
                     projectId, session.getFromDate(), session.getToDate(),
                     session.getEventType(), cursorCreatedAt, cursorId, batchSize);
         }
-        return eventRepository.findByCursorForReplay(
+        return eventRepository.findByCursorForReplay(TenantContext.require(), 
                 projectId, session.getFromDate(), session.getToDate(),
                 cursorCreatedAt, cursorId, batchSize);
     }
 
     private long countEvents(UUID projectId, ReplayRequest request) {
         if (request.getEventType() != null && !request.getEventType().isBlank()) {
-            return eventRepository.countForReplayWithEventType(
+            return eventRepository.countForReplayWithEventType(TenantContext.require(), 
                     projectId, request.getFromDate(), request.getToDate(), request.getEventType());
         }
-        return eventRepository.countForReplay(projectId, request.getFromDate(), request.getToDate());
+        return eventRepository.countForReplay(TenantContext.require(), projectId, request.getFromDate(), request.getToDate());
     }
 
     private List<Subscription> findActiveSubscriptions(UUID projectId, ReplayRequest request) {
@@ -503,12 +504,21 @@ public class ReplayService {
         });
     }
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     private void validateRequest(ReplayRequest request) {

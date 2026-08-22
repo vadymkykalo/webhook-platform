@@ -8,6 +8,7 @@ import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.TunnelBandwidthService;
 import com.webhook.platform.api.service.TunnelRegistry;
 import com.webhook.platform.api.service.TunnelService;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.dto.tunnel.TunnelRequestMessage;
 import com.webhook.platform.common.dto.tunnel.TunnelResponseMessage;
 import io.micrometer.core.instrument.Counter;
@@ -166,10 +167,16 @@ public class TunnelIngressController {
                                     TunnelResponseMessage response, int durationMs) {
         tunnelMeteringExecutor.execute(() -> {
             try {
-                TunnelSession session = tunnelService.getActiveBySlug(slug);
+                // A tunnel request authenticates nothing -- the slug in the URL is the only thing
+                // that names an organization, so the session lookup runs unscoped and everything
+                // after it runs inside the organization that owns the tunnel. Without this the
+                // save below would fail on an unresolved tenant, and the catch further down would
+                // swallow it as a debug line: metering would just quietly stop.
+                TunnelSession session = TenantContext.callAsSystem(() -> tunnelService.getActiveBySlug(slug));
+                TenantContext.runAs(session.getOrganizationId(), () -> {
 
                 // Bandwidth metering — single Redis increment
-                bandwidthService.recordBytes(session.getOrganizationId(), requestBodySize + responseBodySize);
+                bandwidthService.recordBytes(requestBodySize + responseBodySize);
 
                 // Request log
                 TunnelRequestLog logEntry = TunnelRequestLog.builder()
@@ -189,6 +196,7 @@ public class TunnelIngressController {
                         .error(response != null ? response.getError() : "timeout")
                         .build();
                 requestLogRepository.save(logEntry);
+                });
             } catch (Exception e) {
                 log.debug("Failed to log/meter tunnel request: slug={}, error={}", slug, e.getMessage());
             }

@@ -14,6 +14,7 @@ import com.webhook.platform.api.dto.IncidentRequest;
 import com.webhook.platform.api.dto.IncidentResponse;
 import com.webhook.platform.api.dto.TimelineEntryRequest;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,8 +36,8 @@ public class IncidentService {
     private final ProjectRepository projectRepository;
 
     @Transactional(readOnly = true)
-    public Page<IncidentResponse> listIncidents(UUID projectId, UUID organizationId, boolean openOnly, int page, int size) {
-        validateProjectAccess(projectId, organizationId);
+    public Page<IncidentResponse> listIncidents(UUID projectId, boolean openOnly, int page, int size) {
+        validateProjectAccess(projectId);
         Page<Incident> incidents;
         if (openOnly) {
             incidents = incidentRepository.findByProjectIdAndStatusNotOrderByCreatedAtDesc(
@@ -49,8 +50,8 @@ public class IncidentService {
     }
 
     @Transactional(readOnly = true)
-    public IncidentResponse getIncident(UUID projectId, UUID incidentId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public IncidentResponse getIncident(UUID projectId, UUID incidentId) {
+        validateProjectAccess(projectId);
         Incident incident = incidentRepository.findByIdAndProjectId(incidentId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incident not found"));
         IncidentResponse response = toResponse(incident);
@@ -61,8 +62,8 @@ public class IncidentService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Incident")
     @Transactional
-    public IncidentResponse createIncident(UUID projectId, IncidentRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public IncidentResponse createIncident(UUID projectId, IncidentRequest request) {
+        validateProjectAccess(projectId);
         if (request.getTitle() == null || request.getTitle().isBlank()) {
             throw new IllegalArgumentException("Incident title is required");
         }
@@ -87,13 +88,13 @@ public class IncidentService {
         timelineRepository.save(entry);
 
         log.info("Created incident '{}' for project {}", incident.getTitle(), projectId);
-        return getIncident(projectId, incident.getId(), organizationId);
+        return getIncident(projectId, incident.getId());
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Incident")
     @Transactional
-    public IncidentResponse updateIncident(UUID projectId, UUID incidentId, IncidentRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public IncidentResponse updateIncident(UUID projectId, UUID incidentId, IncidentRequest request) {
+        validateProjectAccess(projectId);
         Incident incident = incidentRepository.findByIdAndProjectId(incidentId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incident not found"));
 
@@ -121,13 +122,13 @@ public class IncidentService {
             timelineRepository.save(entry);
         }
 
-        return getIncident(projectId, incidentId, organizationId);
+        return getIncident(projectId, incidentId);
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "IncidentTimeline")
     @Transactional
-    public IncidentResponse addTimelineEntry(UUID projectId, UUID incidentId, TimelineEntryRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public IncidentResponse addTimelineEntry(UUID projectId, UUID incidentId, TimelineEntryRequest request) {
+        validateProjectAccess(projectId);
         incidentRepository.findByIdAndProjectId(incidentId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incident not found"));
 
@@ -141,12 +142,12 @@ public class IncidentService {
                 .build();
         timelineRepository.save(entry);
 
-        return getIncident(projectId, incidentId, organizationId);
+        return getIncident(projectId, incidentId);
     }
 
     @Transactional(readOnly = true)
-    public long countOpen(UUID projectId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public long countOpen(UUID projectId) {
+        validateProjectAccess(projectId);
         return incidentRepository.countByProjectIdAndStatusNot(projectId, IncidentStatus.RESOLVED);
     }
 
@@ -176,7 +177,8 @@ public class IncidentService {
                 .build();
     }
 
-    private void validateProjectAccess(UUID projectId, UUID organizationId) {
+    private void validateProjectAccess(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));

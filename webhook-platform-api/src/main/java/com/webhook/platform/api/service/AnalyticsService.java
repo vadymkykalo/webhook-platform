@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -36,7 +37,7 @@ public class AnalyticsService {
         this.endpointRepository = endpointRepository;
     }
 
-    public AnalyticsResponse getAnalytics(UUID projectId, UUID organizationId, String period) {
+    public AnalyticsResponse getAnalytics(UUID projectId, String period) {
         Instant now = Instant.now();
         Instant from;
         String granularity;
@@ -95,11 +96,11 @@ public class AnalyticsService {
                 ? (double) successfulDeliveries / totalDeliveries * 100 
                 : 0;
 
-        Double avgLatency = attemptRepository.findAverageLatencyByProjectIdAndAttemptedAtBetween(
+        Double avgLatency = attemptRepository.findAverageLatencyByProjectIdAndAttemptedAtBetween(TenantContext.require(), 
                 projectId, from, to);
-        Long p50Latency = attemptRepository.findLatencyPercentileByProjectId(projectId, from, to, 0.50);
-        Long p95Latency = attemptRepository.findLatencyPercentileByProjectId(projectId, from, to, 0.95);
-        Long p99Latency = attemptRepository.findLatencyPercentileByProjectId(projectId, from, to, 0.99);
+        Long p50Latency = attemptRepository.findLatencyPercentileByProjectId(TenantContext.require(), projectId, from, to, 0.50);
+        Long p95Latency = attemptRepository.findLatencyPercentileByProjectId(TenantContext.require(), projectId, from, to, 0.95);
+        Long p99Latency = attemptRepository.findLatencyPercentileByProjectId(TenantContext.require(), projectId, from, to, 0.99);
 
         long durationSeconds = ChronoUnit.SECONDS.between(from, to);
         double eventsPerSecond = durationSeconds > 0 ? (double) totalEvents / durationSeconds : 0;
@@ -123,8 +124,8 @@ public class AnalyticsService {
     private List<TimeSeriesPoint> calculateDeliveryTimeSeries(
             UUID projectId, Instant from, Instant to, String granularity) {
         List<Object[]> rawData = "HOUR".equals(granularity)
-                ? deliveryRepository.findDeliveryTimeSeriesByHour(projectId, from, to)
-                : deliveryRepository.findDeliveryTimeSeriesByDay(projectId, from, to);
+                ? deliveryRepository.findDeliveryTimeSeriesByHour(TenantContext.require(), projectId, from, to)
+                : deliveryRepository.findDeliveryTimeSeriesByDay(TenantContext.require(), projectId, from, to);
 
         return rawData.stream()
                 .map(row -> TimeSeriesPoint.builder()
@@ -139,8 +140,8 @@ public class AnalyticsService {
     private List<TimeSeriesPoint> calculateLatencyTimeSeries(
             UUID projectId, Instant from, Instant to, String granularity) {
         List<Object[]> rawData = "HOUR".equals(granularity)
-                ? attemptRepository.findLatencyTimeSeriesByHour(projectId, from, to)
-                : attemptRepository.findLatencyTimeSeriesByDay(projectId, from, to);
+                ? attemptRepository.findLatencyTimeSeriesByHour(TenantContext.require(), projectId, from, to)
+                : attemptRepository.findLatencyTimeSeriesByDay(TenantContext.require(), projectId, from, to);
 
         return rawData.stream()
                 .map(row -> TimeSeriesPoint.builder()
@@ -152,7 +153,7 @@ public class AnalyticsService {
     }
 
     private List<EventTypeBreakdown> calculateEventTypeBreakdown(UUID projectId, Instant from, Instant to) {
-        List<Object[]> rawData = eventRepository.findEventTypeBreakdownByProjectId(projectId, from, to);
+        List<Object[]> rawData = eventRepository.findEventTypeBreakdownByProjectId(TenantContext.require(), projectId, from, to);
         long total = rawData.stream().mapToLong(row -> ((Number) row[1]).longValue()).sum();
 
         return rawData.stream()
@@ -171,7 +172,7 @@ public class AnalyticsService {
     }
 
     private List<EndpointPerformance> calculateEndpointPerformance(UUID projectId, Instant from, Instant to) {
-        List<Object[]> rawData = deliveryRepository.findEndpointPerformanceByProjectId(projectId, from, to);
+        List<Object[]> rawData = deliveryRepository.findEndpointPerformanceByProjectId(TenantContext.require(), projectId, from, to);
 
         return rawData.stream()
                 .map(row -> {
@@ -222,7 +223,7 @@ public class AnalyticsService {
     }
 
     private long getPercentile(UUID projectId, Instant from, Instant to, double percentile) {
-        Long value = attemptRepository.findLatencyPercentileByProjectId(projectId, from, to, percentile);
+        Long value = attemptRepository.findLatencyPercentileByProjectId(TenantContext.require(), projectId, from, to, percentile);
         return value != null ? value : 0;
     }
 }

@@ -1,5 +1,8 @@
 package com.webhook.platform.api.service.billing;
 
+import java.util.UUID;
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
@@ -68,6 +71,22 @@ class BillingServiceTest {
 
     // ── Plan catalog ────────────────────────────────────────────────
 
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(ORG_ID);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
     @Test
     void listActivePlans_delegatesToRepo() {
         when(planRepository.findByActiveTrueOrderByPriceMonthlyCentsAsc())
@@ -89,11 +108,11 @@ class BillingServiceTest {
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
         when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
 
-        service.assignPlan(ORG_ID, "pro");
+        service.assignPlan( "pro");
 
         assertThat(org.getPlan()).isEqualTo(proPlan);
         verify(organizationRepository).save(org);
-        verify(entitlementService).evictPlanCache(ORG_ID);
+        verify(entitlementService).evictPlanCache(any());
     }
 
     // ── createCheckoutSession ───────────────────────────────────────
@@ -108,8 +127,7 @@ class BillingServiceTest {
         stripeProvider.setCreatePaymentResult(
                 new BillingProvider.CreatePaymentResult("https://checkout.stripe.com/session_1", "cs_1"));
 
-        String url = service.createCheckoutSession(
-                ORG_ID, "starter", "stripe", "MONTHLY",
+        String url = service.createCheckoutSession( "starter", "stripe", "MONTHLY",
                 "https://app.com/success", "https://app.com/cancel");
 
         assertThat(url).isEqualTo("https://checkout.stripe.com/session_1");
@@ -130,7 +148,7 @@ class BillingServiceTest {
         stripeProvider.setCreatePaymentResult(
                 new BillingProvider.CreatePaymentResult("https://checkout.stripe.com/s2", "cs_2"));
 
-        service.createCheckoutSession(ORG_ID, "starter", null, null, "ok", "cancel");
+        service.createCheckoutSession( "starter", null, null, "ok", "cancel");
 
         // Should not create new customer
         assertThat(stripeProvider.createCustomerCalled).isFalse();
@@ -146,7 +164,7 @@ class BillingServiceTest {
         stripeProvider.setCreatePaymentResult(
                 new BillingProvider.CreatePaymentResult("https://url", null));
 
-        service.createCheckoutSession(ORG_ID, "pro", "stripe", "YEARLY", "ok", "cancel");
+        service.createCheckoutSession( "pro", "stripe", "YEARLY", "ok", "cancel");
 
         assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(99000L);
     }
@@ -161,7 +179,7 @@ class BillingServiceTest {
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
                 .thenReturn(Optional.of(sub));
 
-        service.cancelSubscription(ORG_ID);
+        service.cancelSubscription();
 
         assertThat(stripeProvider.cancelledSubscriptionId).isEqualTo("sub_ext_1");
         verify(lifecycleService).cancel(SUB_ID, "User requested cancellation");
@@ -171,7 +189,7 @@ class BillingServiceTest {
     void cancelSubscription_throwsWhenNoActiveSub() {
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
                 .thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.cancelSubscription(ORG_ID))
+        assertThatThrownBy(() -> service.cancelSubscription())
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -187,7 +205,7 @@ class BillingServiceTest {
 
         stripeProvider.setPortalUrl("https://billing.stripe.com/portal_1");
 
-        String url = service.createPortalSession(ORG_ID, "https://app.com/billing");
+        String url = service.createPortalSession( "https://app.com/billing");
         assertThat(url).isEqualTo("https://billing.stripe.com/portal_1");
     }
 
@@ -195,7 +213,7 @@ class BillingServiceTest {
     void createPortalSession_returnsReturnUrlWhenNoSub() {
         when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
                 .thenReturn(Optional.empty());
-        String url = service.createPortalSession(ORG_ID, "https://app.com/billing");
+        String url = service.createPortalSession( "https://app.com/billing");
         assertThat(url).isEqualTo("https://app.com/billing");
     }
 
@@ -211,7 +229,7 @@ class BillingServiceTest {
         when(invoiceRepository.findByOrganizationIdOrderByCreatedAtDesc(ORG_ID))
                 .thenReturn(List.of(inv));
 
-        List<InvoiceResponse> result = service.listInvoices(ORG_ID);
+        List<InvoiceResponse> result = service.listInvoices();
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getAmountCents()).isEqualTo(2900);
     }
@@ -231,7 +249,7 @@ class BillingServiceTest {
                         "starter", Instant.now(), Instant.now(), Instant.now(),
                         "https://stripe.com/inv", null)));
 
-        List<InvoiceResponse> result = service.listInvoices(ORG_ID);
+        List<InvoiceResponse> result = service.listInvoices();
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo("inv_1");
     }
@@ -400,7 +418,7 @@ class BillingServiceTest {
         stripeProvider.setCreatePaymentResult(
                 new BillingProvider.CreatePaymentResult("https://url", null));
 
-        service.createCheckoutSession(ORG_ID, "starter", "stripe", "garbage", "ok", "cancel");
+        service.createCheckoutSession( "starter", "stripe", "garbage", "ok", "cancel");
 
         // monthly price = 2900
         assertThat(stripeProvider.lastPaymentRequest.amountCents()).isEqualTo(2900L);

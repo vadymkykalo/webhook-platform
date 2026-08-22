@@ -51,12 +51,21 @@ public class SubscriptionService {
         this.objectMapper = objectMapper;
     }
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     private void validateEndpointBelongsToProject(UUID endpointId, UUID projectId) {
@@ -77,8 +86,8 @@ public class SubscriptionService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Subscription")
     @Transactional
-    public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public SubscriptionResponse createSubscription(UUID projectId, SubscriptionRequest request) {
+        validateProjectOwnership(projectId);
         validatePayloadTemplate(request.getPayloadTemplate());
         validateEndpointBelongsToProject(request.getEndpointId(), projectId);
         if (request.getTransformationId() != null) {
@@ -119,15 +128,15 @@ public class SubscriptionService {
         return mapToResponse(subscription);
     }
 
-    public SubscriptionResponse getSubscription(UUID id, UUID organizationId) {
+    public SubscriptionResponse getSubscription(UUID id) {
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Subscription not found"));
-        validateProjectOwnership(subscription.getProjectId(), organizationId);
+        validateProjectOwnership(subscription.getProjectId());
         return mapToResponse(subscription);
     }
 
-    public List<SubscriptionResponse> listSubscriptions(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<SubscriptionResponse> listSubscriptions(UUID projectId) {
+        validateProjectOwnership(projectId);
         return subscriptionRepository.findByProjectId(projectId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -135,10 +144,10 @@ public class SubscriptionService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Subscription")
     @Transactional
-    public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request, UUID organizationId) {
+    public SubscriptionResponse updateSubscription(UUID id, SubscriptionRequest request) {
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Subscription not found"));
-        validateProjectOwnership(subscription.getProjectId(), organizationId);
+        validateProjectOwnership(subscription.getProjectId());
         
         if (request.getEndpointId() != null) {
             validateEndpointBelongsToProject(request.getEndpointId(), subscription.getProjectId());
@@ -185,10 +194,10 @@ public class SubscriptionService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Subscription")
     @Transactional
-    public void deleteSubscription(UUID id, UUID organizationId) {
+    public void deleteSubscription(UUID id) {
         Subscription subscription = subscriptionRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Subscription not found"));
-        validateProjectOwnership(subscription.getProjectId(), organizationId);
+        validateProjectOwnership(subscription.getProjectId());
         subscriptionRepository.deleteById(id);
         subscriptionMatchingCache.evict(subscription.getProjectId());
     }

@@ -16,6 +16,7 @@ import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.dto.DlqStatsResponse;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import lombok.RequiredArgsConstructor;
@@ -48,12 +49,21 @@ public class DlqService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
 
-    public void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    public void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +80,7 @@ public class DlqService {
                 .map(Delivery::getId).collect(Collectors.toList());
         Map<UUID, DeliveryAttempt> lastAttempts = Map.of();
         if (!deliveryIds.isEmpty()) {
-            lastAttempts = deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(deliveryIds)
+            lastAttempts = deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(TenantContext.require(), deliveryIds)
                     .stream()
                     .collect(Collectors.toMap(DeliveryAttempt::getDeliveryId, a -> a));
         }
@@ -80,8 +90,8 @@ public class DlqService {
     }
 
     @Transactional(readOnly = true)
-    public DlqItemResponse getDlqItem(UUID projectId, UUID deliveryId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public DlqItemResponse getDlqItem(UUID projectId, UUID deliveryId) {
+        validateProjectOwnership(projectId);
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         
@@ -107,8 +117,8 @@ public class DlqService {
     }
 
     @Transactional
-    public int retryDeliveries(UUID projectId, List<UUID> deliveryIds, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public int retryDeliveries(UUID projectId, List<UUID> deliveryIds) {
+        validateProjectOwnership(projectId);
         
         List<Delivery> deliveries = deliveryRepository.findByIdInAndStatus(deliveryIds, DeliveryStatus.DLQ);
         int retried = 0;
@@ -138,8 +148,8 @@ public class DlqService {
     }
 
     @Transactional
-    public int purgeAllDlq(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public int purgeAllDlq(UUID projectId) {
+        validateProjectOwnership(projectId);
         
         long count = deliveryRepository.countDlqByProjectId(projectId);
         deliveryRepository.deleteDlqByProjectId(projectId);

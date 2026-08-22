@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service.billing;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Organization;
@@ -67,24 +69,40 @@ class EntitlementServiceTest {
                 .build();
 
         org = Organization.builder().id(ORG_ID).name("Test Org").plan(plan).build();
-        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(organizationRepository.findByIdWithPlan(ORG_ID)).thenReturn(Optional.of(org));
     }
 
     // ── Billing disabled (self-hosted) — everything passes ──────────
+
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(ORG_ID);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
 
     @Test
     void billingDisabled_allChecksPass() {
         EntitlementService svc = createService(false);
 
         // No exceptions thrown
-        svc.checkEventQuota(ORG_ID);
-        svc.checkEndpointLimit(PROJECT_ID, ORG_ID);
-        svc.checkProjectLimit(ORG_ID);
-        svc.checkMemberLimit(ORG_ID);
+        svc.checkEventQuota();
+        svc.checkEndpointLimit(PROJECT_ID);
+        svc.checkProjectLimit();
+        svc.checkMemberLimit();
 
-        assertThat(svc.hasFeature(ORG_ID, "anything")).isTrue();
-        assertThat(svc.getRateLimit(ORG_ID)).isEqualTo(100);
-        assertThat(svc.getRetentionDays(ORG_ID)).isEqualTo(-1);
+        assertThat(svc.hasFeature( "anything")).isTrue();
+        assertThat(svc.getRateLimit()).isEqualTo(100);
+        assertThat(svc.getRetentionDays()).isEqualTo(-1);
         assertThat(svc.isBillingEnabled()).isFalse();
 
         // No DB calls
@@ -96,17 +114,17 @@ class EntitlementServiceTest {
     @Test
     void checkEventQuota_passesWhenUnderLimit() {
         EntitlementService svc = createService(true);
-        when(quotaCounterService.getCurrentCount(ORG_ID)).thenReturn(5_000L);
+        when(quotaCounterService.getCurrentCount()).thenReturn(5_000L);
 
-        assertThatCode(() -> svc.checkEventQuota(ORG_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> svc.checkEventQuota()).doesNotThrowAnyException();
     }
 
     @Test
     void checkEventQuota_throwsWhenOverLimit() {
         EntitlementService svc = createService(true);
-        when(quotaCounterService.getCurrentCount(ORG_ID)).thenReturn(10_000L);
+        when(quotaCounterService.getCurrentCount()).thenReturn(10_000L);
 
-        assertThatThrownBy(() -> svc.checkEventQuota(ORG_ID))
+        assertThatThrownBy(() -> svc.checkEventQuota())
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("events_per_month");
     }
@@ -116,7 +134,7 @@ class EntitlementServiceTest {
         plan.setMaxEventsPerMonth(-1);
         EntitlementService svc = createService(true);
 
-        assertThatCode(() -> svc.checkEventQuota(ORG_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> svc.checkEventQuota()).doesNotThrowAnyException();
         verifyNoInteractions(quotaCounterService);
     }
 
@@ -127,7 +145,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(endpointRepository.countByProjectIdAndDeletedAtIsNull(PROJECT_ID)).thenReturn(5L);
 
-        assertThatCode(() -> svc.checkEndpointLimit(PROJECT_ID, ORG_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> svc.checkEndpointLimit(PROJECT_ID)).doesNotThrowAnyException();
     }
 
     @Test
@@ -135,7 +153,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(endpointRepository.countByProjectIdAndDeletedAtIsNull(PROJECT_ID)).thenReturn(10L);
 
-        assertThatThrownBy(() -> svc.checkEndpointLimit(PROJECT_ID, ORG_ID))
+        assertThatThrownBy(() -> svc.checkEndpointLimit(PROJECT_ID))
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("endpoints_per_project");
     }
@@ -147,7 +165,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(projectRepository.countByOrganizationIdAndDeletedAtIsNull(ORG_ID)).thenReturn(2L);
 
-        assertThatCode(() -> svc.checkProjectLimit(ORG_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> svc.checkProjectLimit()).doesNotThrowAnyException();
     }
 
     @Test
@@ -155,7 +173,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(projectRepository.countByOrganizationIdAndDeletedAtIsNull(ORG_ID)).thenReturn(3L);
 
-        assertThatThrownBy(() -> svc.checkProjectLimit(ORG_ID))
+        assertThatThrownBy(() -> svc.checkProjectLimit())
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("projects");
     }
@@ -167,7 +185,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(membershipRepository.countByOrganizationId(ORG_ID)).thenReturn(3L);
 
-        assertThatCode(() -> svc.checkMemberLimit(ORG_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> svc.checkMemberLimit()).doesNotThrowAnyException();
     }
 
     @Test
@@ -175,7 +193,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(membershipRepository.countByOrganizationId(ORG_ID)).thenReturn(5L);
 
-        assertThatThrownBy(() -> svc.checkMemberLimit(ORG_ID))
+        assertThatThrownBy(() -> svc.checkMemberLimit())
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("members");
     }
@@ -189,7 +207,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(tunnelSessionRepository.countByOrganizationIdAndStatus(ORG_ID, com.webhook.platform.api.domain.enums.TunnelStatus.ACTIVE)).thenReturn(1L);
 
-        assertThatCode(() -> svc.checkTunnelLimit(ORG_ID)).doesNotThrowAnyException();
+        assertThatCode(() -> svc.checkTunnelLimit()).doesNotThrowAnyException();
     }
 
     @Test
@@ -198,7 +216,7 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
         when(tunnelSessionRepository.countByOrganizationIdAndStatus(ORG_ID, com.webhook.platform.api.domain.enums.TunnelStatus.ACTIVE)).thenReturn(3L);
 
-        assertThatThrownBy(() -> svc.checkTunnelLimit(ORG_ID))
+        assertThatThrownBy(() -> svc.checkTunnelLimit())
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("active_tunnels");
     }
@@ -208,7 +226,7 @@ class EntitlementServiceTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode) plan.getFeatures()).put("tunnels", false);
         EntitlementService svc = createService(true);
 
-        assertThatThrownBy(() -> svc.checkTunnelLimit(ORG_ID))
+        assertThatThrownBy(() -> svc.checkTunnelLimit())
                 .isInstanceOf(QuotaExceededException.class)
                 .hasMessageContaining("tunnels");
     }
@@ -218,20 +236,20 @@ class EntitlementServiceTest {
     @Test
     void hasFeature_returnsTrueForEnabledFeature() {
         EntitlementService svc = createService(true);
-        assertThat(svc.hasFeature(ORG_ID, "workflows")).isTrue();
-        assertThat(svc.hasFeature(ORG_ID, "incoming_webhooks")).isTrue();
+        assertThat(svc.hasFeature( "workflows")).isTrue();
+        assertThat(svc.hasFeature( "incoming_webhooks")).isTrue();
     }
 
     @Test
     void hasFeature_returnsFalseForDisabledFeature() {
         EntitlementService svc = createService(true);
-        assertThat(svc.hasFeature(ORG_ID, "premium_support")).isFalse();
+        assertThat(svc.hasFeature( "premium_support")).isFalse();
     }
 
     @Test
     void hasFeature_returnsFalseForUnknownFeature() {
         EntitlementService svc = createService(true);
-        assertThat(svc.hasFeature(ORG_ID, "nonexistent")).isFalse();
+        assertThat(svc.hasFeature( "nonexistent")).isFalse();
     }
 
     // ── Rate limit ──────────────────────────────────────────────────
@@ -239,7 +257,7 @@ class EntitlementServiceTest {
     @Test
     void getRateLimit_returnsPlanLimit() {
         EntitlementService svc = createService(true);
-        assertThat(svc.getRateLimit(ORG_ID)).isEqualTo(50);
+        assertThat(svc.getRateLimit()).isEqualTo(50);
     }
 
     @Test
@@ -264,7 +282,7 @@ class EntitlementServiceTest {
     @Test
     void getRetentionDays_returnsPlanRetention() {
         EntitlementService svc = createService(true);
-        assertThat(svc.getRetentionDays(ORG_ID)).isEqualTo(30);
+        assertThat(svc.getRetentionDays()).isEqualTo(30);
     }
 
     // ── Cache eviction ──────────────────────────────────────────────
@@ -274,17 +292,17 @@ class EntitlementServiceTest {
         EntitlementService svc = createService(true);
 
         // First call caches
-        svc.getPlan(ORG_ID);
-        verify(organizationRepository, times(1)).findById(ORG_ID);
+        svc.getPlan();
+        verify(organizationRepository, times(1)).findByIdWithPlan(ORG_ID);
 
         // Second call uses cache
-        svc.getPlan(ORG_ID);
-        verify(organizationRepository, times(1)).findById(ORG_ID);
+        svc.getPlan();
+        verify(organizationRepository, times(1)).findByIdWithPlan(ORG_ID);
 
         // Evict and call again — hits DB
         svc.evictPlanCache(ORG_ID);
-        svc.getPlan(ORG_ID);
-        verify(organizationRepository, times(2)).findById(ORG_ID);
+        svc.getPlan();
+        verify(organizationRepository, times(2)).findByIdWithPlan(ORG_ID);
     }
 
     // ── Helper ──────────────────────────────────────────────────────

@@ -1,10 +1,12 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,13 +40,15 @@ public class TunnelService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Transactional
-    public TunnelSession createSession(UUID userId, UUID organizationId, UUID projectId,
+    public TunnelSession createSession(UUID userId, UUID projectId,
                                        int localPort, String clientInfo) {
+        UUID organizationId = TenantContext.require();
         if (projectId != null) {
+            // @TenantId confines this to the caller's organization; a project outside it is
+            // simply not found here.
             projectRepository.findById(projectId)
-                    .filter(p -> p.getOrganizationId().equals(organizationId))
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                            "Project does not belong to your organization"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Project not found"));
         }
 
         String tunnelToken = generateSecureToken();
@@ -80,22 +84,14 @@ public class TunnelService {
 
     @Transactional
     public void closeSession(UUID sessionId) {
-        tunnelSessionRepository.findById(sessionId).ifPresent(session -> {
-            session.setStatus(TunnelStatus.CLOSED);
-            session.setClosedAt(Instant.now());
-            tunnelSessionRepository.save(session);
-            log.info("Tunnel session closed: id={}, slug={}", session.getId(), session.getPublicSlug());
-        });
-    }
-
-    @Transactional
-    public void closeSession(UUID sessionId, UUID organizationId) {
-        TunnelSession session = tunnelSessionRepository.findByIdAndOrganizationId(sessionId, organizationId)
+        // findById is already confined to the caller's organization by @TenantId, so the
+        // previous findByIdAndOrganizationId asked the same question twice.
+        TunnelSession session = tunnelSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
         session.setStatus(TunnelStatus.CLOSED);
         session.setClosedAt(Instant.now());
         tunnelSessionRepository.save(session);
-        log.info("Tunnel session closed: id={}, slug={}, org={}", session.getId(), session.getPublicSlug(), organizationId);
+        log.info("Tunnel session closed: id={}, slug={}", session.getId(), session.getPublicSlug());
     }
 
     @Transactional
@@ -115,8 +111,8 @@ public class TunnelService {
         return session;
     }
 
-    public TunnelSession getBySessionAndOrg(UUID sessionId, UUID organizationId) {
-        return tunnelSessionRepository.findByIdAndOrganizationId(sessionId, organizationId)
+    public TunnelSession getBySessionAndOrg(UUID sessionId) {
+        return tunnelSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
     }
 
@@ -125,14 +121,16 @@ public class TunnelService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tunnel session not found"));
     }
 
-    public List<TunnelSessionResponse> listActive(UUID organizationId) {
+    public List<TunnelSessionResponse> listActive() {
+        UUID organizationId = TenantContext.require();
         return tunnelSessionRepository.findByOrganizationIdAndStatus(organizationId, TunnelStatus.ACTIVE)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public List<TunnelSessionResponse> listActiveByProject(UUID organizationId, UUID projectId) {
+    public List<TunnelSessionResponse> listActiveByProject(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         return tunnelSessionRepository.findByOrganizationIdAndProjectIdAndStatus(organizationId, projectId, TunnelStatus.ACTIVE)
                 .stream()
                 .map(this::toResponse)
@@ -167,6 +165,7 @@ public class TunnelService {
         return ingressBaseUrl + "/tunnel/" + slug;
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${tunnel.cleanup-interval-ms:60000}")
     @Transactional
     public void cleanupStaleSessions() {

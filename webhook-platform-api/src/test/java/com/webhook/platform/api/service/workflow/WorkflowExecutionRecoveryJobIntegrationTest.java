@@ -66,9 +66,9 @@ class WorkflowExecutionRecoveryJobIntegrationTest extends AbstractIntegrationTes
         jdbcTemplate.update("INSERT INTO projects (id, organization_id, name) VALUES (?, ?, ?)",
                 projectId, orgId, "Test Project");
         jdbcTemplate.update(
-                "INSERT INTO workflows (id, project_id, name, enabled, definition, trigger_type, trigger_config) " +
-                        "VALUES (?, ?, ?, false, '{\"nodes\":[],\"edges\":[]}', 'WEBHOOK_EVENT', '{}')",
-                workflowId, projectId, "Test Workflow");
+                "INSERT INTO workflows (id, project_id, organization_id, name, enabled, definition, trigger_type, trigger_config) " +
+                        "VALUES (?, ?, ?, ?, false, '{\"nodes\":[],\"edges\":[]}', 'WEBHOOK_EVENT', '{}')",
+                workflowId, projectId, orgId, "Test Workflow");
     }
 
     private WorkflowExecution insertExecution(ExecutionStatus status) {

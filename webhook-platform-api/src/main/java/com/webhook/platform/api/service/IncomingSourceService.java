@@ -44,18 +44,27 @@ public class IncomingSourceService {
         this.ingressBaseUrl = ingressBaseUrl;
     }
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     @Auditable(action = AuditAction.CREATE, resourceType = "IncomingSource")
     @Transactional
-    public IncomingSourceResponse createSource(UUID projectId, IncomingSourceRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public IncomingSourceResponse createSource(UUID projectId, IncomingSourceRequest request) {
+        validateProjectOwnership(projectId);
 
         // Generate slug if not provided
         String slug = request.getSlug();
@@ -103,25 +112,25 @@ public class IncomingSourceService {
         return mapToResponse(source);
     }
 
-    public IncomingSourceResponse getSource(UUID id, UUID organizationId) {
+    public IncomingSourceResponse getSource(UUID id) {
         IncomingSource source = sourceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId(), organizationId);
+        validateProjectOwnership(source.getProjectId());
         return mapToResponse(source);
     }
 
-    public Page<IncomingSourceResponse> listSources(UUID projectId, UUID organizationId, Pageable pageable) {
-        validateProjectOwnership(projectId, organizationId);
+    public Page<IncomingSourceResponse> listSources(UUID projectId, Pageable pageable) {
+        validateProjectOwnership(projectId);
         return sourceRepository.findByProjectId(projectId, pageable)
                 .map(this::mapToResponse);
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "IncomingSource")
     @Transactional
-    public IncomingSourceResponse updateSource(UUID id, IncomingSourceRequest request, UUID organizationId) {
+    public IncomingSourceResponse updateSource(UUID id, IncomingSourceRequest request) {
         IncomingSource source = sourceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId(), organizationId);
+        validateProjectOwnership(source.getProjectId());
 
         source.setName(request.getName());
 
@@ -166,10 +175,10 @@ public class IncomingSourceService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "IncomingSource")
     @Transactional
-    public void deleteSource(UUID id, UUID organizationId) {
+    public void deleteSource(UUID id) {
         IncomingSource source = sourceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
-        validateProjectOwnership(source.getProjectId(), organizationId);
+        validateProjectOwnership(source.getProjectId());
         source.setStatus(IncomingSourceStatus.DISABLED);
         sourceRepository.save(source);
         log.info("Disabled incoming source: id={}", id);

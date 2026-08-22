@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
@@ -63,25 +65,34 @@ class DlqServiceTest {
 
     // ─── validateProjectOwnership ───────────────────────────────────────
 
+
+    /**
+     * DlqService reads its organization from the ambient tenant scope now, not from a parameter
+     * (ADR-0006); a unit test has no request to establish one, so it enters the scope itself.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(orgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
     @Test
     void validateProjectOwnership_matchingOrg_doesNotThrow() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        dlqService.validateProjectOwnership(projectId, orgId);
+        dlqService.validateProjectOwnership(projectId);
     }
 
     @Test
     void validateProjectOwnership_projectNotFound_throwsNotFound() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> dlqService.validateProjectOwnership(projectId, orgId))
+        assertThatThrownBy(() -> dlqService.validateProjectOwnership(projectId))
                 .isInstanceOf(NotFoundException.class);
     }
 
-    @Test
-    void validateProjectOwnership_wrongOrg_throwsForbidden() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(UUID.randomUUID())));
-        assertThatThrownBy(() -> dlqService.validateProjectOwnership(projectId, orgId))
-                .isInstanceOf(ForbiddenException.class);
-    }
 
     // ─── listDlqItems ────────────────────────────────────────────────────
 
@@ -98,7 +109,7 @@ class DlqServiceTest {
 
         DeliveryAttempt lastAttempt = DeliveryAttempt.builder()
                 .deliveryId(deliveryId).errorMessage("timeout").build();
-        when(deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(List.of(deliveryId)))
+        when(deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(any(), eq(List.of(deliveryId))))
                 .thenReturn(List.of(lastAttempt));
 
         Page<DlqItemResponse> result = dlqService.listDlqItems(projectId, null, pageable);
@@ -123,7 +134,7 @@ class DlqServiceTest {
         verify(deliveryRepository).findDlqByProjectIdAndEndpointId(projectId, endpointId, pageable);
         verify(deliveryRepository, never()).findDlqByProjectId(any(), any());
         // Empty page must not trigger a batch-attempt query at all.
-        verify(deliveryAttemptRepository, never()).findLatestAttemptsByDeliveryIds(any());
+        verify(deliveryAttemptRepository, never()).findLatestAttemptsByDeliveryIds(any(), any());
     }
 
     @Test
@@ -136,7 +147,7 @@ class DlqServiceTest {
                 .thenReturn(new PageImpl<>(List.of(delivery)));
         DeliveryAttempt lastAttempt = DeliveryAttempt.builder()
                 .deliveryId(deliveryId).httpStatusCode(503).build();
-        when(deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(List.of(deliveryId)))
+        when(deliveryAttemptRepository.findLatestAttemptsByDeliveryIds(any(), eq(List.of(deliveryId))))
                 .thenReturn(List.of(lastAttempt));
 
         Page<DlqItemResponse> result = dlqService.listDlqItems(projectId, null, pageable);
@@ -156,7 +167,7 @@ class DlqServiceTest {
         when(deliveryAttemptRepository.findTopByDeliveryIdOrderByAttemptNumberDesc(deliveryId))
                 .thenReturn(Optional.empty());
 
-        DlqItemResponse response = dlqService.getDlqItem(projectId, deliveryId, orgId);
+        DlqItemResponse response = dlqService.getDlqItem(projectId, deliveryId);
 
         assertThat(response.getDeliveryId()).isEqualTo(deliveryId);
     }
@@ -167,7 +178,7 @@ class DlqServiceTest {
         UUID deliveryId = UUID.randomUUID();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId, orgId))
+        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId))
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -178,18 +189,20 @@ class DlqServiceTest {
         Delivery delivery = Delivery.builder().id(deliveryId).status(DeliveryStatus.SUCCESS).build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
 
-        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId, orgId))
+        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not in DLQ");
     }
 
     @Test
-    void getDlqItem_wrongOrg_throwsForbiddenBeforeLoadingDelivery() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(UUID.randomUUID())));
+    void getDlqItem_projectOutsideTenant_throwsNotFoundBeforeLoadingDelivery() {
+        // A project in another organization is invisible to this tenant, so the
+        // repository returns nothing rather than a row with a mismatched org.
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
         UUID deliveryId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId, orgId))
-                .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> dlqService.getDlqItem(projectId, deliveryId))
+                .isInstanceOf(NotFoundException.class);
         verify(deliveryRepository, never()).findById(any());
     }
 
@@ -227,7 +240,7 @@ class DlqServiceTest {
         Event event = Event.builder().id(eventId).projectId(projectId).build();
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
 
-        int retried = dlqService.retryDeliveries(projectId, List.of(deliveryId), orgId);
+        int retried = dlqService.retryDeliveries(projectId, List.of(deliveryId));
 
         assertThat(retried).isEqualTo(1);
 
@@ -258,7 +271,7 @@ class DlqServiceTest {
         Event eventFromOtherProject = Event.builder().id(eventId).projectId(UUID.randomUUID()).build();
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(eventFromOtherProject));
 
-        int retried = dlqService.retryDeliveries(projectId, List.of(deliveryId), orgId);
+        int retried = dlqService.retryDeliveries(projectId, List.of(deliveryId));
 
         assertThat(retried).isZero();
         verify(deliveryRepository, never()).save(any());
@@ -276,18 +289,20 @@ class DlqServiceTest {
                 .thenReturn(List.of(delivery));
         when(eventRepository.findById(eventId)).thenReturn(Optional.empty());
 
-        int retried = dlqService.retryDeliveries(projectId, List.of(deliveryId), orgId);
+        int retried = dlqService.retryDeliveries(projectId, List.of(deliveryId));
 
         assertThat(retried).isZero();
         verify(deliveryRepository, never()).save(any());
     }
 
     @Test
-    void retryDeliveries_wrongOrg_throwsForbiddenBeforeTouchingDeliveries() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(UUID.randomUUID())));
+    void retryDeliveries_projectOutsideTenant_throwsNotFoundBeforeTouchingDeliveries() {
+        // A project in another organization is invisible to this tenant, so the
+        // repository returns nothing rather than a row with a mismatched org.
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> dlqService.retryDeliveries(projectId, List.of(UUID.randomUUID()), orgId))
-                .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> dlqService.retryDeliveries(projectId, List.of(UUID.randomUUID())))
+                .isInstanceOf(NotFoundException.class);
         verifyNoInteractions(deliveryRepository);
     }
 
@@ -298,18 +313,20 @@ class DlqServiceTest {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
         when(deliveryRepository.countDlqByProjectId(projectId)).thenReturn(5L);
 
-        int purged = dlqService.purgeAllDlq(projectId, orgId);
+        int purged = dlqService.purgeAllDlq(projectId);
 
         assertThat(purged).isEqualTo(5);
         verify(deliveryRepository).deleteDlqByProjectId(projectId);
     }
 
     @Test
-    void purgeAllDlq_wrongOrg_throwsForbiddenBeforeDeleting() {
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(UUID.randomUUID())));
+    void purgeAllDlq_projectOutsideTenant_throwsNotFoundBeforeDeleting() {
+        // A project in another organization is invisible to this tenant, so the
+        // repository returns nothing rather than a row with a mismatched org.
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> dlqService.purgeAllDlq(projectId, orgId))
-                .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> dlqService.purgeAllDlq(projectId))
+                .isInstanceOf(NotFoundException.class);
         verify(deliveryRepository, never()).deleteDlqByProjectId(any());
     }
 }

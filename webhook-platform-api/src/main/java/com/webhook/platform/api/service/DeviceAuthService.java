@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
@@ -9,6 +10,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
 import com.webhook.platform.api.security.JwtUtil;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +42,7 @@ public class DeviceAuthService {
     private static final int CODE_EXPIRY_MINUTES = 10;
     private static final int POLL_INTERVAL_SECONDS = 5;
 
+    @SystemTenant("issues a device code before any user or organization is known -- device_auth_codes is deliberately not tenant-scoped for the same reason")
     @Transactional
     public DeviceCodeResponse initiateDeviceAuth() {
         String deviceCode = generateDeviceCode();
@@ -67,7 +70,8 @@ public class DeviceAuthService {
     }
 
     @Transactional
-    public void approveDeviceCode(String userCode, UUID userId, UUID organizationId) {
+    public void approveDeviceCode(String userCode, UUID userId) {
+        UUID organizationId = TenantContext.require();
         DeviceAuthCode code = deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Device code not found or already used"));
@@ -87,6 +91,7 @@ public class DeviceAuthService {
         log.info("Device auth approved: userCode={}, userId={}", userCode, userId);
     }
 
+    @SystemTenant("polled by an unauthenticated CLI; the membership read is what decides which organization the issued token names")
     @Transactional
     public AuthResponse pollDeviceToken(String deviceCode) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByDeviceCode(deviceCode)
@@ -141,6 +146,7 @@ public class DeviceAuthService {
                 .build();
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${device-auth.cleanup-interval-ms:300000}")
     @Transactional
     public void cleanupExpiredCodes() {

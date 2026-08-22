@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
+import com.webhook.platform.api.tenancy.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +31,8 @@ public class ProjectService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "Project")
     @Transactional
-    public ProjectResponse createProject(ProjectRequest request, UUID organizationId) {
+    public ProjectResponse createProject(ProjectRequest request) {
+        UUID organizationId = TenantContext.require();
         Project project = Project.builder()
                 .name(request.getName())
                 .organizationId(organizationId)
@@ -41,7 +43,8 @@ public class ProjectService {
         return mapToResponse(project);
     }
 
-    public ProjectResponse getProject(UUID id, UUID organizationId) {
+    public ProjectResponse getProject(UUID id) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
@@ -52,7 +55,8 @@ public class ProjectService {
         return mapToResponse(project);
     }
 
-    public List<ProjectResponse> listProjects(UUID organizationId) {
+    public List<ProjectResponse> listProjects() {
+        UUID organizationId = TenantContext.require();
         return projectRepository.findByOrganizationIdAndDeletedAtIsNull(organizationId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -60,7 +64,8 @@ public class ProjectService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Project")
     @Transactional
-    public ProjectResponse updateProject(UUID id, ProjectRequest request, UUID organizationId) {
+    public ProjectResponse updateProject(UUID id, ProjectRequest request) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
@@ -94,7 +99,8 @@ public class ProjectService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Project")
     @Transactional
-    public void deleteProject(UUID id, UUID organizationId) {
+    public void deleteProject(UUID id) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 

@@ -5,6 +5,8 @@ import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.InvoiceResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -90,13 +92,14 @@ public class BillingService {
 
     // ── Organization billing ────────────────────────────────────────
 
-    public Plan getOrganizationPlan(UUID organizationId) {
-        return entitlementService.getPlan(organizationId);
+    public Plan getOrganizationPlan() {
+        return entitlementService.getPlan();
     }
 
     @Transactional
-    public void assignPlan(UUID organizationId, String planName) {
-        Organization org = findOrg(organizationId);
+    public void assignPlan(String planName) {
+        UUID organizationId = TenantContext.require();
+        Organization org = findOrg();
         Plan plan = getPlanByName(planName);
         org.setPlan(plan);
         organizationRepository.save(org);
@@ -107,10 +110,11 @@ public class BillingService {
     // ── Checkout (create payment page) ──────────────────────────────
 
     @Transactional
-    public String createCheckoutSession(UUID organizationId, String planName,
+    public String createCheckoutSession(String planName,
                                          String providerCode, String billingInterval,
                                          String successUrl, String cancelUrl) {
-        Organization org = findOrg(organizationId);
+        UUID organizationId = TenantContext.require();
+        Organization org = findOrg();
         Plan plan = getPlanByName(planName);
         BillingProvider provider = providerRegistry.get(providerCode != null ? providerCode : providerRegistry.getDefault().getProviderCode());
         BillingInterval interval = parseBillingInterval(billingInterval);
@@ -143,7 +147,8 @@ public class BillingService {
 
     // ── Portal session ──────────────────────────────────────────────
 
-    public String createPortalSession(UUID organizationId, String returnUrl) {
+    public String createPortalSession(String returnUrl) {
+        UUID organizationId = TenantContext.require();
         var sub = subscriptionRepository.findActiveByOrganizationId(organizationId).orElse(null);
         if (sub == null || sub.getExternalCustomerId() == null) return returnUrl;
 
@@ -156,7 +161,8 @@ public class BillingService {
     // ── Cancel subscription ─────────────────────────────────────────
 
     @Transactional
-    public void cancelSubscription(UUID organizationId) {
+    public void cancelSubscription() {
+        UUID organizationId = TenantContext.require();
         var sub = subscriptionRepository.findActiveByOrganizationId(organizationId)
                 .orElseThrow(() -> new NotFoundException("No active subscription for this organization"));
 
@@ -173,7 +179,8 @@ public class BillingService {
 
     // ── Invoices ────────────────────────────────────────────────────
 
-    public List<InvoiceResponse> listInvoices(UUID organizationId) {
+    public List<InvoiceResponse> listInvoices() {
+        UUID organizationId = TenantContext.require();
         // First, check local invoices
         List<BillingInvoice> localInvoices = invoiceRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
         if (!localInvoices.isEmpty()) {
@@ -206,6 +213,7 @@ public class BillingService {
 
     // ── Webhook processing (per provider) ───────────────────────────
 
+    @SystemTenant("called by the payment provider, not by a tenant; the subscription it looks up by external id is what identifies the organization")
     @Transactional
     public void processWebhook(String providerCode, String rawPayload, Map<String, String> headers) {
         BillingProvider provider = providerRegistry.get(providerCode);
@@ -315,11 +323,13 @@ public class BillingService {
 
     // ── Subscription history ────────────────────────────────────────
 
-    public List<BillingSubscription> getSubscriptionHistory(UUID organizationId) {
+    public List<BillingSubscription> getSubscriptionHistory() {
+        UUID organizationId = TenantContext.require();
         return subscriptionRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
     }
 
-    public List<BillingPayment> getPaymentHistory(UUID organizationId) {
+    public List<BillingPayment> getPaymentHistory() {
+        UUID organizationId = TenantContext.require();
         return paymentRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
     }
 
@@ -334,7 +344,8 @@ public class BillingService {
         }
     }
 
-    private Organization findOrg(UUID organizationId) {
+    private Organization findOrg() {
+        UUID organizationId = TenantContext.require();
         return organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
     }

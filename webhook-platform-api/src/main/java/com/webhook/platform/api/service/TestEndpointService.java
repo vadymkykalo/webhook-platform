@@ -12,6 +12,7 @@ import com.webhook.platform.api.dto.TestEndpointResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.TrustedProxyResolver;
+import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.BufferedReader;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @Slf4j
@@ -41,6 +44,7 @@ public class TestEndpointService {
     private final CapturedRequestRepository capturedRequestRepository;
     private final ProjectRepository projectRepository;
     private final TrustedProxyResolver trustedProxyResolver;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${test-endpoint.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -55,17 +59,26 @@ public class TestEndpointService {
     private static final int SLUG_LENGTH = 8;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     @Transactional
-    public TestEndpointResponse create(UUID projectId, TestEndpointRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public TestEndpointResponse create(UUID projectId, TestEndpointRequest request) {
+        validateProjectOwnership(projectId);
         long count = testEndpointRepository.countByProjectId(projectId);
         if (count >= maxPerProject) {
             throw new IllegalStateException("Maximum test endpoints limit reached (" + maxPerProject + ")");
@@ -90,16 +103,16 @@ public class TestEndpointService {
         return mapToResponse(endpoint);
     }
 
-    public List<TestEndpointResponse> list(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<TestEndpointResponse> list(UUID projectId) {
+        validateProjectOwnership(projectId);
         return testEndpointRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    public TestEndpointResponse get(UUID projectId, UUID id, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public TestEndpointResponse get(UUID projectId, UUID id) {
+        validateProjectOwnership(projectId);
         TestEndpoint endpoint = testEndpointRepository.findById(id)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
@@ -118,8 +131,8 @@ public class TestEndpointService {
     }
 
     @Transactional
-    public void delete(UUID projectId, UUID id, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public void delete(UUID projectId, UUID id) {
+        validateProjectOwnership(projectId);
         TestEndpoint endpoint = testEndpointRepository.findById(id)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
@@ -129,14 +142,33 @@ public class TestEndpointService {
         log.info("Deleted test endpoint {}", id);
     }
 
-    @Transactional
+    /**
+     * Deliberately not {@code @Transactional}, with the transaction started inside the tenant
+     * scope instead.
+     *
+     * <p>Hibernate reads the tenant when it opens a session, so a scope entered <em>inside</em> a
+     * transaction arrives too late: the session is already bound to whatever scope was in effect
+     * when the transaction began, and the CapturedRequest row is stamped with that instead of the
+     * endpoint's organization. Entering the scope first and opening the transaction within it is
+     * the order that works — the same shape {@code IngressService} uses on the other public path.
+     */
     public CapturedRequestResponse captureRequest(String slug, HttpServletRequest request) {
-        TestEndpoint endpoint = testEndpointRepository.findBySlug(slug)
+        // Public path: the slug is the only identity a capture carries. Resolve the endpoint
+        // without a tenant, then confine the capture itself to the organization that owns it so
+        // the CapturedRequest row lands in the right tenant.
+        TestEndpoint endpoint = TenantContext.callAsSystem(() -> testEndpointRepository.findBySlug(slug))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
 
         if (endpoint.getExpiresAt().isBefore(Instant.now())) {
             throw new NotFoundException("Test endpoint expired");
         }
+
+        return TenantContext.callAs(endpoint.getOrganizationId(), () ->
+                new TransactionTemplate(transactionManager)
+                        .execute(status -> captureWithinTenant(endpoint, request)));
+    }
+
+    private CapturedRequestResponse captureWithinTenant(TestEndpoint endpoint, HttpServletRequest request) {
 
         String body = readBody(request);
         String headers = extractHeaders(request);
@@ -158,13 +190,13 @@ public class TestEndpointService {
         endpoint.setRequestCount(endpoint.getRequestCount() + 1);
         testEndpointRepository.save(endpoint);
 
-        log.debug("Captured request {} for test endpoint {}", captured.getId(), slug);
+        log.debug("Captured request {} for test endpoint {}", captured.getId(), endpoint.getSlug());
 
         return mapToCapturedResponse(captured);
     }
 
-    public Page<CapturedRequestResponse> getRequests(UUID projectId, UUID testEndpointId, Pageable pageable, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public Page<CapturedRequestResponse> getRequests(UUID projectId, UUID testEndpointId, Pageable pageable) {
+        validateProjectOwnership(projectId);
         TestEndpoint endpoint = testEndpointRepository.findById(testEndpointId)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));
@@ -174,8 +206,8 @@ public class TestEndpointService {
     }
 
     @Transactional
-    public void clearRequests(UUID projectId, UUID testEndpointId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public void clearRequests(UUID projectId, UUID testEndpointId) {
+        validateProjectOwnership(projectId);
         TestEndpoint endpoint = testEndpointRepository.findById(testEndpointId)
                 .filter(e -> e.getProjectId().equals(projectId))
                 .orElseThrow(() -> new NotFoundException("Test endpoint not found"));

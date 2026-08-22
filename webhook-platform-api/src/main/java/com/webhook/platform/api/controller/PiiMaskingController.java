@@ -37,7 +37,7 @@ public class PiiMaskingController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(piiMaskingService.listRules(projectId, auth.organizationId()));
+        return ResponseEntity.ok(piiMaskingService.listRules(projectId));
     }
 
     @Operation(operationId = "createPiiRule", summary = "Create PII masking rule", description = "Creates a new masking rule for the project")
@@ -51,7 +51,7 @@ public class PiiMaskingController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        PiiMaskingRuleResponse response = piiMaskingService.createRule(projectId, request, auth.organizationId());
+        PiiMaskingRuleResponse response = piiMaskingService.createRule(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -66,7 +66,7 @@ public class PiiMaskingController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(piiMaskingService.updateRule(projectId, ruleId, request, auth.organizationId()));
+        return ResponseEntity.ok(piiMaskingService.updateRule(projectId, ruleId, request));
     }
 
     @Operation(operationId = "deletePiiRule", summary = "Delete PII masking rule", description = "Deletes a masking rule")
@@ -80,7 +80,7 @@ public class PiiMaskingController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        piiMaskingService.deleteRule(projectId, ruleId, auth.organizationId());
+        piiMaskingService.deleteRule(projectId, ruleId);
         return ResponseEntity.noContent().build();
     }
 
@@ -95,7 +95,7 @@ public class PiiMaskingController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         piiMaskingService.seedDefaultRules(projectId);
-        return ResponseEntity.ok(piiMaskingService.listRules(projectId, auth.organizationId()));
+        return ResponseEntity.ok(piiMaskingService.listRules(projectId));
     }
 
     @Operation(summary = "Preview sanitized payload", description = "Applies current PII rules to a sample payload and returns the result")

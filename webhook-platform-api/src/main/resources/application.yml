@@ -36,6 +36,13 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+    # Off because it is incompatible with the tenant discriminator (ADR-0006). Open Session In
+    # View opens an EntityManager in a HandlerInterceptor's preHandle, before the handler and
+    # before a public path like /ingress or /auth/register has had any chance to discover which
+    # organization it belongs to -- so Hibernate asks for a tenant that does not exist yet and
+    # every unauthenticated request 500s. Spring Boot warns about OSIV on its own merits anyway;
+    # queries now run inside the transaction that needs them.
+    open-in-view: false
     show-sql: false
     properties:
       hibernate:

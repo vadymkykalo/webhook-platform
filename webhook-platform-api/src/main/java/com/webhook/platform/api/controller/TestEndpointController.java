@@ -44,7 +44,7 @@ public class TestEndpointController {
         if (request == null) {
             request = new TestEndpointRequest();
         }
-        return ResponseEntity.ok(testEndpointService.create(projectId, request, auth.organizationId()));
+        return ResponseEntity.ok(testEndpointService.create(projectId, request));
     }
 
     @GetMapping
@@ -53,7 +53,7 @@ public class TestEndpointController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(testEndpointService.list(projectId, auth.organizationId()));
+        return ResponseEntity.ok(testEndpointService.list(projectId));
     }
 
     @GetMapping("/{id}")
@@ -63,7 +63,7 @@ public class TestEndpointController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(testEndpointService.get(projectId, id, auth.organizationId()));
+        return ResponseEntity.ok(testEndpointService.get(projectId, id));
     }
 
     @RequireScope(ApiKeyScope.READ_WRITE)
@@ -76,7 +76,7 @@ public class TestEndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        testEndpointService.delete(projectId, id, auth.organizationId());
+        testEndpointService.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -88,7 +88,7 @@ public class TestEndpointController {
             Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(testEndpointService.getRequests(projectId, id, pageable, auth.organizationId()));
+        return ResponseEntity.ok(testEndpointService.getRequests(projectId, id, pageable));
     }
 
     @RequireScope(ApiKeyScope.READ_WRITE)
@@ -101,7 +101,7 @@ public class TestEndpointController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        testEndpointService.clearRequests(projectId, id, auth.organizationId());
+        testEndpointService.clearRequests(projectId, id);
         return ResponseEntity.noContent().build();
     }
 }

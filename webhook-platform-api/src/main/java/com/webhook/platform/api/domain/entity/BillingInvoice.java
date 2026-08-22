@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.enums.InvoiceStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
@@ -22,6 +23,7 @@ public class BillingInvoice {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @TenantId
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 

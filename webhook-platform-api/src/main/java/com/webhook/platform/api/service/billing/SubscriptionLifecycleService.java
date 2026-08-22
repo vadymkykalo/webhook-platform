@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,10 +31,11 @@ public class SubscriptionLifecycleService {
     // ── Create ──────────────────────────────────────────────────────
 
     @Transactional
-    public BillingSubscription createSubscription(UUID organizationId, Plan plan,
+    public BillingSubscription createSubscription(Plan plan,
                                                    String providerCode, String currency,
                                                    BillingInterval interval,
                                                    Instant periodStart, Instant periodEnd) {
+        UUID organizationId = TenantContext.require();
         BillingSubscription sub = BillingSubscription.builder()
                 .organizationId(organizationId)
                 .plan(plan)
@@ -211,6 +213,14 @@ public class SubscriptionLifecycleService {
                 .build());
     }
 
+    /**
+     * Takes the organization explicitly, unlike the request-facing methods above.
+     *
+     * <p>Most callers here are the billing schedulers, which run under the system tenant and walk
+     * subscriptions belonging to many organizations: the organization comes off the row being
+     * processed, not off an ambient scope. Reading it from {@code TenantContext} would have
+     * resolved to the system sentinel and written the plan onto nothing.
+     */
     private void syncOrgPlan(UUID organizationId, Plan plan, BillingStatus billingStatus) {
         organizationRepository.findById(organizationId).ifPresent(org -> {
             org.setPlan(plan);
@@ -220,6 +230,7 @@ public class SubscriptionLifecycleService {
         entitlementService.evictPlanCache(organizationId);
     }
 
+    /** Explicitly scoped for the same reason as {@link #syncOrgPlan}. */
     private void syncOrgBillingStatus(UUID organizationId, BillingStatus billingStatus) {
         organizationRepository.findById(organizationId).ifPresent(org -> {
             org.setBillingStatus(billingStatus);
