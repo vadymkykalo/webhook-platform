@@ -132,6 +132,13 @@ class DeliveryEndToEndIntegrationTest {
         registry.add("retry.scheduler.reschedule-delay-seconds", () -> "1");
         registry.add("stuck-delivery.check-interval-ms", () -> "500");
         registry.add("stuck-delivery.threshold-minutes", () -> "1");
+        // The ordering scenario below drains a 5-delivery out-of-order burst; at the
+        // production default of 5s this fallback poll dominated its runtime (~30s of a
+        // 60s Awaitility budget on a developer machine, and a timeout on the slower CI
+        // runner). 1s keeps the same code path — the burst still drains through the
+        // fallback poll rather than only through the fast trigger — with a margin that
+        // survives a loaded runner.
+        registry.add("ordering.buffer-reschedule-delay-seconds", () -> "1");
 
         // Worker autoconfigures a reactive web app (webflux is only used for the outbound
         // WebClient) - nothing serves inbound traffic, so don't bind a port for it.
@@ -370,6 +377,14 @@ class DeliveryEndToEndIntegrationTest {
      * {@code fresh.getStatus() == PROCESSING} guard from {@code markAsSuccess}, so that late,
      * stale response blindly re-writes {@code succeededAt} - the {@code assertEquals(
      * succeededAtFromThirdAttempt, ...)} assertion below catches exactly that.</p>
+     *
+     * <p>The status guard alone is not sufficient, which is the third thing this test pins
+     * down. Once the sweep releases the row and the ladder reclaims it, the row is PROCESSING
+     * again — for a different attempt — so the abandoned attempt's late response passes a
+     * status-only check and finalizes a delivery it no longer owns, leaving the reclaimed
+     * attempt never sent (observed as only 2 of the expected 3 requests on the wire). The
+     * fencing token compared by {@code stillHoldsClaim} is what makes the
+     * {@code wireMock.verify(3, ...)} at the end hold.</p>
      */
     @Test
     void retryClaimedThenAbandoned_isRecoveredNotStranded() {
@@ -403,9 +418,9 @@ class DeliveryEndToEndIntegrationTest {
         // Wait for the real RetrySchedulerService claim (Phase 1) of the retry attempt: status
         // flips PENDING -> PROCESSING with attemptCount still at 1 (attempt 2's HTTP call is
         // slow and hasn't incremented it yet). This is the exact invariant the claim relies on.
-        // RetrySchedulerService's steady-state poll cadence is adaptive (RetryGovernor) and
-        // backs off up to 30s when the pending-retry queue is empty between test methods, so
-        // this needs comfortable headroom past that worst case.
+        // RetrySchedulerService's steady-state poll cadence is adaptive (RetryGovernor), which
+        // scales off the configured poll interval and backs off to 3x it while the pending-retry
+        // queue is empty between test methods — headroom for that worst case, not a fixed wait.
         await().atMost(Duration.ofSeconds(50)).pollInterval(Duration.ofMillis(150))
                 .untilAsserted(() -> {
                     Delivery d = reload(deliveryId);
