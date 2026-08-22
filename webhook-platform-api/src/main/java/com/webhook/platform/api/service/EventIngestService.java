@@ -232,98 +232,49 @@ public class EventIngestService {
         log.info("Created event: {} for project: {}", event.getId(), projectId);
 
         // ── Rules Engine evaluation ────────────────────────────────────
-        JsonNode eventJson = null;
+        // A rules-engine failure degrades to "no rules matched" rather than failing an Event
+        // the caller has already been accepted: routing is an enhancement, delivery is the
+        // product.
         List<RuleEngineService.RuleMatch> ruleMatches = List.of();
-        boolean dropEvent = false;
-        Set<UUID> ruleRouteEndpoints = new HashSet<>();
-        UUID ruleTransformationId = null;
-
         try {
-            eventJson = objectMapper.readTree(event.getDecompressedPayload());
+            JsonNode eventJson = objectMapper.readTree(event.getDecompressedPayload());
             ruleMatches = ruleEngineService.evaluate(projectId, request.getType(), eventJson, event.getId());
-
-            for (RuleEngineService.RuleMatch match : ruleMatches) {
-                if (match.hasDrop()) {
-                    dropEvent = true;
-                    log.info("Rule '{}' DROP action — skipping deliveries for event {}",
-                            match.rule().getName(), event.getId());
-                    Counter.builder("rules_drop_total").register(meterRegistry).increment();
-                    break;
-                }
-                for (CompiledRule.CompiledAction action : match.getRouteActions()) {
-                    ruleRouteEndpoints.add(action.getEndpointId());
-                }
-                for (CompiledRule.CompiledAction action : match.getTransformActions()) {
-                    if (action.getTransformationId() != null) {
-                        ruleTransformationId = action.getTransformationId();
-                    }
-                }
-            }
-
             if (!ruleMatches.isEmpty()) {
-                Counter.builder("rules_matched_total")
-                        .register(meterRegistry).increment(ruleMatches.size());
+                Counter.builder("rules_matched_total").register(meterRegistry).increment(ruleMatches.size());
             }
         } catch (Exception e) {
             log.warn("Rules engine evaluation failed for event {}: {} — proceeding without rules",
                     event.getId(), e.getMessage());
         }
 
-        if (dropEvent) {
+        // ── Decide, then commit ────────────────────────────────────────
+        // Everything above this point gathers inputs; IntakePlanner turns them into a decision
+        // with no side effects of its own, and everything below carries that decision out. The
+        // routing rules used to be interleaved with their own writes, which is why none of them
+        // had a test — see IntakePlanner.
+        List<Subscription> subscriptions = subscriptionMatchingCache.findMatching(projectId, request.getType());
+        log.info("Found {} matching subscriptions for event type: {}", subscriptions.size(), request.getType());
+
+        IntakePlan plan;
+        try {
+            plan = IntakePlanner.plan(subscriptions, ruleMatches,
+                    entitlementService.getMaxFanoutForProject(projectId));
+        } catch (IllegalArgumentException e) {
+            log.warn("Fanout limit exceeded for event type '{}' in project {}: {}",
+                    request.getType(), projectId, e.getMessage());
+            Counter.builder("events_fanout_limited_total").register(meterRegistry).increment();
+            throw e;
+        }
+
+        if (plan.dropped()) {
+            log.info("Rule DROP action — skipping deliveries for event {}", event.getId());
+            Counter.builder("rules_drop_total").register(meterRegistry).increment();
             return buildResponse(event, 0);
         }
 
-        // ── Subscription-based deliveries (cached: O(1) exact + O(W) wildcard, zero DB on hit) ──
-        List<Subscription> subscriptions = subscriptionMatchingCache.findMatching(projectId, request.getType());
-        log.info("Found {} matching subscriptions for event type: {}",
-                subscriptions.size(), request.getType());
-
-        // ── Fanout limit — prevent queue flood from 1 event → N deliveries ─
-        int totalFanout = subscriptions.size() + ruleRouteEndpoints.size();
-        int maxFanout = entitlementService.getMaxFanoutForProject(projectId);
-        if (totalFanout > maxFanout) {
-            log.warn("Fanout limit exceeded for event type '{}' in project {}: {} targets > max {}",
-                    request.getType(), projectId, totalFanout, maxFanout);
-            Counter.builder("events_fanout_limited_total")
-                    .register(meterRegistry).increment();
-            throw new IllegalArgumentException(
-                    "Fanout limit exceeded: event would create " + totalFanout +
-                    " deliveries (max " + maxFanout + "). Reduce subscriptions or contact support.");
-        }
-
-        Set<UUID> deliveredEndpoints = new HashSet<>();
-        List<Delivery> deliveriesToSave = new ArrayList<>(subscriptions.size() + ruleRouteEndpoints.size());
-
-        for (Subscription subscription : subscriptions) {
-            // Ordering-enabled deliveries are saved without a sequence number here — it is
-            // generated and backfilled only after this transaction commits, see
-            // assignSequenceNumbersPostCommit. sequenceNumber stays null until then; the
-            // worker only enforces ordering once both orderingEnabled and sequenceNumber are
-            // set, so a delivery is simply delivered unordered in the narrow window before
-            // that backfill lands.
-            boolean orderingEnabled = Boolean.TRUE.equals(subscription.getOrderingEnabled());
-
-            // Apply rule transformation override if present
-            UUID effectiveTransformId = ruleTransformationId != null
-                    ? ruleTransformationId
-                    : subscription.getTransformationId();
-
-            Delivery delivery = createDelivery(event, subscription, null, orderingEnabled);
-            if (effectiveTransformId != null) {
-                delivery.setTransformationId(effectiveTransformId);
-            }
-            deliveriesToSave.add(delivery);
-            deliveredEndpoints.add(subscription.getEndpointId());
-        }
-
-        // ── Rule ROUTE actions — additional endpoints ──────────────────
-        for (UUID routeEndpointId : ruleRouteEndpoints) {
-            if (deliveredEndpoints.contains(routeEndpointId)) {
-                continue; // already delivered via subscription
-            }
-            deliveriesToSave.add(createRuleRouteDelivery(event, routeEndpointId, ruleTransformationId));
-            deliveredEndpoints.add(routeEndpointId);
-            log.debug("Rule ROUTE: added delivery to endpoint {} for event {}", routeEndpointId, event.getId());
+        List<Delivery> deliveriesToSave = new ArrayList<>(plan.deliveries().size());
+        for (IntakePlan.PlannedDelivery planned : plan.deliveries()) {
+            deliveriesToSave.add(toDelivery(event, planned, subscriptions));
         }
 
         List<Delivery> savedDeliveries = deliveryRepository.saveAll(deliveriesToSave);
@@ -388,48 +339,56 @@ public class EventIngestService {
         }
     }
 
-    private Delivery createDelivery(Event event, Subscription subscription, Long sequenceNumber, boolean orderingEnabled) {
+    /**
+     * Turns one {@link IntakePlan.PlannedDelivery} into a row. The plan already resolved which
+     * transformation applies and whether the endpoint was reached twice; what is left here is
+     * inheriting retry settings from the Subscription, which a rule ROUTE has none of.
+     */
+    private Delivery toDelivery(Event event, IntakePlan.PlannedDelivery planned,
+            List<Subscription> subscriptions) {
+        Subscription subscription = planned.subscriptionId() == null ? null
+                : subscriptions.stream()
+                        .filter(sub -> sub.getId().equals(planned.subscriptionId()))
+                        .findFirst()
+                        .orElse(null);
+
+        String suffix = subscription != null ? "-" + planned.endpointId() : "-rule-" + planned.endpointId();
         String deliveryIdempotencyKey = event.getIdempotencyKey() != null
-                ? event.getIdempotencyKey() + "-" + subscription.getEndpointId()
+                ? event.getIdempotencyKey() + suffix
                 : null;
 
-        return Delivery.builder()
+        Delivery.DeliveryBuilder builder = Delivery.builder()
                 .eventId(event.getId())
-                .endpointId(subscription.getEndpointId())
-                .subscriptionId(subscription.getId())
+                .endpointId(planned.endpointId())
+                .subscriptionId(planned.subscriptionId())
                 .status(DeliveryStatus.PENDING)
                 .attemptCount(0)
-                .maxAttempts(subscription.getMaxAttempts() != null ? subscription.getMaxAttempts() : 7)
-                .sequenceNumber(sequenceNumber)
-                .orderingEnabled(orderingEnabled)
-                .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
-                .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
-                        : RetryLadderDefaults.OUTGOING_DELAYS)
-                .payloadTemplate(subscription.getPayloadTemplate())
-                .customHeaders(subscription.getCustomHeaders())
-                .transformationId(subscription.getTransformationId())
-                .idempotencyKey(deliveryIdempotencyKey)
-                .build();
-    }
+                // Ordering-enabled deliveries are saved without a sequence number here — it is
+                // generated and backfilled only after this transaction commits, see
+                // assignSequenceNumbersPostCommit. The worker enforces ordering only once both
+                // orderingEnabled and sequenceNumber are set, so a Delivery is simply delivered
+                // unordered in the narrow window before that backfill lands.
+                .sequenceNumber(null)
+                .orderingEnabled(planned.orderingEnabled())
+                .transformationId(planned.transformationId())
+                .idempotencyKey(deliveryIdempotencyKey);
 
-    private Delivery createRuleRouteDelivery(Event event, UUID endpointId, UUID transformationId) {
-        String deliveryIdempotencyKey = event.getIdempotencyKey() != null
-                ? event.getIdempotencyKey() + "-rule-" + endpointId
-                : null;
+        if (subscription != null) {
+            builder.maxAttempts(subscription.getMaxAttempts() != null ? subscription.getMaxAttempts()
+                            : RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
+                    .timeoutSeconds(subscription.getTimeoutSeconds() != null ? subscription.getTimeoutSeconds() : 30)
+                    .retryDelays(subscription.getRetryDelays() != null ? subscription.getRetryDelays()
+                            : RetryLadderDefaults.OUTGOING_DELAYS)
+                    .payloadTemplate(subscription.getPayloadTemplate())
+                    .customHeaders(subscription.getCustomHeaders());
+        } else {
+            builder.deliveryOrigin(DeliveryOrigin.RULE)
+                    .maxAttempts(RetryLadderDefaults.OUTGOING_MAX_ATTEMPTS)
+                    .timeoutSeconds(30)
+                    .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS);
+        }
 
-        return Delivery.builder()
-                .eventId(event.getId())
-                .endpointId(endpointId)
-                .deliveryOrigin(DeliveryOrigin.RULE)
-                .status(DeliveryStatus.PENDING)
-                .attemptCount(0)
-                .maxAttempts(7)
-                .orderingEnabled(false)
-                .timeoutSeconds(30)
-                .retryDelays(RetryLadderDefaults.OUTGOING_DELAYS)
-                .transformationId(transformationId)
-                .idempotencyKey(deliveryIdempotencyKey)
-                .build();
+        return builder.build();
     }
 
     private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
