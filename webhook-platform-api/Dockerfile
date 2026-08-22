@@ -1,5 +1,10 @@
 # Build stage
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+#
+# Pinned to the *build* platform, not the target one. The artifact this stage
+# produces is a JAR, which is architecture-independent, so building it once
+# natively and copying it into each target image is equivalent to — and far
+# faster than — running Maven under QEMU emulation once per architecture.
+FROM --platform=$BUILDPLATFORM maven:3.9-eclipse-temurin-17-alpine AS build
 
 WORKDIR /workspace
 
@@ -10,12 +15,18 @@ COPY . .
 RUN mvn -pl webhook-platform-common,webhook-platform-api -am clean package -DskipTests
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+#
+# Jammy rather than Alpine: Eclipse Temurin publishes its Alpine (musl) images
+# for linux/amd64 only, so the linux/arm64 half of the multi-arch build in
+# .github/workflows/docker-publish.yml could never resolve it —
+# "no match for platform in manifest". The Jammy variant is published for both.
+FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
+# Create non-root user for security. groupadd/useradd rather than Alpine's
+# BusyBox addgroup/adduser, which do not exist on this base.
+RUN groupadd -g 1001 appgroup && useradd -u 1001 -g appgroup -m -s /usr/sbin/nologin appuser
 USER appuser
 
 # Copy JAR from build stage
