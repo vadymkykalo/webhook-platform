@@ -247,27 +247,30 @@
               pom.xml for the shared rationale (merged exec file, `verify`
               phase choice). Two rules here, not one:
 
-              1. BUNDLE - project floor for this module. Baseline measured
-                 2026-08-21 (unit + integration merged): INSTRUCTION 33.1%
-                 (35542/107430) - by far the biggest module (602 classes),
-                 which is why its bundle percentage is so much lower than
+              1. BUNDLE - project floor for this module. Re-measured
+                 2026-08-22 (unit + integration merged, 749 tests across 72
+                 classes): INSTRUCTION 40.2% (43576/108405), up from 33.1%
+                 at the 2026-08-21 baseline. Still by far the biggest module
+                 (602 classes), which is why its bundle percentage sits below
                  worker's even though plenty of individual classes are well
-                 covered.
-              2. CLASS - floor on OutboxPublisherService specifically
-                 (measured 56.5% 2026-08-21), the outbox-side half of the
-                 delivery path (the other
-                 half - WebhookDeliveryService, RetrySchedulerService,
-                 OrderingBufferService, DeliveryConsumer - lives in
-                 webhook-platform-worker and has its own CLASS rule there).
-                 50% leaves a margin under the measured value.
+                 covered. Floor set a few points under the measured value: a
+                 gate pinned exactly at the current number goes red on
+                 ordinary measurement jitter.
+              2. CLASS - floors on the two api-side halves of the
+                 ordering/delivery path (the rest - WebhookDeliveryService,
+                 AttemptRunner, RetrySchedulerService, OrderingBufferService,
+                 DeliveryConsumer - lives in webhook-platform-worker and has
+                 its own CLASS rule there).
 
-                 SequenceGeneratorService (com.webhook.platform.api.service)
-                 is deliberately NOT included here despite also being part of
-                 the ordering/delivery path: measured at 6.8% today,
-                 essentially untested. Setting a floor near its actual value
-                 would just rubber-stamp the gap instead of flagging it -
-                 raise it for real and add it to this rule once the class is
-                 actually tested.
+                 OutboxPublisherService: measured 74.7% on 2026-08-22, up
+                 from 56.5%.
+
+                 SequenceGeneratorService: measured 77.8%, up from 6.8%.
+                 It used to be excluded from this rule on purpose, with the
+                 note that a floor near its then-actual value would
+                 rubber-stamp the gap instead of flagging it, and that it
+                 should be added "once the class is actually tested". It now
+                 is, so it is in.
             -->
             <plugin>
                 <groupId>org.jacoco</groupId>
@@ -288,7 +291,7 @@
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.30</minimum>
+                                            <minimum>0.37</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
@@ -296,12 +299,13 @@
                                     <element>CLASS</element>
                                     <includes>
                                         <include>com.webhook.platform.api.service.OutboxPublisherService</include>
+                                        <include>com.webhook.platform.api.service.SequenceGeneratorService</include>
                                     </includes>
                                     <limits>
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.50</minimum>
+                                            <minimum>0.70</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

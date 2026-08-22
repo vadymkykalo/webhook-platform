@@ -177,24 +177,13 @@ class EntityMappingParityIntegrationTest {
         exempt("incoming_events.verified", "api-only: an unverified webhook is rejected at ingress and never reaches a Forward");
         exempt("incoming_events.verification_error", "api-only: an unverified webhook is rejected at ingress and never reaches a Forward");
 
-        // --- Incoming: Source configuration that only the ingress endpoint acts on.
-        exempt("incoming_sources.slug", "api-only: addressing and display; the worker resolves a Source by id");
-        exempt("incoming_sources.hmac_header_name", "api-only: signature verification happens at ingress, in the api");
-        exempt("incoming_sources.hmac_signature_prefix", "api-only: signature verification happens at ingress, in the api");
-        exempt("incoming_sources.rate_limit_per_second", "api-only: enforced by the ingress endpoint");
-
-        // NOT a clean api-only column, and deliberately not filed as one. The worker's
-        // IncomingSource maps hmac_secret_encrypted and hmac_secret_iv but not the key version
-        // they were encrypted under — a half-mapped secret. It is inert only because the
-        // worker's IncomingSource and IncomingSourceRepository are currently unreferenced: the
-        // Forward path resolves the Source's Destinations directly. The first worker-side call
-        // to decryptWithFallback for a Source would pass the wrong key version, which is why
-        // this is recorded as a trap rather than as a justification. ADR-0010 has the
-        // versioned-key scheme this column selects into.
-        exempt("incoming_sources.encryption_key_version",
-                "TRAP, not a justification: the worker maps the Source's encrypted HMAC secret "
-                        + "without its key version. Inert only because the worker never decrypts "
-                        + "it — map this column before anything in the worker does.");
+        // incoming_sources is no longer a shared table. The worker's IncomingSource entity and
+        // its repository were dead code — nothing in the worker injected either, because the
+        // Forward path resolves a Destination directly and never loads a Source — and they were
+        // deleted rather than kept in step. That also removed a trap this list used to carry:
+        // the worker mapped the Source's encrypted HMAC secret without the key version it was
+        // encrypted under, so the first worker-side decryptWithFallback for a Source would have
+        // used the wrong one.
     }
 
     private static void exempt(String tableAndColumn, String reason) {
@@ -348,9 +337,13 @@ class EntityMappingParityIntegrationTest {
     @Test
     @DisplayName("the shared-entity set is discovered from the filesystem and is not empty")
     void sharedEntitySetIsDiscovered() {
-        assertTrue(sharedEntities.size() >= 9,
+        // Eight, not the nine ADR-0002 originally recorded: the worker's IncomingSource entity
+        // and repository were dead code and were deleted, so incoming_sources stopped being a
+        // shared table. Lower this number only for a deletion you can name — the guard exists so
+        // a broken directory scan cannot quietly make the whole test vacuous.
+        assertTrue(sharedEntities.size() >= 8,
                 "Only " + sharedEntities.size() + " entities were found in both modules. ADR-0002 "
-                        + "records nine. Fewer means the directory scan is broken and this whole "
+                        + "records eight. Fewer means the directory scan is broken and this whole "
                         + "test is vacuous. Found: " + sharedEntities.keySet());
 
         for (Map.Entry<String, Map<String, EntitySource>> entry : sharedEntities.entrySet()) {

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- The worker's `IncomingSource` entity and `IncomingSourceRepository`. Neither was injected
+  anywhere in the worker — the Forward path resolves a Destination directly and never loads
+  a Source — and keeping them meant keeping a half-mapped secret: the worker mapped the
+  Source's encrypted HMAC secret without the key version it was encrypted under, so the
+  first worker-side `decryptWithFallback` for a Source would have used the wrong one.
+  `incoming_sources` is no longer a shared table.
+
+### Changed
+- The api coverage floors were re-measured and raised. BUNDLE 0.30 → **0.37** against a
+  measured 40.2% (was 33.1%), and `SequenceGeneratorService` joins `OutboxPublisherService`
+  in the CLASS rule at **0.70** — it was deliberately left out at 6.8% with a note to add it
+  "once the class is actually tested", and it now measures 77.8%.
+
 ### Added
 - **Forwards can now be given up on.** `StaleForwardEscalationService` escalates an Incoming
   Forward outstanding past `FORWARD_ESCALATION_HARD_CAP_HOURS` (default 24h) to DLQ,

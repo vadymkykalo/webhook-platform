@@ -85,6 +85,15 @@ Three things about it are deliberate:
   JPA construct it was not written for, and is checked against reflection over the api
   classes, which *are* on its classpath.
 
-The list stands at 25 columns, all of them unmapped by the worker; `api` maps all 143
-columns of the nine shared tables. The revisit trigger above is unchanged — this test makes
-a third drift bug loud, it does not make one less likely.
+The list stands at 20 columns, all of them unmapped by the worker, across eight shared
+tables. The revisit trigger above is unchanged — this test makes a third drift bug loud, it
+does not make one less likely.
+
+There were nine shared tables and 25 exemptions when the ratchet landed. `incoming_sources`
+is no longer one of them: the worker's `IncomingSource` entity and repository turned out to
+be dead code — nothing in the worker injected either, because the Forward path resolves a
+Destination directly and never loads a Source — and were deleted rather than kept in step.
+That also removed the one exemption the list carried as a trap rather than a justification:
+the worker mapped the Source's encrypted HMAC secret without the key version it was
+encrypted under, so the first worker-side `decryptWithFallback` for a Source would have used
+the wrong one.
