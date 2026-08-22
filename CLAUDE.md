@@ -55,18 +55,28 @@ Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `r
 
 ## Working notes and decisions
 
-Two places, with different lifetimes — do not conflate them:
+Three places, with different lifetimes and different tenses — do not conflate them:
 
-- **`docs/adr/`** is tracked and permanent. An ADR records a decision that is load-bearing:
-  one a future reader would otherwise re-litigate, because the code shows *what* was built
-  and not *why the obvious alternative was rejected*. `docs/adr/README.md` has the index and
-  the format. Do not re-open a decision an ADR settles without saying so in the ADR.
-- **`.claude/features/`** is gitignored scratch: one file per piece of work that spans
-  sessions or needs decisions settled before code. It says what we're doing and where we are;
-  the ADR says why. **A feature doc is deleted when its work lands** — whatever is still true
-  moves into the ADR first. `.claude/features/README.md` has the flow and `TEMPLATE.md` the
-  shape. Being gitignored, those two exist only in a working copy that has them; this
-  paragraph is what makes the convention discoverable at all.
+- **`docs/adr/`** is tracked and permanent, and it is about the **past**. An ADR records a
+  decision that is load-bearing: one a future reader would otherwise re-litigate, because the
+  code shows *what* was built and not *why the obvious alternative was rejected*.
+  `docs/adr/README.md` has the index and the format. Do not re-open a decision an ADR settles
+  without saying so in the ADR.
+- **`.claude/features/`** is gitignored scratch, and it is about the **maybe**: proposals.
+  One file per idea we might build — the shape it would take, what it would cost, what it rules
+  out. Nothing here is committed to, and **a feature doc is not a work order**: do not start
+  implementing one because it exists. When a proposal is accepted it becomes a task file (below);
+  when it is rejected, say why in the file before deleting it, or the same idea comes back next
+  quarter. `.claude/features/README.md` has the flow and `TEMPLATE.md` the shape.
+- **`.claude/tasks/`** is gitignored scratch, and it is about the **now**: work that is actually
+  meant to happen. One file per branch, broken into steps someone can pick up cold — each step
+  carrying `file:line`, the symptom, the cause, the fix, and how to verify it. This is the only
+  one of the three that authorizes writing code. **A task file is deleted when its branch
+  merges** — whatever is still true moves into an ADR first. `.claude/tasks/README.md` has the
+  format.
+
+Being gitignored, `features/` and `tasks/` exist only in a working copy that has them; this
+section is what makes the convention discoverable at all.
 
 ## Architecture
 
