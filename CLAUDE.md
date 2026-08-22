@@ -25,7 +25,15 @@ Rules that follow from the table and are easy to get wrong:
 - Start work from an up-to-date `develop` (`git checkout develop && git pull`), branch as `feature/<short-kebab-description>`.
 - Anything merged to `main` must also be merged back into `develop`, or the fix silently disappears at the next release.
 - A hotfix branches from `main`, not from `develop` — branching it from `develop` drags unreleased work into production.
-- PRs need at least one approval and green CI; squash merge is preferred.
+- PRs need at least one approval and green CI.
+- **Merge style depends on the target.** `feature/*` → `develop`: squash, so a
+  feature's work-in-progress commits land as one. `release/*` and `hotfix/*` →
+  `main`: **a merge commit, never squash or rebase.** Squashing collapses the
+  branch into a new SHA with no shared ancestry, so `main` and `develop` stop
+  having a common base — the back-merge then conflicts on every file either side
+  has touched, including files that are byte-identical. Release 2.3.0 hit exactly
+  this: PR #100 was squash-merged, and the next release's merge reported 19
+  conflicts of which 12 were between identical files.
 - Release: `release/1.x.0` from `develop` → bump versions → PR to `main` → tag `v1.x.0` after merge → merge back to `develop`.
 
 Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. See `CONTRIBUTING.md` for the full policy.

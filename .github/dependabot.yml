@@ -1,10 +1,21 @@
 # Dependabot version-update configuration.
 #
-# Five ecosystems: root Maven build, the UI app, the three published SDKs
+# Six ecosystems: root Maven build, the UI app, the three published SDKs
 # (Node/npm, Python/pip, PHP/composer), and the GitHub Actions used in
-# .github/workflows/. Patch-level updates are grouped per ecosystem so
-# Dependabot doesn't open a PR per patch bump — minor/major still land as
-# individual PRs so they get a real look before merging.
+# .github/workflows/.
+#
+# Patch AND minor updates are grouped into one PR per ecosystem; only majors
+# land individually, since those are the ones that actually need a look. This
+# was previously patch-only grouping with a limit of 10 per ecosystem, which
+# meant a refresh could open ~30 PRs at once — each dragging a full CI run
+# including the then-per-push OWASP scan that took up to 104 minutes. That is
+# what led to this file being renamed to .paused rather than tuned.
+#
+# The scan has since moved to .github/workflows/security-sca.yml (nightly plus
+# release/hotfix), so a Dependabot PR now costs a normal CI run. The limit is
+# still lowered to 5 per ecosystem: grouped minors mean far fewer PRs are needed
+# to carry the same updates, and a smaller cap keeps a bad week from flooding
+# the queue again.
 version: 2
 updates:
   # --- Maven (root multi-module build: common, api, worker, cli) ---
@@ -13,11 +24,12 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
       maven-patch:
         update-types:
           - "patch"
+          - "minor"
     labels:
       - "dependencies"
       - "maven"
@@ -28,11 +40,12 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
       ui-patch:
         update-types:
           - "patch"
+          - "minor"
     labels:
       - "dependencies"
       - "npm"
@@ -44,11 +57,12 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
       node-sdk-patch:
         update-types:
           - "patch"
+          - "minor"
     labels:
       - "dependencies"
       - "npm"
@@ -60,11 +74,12 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
       python-sdk-patch:
         update-types:
           - "patch"
+          - "minor"
     labels:
       - "dependencies"
       - "pip"
@@ -76,11 +91,12 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
       php-sdk-patch:
         update-types:
           - "patch"
+          - "minor"
     labels:
       - "dependencies"
       - "composer"
@@ -92,7 +108,7 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
       actions-patch:
         update-types:
