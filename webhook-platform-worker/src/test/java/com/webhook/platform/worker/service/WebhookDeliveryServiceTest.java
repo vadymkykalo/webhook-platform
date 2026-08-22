@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
+import com.webhook.platform.common.util.PayloadCompressionUtil;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.Endpoint;
@@ -1131,5 +1132,92 @@ class WebhookDeliveryServiceTest {
         } finally {
             httpServer.stop(0);
         }
+    }
+
+    /**
+     * The api compresses payloads above WEBHOOK_PAYLOAD_COMPRESSION_THRESHOLD_BYTES (1 KB by
+     * default) and reads them back through getDecompressedPayload(). The worker Event entity
+     * did not map payload_compressed at all, so it read the stored column directly and sent --
+     * and signed -- the gzip+Base64 blob as the webhook body for every event at or above the
+     * threshold.
+     */
+    @Test
+    void processDelivery_compressedEventPayload_isDecompressedBeforeTransformAndSend() throws Exception {
+        UUID deliveryId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID endpointId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+
+        String realJson = "{\"order\":\"" + "x".repeat(2000) + "\"}";
+        PayloadCompressionUtil.CompressionResult compressed = PayloadCompressionUtil.compress(realJson, 1024);
+        assertTrue(compressed.compressed(),
+                "fixture must actually be compressed, otherwise the test proves nothing");
+
+        Event event = Event.builder()
+                .id(eventId).projectId(projectId).eventType("order.created")
+                .payload(compressed.payload())
+                .payloadCompressed(true)
+                .createdAt(Instant.now())
+                .build();
+
+        Endpoint endpoint = verifiedEndpoint(endpointId, projectId);
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
+                .updatedAt(Instant.now())
+                .build();
+
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(event));
+        stubHappyPathPrerequisites(endpoint);
+
+        service.processDelivery(DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+
+        ArgumentCaptor<String> payloadCaptor = ArgumentCaptor.forClass(String.class);
+        verify(payloadTransformService).transform(payloadCaptor.capture(), any());
+        assertEquals(realJson, payloadCaptor.getValue(),
+                "the transform (and therefore the body and the signature) must see real JSON");
+    }
+
+    /**
+     * deleteEndpoint is a soft delete: it stamps deleted_at and leaves `enabled` alone, and
+     * every api-side query filters on deleted_at IS NULL. The worker entity did not map the
+     * column, so already-queued deliveries kept being sent to a deleted endpoint for as long
+     * as the retry ladder ran -- up to the 24h rung.
+     */
+    @Test
+    void processDelivery_softDeletedEndpoint_failsWithoutSending() throws Exception {
+        UUID deliveryId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID endpointId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+
+        Endpoint deleted = verifiedEndpoint(endpointId, projectId);
+        deleted.setDeletedAt(Instant.now());
+
+        Delivery delivery = Delivery.builder()
+                .id(deliveryId).eventId(eventId).endpointId(endpointId)
+                .status(Delivery.DeliveryStatus.PROCESSING)
+                .attemptCount(0).maxAttempts(5).timeoutSeconds(1)
+                .updatedAt(Instant.now())
+                .build();
+
+        when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
+        when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(deleted));
+        when(deliveryRepository.save(any(Delivery.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.processDelivery(DeliveryMessage.builder()
+                .deliveryId(deliveryId).eventId(eventId).endpointId(endpointId).build(), true);
+
+        verify(eventRepository, never()).findById(any());
+        verifyNoInteractions(payloadTransformService);
+        ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
+        verify(deliveryRepository, atLeastOnce()).save(captor.capture());
+        assertTrue(captor.getAllValues().stream()
+                        .anyMatch(d -> d.getStatus() == Delivery.DeliveryStatus.FAILED),
+                "a soft-deleted endpoint must terminally fail the delivery");
     }
 }

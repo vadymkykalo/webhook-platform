@@ -249,6 +249,13 @@ public class WebhookDeliveryService {
         }
 
         Endpoint endpoint = endpointOpt.get();
+        // Soft delete is a deletion as far as the owner is concerned: stop delivering,
+        // including for events already queued or partway through the retry ladder.
+        if (endpoint.getDeletedAt() != null) {
+            log.warn("Endpoint deleted: {}", endpoint.getId());
+            markAsFailed(delivery, "Endpoint has been deleted");
+            return;
+        }
         if (!endpoint.getEnabled()) {
             log.warn("Endpoint disabled: {}", endpoint.getId());
             markAsFailed(delivery, "Endpoint is disabled");
@@ -340,7 +347,7 @@ public class WebhookDeliveryService {
             delivery.setAttemptCount(delivery.getAttemptCount() + 1);
 
             String secret = decryptSecret(endpoint);
-            String originalPayload = event.getPayload();
+            String originalPayload = event.getDecompressedPayload();
             String template = resolveTransformTemplate(delivery);
             body = payloadTransformService.transform(originalPayload, template);
             long timestamp = System.currentTimeMillis();

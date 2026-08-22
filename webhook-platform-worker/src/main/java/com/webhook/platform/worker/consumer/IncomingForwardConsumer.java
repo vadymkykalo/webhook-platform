@@ -64,7 +64,15 @@ public class IncomingForwardConsumer {
                 () -> forwardService.processForward(message),
                 ack,
                 message.getIncomingEventId().toString())) {
-            log.debug("Incoming executor full, not acking eventId={}", message.getIncomingEventId());
+            // Executor full — containers paused automatically to stop further polling,
+            // but this record has already been handed to us. Don't leave it unacked: a
+            // non-ack does not get redelivered until a rebalance/restart, and with
+            // asyncAcks it would block this partition's offset commits forever.
+            // Reschedule explicitly via the retry ladder instead and ack.
+            log.debug("Incoming executor full, rescheduling eventId={} via retry ladder",
+                    message.getIncomingEventId());
+            forwardService.rescheduleForBackpressure(message);
+            ack.acknowledge();
         }
     }
 

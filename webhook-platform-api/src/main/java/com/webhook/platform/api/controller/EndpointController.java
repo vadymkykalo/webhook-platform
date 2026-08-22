@@ -118,11 +118,19 @@ public class EndpointController {
         return ResponseEntity.ok(response);
     }
 
+    // Fires a real outbound request from the platform, signed with the endpoint's own
+    // secret — the same capability rotate-secret above is guarded for. Tenancy was already
+    // safe (endpointService.testEndpoint validates project ownership), but scope and role
+    // were not checked at all, so a Viewer or a READ_ONLY key could drive it.
     @Operation(summary = "Test endpoint", description = "Sends a test webhook to verify endpoint connectivity")
+    @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping("/{id}/test")
     public ResponseEntity<EndpointTestResponse> testEndpoint(
+            @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
         EndpointTestResponse response = endpointService.testEndpoint(id, auth.organizationId());
         log.info("Tested endpoint {}: success={}, latency={}ms", id, response.isSuccess(), response.getLatencyMs());
         return ResponseEntity.ok(response);
@@ -166,6 +174,8 @@ public class EndpointController {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("id") UUID id,
             AuthContext auth) {
+        // Mutates verification_status, exactly like skip-verification below.
+        auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         var result = verificationService.verify(id);
         log.info("Verification attempt for endpoint {}: success={}", id, result.success());

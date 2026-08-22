@@ -221,6 +221,56 @@ public class IncomingForwardService {
         attemptForward(event, destination, attemptNumber, maxAttempts);
     }
 
+    /**
+     * Hands a forward attempt back to the retry ladder when the executor pool is full,
+     * so the consumer can ack instead of leaving the record unacked.
+     *
+     * <p>The incoming listener factory sets {@code asyncAcks(true)}, under which an unacked
+     * record does not get redelivered until a rebalance or restart, and — because a later
+     * offset may already be acked — it blocks this partition's offset commits rather than
+     * merely delaying one message. Kafka's job for this record is done either way:
+     * IncomingForwardRetryScheduler, not Kafka redelivery, drives reprocessing.
+     *
+     * <p>Both entry states are handed back the same way: a dispatch row is still PENDING
+     * (claimed only inside processForward) and a retry row is already PROCESSING. Either
+     * way next_retry_at must be set — the scheduler's claim query ignores rows where it is
+     * null, so acking a fresh dispatch row without stamping it would strand the forward.
+     * Mirrors WebhookDeliveryService.rescheduleForBackpressure on the outgoing side.
+     */
+    public void rescheduleForBackpressure(IncomingForwardMessage message) {
+        UUID eventId = message.getIncomingEventId();
+        UUID destinationId = message.getDestinationId();
+        int attemptNumber = resolveAttemptNumber(message);
+
+        transactionTemplate.executeWithoutResult(tx -> {
+            List<IncomingForwardAttempt> attempts = attemptRepository
+                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
+            IncomingForwardAttempt attempt = attempts.stream()
+                    .filter(a -> a.getAttemptNumber() == attemptNumber)
+                    .findFirst()
+                    .orElse(null);
+            if (attempt == null) {
+                log.debug("Forward attempt {} for eventId={}, destId={} disappeared before backpressure reschedule",
+                        attemptNumber, eventId, destinationId);
+                return;
+            }
+            if (attempt.getStatus() != ForwardAttemptStatus.PENDING
+                    && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
+                log.debug("Forward attempt {} for eventId={}, destId={} is already {} — skipping backpressure reschedule",
+                        attemptNumber, eventId, destinationId, attempt.getStatus());
+                return;
+            }
+            long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
+            attempt.setStatus(ForwardAttemptStatus.PENDING);
+            attempt.setStartedAt(null);
+            attempt.setNextRetryAt(Instant.now().plusSeconds(delaySec));
+            attemptRepository.save(attempt);
+            log.warn("Executor pool full, rescheduled forward eventId={}, destId={} via retry ladder in {}s "
+                            + "instead of leaving it unacked",
+                    eventId, destinationId, delaySec);
+        });
+    }
+
     private int resolveAttemptNumber(IncomingForwardMessage message) {
         return message.getAttemptCount() != null && message.getAttemptCount() > 0
                 ? message.getAttemptCount()
@@ -318,26 +368,35 @@ public class IncomingForwardService {
 
             int timeoutSeconds = Math.max(1, Math.min(60, destination.getTimeoutSeconds()));
 
-            requestSpec.bodyValue(body != null ? body : "")
+            // The mono only ever produces the raw HTTP outcome — no DB work happens inside
+            // .map/.timeout. handleResponse (the attempt-row writes via updateAttempt/
+            // createPendingRetryAttempt) runs below, after block() returns, on this calling
+            // thread — never on the reactor-netty event-loop thread, and never racing the
+            // .timeout that guards the HTTP call itself. Previously handleResponse ran inside
+            // .map, so a slow updateAttempt could trip .timeout AFTER a 2xx was already
+            // received, and the resulting TimeoutException drove handleError to overwrite the
+            // just-written SUCCESS row and schedule a duplicate forward. Mirrors the same
+            // fix on the outgoing side in WebhookDeliveryService.attemptDelivery.
+            ForwardOutcome outcome = requestSpec.bodyValue(body != null ? body : "")
                     .exchangeToMono(response -> {
                         int status = response.statusCode().value();
                         String responseHeaders = serializeHeaders(response.headers().asHttpHeaders());
 
                         return response.bodyToMono(String.class)
                                 .defaultIfEmpty("")
-                                .map(responseBody -> {
-                                    int durationMs = (int) (System.currentTimeMillis() - startTime);
-                                    forwardLatency.record(Duration.ofMillis(durationMs));
-
-                                    handleResponse(eventId, destinationId, attemptNumber, maxAttempts,
-                                            status, truncate(responseBody, 10240),
-                                            responseHeaders, null, durationMs,
-                                            destination.getRetryDelays());
-                                    return status;
-                                });
+                                .map(responseBody -> new ForwardOutcome(status, responseBody, responseHeaders));
                     })
                     .timeout(Duration.ofSeconds(timeoutSeconds))
                     .block();
+
+            if (outcome != null) {
+                int durationMs = (int) (System.currentTimeMillis() - startTime);
+                forwardLatency.record(Duration.ofMillis(durationMs));
+                handleResponse(eventId, destinationId, attemptNumber, maxAttempts,
+                        outcome.status(), truncate(outcome.responseBody(), 10240),
+                        outcome.responseHeaders(), null, durationMs,
+                        destination.getRetryDelays());
+            }
 
         } catch (PayloadTransformException e) {
             // A configured transformation that fails to apply must never result in the
@@ -360,6 +419,9 @@ public class IncomingForwardService {
         } finally {
             concurrencyControlService.release(destinationId);
         }
+    }
+
+    private record ForwardOutcome(int status, String responseBody, String responseHeaders) {
     }
 
     private void handleResponse(UUID eventId, UUID destinationId, int attemptNumber, int maxAttempts,
@@ -387,12 +449,16 @@ public class IncomingForwardService {
                 // Schedule retry: update current attempt to final state, create next PENDING
                 // attempt
                 Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays);
-                updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
+                // Only schedule the next attempt if we actually finalized this one. If the
+                // row had already reached a terminal state, someone else owns this forward
+                // and creating a PENDING successor here would duplicate it.
+                if (updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
                         statusCode, responseHeaders, responseBody,
-                        "Retryable HTTP " + statusCode, durationMs, null);
-                createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
-                log.info("Forward retry scheduled: eventId={}, destId={}, attempt={}, nextRetry={}",
-                        eventId, destinationId, attemptNumber, nextRetry);
+                        "Retryable HTTP " + statusCode, durationMs, null)) {
+                    createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
+                    log.info("Forward retry scheduled: eventId={}, destId={}, attempt={}, nextRetry={}",
+                            eventId, destinationId, attemptNumber, nextRetry);
+                }
             }
         } else {
             forwardFailureCounter.increment();
@@ -417,12 +483,15 @@ public class IncomingForwardService {
             log.warn("Forward DLQ (error): eventId={}, destId={}", eventId, destinationId);
         } else {
             Instant nextRetry = calculateNextRetry(attemptNumber, retryDelays);
-            updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
+            // Same rule as the retryable-HTTP branch above: no successor row unless this
+            // attempt was actually the one that finalized.
+            if (updateAttempt(eventId, destinationId, attemptNumber, ForwardAttemptStatus.FAILED,
                     null, null, null,
-                    errorMessage, durationMs, null);
-            createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
-            log.info("Forward retry scheduled (error): eventId={}, destId={}, nextRetry={}",
-                    eventId, destinationId, nextRetry);
+                    errorMessage, durationMs, null)) {
+                createPendingRetryAttempt(eventId, destinationId, attemptNumber + 1, nextRetry);
+                log.info("Forward retry scheduled (error): eventId={}, destId={}, nextRetry={}",
+                        eventId, destinationId, nextRetry);
+            }
         }
     }
 
@@ -430,10 +499,10 @@ public class IncomingForwardService {
      * Updates the existing PROCESSING attempt row with the final result.
      * The row was created/claimed atomically before the HTTP call.
      */
-    private void updateAttempt(UUID eventId, UUID destinationId, int attemptNumber, ForwardAttemptStatus status,
+    private boolean updateAttempt(UUID eventId, UUID destinationId, int attemptNumber, ForwardAttemptStatus status,
             Integer responseCode, String responseHeaders, String responseBody,
             String errorMessage, int durationMs, Instant nextRetryAt) {
-        transactionTemplate.executeWithoutResult(tx -> {
+        Boolean applied = transactionTemplate.execute(tx -> {
             List<IncomingForwardAttempt> attempts = attemptRepository
                     .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
             IncomingForwardAttempt attempt = attempts.stream()
@@ -443,7 +512,17 @@ public class IncomingForwardService {
             if (attempt == null) {
                 log.error("Attempt row not found for update: eventId={}, destId={}, attempt={}",
                         eventId, destinationId, attemptNumber);
-                return;
+                return false;
+            }
+            // Only the holder of the PROCESSING row may finalize it. Without this guard a
+            // late writer — a timed-out call whose 2xx already landed, or a duplicate Kafka
+            // redelivery — silently overwrote a terminal row and, via the FAILED branch,
+            // scheduled a duplicate forward. Terminal states are final: whoever got here
+            // first won. Mirrors the status fence on the outgoing finalizers.
+            if (attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
+                log.warn("Attempt {} for eventId={}, destId={} is already {} — refusing to overwrite with {}",
+                        attemptNumber, eventId, destinationId, attempt.getStatus(), status);
+                return false;
             }
             attempt.setStatus(status);
             attempt.setFinishedAt(Instant.now());
@@ -453,7 +532,9 @@ public class IncomingForwardService {
             attempt.setErrorMessage(errorMessage);
             attempt.setNextRetryAt(nextRetryAt);
             attemptRepository.save(attempt);
+            return true;
         });
+        return Boolean.TRUE.equals(applied);
     }
 
     /**

@@ -501,4 +501,93 @@ class IncomingForwardServiceTest {
                 .findFirst().orElseThrow();
         assertThat(failedUpdate.getErrorMessage()).contains("TRANSFORM_FAILED");
     }
+
+    /**
+     * The finalizers must refuse a row that is no longer PROCESSING. Before the guard, a
+     * late writer -- a timed-out call whose 2xx had already landed, or a duplicate Kafka
+     * redelivery -- overwrote the terminal row AND created a PENDING successor, forwarding
+     * the same event twice.
+     */
+    @Test
+    void updateAttempt_rowAlreadyTerminal_doesNotOverwriteAndDoesNotScheduleSuccessor() {
+        IncomingForwardAttempt alreadySucceeded = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID())
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1)
+                .status(ForwardAttemptStatus.SUCCESS)
+                .build();
+
+        when(eventRepository.findById(eventId)).thenReturn(Optional.of(buildEvent()));
+        when(destinationRepository.findById(destinationId)).thenReturn(Optional.of(buildDestination()));
+        when(attemptRepository.claimForProcessing(eventId, destinationId, 1)).thenReturn(1);
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(alreadySucceeded));
+        when(transformationCacheService.findById(any())).thenReturn(Optional.empty());
+        when(payloadTransformService.transform(anyString(), any()))
+                .thenThrow(new PayloadTransformException("boom"));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(0).replay(false)
+                .build();
+
+        service.processForward(message);
+
+        // Neither the overwrite nor the duplicate successor row.
+        verify(attemptRepository, never()).save(any(IncomingForwardAttempt.class));
+        assertThat(alreadySucceeded.getStatus()).isEqualTo(ForwardAttemptStatus.SUCCESS);
+    }
+
+    /**
+     * Backpressure hand-back. next_retry_at must be stamped even for a first-dispatch row
+     * that was still PENDING: the scheduler's claim query ignores rows where it is null, so
+     * acking without stamping would strand the forward entirely.
+     */
+    @Test
+    void rescheduleForBackpressure_stampsNextRetryAtAndClearsFencingToken() {
+        IncomingForwardAttempt inFlight = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID())
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1)
+                .status(ForwardAttemptStatus.PROCESSING)
+                .startedAt(Instant.now())
+                .build();
+
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(inFlight));
+
+        IncomingForwardMessage message = IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(1).replay(false)
+                .build();
+
+        service.rescheduleForBackpressure(message);
+
+        ArgumentCaptor<IncomingForwardAttempt> captor = ArgumentCaptor.forClass(IncomingForwardAttempt.class);
+        verify(attemptRepository).save(captor.capture());
+        IncomingForwardAttempt saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(ForwardAttemptStatus.PENDING);
+        assertThat(saved.getNextRetryAt()).isNotNull();
+        assertThat(saved.getStartedAt()).isNull();
+    }
+
+    @Test
+    void rescheduleForBackpressure_rowAlreadyTerminal_isLeftAlone() {
+        IncomingForwardAttempt done = IncomingForwardAttempt.builder()
+                .id(UUID.randomUUID())
+                .incomingEventId(eventId).destinationId(destinationId)
+                .attemptNumber(1)
+                .status(ForwardAttemptStatus.SUCCESS)
+                .build();
+
+        when(attemptRepository.findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId))
+                .thenReturn(List.of(done));
+
+        service.rescheduleForBackpressure(IncomingForwardMessage.builder()
+                .incomingEventId(eventId).destinationId(destinationId)
+                .incomingSourceId(sourceId).attemptCount(1).replay(false)
+                .build());
+
+        verify(attemptRepository, never()).save(any(IncomingForwardAttempt.class));
+    }
 }
