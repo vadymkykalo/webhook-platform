@@ -52,8 +52,8 @@ public class SchemaRegistryService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "EventType")
     @Transactional
-    public EventTypeCatalogResponse createEventType(UUID projectId, EventTypeCatalogRequest request, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public EventTypeCatalogResponse createEventType(UUID projectId, EventTypeCatalogRequest request) {
+        validateProjectOwnership(projectId);
 
         if (catalogRepository.existsByProjectIdAndName(projectId, request.getName())) {
             throw new IllegalArgumentException("Event type '" + request.getName() + "' already exists in this project");
@@ -70,26 +70,26 @@ public class SchemaRegistryService {
         return mapCatalogResponse(entity);
     }
 
-    public List<EventTypeCatalogResponse> listEventTypes(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<EventTypeCatalogResponse> listEventTypes(UUID projectId) {
+        validateProjectOwnership(projectId);
         return catalogRepository.findByProjectIdOrderByNameAsc(projectId).stream()
                 .map(this::mapCatalogResponse)
                 .collect(Collectors.toList());
     }
 
-    public EventTypeCatalogResponse getEventType(UUID eventTypeId, UUID organizationId) {
+    public EventTypeCatalogResponse getEventType(UUID eventTypeId) {
         EventTypeCatalog entity = catalogRepository.findById(eventTypeId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(entity.getProjectId(), organizationId);
+        validateProjectOwnership(entity.getProjectId());
         return mapCatalogResponse(entity);
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "EventType")
     @Transactional
-    public EventTypeCatalogResponse updateEventType(UUID eventTypeId, EventTypeCatalogRequest request, UUID organizationId) {
+    public EventTypeCatalogResponse updateEventType(UUID eventTypeId, EventTypeCatalogRequest request) {
         EventTypeCatalog entity = catalogRepository.findById(eventTypeId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(entity.getProjectId(), organizationId);
+        validateProjectOwnership(entity.getProjectId());
 
         if (request.getDescription() != null) {
             entity.setDescription(request.getDescription());
@@ -100,10 +100,10 @@ public class SchemaRegistryService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "EventType")
     @Transactional
-    public void deleteEventType(UUID eventTypeId, UUID organizationId) {
+    public void deleteEventType(UUID eventTypeId) {
         EventTypeCatalog entity = catalogRepository.findById(eventTypeId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(entity.getProjectId(), organizationId);
+        validateProjectOwnership(entity.getProjectId());
         catalogRepository.delete(entity);
         log.info("Deleted event type '{}'", entity.getName());
     }
@@ -113,10 +113,10 @@ public class SchemaRegistryService {
     @Auditable(action = AuditAction.CREATE, resourceType = "SchemaVersion")
     @Transactional
     public EventSchemaVersionResponse createSchemaVersion(UUID eventTypeId, EventSchemaVersionRequest request,
-                                                          UUID userId, UUID organizationId) {
+                                                          UUID userId) {
         EventTypeCatalog eventType = catalogRepository.findById(eventTypeId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(eventType.getProjectId(), organizationId);
+        validateProjectOwnership(eventType.getProjectId());
 
         // Validate the schema JSON is valid
         try {
@@ -175,33 +175,33 @@ public class SchemaRegistryService {
         return mapVersionResponse(version);
     }
 
-    public List<EventSchemaVersionResponse> listSchemaVersions(UUID eventTypeId, UUID organizationId) {
+    public List<EventSchemaVersionResponse> listSchemaVersions(UUID eventTypeId) {
         EventTypeCatalog eventType = catalogRepository.findById(eventTypeId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(eventType.getProjectId(), organizationId);
+        validateProjectOwnership(eventType.getProjectId());
 
         return versionRepository.findByEventTypeIdOrderByVersionDesc(eventTypeId).stream()
                 .map(this::mapVersionResponse)
                 .collect(Collectors.toList());
     }
 
-    public EventSchemaVersionResponse getSchemaVersion(UUID versionId, UUID organizationId) {
+    public EventSchemaVersionResponse getSchemaVersion(UUID versionId) {
         EventSchemaVersion version = versionRepository.findById(versionId)
                 .orElseThrow(() -> new NotFoundException("Schema version not found"));
         EventTypeCatalog eventType = catalogRepository.findById(version.getEventTypeId())
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(eventType.getProjectId(), organizationId);
+        validateProjectOwnership(eventType.getProjectId());
         return mapVersionResponse(version);
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "SchemaVersion")
     @Transactional
-    public EventSchemaVersionResponse promoteSchema(UUID versionId, UUID organizationId) {
+    public EventSchemaVersionResponse promoteSchema(UUID versionId) {
         EventSchemaVersion version = versionRepository.findById(versionId)
                 .orElseThrow(() -> new NotFoundException("Schema version not found"));
         EventTypeCatalog eventType = catalogRepository.findById(version.getEventTypeId())
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(eventType.getProjectId(), organizationId);
+        validateProjectOwnership(eventType.getProjectId());
 
         if (version.getStatus() == SchemaStatus.ACTIVE) {
             return mapVersionResponse(version);
@@ -224,12 +224,12 @@ public class SchemaRegistryService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "SchemaVersion")
     @Transactional
-    public EventSchemaVersionResponse deprecateSchema(UUID versionId, UUID organizationId) {
+    public EventSchemaVersionResponse deprecateSchema(UUID versionId) {
         EventSchemaVersion version = versionRepository.findById(versionId)
                 .orElseThrow(() -> new NotFoundException("Schema version not found"));
         EventTypeCatalog eventType = catalogRepository.findById(version.getEventTypeId())
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(eventType.getProjectId(), organizationId);
+        validateProjectOwnership(eventType.getProjectId());
 
         version.setStatus(SchemaStatus.DEPRECATED);
         version = versionRepository.saveAndFlush(version);
@@ -239,10 +239,10 @@ public class SchemaRegistryService {
     // ── Schema Changes ──
 
     @Transactional(readOnly = true)
-    public List<SchemaChangeResponse> listSchemaChanges(UUID eventTypeId, UUID organizationId) {
+    public List<SchemaChangeResponse> listSchemaChanges(UUID eventTypeId) {
         EventTypeCatalog eventType = catalogRepository.findById(eventTypeId)
                 .orElseThrow(() -> new NotFoundException("Event type not found"));
-        validateProjectOwnership(eventType.getProjectId(), organizationId);
+        validateProjectOwnership(eventType.getProjectId());
 
         return changeRepository.findByEventTypeIdOrderByCreatedAtDesc(eventTypeId).stream()
                 .map(this::mapChangeResponse)
@@ -250,8 +250,8 @@ public class SchemaRegistryService {
     }
 
     @Transactional(readOnly = true)
-    public List<SchemaChangeResponse> listProjectSchemaChanges(UUID projectId, UUID organizationId) {
-        validateProjectOwnership(projectId, organizationId);
+    public List<SchemaChangeResponse> listProjectSchemaChanges(UUID projectId) {
+        validateProjectOwnership(projectId);
         return changeRepository.findByProjectIdWithDetails(projectId).stream()
                 .map(this::mapChangeResponse)
                 .collect(Collectors.toList());
@@ -360,12 +360,21 @@ public class SchemaRegistryService {
         }
     }
 
-    private void validateProjectOwnership(UUID projectId, UUID organizationId) {
-        Project project = projectRepository.findById(projectId)
+    /**
+     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
+     *
+     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
+     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
+     * turning "no such project here" into a {@link NotFoundException} rather than letting the
+     * caller get an empty list back.
+     *
+     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
+     * the intended consequence: the old answer told a caller that a project id it had no access to
+     * existed.
+     */
+    private void validateProjectOwnership(UUID projectId) {
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     private EventTypeCatalogResponse mapCatalogResponse(EventTypeCatalog entity) {

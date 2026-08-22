@@ -136,42 +136,60 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
                         .header("Authorization", "Bearer " + orgBJwt)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void orgB_list_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints")
                         .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void orgB_get_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
                         .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void orgB_delete_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
                         .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void orgB_getRequests_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
                         .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     @Test
     public void orgB_clearRequests_onOrgAProject_forbidden() throws Exception {
         mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
                         .header("Authorization", "Bearer " + orgBJwt))
-                .andExpect(status().isForbidden());
+                // A resource in another organization is not found rather than forbidden: the tenant
+        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // confirm the id exists.
+                .andExpect(status().isNotFound());
     }
 
     // ── API key scoped to project A cannot reach project A2 in the same org ──

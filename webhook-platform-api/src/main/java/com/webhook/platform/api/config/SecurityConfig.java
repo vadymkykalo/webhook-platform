@@ -4,6 +4,7 @@ import com.webhook.platform.api.security.ApiKeyAuthenticationFilter;
 import com.webhook.platform.api.security.JwtAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationFilter;
 import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
+import com.webhook.platform.api.tenancy.TenantContextFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ public class SecurityConfig {
         private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
         private final JwtAuthenticationFilter jwtAuthenticationFilter;
         private final PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter;
+        private final TenantContextFilter tenantContextFilter = new TenantContextFilter();
         private final CorsConfigurationSource corsConfigurationSource;
         private final boolean swaggerEnabled;
 
@@ -125,7 +127,11 @@ public class SecurityConfig {
                                 .addFilterBefore(apiKeyAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .addFilterBefore(platformAdminAuthenticationFilter,
-                                                UsernamePasswordAuthenticationFilter.class);
+                                                UsernamePasswordAuthenticationFilter.class)
+                                // Last of the four on purpose: it reads the identity the other
+                                // three establish and turns it into the tenant scope every query
+                                // in the request then runs under.
+                                .addFilterAfter(tenantContextFilter, PlatformAdminAuthenticationFilter.class);
 
                 return http.build();
         }

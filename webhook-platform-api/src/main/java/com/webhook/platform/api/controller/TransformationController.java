@@ -43,7 +43,7 @@ public class TransformationController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(transformationService.create(projectId, request, auth.organizationId()));
+                .body(transformationService.create(projectId, request));
     }
 
     @Operation(operationId = "getTransformation", summary = "Get transformation", description = "Returns transformation details")
@@ -53,7 +53,7 @@ public class TransformationController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(transformationService.get(id, auth.organizationId()));
+        return ResponseEntity.ok(transformationService.get(id));
     }
 
     @Operation(operationId = "listTransformations", summary = "List transformations", description = "Returns all transformations for the project")
@@ -62,7 +62,7 @@ public class TransformationController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(transformationService.list(projectId, auth.organizationId()));
+        return ResponseEntity.ok(transformationService.list(projectId));
     }
 
     @Operation(operationId = "updateTransformation", summary = "Update transformation", description = "Updates transformation (auto-increments version when template changes)")
@@ -76,7 +76,7 @@ public class TransformationController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(transformationService.update(id, request, auth.organizationId()));
+        return ResponseEntity.ok(transformationService.update(id, request));
     }
 
     @Operation(operationId = "deleteTransformation", summary = "Delete transformation", description = "Removes a transformation (subscriptions/destinations referencing it will have transformation_id set to NULL)")
@@ -90,7 +90,7 @@ public class TransformationController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        transformationService.delete(id, auth.organizationId());
+        transformationService.delete(id);
         return ResponseEntity.noContent().build();
     }
 }

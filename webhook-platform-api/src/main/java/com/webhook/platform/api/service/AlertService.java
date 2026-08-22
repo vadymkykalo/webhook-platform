@@ -20,6 +20,7 @@ import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.dto.AlertRuleResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -46,8 +47,8 @@ public class AlertService {
     // ─── Rule CRUD ──────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<AlertRuleResponse> listRules(UUID projectId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public List<AlertRuleResponse> listRules(UUID projectId) {
+        validateProjectAccess(projectId);
         return ruleRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
                 .map(this::toRuleResponse)
                 .toList();
@@ -55,8 +56,8 @@ public class AlertService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "AlertRule")
     @Transactional
-    public AlertRuleResponse createRule(UUID projectId, AlertRuleRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public AlertRuleResponse createRule(UUID projectId, AlertRuleRequest request) {
+        validateProjectAccess(projectId);
 
         AlertRule rule = AlertRule.builder()
                 .projectId(projectId)
@@ -82,8 +83,8 @@ public class AlertService {
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "AlertRule")
     @Transactional
-    public AlertRuleResponse updateRule(UUID projectId, UUID ruleId, AlertRuleRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public AlertRuleResponse updateRule(UUID projectId, UUID ruleId, AlertRuleRequest request) {
+        validateProjectAccess(projectId);
 
         AlertRule rule = ruleRepository.findByIdAndProjectId(ruleId, projectId)
                 .orElseThrow(() -> new NotFoundException("Alert rule not found"));
@@ -109,8 +110,8 @@ public class AlertService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "AlertRule")
     @Transactional
-    public void deleteRule(UUID projectId, UUID ruleId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public void deleteRule(UUID projectId, UUID ruleId) {
+        validateProjectAccess(projectId);
         AlertRule rule = ruleRepository.findByIdAndProjectId(ruleId, projectId)
                 .orElseThrow(() -> new NotFoundException("Alert rule not found"));
         ruleRepository.delete(rule);
@@ -120,21 +121,21 @@ public class AlertService {
     // ─── Alert Events ───────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<AlertEventResponse> listEvents(UUID projectId, UUID organizationId, int page, int size) {
-        validateProjectAccess(projectId, organizationId);
+    public Page<AlertEventResponse> listEvents(UUID projectId, int page, int size) {
+        validateProjectAccess(projectId);
         return eventRepository.findByProjectIdOrderByCreatedAtDesc(projectId, PageRequest.of(page, Math.min(size, 100)))
                 .map(this::toEventResponse);
     }
 
     @Transactional(readOnly = true)
-    public long countUnresolved(UUID projectId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public long countUnresolved(UUID projectId) {
+        validateProjectAccess(projectId);
         return eventRepository.countByProjectIdAndResolvedFalse(projectId);
     }
 
     @Transactional
-    public void resolveEvent(UUID projectId, UUID eventId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public void resolveEvent(UUID projectId, UUID eventId) {
+        validateProjectAccess(projectId);
         int updated = eventRepository.resolveById(eventId, projectId, Instant.now());
         if (updated == 0) {
             throw new NotFoundException("Alert event not found");
@@ -142,8 +143,8 @@ public class AlertService {
     }
 
     @Transactional
-    public int resolveAll(UUID projectId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public int resolveAll(UUID projectId) {
+        validateProjectAccess(projectId);
         return eventRepository.resolveAllByProjectId(projectId, Instant.now());
     }
 
@@ -232,7 +233,8 @@ public class AlertService {
                 .build();
     }
 
-    private void validateProjectAccess(UUID projectId, UUID organizationId) {
+    private void validateProjectAccess(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));

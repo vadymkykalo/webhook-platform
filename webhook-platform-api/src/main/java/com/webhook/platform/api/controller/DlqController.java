@@ -44,7 +44,7 @@ public class DlqController {
             @RequestParam(name = "endpointId", required = false) UUID endpointId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        dlqService.validateProjectOwnership(projectId, auth.organizationId());
+        dlqService.validateProjectOwnership(projectId);
         
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
         Page<DlqItemResponse> items = dlqService.listDlqItems(projectId, endpointId, pageable);
@@ -57,7 +57,7 @@ public class DlqController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        dlqService.validateProjectOwnership(projectId, auth.organizationId());
+        dlqService.validateProjectOwnership(projectId);
         
         DlqStatsResponse stats = dlqService.getDlqStats(projectId);
         return ResponseEntity.ok(stats);
@@ -70,7 +70,7 @@ public class DlqController {
             @PathVariable("deliveryId") UUID deliveryId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        DlqItemResponse item = dlqService.getDlqItem(projectId, deliveryId, auth.organizationId());
+        DlqItemResponse item = dlqService.getDlqItem(projectId, deliveryId);
         return ResponseEntity.ok(item);
     }
 
@@ -86,7 +86,7 @@ public class DlqController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         
-        int retried = dlqService.retryDeliveries(projectId, Collections.singletonList(deliveryId), auth.organizationId());
+        int retried = dlqService.retryDeliveries(projectId, Collections.singletonList(deliveryId));
         return ResponseEntity.ok(DlqActionResponse.builder().retried(retried).build());
     }
 
@@ -102,7 +102,7 @@ public class DlqController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         
-        int retried = dlqService.retryDeliveries(projectId, request.getDeliveryIds(), auth.organizationId());
+        int retried = dlqService.retryDeliveries(projectId, request.getDeliveryIds());
         return ResponseEntity.ok(DlqActionResponse.builder()
                 .retried(retried)
                 .requested(request.getDeliveryIds().size())
@@ -120,7 +120,7 @@ public class DlqController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         
-        int purged = dlqService.purgeAllDlq(projectId, auth.organizationId());
+        int purged = dlqService.purgeAllDlq(projectId);
         return ResponseEntity.ok(DlqActionResponse.builder().purged(purged).build());
     }
 }

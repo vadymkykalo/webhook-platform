@@ -42,7 +42,7 @@ public class IncidentController {
             @RequestParam(defaultValue = "20") int size,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(incidentService.listIncidents(projectId, auth.organizationId(), openOnly, page, size));
+        return ResponseEntity.ok(incidentService.listIncidents(projectId, openOnly, page, size));
     }
 
     @Operation(operationId = "getIncident", summary = "Get incident with timeline")
@@ -52,7 +52,7 @@ public class IncidentController {
             @PathVariable("incidentId") UUID incidentId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(incidentService.getIncident(projectId, incidentId, auth.organizationId()));
+        return ResponseEntity.ok(incidentService.getIncident(projectId, incidentId));
     }
 
     @Operation(operationId = "createIncident", summary = "Create incident")
@@ -67,7 +67,7 @@ public class IncidentController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(incidentService.createIncident(projectId, request, auth.organizationId()));
+                .body(incidentService.createIncident(projectId, request));
     }
 
     @Operation(operationId = "updateIncident", summary = "Update incident (status, RCA notes, severity)")
@@ -81,7 +81,7 @@ public class IncidentController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(incidentService.updateIncident(projectId, incidentId, request, auth.organizationId()));
+        return ResponseEntity.ok(incidentService.updateIncident(projectId, incidentId, request));
     }
 
     @Operation(summary = "Add timeline entry to incident")
@@ -95,7 +95,7 @@ public class IncidentController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(incidentService.addTimelineEntry(projectId, incidentId, request, auth.organizationId()));
+        return ResponseEntity.ok(incidentService.addTimelineEntry(projectId, incidentId, request));
     }
 
     @Operation(summary = "Count open incidents")
@@ -104,6 +104,6 @@ public class IncidentController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(Map.of("count", incidentService.countOpen(projectId, auth.organizationId())));
+        return ResponseEntity.ok(Map.of("count", incidentService.countOpen(projectId)));
     }
 }

@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
@@ -107,7 +108,16 @@ public class IngressService {
      * never wrote anything (a cheap DoS on the connection pool).
      */
     public IncomingEvent receiveWebhook(String token, String body, HttpServletRequest request) {
-        IncomingSource source = resolveActiveSource(token);
+        // Ingress has a tenant but no caller. Nothing has authenticated, so TenantContextFilter
+        // left the scope unset and the path token in the URL is the only thing that names an
+        // organization -- which means the lookup that finds it has to run without one. Everything
+        // after it is confined to the Source's organization, so the writes below (IncomingEvent,
+        // forward attempts, outbox) get the right tenant stamped on them by Hibernate.
+        IncomingSource source = TenantContext.callAsSystem(() -> resolveActiveSource(token));
+        return TenantContext.callAs(source.getOrganizationId(), () -> receiveVerifiedWebhook(source, body, request));
+    }
+
+    private IncomingEvent receiveVerifiedWebhook(IncomingSource source, String body, HttpServletRequest request) {
         enforceRateLimit(source);
         enforcePayloadSize(body);
 

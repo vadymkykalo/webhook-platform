@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.billing;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.BillingSubscription;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.enums.SubscriptionStatus;
@@ -69,6 +70,7 @@ public class BillingReconciliationService {
                 .register(meterRegistry);
     }
 
+    @SystemTenant
     @Scheduled(cron = "${billing.reconciliation.cron:0 0 */6 * * *}")
     @SchedulerLock(name = "billing_reconciliation", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
     public void reconcile() {

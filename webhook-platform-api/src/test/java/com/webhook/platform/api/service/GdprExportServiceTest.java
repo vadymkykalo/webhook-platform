@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
@@ -81,11 +83,27 @@ class GdprExportServiceTest {
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
     }
 
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(orgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
     @Test
     void exportOrganizationData_returnsOrganizationInfo() {
         stubEmptyOrg();
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         assertThat(export.exportVersion()).isEqualTo("1.0");
         assertThat(export.exportedAt()).isNotNull();
@@ -116,7 +134,7 @@ class GdprExportServiceTest {
         when(auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(eq(orgId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         assertThat(export.members()).hasSize(1);
         assertThat(export.members().get(0).email()).isEqualTo("user@test.com");
@@ -157,7 +175,7 @@ class GdprExportServiceTest {
         when(apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId))
                 .thenReturn(Collections.emptyList());
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         assertThat(export.projects()).hasSize(1);
         GdprExportDto.ProjectData pd = export.projects().get(0);
@@ -200,7 +218,7 @@ class GdprExportServiceTest {
         when(incomingDestinationRepository.findByIncomingSourceId(sourceId))
                 .thenReturn(List.of(dest));
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         GdprExportDto.IncomingSourceData sd = export.projects().get(0).incomingSources().get(0);
         assertThat(sd.name()).isEqualTo("GitHub");
@@ -234,7 +252,7 @@ class GdprExportServiceTest {
         when(apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId))
                 .thenReturn(List.of(key));
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         GdprExportDto.ApiKeyData akd = export.projects().get(0).apiKeys().get(0);
         assertThat(akd.name()).isEqualTo("Production Key");
@@ -256,7 +274,7 @@ class GdprExportServiceTest {
         when(auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(eq(orgId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(log)));
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         assertThat(export.auditLogs()).hasSize(1);
         assertThat(export.auditLogs().get(0).action()).isEqualTo("CREATE");
@@ -285,7 +303,7 @@ class GdprExportServiceTest {
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
         when(apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId)).thenReturn(Collections.emptyList());
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         GdprExportDto.EndpointData ed = export.projects().get(0).endpoints().get(0);
         // EndpointData DTO has no secret/cipher fields — only url, description, enabled etc.
@@ -296,7 +314,7 @@ class GdprExportServiceTest {
     void exportOrganizationData_orgNotFound_throws() {
         when(organizationRepository.findById(orgId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.exportOrganizationData(orgId))
+        assertThatThrownBy(() -> service.exportOrganizationData())
                 .isInstanceOf(NotFoundException.class);
     }
 
@@ -304,7 +322,7 @@ class GdprExportServiceTest {
     void exportOrganizationData_emptyOrg_returnsEmptyLists() {
         stubEmptyOrg();
 
-        GdprExportDto export = service.exportOrganizationData(orgId);
+        GdprExportDto export = service.exportOrganizationData();
 
         assertThat(export.members()).isEmpty();
         assertThat(export.projects()).isEmpty();

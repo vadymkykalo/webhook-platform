@@ -141,7 +141,7 @@ public class EventIngestService {
             return;
         }
         try {
-            quotaCounterService.increment(organizationId);
+            quotaCounterService.increment();
         } catch (Exception e) {
             log.error("Failed to charge quota for organization {} after a committed ingest: {}",
                     organizationId, e.getMessage(), e);

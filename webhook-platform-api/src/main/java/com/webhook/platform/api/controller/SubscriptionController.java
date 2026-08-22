@@ -44,7 +44,7 @@ public class SubscriptionController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        SubscriptionResponse response = subscriptionService.createSubscription(projectId, request, auth.organizationId());
+        SubscriptionResponse response = subscriptionService.createSubscription(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -53,7 +53,7 @@ public class SubscriptionController {
     public ResponseEntity<SubscriptionResponse> getSubscription(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        SubscriptionResponse response = subscriptionService.getSubscription(id, auth.organizationId());
+        SubscriptionResponse response = subscriptionService.getSubscription(id);
         return ResponseEntity.ok(response);
     }
 
@@ -63,7 +63,7 @@ public class SubscriptionController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        List<SubscriptionResponse> response = subscriptionService.listSubscriptions(projectId, auth.organizationId());
+        List<SubscriptionResponse> response = subscriptionService.listSubscriptions(projectId);
         return ResponseEntity.ok(response);
     }
 
@@ -76,7 +76,7 @@ public class SubscriptionController {
             @Valid @RequestBody SubscriptionRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, auth.organizationId());
+        SubscriptionResponse response = subscriptionService.updateSubscription(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -89,7 +89,7 @@ public class SubscriptionController {
             @RequestBody SubscriptionRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        SubscriptionResponse response = subscriptionService.updateSubscription(id, request, auth.organizationId());
+        SubscriptionResponse response = subscriptionService.updateSubscription(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -102,7 +102,7 @@ public class SubscriptionController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        subscriptionService.deleteSubscription(id, auth.organizationId());
+        subscriptionService.deleteSubscription(id);
         return ResponseEntity.noContent().build();
     }
 }

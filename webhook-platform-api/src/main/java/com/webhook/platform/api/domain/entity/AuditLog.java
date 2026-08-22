@@ -1,6 +1,7 @@
 package com.webhook.platform.api.domain.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import lombok.*;
 
 import java.time.Instant;
@@ -31,6 +32,7 @@ public class AuditLog {
     @Column(name = "user_id")
     private UUID userId;
 
+    @TenantId
     @Column(name = "organization_id")
     private UUID organizationId;
 

@@ -62,7 +62,7 @@ class AccessLevelEnforcementTest {
     }
 
     private static Authentication apiKey(ApiKeyScope scope) {
-        return new ApiKeyAuthenticationToken("test-key", UUID.randomUUID(), scope, List.of());
+        return new ApiKeyAuthenticationToken("test-key", UUID.randomUUID(), UUID.randomUUID(), scope, List.of());
     }
 
     // ── the declarations exist where these tests assume they do ───────────────────

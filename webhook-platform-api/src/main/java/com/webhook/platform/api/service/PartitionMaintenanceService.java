@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -90,6 +91,7 @@ public class PartitionMaintenanceService {
                 tunnelRequestLogLookaheadWeeks, tunnelRequestLogRetentionDays);
     }
 
+    @SystemTenant
     @Scheduled(cron = "${partition-maintenance.cron:0 45 1 * * *}")
     @SchedulerLock(name = "partitionMaintenance", lockAtMostFor = "9m", lockAtLeastFor = "1m")
     public void runMaintenance() {

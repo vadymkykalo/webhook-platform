@@ -1,5 +1,6 @@
 package com.webhook.platform.api.audit;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -30,6 +31,7 @@ public class AuditLogRetentionJob {
     // idempotent either way, but the lock avoids redundant duplicate DELETE work across
     // replicas - same reasoning as every other retention job in DataRetentionService /
     // RetentionCleanupScheduler, which are all already locked.
+    @SystemTenant
     @Scheduled(cron = "${audit.retention-cron:0 0 3 * * *}")
     @SchedulerLock(name = "audit-log-retention", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional

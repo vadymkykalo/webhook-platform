@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
@@ -62,11 +63,12 @@ public class EventService {
         this.schemaRegistryService = schemaRegistryService;
     }
 
-    public Page<EventResponse> listEvents(UUID projectId, UUID organizationId, Pageable pageable) {
-        return listEvents(projectId, organizationId, null, pageable);
+    public Page<EventResponse> listEvents(UUID projectId, Pageable pageable) {
+        return listEvents(projectId, null, pageable);
     }
 
-    public Page<EventResponse> listEvents(UUID projectId, UUID organizationId, String eventType, Pageable pageable) {
+    public Page<EventResponse> listEvents(UUID projectId, String eventType, Pageable pageable) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
@@ -94,7 +96,8 @@ public class EventService {
         });
     }
 
-    public EventResponse getEvent(UUID projectId, UUID eventId, UUID organizationId) {
+    public EventResponse getEvent(UUID projectId, UUID eventId) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {
@@ -114,7 +117,8 @@ public class EventService {
     }
 
     @Transactional
-    public EventResponse sendTestEvent(UUID projectId, EventIngestRequest request, UUID organizationId) {
+    public EventResponse sendTestEvent(UUID projectId, EventIngestRequest request) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         if (!project.getOrganizationId().equals(organizationId)) {

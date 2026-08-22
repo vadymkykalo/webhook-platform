@@ -51,7 +51,7 @@ public class IncomingEventController {
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         Page<IncomingEventResponse> response = eventService.listEvents(
-                projectId, auth.organizationId(), sourceId, pageable);
+                projectId, sourceId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -120,7 +120,7 @@ public class IncomingEventController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         IncomingBulkReplayResponse response = eventService.bulkReplay(
-                projectId, request, auth.organizationId());
+                projectId, request);
         return ResponseEntity.ok(response);
     }
 }

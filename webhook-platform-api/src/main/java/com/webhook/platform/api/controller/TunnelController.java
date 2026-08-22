@@ -55,7 +55,7 @@ public class TunnelController {
         }
 
         TunnelSession session = tunnelService.createSession(
-                auth.requireUserId(), auth.organizationId(), projectId, localPort, clientInfo);
+                auth.requireUserId(), projectId, localPort, clientInfo);
 
         TunnelCreateResponse response = TunnelCreateResponse.builder()
                 .id(session.getId())
@@ -79,8 +79,8 @@ public class TunnelController {
             auth.validateProjectAccess(projectId);
         }
         List<TunnelSessionResponse> sessions = projectId != null
-                ? tunnelService.listActiveByProject(auth.organizationId(), projectId)
-                : tunnelService.listActive(auth.organizationId());
+                ? tunnelService.listActiveByProject( projectId)
+                : tunnelService.listActive();
         return ResponseEntity.ok(sessions);
     }
 
@@ -91,7 +91,7 @@ public class TunnelController {
             @PathVariable("sessionId") UUID sessionId,
             AuthContext auth) {
         auth.requireWriteAccess();
-        tunnelService.closeSession(sessionId, auth.organizationId());
+        tunnelService.closeSession(sessionId);
         return ResponseEntity.noContent().build();
     }
 
@@ -103,7 +103,7 @@ public class TunnelController {
             @RequestParam(value = "size", defaultValue = "50") int size,
             AuthContext auth) {
         // Verify ownership
-        tunnelService.getBySessionAndOrg(sessionId, auth.organizationId());
+        tunnelService.getBySessionAndOrg(sessionId);
         size = Math.min(size, 100);
         Page<TunnelRequestLog> logs = requestLogRepository
                 .findByTunnelSessionIdOrderByCreatedAtDesc(sessionId, PageRequest.of(page, size));
@@ -118,7 +118,7 @@ public class TunnelController {
                 "activeTunnels", tunnelRegistry.activeCount(),
                 "pendingRequests", tunnelRegistry.pendingRequestCount(),
                 "myTunnels", myTunnels,
-                "bandwidthBytesThisMonth", bandwidthService.getCurrentUsage(auth.organizationId())
+                "bandwidthBytesThisMonth", bandwidthService.getCurrentUsage()
         ));
     }
 }

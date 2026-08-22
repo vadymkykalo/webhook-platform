@@ -10,6 +10,8 @@ import com.webhook.platform.api.dto.SharedDebugLinkPublicResponse;
 import com.webhook.platform.api.dto.SharedDebugLinkRequest;
 import com.webhook.platform.api.dto.SharedDebugLinkResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +40,8 @@ public class SharedDebugLinkService {
 
     @Transactional
     public SharedDebugLinkResponse createLink(UUID projectId, UUID eventId, SharedDebugLinkRequest request,
-                                               UUID userId, UUID organizationId) {
+                                               UUID userId) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -64,7 +67,8 @@ public class SharedDebugLinkService {
     }
 
     @Transactional(readOnly = true)
-    public List<SharedDebugLinkResponse> listLinks(UUID projectId, UUID organizationId) {
+    public List<SharedDebugLinkResponse> listLinks(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -75,7 +79,8 @@ public class SharedDebugLinkService {
     }
 
     @Transactional(readOnly = true)
-    public List<SharedDebugLinkResponse> listLinksForEvent(UUID projectId, UUID eventId, UUID organizationId) {
+    public List<SharedDebugLinkResponse> listLinksForEvent(UUID projectId, UUID eventId) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -86,7 +91,8 @@ public class SharedDebugLinkService {
     }
 
     @Transactional
-    public void deleteLink(UUID projectId, UUID linkId, UUID organizationId) {
+    public void deleteLink(UUID projectId, UUID linkId) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));
@@ -103,6 +109,7 @@ public class SharedDebugLinkService {
      * Public endpoint — no auth required, token-based access.
      * Returns sanitized payload (PII masked).
      */
+    @SystemTenant("the share token in the URL is the only identity a public debug link carries; it resolves the link and its Event unscoped")
     @Transactional
     public SharedDebugLinkPublicResponse viewPublicLink(String token) {
         SharedDebugLink link = linkRepository.findByToken(token)

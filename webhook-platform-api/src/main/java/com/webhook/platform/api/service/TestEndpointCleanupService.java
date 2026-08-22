@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.CapturedRequestRepository;
 import com.webhook.platform.api.domain.repository.TestEndpointRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class TestEndpointCleanupService {
     private final TestEndpointRepository testEndpointRepository;
     private final CapturedRequestRepository capturedRequestRepository;
 
+    @SystemTenant
     @Scheduled(fixedRateString = "${test-endpoint.cleanup-interval-ms:3600000}")
     @SchedulerLock(name = "testEndpointCleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional

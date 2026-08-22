@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -41,11 +42,12 @@ public class TunnelBandwidthService {
      * Record bytes transferred through a tunnel for an organization.
      * Fire-and-forget — if Redis is down, just record the Prometheus metric.
      */
-    public void recordBytes(UUID organizationId, long bytes) {
+    public void recordBytes(long bytes) {
+        UUID organizationId = TenantContext.require();
         if (bytes <= 0) return;
         bytesCounter.increment(bytes);
         try {
-            String key = currentKey(organizationId);
+            String key = currentKey();
             RAtomicLong counter = redissonClient.getAtomicLong(key);
             long val = counter.addAndGet(bytes);
             if (val == bytes) {
@@ -59,9 +61,10 @@ public class TunnelBandwidthService {
     /**
      * Get current month's bandwidth usage for an organization (bytes).
      */
-    public long getCurrentUsage(UUID organizationId) {
+    public long getCurrentUsage() {
+        UUID organizationId = TenantContext.require();
         try {
-            String key = currentKey(organizationId);
+            String key = currentKey();
             return redissonClient.getAtomicLong(key).get();
         } catch (Exception e) {
             log.debug("Redis tunnel bandwidth read failed for org={}: {}", organizationId, e.getMessage());
@@ -69,7 +72,8 @@ public class TunnelBandwidthService {
         }
     }
 
-    private String currentKey(UUID organizationId) {
+    private String currentKey() {
+        UUID organizationId = TenantContext.require();
         YearMonth ym = YearMonth.now(ZoneOffset.UTC);
         return KEY_PREFIX + organizationId + ":" + ym;
     }

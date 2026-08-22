@@ -49,7 +49,7 @@ public class IncomingSourceController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        IncomingSourceResponse response = sourceService.createSource(projectId, request, auth.organizationId());
+        IncomingSourceResponse response = sourceService.createSource(projectId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -62,7 +62,7 @@ public class IncomingSourceController {
     public ResponseEntity<IncomingSourceResponse> getSource(
             @PathVariable("id") UUID id,
             AuthContext auth) {
-        IncomingSourceResponse response = sourceService.getSource(id, auth.organizationId());
+        IncomingSourceResponse response = sourceService.getSource(id);
         return ResponseEntity.ok(response);
     }
 
@@ -73,7 +73,7 @@ public class IncomingSourceController {
             @PageableDefault(size = 20) Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        Page<IncomingSourceResponse> response = sourceService.listSources(projectId, auth.organizationId(), pageable);
+        Page<IncomingSourceResponse> response = sourceService.listSources(projectId, pageable);
         return ResponseEntity.ok(response);
     }
 
@@ -90,7 +90,7 @@ public class IncomingSourceController {
             @Valid @RequestBody IncomingSourceRequest request,
             AuthContext auth) {
         auth.requireWriteAccess();
-        IncomingSourceResponse response = sourceService.updateSource(id, request, auth.organizationId());
+        IncomingSourceResponse response = sourceService.updateSource(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -103,7 +103,7 @@ public class IncomingSourceController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.requireWriteAccess();
-        sourceService.deleteSource(id, auth.organizationId());
+        sourceService.deleteSource(id);
         return ResponseEntity.noContent().build();
     }
 }

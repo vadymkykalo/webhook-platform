@@ -51,7 +51,7 @@ public class OrganizationController {
     public ResponseEntity<OrganizationResponse> getOrganization(
             @PathVariable("orgId") UUID orgId,
             AuthContext auth) {
-        OrganizationResponse response = organizationService.getOrganization(orgId, auth.requireUserId());
+        OrganizationResponse response = organizationService.getOrganization( auth.requireUserId());
         return ResponseEntity.ok(response);
     }
 
@@ -63,7 +63,7 @@ public class OrganizationController {
             @Valid @RequestBody UpdateOrganizationRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        OrganizationResponse response = organizationService.updateOrganization(orgId, auth.organizationId(), request);
+        OrganizationResponse response = organizationService.updateOrganization( request);
         return ResponseEntity.ok(response);
     }
 
@@ -82,7 +82,7 @@ public class OrganizationController {
         if (!orgId.equals(auth.organizationId())) {
             throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
         }
-        GdprExportDto export = gdprExportService.exportOrganizationData(orgId);
+        GdprExportDto export = gdprExportService.exportOrganizationData();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"org-" + orgId + "-export.json\"")
@@ -103,7 +103,7 @@ public class OrganizationController {
         if (!orgId.equals(auth.organizationId())) {
             throw new com.webhook.platform.api.exception.ForbiddenException("Access denied");
         }
-        organizationService.deleteOrganization(orgId);
+        organizationService.deleteOrganization();
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.api.audit.AuditAction;
@@ -59,7 +60,8 @@ public class IncomingDestinationService {
         this.allowedHosts = allowedHosts;
     }
 
-    private void validateSourceOwnership(UUID sourceId, UUID organizationId) {
+    private void validateSourceOwnership(UUID sourceId) {
+        UUID organizationId = TenantContext.require();
         IncomingSource source = sourceRepository.findById(sourceId)
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
         Project project = projectRepository.findById(source.getProjectId())
@@ -85,8 +87,8 @@ public class IncomingDestinationService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "IncomingDestination")
     @Transactional
-    public IncomingDestinationResponse createDestination(UUID sourceId, IncomingDestinationRequest request, UUID organizationId) {
-        validateSourceOwnership(sourceId, organizationId);
+    public IncomingDestinationResponse createDestination(UUID sourceId, IncomingDestinationRequest request) {
+        validateSourceOwnership(sourceId);
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
         if (request.getTransformationId() != null) {
             validateTransformationBelongsToProject(request.getTransformationId(), resolveProjectIdForSource(sourceId));
@@ -127,25 +129,25 @@ public class IncomingDestinationService {
         return mapToResponse(destination);
     }
 
-    public IncomingDestinationResponse getDestination(UUID id, UUID organizationId) {
+    public IncomingDestinationResponse getDestination(UUID id) {
         IncomingDestination destination = destinationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        validateSourceOwnership(destination.getIncomingSourceId(), organizationId);
+        validateSourceOwnership(destination.getIncomingSourceId());
         return mapToResponse(destination);
     }
 
-    public Page<IncomingDestinationResponse> listDestinations(UUID sourceId, UUID organizationId, Pageable pageable) {
-        validateSourceOwnership(sourceId, organizationId);
+    public Page<IncomingDestinationResponse> listDestinations(UUID sourceId, Pageable pageable) {
+        validateSourceOwnership(sourceId);
         return destinationRepository.findByIncomingSourceId(sourceId, pageable)
                 .map(this::mapToResponse);
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "IncomingDestination")
     @Transactional
-    public IncomingDestinationResponse updateDestination(UUID id, IncomingDestinationRequest request, UUID organizationId) {
+    public IncomingDestinationResponse updateDestination(UUID id, IncomingDestinationRequest request) {
         IncomingDestination destination = destinationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        validateSourceOwnership(destination.getIncomingSourceId(), organizationId);
+        validateSourceOwnership(destination.getIncomingSourceId());
 
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
 
@@ -194,10 +196,10 @@ public class IncomingDestinationService {
 
     @Auditable(action = AuditAction.DELETE, resourceType = "IncomingDestination")
     @Transactional
-    public void deleteDestination(UUID id, UUID organizationId) {
+    public void deleteDestination(UUID id) {
         IncomingDestination destination = destinationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Incoming destination not found"));
-        validateSourceOwnership(destination.getIncomingSourceId(), organizationId);
+        validateSourceOwnership(destination.getIncomingSourceId());
         destinationRepository.delete(destination);
         log.info("Deleted incoming destination: id={}", id);
     }

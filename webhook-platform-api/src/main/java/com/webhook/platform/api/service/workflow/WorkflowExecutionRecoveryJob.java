@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.workflow;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -32,6 +33,7 @@ public class WorkflowExecutionRecoveryJob {
         this.stuckThresholdMinutes = stuckThresholdMinutes;
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${workflow.execution.recovery-interval-ms:120000}")
     @SchedulerLock(name = "recoverStuckWorkflowExecutions", lockAtMostFor = "2m", lockAtLeastFor = "30s")
     @Transactional

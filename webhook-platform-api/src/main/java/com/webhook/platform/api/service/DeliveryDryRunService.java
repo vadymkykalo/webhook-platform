@@ -52,7 +52,7 @@ public class DeliveryDryRunService {
         this.encryptionKeyRegistry = encryptionKeyRegistry;
     }
 
-    public DeliveryDryRunResponse dryRun(DeliveryDryRunRequest request, UUID organizationId) {
+    public DeliveryDryRunResponse dryRun(DeliveryDryRunRequest request) {
         List<String> errors = new ArrayList<>();
         String transformedPayload = null;
         String transformationName = null;

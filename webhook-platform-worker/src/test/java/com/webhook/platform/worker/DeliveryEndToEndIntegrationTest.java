@@ -88,6 +88,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DeliveryEndToEndIntegrationTest {
 
+    /**
+     * Fixture tenant for persisted rows.
+     *
+     * <p>{@code organization_id} is NOT NULL since ADR-0006, and the worker's entities map it
+     * without filtering on it: in production the worker copies the value off the parent row it is
+     * processing. A fixture that persists directly has to supply one.
+     */
+    private static final UUID FIXTURE_ORG = UUID.randomUUID();
+
     private static final String TEST_ENCRYPTION_KEY = "e2e-test-encryption-key-please-ignore";
     private static final String TEST_ENCRYPTION_SALT = "e2e-test-salt-0123456789abcdef";
 
@@ -189,6 +198,7 @@ class DeliveryEndToEndIntegrationTest {
         String secret = "secret-" + endpointId;
         var encrypted = encryptionKeyRegistry.encrypt(secret);
         Endpoint endpoint = Endpoint.builder()
+                .organizationId(FIXTURE_ORG)
                 .id(endpointId)
                 .projectId(UUID.randomUUID())
                 .url(wireMock.baseUrl() + path)
@@ -206,6 +216,7 @@ class DeliveryEndToEndIntegrationTest {
 
     private Event createEvent(UUID eventId, String payloadJson) {
         Event event = Event.builder()
+                .organizationId(FIXTURE_ORG)
                 .id(eventId)
                 .projectId(UUID.randomUUID())
                 .eventType("order.created")
@@ -218,6 +229,7 @@ class DeliveryEndToEndIntegrationTest {
     private Delivery createPendingDelivery(UUID deliveryId, UUID eventId, UUID endpointId,
             int maxAttempts, String retryDelays, int timeoutSeconds) {
         Delivery delivery = Delivery.builder()
+                .organizationId(FIXTURE_ORG)
                 .id(deliveryId)
                 .eventId(eventId)
                 .endpointId(endpointId)
@@ -604,6 +616,7 @@ class DeliveryEndToEndIntegrationTest {
     private Delivery createOrderedPendingDelivery(UUID deliveryId, UUID eventId, UUID endpointId,
             long sequenceNumber, int maxAttempts, String retryDelays, int timeoutSeconds) {
         Delivery delivery = Delivery.builder()
+                .organizationId(FIXTURE_ORG)
                 .id(deliveryId)
                 .eventId(eventId)
                 .endpointId(endpointId)

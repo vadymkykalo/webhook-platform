@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -50,6 +51,7 @@ public class SequenceReconciliationService {
                 .register(meterRegistry);
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${ordering.sequence-reconciliation-interval-ms:900000}")
     @SchedulerLock(name = "sequence_reconciliation", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     public void reconcile() {

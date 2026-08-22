@@ -38,6 +38,15 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 class DeliveryRepositoryTest {
 
+    /**
+     * Fixture tenant for persisted rows.
+     *
+     * <p>{@code organization_id} is NOT NULL since ADR-0006, and the worker's entities map it
+     * without filtering on it: in production the worker copies the value off the parent row it is
+     * processing. A fixture that persists directly has to supply one.
+     */
+    private static final UUID FIXTURE_ORG = UUID.randomUUID();
+
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15-alpine")
             .withDatabaseName("webhook_test")
@@ -65,6 +74,7 @@ class DeliveryRepositoryTest {
         sharedProjectId = UUID.randomUUID();
         sharedEndpointId = UUID.randomUUID();
         Endpoint endpoint = Endpoint.builder()
+                .organizationId(FIXTURE_ORG)
                 .id(sharedEndpointId)
                 .projectId(sharedProjectId)
                 .url("https://example.com/hook")
@@ -224,6 +234,7 @@ class DeliveryRepositoryTest {
 
     private Delivery createAndPersistDelivery(Delivery.DeliveryStatus status, Instant nextRetryAt, Instant updatedAt) {
         Delivery delivery = Delivery.builder()
+                .organizationId(FIXTURE_ORG)
                 .id(UUID.randomUUID())
                 .eventId(UUID.randomUUID())
                 .endpointId(sharedEndpointId)

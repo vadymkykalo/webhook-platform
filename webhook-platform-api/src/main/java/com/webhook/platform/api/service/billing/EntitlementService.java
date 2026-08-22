@@ -13,6 +13,7 @@ import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.exception.QuotaExceededException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -75,21 +76,21 @@ public class EntitlementService {
 
     // ── Quota checks ──────────────────────────────────────────────
 
-    public void checkEventQuota(UUID organizationId) {
+    public void checkEventQuota() {
         if (!billingEnabled) return;
-        Plan plan = getPlan(organizationId);
+        Plan plan = getPlan();
         if (plan.isUnlimited(plan.getMaxEventsPerMonth())) return;
 
-        long currentMonthEvents = quotaCounterService.getCurrentCount(organizationId);
+        long currentMonthEvents = quotaCounterService.getCurrentCount();
         if (currentMonthEvents >= plan.getMaxEventsPerMonth()) {
             throw new QuotaExceededException("events_per_month",
                     currentMonthEvents, plan.getMaxEventsPerMonth(), plan.getDisplayName());
         }
     }
 
-    public void checkEndpointLimit(UUID projectId, UUID organizationId) {
+    public void checkEndpointLimit(UUID projectId) {
         if (!billingEnabled) return;
-        Plan plan = getPlan(organizationId);
+        Plan plan = getPlan();
         if (plan.isUnlimited(plan.getMaxEndpointsPerProject())) return;
 
         long count = endpointRepository.countByProjectIdAndDeletedAtIsNull(projectId);
@@ -99,9 +100,10 @@ public class EntitlementService {
         }
     }
 
-    public void checkProjectLimit(UUID organizationId) {
+    public void checkProjectLimit() {
+        UUID organizationId = TenantContext.require();
         if (!billingEnabled) return;
-        Plan plan = getPlan(organizationId);
+        Plan plan = getPlan();
         if (plan.isUnlimited(plan.getMaxProjects())) return;
 
         long count = projectRepository.countByOrganizationIdAndDeletedAtIsNull(organizationId);
@@ -111,9 +113,10 @@ public class EntitlementService {
         }
     }
 
-    public void checkMemberLimit(UUID organizationId) {
+    public void checkMemberLimit() {
+        UUID organizationId = TenantContext.require();
         if (!billingEnabled) return;
-        Plan plan = getPlan(organizationId);
+        Plan plan = getPlan();
         if (plan.isUnlimited(plan.getMaxMembers())) return;
 
         long count = membershipRepository.countByOrganizationId(organizationId);
@@ -123,9 +126,10 @@ public class EntitlementService {
         }
     }
 
-    public void checkTunnelLimit(UUID organizationId) {
+    public void checkTunnelLimit() {
+        UUID organizationId = TenantContext.require();
         if (!billingEnabled) return;
-        Plan plan = getPlan(organizationId);
+        Plan plan = getPlan();
         if (!plan.hasFeature("tunnels")) {
             throw new QuotaExceededException("tunnels",
                     0, 0, plan.getDisplayName());
@@ -141,13 +145,21 @@ public class EntitlementService {
 
     // ── Feature flags ─────────────────────────────────────────────
 
-    public boolean hasFeature(UUID organizationId, String featureName) {
+    public boolean hasFeature(String featureName) {
         if (!billingEnabled) return true;
-        return getPlan(organizationId).hasFeature(featureName);
+        return getPlan().hasFeature(featureName);
     }
 
     // ── Rate limit ────────────────────────────────────────────────
 
+    public int getRateLimit() {
+        return getRateLimit(TenantContext.require());
+    }
+
+    /**
+     * Explicit-organization form, for callers holding a row rather than a scope — see
+     * {@link #getPlan(java.util.UUID)}.
+     */
     public int getRateLimit(UUID organizationId) {
         if (!billingEnabled) return defaultRateLimitPerSecond;
         return getPlan(organizationId).getRateLimitPerSecond();
@@ -175,25 +187,42 @@ public class EntitlementService {
 
     // ── Retention ─────────────────────────────────────────────────
 
-    public int getRetentionDays(UUID organizationId) {
+    public int getRetentionDays() {
         if (!billingEnabled) return -1;
-        return getPlan(organizationId).getMaxRetentionDays();
+        return getPlan().getMaxRetentionDays();
     }
 
     // ── Plan access ───────────────────────────────────────────────
 
+    public Plan getPlan() {
+        return getPlan(TenantContext.require());
+    }
+
+    /**
+     * Explicit-organization form.
+     *
+     * <p>Kept alongside the no-argument one because two callers legitimately have an organization
+     * without being scoped to it: {@code getRateLimitForProject} and {@code getMaxFanoutForProject}
+     * resolve a Project first and read the organization off it, on paths that may be running as
+     * the system tenant.
+     */
     public Plan getPlan(UUID organizationId) {
         return planCache.get(organizationId, this::loadPlan);
     }
 
+    /**
+     * Takes the organization explicitly: the billing schedulers evict the cache for an
+     * organization they are processing under the system tenant, not for one they are "in".
+     */
     public void evictPlanCache(UUID organizationId) {
         planCache.invalidate(organizationId);
     }
 
     // ── Internals ─────────────────────────────────────────────────
 
+    /** Cache loader, so it is handed the key rather than reading an ambient scope. */
     private Plan loadPlan(UUID organizationId) {
-        Organization org = organizationRepository.findById(organizationId)
+        Organization org = organizationRepository.findByIdWithPlan(organizationId)
                 .orElseThrow(() -> new IllegalStateException("Organization not found: " + organizationId));
         return org.getPlan();
     }

@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service.billing;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
@@ -55,6 +57,22 @@ class SubscriptionLifecycleServiceTest {
 
     // ── createSubscription ──────────────────────────────────────────
 
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(ORG_ID);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
     @Test
     void createSubscription_savesWithActiveStatus() {
         Instant start = Instant.now();
@@ -68,8 +86,7 @@ class SubscriptionLifecycleServiceTest {
                 });
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
 
-        BillingSubscription result = service.createSubscription(
-                ORG_ID, starterPlan, "stripe", "USD", BillingInterval.MONTHLY, start, end);
+        BillingSubscription result = service.createSubscription( starterPlan, "stripe", "USD", BillingInterval.MONTHLY, start, end);
 
         assertThat(result.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
         assertThat(result.getOrganizationId()).isEqualTo(ORG_ID);
@@ -86,7 +103,7 @@ class SubscriptionLifecycleServiceTest {
         // Org plan synced
         verify(organizationRepository).save(org);
         assertThat(org.getPlan()).isEqualTo(starterPlan);
-        verify(entitlementService).evictPlanCache(ORG_ID);
+        verify(entitlementService).evictPlanCache(any());
     }
 
     @Test
@@ -98,8 +115,7 @@ class SubscriptionLifecycleServiceTest {
         });
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
 
-        BillingSubscription result = service.createSubscription(
-                ORG_ID, starterPlan, "wayforpay", null, null, Instant.now(), Instant.now());
+        BillingSubscription result = service.createSubscription( starterPlan, "wayforpay", null, null, Instant.now(), Instant.now());
 
         assertThat(result.getCurrency()).isEqualTo("USD");
         assertThat(result.getBillingInterval()).isEqualTo(BillingInterval.MONTHLY);

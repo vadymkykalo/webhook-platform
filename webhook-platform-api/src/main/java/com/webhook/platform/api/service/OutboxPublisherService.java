@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.enums.OutboxStatus;
@@ -107,6 +108,7 @@ public class OutboxPublisherService {
                 .register(meterRegistry);
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
     @SchedulerLock(name = "outbox-publisher", lockAtLeastFor = "PT1S", lockAtMostFor = "PT30S")
     public void publishPendingMessages() {
@@ -129,6 +131,7 @@ public class OutboxPublisherService {
         publishBatchAsync(claimed, false);
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${outbox.publisher.retry-interval-ms:30000}")
     @SchedulerLock(name = "outbox-publisher-retry", lockAtLeastFor = "PT5S", lockAtMostFor = "PT2M")
     public void retryFailedMessages() {
@@ -178,6 +181,7 @@ public class OutboxPublisherService {
         promoteExhaustedToDead();
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${outbox.publisher.cleanup-interval-ms:3600000}")
     @SchedulerLock(name = "outbox-cleanup", lockAtLeastFor = "PT30S", lockAtMostFor = "PT10M")
     public void cleanupOldMessages() {

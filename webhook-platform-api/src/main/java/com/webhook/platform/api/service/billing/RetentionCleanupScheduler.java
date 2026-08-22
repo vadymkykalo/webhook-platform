@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.billing;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class RetentionCleanupScheduler {
     @PersistenceContext
     private EntityManager em;
 
+    @SystemTenant
     @Scheduled(cron = "0 0 3 * * *")
     @SchedulerLock(name = "retention_cleanup", lockAtMostFor = "PT55M", lockAtLeastFor = "PT5M")
     @Transactional

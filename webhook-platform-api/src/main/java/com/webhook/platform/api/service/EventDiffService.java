@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.EventDiffResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,8 @@ public class EventDiffService {
 
     @Transactional(readOnly = true)
     public EventDiffResponse diff(UUID projectId, UUID leftEventId, UUID rightEventId,
-                                   boolean sanitize, UUID organizationId) {
+                                   boolean sanitize) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));

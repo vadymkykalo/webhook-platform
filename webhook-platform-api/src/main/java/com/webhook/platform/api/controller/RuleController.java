@@ -46,7 +46,7 @@ public class RuleController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ruleService.create(projectId, request, auth.organizationId()));
+                .body(ruleService.create(projectId, request));
     }
 
     @Operation(operationId = "getRule", summary = "Get rule", description = "Returns rule details with conditions, actions, and execution stats")
@@ -56,7 +56,7 @@ public class RuleController {
             @PathVariable("id") UUID id,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(ruleService.get(id, auth.organizationId()));
+        return ResponseEntity.ok(ruleService.get(id));
     }
 
     @Operation(operationId = "listRules", summary = "List rules", description = "Returns all rules for the project ordered by priority")
@@ -65,7 +65,7 @@ public class RuleController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(ruleService.list(projectId, auth.organizationId()));
+        return ResponseEntity.ok(ruleService.list(projectId));
     }
 
     @Operation(operationId = "updateRule", summary = "Update rule", description = "Updates rule conditions, actions, and settings")
@@ -80,7 +80,7 @@ public class RuleController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(ruleService.update(id, request, auth.organizationId()));
+        return ResponseEntity.ok(ruleService.update(id, request));
     }
 
     @Operation(operationId = "deleteRule", summary = "Delete rule", description = "Removes a rule and all its actions")
@@ -94,7 +94,7 @@ public class RuleController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        ruleService.delete(id, auth.organizationId());
+        ruleService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -110,6 +110,6 @@ public class RuleController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         boolean enabled = body.getOrDefault("enabled", true);
-        return ResponseEntity.ok(ruleService.toggleEnabled(id, enabled, auth.organizationId()));
+        return ResponseEntity.ok(ruleService.toggleEnabled(id, enabled));
     }
 }

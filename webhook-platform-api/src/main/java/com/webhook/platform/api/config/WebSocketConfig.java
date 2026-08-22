@@ -1,6 +1,7 @@
 package com.webhook.platform.api.config;
 
 import com.webhook.platform.api.service.TunnelWebSocketHandler;
+import com.webhook.platform.api.tenancy.SystemTenantWebSocketHandlerDecorator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
@@ -23,7 +24,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(tunnelWebSocketHandler, "/ws/tunnel")
+        registry.addHandler(new SystemTenantWebSocketHandlerDecorator(tunnelWebSocketHandler), "/ws/tunnel")
                 .setAllowedOrigins(allowedOrigins);
     }
 }

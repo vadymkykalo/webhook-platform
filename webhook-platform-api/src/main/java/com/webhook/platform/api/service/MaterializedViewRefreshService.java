@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -14,6 +15,7 @@ public class MaterializedViewRefreshService {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @SystemTenant
     @Scheduled(cron = "0 */5 * * * *")
     @SchedulerLock(name = "refresh-mv-delivery-stats", lockAtLeastFor = "PT1M", lockAtMostFor = "PT10M")
     public void refreshDeliveryStats() {
@@ -27,6 +29,7 @@ public class MaterializedViewRefreshService {
         }
     }
 
+    @SystemTenant
     @Scheduled(cron = "0 */5 * * * *")
     @SchedulerLock(name = "refresh-mv-incoming-stats", lockAtLeastFor = "PT1M", lockAtMostFor = "PT10M")
     public void refreshIncomingStats() {

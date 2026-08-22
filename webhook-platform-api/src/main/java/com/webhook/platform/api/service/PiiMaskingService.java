@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.PiiMaskingRuleRequest;
 import com.webhook.platform.api.dto.PiiMaskingRuleResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.PiiSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,16 +28,16 @@ public class PiiMaskingService {
     private final ProjectRepository projectRepository;
 
     @Transactional(readOnly = true)
-    public List<PiiMaskingRuleResponse> listRules(UUID projectId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public List<PiiMaskingRuleResponse> listRules(UUID projectId) {
+        validateProjectAccess(projectId);
         return ruleRepository.findByProjectId(projectId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public PiiMaskingRuleResponse createRule(UUID projectId, PiiMaskingRuleRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public PiiMaskingRuleResponse createRule(UUID projectId, PiiMaskingRuleRequest request) {
+        validateProjectAccess(projectId);
 
         boolean isBuiltin = isBuiltinPattern(request.getPatternName());
 
@@ -55,8 +56,8 @@ public class PiiMaskingService {
     }
 
     @Transactional
-    public PiiMaskingRuleResponse updateRule(UUID projectId, UUID ruleId, PiiMaskingRuleRequest request, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public PiiMaskingRuleResponse updateRule(UUID projectId, UUID ruleId, PiiMaskingRuleRequest request) {
+        validateProjectAccess(projectId);
 
         PiiMaskingRule rule = ruleRepository.findById(ruleId)
                 .filter(r -> r.getProjectId().equals(projectId))
@@ -78,8 +79,8 @@ public class PiiMaskingService {
     }
 
     @Transactional
-    public void deleteRule(UUID projectId, UUID ruleId, UUID organizationId) {
-        validateProjectAccess(projectId, organizationId);
+    public void deleteRule(UUID projectId, UUID ruleId) {
+        validateProjectAccess(projectId);
 
         PiiMaskingRule rule = ruleRepository.findById(ruleId)
                 .filter(r -> r.getProjectId().equals(projectId))
@@ -146,7 +147,8 @@ public class PiiMaskingService {
                 || PiiSanitizer.BUILTIN_CARD.equals(name);
     }
 
-    private void validateProjectAccess(UUID projectId, UUID organizationId) {
+    private void validateProjectAccess(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         projectRepository.findById(projectId)
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));

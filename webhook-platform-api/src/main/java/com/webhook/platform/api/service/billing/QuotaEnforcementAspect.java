@@ -6,6 +6,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -46,6 +47,7 @@ public class QuotaEnforcementAspect {
 
     @Before("@annotation(requireQuota)")
     public void enforceQuota(JoinPoint joinPoint, RequireQuota requireQuota) {
+        UUID organizationId = TenantContext.require();
         if (!entitlementService.isBillingEnabled()) return;
 
         UUID orgId = resolveOrganizationId(joinPoint);
@@ -58,7 +60,7 @@ public class QuotaEnforcementAspect {
         QuotaType quota = requireQuota.value();
 
         switch (quota) {
-            case EVENTS_PER_MONTH -> entitlementService.checkEventQuota(orgId);
+            case EVENTS_PER_MONTH -> entitlementService.checkEventQuota();
             case ENDPOINTS_PER_PROJECT -> {
                 UUID projectId = extractProjectId(joinPoint);
                 if (projectId == null) {
@@ -66,11 +68,11 @@ public class QuotaEnforcementAspect {
                             joinPoint.getSignature().toShortString());
                     return;
                 }
-                entitlementService.checkEndpointLimit(projectId, orgId);
+                entitlementService.checkEndpointLimit(projectId);
             }
-            case PROJECTS -> entitlementService.checkProjectLimit(orgId);
-            case MEMBERS -> entitlementService.checkMemberLimit(orgId);
-            case TUNNELS -> entitlementService.checkTunnelLimit(orgId);
+            case PROJECTS -> entitlementService.checkProjectLimit();
+            case MEMBERS -> entitlementService.checkMemberLimit();
+            case TUNNELS -> entitlementService.checkTunnelLimit();
         }
     }
 
@@ -78,6 +80,7 @@ public class QuotaEnforcementAspect {
 
     @Before("@annotation(requireFeature)")
     public void enforceFeature(JoinPoint joinPoint, RequireFeature requireFeature) {
+        UUID organizationId = TenantContext.require();
         if (!entitlementService.isBillingEnabled()) return;
 
         UUID orgId = resolveOrganizationId(joinPoint);
@@ -88,7 +91,7 @@ public class QuotaEnforcementAspect {
         }
 
         String feature = requireFeature.value();
-        if (!entitlementService.hasFeature(orgId, feature)) {
+        if (!entitlementService.hasFeature( feature)) {
             throw new ForbiddenException(
                     "Feature '" + feature + "' is not available on your current plan. Please upgrade.");
         }

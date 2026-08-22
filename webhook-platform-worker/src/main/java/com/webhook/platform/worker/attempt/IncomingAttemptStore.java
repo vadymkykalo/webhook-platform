@@ -301,6 +301,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 attemptRepository.save(IncomingForwardAttempt.builder()
                         .incomingEventId(claim.eventId())
                         .destinationId(claim.destinationId())
+                        // Inherited from the Attempt this one succeeds, which is the same
+                        // organization by construction (ADR-0006).
+                        .organizationId(attempt.getOrganizationId())
                         .attemptNumber(claim.attemptNumber() + 1)
                         .status(ForwardAttemptStatus.PENDING)
                         .nextRetryAt(retry.at())

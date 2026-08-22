@@ -79,7 +79,7 @@ public class DeliveryController {
                  projectId, status, endpointId, eventId, eventType, fromDate, toDate);
         
         Page<DeliveryResponse> response = deliveryService.listDeliveriesByProject(
-                projectId, auth.organizationId(), status, endpointId, eventId, eventType, fromDate, toDate, pageable);
+                projectId, status, endpointId, eventId, eventType, fromDate, toDate, pageable);
         return ResponseEntity.ok(response);
     }
 

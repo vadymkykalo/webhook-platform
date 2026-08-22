@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
+import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -51,12 +52,13 @@ public class OrganizationService {
                 .collect(Collectors.toList());
     }
 
-    public OrganizationResponse getOrganization(UUID orgId, UUID userId) {
-        if (!membershipRepository.existsByUserIdAndOrganizationId(userId, orgId)) {
+    public OrganizationResponse getOrganization(UUID userId) {
+        UUID organizationId = TenantContext.require();
+        if (!membershipRepository.existsByUserIdAndOrganizationId(userId, organizationId)) {
             throw new ForbiddenException("Access denied");
         }
 
-        Organization organization = organizationRepository.findById(orgId)
+        Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         return OrganizationResponse.builder()
@@ -74,28 +76,30 @@ public class OrganizationService {
      * organizations → audit_logs
      */
     @Transactional
-    public void deleteOrganization(UUID orgId) {
-        Organization organization = organizationRepository.findById(orgId)
+    public void deleteOrganization() {
+        UUID organizationId = TenantContext.require();
+        Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
 
-        log.warn("GDPR DELETE: permanently deleting organization {} ('{}')", orgId, organization.getName());
+        log.warn("GDPR DELETE: permanently deleting organization {} ('{}')", organizationId, organization.getName());
         organizationRepository.delete(organization);
         entityManager.flush();
-        log.info("GDPR DELETE: organization {} deleted successfully", orgId);
+        log.info("GDPR DELETE: organization {} deleted successfully", organizationId);
     }
 
     @Transactional
-    public OrganizationResponse updateOrganization(UUID orgId, UUID organizationId, UpdateOrganizationRequest request) {
-        if (!orgId.equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
+    public OrganizationResponse updateOrganization(UpdateOrganizationRequest request) {
+        // Was: an {orgId} path variable compared against the token's organization. Both halves
+        // are gone -- @RequireOrgAccess already rejects a mismatched path variable, and the
+        // organization being updated is now the caller's tenant by construction.
+        UUID organizationId = TenantContext.require();
 
-        Organization organization = organizationRepository.findById(orgId)
+        Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
 
         organization.setName(request.getName().trim());
         organization = organizationRepository.save(organization);
-        log.info("Organization {} renamed to '{}'", orgId, organization.getName());
+        log.info("Organization {} renamed to '{}'", organizationId, organization.getName());
 
         return OrganizationResponse.builder()
                 .id(organization.getId())

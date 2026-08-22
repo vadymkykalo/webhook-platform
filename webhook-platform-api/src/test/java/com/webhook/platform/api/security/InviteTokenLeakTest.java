@@ -1,5 +1,6 @@
 package com.webhook.platform.api.security;
 
+import com.webhook.platform.api.tenancy.TenantContext;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -34,6 +35,24 @@ import static org.mockito.Mockito.when;
  * Security fix for invite token leak vulnerability.
  */
 class InviteTokenLeakTest {
+
+    private final UUID tenantOrgId = UUID.randomUUID();
+
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(tenantOrgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
 
     @Test
     void testMemberResponseDoesNotContainInviteTokenField() {
@@ -150,7 +169,7 @@ class InviteTokenLeakTest {
                 .role(MembershipRole.DEVELOPER)
                 .build();
 
-        membershipService.addMember(orgId, request, MembershipRole.OWNER);
+        membershipService.addMember( request, MembershipRole.OWNER);
 
         // The temp password must have been emailed, not just generated and discarded.
         ArgumentCaptor<String> tempPasswordCaptor = ArgumentCaptor.forClass(String.class);
@@ -194,7 +213,7 @@ class InviteTokenLeakTest {
                 .role(MembershipRole.VIEWER)
                 .build();
 
-        membershipService.addMember(orgId, request, MembershipRole.OWNER);
+        membershipService.addMember( request, MembershipRole.OWNER);
 
         // An already-registered user already has a usable password; no temp password
         // should be generated or emailed for them.

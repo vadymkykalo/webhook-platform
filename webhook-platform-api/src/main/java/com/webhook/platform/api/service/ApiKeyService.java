@@ -9,6 +9,7 @@ import com.webhook.platform.api.domain.repository.ApiKeyRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,7 +43,8 @@ public class ApiKeyService {
 
     @Auditable(action = AuditAction.CREATE, resourceType = "ApiKey")
     @Transactional
-    public ApiKeyResponse createApiKey(UUID projectId, ApiKeyRequest request, UUID organizationId) {
+    public ApiKeyResponse createApiKey(UUID projectId, ApiKeyRequest request) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
@@ -70,7 +72,8 @@ public class ApiKeyService {
     }
 
     @Transactional(readOnly = true)
-    public List<ApiKeyResponse> listApiKeys(UUID projectId, UUID organizationId) {
+    public List<ApiKeyResponse> listApiKeys(UUID projectId) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
@@ -85,7 +88,8 @@ public class ApiKeyService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ApiKeyResponse> listApiKeys(UUID projectId, UUID organizationId, Pageable pageable) {
+    public Page<ApiKeyResponse> listApiKeys(UUID projectId, Pageable pageable) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
@@ -99,7 +103,8 @@ public class ApiKeyService {
 
     @Auditable(action = AuditAction.REVOKE, resourceType = "ApiKey")
     @Transactional
-    public void revokeApiKey(UUID projectId, UUID apiKeyId, UUID organizationId) {
+    public void revokeApiKey(UUID projectId, UUID apiKeyId) {
+        UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 

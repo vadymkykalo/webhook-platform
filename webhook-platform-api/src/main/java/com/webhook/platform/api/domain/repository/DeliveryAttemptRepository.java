@@ -23,11 +23,13 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         INNER JOIN (
             SELECT delivery_id, MAX(attempt_number) as max_attempt
             FROM delivery_attempts
-            WHERE delivery_id IN :deliveryIds
+            WHERE delivery_id IN :deliveryIds AND organization_id = :organizationId
             GROUP BY delivery_id
         ) latest ON da.delivery_id = latest.delivery_id AND da.attempt_number = latest.max_attempt
+        WHERE da.organization_id = :organizationId
         """, nativeQuery = true)
-    List<DeliveryAttempt> findLatestAttemptsByDeliveryIds(@Param("deliveryIds") List<UUID> deliveryIds);
+    List<DeliveryAttempt> findLatestAttemptsByDeliveryIds(
+ @Param("organizationId") UUID organizationId,@Param("deliveryIds") List<UUID> deliveryIds);
 
     @Modifying(clearAutomatically = true)
     @Query(value = """
@@ -84,9 +86,11 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         SELECT AVG(da.duration_ms) FROM delivery_attempts da
         JOIN deliveries d ON da.delivery_id = d.id
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        WHERE da.organization_id = :organizationId
+          AND e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
         """, nativeQuery = true)
     Double findAverageLatencyByProjectIdAndAttemptedAtBetween(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
@@ -96,9 +100,11 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         FROM delivery_attempts da
         JOIN deliveries d ON da.delivery_id = d.id
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        WHERE da.organization_id = :organizationId
+          AND e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
         """, nativeQuery = true)
     Long findLatencyPercentileByProjectId(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to,
@@ -112,11 +118,13 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         FROM delivery_attempts da
         JOIN deliveries d ON da.delivery_id = d.id
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        WHERE da.organization_id = :organizationId
+          AND e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
         GROUP BY DATE_TRUNC('hour', da.created_at)
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findLatencyTimeSeriesByHour(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);
@@ -129,11 +137,13 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         FROM delivery_attempts da
         JOIN deliveries d ON da.delivery_id = d.id
         JOIN events e ON d.event_id = e.id
-        WHERE e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
+        WHERE da.organization_id = :organizationId
+          AND e.project_id = :projectId AND da.created_at BETWEEN :from AND :to
         GROUP BY DATE_TRUNC('day', da.created_at)
         ORDER BY ts
         """, nativeQuery = true)
     List<Object[]> findLatencyTimeSeriesByDay(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("from") Instant from,
             @Param("to") Instant to);

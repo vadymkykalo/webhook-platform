@@ -37,6 +37,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest {
 
+    /**
+     * Fixture tenant for rows inserted straight through JDBC.
+     *
+     * <p>These fixtures bypass the entity mapping (and the FK checks, via
+     * {@code session_replication_role = replica}) that would normally stamp
+     * {@code organization_id}, so they name one themselves. The value only has to be non-null and
+     * consistent — nothing here asserts on tenant confinement.
+     */
+    private static final UUID FIXTURE_ORG = UUID.randomUUID();
+
     @Autowired
     private PartitionMaintenanceService partitionMaintenanceService;
 
@@ -150,8 +160,8 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
 
         jdbcTemplate.execute("SET session_replication_role = replica");
         jdbcTemplate.update(
-                "INSERT INTO deliveries (id, event_id, endpoint_id, subscription_id, status, attempt_count, max_attempts, ordering_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                deliveryId, eventId, endpointId, subscriptionId, "PENDING", 0, 5, false, now, now);
+                "INSERT INTO deliveries (id, event_id, endpoint_id, subscription_id, organization_id, status, attempt_count, max_attempts, ordering_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                deliveryId, eventId, endpointId, subscriptionId, FIXTURE_ORG, "PENDING", 0, 5, false, now, now);
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
         return deliveryId;
     }
@@ -159,8 +169,8 @@ class PartitionMaintenanceServiceIntegrationTest extends AbstractIntegrationTest
     private void insertDeliveryAttempt(UUID deliveryId, int attemptNumber, Instant createdAt) {
         jdbcTemplate.execute("SET session_replication_role = replica");
         jdbcTemplate.update(
-                "INSERT INTO delivery_attempts (id, delivery_id, attempt_number, http_status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                UUID.randomUUID(), deliveryId, attemptNumber, 200, 100, Timestamp.from(createdAt));
+                "INSERT INTO delivery_attempts (id, delivery_id, organization_id, attempt_number, http_status_code, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                UUID.randomUUID(), deliveryId, FIXTURE_ORG, attemptNumber, 200, 100, Timestamp.from(createdAt));
         jdbcTemplate.execute("SET session_replication_role = DEFAULT");
     }
 }

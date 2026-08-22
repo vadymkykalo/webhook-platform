@@ -8,6 +8,8 @@ import com.webhook.platform.api.service.SequenceGeneratorService;
 import com.webhook.platform.api.service.SequenceReconciliationService;
 import com.webhook.platform.api.service.TestEndpointCleanupService;
 import com.webhook.platform.api.service.TokenBlacklistService;
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -61,6 +63,28 @@ public abstract class AbstractIntegrationTest {
 
     @MockBean
     protected RedisTunnelCoordinator redisTunnelCoordinator;
+
+    /**
+     * Integration tests reach for repositories directly — seeding fixtures, asserting on rows,
+     * often for several organizations in one test. That is system work, and ADR-0006 made system
+     * work say so: without a scope the first repository call fails with
+     * TenantNotResolvedException.
+     *
+     * <p>Entered here rather than in each test so the default matches what these tests are: an
+     * out-of-band view of the database. A test that wants to prove confinement enters a real
+     * tenant itself with {@code TenantContext.runAs(...)} — see {@code CrossTenantIsolationTest}.
+     * Requests made through MockMvc are unaffected: they go through TenantContextFilter and get
+     * the caller's own scope.
+     */
+    @BeforeEach
+    void enterSystemTenantScope() {
+        TenantContext.set(TenantContext.SYSTEM);
+    }
+
+    @AfterEach
+    void leaveSystemTenantScope() {
+        TenantContext.clear();
+    }
 
     @BeforeEach
     void setupMocks() {

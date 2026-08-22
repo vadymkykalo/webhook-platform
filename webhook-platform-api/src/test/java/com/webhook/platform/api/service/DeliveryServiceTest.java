@@ -1,5 +1,7 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.tenancy.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
@@ -83,6 +85,22 @@ class DeliveryServiceTest {
 
     // ─── getDelivery ─────────────────────────────────────────────────────
 
+
+    /**
+     * Every service under test now reads its organization from the ambient tenant scope instead
+     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * enters the scope itself; without this the first call fails with TenantNotResolvedException.
+     */
+    @BeforeEach
+    void enterTenantScope() {
+        TenantContext.set(orgId);
+    }
+
+    @AfterEach
+    void leaveTenantScope() {
+        TenantContext.clear();
+    }
+
     @Test
     void getDelivery_notFound_throwsNotFound() {
         UUID deliveryId = UUID.randomUUID();
@@ -160,7 +178,7 @@ class DeliveryServiceTest {
                 .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
 
         assertThatThrownBy(() -> deliveryService.listDeliveriesByProject(
-                projectId, orgId, null, null, null, null, null, null, PageRequest.of(0, 20)))
+                projectId, null, null, null, null, null, null, PageRequest.of(0, 20)))
                 .isInstanceOf(ForbiddenException.class);
     }
 
@@ -172,7 +190,7 @@ class DeliveryServiceTest {
                 .thenReturn(new PageImpl<>(List.of()));
 
         Page<DeliveryResponse> result = deliveryService.listDeliveriesByProject(
-                projectId, orgId, DeliveryStatus.FAILED, null, null, null, null, null, PageRequest.of(0, 20));
+                projectId, DeliveryStatus.FAILED, null, null, null, null, null, PageRequest.of(0, 20));
 
         assertThat(result.getContent()).isEmpty();
         verify(deliveryRepository).findAll(any(Specification.class), any(Pageable.class));

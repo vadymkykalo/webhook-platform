@@ -56,7 +56,6 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
     private static final String ATTR_TUNNEL_TOKEN = "tunnelToken";
     private static final String ATTR_SLUG = "slug";
     private static final int MAX_MESSAGE_SIZE = 1024 * 1024; // 1MB
-
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(MAX_MESSAGE_SIZE);
@@ -104,7 +103,6 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
         wsConnectCounter.increment();
         log.info("Tunnel WS connected: slug={}, sessionId={}", slug, session.getId());
     }
-
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String slug = (String) session.getAttributes().get(ATTR_SLUG);
@@ -143,7 +141,6 @@ public class TunnelWebSocketHandler extends TextWebSocketHandler {
                 log.debug("Unhandled tunnel message type: {} from slug={}", tunnelMessage.getType(), slug);
         }
     }
-
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String slug = (String) session.getAttributes().get(ATTR_SLUG);

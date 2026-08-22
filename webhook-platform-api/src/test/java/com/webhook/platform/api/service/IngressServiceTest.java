@@ -56,6 +56,8 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class IngressServiceTest {
 
+    private final UUID orgId = UUID.randomUUID();
+
     @Mock
     private IncomingSourceRepository sourceRepository;
     @Mock
@@ -125,7 +127,9 @@ class IngressServiceTest {
 
     private IncomingSource buildActiveSource() {
         return IncomingSource.builder()
-                .id(sourceId).projectId(UUID.randomUUID())
+                // The Source names its organization: ingress is unauthenticated, so the tenant
+                // scope the rest of the request runs in comes off this row (ADR-0006).
+                .id(sourceId).projectId(UUID.randomUUID()).organizationId(orgId)
                 .name("Test").slug("test").providerType(ProviderType.GENERIC)
                 .status(IncomingSourceStatus.ACTIVE)
                 .ingressPathToken("validtoken")

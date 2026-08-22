@@ -119,7 +119,7 @@ class IncomingEventServiceTest {
                 .thenReturn(new PageImpl<>(List.of(event)));
         when(sourceRepository.findAllById(List.of(sourceId))).thenReturn(List.of(source));
 
-        Page<IncomingEventResponse> page = service.listEvents(projectId, orgId, null, PageRequest.of(0, 20));
+        Page<IncomingEventResponse> page = service.listEvents(projectId, null, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1);
         assertThat(page.getContent().get(0).getRequestId()).isEqualTo("req-123");
@@ -135,7 +135,7 @@ class IncomingEventServiceTest {
                 .thenReturn(new PageImpl<>(List.of(event)));
         when(sourceRepository.findAllById(List.of(sourceId))).thenReturn(List.of(source));
 
-        Page<IncomingEventResponse> page = service.listEvents(projectId, orgId, sourceId, PageRequest.of(0, 20));
+        Page<IncomingEventResponse> page = service.listEvents(projectId, sourceId, PageRequest.of(0, 20));
 
         assertThat(page.getTotalElements()).isEqualTo(1);
     }
@@ -233,7 +233,7 @@ class IncomingEventServiceTest {
                 .build();
         when(sourceRepository.findById(foreignSourceId)).thenReturn(Optional.of(foreignSource));
 
-        assertThatThrownBy(() -> service.listEvents(projectId, orgId, foreignSourceId, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> service.listEvents(projectId, foreignSourceId, PageRequest.of(0, 20)))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Source does not belong to project");
 

@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
@@ -26,6 +27,7 @@ public class Project {
     @Column(nullable = false)
     private String name;
 
+    @TenantId
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
 

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.service.workflow;
 
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.WorkflowTriggerOutbox;
 import com.webhook.platform.api.domain.enums.WorkflowTriggerOutboxStatus;
 import com.webhook.platform.api.domain.repository.WorkflowTriggerOutboxRepository;
@@ -64,6 +65,7 @@ public class WorkflowTriggerOutboxService {
         this.maxConcurrentPerProject = maxConcurrentPerProject;
     }
 
+    @SystemTenant
     @Scheduled(fixedDelayString = "${workflow.trigger-outbox.poll-interval-ms:2000}")
     @SchedulerLock(name = "workflowTriggerOutboxPoll", lockAtMostFor = "PT30S", lockAtLeastFor = "PT1S")
     public void poll() {
@@ -144,6 +146,7 @@ public class WorkflowTriggerOutboxService {
         }
     }
 
+    @SystemTenant
     @Scheduled(cron = "${workflow.trigger-outbox.cleanup-cron:0 0 3 * * *}")
     @SchedulerLock(name = "workflowTriggerOutboxCleanup", lockAtMostFor = "PT5M")
     @Transactional

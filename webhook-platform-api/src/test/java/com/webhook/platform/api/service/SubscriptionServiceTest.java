@@ -103,7 +103,7 @@ class SubscriptionServiceTest {
             return s;
         });
 
-        SubscriptionResponse response = service.createSubscription(projectId, baseRequest().build(), orgId);
+        SubscriptionResponse response = service.createSubscription(projectId, baseRequest().build());
         assertThat(response).isNotNull();
         verify(subscriptionRepository).saveAndFlush(any());
     }
@@ -112,7 +112,7 @@ class SubscriptionServiceTest {
     void createSubscription_foreignEndpoint_throwsForbidden() {
         SubscriptionRequest request = baseRequest().endpointId(foreignEndpoint.getId()).build();
 
-        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Endpoint does not belong to this project");
     }
@@ -123,7 +123,7 @@ class SubscriptionServiceTest {
         when(endpointRepository.findById(missingId)).thenReturn(Optional.empty());
         SubscriptionRequest request = baseRequest().endpointId(missingId).build();
 
-        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("Endpoint not found");
     }
@@ -142,7 +142,7 @@ class SubscriptionServiceTest {
         });
 
         SubscriptionRequest request = baseRequest().transformationId(transformationId).build();
-        SubscriptionResponse response = service.createSubscription(projectId, request, orgId);
+        SubscriptionResponse response = service.createSubscription(projectId, request);
         assertThat(response).isNotNull();
     }
 
@@ -150,7 +150,7 @@ class SubscriptionServiceTest {
     void createSubscription_foreignTransformation_throwsForbidden() {
         SubscriptionRequest request = baseRequest().transformationId(foreignTransformation.getId()).build();
 
-        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
@@ -167,7 +167,7 @@ class SubscriptionServiceTest {
         });
 
         SubscriptionRequest request = baseRequest().transformationId(null).build();
-        SubscriptionResponse response = service.createSubscription(projectId, request, orgId);
+        SubscriptionResponse response = service.createSubscription(projectId, request);
         assertThat(response).isNotNull();
     }
 
@@ -185,7 +185,7 @@ class SubscriptionServiceTest {
         SubscriptionRequest request = SubscriptionRequest.builder()
                 .endpointId(foreignEndpoint.getId()).build();
 
-        assertThatThrownBy(() -> service.updateSubscription(subId, request, orgId))
+        assertThatThrownBy(() -> service.updateSubscription(subId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Endpoint does not belong to this project");
     }
@@ -204,7 +204,7 @@ class SubscriptionServiceTest {
         SubscriptionRequest request = SubscriptionRequest.builder()
                 .transformationId(foreignTransformation.getId()).build();
 
-        assertThatThrownBy(() -> service.updateSubscription(subId, request, orgId))
+        assertThatThrownBy(() -> service.updateSubscription(subId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
     }
@@ -219,7 +219,7 @@ class SubscriptionServiceTest {
     void createSubscription_malformedRetryDelays_throwsWithActionableMessage() {
         SubscriptionRequest request = baseRequest().retryDelays("60,oops,900").build();
 
-        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retryDelays")
                 .hasMessageContaining("tier 2");
@@ -231,7 +231,7 @@ class SubscriptionServiceTest {
     void createSubscription_nonPositiveRetryDelay_throws() {
         SubscriptionRequest request = baseRequest().retryDelays("60,0,900").build();
 
-        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("greater than zero");
     }
@@ -240,7 +240,7 @@ class SubscriptionServiceTest {
     void createSubscription_zeroMaxAttempts_throws() {
         SubscriptionRequest request = baseRequest().maxAttempts(0).build();
 
-        assertThatThrownBy(() -> service.createSubscription(projectId, request, orgId))
+        assertThatThrownBy(() -> service.createSubscription(projectId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maxAttempts");
     }
@@ -256,7 +256,7 @@ class SubscriptionServiceTest {
             return sub;
         });
 
-        service.createSubscription(projectId, baseRequest().build(), orgId);
+        service.createSubscription(projectId, baseRequest().build());
 
         ArgumentCaptor<Subscription> saved = ArgumentCaptor.forClass(Subscription.class);
         verify(subscriptionRepository).saveAndFlush(saved.capture());
@@ -276,7 +276,7 @@ class SubscriptionServiceTest {
 
         SubscriptionRequest request = SubscriptionRequest.builder().retryDelays("not,a,ladder").build();
 
-        assertThatThrownBy(() -> service.updateSubscription(subId, request, orgId))
+        assertThatThrownBy(() -> service.updateSubscription(subId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retryDelays");
 

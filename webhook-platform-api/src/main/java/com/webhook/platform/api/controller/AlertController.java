@@ -42,7 +42,7 @@ public class AlertController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(alertService.listRules(projectId, auth.organizationId()));
+        return ResponseEntity.ok(alertService.listRules(projectId));
     }
 
     @Operation(operationId = "createAlertRule", summary = "Create alert rule")
@@ -57,7 +57,7 @@ public class AlertController {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(alertService.createRule(projectId, request, auth.organizationId()));
+                .body(alertService.createRule(projectId, request));
     }
 
     @Operation(operationId = "updateAlertRule", summary = "Update alert rule")
@@ -71,7 +71,7 @@ public class AlertController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(alertService.updateRule(projectId, ruleId, request, auth.organizationId()));
+        return ResponseEntity.ok(alertService.updateRule(projectId, ruleId, request));
     }
 
     @Operation(operationId = "deleteAlertRule", summary = "Delete alert rule")
@@ -85,7 +85,7 @@ public class AlertController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        alertService.deleteRule(projectId, ruleId, auth.organizationId());
+        alertService.deleteRule(projectId, ruleId);
         return ResponseEntity.noContent().build();
     }
 
@@ -99,7 +99,7 @@ public class AlertController {
             @RequestParam(defaultValue = "20") int size,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        return ResponseEntity.ok(alertService.listEvents(projectId, auth.organizationId(), page, size));
+        return ResponseEntity.ok(alertService.listEvents(projectId, page, size));
     }
 
     @Operation(summary = "Count unresolved alerts")
@@ -108,7 +108,7 @@ public class AlertController {
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
-        long count = alertService.countUnresolved(projectId, auth.organizationId());
+        long count = alertService.countUnresolved(projectId);
         return ResponseEntity.ok(Map.of("count", count));
     }
 
@@ -122,7 +122,7 @@ public class AlertController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        alertService.resolveEvent(projectId, eventId, auth.organizationId());
+        alertService.resolveEvent(projectId, eventId);
         return ResponseEntity.noContent().build();
     }
 
@@ -135,7 +135,7 @@ public class AlertController {
             AuthContext auth) {
         auth.requireWriteAccess();
         auth.validateProjectAccess(projectId);
-        int resolved = alertService.resolveAll(projectId, auth.organizationId());
+        int resolved = alertService.resolveAll(projectId);
         return ResponseEntity.ok(Map.of("resolved", resolved));
     }
 }

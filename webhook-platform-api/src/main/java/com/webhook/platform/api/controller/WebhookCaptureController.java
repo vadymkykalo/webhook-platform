@@ -5,6 +5,7 @@ import com.webhook.platform.api.dto.CapturedRequestResponse;
 import com.webhook.platform.api.dto.WebhookCaptureResponse;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.service.TestEndpointService;
+import com.webhook.platform.api.tenancy.TenantContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -48,8 +49,10 @@ public class WebhookCaptureController {
             @RequestBody(required = false) String body,
             HttpServletRequest request) {
 
-        // Early check: reject unknown slugs before allocating a rate-limit bucket
-        if (!testEndpointRepository.existsBySlug(slug)) {
+        // Early check: reject unknown slugs before allocating a rate-limit bucket.
+        // Unscoped on purpose: /hook/** is public, so nothing has established a tenant yet and
+        // the slug is what identifies the endpoint's owner.
+        if (!TenantContext.callAsSystem(() -> testEndpointRepository.existsBySlug(slug))) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(WebhookCaptureResponse.builder()
                             .success(false)
