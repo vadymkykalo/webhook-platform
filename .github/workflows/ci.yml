@@ -474,7 +474,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       
       # The only full builds in the workflow. docker-compose-smoke and
       # container-scan need the same three images and used to rebuild each from
@@ -535,7 +535,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build API image
         uses: docker/build-push-action@v6
@@ -631,7 +631,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       
       - name: Build API image for scan
         uses: docker/build-push-action@v6
