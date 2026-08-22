@@ -160,7 +160,11 @@ class RetrySchedulerServiceTest {
 
                 // Assert
                 verify(kafkaTemplate, times(3)).send(anyString(), anyString(), any(DeliveryMessage.class));
-                verify(deliveryRepository, times(2)).saveAll(anyList()); // Phase 1 claim + Phase 3 results
+                // Phase 1 claim only. A successful send hands the row to the consumer, which
+                // may already have advanced it by the time Phase 3 runs — re-saving the Phase 1
+                // snapshot there raced that update and could stall the retry partition, so
+                // Phase 3 writes nothing when every send succeeded.
+                verify(deliveryRepository, times(1)).saveAll(anyList());
         }
 
         @Test
@@ -185,11 +189,11 @@ class RetrySchedulerServiceTest {
                 // Act
                 retrySchedulerService.scheduleRetries(0);
 
-                // Assert — Phase 1 nullifies nextRetryAt, Phase 3 keeps it null for successful sends
+                // Assert — Phase 1 nullifies nextRetryAt and is the only write for a
+                // successful send; Phase 3 leaves the row to the consumer.
                 @SuppressWarnings("unchecked")
                 ArgumentCaptor<List<Delivery>> deliveryCaptor = ArgumentCaptor.forClass(List.class);
-                verify(deliveryRepository, times(2)).saveAll(deliveryCaptor.capture());
-                // Phase 1 save nullified nextRetryAt; Phase 3 save preserves it
+                verify(deliveryRepository, times(1)).saveAll(deliveryCaptor.capture());
                 List<List<Delivery>> allSaves = deliveryCaptor.getAllValues();
                 assertNull(allSaves.get(0).get(0).getNextRetryAt());
         }

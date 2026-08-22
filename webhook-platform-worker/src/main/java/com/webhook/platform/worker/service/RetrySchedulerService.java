@@ -107,7 +107,7 @@ public class RetrySchedulerService {
         try {
             long pendingCount = countPendingRetries();
             scheduleRetries(pendingCount);
-            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount);
+            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount, defaultPollIntervalMs);
         } catch (Exception e) {
             log.error("Retry scheduler poll failed: {}", e.getMessage(), e);
         } finally {
@@ -146,6 +146,11 @@ public class RetrySchedulerService {
                 d.setStatus(Delivery.DeliveryStatus.PROCESSING);
                 d.setNextRetryAt(null);
                 d.setLastAttemptAt(Instant.now());
+                // Fresh fencing token per claim: the attempt this claim hands to the
+                // consumer finalizes the row only while the token still matches, so an
+                // earlier attempt that was swept away as abandoned cannot come back and
+                // write over the claim made here. See V055__delivery_claim_token.sql.
+                d.setClaimToken(UUID.randomUUID());
                 d.setUpdatedAt(Instant.now());
             }
             deliveryRepository.saveAll(locked);
@@ -210,7 +215,9 @@ public class RetrySchedulerService {
         }
 
         // ── Phase 3: Short transaction — update results ──
-        List<Delivery> successfulDeliveries = new ArrayList<>();
+        // Only rows this method still owns are written here: a successful send hands
+        // ownership of the row to the consumer (see below), so it is counted, not saved.
+        int sentDeliveries = 0;
         List<Delivery> failedDeliveries = new ArrayList<>();
 
         for (Delivery delivery : claimed) {
@@ -229,9 +236,19 @@ public class RetrySchedulerService {
                 }
                 SendResult<String, DeliveryMessage> result = future.get();
                 RecordMetadata metadata = result.getRecordMetadata();
-                // Status stays PROCESSING (set in Phase 1) — the consumer finalizes it
-                // (success/failure/reschedule) once it picks up the retry message.
-                successfulDeliveries.add(delivery);
+                // Status stays PROCESSING (set and committed in Phase 1) — the consumer
+                // finalizes it (success/failure/reschedule) once it picks up the retry
+                // message. Deliberately NOT collected for saving: there is nothing to
+                // write, and writing it back is actively harmful. The consumer often
+                // picks the message up within milliseconds of the send, so by the time
+                // Phase 3 runs it may already have advanced the row (to PENDING with a
+                // new next_retry_at when the ordering buffer parks it, or to a terminal
+                // state). Re-saving the Phase 1 snapshot then raced that update: whoever
+                // lost threw ObjectOptimisticLockingFailureException, and when the loser
+                // was the consumer, BoundedAsyncExecutor did not ack — stalling the
+                // retry partition until a restart or rebalance. Observed as a real
+                // interleaving in DeliveryEndToEndIntegrationTest's ordering scenario.
+                sentDeliveries++;
 
                 log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
                         delivery.getId(),
@@ -252,9 +269,6 @@ public class RetrySchedulerService {
 
         // Batch save in a short transaction
         transactionTemplate.executeWithoutResult(tx -> {
-            if (!successfulDeliveries.isEmpty()) {
-                deliveryRepository.saveAll(successfulDeliveries);
-            }
             if (!failedDeliveries.isEmpty()) {
                 deliveryRepository.saveAll(failedDeliveries);
             }
@@ -264,10 +278,10 @@ public class RetrySchedulerService {
         });
 
         // ── Governor feedback ──
-        governor.recordResult(successfulDeliveries.size(), failedDeliveries.size());
+        governor.recordResult(sentDeliveries, failedDeliveries.size());
 
         log.info("Retry scheduling complete: {} successful, {} failed/rescheduled, {} circuit-breaker-skipped (governor batch={}, pendingCount={})",
-                successfulDeliveries.size(), failedDeliveries.size(), circuitBreakerSkipped.size(), 
+                sentDeliveries, failedDeliveries.size(), circuitBreakerSkipped.size(), 
                 effectiveBatch, pendingCount);
     }
 
@@ -284,6 +298,9 @@ public class RetrySchedulerService {
         // Revert the Phase 1 PROCESSING claim so the delivery is picked up again by
         // findPendingRetryIds instead of waiting out a stuck-delivery sweep.
         delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+        // Handing the row back also ends the claim made in Phase 1, so drop its fencing
+        // token — "token set" is meant to mean "currently claimed" (V055).
+        delivery.setClaimToken(null);
         delivery.setNextRetryAt(rescheduleTime);
         delivery.setUpdatedAt(Instant.now());
 
