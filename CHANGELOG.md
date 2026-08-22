@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- OpenAPI drift is now checked by `OpenApiDriftIntegrationTest` rather than by
+  booting the whole Compose stack with `SWAGGER_ENABLED=true` and diffing with a
+  Python script. The check runs in the existing backend integration job, and an
+  intentional API change is regenerated with
+  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
+  The `servers` block is now excluded from the comparison: springdoc derives it
+  from the request, so it describes where an instance is reachable, not the API.
+- Dropped task-tracker ids (`P0-…`/`P1-…`/`P2-…`) and links to the gitignored
+  `.claude/features/` directory from code comments and docs. The technical
+  rationale stays inline; only the dangling references are gone.
+
+### Removed
+- `scripts/check-openapi-drift.py`, superseded by `OpenApiDriftIntegrationTest`.
+
 ## [2.3.0] - 2026-08-22
 
 ### Added
@@ -46,8 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   across restarts.
 - **Spring Boot upgraded 3.2.0 → 3.5.16** (the 3.2.x line went OSS-EOL in
   2024; 3.5.16 was the final OSS release of the 3.5.x line before it too
-  went EOL 2026-06-30 - see `docs`/the P1-19 task record for why this stops
-  short of the current Spring Boot 4.x line). Along with it: jjwt 0.12.3 →
+  went EOL 2026-06-30 - see the comment on `spring-boot.version` in the root
+  `pom.xml` for why this stops short of the current Spring Boot 4.x line). Along with it: jjwt 0.12.3 →
   0.13.0, redisson-spring-boot-starter 3.24.3 → 3.52.0, ShedLock 5.10.0 →
   5.16.0, springdoc-openapi 2.3.0 → 2.9.0, stripe-java 28.2.0 → 28.4.0,
   maven-surefire-plugin 2.22.2 → 3.5.6 (required - the old version silently

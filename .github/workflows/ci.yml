@@ -573,9 +573,6 @@ jobs:
           API_IMAGE_TAG: test
           WORKER_IMAGE_TAG: test
           UI_IMAGE_TAG: test
-          # /v3/api-docs.yaml is gated behind swagger.enabled (SecurityConfig),
-          # default false. Needed here so the OpenAPI drift check below can reach it.
-          SWAGGER_ENABLED: "true"
         run: docker compose -f docker-compose.pull.yml --env-file .env up -d
 
       - name: Wait for API and UI health, then curl both endpoints
@@ -608,39 +605,6 @@ jobs:
           echo ""
           echo "--- curl http://localhost:5173 (status only) ---"
           curl -f -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:5173
-
-      # The committed openapi.yaml (repo root) is the source evaluators and
-      # docs.hookflow.dev's Redoc renderer read - it must never silently drift from
-      # what the running API actually serves. Springdoc generates it live from the
-      # 35 @RestController classes, so this is a real drift check, not a rebuild of
-      # a hand-maintained file.
-      #
-      # Compared semantically (scripts/check-openapi-drift.py parses both sides)
-      # rather than with `diff -u`. A byte-for-byte diff over 246 KB of generated
-      # YAML also fires on the serializer's quoting style and on key ordering,
-      # neither of which is an API change - that produced a red build a
-      # regenerate-and-commit "fixed" without anything having actually changed,
-      # which trains people to regenerate on red instead of reading the diff.
-      # operationIds are compared like any other value: they are stable by
-      # construction (OperationIdNamingConfig#deterministicOperationIds, guarded by
-      # OpenApiOperationIdTest), so a change in one is a real API change.
-      - name: Export OpenAPI spec and check for drift
-        run: |
-          # PyYAML ships on the GitHub-hosted images, so this normally does nothing. The
-          # fallback covers a runner image without it: a plain `pip install` into the
-          # system interpreter is refused on Ubuntu 24.04+ (PEP 668), hence
-          # --break-system-packages, which is safe on a throwaway runner.
-          python3 -c 'import yaml' 2>/dev/null \
-            || python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pyyaml
-          curl -sf http://localhost:8080/v3/api-docs.yaml -o /tmp/openapi-live.yaml
-          scripts/check-openapi-drift.py openapi.yaml /tmp/openapi-live.yaml
-
-      - name: Upload generated OpenAPI spec
-        uses: actions/upload-artifact@v4
-        with:
-          name: openapi-spec
-          path: /tmp/openapi-live.yaml
-          retention-days: 30
 
       - name: Smoke Test Summary
         if: always()
