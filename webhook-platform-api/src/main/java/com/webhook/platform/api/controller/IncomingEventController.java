@@ -39,7 +39,7 @@ public class IncomingEventController {
         this.eventService = eventService;
     }
 
-    @Operation(summary = "List incoming events", description = "Returns paginated incoming events for the project")
+    @Operation(operationId = "listIncomingEvents", summary = "List incoming events", description = "Returns paginated incoming events for the project")
     @ApiResponse(responseCode = "200", description = "Events retrieved")
     @GetMapping
     public ResponseEntity<Page<IncomingEventResponse>> listEvents(
@@ -53,7 +53,7 @@ public class IncomingEventController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Get incoming event", description = "Returns incoming event details by ID")
+    @Operation(operationId = "getIncomingEvent", summary = "Get incoming event", description = "Returns incoming event details by ID")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Event retrieved"),
             @ApiResponse(responseCode = "404", description = "Event not found")

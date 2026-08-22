@@ -51,7 +51,7 @@ public class ReplayController {
         return ResponseEntity.ok(estimate);
     }
 
-    @Operation(summary = "Create replay session", description = "Start async replay of events matching the criteria")
+    @Operation(operationId = "createReplaySession", summary = "Create replay session", description = "Start async replay of events matching the criteria")
     @ApiResponse(responseCode = "201", description = "Replay session created and processing started")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("replay")
@@ -66,7 +66,7 @@ public class ReplayController {
         return ResponseEntity.status(HttpStatus.CREATED).body(session);
     }
 
-    @Operation(summary = "Get replay session", description = "Returns current status and progress of a replay session")
+    @Operation(operationId = "getReplaySession", summary = "Get replay session", description = "Returns current status and progress of a replay session")
     @GetMapping("/{sessionId}")
     public ResponseEntity<ReplaySessionResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -77,7 +77,7 @@ public class ReplayController {
         return ResponseEntity.ok(session);
     }
 
-    @Operation(summary = "List replay sessions", description = "Returns paginated history of replay sessions for the project")
+    @Operation(operationId = "listReplaySessions", summary = "List replay sessions", description = "Returns paginated history of replay sessions for the project")
     @GetMapping
     public ResponseEntity<Page<ReplaySessionResponse>> list(
             @PathVariable("projectId") UUID projectId,

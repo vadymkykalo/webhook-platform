@@ -7,13 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-22
+
 ### Added
+- `deliveries.claim_token` (V055): a fencing token stamped by whichever claim
+  moves a delivery to PROCESSING. `markAsSuccess` / `scheduleRetry` /
+  `markAsFailed` now write only while the row's token still matches the one
+  their attempt was claimed under. Guarding on `status = PROCESSING` alone
+  could not tell an attempt's own claim from a newer one: after
+  `StuckDeliveryRecoveryService` released a claim and the ladder reclaimed the
+  row, the abandoned attempt's late response finalized a delivery it no longer
+  owned, and the reclaimed attempt never reached the endpoint at all.
+- `ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS`: the fallback poll interval for a
+  delivery parked behind an outstanding sequence, previously hardcoded at 5s.
+- `OpenApiOperationIdTest`: fails the build on any controller method that would
+  be handed a scan-order-dependent operationId.
+- `scripts/check-openapi-drift.py`: semantic (parsed) comparison of the
+  committed openapi.yaml against the live spec.
 - GitFlow branching strategy with `develop` branch
 - CONTRIBUTING.md with development guidelines
 - Issue and PR templates
 - SECURITY.md policy
 
 ### Changed
+- OWASP Dependency-Check moved out of CI into `.github/workflows/security-sca.yml`,
+  now nightly plus `release/*` and `hotfix/*`, with a 75-minute timeout and its
+  NVD cache saved even when the scan fails. It had been costing 60-104 minutes
+  per run whenever the cache was cold — which a failed scan guaranteed for the
+  next run, since `actions/cache` skips its save step on failure. Pull requests
+  keep dependency-CVE coverage through the Trivy image scan.
+- `RetryGovernor` poll-interval recommendations are now multiples of the
+  configured interval instead of hardcoded constants, so
+  `RETRY_SCHEDULER_POLL_INTERVAL_MS` finally takes effect. The multipliers
+  reproduce the previous 30s/10s/5s/2s exactly at the 10s default.
+- OpenAPI operationIds are deterministic: `OperationIdNamingConfig` replaces
+  springdoc's positional `_1`/`_2` disambiguation, and 43 cross-controller
+  collisions carry explicit, descriptive ids. The spec is now byte-identical
+  across restarts.
 - **Spring Boot upgraded 3.2.0 → 3.5.16** (the 3.2.x line went OSS-EOL in
   2024; 3.5.16 was the final OSS release of the 3.5.x line before it too
   went EOL 2026-06-30 - see `docs`/the P1-19 task record for why this stops
@@ -32,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `external.*` values - see the Helm README.
 
 ### Fixed
+- `RetrySchedulerService` no longer writes back rows whose Kafka send succeeded.
+  A successful send hands the row to the consumer, which often advanced it
+  within milliseconds; re-saving the Phase 1 snapshot raced that update, and
+  when the consumer lost the optimistic-lock race `BoundedAsyncExecutor` did not
+  ack — **stalling the entire retry partition until a restart or rebalance**.
+- The ordering buffer tolerates a concurrent update while parking a delivery
+  instead of failing the consumer task (same partition-stall blast radius).
 - Integration tests with proper `@MockBean` for Redis services
 - `GlobalExceptionHandler` now properly handles `ResponseStatusException`
 - Test assertions in `MembershipRbacTest` and `AuthIntegrationTest`

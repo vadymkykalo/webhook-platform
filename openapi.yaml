@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Hookflow API
   description: |
@@ -115,31 +115,31 @@ paths:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest
+      operationId: captureRequestGet
       parameters:
       - name: slug
         in: path
         required: true
         schema:
           type: string
-      - name: body
-        in: query
-        required: true
-        schema:
-          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WebhookCaptureResponse'
+                $ref: "#/components/schemas/WebhookCaptureResponse"
     put:
       tags:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_2
+      operationId: captureRequestPut
       parameters:
       - name: slug
         in: path
@@ -157,13 +157,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WebhookCaptureResponse'
+                $ref: "#/components/schemas/WebhookCaptureResponse"
     post:
       tags:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_1
+      operationId: captureRequestPost
       parameters:
       - name: slug
         in: path
@@ -181,13 +181,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WebhookCaptureResponse'
+                $ref: "#/components/schemas/WebhookCaptureResponse"
     delete:
       tags:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_4
+      operationId: captureRequestDelete
       parameters:
       - name: slug
         in: path
@@ -205,13 +205,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WebhookCaptureResponse'
+                $ref: "#/components/schemas/WebhookCaptureResponse"
     patch:
       tags:
       - Webhook Capture
       summary: Capture webhook request
       description: Captures any HTTP request sent to this test endpoint
-      operationId: captureRequest_3
+      operationId: captureRequestPatch
       parameters:
       - name: slug
         in: path
@@ -229,25 +229,25 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WebhookCaptureResponse'
+                $ref: "#/components/schemas/WebhookCaptureResponse"
   /tunnel/{slug}:
     get:
       tags:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest
+      operationId: handleTunnelRequestGet
       parameters:
       - name: slug
         in: path
         required: true
         schema:
           type: string
-      - name: body
-        in: query
-        required: true
-        schema:
-          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
       responses:
         "200":
           description: OK
@@ -260,7 +260,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_3
+      operationId: handleTunnelRequestPut
       parameters:
       - name: slug
         in: path
@@ -284,7 +284,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_2
+      operationId: handleTunnelRequestPost
       parameters:
       - name: slug
         in: path
@@ -308,7 +308,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_5
+      operationId: handleTunnelRequestDelete
       parameters:
       - name: slug
         in: path
@@ -332,7 +332,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_6
+      operationId: handleTunnelRequestOptions
       parameters:
       - name: slug
         in: path
@@ -356,7 +356,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_1
+      operationId: handleTunnelRequestHead
       parameters:
       - name: slug
         in: path
@@ -380,7 +380,7 @@ paths:
       - Tunnel Ingress
       summary: Tunnel ingress
       description: Forward request through CLI tunnel to local application
-      operationId: handleTunnelRequest_4
+      operationId: handleTunnelRequestPatch
       parameters:
       - name: slug
         in: path
@@ -417,14 +417,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ProjectResponse'
+                $ref: "#/components/schemas/ProjectResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -445,12 +445,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProjectRequest'
+              $ref: "#/components/schemas/ProjectRequest"
         required: true
       responses:
         "200":
@@ -458,7 +458,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ProjectResponse'
+                $ref: "#/components/schemas/ProjectResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -479,7 +479,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Project deleted
@@ -491,7 +491,7 @@ paths:
       tags:
       - Workflows
       summary: Get workflow
-      operationId: get
+      operationId: getWorkflow
       parameters:
       - name: projectId
         in: path
@@ -509,14 +509,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowResponse'
+                $ref: "#/components/schemas/WorkflowResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -524,7 +524,7 @@ paths:
       tags:
       - Workflows
       summary: Update workflow
-      operationId: update
+      operationId: updateWorkflow
       parameters:
       - name: projectId
         in: path
@@ -542,12 +542,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WorkflowRequest'
+              $ref: "#/components/schemas/WorkflowRequest"
         required: true
       responses:
         "200":
@@ -555,7 +555,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowResponse'
+                $ref: "#/components/schemas/WorkflowResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -563,7 +563,7 @@ paths:
       tags:
       - Workflows
       summary: Delete workflow
-      operationId: delete
+      operationId: deleteWorkflow
       parameters:
       - name: projectId
         in: path
@@ -581,7 +581,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Workflow deleted
@@ -594,7 +594,7 @@ paths:
       - Transformations
       summary: Get transformation
       description: Returns transformation details
-      operationId: get_1
+      operationId: getTransformation
       parameters:
       - name: projectId
         in: path
@@ -612,14 +612,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TransformationResponse'
+                $ref: "#/components/schemas/TransformationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -628,7 +628,7 @@ paths:
       - Transformations
       summary: Update transformation
       description: Updates transformation (auto-increments version when template changes)
-      operationId: update_1
+      operationId: updateTransformation
       parameters:
       - name: projectId
         in: path
@@ -646,12 +646,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TransformationRequest'
+              $ref: "#/components/schemas/TransformationRequest"
         required: true
       responses:
         "200":
@@ -659,7 +659,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TransformationResponse'
+                $ref: "#/components/schemas/TransformationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -669,7 +669,7 @@ paths:
       summary: Delete transformation
       description: Removes a transformation (subscriptions/destinations referencing
         it will have transformation_id set to NULL)
-      operationId: delete_1
+      operationId: deleteTransformation
       parameters:
       - name: projectId
         in: path
@@ -687,7 +687,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Transformation deleted
@@ -712,14 +712,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/SubscriptionResponse'
+                $ref: "#/components/schemas/SubscriptionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -740,12 +740,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionRequest'
+              $ref: "#/components/schemas/SubscriptionRequest"
         required: true
       responses:
         "200":
@@ -753,7 +753,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/SubscriptionResponse'
+                $ref: "#/components/schemas/SubscriptionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -774,7 +774,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Subscription deleted
@@ -798,12 +798,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionRequest'
+              $ref: "#/components/schemas/SubscriptionRequest"
         required: true
       responses:
         "200":
@@ -811,7 +811,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/SubscriptionResponse'
+                $ref: "#/components/schemas/SubscriptionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -839,14 +839,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventTypeCatalogResponse'
+                $ref: "#/components/schemas/EventTypeCatalogResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -873,12 +873,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventTypeCatalogRequest'
+              $ref: "#/components/schemas/EventTypeCatalogRequest"
         required: true
       responses:
         "200":
@@ -886,7 +886,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventTypeCatalogResponse'
+                $ref: "#/components/schemas/EventTypeCatalogResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -913,7 +913,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Event type deleted
@@ -926,7 +926,7 @@ paths:
       - Rules
       summary: Get rule
       description: "Returns rule details with conditions, actions, and execution stats"
-      operationId: get_3
+      operationId: getRule
       parameters:
       - name: projectId
         in: path
@@ -944,14 +944,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/RuleResponse'
+                $ref: "#/components/schemas/RuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -960,7 +960,7 @@ paths:
       - Rules
       summary: Update rule
       description: "Updates rule conditions, actions, and settings"
-      operationId: update_2
+      operationId: updateRule
       parameters:
       - name: projectId
         in: path
@@ -978,12 +978,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RuleRequest'
+              $ref: "#/components/schemas/RuleRequest"
         required: true
       responses:
         "200":
@@ -991,7 +991,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/RuleResponse'
+                $ref: "#/components/schemas/RuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1000,7 +1000,7 @@ paths:
       - Rules
       summary: Delete rule
       description: Removes a rule and all its actions
-      operationId: delete_3
+      operationId: deleteRule
       parameters:
       - name: projectId
         in: path
@@ -1018,7 +1018,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Rule deleted
@@ -1031,7 +1031,7 @@ paths:
       - PII Masking
       summary: Update PII masking rule
       description: Updates an existing masking rule
-      operationId: updateRule
+      operationId: updatePiiRule
       parameters:
       - name: projectId
         in: path
@@ -1049,12 +1049,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PiiMaskingRuleRequest'
+              $ref: "#/components/schemas/PiiMaskingRuleRequest"
         required: true
       responses:
         "200":
@@ -1062,7 +1062,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PiiMaskingRuleResponse'
+                $ref: "#/components/schemas/PiiMaskingRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1071,7 +1071,7 @@ paths:
       - PII Masking
       summary: Delete PII masking rule
       description: Deletes a masking rule
-      operationId: deleteRule
+      operationId: deletePiiRule
       parameters:
       - name: projectId
         in: path
@@ -1089,7 +1089,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Rule deleted
@@ -1114,20 +1114,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
-        "404":
-          description: Destination not found
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IncomingDestinationResponse'
         "200":
           description: Destination retrieved
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingDestinationResponse'
+                $ref: "#/components/schemas/IncomingDestinationResponse"
+        "404":
+          description: Destination not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingDestinationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1148,26 +1148,26 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncomingDestinationRequest'
+              $ref: "#/components/schemas/IncomingDestinationRequest"
         required: true
       responses:
-        "404":
-          description: Destination not found
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IncomingDestinationResponse'
         "200":
           description: Destination updated
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingDestinationResponse'
+                $ref: "#/components/schemas/IncomingDestinationResponse"
+        "404":
+          description: Destination not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingDestinationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1188,7 +1188,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Destination deleted
@@ -1213,20 +1213,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
-        "404":
-          description: Source not found
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IncomingSourceResponse'
         "200":
           description: Source retrieved
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingSourceResponse'
+                $ref: "#/components/schemas/IncomingSourceResponse"
+        "404":
+          description: Source not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingSourceResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1247,26 +1247,26 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncomingSourceRequest'
+              $ref: "#/components/schemas/IncomingSourceRequest"
         required: true
       responses:
-        "404":
-          description: Source not found
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IncomingSourceResponse'
         "200":
           description: Source updated
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingSourceResponse'
+                $ref: "#/components/schemas/IncomingSourceResponse"
+        "404":
+          description: Source not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingSourceResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1287,7 +1287,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Source disabled
@@ -1299,7 +1299,7 @@ paths:
       tags:
       - Incidents
       summary: Get incident with timeline
-      operationId: get_5
+      operationId: getIncident
       parameters:
       - name: projectId
         in: path
@@ -1317,14 +1317,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncidentResponse'
+                $ref: "#/components/schemas/IncidentResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1332,7 +1332,7 @@ paths:
       tags:
       - Incidents
       summary: "Update incident (status, RCA notes, severity)"
-      operationId: update_3
+      operationId: updateIncident
       parameters:
       - name: projectId
         in: path
@@ -1350,12 +1350,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncidentRequest'
+              $ref: "#/components/schemas/IncidentRequest"
         required: true
       responses:
         "200":
@@ -1363,7 +1363,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncidentResponse'
+                $ref: "#/components/schemas/IncidentResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1385,14 +1385,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1413,12 +1413,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EndpointRequest'
+              $ref: "#/components/schemas/EndpointRequest"
         required: true
       responses:
         "200":
@@ -1426,7 +1426,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1447,7 +1447,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Endpoint deleted
@@ -1459,7 +1459,7 @@ paths:
       tags:
       - Alerts
       summary: Update alert rule
-      operationId: updateRule_1
+      operationId: updateAlertRule
       parameters:
       - name: projectId
         in: path
@@ -1477,12 +1477,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AlertRuleRequest'
+              $ref: "#/components/schemas/AlertRuleRequest"
         required: true
       responses:
         "200":
@@ -1490,7 +1490,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AlertRuleResponse'
+                $ref: "#/components/schemas/AlertRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1498,7 +1498,7 @@ paths:
       tags:
       - Alerts
       summary: Delete alert rule
-      operationId: deleteRule_1
+      operationId: deleteAlertRule
       parameters:
       - name: projectId
         in: path
@@ -1516,7 +1516,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Rule deleted
@@ -1541,14 +1541,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/OrganizationResponse'
+                $ref: "#/components/schemas/OrganizationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1569,12 +1569,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateOrganizationRequest'
+              $ref: "#/components/schemas/UpdateOrganizationRequest"
         required: true
       responses:
         "200":
@@ -1582,7 +1582,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/OrganizationResponse'
+                $ref: "#/components/schemas/OrganizationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1604,7 +1604,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Organization deleted
@@ -1623,14 +1623,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/OrganizationBillingResponse'
+                $ref: "#/components/schemas/OrganizationBillingResponse"
       security:
       - bearerAuth: []
     put:
@@ -1644,12 +1644,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateBillingRequest'
+              $ref: "#/components/schemas/UpdateBillingRequest"
         required: true
       responses:
         "200":
@@ -1657,7 +1657,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/OrganizationBillingResponse'
+                $ref: "#/components/schemas/OrganizationBillingResponse"
       security:
       - bearerAuth: []
   /api/v1/billing/organization/plan:
@@ -1673,12 +1673,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChangePlanRequest'
+              $ref: "#/components/schemas/ChangePlanRequest"
         required: true
       responses:
         "200":
@@ -1686,7 +1686,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/OrganizationBillingResponse'
+                $ref: "#/components/schemas/OrganizationBillingResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/profile:
@@ -1701,12 +1701,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateProfileRequest'
+              $ref: "#/components/schemas/UpdateProfileRequest"
         required: true
       responses:
         "200":
@@ -1714,13 +1714,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: "#/components/schemas/UserResponse"
         "401":
           description: Not authenticated
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: "#/components/schemas/UserResponse"
       security:
       - bearerAuth: []
   /ingress/{token}:
@@ -1743,42 +1743,42 @@ paths:
             schema:
               type: string
       responses:
-        "410":
-          description: Source is disabled
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IngressResponse'
-        "429":
-          description: Rate limit exceeded
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IngressResponse'
-        "401":
-          description: Signature verification failed
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IngressResponse'
-        "404":
-          description: Invalid ingress token
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IngressResponse'
-        "413":
-          description: Payload too large
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IngressResponse'
         "202":
           description: Webhook accepted for processing
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IngressResponse'
+                $ref: "#/components/schemas/IngressResponse"
+        "404":
+          description: Invalid ingress token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IngressResponse"
+        "410":
+          description: Source is disabled
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IngressResponse"
+        "413":
+          description: Payload too large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IngressResponse"
+        "401":
+          description: Signature verification failed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IngressResponse"
+        "429":
+          description: Rate limit exceeded
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IngressResponse"
   /api/v1/tunnels:
     get:
       tags:
@@ -1786,7 +1786,7 @@ paths:
       summary: List active tunnels
       description: "Lists all active tunnel sessions for the organization, optionally\
         \ filtered by project"
-      operationId: list
+      operationId: listTunnels
       parameters:
       - name: projectId
         in: query
@@ -1798,7 +1798,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1807,7 +1807,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TunnelSessionResponse'
+                  $ref: "#/components/schemas/TunnelSessionResponse"
       security:
       - bearerAuth: []
     post:
@@ -1816,7 +1816,7 @@ paths:
       summary: Create tunnel session
       description: Creates a new tunnel session for CLI use. The tunnelToken is returned
         only once.
-      operationId: create
+      operationId: createTunnel
       parameters:
       - name: localPort
         in: query
@@ -1839,14 +1839,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TunnelCreateResponse'
+                $ref: "#/components/schemas/TunnelCreateResponse"
       security:
       - bearerAuth: []
   /api/v1/projects:
@@ -1861,7 +1861,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1870,7 +1870,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProjectResponse'
+                  $ref: "#/components/schemas/ProjectResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1885,12 +1885,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ProjectRequest'
+              $ref: "#/components/schemas/ProjectRequest"
         required: true
       responses:
         "201":
@@ -1898,7 +1898,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ProjectResponse'
+                $ref: "#/components/schemas/ProjectResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1907,7 +1907,7 @@ paths:
       tags:
       - Workflows
       summary: List workflows
-      operationId: list_1
+      operationId: listWorkflows
       parameters:
       - name: projectId
         in: path
@@ -1919,7 +1919,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1928,7 +1928,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/WorkflowResponse'
+                  $ref: "#/components/schemas/WorkflowResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1936,7 +1936,7 @@ paths:
       tags:
       - Workflows
       summary: Create workflow
-      operationId: create_1
+      operationId: createWorkflow
       parameters:
       - name: projectId
         in: path
@@ -1948,12 +1948,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WorkflowRequest'
+              $ref: "#/components/schemas/WorkflowRequest"
         required: true
       responses:
         "201":
@@ -1961,7 +1961,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowResponse'
+                $ref: "#/components/schemas/WorkflowResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -1988,14 +1988,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
       responses:
         "200":
           description: Workflow executed
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowExecutionResponse'
+                $ref: "#/components/schemas/WorkflowExecutionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2005,7 +2011,7 @@ paths:
       - Transformations
       summary: List transformations
       description: Returns all transformations for the project
-      operationId: list_2
+      operationId: listTransformations
       parameters:
       - name: projectId
         in: path
@@ -2017,7 +2023,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2026,7 +2032,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TransformationResponse'
+                  $ref: "#/components/schemas/TransformationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2035,7 +2041,7 @@ paths:
       - Transformations
       summary: Create transformation
       description: Creates a reusable payload transformation template
-      operationId: create_2
+      operationId: createTransformation
       parameters:
       - name: projectId
         in: path
@@ -2047,12 +2053,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TransformationRequest'
+              $ref: "#/components/schemas/TransformationRequest"
         required: true
       responses:
         "201":
@@ -2060,7 +2066,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TransformationResponse'
+                $ref: "#/components/schemas/TransformationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2082,12 +2088,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TransformPreviewRequest'
+              $ref: "#/components/schemas/TransformPreviewRequest"
         required: true
       responses:
         "200":
@@ -2095,7 +2101,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TransformPreviewResponse'
+                $ref: "#/components/schemas/TransformPreviewResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2118,12 +2124,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeliveryDryRunRequest'
+              $ref: "#/components/schemas/DeliveryDryRunRequest"
         required: true
       responses:
         "200":
@@ -2131,7 +2137,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DeliveryDryRunResponse'
+                $ref: "#/components/schemas/DeliveryDryRunResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2141,7 +2147,7 @@ paths:
       - Test Endpoints
       summary: List test endpoints
       description: Lists all test endpoints for a project
-      operationId: list_3
+      operationId: listTestEndpoints
       parameters:
       - name: projectId
         in: path
@@ -2153,7 +2159,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2162,7 +2168,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TestEndpointResponse'
+                  $ref: "#/components/schemas/TestEndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2171,7 +2177,7 @@ paths:
       - Test Endpoints
       summary: Create a test endpoint
       description: Creates a temporary endpoint to capture webhook requests
-      operationId: create_3
+      operationId: createTestEndpoint
       parameters:
       - name: projectId
         in: path
@@ -2183,19 +2189,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TestEndpointRequest'
+              $ref: "#/components/schemas/TestEndpointRequest"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TestEndpointResponse'
+                $ref: "#/components/schemas/TestEndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2217,7 +2223,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2226,7 +2232,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SubscriptionResponse'
+                  $ref: "#/components/schemas/SubscriptionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2247,12 +2253,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionRequest'
+              $ref: "#/components/schemas/SubscriptionRequest"
         required: true
       responses:
         "201":
@@ -2260,7 +2266,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/SubscriptionResponse'
+                $ref: "#/components/schemas/SubscriptionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2282,7 +2288,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2291,7 +2297,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/EventTypeCatalogResponse'
+                  $ref: "#/components/schemas/EventTypeCatalogResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2312,12 +2318,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventTypeCatalogRequest'
+              $ref: "#/components/schemas/EventTypeCatalogRequest"
         required: true
       responses:
         "201":
@@ -2325,7 +2331,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventTypeCatalogResponse'
+                $ref: "#/components/schemas/EventTypeCatalogResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2353,7 +2359,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2362,7 +2368,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/EventSchemaVersionResponse'
+                  $ref: "#/components/schemas/EventSchemaVersionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2389,12 +2395,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventSchemaVersionRequest'
+              $ref: "#/components/schemas/EventSchemaVersionRequest"
         required: true
       responses:
         "201":
@@ -2402,7 +2408,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventSchemaVersionResponse'
+                $ref: "#/components/schemas/EventSchemaVersionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2437,14 +2443,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventSchemaVersionResponse'
+                $ref: "#/components/schemas/EventSchemaVersionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2478,14 +2484,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventSchemaVersionResponse'
+                $ref: "#/components/schemas/EventSchemaVersionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2495,7 +2501,7 @@ paths:
       - Rules
       summary: List rules
       description: Returns all rules for the project ordered by priority
-      operationId: list_4
+      operationId: listRules
       parameters:
       - name: projectId
         in: path
@@ -2507,7 +2513,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2516,7 +2522,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/RuleResponse'
+                  $ref: "#/components/schemas/RuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2525,7 +2531,7 @@ paths:
       - Rules
       summary: Create rule
       description: Creates a new event processing rule with conditions and actions
-      operationId: create_4
+      operationId: createRule
       parameters:
       - name: projectId
         in: path
@@ -2537,12 +2543,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RuleRequest'
+              $ref: "#/components/schemas/RuleRequest"
         required: true
       responses:
         "201":
@@ -2550,7 +2556,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/RuleResponse'
+                $ref: "#/components/schemas/RuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2560,7 +2566,7 @@ paths:
       - Event Time Machine
       summary: List replay sessions
       description: Returns paginated history of replay sessions for the project
-      operationId: list_5
+      operationId: listReplaySessions
       parameters:
       - name: projectId
         in: path
@@ -2586,14 +2592,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageReplaySessionResponse'
+                $ref: "#/components/schemas/PageReplaySessionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2602,7 +2608,7 @@ paths:
       - Event Time Machine
       summary: Create replay session
       description: Start async replay of events matching the criteria
-      operationId: create_5
+      operationId: createReplaySession
       parameters:
       - name: projectId
         in: path
@@ -2614,12 +2620,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReplayRequest'
+              $ref: "#/components/schemas/ReplayRequest"
         required: true
       responses:
         "201":
@@ -2627,7 +2633,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ReplaySessionResponse'
+                $ref: "#/components/schemas/ReplaySessionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2655,14 +2661,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ReplaySessionResponse'
+                $ref: "#/components/schemas/ReplaySessionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2685,12 +2691,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ReplayRequest'
+              $ref: "#/components/schemas/ReplayRequest"
         required: true
       responses:
         "200":
@@ -2698,7 +2704,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ReplayEstimateResponse'
+                $ref: "#/components/schemas/ReplayEstimateResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2708,7 +2714,7 @@ paths:
       - PII Masking
       summary: List PII masking rules
       description: Returns all masking rules for the project
-      operationId: listRules
+      operationId: listPiiRules
       parameters:
       - name: projectId
         in: path
@@ -2720,7 +2726,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2729,7 +2735,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PiiMaskingRuleResponse'
+                  $ref: "#/components/schemas/PiiMaskingRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2738,7 +2744,7 @@ paths:
       - PII Masking
       summary: Create PII masking rule
       description: Creates a new masking rule for the project
-      operationId: createRule
+      operationId: createPiiRule
       parameters:
       - name: projectId
         in: path
@@ -2750,12 +2756,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PiiMaskingRuleRequest'
+              $ref: "#/components/schemas/PiiMaskingRuleRequest"
         required: true
       responses:
         "201":
@@ -2763,7 +2769,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PiiMaskingRuleResponse'
+                $ref: "#/components/schemas/PiiMaskingRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2785,7 +2791,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Default rules seeded
@@ -2794,7 +2800,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PiiMaskingRuleResponse'
+                  $ref: "#/components/schemas/PiiMaskingRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2816,7 +2822,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2851,19 +2857,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageIncomingSourceResponse'
+                $ref: "#/components/schemas/PageIncomingSourceResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2884,12 +2890,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncomingSourceRequest'
+              $ref: "#/components/schemas/IncomingSourceRequest"
         required: true
       responses:
         "201":
@@ -2897,7 +2903,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingSourceResponse'
+                $ref: "#/components/schemas/IncomingSourceResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2919,19 +2925,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageIncomingDestinationResponse'
+                $ref: "#/components/schemas/PageIncomingDestinationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2952,12 +2958,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncomingDestinationRequest'
+              $ref: "#/components/schemas/IncomingDestinationRequest"
         required: true
       responses:
         "201":
@@ -2965,7 +2971,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingDestinationResponse'
+                $ref: "#/components/schemas/IncomingDestinationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -2987,20 +2993,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Event replayed
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ReplayEventResponse'
+                $ref: "#/components/schemas/ReplayEventResponse"
         "404":
           description: Event not found
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ReplayEventResponse'
+                $ref: "#/components/schemas/ReplayEventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3023,26 +3029,26 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncomingBulkReplayRequest'
+              $ref: "#/components/schemas/IncomingBulkReplayRequest"
         required: true
       responses:
-        "404":
-          description: Source not found
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/IncomingBulkReplayResponse'
         "200":
           description: Bulk replay completed
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingBulkReplayResponse'
+                $ref: "#/components/schemas/IncomingBulkReplayResponse"
+        "404":
+          description: Source not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingBulkReplayResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3051,7 +3057,7 @@ paths:
       tags:
       - Incidents
       summary: List incidents
-      operationId: list_6
+      operationId: listIncidents
       parameters:
       - name: projectId
         in: path
@@ -3083,14 +3089,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageIncidentResponse'
+                $ref: "#/components/schemas/PageIncidentResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3098,7 +3104,7 @@ paths:
       tags:
       - Incidents
       summary: Create incident
-      operationId: create_6
+      operationId: createIncident
       parameters:
       - name: projectId
         in: path
@@ -3110,12 +3116,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IncidentRequest'
+              $ref: "#/components/schemas/IncidentRequest"
         required: true
       responses:
         "201":
@@ -3123,7 +3129,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncidentResponse'
+                $ref: "#/components/schemas/IncidentResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3150,12 +3156,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TimelineEntryRequest'
+              $ref: "#/components/schemas/TimelineEntryRequest"
         required: true
       responses:
         "200":
@@ -3163,7 +3169,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncidentResponse'
+                $ref: "#/components/schemas/IncidentResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3191,7 +3197,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3200,7 +3206,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SharedDebugLinkResponse'
+                  $ref: "#/components/schemas/SharedDebugLinkResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3227,12 +3233,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SharedDebugLinkRequest'
+              $ref: "#/components/schemas/SharedDebugLinkRequest"
         required: true
       responses:
         "201":
@@ -3240,7 +3246,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/SharedDebugLinkResponse'
+                $ref: "#/components/schemas/SharedDebugLinkResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3262,12 +3268,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventIngestRequest'
+              $ref: "#/components/schemas/EventIngestRequest"
         required: true
       responses:
         "201":
@@ -3275,7 +3281,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventResponse'
+                $ref: "#/components/schemas/EventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3297,19 +3303,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageEndpointResponse'
+                $ref: "#/components/schemas/PageEndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3330,12 +3336,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EndpointRequest'
+              $ref: "#/components/schemas/EndpointRequest"
         required: true
       responses:
         "201":
@@ -3343,7 +3349,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3371,14 +3377,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/VerificationResponse'
+                $ref: "#/components/schemas/VerificationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3400,14 +3406,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointTestResponse'
+                $ref: "#/components/schemas/EndpointTestResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3435,19 +3441,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SkipVerificationRequest'
+              $ref: "#/components/schemas/SkipVerificationRequest"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3469,14 +3475,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3504,12 +3510,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MtlsConfigRequest'
+              $ref: "#/components/schemas/MtlsConfigRequest"
         required: true
       responses:
         "200":
@@ -3517,7 +3523,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3544,14 +3550,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EndpointResponse'
+                $ref: "#/components/schemas/EndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3579,14 +3585,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Delivery queued for retry
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DlqActionResponse'
+                $ref: "#/components/schemas/DlqActionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3608,12 +3614,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DlqRetryRequest'
+              $ref: "#/components/schemas/DlqRetryRequest"
         required: true
       responses:
         "200":
@@ -3621,7 +3627,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DlqActionResponse'
+                $ref: "#/components/schemas/DlqActionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3643,19 +3649,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageApiKeyResponse'
+                $ref: "#/components/schemas/PageApiKeyResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3677,12 +3683,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ApiKeyRequest'
+              $ref: "#/components/schemas/ApiKeyRequest"
         required: true
       responses:
         "201":
@@ -3690,7 +3696,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ApiKeyResponse'
+                $ref: "#/components/schemas/ApiKeyResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3699,7 +3705,7 @@ paths:
       tags:
       - Alerts
       summary: List alert rules
-      operationId: listRules_1
+      operationId: listAlertRules
       parameters:
       - name: projectId
         in: path
@@ -3711,7 +3717,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3720,7 +3726,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/AlertRuleResponse'
+                  $ref: "#/components/schemas/AlertRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3728,7 +3734,7 @@ paths:
       tags:
       - Alerts
       summary: Create alert rule
-      operationId: createRule_1
+      operationId: createAlertRule
       parameters:
       - name: projectId
         in: path
@@ -3740,12 +3746,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AlertRuleRequest'
+              $ref: "#/components/schemas/AlertRuleRequest"
         required: true
       responses:
         "201":
@@ -3753,7 +3759,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AlertRuleResponse'
+                $ref: "#/components/schemas/AlertRuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3780,7 +3786,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3804,7 +3810,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3836,7 +3842,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3845,7 +3851,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/MemberResponse'
+                  $ref: "#/components/schemas/MemberResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3866,12 +3872,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddMemberRequest'
+              $ref: "#/components/schemas/AddMemberRequest"
         required: true
       responses:
         "201":
@@ -3879,7 +3885,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/MemberResponse'
+                $ref: "#/components/schemas/MemberResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3906,14 +3912,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Invite accepted
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/MemberResponse'
+                $ref: "#/components/schemas/MemberResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -3936,7 +3942,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/EventIngestRequest'
+              $ref: "#/components/schemas/EventIngestRequest"
         required: true
       responses:
         "201":
@@ -3945,14 +3951,14 @@ paths:
             '*/*':
               schema:
                 type: object
-        "429":
-          description: Rate limit exceeded
+        "401":
+          description: Invalid or missing API key
           content:
             '*/*':
               schema:
                 type: object
-        "401":
-          description: Invalid or missing API key
+        "429":
+          description: Rate limit exceeded
           content:
             '*/*':
               schema:
@@ -3990,7 +3996,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "202":
           description: Replay initiated
@@ -4013,12 +4019,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkReplayRequest'
+              $ref: "#/components/schemas/BulkReplayRequest"
         required: true
       responses:
         "202":
@@ -4026,7 +4032,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/BulkReplayResponse'
+                $ref: "#/components/schemas/BulkReplayResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4072,7 +4078,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4096,12 +4102,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CheckoutRequest'
+              $ref: "#/components/schemas/CheckoutRequest"
         required: true
       responses:
         "200":
@@ -4126,7 +4132,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4161,7 +4167,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
+              $ref: "#/components/schemas/ResetPasswordRequest"
         required: true
       responses:
         "200":
@@ -4182,14 +4188,14 @@ paths:
         schema:
           type: string
       responses:
-        "429":
-          description: Too many requests
-        "400":
-          description: Email already verified
         "200":
           description: Verification email sent
+        "400":
+          description: Email already verified
         "404":
           description: User not found
+        "429":
+          description: Too many requests
   /api/v1/auth/register:
     post:
       tags:
@@ -4201,7 +4207,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
         required: true
       responses:
         "201":
@@ -4209,13 +4215,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
         "400":
           description: Invalid request or email already exists
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/auth/refresh:
     post:
       tags:
@@ -4233,20 +4239,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RefreshTokenRequest'
+              $ref: "#/components/schemas/RefreshTokenRequest"
       responses:
-        "401":
-          description: Invalid or expired refresh token
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
         "200":
           description: Tokens refreshed successfully
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/auth/logout:
     post:
       tags:
@@ -4264,7 +4270,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LogoutRequest'
+              $ref: "#/components/schemas/LogoutRequest"
       responses:
         "204":
           description: Logged out successfully
@@ -4283,7 +4289,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
         required: true
       responses:
         "200":
@@ -4291,13 +4297,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
         "401":
           description: Invalid credentials
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/auth/forgot-password:
     post:
       tags:
@@ -4309,13 +4315,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
+              $ref: "#/components/schemas/ForgotPasswordRequest"
         required: true
       responses:
-        "429":
-          description: Too many requests
         "200":
           description: "If the email exists, a reset link has been sent"
+        "429":
+          description: Too many requests
   /api/v1/auth/device/token:
     post:
       tags:
@@ -4328,33 +4334,33 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeviceTokenRequest'
+              $ref: "#/components/schemas/DeviceTokenRequest"
         required: true
       responses:
-        "410":
-          description: Code expired
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
-        "202":
-          description: Authorization pending
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/AuthResponse'
         "200":
           description: "Authorization granted, tokens returned"
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
+        "202":
+          description: Authorization pending
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
         "403":
           description: Authorization denied
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
+        "410":
+          description: Code expired
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
   /api/v1/auth/device/code:
     post:
       tags:
@@ -4369,7 +4375,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DeviceCodeResponse'
+                $ref: "#/components/schemas/DeviceCodeResponse"
   /api/v1/auth/device/approve:
     post:
       tags:
@@ -4383,20 +4389,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeviceApproveRequest'
+              $ref: "#/components/schemas/DeviceApproveRequest"
         required: true
       responses:
-        "410":
-          description: Code expired
         "200":
           description: Device code approved
         "404":
           description: Code not found or already used
+        "410":
+          description: Code expired
       security:
       - bearerAuth: []
   /api/v1/auth/change-password:
@@ -4411,20 +4417,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChangePasswordRequest'
+              $ref: "#/components/schemas/ChangePasswordRequest"
         required: true
       responses:
-        "401":
-          description: Not authenticated
         "200":
           description: Password changed successfully
         "400":
           description: Current password incorrect or validation failed
+        "401":
+          description: Not authenticated
       security:
       - bearerAuth: []
   /api/v1/admin/encryption/rotate:
@@ -4442,26 +4448,26 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EncryptionRotationResponse'
-        "409":
-          description: Rotation already in progress on another node
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/EncryptionRotationResponse'
+                $ref: "#/components/schemas/EncryptionRotationResponse"
         "207":
           description: Rotation completed but some records failed to re-encrypt —
             see 'errors'
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EncryptionRotationResponse'
+                $ref: "#/components/schemas/EncryptionRotationResponse"
         "403":
           description: Forbidden — requires the platform-admin operator credential
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EncryptionRotationResponse'
+                $ref: "#/components/schemas/EncryptionRotationResponse"
+        "409":
+          description: Rotation already in progress on another node
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EncryptionRotationResponse"
       security:
       - platformAdminToken: []
   /api/v1/projects/{projectId}/workflows/{id}/toggle:
@@ -4469,7 +4475,7 @@ paths:
       tags:
       - Workflows
       summary: Toggle workflow enabled/disabled
-      operationId: toggle
+      operationId: toggleWorkflow
       parameters:
       - name: projectId
         in: path
@@ -4487,7 +4493,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4502,7 +4508,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowResponse'
+                $ref: "#/components/schemas/WorkflowResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4511,7 +4517,7 @@ paths:
       tags:
       - Rules
       summary: Toggle rule enabled/disabled
-      operationId: toggle_1
+      operationId: toggleRule
       parameters:
       - name: projectId
         in: path
@@ -4529,7 +4535,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4544,7 +4550,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/RuleResponse'
+                $ref: "#/components/schemas/RuleResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4572,7 +4578,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Member removed
@@ -4602,12 +4608,12 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChangeMemberRoleRequest'
+              $ref: "#/components/schemas/ChangeMemberRoleRequest"
         required: true
       responses:
         "200":
@@ -4615,7 +4621,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/MemberResponse'
+                $ref: "#/components/schemas/MemberResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4651,14 +4657,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageTunnelRequestLog'
+                $ref: "#/components/schemas/PageTunnelRequestLog"
       security:
       - bearerAuth: []
   /api/v1/tunnels/status:
@@ -4673,7 +4679,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4681,8 +4687,7 @@ paths:
             '*/*':
               schema:
                 type: object
-                additionalProperties:
-                  type: object
+                additionalProperties: {}
       security:
       - bearerAuth: []
   /api/v1/public/debug/{token}:
@@ -4705,7 +4710,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/SharedDebugLinkPublicResponse'
+                $ref: "#/components/schemas/SharedDebugLinkPublicResponse"
   /api/v1/projects/{projectId}/workflows/{id}/executions:
     get:
       tags:
@@ -4743,14 +4748,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageWorkflowExecutionResponse'
+                $ref: "#/components/schemas/PageWorkflowExecutionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4783,14 +4788,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowExecutionResponse'
+                $ref: "#/components/schemas/WorkflowExecutionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4800,7 +4805,7 @@ paths:
       - Usage
       summary: Get usage stats
       description: Returns live usage counts and daily history for the project
-      operationId: getUsage
+      operationId: getProjectUsage
       parameters:
       - name: projectId
         in: path
@@ -4819,14 +4824,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/UsageStatsResponse'
+                $ref: "#/components/schemas/UsageStatsResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4836,7 +4841,7 @@ paths:
       - Test Endpoints
       summary: Get test endpoint
       description: Gets a specific test endpoint by ID
-      operationId: get_2
+      operationId: getTestEndpoint
       parameters:
       - name: projectId
         in: path
@@ -4854,14 +4859,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/TestEndpointResponse'
+                $ref: "#/components/schemas/TestEndpointResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4870,7 +4875,7 @@ paths:
       - Test Endpoints
       summary: Delete test endpoint
       description: Deletes a test endpoint and all captured requests
-      operationId: delete_2
+      operationId: deleteTestEndpoint
       parameters:
       - name: projectId
         in: path
@@ -4888,7 +4893,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4919,19 +4924,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageCapturedRequestResponse'
+                $ref: "#/components/schemas/PageCapturedRequestResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4958,7 +4963,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4995,14 +5000,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventSchemaVersionResponse'
+                $ref: "#/components/schemas/EventSchemaVersionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5030,7 +5035,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5039,7 +5044,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SchemaChangeResponse'
+                  $ref: "#/components/schemas/SchemaChangeResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5061,7 +5066,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5070,7 +5075,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SchemaChangeResponse'
+                  $ref: "#/components/schemas/SchemaChangeResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5080,7 +5085,7 @@ paths:
       - Event Time Machine
       summary: Get replay session
       description: Returns current status and progress of a replay session
-      operationId: get_4
+      operationId: getReplaySession
       parameters:
       - name: projectId
         in: path
@@ -5098,14 +5103,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ReplaySessionResponse'
+                $ref: "#/components/schemas/ReplaySessionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5115,7 +5120,7 @@ paths:
       - Incoming Events
       summary: List incoming events
       description: Returns paginated incoming events for the project
-      operationId: listEvents
+      operationId: listIncomingEvents
       parameters:
       - name: projectId
         in: path
@@ -5134,19 +5139,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Events retrieved
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageIncomingEventResponse'
+                $ref: "#/components/schemas/PageIncomingEventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5156,7 +5161,7 @@ paths:
       - Incoming Events
       summary: Get incoming event
       description: Returns incoming event details by ID
-      operationId: getEvent
+      operationId: getIncomingEvent
       parameters:
       - name: id
         in: path
@@ -5168,20 +5173,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Event retrieved
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingEventResponse'
+                $ref: "#/components/schemas/IncomingEventResponse"
         "404":
           description: Event not found
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/IncomingEventResponse'
+                $ref: "#/components/schemas/IncomingEventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5203,25 +5208,25 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Attempts retrieved
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageIncomingForwardAttemptResponse'
+                $ref: "#/components/schemas/PageIncomingForwardAttemptResponse"
         "404":
           description: Event not found
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageIncomingForwardAttemptResponse'
+                $ref: "#/components/schemas/PageIncomingForwardAttemptResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5242,7 +5247,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5262,7 +5267,7 @@ paths:
       - Events
       summary: List events
       description: Returns paginated event history for the project
-      operationId: listEvents_1
+      operationId: listEvents
       parameters:
       - name: projectId
         in: path
@@ -5279,19 +5284,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageEventResponse'
+                $ref: "#/components/schemas/PageEventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5301,7 +5306,7 @@ paths:
       - Events
       summary: Get event
       description: Returns event details by ID
-      operationId: getEvent_1
+      operationId: getEvent
       parameters:
       - name: projectId
         in: path
@@ -5319,14 +5324,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventResponse'
+                $ref: "#/components/schemas/EventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5354,14 +5359,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventResponse'
+                $ref: "#/components/schemas/EventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5401,14 +5406,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EventDiffResponse'
+                $ref: "#/components/schemas/EventDiffResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5450,14 +5455,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageDlqItemResponse'
+                $ref: "#/components/schemas/PageDlqItemResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5478,14 +5483,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: DLQ purged
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DlqActionResponse'
+                $ref: "#/components/schemas/DlqActionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5513,14 +5518,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DlqItemResponse'
+                $ref: "#/components/schemas/DlqItemResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5542,14 +5547,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DlqStatsResponse'
+                $ref: "#/components/schemas/DlqStatsResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5558,7 +5563,7 @@ paths:
       tags:
       - Alerts
       summary: List alert events (fired alerts)
-      operationId: listEvents_2
+      operationId: listAlertEvents
       parameters:
       - name: projectId
         in: path
@@ -5584,14 +5589,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageAlertEventResponse'
+                $ref: "#/components/schemas/PageAlertEventResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5612,7 +5617,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5638,7 +5643,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5647,7 +5652,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/OrganizationResponse'
+                  $ref: "#/components/schemas/OrganizationResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5672,20 +5677,20 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
-        "403":
-          description: Forbidden — requires OWNER role
-          content:
-            '*/*':
-              schema:
-                $ref: '#/components/schemas/GdprExportDto'
         "200":
           description: Data export as JSON
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/GdprExportDto'
+                $ref: "#/components/schemas/GdprExportDto"
+        "403":
+          description: Forbidden — requires OWNER role
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GdprExportDto"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5707,19 +5712,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageDeliveryResponse'
+                $ref: "#/components/schemas/PageDeliveryResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5741,14 +5746,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DeliveryResponse'
+                $ref: "#/components/schemas/DeliveryResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5770,7 +5775,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5779,7 +5784,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DeliveryAttemptResponse'
+                  $ref: "#/components/schemas/DeliveryAttemptResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5841,19 +5846,19 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/Pageable'
+          $ref: "#/components/schemas/Pageable"
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageDeliveryResponse'
+                $ref: "#/components/schemas/PageDeliveryResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5875,14 +5880,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/DashboardStatsResponse'
+                $ref: "#/components/schemas/DashboardStatsResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5904,14 +5909,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/OnboardingStatusResponse'
+                $ref: "#/components/schemas/OnboardingStatusResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5940,14 +5945,14 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/AnalyticsResponse'
+                $ref: "#/components/schemas/AnalyticsResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -5957,20 +5962,20 @@ paths:
       - Billing
       summary: Get detailed usage
       description: Returns current resource usage vs plan limits for all quota types
-      operationId: getUsage_1
+      operationId: getBillingUsage
       parameters:
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/UsageResponse'
+                $ref: "#/components/schemas/UsageResponse"
       security:
       - bearerAuth: []
   /api/v1/billing/plans:
@@ -5988,7 +5993,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/PlanResponse'
+                  $ref: "#/components/schemas/PlanResponse"
       security:
       - bearerAuth: []
   /api/v1/billing/invoices:
@@ -6004,7 +6009,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -6013,7 +6018,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/InvoiceResponse'
+                  $ref: "#/components/schemas/InvoiceResponse"
       security:
       - bearerAuth: []
   /api/v1/auth/me:
@@ -6028,33 +6033,36 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: User info returned
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/CurrentUserResponse'
+                $ref: "#/components/schemas/CurrentUserResponse"
         "401":
           description: Not authenticated
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/CurrentUserResponse'
+                $ref: "#/components/schemas/CurrentUserResponse"
       security:
       - bearerAuth: []
   /api/v1/audit-log:
     get:
       tags:
       - audit-log-controller
-      operationId: list_7
+      summary: List audit log entries
+      description: "Returns the organization's audit log, newest first, filterable\
+        \ by action and actor"
+      operationId: listAuditLog
       parameters:
       - name: auth
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       - name: page
         in: query
         required: false
@@ -6100,7 +6108,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/PageAuditLogResponse'
+                $ref: "#/components/schemas/PageAuditLogResponse"
   /api/v1/audit-log/export:
     get:
       tags:
@@ -6111,7 +6119,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       - name: action
         in: query
         required: false
@@ -6154,13 +6162,13 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EncryptionStatusResponse'
+                $ref: "#/components/schemas/EncryptionStatusResponse"
         "403":
           description: Forbidden — requires the platform-admin operator credential
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/EncryptionStatusResponse'
+                $ref: "#/components/schemas/EncryptionStatusResponse"
       security:
       - platformAdminToken: []
   /api/v1/tunnels/{sessionId}:
@@ -6181,7 +6189,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -6211,7 +6219,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Link deleted
@@ -6242,7 +6250,7 @@ paths:
         in: query
         required: true
         schema:
-          $ref: '#/components/schemas/AuthContext'
+          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: API key revoked
@@ -6267,24 +6275,24 @@ components:
         challenge:
           type: string
     ProjectRequest:
-      required:
-      - name
       type: object
       properties:
         name:
+          type: string
           maxLength: 100
           minLength: 2
-          type: string
         description:
+          type: string
           maxLength: 500
           minLength: 0
-          type: string
         schemaValidationEnabled:
           type: boolean
         schemaValidationPolicy:
           type: string
         idempotencyPolicy:
           type: string
+      required:
+      - name
     AuthContext:
       type: object
       properties:
@@ -6334,30 +6342,28 @@ components:
           type: string
           format: date-time
     WorkflowRequest:
-      required:
-      - name
       type: object
       properties:
         name:
+          type: string
           maxLength: 255
           minLength: 0
-          type: string
         description:
+          type: string
           maxLength: 2000
           minLength: 0
-          type: string
         enabled:
           type: boolean
-        definition:
-          type: object
+        definition: {}
         triggerType:
           type: string
           enum:
           - WEBHOOK_EVENT
           - MANUAL
           - SCHEDULE
-        triggerConfig:
-          type: object
+        triggerConfig: {}
+      required:
+      - name
     WorkflowResponse:
       type: object
       properties:
@@ -6373,16 +6379,14 @@ components:
           type: string
         enabled:
           type: boolean
-        definition:
-          type: object
+        definition: {}
         triggerType:
           type: string
           enum:
           - WEBHOOK_EVENT
           - MANUAL
           - SCHEDULE
-        triggerConfig:
-          type: object
+        triggerConfig: {}
         version:
           type: integer
           format: int32
@@ -6402,34 +6406,36 @@ components:
           type: integer
           format: int64
     TransformationRequest:
-      required:
-      - name
-      - template
       type: object
+      description: Request to create or update a transformation
       properties:
         name:
-          maxLength: 255
-          minLength: 0
           type: string
           description: Human-readable name for the transformation
           example: Stripe v2 → CRM v1
-        description:
-          maxLength: 4096
+          maxLength: 255
           minLength: 0
+        description:
           type: string
           description: Description of what this transformation does
           example: Normalizes Stripe payment events to CRM format
-        template:
-          maxLength: 65536
+          maxLength: 4096
           minLength: 0
+        template:
           type: string
           description: "JSON template with ${$.jsonpath} expressions for field mapping"
-          example: "{\"event_type\":\"${$.type}\",\"amount\":\"${$.data.amount}\"}"
+          example:
+            event_type: "${$.type}"
+            amount: "${$.data.amount}"
+          maxLength: 65536
+          minLength: 0
         enabled:
           type: boolean
           description: Whether this transformation is active
           example: true
-      description: Request to create or update a transformation
+      required:
+      - name
+      - template
     TransformationResponse:
       type: object
       properties:
@@ -6463,31 +6469,29 @@ components:
           type: string
           format: date-time
     SubscriptionRequest:
-      required:
-      - endpointId
-      - eventType
       type: object
       properties:
         endpointId:
           type: string
           format: uuid
         eventType:
-          pattern: "^(\\*{1,2}|[a-z][a-z0-9_]*)(\\.([a-z][a-z0-9_]*|\\*{1,2}))*$"
           type: string
+          minLength: 1
+          pattern: "^(\\*{1,2}|[a-z][a-z0-9_]*)(\\.([a-z][a-z0-9_]*|\\*{1,2}))*$"
         enabled:
           type: boolean
         orderingEnabled:
           type: boolean
         maxAttempts:
+          type: integer
+          format: int32
           maximum: 20
           minimum: 1
+        timeoutSeconds:
           type: integer
           format: int32
-        timeoutSeconds:
           maximum: 60
           minimum: 1
-          type: integer
-          format: int32
         retryDelays:
           type: string
         payloadTemplate:
@@ -6497,6 +6501,9 @@ components:
         transformationId:
           type: string
           format: uuid
+      required:
+      - endpointId
+      - eventType
     SubscriptionResponse:
       type: object
       properties:
@@ -6539,15 +6546,16 @@ components:
           type: string
           format: date-time
     EventTypeCatalogRequest:
-      required:
-      - name
       type: object
       properties:
         name:
-          pattern: "^[a-z][a-z0-9_.]*$"
           type: string
+          minLength: 1
+          pattern: "^[a-z][a-z0-9_.]*$"
         description:
           type: string
+      required:
+      - name
     EventTypeCatalogResponse:
       type: object
       properties:
@@ -6575,18 +6583,16 @@ components:
           type: string
           format: date-time
     ConditionNode:
-      required:
-      - type
-      type: object
+      discriminator:
+        propertyName: type
       properties:
         type:
           type: string
-      discriminator:
-        propertyName: type
+      required:
+      - type
     Group:
-      type: object
       allOf:
-      - $ref: '#/components/schemas/ConditionNode'
+      - $ref: "#/components/schemas/ConditionNode"
       - type: object
         properties:
           op:
@@ -6598,11 +6604,12 @@ components:
           children:
             type: array
             items:
-              $ref: '#/components/schemas/ConditionNode'
+              oneOf:
+              - $ref: "#/components/schemas/Group"
+              - $ref: "#/components/schemas/Predicate"
     Predicate:
-      type: object
       allOf:
-      - $ref: '#/components/schemas/ConditionNode'
+      - $ref: "#/components/schemas/ConditionNode"
       - type: object
         properties:
           field:
@@ -6628,8 +6635,7 @@ components:
             - NOT_EXISTS
             - IS_NULL
             - NOT_NULL
-          value:
-            type: object
+          value: {}
           valueType:
             type: string
             enum:
@@ -6642,8 +6648,6 @@ components:
           caseInsensitive:
             type: boolean
     RuleActionRequest:
-      required:
-      - type
       type: object
       properties:
         type:
@@ -6659,20 +6663,19 @@ components:
         transformationId:
           type: string
           format: uuid
-        config:
-          type: object
+        config: {}
         sortOrder:
           type: integer
           format: int32
-    RuleRequest:
       required:
-      - name
+      - type
+    RuleRequest:
       type: object
       properties:
         name:
+          type: string
           maxLength: 255
           minLength: 0
-          type: string
         description:
           type: string
         enabled:
@@ -6684,12 +6687,14 @@ components:
           type: string
         conditions:
           oneOf:
-          - $ref: '#/components/schemas/Group'
-          - $ref: '#/components/schemas/Predicate'
+          - $ref: "#/components/schemas/Group"
+          - $ref: "#/components/schemas/Predicate"
         actions:
           type: array
           items:
-            $ref: '#/components/schemas/RuleActionRequest'
+            $ref: "#/components/schemas/RuleActionRequest"
+      required:
+      - name
     RuleActionResponse:
       type: object
       properties:
@@ -6713,8 +6718,7 @@ components:
           format: uuid
         transformationName:
           type: string
-        config:
-          type: object
+        config: {}
         sortOrder:
           type: integer
           format: int32
@@ -6743,12 +6747,12 @@ components:
           type: string
         conditions:
           oneOf:
-          - $ref: '#/components/schemas/Group'
-          - $ref: '#/components/schemas/Predicate'
+          - $ref: "#/components/schemas/Group"
+          - $ref: "#/components/schemas/Predicate"
         actions:
           type: array
           items:
-            $ref: '#/components/schemas/RuleActionResponse'
+            $ref: "#/components/schemas/RuleActionResponse"
         totalExecutions:
           type: integer
           format: int64
@@ -6762,19 +6766,16 @@ components:
           type: string
           format: date-time
     PiiMaskingRuleRequest:
-      required:
-      - maskStyle
-      - patternName
       type: object
       properties:
         patternName:
+          type: string
           maxLength: 100
           minLength: 0
-          type: string
         jsonPath:
+          type: string
           maxLength: 500
           minLength: 0
-          type: string
         maskStyle:
           type: string
           enum:
@@ -6783,6 +6784,9 @@ components:
           - HASH
         enabled:
           type: boolean
+      required:
+      - maskStyle
+      - patternName
     PiiMaskingRuleResponse:
       type: object
       properties:
@@ -6816,14 +6820,15 @@ components:
           type: string
           format: date-time
     IncomingDestinationRequest:
-      required:
-      - url
       type: object
+      description: Request to create or update a forwarding destination
       properties:
         url:
           type: string
           description: Destination URL to forward webhooks to
           example: https://api.example.com/webhooks
+          minLength: 1
+          pattern: ""
         authType:
           type: string
           description: Authentication type for the destination
@@ -6833,48 +6838,50 @@ components:
           - BEARER
           - CUSTOM_HEADER
         authConfig:
-          maxLength: 4096
-          minLength: 0
           type: string
           description: "JSON auth config (encrypted at rest). Keys depend on authType:\
             \ BEARER={token}, BASIC={username,password}, CUSTOM_HEADER={headerName,headerValue}"
+          maxLength: 4096
+          minLength: 0
         customHeadersJson:
           type: string
           description: Custom HTTP headers as JSON object
-          example: "{\"X-Custom\":\"value\"}"
+          example:
+            X-Custom: value
         enabled:
           type: boolean
           description: Whether the destination is active
           example: true
         maxAttempts:
           type: integer
-          description: Maximum delivery attempts before moving to DLQ
           format: int32
+          description: Maximum delivery attempts before moving to DLQ
           example: 5
         timeoutSeconds:
           type: integer
-          description: HTTP request timeout in seconds
           format: int32
+          description: HTTP request timeout in seconds
           example: 30
         retryDelays:
-          maxLength: 255
-          minLength: 0
           type: string
           description: Comma-separated retry delays in seconds
           example: "60,300,900,3600,21600"
-        payloadTransform:
-          maxLength: 4096
+          maxLength: 255
           minLength: 0
+        payloadTransform:
           type: string
           description: JSONPath expression to transform payload before forwarding
             (null = forward as-is)
           example: $.data
+          maxLength: 4096
+          minLength: 0
         transformationId:
           type: string
+          format: uuid
           description: ID of a reusable transformation template to apply (overrides
             payloadTransform if set)
-          format: uuid
-      description: Request to create or update a forwarding destination
+      required:
+      - url
     IncomingDestinationResponse:
       type: object
       properties:
@@ -6921,27 +6928,25 @@ components:
           type: string
           format: date-time
     IncomingSourceRequest:
-      required:
-      - name
       type: object
+      description: Request to create or update an incoming webhook source
       properties:
         name:
-          maxLength: 255
-          minLength: 0
           type: string
           description: Display name for the source
           example: GitHub Webhooks
-        slug:
-          maxLength: 64
+          maxLength: 255
           minLength: 0
-          pattern: "^[a-z0-9][a-z0-9-]*$"
+        slug:
           type: string
           description: URL-friendly slug (auto-generated if omitted)
           example: github-webhooks
+          maxLength: 64
+          minLength: 0
+          pattern: "^[a-z0-9][a-z0-9-]*$"
         providerType:
           type: string
           description: Provider type
-          example: GITHUB
           enum:
           - GENERIC
           - GITHUB
@@ -6951,6 +6956,7 @@ components:
           - SLACK
           - TWILIO
           - CUSTOM
+          example: GITHUB
         status:
           type: string
           description: Source status
@@ -6969,23 +6975,24 @@ components:
           description: "HMAC secret for signature verification (write-only, never\
             \ returned)"
         hmacHeaderName:
-          maxLength: 255
-          minLength: 0
           type: string
           description: HTTP header name containing the signature
           example: X-Hub-Signature-256
-        hmacSignaturePrefix:
-          maxLength: 50
+          maxLength: 255
           minLength: 0
+        hmacSignaturePrefix:
           type: string
           description: Prefix before the signature value
           example: sha256=
+          maxLength: 50
+          minLength: 0
         rateLimitPerSecond:
           type: integer
-          description: Rate limit per second for ingress endpoint (null = unlimited)
           format: int32
+          description: Rate limit per second for ingress endpoint (null = unlimited)
           example: 100
-      description: Request to create or update an incoming webhook source
+      required:
+      - name
     IncomingSourceResponse:
       type: object
       properties:
@@ -7096,7 +7103,7 @@ components:
         timeline:
           type: array
           items:
-            $ref: '#/components/schemas/TimelineEntry'
+            $ref: "#/components/schemas/TimelineEntry"
     TimelineEntry:
       type: object
       properties:
@@ -7119,27 +7126,29 @@ components:
           type: string
           format: date-time
     EndpointRequest:
-      required:
-      - url
       type: object
       properties:
         url:
           type: string
+          minLength: 1
+          pattern: ""
         description:
+          type: string
           maxLength: 500
           minLength: 0
-          type: string
         secret:
           type: string
         enabled:
           type: boolean
         rateLimitPerSecond:
-          maximum: 10000
-          minimum: 1
           type: integer
           format: int32
+          maximum: 10000
+          minimum: 1
         allowedSourceIps:
           type: string
+      required:
+      - url
     EndpointResponse:
       type: object
       properties:
@@ -7181,14 +7190,11 @@ components:
         secret:
           type: string
     AlertRuleRequest:
-      required:
-      - alertType
-      - name
-      - thresholdValue
       type: object
       properties:
         name:
           type: string
+          minLength: 1
         description:
           type: string
         alertType:
@@ -7214,9 +7220,11 @@ components:
         thresholdValue:
           type: number
           format: double
+          minimum: 0
         windowMinutes:
           type: integer
           format: int32
+          minimum: 0
         endpointId:
           type: string
           format: uuid
@@ -7231,6 +7239,10 @@ components:
           type: string
         emailRecipients:
           type: string
+      required:
+      - alertType
+      - name
+      - thresholdValue
     AlertRuleResponse:
       type: object
       properties:
@@ -7291,14 +7303,14 @@ components:
           type: string
           format: date-time
     UpdateOrganizationRequest:
-      required:
-      - name
       type: object
       properties:
         name:
+          type: string
           maxLength: 100
           minLength: 2
-          type: string
+      required:
+      - name
     OrganizationResponse:
       type: object
       properties:
@@ -7315,8 +7327,8 @@ components:
       properties:
         billingEmail:
           type: string
-    JsonNode:
-      type: object
+          format: email
+    JsonNode: {}
     OrganizationBillingResponse:
       type: object
       properties:
@@ -7324,7 +7336,7 @@ components:
           type: string
           format: uuid
         plan:
-          $ref: '#/components/schemas/PlanResponse'
+          $ref: "#/components/schemas/PlanResponse"
         billingStatus:
           type: string
           enum:
@@ -7336,7 +7348,7 @@ components:
         billingEmail:
           type: string
         usage:
-          $ref: '#/components/schemas/UsageSnapshot'
+          $ref: "#/components/schemas/UsageSnapshot"
     PlanResponse:
       type: object
       properties:
@@ -7369,7 +7381,7 @@ components:
           type: integer
           format: int32
         features:
-          $ref: '#/components/schemas/JsonNode'
+          $ref: "#/components/schemas/JsonNode"
         priceMonthlyCents:
           type: integer
           format: int32
@@ -7392,19 +7404,20 @@ components:
           type: integer
           format: int64
     ChangePlanRequest:
-      required:
-      - planName
       type: object
       properties:
         planName:
           type: string
+          minLength: 1
+      required:
+      - planName
     UpdateProfileRequest:
       type: object
       properties:
         fullName:
+          type: string
           maxLength: 255
           minLength: 0
-          type: string
     UserResponse:
       type: object
       properties:
@@ -7423,6 +7436,7 @@ components:
           - DISABLED
     IngressResponse:
       type: object
+      description: Response from incoming webhook ingress endpoint
       properties:
         status:
           type: string
@@ -7440,7 +7454,6 @@ components:
           type: string
           description: Human-readable message
           example: Webhook accepted for processing
-      description: Response from incoming webhook ingress endpoint
     TunnelCreateResponse:
       type: object
       properties:
@@ -7483,10 +7496,8 @@ components:
           - SUCCESS
           - FAILED
           - SKIPPED
-        inputData:
-          type: object
-        outputData:
-          type: object
+        inputData: {}
+        outputData: {}
         errorMessage:
           type: string
         attemptCount:
@@ -7520,8 +7531,7 @@ components:
           - COMPLETED
           - FAILED
           - CANCELLED
-        triggerData:
-          type: object
+        triggerData: {}
         startedAt:
           type: string
           format: date-time
@@ -7536,14 +7546,13 @@ components:
         steps:
           type: array
           items:
-            $ref: '#/components/schemas/StepExecutionResponse'
+            $ref: "#/components/schemas/StepExecutionResponse"
     TransformPreviewRequest:
-      required:
-      - inputPayload
       type: object
       properties:
         inputPayload:
           type: string
+          minLength: 1
         transformExpression:
           type: string
         template:
@@ -7553,6 +7562,8 @@ components:
           format: uuid
         customHeaders:
           type: string
+      required:
+      - inputPayload
     TransformPreviewResponse:
       type: object
       properties:
@@ -7567,37 +7578,44 @@ components:
           items:
             type: string
     DeliveryDryRunRequest:
-      required:
-      - payload
       type: object
+      description: "Request to dry-run a delivery: shows what the endpoint would receive\
+        \ without actually sending"
       properties:
         payload:
           type: string
           description: The event payload JSON to transform
-          example: "{\"type\":\"order.created\",\"data\":{\"amount\":100}}"
+          example:
+            type: order.created
+            data:
+              amount: 100
+          minLength: 1
         transformationId:
           type: string
-          description: ID of a saved Transformation to apply (highest priority)
           format: uuid
+          description: ID of a saved Transformation to apply (highest priority)
         payloadTemplate:
           type: string
           description: "Inline JSON template with ${$.path} expressions"
         customHeaders:
           type: string
           description: Custom headers JSON to merge
-          example: "{\"X-Custom\":\"value\"}"
+          example:
+            X-Custom: value
         endpointId:
           type: string
-          description: Endpoint ID to use for HMAC signature computation
           format: uuid
+          description: Endpoint ID to use for HMAC signature computation
         eventType:
           type: string
           description: Event type for X-Event-Type header
           example: order.created
-      description: "Request to dry-run a delivery: shows what the endpoint would receive\
-        \ without actually sending"
+      required:
+      - payload
     DeliveryDryRunResponse:
       type: object
+      description: "Dry-run delivery result: shows exactly what the endpoint would\
+        \ receive"
       properties:
         transformedPayload:
           type: string
@@ -7606,7 +7624,6 @@ components:
           type: object
           additionalProperties:
             type: string
-            description: HTTP headers that would be sent with the request
           description: HTTP headers that would be sent with the request
         signature:
           type: string
@@ -7622,16 +7639,13 @@ components:
           description: Any errors or warnings encountered during the dry-run
           items:
             type: string
-            description: Any errors or warnings encountered during the dry-run
         transformationName:
           type: string
           description: Name of the transformation applied (if any)
         transformationVersion:
           type: integer
-          description: Version of the transformation applied (if any)
           format: int32
-      description: "Dry-run delivery result: shows exactly what the endpoint would\
-        \ receive"
+          description: Version of the transformation applied (if any)
     TestEndpointRequest:
       type: object
       properties:
@@ -7667,16 +7681,17 @@ components:
           type: integer
           format: int32
     EventSchemaVersionRequest:
-      required:
-      - schemaJson
       type: object
       properties:
         schemaJson:
           type: string
+          minLength: 1
         compatibilityMode:
           type: string
         description:
           type: string
+      required:
+      - schemaJson
     EventSchemaVersionResponse:
       type: object
       properties:
@@ -7706,9 +7721,6 @@ components:
           type: string
           format: date-time
     ReplayRequest:
-      required:
-      - fromDate
-      - toDate
       type: object
       properties:
         fromDate:
@@ -7730,6 +7742,9 @@ components:
           - SUCCESS
           - FAILED
           - DLQ
+      required:
+      - fromDate
+      - toDate
     ReplaySessionResponse:
       type: object
       properties:
@@ -7819,6 +7834,7 @@ components:
           type: string
     ReplayEventResponse:
       type: object
+      description: Response after replaying an incoming event
       properties:
         status:
           type: string
@@ -7826,32 +7842,30 @@ components:
           example: replayed
         eventId:
           type: string
-          description: ID of the replayed event
           format: uuid
+          description: ID of the replayed event
         destinationsCount:
           type: integer
-          description: Number of destinations the event was forwarded to
           format: int32
+          description: Number of destinations the event was forwarded to
           example: 3
-      description: Response after replaying an incoming event
     IncomingBulkReplayRequest:
-      required:
-      - sourceId
       type: object
+      description: Request for bulk replay of incoming events
       properties:
         sourceId:
           type: string
-          description: Filter by source ID (required)
           format: uuid
+          description: Filter by source ID (required)
           example: 550e8400-e29b-41d4-a716-446655440000
         from:
           type: string
-          description: "Filter: only events received after this timestamp (inclusive)"
           format: date-time
+          description: "Filter: only events received after this timestamp (inclusive)"
         to:
           type: string
-          description: "Filter: only events received before this timestamp (exclusive)"
           format: date-time
+          description: "Filter: only events received before this timestamp (exclusive)"
         verified:
           type: boolean
           description: Filter by verification status (null = all)
@@ -7861,17 +7875,17 @@ components:
             filters)
           items:
             type: string
-            description: Explicit list of event IDs to replay (overrides time range
-              filters)
             format: uuid
         maxEvents:
           type: integer
-          description: Maximum number of events to replay (safety limit)
           format: int32
+          description: Maximum number of events to replay (safety limit)
           example: 1000
-      description: Request for bulk replay of incoming events
+      required:
+      - sourceId
     IncomingBulkReplayResponse:
       type: object
+      description: Response for bulk replay of incoming events
       properties:
         status:
           type: string
@@ -7879,21 +7893,17 @@ components:
           example: bulk_replayed
         sourceId:
           type: string
-          description: Source ID the events belong to
           format: uuid
+          description: Source ID the events belong to
         eventsReplayed:
           type: integer
-          description: Number of events replayed
           format: int32
+          description: Number of events replayed
         totalForwardAttempts:
           type: integer
-          description: Total forward attempts created across all events
           format: int32
-      description: Response for bulk replay of incoming events
+          description: Total forward attempts created across all events
     TimelineEntryRequest:
-      required:
-      - entryType
-      - title
       type: object
       properties:
         entryType:
@@ -7906,6 +7916,7 @@ components:
           - STATUS_CHANGE
         title:
           type: string
+          minLength: 1
         detail:
           type: string
         deliveryId:
@@ -7914,14 +7925,17 @@ components:
         endpointId:
           type: string
           format: uuid
+      required:
+      - entryType
+      - title
     SharedDebugLinkRequest:
       type: object
       properties:
         expiryHours:
-          maximum: 168
-          minimum: 1
           type: integer
           format: int32
+          maximum: 168
+          minimum: 1
     SharedDebugLinkResponse:
       type: object
       properties:
@@ -7948,18 +7962,18 @@ components:
           type: integer
           format: int32
     EventIngestRequest:
-      required:
-      - data
-      - type
       type: object
       properties:
         type:
+          type: string
           maxLength: 255
           minLength: 0
           pattern: "^[a-z][a-z0-9_.]*$"
-          type: string
         data:
-          $ref: '#/components/schemas/JsonNode'
+          $ref: "#/components/schemas/JsonNode"
+      required:
+      - data
+      - type
     EventResponse:
       type: object
       properties:
@@ -8011,17 +8025,19 @@ components:
         reason:
           type: string
     MtlsConfigRequest:
-      required:
-      - clientCert
-      - clientKey
       type: object
       properties:
         clientCert:
           type: string
+          minLength: 1
         clientKey:
           type: string
+          minLength: 1
         caCert:
           type: string
+      required:
+      - clientCert
+      - clientKey
     DlqActionResponse:
       type: object
       properties:
@@ -8035,8 +8051,6 @@ components:
           type: integer
           format: int32
     DlqRetryRequest:
-      required:
-      - deliveryIds
       type: object
       properties:
         deliveryIds:
@@ -8044,15 +8058,16 @@ components:
           items:
             type: string
             format: uuid
-    ApiKeyRequest:
+          minItems: 1
       required:
-      - name
+      - deliveryIds
+    ApiKeyRequest:
       type: object
       properties:
         name:
+          type: string
           maxLength: 100
           minLength: 2
-          type: string
         scope:
           type: string
           enum:
@@ -8061,6 +8076,8 @@ components:
         expiresAt:
           type: string
           format: date-time
+      required:
+      - name
     ApiKeyResponse:
       type: object
       properties:
@@ -8091,13 +8108,12 @@ components:
         key:
           type: string
     AddMemberRequest:
-      required:
-      - email
-      - role
       type: object
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         role:
           type: string
           enum:
@@ -8105,6 +8121,9 @@ components:
           - DEVELOPER
           - VIEWER
           - API_KEY
+      required:
+      - email
+      - role
     MemberResponse:
       type: object
       properties:
@@ -8133,12 +8152,12 @@ components:
       type: object
       properties:
         deliveryIds:
-          maxItems: 1000
-          minItems: 0
           type: array
           items:
             type: string
             format: uuid
+          maxItems: 1000
+          minItems: 0
         status:
           type: string
           enum:
@@ -8154,9 +8173,9 @@ components:
           type: string
           format: uuid
         limit:
-          maximum: 5000
           type: integer
           format: int32
+          maximum: 5000
     BulkReplayResponse:
       type: object
       properties:
@@ -8177,59 +8196,65 @@ components:
         message:
           type: string
     CheckoutRequest:
-      required:
-      - cancelUrl
-      - planName
-      - successUrl
       type: object
       properties:
         planName:
           type: string
+          minLength: 1
         successUrl:
           type: string
+          minLength: 1
         cancelUrl:
           type: string
+          minLength: 1
         providerCode:
           type: string
         billingInterval:
           type: string
-    ResetPasswordRequest:
       required:
-      - newPassword
-      - token
+      - cancelUrl
+      - planName
+      - successUrl
+    ResetPasswordRequest:
       type: object
       properties:
         token:
           type: string
+          minLength: 1
         newPassword:
+          type: string
           maxLength: 128
           minLength: 8
           pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&\\-_#^()+=])[A-Za-z\\\
             d@$!%*?&\\-_#^()+=]{8,}$"
-          type: string
-    RegisterRequest:
       required:
-      - email
-      - organizationName
-      - password
+      - newPassword
+      - token
+    RegisterRequest:
       type: object
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         password:
+          type: string
           maxLength: 128
           minLength: 8
           pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&\\-_#^()+=])[A-Za-z\\\
             d@$!%*?&\\-_#^()+=]{8,}$"
-          type: string
         fullName:
+          type: string
           maxLength: 255
           minLength: 0
-          type: string
         organizationName:
+          type: string
           maxLength: 100
           minLength: 2
-          type: string
+      required:
+      - email
+      - organizationName
+      - password
     AuthResponse:
       type: object
       properties:
@@ -8240,41 +8265,48 @@ components:
         emailVerified:
           type: boolean
     RefreshTokenRequest:
-      required:
-      - refreshToken
       type: object
       properties:
         refreshToken:
           type: string
+          minLength: 1
+      required:
+      - refreshToken
     LogoutRequest:
       type: object
       properties:
         refreshToken:
           type: string
     LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          minLength: 1
       required:
       - email
       - password
+    ForgotPasswordRequest:
       type: object
       properties:
         email:
           type: string
-        password:
-          type: string
-    ForgotPasswordRequest:
+          format: email
+          minLength: 1
       required:
       - email
-      type: object
-      properties:
-        email:
-          type: string
     DeviceTokenRequest:
-      required:
-      - deviceCode
       type: object
       properties:
         deviceCode:
           type: string
+          minLength: 1
+      required:
+      - deviceCode
     DeviceCodeResponse:
       type: object
       properties:
@@ -8294,26 +8326,28 @@ components:
           type: string
           format: date-time
     DeviceApproveRequest:
-      required:
-      - userCode
       type: object
       properties:
         userCode:
           type: string
-    ChangePasswordRequest:
+          minLength: 1
       required:
-      - currentPassword
-      - newPassword
+      - userCode
+    ChangePasswordRequest:
       type: object
       properties:
         currentPassword:
           type: string
+          minLength: 1
         newPassword:
+          type: string
           maxLength: 128
           minLength: 8
           pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&\\-_#^()+=])[A-Za-z\\\
             d@$!%*?&\\-_#^()+=]{8,}$"
-          type: string
+      required:
+      - currentPassword
+      - newPassword
     EncryptionRotationResponse:
       type: object
       properties:
@@ -8335,8 +8369,6 @@ components:
           type: integer
           format: int32
     ChangeMemberRoleRequest:
-      required:
-      - role
       type: object
       properties:
         role:
@@ -8346,6 +8378,8 @@ components:
           - DEVELOPER
           - VIEWER
           - API_KEY
+      required:
+      - role
     TunnelSessionResponse:
       type: object
       properties:
@@ -8394,20 +8428,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/TunnelRequestLog'
+            $ref: "#/components/schemas/TunnelRequestLog"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8420,6 +8454,10 @@ components:
     PageableObject:
       type: object
       properties:
+        unpaged:
+          type: boolean
+        paged:
+          type: boolean
         pageNumber:
           type: integer
           format: int32
@@ -8430,19 +8468,15 @@ components:
           type: integer
           format: int64
         sort:
-          $ref: '#/components/schemas/SortObject'
-        paged:
-          type: boolean
-        unpaged:
-          type: boolean
+          $ref: "#/components/schemas/SortObject"
     SortObject:
       type: object
       properties:
+        unsorted:
+          type: boolean
         sorted:
           type: boolean
         empty:
-          type: boolean
-        unsorted:
           type: boolean
     TunnelRequestLog:
       type: object
@@ -8515,20 +8549,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/WorkflowExecutionResponse'
+            $ref: "#/components/schemas/WorkflowExecutionResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8610,22 +8644,22 @@ components:
       type: object
       properties:
         current:
-          $ref: '#/components/schemas/LiveUsage'
+          $ref: "#/components/schemas/LiveUsage"
         history:
           type: array
           items:
-            $ref: '#/components/schemas/DailyUsage'
+            $ref: "#/components/schemas/DailyUsage"
     Pageable:
       type: object
       properties:
         page:
+          type: integer
+          format: int32
           minimum: 0
-          type: integer
-          format: int32
         size:
-          minimum: 1
           type: integer
           format: int32
+          minimum: 1
         sort:
           type: array
           items:
@@ -8665,20 +8699,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/CapturedRequestResponse'
+            $ref: "#/components/schemas/CapturedRequestResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8727,20 +8761,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/ReplaySessionResponse'
+            $ref: "#/components/schemas/ReplaySessionResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8759,20 +8793,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/IncomingSourceResponse'
+            $ref: "#/components/schemas/IncomingSourceResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8791,20 +8825,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/IncomingDestinationResponse'
+            $ref: "#/components/schemas/IncomingDestinationResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8861,20 +8895,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/IncomingEventResponse'
+            $ref: "#/components/schemas/IncomingEventResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8939,20 +8973,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/IncomingForwardAttemptResponse'
+            $ref: "#/components/schemas/IncomingForwardAttemptResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -8971,20 +9005,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/IncidentResponse'
+            $ref: "#/components/schemas/IncidentResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9003,20 +9037,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/EventResponse'
+            $ref: "#/components/schemas/EventResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9037,10 +9071,8 @@ components:
           - ADDED
           - REMOVED
           - CHANGED
-        leftValue:
-          type: object
-        rightValue:
-          type: object
+        leftValue: {}
+        rightValue: {}
     EventDiffResponse:
       type: object
       properties:
@@ -9065,7 +9097,7 @@ components:
         diffs:
           type: array
           items:
-            $ref: '#/components/schemas/DiffEntry'
+            $ref: "#/components/schemas/DiffEntry"
     PageEndpointResponse:
       type: object
       properties:
@@ -9075,20 +9107,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/EndpointResponse'
+            $ref: "#/components/schemas/EndpointResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9140,20 +9172,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/DlqItemResponse'
+            $ref: "#/components/schemas/DlqItemResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9184,20 +9216,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/ApiKeyResponse'
+            $ref: "#/components/schemas/ApiKeyResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9252,20 +9284,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/AlertEventResponse'
+            $ref: "#/components/schemas/AlertEventResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9342,19 +9374,19 @@ components:
           type: string
           format: date-time
         organization:
-          $ref: '#/components/schemas/OrganizationData'
+          $ref: "#/components/schemas/OrganizationData"
         members:
           type: array
           items:
-            $ref: '#/components/schemas/MemberData'
+            $ref: "#/components/schemas/MemberData"
         projects:
           type: array
           items:
-            $ref: '#/components/schemas/ProjectData'
+            $ref: "#/components/schemas/ProjectData"
         auditLogs:
           type: array
           items:
-            $ref: '#/components/schemas/AuditLogData'
+            $ref: "#/components/schemas/AuditLogData"
     IncomingDestinationData:
       type: object
       properties:
@@ -9398,7 +9430,7 @@ components:
         destinations:
           type: array
           items:
-            $ref: '#/components/schemas/IncomingDestinationData'
+            $ref: "#/components/schemas/IncomingDestinationData"
     MemberData:
       type: object
       properties:
@@ -9449,19 +9481,19 @@ components:
         endpoints:
           type: array
           items:
-            $ref: '#/components/schemas/EndpointData'
+            $ref: "#/components/schemas/EndpointData"
         subscriptions:
           type: array
           items:
-            $ref: '#/components/schemas/SubscriptionData'
+            $ref: "#/components/schemas/SubscriptionData"
         incomingSources:
           type: array
           items:
-            $ref: '#/components/schemas/IncomingSourceData'
+            $ref: "#/components/schemas/IncomingSourceData"
         apiKeys:
           type: array
           items:
-            $ref: '#/components/schemas/ApiKeyData'
+            $ref: "#/components/schemas/ApiKeyData"
     SubscriptionData:
       type: object
       properties:
@@ -9533,20 +9565,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/DeliveryResponse'
+            $ref: "#/components/schemas/DeliveryResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9591,15 +9623,15 @@ components:
       type: object
       properties:
         deliveryStats:
-          $ref: '#/components/schemas/DeliveryStats'
+          $ref: "#/components/schemas/DeliveryStats"
         recentEvents:
           type: array
           items:
-            $ref: '#/components/schemas/RecentEventSummary'
+            $ref: "#/components/schemas/RecentEventSummary"
         endpointHealth:
           type: array
           items:
-            $ref: '#/components/schemas/EndpointHealthSummary'
+            $ref: "#/components/schemas/EndpointHealthSummary"
     DeliveryStats:
       type: object
       properties:
@@ -9672,27 +9704,27 @@ components:
       type: object
       properties:
         timeRange:
-          $ref: '#/components/schemas/TimeRange'
+          $ref: "#/components/schemas/TimeRange"
         overview:
-          $ref: '#/components/schemas/OverviewMetrics'
+          $ref: "#/components/schemas/OverviewMetrics"
         deliveryTimeSeries:
           type: array
           items:
-            $ref: '#/components/schemas/TimeSeriesPoint'
+            $ref: "#/components/schemas/TimeSeriesPoint"
         latencyTimeSeries:
           type: array
           items:
-            $ref: '#/components/schemas/TimeSeriesPoint'
+            $ref: "#/components/schemas/TimeSeriesPoint"
         eventTypeBreakdown:
           type: array
           items:
-            $ref: '#/components/schemas/EventTypeBreakdown'
+            $ref: "#/components/schemas/EventTypeBreakdown"
         endpointPerformance:
           type: array
           items:
-            $ref: '#/components/schemas/EndpointPerformance'
+            $ref: "#/components/schemas/EndpointPerformance"
         latencyPercentiles:
-          $ref: '#/components/schemas/LatencyPercentiles'
+          $ref: "#/components/schemas/LatencyPercentiles"
     EndpointPerformance:
       type: object
       properties:
@@ -9840,13 +9872,13 @@ components:
       type: object
       properties:
         events:
-          $ref: '#/components/schemas/ResourceUsage'
+          $ref: "#/components/schemas/ResourceUsage"
         endpoints:
-          $ref: '#/components/schemas/ResourceUsage'
+          $ref: "#/components/schemas/ResourceUsage"
         projects:
-          $ref: '#/components/schemas/ResourceUsage'
+          $ref: "#/components/schemas/ResourceUsage"
         members:
-          $ref: '#/components/schemas/ResourceUsage'
+          $ref: "#/components/schemas/ResourceUsage"
         rateLimitPerSecond:
           type: integer
           format: int32
@@ -9888,9 +9920,9 @@ components:
       type: object
       properties:
         user:
-          $ref: '#/components/schemas/UserResponse'
+          $ref: "#/components/schemas/UserResponse"
         organization:
-          $ref: '#/components/schemas/OrganizationResponse'
+          $ref: "#/components/schemas/OrganizationResponse"
         role:
           type: string
           enum:
@@ -9942,20 +9974,20 @@ components:
         totalElements:
           type: integer
           format: int64
-        pageable:
-          $ref: '#/components/schemas/PageableObject'
         size:
           type: integer
           format: int32
         content:
           type: array
           items:
-            $ref: '#/components/schemas/AuditLogResponse'
+            $ref: "#/components/schemas/AuditLogResponse"
         number:
           type: integer
           format: int32
         sort:
-          $ref: '#/components/schemas/SortObject'
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
         numberOfElements:
           type: integer
           format: int32
@@ -9972,11 +10004,11 @@ components:
           type: integer
           format: int32
         availableVersions:
-          uniqueItems: true
           type: array
           items:
             type: integer
             format: int32
+          uniqueItems: true
   securitySchemes:
     bearerAuth:
       type: http

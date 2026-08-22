@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.dto.AuditLogResponse;
 import com.webhook.platform.api.security.AuthContext;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +37,8 @@ public class AuditLogController {
         this.userRepository = userRepository;
     }
 
+    @Operation(operationId = "listAuditLog", summary = "List audit log entries",
+            description = "Returns the organization's audit log, newest first, filterable by action and actor")
     @GetMapping
     public ResponseEntity<Page<AuditLogResponse>> list(
             AuthContext auth,

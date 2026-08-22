@@ -131,4 +131,34 @@ class RetryGovernorTest {
         int batch = gov.computeEffectiveBatch(-1);
         assertEquals(100, batch);
     }
+
+    @Test
+    void getRecommendedPollIntervalMs_atProductionDefault_reproducesTheHistoricalLadder() {
+        // The multipliers replaced hardcoded 30s/10s/5s/2s constants. At the production
+        // default (retry.scheduler.poll-interval-ms = 10000) they must land on exactly
+        // those numbers, so making the setting effective did not quietly retune a
+        // default deployment's polling behaviour.
+        RetryGovernor gov = new RetryGovernor("test", 100, 5, 10, 5000, 6, meterRegistry);
+        long base = 10_000;
+
+        assertEquals(10_000, gov.getRecommendedPollIntervalMs(-1, base), "unknown depth");
+        assertEquals(30_000, gov.getRecommendedPollIntervalMs(0, base), "empty queue");
+        assertEquals(10_000, gov.getRecommendedPollIntervalMs(50, base), "light load");
+        assertEquals(5_000, gov.getRecommendedPollIntervalMs(500, base), "medium load");
+        assertEquals(2_000, gov.getRecommendedPollIntervalMs(5000, base), "heavy backlog");
+    }
+
+    @Test
+    void getRecommendedPollIntervalMs_scalesWithTheConfiguredInterval() {
+        // Regression test for the setting being dead: the old implementation returned the
+        // same constants no matter what was configured, so the first poll silently
+        // discarded retry.scheduler.poll-interval-ms and every later poll ignored it too.
+        RetryGovernor gov = new RetryGovernor("test", 100, 5, 10, 5000, 6, meterRegistry);
+        long base = 500;
+
+        assertEquals(1_500, gov.getRecommendedPollIntervalMs(0, base), "empty queue");
+        assertEquals(500, gov.getRecommendedPollIntervalMs(50, base), "light load");
+        assertEquals(250, gov.getRecommendedPollIntervalMs(500, base), "medium load");
+        assertEquals(100, gov.getRecommendedPollIntervalMs(5000, base), "heavy backlog");
+    }
 }

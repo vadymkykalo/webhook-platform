@@ -14,6 +14,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import com.webhook.platform.common.constants.KafkaTopics;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -66,6 +67,22 @@ public class WebhookDeliveryService {
     private final Counter deliveryFailureCounter;
     private final Counter deliveryErrorCounter;
     private final Counter orderingGapTimeoutCounter;
+    /**
+     * How long a delivery blocked behind an outstanding sequence waits before it is
+     * re-polled. This is the fallback path only: the fast path is
+     * {@link #triggerBufferedDeliveries}, which republishes buffered deliveries the
+     * moment the sequence ahead of them completes. The fallback still matters when a
+     * delivery reaches the buffer *after* the trigger for its predecessor already
+     * fired — the chain is broken at that point and nothing but this poll restarts it.
+     *
+     * <p>Configurable rather than hardcoded because it sets the floor on how long an
+     * out-of-order burst takes to drain, which is a deployment-shaped trade-off (a
+     * shorter delay drains faster and polls the DB more often) and, concretely, was
+     * what made {@code DeliveryEndToEndIntegrationTest}'s ordering scenario take ~30s
+     * of its 60s Awaitility budget on a developer machine — a margin thin enough that
+     * the slower CI runner tipped it over into a timeout.
+     */
+    private final int orderingBufferRescheduleDelaySeconds;
     private final Counter transformFailedCounter;
     private final Timer deliveryLatency2xx;
     private final Timer deliveryLatency4xx;
@@ -95,7 +112,8 @@ public class WebhookDeliveryService {
             PayloadTransformService payloadTransformService,
             TransactionTemplate transactionTemplate,
             TransformationCacheService transformationCacheService,
-            ConnectionProvider webhookConnectionProvider) {
+            ConnectionProvider webhookConnectionProvider,
+            @Value("${ordering.buffer-reschedule-delay-seconds:5}") int orderingBufferRescheduleDelaySeconds) {
         this.deliveryRepository = deliveryRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
@@ -130,6 +148,7 @@ public class WebhookDeliveryService {
         this.deliveryErrorCounter = Counter.builder("webhook_delivery_attempts_total")
                 .tag("result", "error").tag("status_class", "none")
                 .register(meterRegistry);
+        this.orderingBufferRescheduleDelaySeconds = orderingBufferRescheduleDelaySeconds;
         this.orderingGapTimeoutCounter = Counter.builder("webhook_ordering_gap_timeout_total")
                 .register(meterRegistry);
         this.transformFailedCounter = Counter.builder("transform_failed_total")
@@ -181,6 +200,7 @@ public class WebhookDeliveryService {
             }
             long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
             delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+            delivery.setClaimToken(null);
             delivery.setNextRetryAt(Instant.now().plusSeconds(delaySec));
             delivery.setUpdatedAt(Instant.now());
             deliveryRepository.save(delivery);
@@ -206,7 +226,8 @@ public class WebhookDeliveryService {
         } else {
             // Atomic claim + read in single transaction (UPDATE ... RETURNING *)
             delivery = transactionTemplate
-                    .execute(tx -> deliveryRepository.claimForProcessingAndReturn(message.getDeliveryId()));
+                    .execute(tx -> deliveryRepository.claimForProcessingAndReturn(
+                            message.getDeliveryId(), UUID.randomUUID()));
             if (delivery == null) {
                 log.debug("Delivery {} already claimed or not PENDING, skipping", message.getDeliveryId());
                 return;
@@ -452,6 +473,31 @@ public class WebhookDeliveryService {
         return deliveryLatency5xx;
     }
 
+    /**
+     * True when {@code fresh} is still the same claim {@code claimed} was read under.
+     *
+     * <p>Every finalizer below re-reads the row before writing, and guarding that re-read on
+     * {@code status == PROCESSING} alone is not enough: a claim can be swept away as abandoned
+     * by {@link StuckDeliveryRecoveryService} and the row reclaimed by a different attempt, at
+     * which point it is PROCESSING again — for somebody else. A late response belonging to the
+     * abandoned attempt would then finalize a row it no longer owns, and the attempt that
+     * actually holds the claim never reaches the endpoint. Comparing the fencing token stamped
+     * at claim time closes that window (V055__delivery_claim_token.sql).
+     *
+     * <p>Nulls decide the rolling-deploy case. A row still carrying no token was claimed by
+     * an instance running the pre-V055 code, and refusing to finalize it would strand every
+     * in-flight delivery of the older instances until the stuck sweep caught up — so an
+     * untokened row read by an attempt that also holds no token is accepted, which is exactly
+     * the status-only behaviour that preceded this. What must be rejected is the mismatch: a
+     * row that now carries a token the attempt does not hold has been reclaimed by somebody
+     * else, whether or not this attempt ever had one.
+     */
+    private boolean stillHoldsClaim(Delivery fresh, Delivery claimed) {
+        UUID currentToken = fresh.getClaimToken();
+        UUID heldToken = claimed.getClaimToken();
+        return currentToken == null ? heldToken == null : currentToken.equals(heldToken);
+    }
+
     private void scheduleRetry(Delivery delivery) {
         // Use transactionTemplate.execute to return whether DLQ was triggered
         Delivery dlqDelivery = transactionTemplate.execute(tx -> {
@@ -470,6 +516,11 @@ public class WebhookDeliveryService {
                         "— already reached a terminal state via another path", fresh.getId(), fresh.getStatus());
                 return null;
             }
+            if (!stillHoldsClaim(fresh, delivery)) {
+                log.warn("Delivery {} was reclaimed by another attempt, skipping retry scheduling "
+                        + "for the attempt this call belongs to", fresh.getId());
+                return null;
+            }
 
             if (fresh.getAttemptCount() >= fresh.getMaxAttempts()) {
                 log.warn("Max attempts reached for delivery {}, moving to DLQ", fresh.getId());
@@ -480,6 +531,7 @@ public class WebhookDeliveryService {
                 return fresh;
             } else {
                 fresh.setStatus(Delivery.DeliveryStatus.PENDING);
+                fresh.setClaimToken(null);
                 fresh.setNextRetryAt(RetryPolicy.calculateNextRetry(fresh.getAttemptCount(), fresh.getRetryDelays()));
                 log.info("Scheduled retry {} for delivery {} at {}",
                         fresh.getAttemptCount(), fresh.getId(), fresh.getNextRetryAt());
@@ -536,6 +588,7 @@ public class WebhookDeliveryService {
                 return;
             }
             fresh.setStatus(Delivery.DeliveryStatus.PENDING);
+            fresh.setClaimToken(null);
             fresh.setNextRetryAt(nextRetryAt);
             fresh.setUpdatedAt(Instant.now());
             deliveryRepository.save(fresh);
@@ -556,6 +609,11 @@ public class WebhookDeliveryService {
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping success marking",
                         fresh.getId(), fresh.getStatus());
+                return;
+            }
+            if (!stillHoldsClaim(fresh, delivery)) {
+                log.warn("Delivery {} was reclaimed by another attempt, skipping success marking "
+                        + "for this attempt's late response", fresh.getId());
                 return;
             }
             fresh.setStatus(Delivery.DeliveryStatus.SUCCESS);
@@ -640,9 +698,26 @@ public class WebhookDeliveryService {
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
         delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-        delivery.setNextRetryAt(Instant.now().plusSeconds(5));
+        delivery.setNextRetryAt(Instant.now().plusSeconds(orderingBufferRescheduleDelaySeconds));
+        // Parking the delivery hands the row back to the retry ladder, so the claim this
+        // attempt held is over — clear the token rather than leave a stale one that a later
+        // writer could still match.
+        delivery.setClaimToken(null);
         delivery.setUpdatedAt(Instant.now());
-        deliveryRepository.save(delivery);
+        try {
+            deliveryRepository.save(delivery);
+        } catch (OptimisticLockingFailureException e) {
+            // Someone else advanced this row while we were deciding to park it. Their
+            // view is the newer one, and the Redis buffer entry above is already in
+            // place, so the delivery is not lost — it comes back through the buffer
+            // trigger or the retry poll. Swallowing this is deliberate: letting it
+            // propagate fails the consumer task, and BoundedAsyncExecutor then does not
+            // ack, which stalls the whole partition until a restart or rebalance. A lost
+            // race on a row we are about to hand back is not worth a stalled partition.
+            log.warn("Delivery {} (seq={}) was updated concurrently while being buffered; "
+                            + "leaving the other writer's state in place",
+                    delivery.getId(), sequenceNumber);
+        }
 
         return false;
     }
@@ -691,6 +766,11 @@ public class WebhookDeliveryService {
             if (fresh.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
                 log.debug("Delivery {} no longer PROCESSING (status={}), skipping failure marking",
                         fresh.getId(), fresh.getStatus());
+                return;
+            }
+            if (!stillHoldsClaim(fresh, delivery)) {
+                log.warn("Delivery {} was reclaimed by another attempt, skipping failure marking "
+                        + "for this attempt", fresh.getId());
                 return;
             }
             fresh.setStatus(Delivery.DeliveryStatus.FAILED);

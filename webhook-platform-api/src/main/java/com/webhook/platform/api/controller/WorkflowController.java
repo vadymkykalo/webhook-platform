@@ -33,7 +33,7 @@ public class WorkflowController {
 
     private final WorkflowService workflowService;
 
-    @Operation(summary = "Create workflow")
+    @Operation(operationId = "createWorkflow", summary = "Create workflow")
     @ApiResponse(responseCode = "201", description = "Workflow created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
@@ -48,7 +48,7 @@ public class WorkflowController {
                 .body(workflowService.create(projectId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Get workflow")
+    @Operation(operationId = "getWorkflow", summary = "Get workflow")
     @GetMapping("/{id}")
     public ResponseEntity<WorkflowResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -58,7 +58,7 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.get(id, auth.organizationId()));
     }
 
-    @Operation(summary = "List workflows")
+    @Operation(operationId = "listWorkflows", summary = "List workflows")
     @GetMapping
     public ResponseEntity<List<WorkflowResponse>> list(
             @PathVariable("projectId") UUID projectId,
@@ -67,7 +67,7 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.list(projectId, auth.organizationId()));
     }
 
-    @Operation(summary = "Update workflow")
+    @Operation(operationId = "updateWorkflow", summary = "Update workflow")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
     @PutMapping("/{id}")
@@ -81,7 +81,7 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.update(id, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Delete workflow")
+    @Operation(operationId = "deleteWorkflow", summary = "Delete workflow")
     @ApiResponse(responseCode = "204", description = "Workflow deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @DeleteMapping("/{id}")
@@ -95,7 +95,7 @@ public class WorkflowController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Toggle workflow enabled/disabled")
+    @Operation(operationId = "toggleWorkflow", summary = "Toggle workflow enabled/disabled")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<WorkflowResponse> toggle(

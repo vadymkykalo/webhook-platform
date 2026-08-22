@@ -58,6 +58,19 @@ public class Delivery {
     @Column(name = "ordering_first_buffered_at")
     private Instant orderingFirstBufferedAt;
 
+    /**
+     * Fencing token stamped by whichever claim moved this delivery to PROCESSING.
+     *
+     * <p>Guarding a finalizer on {@code status == PROCESSING} alone cannot tell the claim
+     * it is finishing apart from a newer claim on the same row: an attempt whose worker
+     * looked dead can be swept back to PENDING, reclaimed by a different attempt, and then
+     * have its own late response arrive and finalize a row it no longer owns. Comparing
+     * this token against the one the attempt started under closes that window. Null while
+     * the delivery is unclaimed.
+     */
+    @Column(name = "claim_token")
+    private UUID claimToken;
+
     @Builder.Default
     @Column(name = "timeout_seconds")
     private Integer timeoutSeconds = 30;

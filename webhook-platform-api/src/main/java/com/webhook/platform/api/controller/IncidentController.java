@@ -31,7 +31,7 @@ public class IncidentController {
 
     private final IncidentService incidentService;
 
-    @Operation(summary = "List incidents")
+    @Operation(operationId = "listIncidents", summary = "List incidents")
     @GetMapping
     public ResponseEntity<Page<IncidentResponse>> list(
             @PathVariable("projectId") UUID projectId,
@@ -43,7 +43,7 @@ public class IncidentController {
         return ResponseEntity.ok(incidentService.listIncidents(projectId, auth.organizationId(), openOnly, page, size));
     }
 
-    @Operation(summary = "Get incident with timeline")
+    @Operation(operationId = "getIncident", summary = "Get incident with timeline")
     @GetMapping("/{incidentId}")
     public ResponseEntity<IncidentResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -53,7 +53,7 @@ public class IncidentController {
         return ResponseEntity.ok(incidentService.getIncident(projectId, incidentId, auth.organizationId()));
     }
 
-    @Operation(summary = "Create incident")
+    @Operation(operationId = "createIncident", summary = "Create incident")
     @ApiResponse(responseCode = "201", description = "Incident created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PostMapping
@@ -67,7 +67,7 @@ public class IncidentController {
                 .body(incidentService.createIncident(projectId, request, auth.organizationId()));
     }
 
-    @Operation(summary = "Update incident (status, RCA notes, severity)")
+    @Operation(operationId = "updateIncident", summary = "Update incident (status, RCA notes, severity)")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @PutMapping("/{incidentId}")
     public ResponseEntity<IncidentResponse> update(

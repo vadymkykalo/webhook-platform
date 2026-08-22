@@ -440,96 +440,12 @@ jobs:
           echo "Static analysis completed. Check workflow logs for findings." >> $GITHUB_STEP_SUMMARY
           echo "_Advisory only — see comment in ci.yml for why this doesn't gate yet._" >> $GITHUB_STEP_SUMMARY
 
-  security-sca:
-    name: SCA (OWASP Dependency-Check)
-    runs-on: ubuntu-latest
-    needs: backend-build
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
-
-      # Persist OWASP's local NVD mirror across runs. Without this, every run
-      # starts from an empty database and dependency-check backfills the
-      # entire NVD history (380k+ CVEs, ~500MB) before it can analyze
-      # anything — a one-time cost that's unavoidable on a cold cache, but
-      # with the cache warm each run only fetches the incremental delta.
-      # Keyed by week so the mirror still refreshes regularly rather than
-      # going stale forever.
-      - name: Compute cache week key
-        id: dc-cache-week
-        run: echo "week=$(date +%G-%V)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache OWASP Dependency-Check NVD data
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository/org/owasp/dependency-check-data
-          key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
-          restore-keys: |
-            dependency-check-data-
-
-      # Gates on CVSS >= 9 (CRITICAL) first, staged the same way as Trivy below:
-      # widen to HIGH (CVSS >= 7) once the CRITICAL backlog is clear. Known
-      # false positives go in the reviewed suppression file, not a blanket
-      # continue-on-error.
-      #
-      # -DknownExploitedEnabled=false: the CISA KEV datafeed
-      # (cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json)
-      # returned 403 from this task's build environment (a cloud/datacenter
-      # egress IP) — bot-protection on that .gov host blocks non-browser
-      # clients, not something we control, and this is a commonly reported
-      # issue from CI/cloud IPs generally. Without disabling it, the whole scan
-      # hard-fails on a feed download error before any CVE analysis runs, which
-      # is a false-red build, not a real finding. If GitHub-hosted runners turn
-      # out to reach that host fine, re-enabling this is a one-line revert.
-      # NVD itself (services.nvd.nist.gov) was reachable without this flag.
-      #
-      # NVD_API_KEY: repo secret `NVD_API_KEY` (https://nvd.nist.gov/developers/request-an-api-key)
-      # is set. Without it, unauthenticated NVD requests are rate-limited hard
-      # enough that this step reliably fails.
-      #
-      # Plugin pinned at 12.1.0, not the 9.0.9 originally used: 9.0.9's HTTP
-      # client got a straight-up Cloudflare "Attention Required" block page
-      # (403, WAF-level) hitting services.nvd.nist.gov, reproduced locally
-      # with -X debug logging — the exact same URL + API key via plain curl
-      # returned 200. Not a key or rate-limit problem, a client-fingerprint
-      # one. 12.1.0's HTTP stack isn't blocked; confirmed locally by letting
-      # it run past the point 9.0.9 instantly 403'd and watching it actually
-      # pull ~500MB of real NVD data. That failure is intentionally NOT
-      # swallowed by continue-on-error: a security gate that can't fetch fresh
-      # vulnerability data should go red, not silently pass.
-      - name: Run OWASP Dependency-Check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: >
-          mvn org.owasp:dependency-check-maven:12.1.0:aggregate -B -DskipTests
-          -DfailBuildOnCVSS=9
-          -DknownExploitedEnabled=false
-          -DnvdApiKey="${NVD_API_KEY}"
-          -DdataDirectory="$HOME/.m2/repository/org/owasp/dependency-check-data"
-          -DsuppressionFiles=.github/dependency-check-suppressions.xml
-
-      - name: Upload Dependency-Check report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: target/dependency-check-report.html
-          retention-days: 14
-      
-      - name: SCA Summary
-        if: always()
-        run: |
-          echo "### SCA (OWASP Dependency-Check) Results" >> $GITHUB_STEP_SUMMARY
-          echo "Dependency vulnerability scan completed. Report uploaded as artifact." >> $GITHUB_STEP_SUMMARY
-          echo "Gates on CVSS >= 9 (see comment above the scan step for the staged rollout plan)." >> $GITHUB_STEP_SUMMARY
+  # OWASP Dependency-Check (SCA) is not here: it lives in
+  # .github/workflows/security-sca.yml, on a nightly schedule plus release/hotfix
+  # branches. It cost 6-104 minutes per run depending on NVD cache state and its
+  # input (the NVD feed) does not change with the diff. Pull requests keep
+  # dependency-CVE coverage through `container-scan` below, which scans the same
+  # Maven artifacts inside the built images. See that workflow's header comment.
 
   docker-build:
     name: Docker Images
@@ -635,17 +551,28 @@ jobs:
       # The committed openapi.yaml (repo root) is the source evaluators and
       # docs.hookflow.dev's Redoc renderer read - it must never silently drift from
       # what the running API actually serves. Springdoc generates it live from the
-      # 33 @RestController classes, so this is a real drift check, not a rebuild of
+      # 35 @RestController classes, so this is a real drift check, not a rebuild of
       # a hand-maintained file.
+      #
+      # Compared semantically (scripts/check-openapi-drift.py parses both sides)
+      # rather than with `diff -u`. A byte-for-byte diff over 246 KB of generated
+      # YAML also fires on the serializer's quoting style and on key ordering,
+      # neither of which is an API change - that produced a red build a
+      # regenerate-and-commit "fixed" without anything having actually changed,
+      # which trains people to regenerate on red instead of reading the diff.
+      # operationIds are compared like any other value: they are stable by
+      # construction (OperationIdNamingConfig#deterministicOperationIds, guarded by
+      # OpenApiOperationIdTest), so a change in one is a real API change.
       - name: Export OpenAPI spec and check for drift
         run: |
+          # PyYAML ships on the GitHub-hosted images, so this normally does nothing. The
+          # fallback covers a runner image without it: a plain `pip install` into the
+          # system interpreter is refused on Ubuntu 24.04+ (PEP 668), hence
+          # --break-system-packages, which is safe on a throwaway runner.
+          python3 -c 'import yaml' 2>/dev/null \
+            || python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pyyaml
           curl -sf http://localhost:8080/v3/api-docs.yaml -o /tmp/openapi-live.yaml
-          echo "--- diff against committed openapi.yaml ---"
-          if ! diff -u openapi.yaml /tmp/openapi-live.yaml; then
-            echo "::error::openapi.yaml is stale. Regenerate it: curl -s http://localhost:8080/v3/api-docs.yaml -o openapi.yaml (with SWAGGER_ENABLED=true) and commit the result."
-            exit 1
-          fi
-          echo "openapi.yaml matches the live spec."
+          scripts/check-openapi-drift.py openapi.yaml /tmp/openapi-live.yaml
 
       - name: Upload generated OpenAPI spec
         uses: actions/upload-artifact@v4
