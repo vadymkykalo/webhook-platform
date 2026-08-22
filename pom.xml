@@ -36,7 +36,7 @@
           on 4.x: that is a much larger migration (module restructuring,
           Spring Security 7) and needs its own reviewed change.
         -->
-        <spring-boot.version>3.5.16</spring-boot.version>
+        <spring-boot.version>4.1.0</spring-boot.version>
         <lombok.version>1.18.30</lombok.version>
         <!--
           Overrides the versions spring-boot-dependencies pins for netty and
