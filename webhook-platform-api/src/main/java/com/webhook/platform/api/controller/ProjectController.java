@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.ProjectRequest;
 import com.webhook.platform.api.dto.ProjectResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.ProjectService;
 import com.webhook.platform.api.service.billing.QuotaType;
@@ -37,7 +39,8 @@ public class ProjectController {
     @ApiResponse(responseCode = "201", description = "Project created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireQuota(QuotaType.PROJECTS)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<ProjectResponse> createProject(
             @Valid @RequestBody ProjectRequest request,
             AuthContext auth) {
@@ -64,7 +67,8 @@ public class ProjectController {
 
     @Operation(summary = "Update project", description = "Updates project details")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/{projectId}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{projectId}")
     public ResponseEntity<ProjectResponse> updateProject(
             @PathVariable("projectId") UUID id,
             @Valid @RequestBody ProjectRequest request,
@@ -77,7 +81,8 @@ public class ProjectController {
     @Operation(summary = "Delete project", description = "Deletes a project and all associated resources")
     @ApiResponse(responseCode = "204", description = "Project deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{projectId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{projectId}")
     public ResponseEntity<Void> deleteProject(
             @PathVariable("projectId") UUID id,
             AuthContext auth) {

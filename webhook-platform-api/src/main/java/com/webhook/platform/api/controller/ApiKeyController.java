@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.ApiKeyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,7 +40,8 @@ public class ApiKeyController {
     @Operation(summary = "Create API key", description = "Generates a new API key for event ingestion. The key is shown only once.")
     @ApiResponse(responseCode = "201", description = "API key created")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<ApiKeyResponse> createApiKey(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody ApiKeyRequest request,
@@ -64,7 +67,8 @@ public class ApiKeyController {
     @Operation(summary = "Revoke API key", description = "Permanently revokes an API key")
     @ApiResponse(responseCode = "204", description = "API key revoked")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{apiKeyId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{apiKeyId}")
     public ResponseEntity<Void> revokeApiKey(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("apiKeyId") UUID apiKeyId,

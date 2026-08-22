@@ -7,7 +7,9 @@ import com.webhook.platform.api.dto.IncomingEventResponse;
 import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.dto.ReplayEventResponse;
 import jakarta.validation.Valid;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.IncomingEventService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -87,7 +89,8 @@ public class IncomingEventController {
             @ApiResponse(responseCode = "404", description = "Event not found")
     })
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{id}/replay")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{id}/replay")
     public ResponseEntity<ReplayEventResponse> replayEvent(
             @PathVariable("id") UUID id,
             AuthContext auth) {
@@ -108,7 +111,8 @@ public class IncomingEventController {
             @ApiResponse(responseCode = "404", description = "Source not found")
     })
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/bulk-replay")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/bulk-replay")
     public ResponseEntity<IncomingBulkReplayResponse> bulkReplay(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody IncomingBulkReplayRequest request,

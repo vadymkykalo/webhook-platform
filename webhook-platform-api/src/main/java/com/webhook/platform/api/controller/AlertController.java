@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.AlertEventResponse;
 import com.webhook.platform.api.dto.AlertRuleRequest;
 import com.webhook.platform.api.dto.AlertRuleResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.AlertService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,7 +48,8 @@ public class AlertController {
     @Operation(operationId = "createAlertRule", summary = "Create alert rule")
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/rules")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/rules")
     public ResponseEntity<AlertRuleResponse> createRule(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody AlertRuleRequest request,
@@ -59,7 +62,8 @@ public class AlertController {
 
     @Operation(operationId = "updateAlertRule", summary = "Update alert rule")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/rules/{ruleId}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/rules/{ruleId}")
     public ResponseEntity<AlertRuleResponse> updateRule(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("ruleId") UUID ruleId,
@@ -73,7 +77,8 @@ public class AlertController {
     @Operation(operationId = "deleteAlertRule", summary = "Delete alert rule")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/rules/{ruleId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/rules/{ruleId}")
     public ResponseEntity<Void> deleteRule(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("ruleId") UUID ruleId,
@@ -109,7 +114,8 @@ public class AlertController {
 
     @Operation(summary = "Resolve a single alert event")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/events/{eventId}/resolve")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/events/{eventId}/resolve")
     public ResponseEntity<Void> resolveEvent(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventId") UUID eventId,
@@ -122,7 +128,8 @@ public class AlertController {
 
     @Operation(summary = "Resolve all unresolved alert events")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/events/resolve-all")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/events/resolve-all")
     public ResponseEntity<Map<String, Integer>> resolveAll(
             @PathVariable("projectId") UUID projectId,
             AuthContext auth) {

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A handler now says who may call it.** `@RequireAccess(AccessLevel)` declares the level a
+  state-changing handler requires and `ScopeEnforcementInterceptor` enforces it before the
+  handler runs, for JWT and API-key callers alike. 79 handlers carry it (72 `WRITE`,
+  7 `OWNER`), derived from the imperative `auth.requireWriteAccess()` /
+  `requireOwnerAccess()` calls they already made — which stay, as defence in depth.
+
+  The level is `READ | WRITE | OWNER` rather than a minimum `MembershipRole`, because the
+  roles are not a line: `OWNER`, `DEVELOPER` and `VIEWER` order naturally but `API_KEY` sits
+  outside that order entirely, and a minimum-role annotation would have had to invent a
+  position for it.
+
+  Three handlers once shipped reachable by a `VIEWER` JWT and a `READ_ONLY` API key — one
+  returned a real HMAC signature computed with an Endpoint's signing secret — because the
+  guard was a call somebody had not written and nothing said it was missing.
+  `MutatingHandlerAccessDeclarationTest` now fails the build on a new handler that declares
+  nothing, and `AccessLevelEnforcementTest` drives the interceptor directly so a ratchet over
+  annotations cannot pass while the thing reading them is unregistered or reordered. See
+  ADR-0006.
+
 ### Removed
 - The worker's `IncomingSource` entity and `IncomingSourceRepository`. Neither was injected
   anywhere in the worker — the Forward path resolves a Destination directly and never loads

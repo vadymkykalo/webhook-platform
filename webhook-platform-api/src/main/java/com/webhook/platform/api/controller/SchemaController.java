@@ -2,7 +2,9 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.*;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.SchemaRegistryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,7 +44,8 @@ public class SchemaController {
     @Operation(summary = "Create event type", description = "Registers a new event type in the catalog")
     @ApiResponse(responseCode = "201", description = "Event type created")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<EventTypeCatalogResponse> createEventType(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody EventTypeCatalogRequest request,
@@ -63,7 +66,8 @@ public class SchemaController {
 
     @Operation(summary = "Update event type", description = "Updates event type description")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PutMapping("/{eventTypeId}")
+    @RequireAccess(AccessLevel.WRITE)
+@PutMapping("/{eventTypeId}")
     public ResponseEntity<EventTypeCatalogResponse> updateEventType(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
@@ -76,7 +80,8 @@ public class SchemaController {
     @Operation(summary = "Delete event type", description = "Deletes event type and all its schema versions")
     @ApiResponse(responseCode = "204", description = "Event type deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/{eventTypeId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{eventTypeId}")
     public ResponseEntity<Void> deleteEventType(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
@@ -100,7 +105,8 @@ public class SchemaController {
     @Operation(summary = "Create schema version", description = "Uploads a new JSON Schema version (created as DRAFT)")
     @ApiResponse(responseCode = "201", description = "Schema version created")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{eventTypeId}/versions")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{eventTypeId}/versions")
     public ResponseEntity<EventSchemaVersionResponse> createVersion(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
@@ -123,7 +129,8 @@ public class SchemaController {
 
     @Operation(summary = "Promote schema to ACTIVE", description = "Promotes a DRAFT schema to ACTIVE, deprecating the previous active version")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{eventTypeId}/versions/{versionId}/promote")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{eventTypeId}/versions/{versionId}/promote")
     public ResponseEntity<EventSchemaVersionResponse> promoteVersion(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,
@@ -135,7 +142,8 @@ public class SchemaController {
 
     @Operation(summary = "Deprecate schema version", description = "Sets schema version status to DEPRECATED")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/{eventTypeId}/versions/{versionId}/deprecate")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/{eventTypeId}/versions/{versionId}/deprecate")
     public ResponseEntity<EventSchemaVersionResponse> deprecateVersion(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventTypeId") UUID eventTypeId,

@@ -4,7 +4,9 @@ import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.SharedDebugLinkPublicResponse;
 import com.webhook.platform.api.dto.SharedDebugLinkRequest;
 import com.webhook.platform.api.dto.SharedDebugLinkResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.SharedDebugLinkService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,7 +34,8 @@ public class SharedDebugLinkController {
     @SecurityRequirement(name = "bearerAuth")
     @SecurityRequirement(name = "apiKey")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/api/v1/projects/{projectId}/events/{eventId}/debug-links")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/api/v1/projects/{projectId}/events/{eventId}/debug-links")
     public ResponseEntity<SharedDebugLinkResponse> createLink(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("eventId") UUID eventId,
@@ -62,7 +65,8 @@ public class SharedDebugLinkController {
     @SecurityRequirement(name = "bearerAuth")
     @SecurityRequirement(name = "apiKey")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @DeleteMapping("/api/v1/projects/{projectId}/debug-links/{linkId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/api/v1/projects/{projectId}/debug-links/{linkId}")
     public ResponseEntity<Void> deleteLink(
             @PathVariable("projectId") UUID projectId,
             @PathVariable("linkId") UUID linkId,

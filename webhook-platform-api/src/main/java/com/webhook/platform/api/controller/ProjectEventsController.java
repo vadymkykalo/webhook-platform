@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.EventDiffResponse;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.service.EventDiffService;
 import com.webhook.platform.api.service.EventService;
 import com.webhook.platform.api.service.PiiMaskingService;
@@ -92,7 +94,8 @@ public class ProjectEventsController {
 
     @Operation(summary = "Send test event", description = "Sends a test event through the webhook pipeline")
     @ApiResponse(responseCode = "201", description = "Test event created")
-    @PostMapping("/test")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/test")
     public ResponseEntity<EventResponse> sendTestEvent(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody EventIngestRequest request,

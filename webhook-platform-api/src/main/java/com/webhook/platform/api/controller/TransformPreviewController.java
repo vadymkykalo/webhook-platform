@@ -5,7 +5,9 @@ import com.webhook.platform.api.dto.DeliveryDryRunRequest;
 import com.webhook.platform.api.dto.DeliveryDryRunResponse;
 import com.webhook.platform.api.dto.TransformPreviewRequest;
 import com.webhook.platform.api.dto.TransformPreviewResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.RequireScope;
 import com.webhook.platform.api.service.DeliveryDryRunService;
 import com.webhook.platform.api.service.TransformPreviewService;
@@ -46,7 +48,8 @@ public class TransformPreviewController {
     // destination will accept as genuine. Guard it like one.
     @Operation(summary = "Dry-run delivery", description = "Simulate a full delivery: transform payload, compute HMAC signature, build headers — without actually sending the request")
     @RequireScope(ApiKeyScope.READ_WRITE)
-    @PostMapping("/delivery-dry-run")
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping("/delivery-dry-run")
     public ResponseEntity<DeliveryDryRunResponse> deliveryDryRun(
             @PathVariable("projectId") UUID projectId,
             @Valid @RequestBody DeliveryDryRunRequest request,

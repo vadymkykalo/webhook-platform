@@ -40,9 +40,24 @@ an opt-in call to something a handler cannot silently omit:
    `@RequireScope` and is not in a frozen, individually-justified exemption set. The
    interceptor's runtime default stays *allow* for backward compatibility; the build-time
    default is now *deny*.
-3. **Role and org-ownership checks remain in place** — `requireWriteAccess()` in handlers,
-   `validateProjectOwnership` in services — and are **not yet** structural. This is the
-   part of the decision still outstanding.
+3. **Role is declared at the route.** `@RequireAccess(AccessLevel)` states what a handler
+   requires; `ScopeEnforcementInterceptor` enforces it before the handler runs, for JWT and
+   API-key callers alike. 79 mutating handlers carry it (72 WRITE, 7 OWNER), derived from the
+   imperative calls they already made. `MutatingHandlerAccessDeclarationTest` fails the build
+   on a new one that declares nothing and is not a documented exemption.
+
+   The level is `READ | WRITE | OWNER`, deliberately not "the minimum `MembershipRole`": the
+   four roles are not a line. OWNER, DEVELOPER and VIEWER order naturally, but API_KEY sits
+   outside that order — a key is neither above nor below a Viewer, it is a different kind of
+   caller whose permissions come from its scope. A minimum-role annotation would have had to
+   invent a position for it.
+
+   The interceptor calls the same `RbacUtil` the handlers do rather than reimplementing what
+   write access means, and the handlers keep their imperative calls as defence in depth.
+
+4. **Org-ownership checks remain in the services** — `validateProjectOwnership` threaded
+   through ~186 signatures — and are **not yet** structural. This is the part of the decision
+   still outstanding.
 
 ## Consequences
 
@@ -60,11 +75,8 @@ an opt-in call to something a handler cannot silently omit:
 
 ## Outstanding
 
-Extend the structural approach to the two remaining checks:
+One check left:
 
-- **Role**: require every mutating handler to declare its minimum role at the route (an
-  annotation the same interceptor enforces), with the same build-time ratchet, so
-  `requireWriteAccess()` becomes defence in depth rather than the only guard.
 - **Org ownership**: make "an organization can only reach its own rows" a property of data
   access — a request-scoped tenant identity consulted by the repository layer — rather than
   a parameter threaded through every signature. Hibernate's `@TenantId` with a

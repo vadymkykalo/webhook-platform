@@ -5,7 +5,9 @@ import com.webhook.platform.api.domain.entity.TunnelSession;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
 import com.webhook.platform.api.dto.TunnelCreateResponse;
 import com.webhook.platform.api.dto.TunnelSessionResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.service.TunnelBandwidthService;
 import com.webhook.platform.api.service.TunnelRegistry;
 import com.webhook.platform.api.service.TunnelService;
@@ -40,7 +42,8 @@ public class TunnelController {
     @Operation(operationId = "createTunnel", summary = "Create tunnel session",
             description = "Creates a new tunnel session for CLI use. The tunnelToken is returned only once.")
     @RequireQuota(QuotaType.TUNNELS)
-    @PostMapping
+    @RequireAccess(AccessLevel.WRITE)
+@PostMapping
     public ResponseEntity<TunnelCreateResponse> create(
             @RequestParam("localPort") int localPort,
             @RequestParam(value = "projectId", required = false) UUID projectId,
@@ -82,7 +85,8 @@ public class TunnelController {
     }
 
     @Operation(summary = "Close tunnel session", description = "Closes an active tunnel session belonging to your organization")
-    @DeleteMapping("/{sessionId}")
+    @RequireAccess(AccessLevel.WRITE)
+@DeleteMapping("/{sessionId}")
     public ResponseEntity<Void> close(
             @PathVariable("sessionId") UUID sessionId,
             AuthContext auth) {

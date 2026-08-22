@@ -3,7 +3,9 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.dto.GdprExportDto;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.service.GdprExportService;
 import com.webhook.platform.api.service.OrganizationService;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -54,7 +56,8 @@ public class OrganizationController {
     }
 
     @Operation(summary = "Update organization", description = "Updates organization details (owner only)")
-    @PutMapping("/{orgId}")
+    @RequireAccess(AccessLevel.OWNER)
+@PutMapping("/{orgId}")
     public ResponseEntity<OrganizationResponse> updateOrganization(
             @PathVariable("orgId") UUID orgId,
             @Valid @RequestBody UpdateOrganizationRequest request,
@@ -91,7 +94,8 @@ public class OrganizationController {
             description = "Permanently deletes the organization and all associated data. " +
                     "This action is irreversible. Owner only.")
     @ApiResponse(responseCode = "204", description = "Organization deleted")
-    @DeleteMapping("/{orgId}")
+    @RequireAccess(AccessLevel.OWNER)
+@DeleteMapping("/{orgId}")
     public ResponseEntity<Void> deleteOrganization(
             @PathVariable("orgId") UUID orgId,
             AuthContext auth) {

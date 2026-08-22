@@ -9,7 +9,9 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.service.billing.BillingService;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -89,7 +91,8 @@ public class BillingController {
     }
 
     @Operation(summary = "Update organization billing info", description = "Updates billing email for the organization (owner only)")
-    @PutMapping("/organization")
+    @RequireAccess(AccessLevel.OWNER)
+@PutMapping("/organization")
     public ResponseEntity<OrganizationBillingResponse> updateBillingInfo(
             @Valid @RequestBody UpdateBillingRequest request,
             AuthContext auth) {
@@ -104,7 +107,8 @@ public class BillingController {
 
     @Operation(summary = "Change organization plan", description = "Directly assigns a plan to the organization (owner only). " +
             "For paid plans, use checkout instead.")
-    @PutMapping("/organization/plan")
+    @RequireAccess(AccessLevel.OWNER)
+@PutMapping("/organization/plan")
     public ResponseEntity<OrganizationBillingResponse> changePlan(
             @Valid @RequestBody ChangePlanRequest request,
             AuthContext auth) {
@@ -160,7 +164,8 @@ public class BillingController {
 
     @Operation(summary = "Create checkout session", description = "Creates a billing provider checkout session for plan upgrade")
     @ApiResponse(responseCode = "200", description = "Checkout URL returned")
-    @PostMapping("/checkout")
+    @RequireAccess(AccessLevel.OWNER)
+@PostMapping("/checkout")
     public ResponseEntity<Map<String, String>> createCheckout(
             @Valid @RequestBody CheckoutRequest request,
             AuthContext auth) {
@@ -173,7 +178,8 @@ public class BillingController {
     }
 
     @Operation(summary = "Create portal session", description = "Creates a billing provider portal session for managing subscription")
-    @PostMapping("/portal")
+    @RequireAccess(AccessLevel.OWNER)
+@PostMapping("/portal")
     public ResponseEntity<Map<String, String>> createPortal(
             @RequestParam("returnUrl") String returnUrl,
             AuthContext auth) {
@@ -183,7 +189,8 @@ public class BillingController {
     }
 
     @Operation(summary = "Cancel subscription", description = "Cancels the current subscription and downgrades to free plan")
-    @PostMapping("/cancel")
+    @RequireAccess(AccessLevel.OWNER)
+@PostMapping("/cancel")
     public ResponseEntity<Void> cancelSubscription(AuthContext auth) {
         auth.requireOwnerAccess();
         billingService.cancelSubscription(auth.organizationId());
