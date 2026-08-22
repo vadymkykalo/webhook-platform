@@ -19,6 +19,7 @@ jobs:
   version-check:
     name: Version drift check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     # No SNAPSHOT-suffix skip here: pom.xml is intentionally allowed to run a
     # -SNAPSHOT ahead of the Chart/UI/SDK versions between releases (see
     # scripts/check-version-drift.sh) but every real value still has to agree.
@@ -32,6 +33,7 @@ jobs:
   backend-build:
     name: Backend Build & Compile
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -60,6 +62,7 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: backend-build
     
     steps:
@@ -83,6 +86,12 @@ jobs:
       # true merged coverage. The coverage-report job later downloads both
       # sets of exec files into one checkout and runs jacoco:report-aggregate,
       # whose default file pattern (**/jacoco*.exec) picks up both.
+      # Cheap guard before the tests themselves: the unit/integration split is done
+      # by class-name suffix alone, so a Testcontainers test with a plain *Test name
+      # lands here, where there is no Docker, and fails as if it were broken.
+      - name: Check test routing
+        run: scripts/check-test-routing.sh
+
       - name: Run unit tests
         run: mvn test -B -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest' -Djacoco.destFile=target/jacoco-unit.exec --fail-at-end
 
@@ -108,6 +117,7 @@ jobs:
   backend-integration-test:
     name: Backend Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     needs: backend-build
     
     steps:
@@ -173,6 +183,7 @@ jobs:
   coverage-report:
     name: Aggregate Coverage Report
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [backend-test, backend-integration-test]
     if: ${{ !cancelled() }}
 
@@ -238,6 +249,7 @@ jobs:
   restore-drill:
     name: Backup/Restore Drill
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -306,6 +318,7 @@ jobs:
   frontend-lint:
     name: Frontend Lint & Typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
       - name: Checkout code
@@ -333,6 +346,7 @@ jobs:
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: frontend-lint
     
     steps:
@@ -377,6 +391,7 @@ jobs:
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [frontend-lint, frontend-test]
     
     steps:
@@ -409,6 +424,7 @@ jobs:
   security-sast:
     name: SAST (SpotBugs)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: backend-build
     
     steps:
@@ -450,6 +466,7 @@ jobs:
   docker-build:
     name: Docker Images
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [backend-test, backend-integration-test, frontend-build]
     
     steps:
