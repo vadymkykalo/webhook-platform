@@ -31,11 +31,10 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
-import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
+import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
 
 const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
-const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
 
 function statusOptions(t: (key: string) => string) {
   return STATUS_VALUES.map((value) => ({
@@ -319,7 +318,7 @@ export default function DeliveriesPage() {
               <TableHeader>
                 <TableRow>
                   {canReplayDeliveries && (
-                    <TableHead className={`${HEAD_CLASS} w-10`}>
+                    <TableHead className="w-10">
                       <SelectBox
                         checked={allSelected}
                         indeterminate={selectedCount > 0}
@@ -328,12 +327,12 @@ export default function DeliveriesPage() {
                       />
                     </TableHead>
                   )}
-                  <SortableTableHead field="status" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('deliveries.columns.status')}</SortableTableHead>
-                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.event')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.endpoint')}</TableHead>
-                  <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('deliveries.columns.attempts')}</SortableTableHead>
-                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('deliveries.columns.created')}</SortableTableHead>
-                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.deliveryId')}</TableHead>
+                  <SortableTableHead field="status" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.status')}</SortableTableHead>
+                  <TableHead>{t('deliveries.columns.event')}</TableHead>
+                  <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
+                  <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.attempts')}</SortableTableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.created')}</SortableTableHead>
+                  <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

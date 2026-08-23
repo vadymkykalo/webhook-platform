@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FileJson2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import EmptyState from '../components/EmptyState';
 import { useEventTypes } from '../api/queries';
 import type { EventTypeCatalogResponse } from '../api/schemas.api';
 import SchemaValidationPanel from './schemas/SchemaValidationPanel';
@@ -22,9 +24,18 @@ export default function SchemasPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const [selected, setSelected] = useState<EventTypeCatalogResponse | null>(null);
-  const { data: eventTypes = [] } = useEventTypes(projectId);
+  const { data: eventTypes = [], isLoading } = useEventTypes(projectId);
 
   if (!projectId) return null;
+
+  if (isLoading) {
+    return (
+      <PageSkeleton>
+        <SkeletonCards count={1} height="h-36" cols="grid-cols-1" />
+        <SkeletonCards count={2} height="h-80" cols="grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]" />
+      </PageSkeleton>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6">
@@ -50,13 +61,12 @@ export default function SchemasPage() {
             ) : (
               <>
                 <RecentSchemaChanges projectId={projectId} />
-                <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-rail px-6 text-center">
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
-                    <FileJson2 className="h-5 w-5 text-muted-foreground" aria-hidden />
-                  </div>
-                  <p className="text-[15px] font-medium">{t('schemas.selectEventType')}</p>
-                  <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t('schemas.selectEventTypeHint')}</p>
-                </div>
+                <EmptyState
+                  icon={FileJson2}
+                  title={t('schemas.selectEventType')}
+                  description={t('schemas.selectEventTypeHint')}
+                  className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-rail px-6"
+                />
               </>
             )}
           </div>

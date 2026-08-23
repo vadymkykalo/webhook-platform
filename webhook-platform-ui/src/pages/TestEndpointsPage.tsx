@@ -6,11 +6,11 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import JsonEditor from '../components/JsonEditor';
 import { Workbench, WorkbenchPanel, OutputBlock, ResultPlaceholder } from '../components/Workbench';
 import { testEndpointsApi, type TestEndpointResponse, type CapturedRequestResponse } from '../api/testEndpoints.api';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -31,6 +31,7 @@ export default function TestEndpointsPage() {
 
   const [endpoints, setEndpoints] = useState<TestEndpointResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -45,7 +46,9 @@ export default function TestEndpointsPage() {
     try {
       setLoading(true);
       setEndpoints(await testEndpointsApi.list(projectId));
+      setLoadError(null);
     } catch (err: any) {
+      setLoadError(err);
       showApiError(err, 'testEndpoints.toast.loadFailed');
     } finally {
       setLoading(false);
@@ -161,6 +164,20 @@ export default function TestEndpointsPage() {
     ) : null
   );
 
+  if (loadError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <PageHeader title={t('testEndpoints.title')} description={t('testEndpoints.subtitle')} />
+        <ErrorState
+          error={loadError}
+          fallbackKey="testEndpoints.toast.loadFailed"
+          onRetry={loadEndpoints}
+          retrying={loading}
+        />
+      </div>
+    );
+  }
+
   if (endpoints.length === 0) {
     return (
       <div className="p-4 lg:p-6">
@@ -257,14 +274,14 @@ export default function TestEndpointsPage() {
               bodyClassName="space-y-2"
             >
               {loadingRequests ? (
-                <div className="flex h-32 items-center justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
-                </div>
+                <SkeletonRows count={3} height="h-12" />
               ) : requests.length === 0 ? (
-                <div className="py-10 text-center">
-                  <p className="text-sm font-medium">{t('testEndpoints.noRequests')}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t('testEndpoints.noRequestsHint')}</p>
-                </div>
+                <EmptyState
+                  icon={Inbox}
+                  title={t('testEndpoints.noRequests')}
+                  description={t('testEndpoints.noRequestsHint')}
+                  className="flex flex-col items-center justify-center py-10"
+                />
               ) : (
                 requests.map((req) => {
                   const expanded = expandedRequest === req.id;
@@ -327,7 +344,7 @@ export default function TestEndpointsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-halt text-white hover:bg-halt/90">
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className={buttonVariants({ variant: 'destructive' })}>
               {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('common.delete')}
             </AlertDialogAction>

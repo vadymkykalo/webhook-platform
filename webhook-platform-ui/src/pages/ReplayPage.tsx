@@ -4,7 +4,7 @@ import { History, Play, Square, Loader2, AlertTriangle, RefreshCw } from 'lucide
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
 import { projectsApi } from '../api/projects.api';
@@ -25,7 +25,6 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { FilterBar, FilterField, TimeCell } from './tableParts';
 
-const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
 const QUICK_RANGES = ['1h', '6h', '24h', '7d', 'custom'] as const;
 
 /**
@@ -85,6 +84,7 @@ export default function ReplayPage() {
   const [endpoints, setEndpoints] = useState<EndpointResponse[]>([]);
   const [sessions, setSessions] = useState<ReplaySessionResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -121,7 +121,9 @@ export default function ReplayPage() {
       setProject(projectData);
       setEndpoints(endpointsData);
       setSessions(sessionsData.content);
+      setLoadError(null);
     } catch (err: any) {
+      setLoadError(err);
       showApiError(err, 'replay.toast.loadFailed', { retry: loadData });
     } finally {
       setLoading(false);
@@ -334,7 +336,9 @@ export default function ReplayPage() {
         )}
       </div>
 
-      {sessions.length === 0 ? (
+      {loadError ? (
+        <ErrorState error={loadError} fallbackKey="replay.toast.loadFailed" onRetry={loadData} retrying={loading} />
+      ) : sessions.length === 0 ? (
         <EmptyState
           icon={History}
           title={t('replay.noSessions')}
@@ -346,14 +350,14 @@ export default function ReplayPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className={HEAD_CLASS}>{t('deliveries.columns.status')}</TableHead>
-                <TableHead className={HEAD_CLASS}>{t('replay.session.timeRange')}</TableHead>
-                <TableHead className={HEAD_CLASS}>{t('replay.session.eventType')}</TableHead>
-                <TableHead className={HEAD_CLASS}>{t('replay.session.endpoint')}</TableHead>
-                <TableHead className={HEAD_CLASS}>{t('replay.session.progress')}</TableHead>
-                <TableHead className={HEAD_CLASS}>{t('replay.session.deliveries')}</TableHead>
-                <TableHead className={HEAD_CLASS}>{t('replay.session.created')}</TableHead>
-                <TableHead className={`${HEAD_CLASS} w-[90px]`}><span className="sr-only">{t('common.actions')}</span></TableHead>
+                <TableHead>{t('deliveries.columns.status')}</TableHead>
+                <TableHead>{t('replay.session.timeRange')}</TableHead>
+                <TableHead>{t('replay.session.eventType')}</TableHead>
+                <TableHead>{t('replay.session.endpoint')}</TableHead>
+                <TableHead>{t('replay.session.progress')}</TableHead>
+                <TableHead>{t('replay.session.deliveries')}</TableHead>
+                <TableHead>{t('replay.session.created')}</TableHead>
+                <TableHead className="w-[90px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -9,7 +9,7 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import { tunnelsApi, TunnelSessionResponse, TunnelStatusResponse } from '../api/tunnels.api';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import {
   AlertDialog,
@@ -189,7 +189,7 @@ export default function TunnelsPage() {
             <AlertDialogAction
               onClick={handleClose}
               disabled={closing}
-              className="bg-halt text-white hover:bg-halt/90"
+              className={buttonVariants({ variant: 'destructive' })}
             >
               {closing ? t('tunnels.closing') : t('tunnels.close')}
             </AlertDialogAction>

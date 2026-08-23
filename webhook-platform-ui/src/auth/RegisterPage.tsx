@@ -11,7 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import IntentPicker from '../components/IntentPicker';
-import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+import PasswordStrengthIndicator, { passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -45,7 +45,14 @@ export default function RegisterPage() {
       showSuccess(t('auth.register.success'));
       setRegistered(true);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || t('auth.register.failed');
+      // The API answers a rejected field with fieldErrors {field: reason} and a
+      // generic "Invalid request parameters" summary. Showing the summary threw
+      // away the only part that says what to change.
+      const data = err.response?.data;
+      const fieldDetail = data?.fieldErrors
+        ? Object.values(data.fieldErrors as Record<string, string>).join('. ')
+        : '';
+      const errorMessage = fieldDetail || data?.message || t('auth.register.failed');
       setError(errorMessage);
       showApiError(err, 'auth.register.failed');
     } finally {
@@ -175,7 +182,7 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <Button type="submit" className="h-10 w-full" disabled={loading}>
+        <Button type="submit" className="h-10 w-full" disabled={loading || !passwordMeetsPolicy(password)}>
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           {loading ? t('auth.register.submitting') : t('auth.register.submit')}
         </Button>

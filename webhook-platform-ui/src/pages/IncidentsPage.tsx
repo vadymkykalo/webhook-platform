@@ -21,6 +21,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
+import { TablePagination } from '../components/ui/table-pagination';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
@@ -58,6 +59,7 @@ export default function IncidentsPage() {
 
   const [openOnly, setOpenOnly] = useState(true);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showNoteDialog, setShowNoteDialog] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function IncidentsPage() {
 
   const {
     data: incidentsData, isLoading, isError, error, refetch,
-  } = useIncidents(projectId, openOnly, page);
+  } = useIncidents(projectId, openOnly, page, pageSize);
   const { data: openCount } = useOpenIncidentCount(projectId);
   const createIncident = useCreateIncident(projectId!);
   const updateIncident = useUpdateIncident(projectId!);
@@ -352,23 +354,15 @@ export default function IncidentsPage() {
               );
             })}
 
-            {(incidentsData?.totalPages ?? 0) > 1 && (
-              <div className="flex items-center justify-center gap-3 pt-2">
-                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                  {t('common.previous')}
-                </Button>
-                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {t('incidents.pageOf', { page: page + 1, total: incidentsData?.totalPages ?? 1 })}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= (incidentsData?.totalPages ?? 1) - 1}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  {t('common.next')}
-                </Button>
-              </div>
+            {incidentsData && (
+              <TablePagination
+                page={page}
+                pageSize={pageSize}
+                totalElements={incidentsData.totalElements}
+                totalPages={incidentsData.totalPages}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
             )}
           </div>
         )}

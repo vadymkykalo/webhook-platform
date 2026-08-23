@@ -5,11 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
 import { RuleStats, RuleRow, MatchExpression, RuleActionChip } from '../components/RuleLayout';
 import { piiRulesApi, type PiiMaskingRuleResponse, type MaskStyle } from '../api/piiRules.api';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
@@ -54,6 +54,7 @@ export default function PiiRulesPage() {
 
   const [rules, setRules] = useState<PiiMaskingRuleResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [seeding, setSeeding] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -68,7 +69,9 @@ export default function PiiRulesPage() {
     try {
       setLoading(true);
       setRules(await piiRulesApi.list(projectId));
+      setLoadError(null);
     } catch (err: any) {
+      setLoadError(err);
       showApiError(err, 'piiRules.toast.loadFailed', { retry: loadRules });
     } finally {
       setLoading(false);
@@ -157,7 +160,7 @@ export default function PiiRulesPage() {
         eyebrow={t('piiRules.count', { count: rules.length })}
         title={t('piiRules.title')}
         description={t('piiRules.subtitle')}
-        actions={rules.length > 0 ? (
+        actions={!loadError && rules.length > 0 ? (
           <PermissionGate allowed={canManagePiiRules}>
             <VerificationGate>
               <Button variant={showAddForm ? 'secondary' : 'default'} onClick={() => setShowAddForm(!showAddForm)}>
@@ -217,7 +220,9 @@ export default function PiiRulesPage() {
         </section>
       )}
 
-      {rules.length === 0 ? (
+      {loadError ? (
+        <ErrorState error={loadError} fallbackKey="piiRules.toast.loadFailed" onRetry={loadRules} retrying={loading} />
+      ) : rules.length === 0 ? (
         <EmptyState
           icon={Shield}
           title={t('piiRules.noRules')}
@@ -320,7 +325,7 @@ export default function PiiRulesPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-halt text-white hover:bg-halt/90">
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className={buttonVariants({ variant: 'destructive' })}>
               {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('common.delete')}
             </AlertDialogAction>

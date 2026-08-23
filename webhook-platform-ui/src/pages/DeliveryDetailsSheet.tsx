@@ -11,6 +11,8 @@ import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.typ
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import AttemptRail from '../components/AttemptRail';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import { SkeletonRows } from '../components/PageSkeleton';
 import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import { railFromDeliveryAttempts } from './attemptRailData';
 import {
@@ -52,6 +54,7 @@ export default function DeliveryDetailsSheet({
   const [delivery, setDelivery] = useState<DeliveryResponse | null>(null);
   const [attempts, setAttempts] = useState<DeliveryAttemptResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
   const [showReplayDialog, setShowReplayDialog] = useState(false);
   const [replaying, setReplaying] = useState(false);
@@ -85,7 +88,9 @@ export default function DeliveryDetailsSheet({
       setLoading(true);
       const data = await deliveriesApi.get(deliveryId);
       setDelivery(data);
+      setLoadError(null);
     } catch (err: any) {
+      setLoadError(err);
       showApiError(err, 'deliveryDetails.toast.loadFailed', { retry: loadDelivery });
     } finally {
       setLoading(false);
@@ -245,9 +250,7 @@ export default function DeliveryDetailsSheet({
           </SheetHeader>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
+            <div className="mt-6"><SkeletonRows count={4} height="h-20" /></div>
           ) : delivery ? (
             <div className="space-y-6 mt-6">
               {/* Status Banner */}
@@ -557,13 +560,13 @@ export default function DeliveryDetailsSheet({
                   })()}
 
                   {attemptsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    </div>
+                    <SkeletonRows count={3} height="h-16" />
                   ) : attempts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t('deliveryDetails.noAttempts')}
-                    </p>
+                    <EmptyState
+                      icon={Clock}
+                      title={t('deliveryDetails.noAttempts')}
+                      className="flex flex-col items-center justify-center py-8"
+                    />
                   ) : (
                     <div className="relative">
                       {attempts.map((attempt, i) => {
@@ -804,10 +807,20 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
             </div>
+          ) : loadError ? (
+            <ErrorState
+              error={loadError}
+              fallbackKey="deliveryDetails.toast.loadFailed"
+              onRetry={loadDelivery}
+              retrying={loading}
+              className="flex flex-col items-center justify-center py-16"
+            />
           ) : (
-            <div className="flex items-center justify-center py-16">
-              <p className="text-muted-foreground">{t('deliveryDetails.noData')}</p>
-            </div>
+            <EmptyState
+              icon={Info}
+              title={t('deliveryDetails.noData')}
+              className="flex flex-col items-center justify-center py-16"
+            />
           )}
         </SheetContent>
       </Sheet>

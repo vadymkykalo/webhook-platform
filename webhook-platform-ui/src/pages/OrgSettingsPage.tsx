@@ -9,6 +9,8 @@ import { useMembers, useProjects } from '../api/queries';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageHeader from '../components/PageHeader';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import { ErrorState } from '../components/EmptyState';
 import PermissionGate, { ROLES, RoleCard } from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import ConfigExportImport from '../components/ConfigExportImport';
@@ -36,8 +38,14 @@ export default function OrgSettingsPage() {
   const [saved, setSaved] = useState(false);
   const dirty = name !== orgName;
 
-  const { data: members = [] } = useMembers(orgId || undefined);
-  const { data: projects = [] } = useProjects();
+  const {
+    data: members = [], isLoading: membersLoading, isError: membersFailed,
+    error: membersError, refetch: refetchMembers,
+  } = useMembers(orgId || undefined);
+  const {
+    data: projects = [], isLoading: projectsLoading, isError: projectsFailed,
+    error: projectsError, refetch: refetchProjects,
+  } = useProjects();
   const [exportProjectId, setExportProjectId] = useState('');
   const selectedProject = projects.find((p) => p.id === exportProjectId);
 
@@ -70,6 +78,27 @@ export default function OrgSettingsPage() {
     navigator.clipboard.writeText(orgId);
     showSuccess(t('orgSettings.idCopied'));
   };
+
+  if (membersLoading || projectsLoading) {
+    return (
+      <PageSkeleton maxWidth="max-w-4xl">
+        <SkeletonCards count={3} height="h-44" cols="grid-cols-1" />
+      </PageSkeleton>
+    );
+  }
+
+  // The danger zone spells out what deleting costs from these two counts. A
+  // failed fetch would render that as "0 projects, 0 members" — an invitation.
+  if (membersFailed || projectsFailed) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState
+          error={membersError ?? projectsError}
+          onRetry={() => { refetchMembers(); refetchProjects(); }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6">

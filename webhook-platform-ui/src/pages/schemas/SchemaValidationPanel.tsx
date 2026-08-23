@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { Fingerprint, ShieldCheck } from 'lucide-react';
 import { useProject, useUpdateProject } from '../../api/queries';
 import { showApiError, showSuccess } from '../../lib/toast';
+import { ErrorState } from '../../components/EmptyState';
+import { SkeletonRows } from '../../components/PageSkeleton';
 import { cn } from '../../lib/utils';
 
 /**
@@ -73,10 +75,19 @@ type ValidationChoice = 'OFF' | 'WARN' | 'BLOCK';
 
 export default function SchemaValidationPanel({ projectId }: { projectId: string }) {
   const { t } = useTranslation();
-  const { data: project } = useProject(projectId);
+  const {
+    data: project, isLoading, isError, error, refetch, isRefetching,
+  } = useProject(projectId);
   const updateMutation = useUpdateProject(projectId);
 
-  if (!project) return null;
+  if (isLoading) return <SkeletonRows count={2} height="h-[72px]" />;
+
+  // Both rows are a switch reading its position from the project. Rendering
+  // nothing on a failed fetch hid the two settings that decide whether a
+  // malformed event is rejected.
+  if (isError || !project) {
+    return <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />;
+  }
 
   const validation: ValidationChoice = project.schemaValidationEnabled
     ? (project.schemaValidationPolicy === 'BLOCK' ? 'BLOCK' : 'WARN')

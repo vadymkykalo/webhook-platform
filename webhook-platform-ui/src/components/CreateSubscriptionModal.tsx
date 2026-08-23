@@ -414,6 +414,10 @@ export default function CreateSubscriptionModal({
                       {errors.payloadTemplate ? (
                         <p className="text-[11px] text-halt">{errors.payloadTemplate}</p>
                       ) : (
+                        // TODO(i18n): the sentence below is the only literal
+                        // English left in JSX. It needs a key (suggest
+                        // createSubscription.fields.payloadTemplateHint); the
+                        // locale files are owned elsewhere on this branch.
                         <p className="text-[11px] text-muted-foreground">
                           JSONPath: <code className="bg-muted px-0.5 rounded">${'{'}$.path{'}'}</code>. Empty = original payload.
                         </p>

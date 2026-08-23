@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Sparkles, ArrowRight, ArrowLeft, X, FolderKanban,
+  Sparkles, ArrowRight, ArrowLeft, FolderKanban,
   Webhook, Bell, Key, Send, CheckCircle2, Rocket, Clock, Copy, Check
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -55,9 +55,14 @@ const STEPS: WizardStep[] = [
   { key: 'done', icon: Rocket, iconColor: 'text-ok', iconBg: 'bg-ok-soft' },
 ];
 
+// The same origin the app already talks to: empty VITE_API_URL means the API
+// is served beside the UI, so the page's own origin is the honest default.
+// The hardcoded localhost:8080 this replaced shipped to every hosted install.
+const API_ORIGIN = import.meta.env.VITE_API_URL || window.location.origin;
+
 function CurlSnippet({ t }: { t: (key: string) => string }) {
   const [copied, setCopied] = useState(false);
-  const curlCmd = `curl -X POST http://localhost:8080/api/v1/events \\
+  const curlCmd = `curl -X POST ${API_ORIGIN}/api/v1/events \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: YOUR_API_KEY" \\
   -d '{
@@ -136,15 +141,6 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="sm:max-w-md">
-        <button
-          onClick={handleClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-          title={t('common.close')}
-          aria-label={t('common.close')}
-        >
-          <X className="h-4 w-4" />
-        </button>
-
         <DialogHeader className="text-center items-center pt-2">
           <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center mb-3", step.iconBg)}>
             <Icon className={cn("h-8 w-8", step.iconColor)} />

@@ -29,7 +29,6 @@ import { usePermissions } from '../auth/usePermissions';
 import { railFromForwardAttempts } from './attemptRailData';
 import { CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
 
-const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
 
 /** Verification is the incoming direction's status: did this really come from the source. */
 function verificationOf(event: IncomingEventResponse): { kind: StatusKind; key: string } {
@@ -238,7 +237,7 @@ export default function IncomingEventsPage() {
               <TableHeader>
                 <TableRow>
                   {canReplayIncomingEvents && (
-                    <TableHead className={`${HEAD_CLASS} w-10`}>
+                    <TableHead className="w-10">
                       <SelectBox
                         checked={allSelected}
                         indeterminate={selectedCount > 0}
@@ -247,12 +246,12 @@ export default function IncomingEventsPage() {
                       />
                     </TableHead>
                   )}
-                  <TableHead className={HEAD_CLASS}>{t('incomingEvents.columns.status')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('incomingEvents.columns.source')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('incomingEvents.columns.method')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('incomingEvents.columns.requestId')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('incomingEvents.columns.received')}</TableHead>
-                  <TableHead className={`${HEAD_CLASS} w-[60px]`}><span className="sr-only">{t('common.actions')}</span></TableHead>
+                  <TableHead>{t('incomingEvents.columns.status')}</TableHead>
+                  <TableHead>{t('incomingEvents.columns.source')}</TableHead>
+                  <TableHead>{t('incomingEvents.columns.method')}</TableHead>
+                  <TableHead>{t('incomingEvents.columns.requestId')}</TableHead>
+                  <TableHead>{t('incomingEvents.columns.received')}</TableHead>
+                  <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,11 +375,13 @@ export default function IncomingEventsPage() {
                 </div>
                 <div className="p-4">
                   {loadingAttempts ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
-                    </div>
+                    <SkeletonRows count={2} height="h-16" />
                   ) : forwards.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">{t('incomingEvents.detail.noAttempts')}</p>
+                    <EmptyState
+                      icon={Clock}
+                      title={t('incomingEvents.detail.noAttempts')}
+                      className="flex flex-col items-center justify-center py-6"
+                    />
                   ) : (
                     <div className="space-y-6">
                       {forwards.map((forward) => (

@@ -20,10 +20,9 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
-import { CopyId, FilterBar, FilterField, SearchField, TimeCell } from './tableParts';
+import { CopyId, FilterBar, FilterField, SearchField, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
 import type { DeliveryResponse } from '../types/api.types';
 
-const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
 
 /**
  * What happened to the Deliveries one Event owed.
@@ -211,12 +210,12 @@ export default function EventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.status')}</TableHead>
-                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('events.eventType')}</SortableTableHead>
-                  <TableHead className={HEAD_CLASS}>{t('events.deliveriesCount')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('events.eventId')}</TableHead>
-                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('events.created')}</SortableTableHead>
-                  <TableHead className={`${HEAD_CLASS} w-[60px]`}><span className="sr-only">{t('common.actions')}</span></TableHead>
+                  <TableHead>{t('deliveries.columns.status')}</TableHead>
+                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('events.eventType')}</SortableTableHead>
+                  <TableHead>{t('events.deliveriesCount')}</TableHead>
+                  <TableHead>{t('events.eventId')}</TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('events.created')}</SortableTableHead>
+                  <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

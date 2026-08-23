@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { FileText, ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
+import { FileText, Download, Loader2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/queries';
 import { formatDateTimeCompact } from '../lib/date';
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
+import { TablePagination } from '../components/ui/table-pagination';
 
 const ALL_ACTIONS = [
   'CREATE', 'UPDATE', 'DELETE', 'ROTATE_SECRET', 'REVOKE',
@@ -46,6 +47,7 @@ function shortId(id: string | null) {
 export default function AuditLogPage() {
   const { t } = useTranslation();
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [actionFilter, setActionFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('');
@@ -62,7 +64,7 @@ export default function AuditLogPage() {
     to: dateTo || undefined,
   }), [actionFilter, statusFilter, resourceTypeFilter, dateFrom, dateTo]);
 
-  const { data, isLoading, isError, error, refetch, isRefetching } = useAuditLog(page, 20, filters);
+  const { data, isLoading, isError, error, refetch, isRefetching } = useAuditLog(page, pageSize, filters);
 
   const hasFilters = !!(actionFilter || statusFilter || resourceTypeFilter || dateFrom || dateTo);
 
@@ -221,27 +223,18 @@ export default function AuditLogPage() {
               ))}
             </TableBody>
           </Table>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rail bg-secondary/30 px-4 py-2.5">
-            <p className="font-mono text-[11px] text-muted-foreground">
-              {t('auditLog.pagination', { total: data.totalElements, page: data.number + 1, pages: data.totalPages })}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}
-                aria-label={t('common.previous')}
-              >
-                <ChevronLeft className="h-4 w-4" aria-hidden />
-              </Button>
-              <Button
-                variant="outline" size="sm" disabled={page >= data.totalPages - 1} onClick={() => setPage((p) => p + 1)}
-                aria-label={t('common.next')}
-              >
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </Button>
-            </div>
-          </div>
         </Card>
+      )}
+
+      {!isError && !isLoading && data && data.content.length > 0 && (
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalElements={data.totalElements}
+          totalPages={data.totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       )}
 
       <Dialog open={!!selected} onOpenChange={(open) => { if (!open) setSelected(null); }}>

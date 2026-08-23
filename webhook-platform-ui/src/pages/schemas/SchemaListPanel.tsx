@@ -4,7 +4,8 @@ import { FileJson2, Loader2, Plus, Search, X } from 'lucide-react';
 import { useEventTypes, useCreateEventType } from '../../api/queries';
 import { showApiError, showSuccess } from '../../lib/toast';
 import type { EventTypeCatalogResponse } from '../../api/schemas.api';
-import EmptyState from '../../components/EmptyState';
+import EmptyState, { ErrorState } from '../../components/EmptyState';
+import { SkeletonRows } from '../../components/PageSkeleton';
 import StatusBadge from '../../components/StatusBadge';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -25,7 +26,9 @@ export default function SchemaListPanel({
   onSelect: (eventType: EventTypeCatalogResponse | null) => void;
 }) {
   const { t } = useTranslation();
-  const { data: eventTypes, isLoading } = useEventTypes(projectId);
+  const {
+    data: eventTypes, isLoading, isError, error, refetch, isRefetching,
+  } = useEventTypes(projectId);
   const createMutation = useCreateEventType(projectId);
 
   const [search, setSearch] = useState('');
@@ -112,9 +115,14 @@ export default function SchemaListPanel({
 
       <div className="max-h-[560px] overflow-y-auto p-2">
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
-          </div>
+          <SkeletonRows count={5} height="h-12" />
+        ) : isError ? (
+          <ErrorState
+            className="flex flex-col items-center justify-center px-4 py-10 text-center"
+            error={error}
+            onRetry={() => refetch()}
+            retrying={isRefetching}
+          />
         ) : all.length === 0 ? (
           <EmptyState
             className="flex flex-col items-center justify-center px-4 py-10 text-center"

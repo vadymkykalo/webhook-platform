@@ -219,3 +219,10 @@ export function AttemptCell({
     </span>
   );
 }
+
+/**
+ * SortableTableHead renders a bare `<th>` rather than `TableHead`, so it does
+ * not inherit the mono column-head style. Every sortable column in these
+ * tables sits next to plain `TableHead` cells and has to match them.
+ */
+export const SORTABLE_HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';

@@ -11,7 +11,8 @@ import { debugLinksApi } from '../api/debugLinks.api';
 import { useQuery } from '@tanstack/react-query';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import { showSuccess, showApiError } from '../lib/toast';
-import PageSkeleton from '../components/PageSkeleton';
+import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
@@ -21,7 +22,6 @@ import type { DeliveryResponse, PageResponse } from '../types/api.types';
 import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, TimeCell } from './tableParts';
 
-const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
 
 export default function EventDetailPage() {
   const { t } = useTranslation();
@@ -32,7 +32,9 @@ export default function EventDetailPage() {
   const [activeTab, setActiveTab] = useState<'raw' | 'sanitized' | 'schema' | 'deliveries' | 'debug'>('raw');
   const [sharingDebug, setSharingDebug] = useState(false);
 
-  const { data: event, isLoading } = useEvent(projectId, eventId);
+  const {
+    data: event, isLoading, isError, error, refetch, isRefetching,
+  } = useEvent(projectId, eventId);
   const { data: eventTypes } = useEventTypes(projectId);
 
   const { data: deliveriesData, isLoading: deliveriesLoading, refetch: refetchDeliveries } = useQuery({
@@ -91,7 +93,20 @@ export default function EventDetailPage() {
   const matchingSchema = eventTypes?.find((et: any) => et.name === event?.eventType);
 
   if (isLoading) return <PageSkeleton maxWidth="max-w-none" />;
-  if (!event) return <div className="p-8 text-center text-muted-foreground">{t('events.details.notFound')}</div>;
+  if (isError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
+      </div>
+    );
+  }
+  if (!event) {
+    return (
+      <div className="p-4 lg:p-6">
+        <EmptyState icon={FileJson} title={t('events.details.notFound')} />
+      </div>
+    );
+  }
 
   const undeliveredCount = deliveries.filter(d => d.status === 'FAILED' || d.status === 'DLQ').length;
 
@@ -236,7 +251,11 @@ export default function EventDetailPage() {
                 </Button>
               </div>
             ) : (
-              <p className="py-8 text-center text-sm text-muted-foreground">{t('eventDetail.noSchema', { type: event.eventType })}</p>
+              <EmptyState
+                icon={FileType}
+                title={t('eventDetail.noSchema', { type: event.eventType })}
+                className="flex flex-col items-center justify-center py-8"
+              />
             )}
           </section>
         )}
@@ -244,27 +263,31 @@ export default function EventDetailPage() {
         {activeTab === 'deliveries' && (
           <section className="overflow-hidden rounded-lg border border-rail bg-card">
             {deliveriesLoading ? (
-              <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden /></div>
+              <SkeletonTable rows={4} />
             ) : deliveries.length === 0 ? (
-              <div className="space-y-2 py-10 text-center">
-                <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
-                <p className="mx-auto max-w-sm text-xs text-muted-foreground">
+              <EmptyState
+                icon={Send}
+                title={t('events.details.noDeliveries')}
+                description={(
                   <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
-                </p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
-                  {t('deliveries.noDeliveriesForEventAction')}
-                </Button>
-              </div>
+                )}
+                action={(
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
+                    {t('deliveries.noDeliveriesForEventAction')}
+                  </Button>
+                )}
+                className="flex flex-col items-center justify-center py-10"
+              />
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={HEAD_CLASS}>{t('deliveries.columns.status')}</TableHead>
-                    <TableHead className={HEAD_CLASS}>{t('deliveries.columns.endpoint')}</TableHead>
-                    <TableHead className={HEAD_CLASS}>{t('deliveries.columns.attempts')}</TableHead>
-                    <TableHead className={HEAD_CLASS}>{t('deliveries.columns.created')}</TableHead>
-                    <TableHead className={HEAD_CLASS}>{t('deliveries.columns.deliveryId')}</TableHead>
-                    <TableHead className={`${HEAD_CLASS} w-[60px]`}><span className="sr-only">{t('common.actions')}</span></TableHead>
+                    <TableHead>{t('deliveries.columns.status')}</TableHead>
+                    <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
+                    <TableHead>{t('deliveries.columns.attempts')}</TableHead>
+                    <TableHead>{t('deliveries.columns.created')}</TableHead>
+                    <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
+                    <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -327,7 +350,11 @@ export default function EventDetailPage() {
             </div>
             <div className="p-4">
               {debugLinks.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">{t('eventDetail.noDebugLinks')}</p>
+                <EmptyState
+                  icon={Share2}
+                  title={t('eventDetail.noDebugLinks')}
+                  className="flex flex-col items-center justify-center py-8"
+                />
               ) : (
                 <div className="space-y-3">
                   {debugLinks.map((link) => (

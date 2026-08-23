@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  Play, Copy, RotateCcw, Download, Loader2, Zap, Send, Globe, Shield, Wand2, X,
+  Play, Copy, RotateCcw, Download, Zap, Send, Globe, Shield, Wand2, X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { useTransformPreview, useTransformations, useEvents, useEndpoints, useDeliveryDryRun } from '../api/queries';
 import PageHeader from '../components/PageHeader';
+import { SkeletonRows } from '../components/PageSkeleton';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import JsonEditor from '../components/JsonEditor';
 import {
   Workbench, WorkbenchPanel, RunControl, ResultFrame, ResultMetric,
@@ -77,7 +79,10 @@ export default function TransformStudioPage() {
   const dryRun = useDeliveryDryRun(projectId!);
   const { data: transformations = [] } = useTransformations(projectId!);
   const { data: endpoints = [] } = useEndpoints(projectId);
-  const { data: recentEventsData, isLoading: eventsLoading } = useEvents(projectId, 0, eventPageSize, 'createdAt,desc', eventSearch || undefined);
+  const {
+    data: recentEventsData, isLoading: eventsLoading, isError: eventsFailed,
+    error: eventsError, refetch: refetchEvents, isRefetching: eventsRefetching,
+  } = useEvents(projectId, 0, eventPageSize, 'createdAt,desc', eventSearch || undefined);
   const recentEvents = recentEventsData?.content ?? [];
   const hasMoreEvents = recentEventsData ? !recentEventsData.last : false;
 
@@ -192,9 +197,20 @@ export default function TransformStudioPage() {
               onChange={(e) => { setEventSearch(e.target.value); setEventPageSize(10); }}
             />
             {eventsLoading ? (
-              <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" aria-hidden /></div>
+              <SkeletonRows count={3} height="h-11" />
+            ) : eventsFailed ? (
+              <ErrorState
+                error={eventsError}
+                onRetry={() => refetchEvents()}
+                retrying={eventsRefetching}
+                className="flex flex-col items-center justify-center py-6"
+              />
             ) : recentEvents.length === 0 ? (
-              <p className="py-2 text-xs text-muted-foreground">{t('transform.noEvents')}</p>
+              <EmptyState
+                icon={Send}
+                title={t('transform.noEvents')}
+                className="flex flex-col items-center justify-center py-6"
+              />
             ) : (
               <div className="max-h-[220px] space-y-1 overflow-y-auto">
                 {recentEvents.map((evt) => (

@@ -53,6 +53,9 @@ export default function LanguageSwitcher({ variant = 'icon', className }: Langua
   }
 
   return (
+    // TODO(i18n): the aria-label below is untranslated — it needs a key
+    // (suggest settings.language). The locale files are owned elsewhere on
+    // this branch, so the literal stays until that key exists.
     <div
       role="group"
       aria-label="Language"

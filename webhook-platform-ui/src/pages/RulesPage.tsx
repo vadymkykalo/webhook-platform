@@ -10,7 +10,7 @@ import { showSuccess, showApiError } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
 import { RuleStats, RuleRow, MatchExpression, RuleActionChip } from '../components/RuleLayout';
 import {
@@ -20,7 +20,7 @@ import {
 import type {
   RuleResponse, RuleRequest, RuleActionRequest, ActionType, ConditionNode,
 } from '../api/rules.api';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -63,8 +63,13 @@ export default function RulesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageSubscriptions: canManage } = usePermissions();
-  const { isLoading: projectLoading } = useProject(projectId);
-  const { data: rules = [], isLoading: rulesLoading } = useRules(projectId!);
+  const {
+    isLoading: projectLoading, isError: projectFailed, error: projectError, refetch: refetchProject,
+  } = useProject(projectId);
+  const {
+    data: rules = [], isLoading: rulesLoading, isError: rulesFailed,
+    error: rulesError, refetch: refetchRules, isRefetching,
+  } = useRules(projectId!);
   const { data: endpoints = [] } = useEndpoints(projectId!);
   const { data: transformations = [] } = useTransformations(projectId!);
 
@@ -191,6 +196,8 @@ export default function RulesPage() {
     setFormActions(formActions.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
   const removeAction = (idx: number) => setFormActions(formActions.filter((_, i) => i !== idx));
 
+  const loadFailed = projectFailed || rulesFailed;
+
   if (loading) return <PageSkeleton />;
 
   const enabledCount = rules.filter((r) => r.enabled).length;
@@ -214,10 +221,16 @@ export default function RulesPage() {
         eyebrow={t('rules.count', { count: rules.length })}
         title={t('rules.title')}
         description={t('rules.subtitle')}
-        actions={rules.length > 0 ? createButton : undefined}
+        actions={!loadFailed && rules.length > 0 ? createButton : undefined}
       />
 
-      {rules.length === 0 ? (
+      {loadFailed ? (
+        <ErrorState
+          error={projectError ?? rulesError}
+          onRetry={() => { refetchProject(); refetchRules(); }}
+          retrying={isRefetching}
+        />
+      ) : rules.length === 0 ? (
         <EmptyState
           icon={GitBranch}
           title={t('rules.empty.title')}
@@ -420,9 +433,11 @@ export default function RulesPage() {
               </div>
 
               {!formConditions || (formConditions.type === 'group' && formConditions.children.length === 0) ? (
-                <p className="rounded-lg border border-dashed border-rail p-4 text-center text-sm text-muted-foreground">
-                  {t('rules.form.noConditions')}
-                </p>
+                <EmptyState
+                  icon={Filter}
+                  title={t('rules.form.noConditions')}
+                  className="flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-6"
+                />
               ) : (
                 <ConditionTreeEditor
                   node={formConditions}
@@ -521,7 +536,7 @@ export default function RulesPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-halt text-white hover:bg-halt/90">
+            <AlertDialogAction onClick={handleDelete} className={buttonVariants({ variant: 'destructive' })}>
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('common.delete')}
             </AlertDialogAction>

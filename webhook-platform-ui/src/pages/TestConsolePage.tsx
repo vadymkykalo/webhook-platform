@@ -11,7 +11,8 @@ import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
 import { deliveriesApi } from '../api/deliveries.api';
 import { useProject, useEndpoints, useSubscriptions, useEventTypes } from '../api/queries';
 import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
-import PageSkeleton from '../components/PageSkeleton';
+import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
+import { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import StatusBadge, { kindOfDeliveryStatus, type StatusKind } from '../components/StatusBadge';
 import AttemptRail, { type RailAttempt } from '../components/AttemptRail';
@@ -97,8 +98,14 @@ export default function TestConsolePage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageEndpoints } = usePermissions();
-  const { data: project, isLoading: projectLoading } = useProject(projectId);
-  const { data: endpoints = [], isLoading: endpointsLoading } = useEndpoints(projectId);
+  const {
+    data: project, isLoading: projectLoading, isError: projectFailed,
+    error: projectError, refetch: refetchProject, isRefetching,
+  } = useProject(projectId);
+  const {
+    data: endpoints = [], isLoading: endpointsLoading, isError: endpointsFailed,
+    error: endpointsError, refetch: refetchEndpoints,
+  } = useEndpoints(projectId);
   const { data: subscriptions = [] } = useSubscriptions(projectId);
   const { data: catalogTypes = [] } = useEventTypes(projectId);
 
@@ -275,7 +282,20 @@ export default function TestConsolePage() {
   };
 
   if (loading) return <PageSkeleton />;
-  if (!project) return null;
+
+  // Every mode below sends to an endpoint out of these two fetches. Returning
+  // null on a failed one left the console blank with no way back.
+  if (projectFailed || endpointsFailed || !project) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState
+          error={projectError ?? endpointsError}
+          onRetry={() => { refetchProject(); refetchEndpoints(); }}
+          retrying={isRefetching}
+        />
+      </div>
+    );
+  }
 
   const getEndpointUrl = (endpointId: string) => endpoints.find((e) => e.id === endpointId)?.url || endpointId;
   const busy = sending || pinging || loadingResults;
@@ -583,9 +603,9 @@ function ResultsPanel({
 
   if (busy && !lastEvent && !pingResult) {
     return (
-      <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-rail">
-        <Loader2 className="mb-3 h-6 w-6 animate-spin text-primary" aria-hidden />
+      <div className="min-h-[320px] space-y-3 rounded-xl border border-dashed border-rail p-4" aria-busy="true">
         <p className="text-sm text-muted-foreground">{t('testConsole.processing')}</p>
+        <SkeletonRows count={3} height="h-20" />
       </div>
     );
   }

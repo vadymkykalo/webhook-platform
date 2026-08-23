@@ -27,6 +27,18 @@ export function getPasswordStrength(password: string): number {
 }
 
 /**
+ * Whether every rule the checklist draws is satisfied.
+ *
+ * The form has to gate on the same list the user is looking at. Before this,
+ * the submit button stayed enabled while the checklist showed a red cross, so
+ * the only way to learn the password was rejected was to send it and read a
+ * server error — which said "Invalid request parameters" and named no field.
+ */
+export function passwordMeetsPolicy(password: string): boolean {
+  return RULES.every((r) => r.test(password));
+}
+
+/**
  * The meter reads in three steps, not four: rejected, not yet accepted,
  * accepted. "Fair" and "Good" are both "not yet strong", so they share a hue
  * and are told apart by the filled segment count and the label — which is what

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Key, Loader2, Trash2, Copy, Check, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Plus, Key, Loader2, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
@@ -19,6 +19,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { Card, CardContent } from '../components/ui/card';
+import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ export default function ApiKeysPage() {
   const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
   const [pageInfo, setPageInfo] = useState<PageResponse<ApiKeyResponse> | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
 
@@ -71,7 +73,7 @@ export default function ApiKeysPage() {
       setLoading(true);
       const [projectData, apiKeysData] = await Promise.all([
         projectsApi.get(projectId),
-        apiKeysApi.listPaged(projectId, currentPage, PAGE_SIZE),
+        apiKeysApi.listPaged(projectId, currentPage, pageSize),
       ]);
       setProject(projectData);
       setApiKeys(apiKeysData.content);
@@ -82,7 +84,7 @@ export default function ApiKeysPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId, currentPage]);
+  }, [projectId, currentPage, pageSize]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -233,27 +235,15 @@ export default function ApiKeysPage() {
             );
           })}
 
-          {pageInfo && pageInfo.totalPages > 1 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <p className="text-sm text-muted-foreground">
-                {t('common.showing', {
-                  from: currentPage * PAGE_SIZE + 1,
-                  to: Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements),
-                  total: pageInfo.totalElements,
-                })}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => p - 1)} disabled={pageInfo.first}>
-                  <ChevronLeft className="h-4 w-4" aria-hidden /> {t('common.previous')}
-                </Button>
-                <span className="px-1 font-mono text-xs text-muted-foreground">
-                  {currentPage + 1} / {pageInfo.totalPages}
-                </span>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => p + 1)} disabled={pageInfo.last}>
-                  {t('common.next')} <ChevronRight className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
-            </div>
+          {pageInfo && (
+            <TablePagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalElements={pageInfo.totalElements}
+              totalPages={pageInfo.totalPages}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
           )}
         </div>
       )}

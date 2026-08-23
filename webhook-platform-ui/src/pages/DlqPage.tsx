@@ -22,7 +22,6 @@ import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
 
-const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
 
 /** A number worth reading on its own, in the machine voice. */
 function Metric({ label, value, halt }: { label: string; value: number; halt?: boolean }) {
@@ -196,7 +195,7 @@ export default function DlqPage() {
       </FilterBar>
 
       {items.length === 0 ? (
-        <EmptyState icon={CheckCircle2} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} docsLink="/docs#deliveries-api" />
+        <EmptyState icon={CheckCircle2} title={t('dlq.noItems')} description={t('dlq.noItemsDesc')} docsLink="/docs#retries" />
       ) : (
         <div className="animate-fade-in">
           <PermissionGate allowed={canManageDlq}>
@@ -215,7 +214,7 @@ export default function DlqPage() {
               <TableHeader>
                 <TableRow>
                   {canManageDlq && (
-                    <TableHead className={`${HEAD_CLASS} w-10`}>
+                    <TableHead className="w-10">
                       <SelectBox
                         checked={allSelected}
                         indeterminate={selectedCount > 0}
@@ -224,14 +223,14 @@ export default function DlqPage() {
                       />
                     </TableHead>
                   )}
-                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.status')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('dlq.columns.eventType')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('dlq.columns.endpoint')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('dlq.columns.attempts')}</TableHead>
-                  <TableHead className={`${HEAD_CLASS} hidden lg:table-cell`}>{t('dlq.columns.lastError')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('dlq.columns.failedAt')}</TableHead>
-                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.deliveryId')}</TableHead>
-                  {canManageDlq && <TableHead className={`${HEAD_CLASS} w-[60px]`}><span className="sr-only">{t('common.actions')}</span></TableHead>}
+                  <TableHead>{t('deliveries.columns.status')}</TableHead>
+                  <TableHead>{t('dlq.columns.eventType')}</TableHead>
+                  <TableHead>{t('dlq.columns.endpoint')}</TableHead>
+                  <TableHead>{t('dlq.columns.attempts')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('dlq.columns.lastError')}</TableHead>
+                  <TableHead>{t('dlq.columns.failedAt')}</TableHead>
+                  <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
+                  {canManageDlq && <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>

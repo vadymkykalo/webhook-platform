@@ -22,6 +22,8 @@ import { ArrowLeft, Save, ToggleLeft, ToggleRight, Loader2, Play, History, Check
 import type { WorkflowExecutionResponse } from '../api/workflows.api';
 import { workflowsApi } from '../api/workflows.api';
 import { Button } from '../components/ui/button';
+import PageSkeleton from '../components/PageSkeleton';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import { nodeTypes, nodeTemplates, type NodeTemplate } from '../components/workflow/nodes/nodeTypes';
@@ -47,7 +49,9 @@ function WorkflowBuilderInner() {
   const [triggerPayload, setTriggerPayload] = useState('{"type":"test.event","data":{}}');
   const [showTriggerDialog, setShowTriggerDialog] = useState(false);
 
-  const { data: workflow, isLoading } = useQuery({
+  const {
+    data: workflow, isLoading, isError, error, refetch, isRefetching,
+  } = useQuery({
     queryKey: ['workflow', projectId, workflowId],
     queryFn: () => workflowsApi.get(projectId!, workflowId!),
     enabled: !!projectId && !!workflowId,
@@ -229,14 +233,28 @@ function WorkflowBuilderInner() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <PageSkeleton maxWidth="max-w-none">
+        <div className="h-[70vh] animate-pulse rounded-lg border border-rail bg-muted" />
+      </PageSkeleton>
+    );
+  }
+
+  // A fetch that failed is not a workflow that was deleted, and the canvas
+  // below writes back to whatever this returned.
+  if (isError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
       </div>
     );
   }
 
   if (!workflow) {
-    return <div className="p-6 text-center text-muted-foreground">{t('workflows.builder.notFound')}</div>;
+    return (
+      <div className="p-4 lg:p-6">
+        <EmptyState icon={Activity} title={t('workflows.builder.notFound')} />
+      </div>
+    );
   }
 
   return (
@@ -433,7 +451,11 @@ function WorkflowBuilderInner() {
           })()}
 
           {!executions?.content?.length ? (
-            <p className="text-xs text-muted-foreground p-4 text-center">{t('workflows.builder.noExecutions')}</p>
+            <EmptyState
+              icon={History}
+              title={t('workflows.builder.noExecutions')}
+              className="flex flex-col items-center justify-center p-6"
+            />
           ) : (
             <div className="divide-y divide-rail">
               {executions.content.map((exec: WorkflowExecutionResponse) => (

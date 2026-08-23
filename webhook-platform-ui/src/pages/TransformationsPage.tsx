@@ -6,7 +6,7 @@ import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
-import EmptyState from '../components/EmptyState';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
 import {
   useProject,
@@ -15,7 +15,7 @@ import {
   useUpdateTransformation,
   useDeleteTransformation,
 } from '../api/queries';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Input } from '../components/ui/input';
@@ -46,8 +46,14 @@ export default function TransformationsPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageSubscriptions: canManage } = usePermissions();
-  const { data: project, isLoading: projectLoading } = useProject(projectId);
-  const { data: transformations = [], isLoading: listLoading } = useTransformations(projectId!);
+  const {
+    data: project, isLoading: projectLoading, isError: projectFailed,
+    error: projectError, refetch: refetchProject, isRefetching,
+  } = useProject(projectId);
+  const {
+    data: transformations = [], isLoading: listLoading, isError: listFailed,
+    error: listError, refetch: refetchList,
+  } = useTransformations(projectId!);
   const createMutation = useCreateTransformation(projectId!);
   const updateMutation = useUpdateTransformation(projectId!);
   const deleteMutation = useDeleteTransformation(projectId!);
@@ -166,10 +172,16 @@ export default function TransformationsPage() {
 
   if (loading) return <PageSkeleton />;
 
-  if (!project) {
+  // A failed fetch used to render "project not found", which reads as a
+  // deleted project rather than a backend that is down.
+  if (projectFailed || listFailed || !project) {
     return (
       <div className="p-4 lg:p-6">
-        <EmptyState icon={Repeat2} title={t('transformations.projectNotFound')} />
+        <ErrorState
+          error={projectError ?? listError}
+          onRetry={() => { refetchProject(); refetchList(); }}
+          retrying={isRefetching}
+        />
       </div>
     );
   }
@@ -214,10 +226,11 @@ export default function TransformationsPage() {
           action={createButton(t('transformations.createFirst'))}
         />
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-rail px-6 py-12 text-center">
-          <p className="text-sm font-medium">{t('transformations.noMatching')}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t('transformations.noMatchingDesc')}</p>
-        </div>
+        <EmptyState
+          icon={Search}
+          title={t('transformations.noMatching')}
+          description={t('transformations.noMatchingDesc')}
+        />
       ) : (
         <Card className="overflow-hidden">
           <Table>
@@ -423,7 +436,7 @@ export default function TransformationsPage() {
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="bg-halt text-white hover:bg-halt/90"
+              className={buttonVariants({ variant: 'destructive' })}
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}

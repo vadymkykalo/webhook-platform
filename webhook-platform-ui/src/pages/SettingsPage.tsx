@@ -7,6 +7,7 @@ import { authApi } from '../api/auth.api';
 import { showApiError, showSuccess } from '../lib/toast';
 import { getStoredTimezone, setStoredTimezone } from '../lib/date';
 import PageHeader from '../components/PageHeader';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import StatusBadge from '../components/StatusBadge';
 import { RoleCard } from '../components/PermissionGate';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
@@ -192,6 +193,19 @@ export default function SettingsPage() {
   };
 
   const verified = user?.user?.status !== 'PENDING_VERIFICATION';
+
+  // Everything below reads out of the auth store. Until the session restore in
+  // App.tsx lands, that store is empty and the form would render as blank
+  // fields with a blank email beside them. There is no error branch to pair
+  // with this: a restore that fails clears the session and routes to login, so
+  // this page never sees a failure it could report.
+  if (!user) {
+    return (
+      <PageSkeleton maxWidth="max-w-4xl">
+        <SkeletonCards count={3} height="h-44" cols="grid-cols-1" />
+      </PageSkeleton>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6">

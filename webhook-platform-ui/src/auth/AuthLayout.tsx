@@ -15,12 +15,24 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
  * about what this is than any tagline.
  */
 
+/**
+ * The headers a real outgoing attempt carries, copied from
+ * OutgoingAttemptStore: X-Signature, X-Event-Id, X-Delivery-Id, X-Timestamp,
+ * X-Sequence-Number, Idempotency-Key. The signature format is
+ * `t=<unix-ms>,v1=<hex>` from WebhookSignatureUtils.buildSignatureHeader.
+ *
+ * This panel used to invent `x-hookflow-signature: sha256=…` and
+ * `x-hookflow-attempt: 4 of 8` — headers the product does not send, in a
+ * format the docs teach differently, over an attempt count the outgoing ladder
+ * does not have. It is the first thing a developer sees on all seven auth
+ * screens; a fabricated wire format is the most expensive kind of wrong.
+ */
 const SAMPLE = [
   ['POST', '/webhooks/orders'],
   ['host', 'api.acme.com'],
-  ['x-hookflow-event', 'order.completed'],
-  ['x-hookflow-signature', 'sha256=9f2b…c41e'],
-  ['x-hookflow-attempt', '4 of 8'],
+  ['X-Event-Id', 'evt_9c41e8f2'],
+  ['X-Signature', 't=1787519666714,v1=9f2b…c41e'],
+  ['X-Timestamp', '1787519666714'],
 ] as const;
 
 export default function AuthLayout({

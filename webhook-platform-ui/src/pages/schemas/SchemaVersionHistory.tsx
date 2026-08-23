@@ -13,9 +13,11 @@ import { formatDate } from '../../lib/date';
 import type {
   EventTypeCatalogResponse, EventSchemaVersionResponse, SchemaChangeResponse,
 } from '../../api/schemas.api';
+import EmptyState, { ErrorState } from '../../components/EmptyState';
+import { SkeletonRows } from '../../components/PageSkeleton';
 import StatusBadge, { type StatusKind } from '../../components/StatusBadge';
 import JsonEditor from '../../components/JsonEditor';
-import { Button } from '../../components/ui/button';
+import { Button, buttonVariants } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import {
@@ -174,7 +176,7 @@ export default function SchemaVersionHistory({
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="bg-halt text-white hover:bg-halt/90"
+              className={buttonVariants({ variant: 'destructive' })}
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('common.delete')}
@@ -206,7 +208,9 @@ function HistoryTab({ active, onClick, label }: { active: boolean; onClick: () =
 
 function VersionList({ projectId, eventType }: { projectId: string; eventType: EventTypeCatalogResponse }) {
   const { t } = useTranslation();
-  const { data: versions, isLoading } = useSchemaVersions(projectId, eventType.id);
+  const {
+    data: versions, isLoading, isError, error, refetch, isRefetching,
+  } = useSchemaVersions(projectId, eventType.id);
   const createMutation = useCreateSchemaVersion(projectId, eventType.id);
   const promoteMutation = usePromoteSchema(projectId, eventType.id);
   const deprecateMutation = useDeprecateSchema(projectId, eventType.id);
@@ -297,17 +301,20 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
-        </div>
+        <SkeletonRows count={3} height="h-14" />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
       ) : !versions?.length ? (
-        <div className="rounded-xl border border-dashed border-rail px-6 py-12 text-center">
-          <p className="text-sm font-medium">{t('schemas.noVersions')}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t('schemas.noVersionsHint')}</p>
-          <Button size="sm" className="mt-4" onClick={() => setShowUpload(true)}>
-            <Plus className="h-3.5 w-3.5" /> {t('schemas.uploadSchema')}
-          </Button>
-        </div>
+        <EmptyState
+          icon={History}
+          title={t('schemas.noVersions')}
+          description={t('schemas.noVersionsHint')}
+          action={(
+            <Button size="sm" onClick={() => setShowUpload(true)}>
+              <Plus className="h-3.5 w-3.5" /> {t('schemas.uploadSchema')}
+            </Button>
+          )}
+        />
       ) : (
         <ul className="space-y-2">
           {versions.map((v: EventSchemaVersionResponse) => {
@@ -387,22 +394,23 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
 
 function ChangeList({ projectId, eventType }: { projectId: string; eventType: EventTypeCatalogResponse }) {
   const { t } = useTranslation();
-  const { data: changes, isLoading } = useSchemaChanges(projectId, eventType.id);
+  const {
+    data: changes, isLoading, isError, error, refetch, isRefetching,
+  } = useSchemaChanges(projectId, eventType.id);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
-      </div>
-    );
+  if (isLoading) return <SkeletonRows count={3} height="h-20" />;
+
+  if (isError) {
+    return <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />;
   }
 
   if (!changes?.length) {
     return (
-      <div className="rounded-xl border border-dashed border-rail px-6 py-12 text-center">
-        <p className="text-sm font-medium">{t('schemas.noChanges')}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{t('schemas.noChangesHint')}</p>
-      </div>
+      <EmptyState
+        icon={GitCompareArrows}
+        title={t('schemas.noChanges')}
+        description={t('schemas.noChangesHint')}
+      />
     );
   }
 

@@ -11,6 +11,8 @@ import { useEventTypes, useProject, queryKeys } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import AttemptRail, { type RailAttempt } from '../components/AttemptRail';
 import PageHeader from '../components/PageHeader';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -519,9 +521,29 @@ export default function ConnectionSetupPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { data: project } = useProject(projectId);
+  const {
+    data: project, isLoading, isError, error, refetch, isRefetching,
+  } = useProject(projectId);
 
   const backToConnections = () => navigate(`/admin/projects/${projectId}/connections`);
+
+  if (isLoading) {
+    return (
+      <PageSkeleton maxWidth="max-w-2xl">
+        <SkeletonCards count={2} height="h-40" cols="grid-cols-1" />
+      </PageSkeleton>
+    );
+  }
+
+  // A wizard whose fetch failed would otherwise write into a project we could
+  // not confirm exists — an empty form, then a 404 on submit.
+  if (isError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6">

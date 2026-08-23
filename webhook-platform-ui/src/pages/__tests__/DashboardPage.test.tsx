@@ -61,7 +61,7 @@ const STATS: DashboardStats = {
 };
 
 const EMPTY_PAGE: PageResponse<DeliveryResponse> = {
-  content: [], totalElements: 0, totalPages: 0, size: 20, number: 0, first: true, last: true, empty: true,
+  content: [], totalElements: 0, totalPages: 0, size: 20, number: 0, first: true, last: true,
 };
 
 /**

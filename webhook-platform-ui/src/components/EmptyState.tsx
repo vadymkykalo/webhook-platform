@@ -8,7 +8,8 @@ import { Button } from './ui/button';
 interface EmptyStateProps {
   icon: LucideIcon;
   title: string;
-  description?: string;
+  /** ReactNode, not string: some descriptions name the record in <strong>. */
+  description?: ReactNode;
   action?: ReactNode;
   docsLink?: string;
   className?: string;

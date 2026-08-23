@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Copy, Radio, Send, FileJson, Shield, ExternalLink, Loader2 } from 'lucide-react';
+import { Copy, Radio, Send, FileJson, Shield, ExternalLink } from 'lucide-react';
 import { useEvent } from '../api/queries';
 import { useQuery } from '@tanstack/react-query';
 import { deliveriesApi } from '../api/deliveries.api';
@@ -11,6 +11,8 @@ import { showSuccess, showApiError } from '../lib/toast';
 import { railFromCounts } from '../pages/attemptRailData';
 import AttemptRail from './AttemptRail';
 import StatusBadge, { kindOfDeliveryStatus } from './StatusBadge';
+import EmptyState, { ErrorState } from './EmptyState';
+import { SkeletonRows } from './PageSkeleton';
 import {
   Sheet,
   SheetContent,
@@ -40,7 +42,9 @@ export default function EventDetailsSheet({
 }: EventDetailsSheetProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: event, isLoading } = useEvent(projectId, eventId ?? undefined);
+  const {
+    data: event, isLoading, isError, error, refetch, isRefetching,
+  } = useEvent(projectId, eventId ?? undefined);
   const [activeTab, setActiveTab] = useState<'raw' | 'sanitized' | 'deliveries'>('raw');
 
   const { data: deliveriesData, isLoading: deliveriesLoading, refetch: refetchDeliveries } = useQuery({
@@ -177,7 +181,7 @@ export default function EventDetailsSheet({
             {activeTab === 'sanitized' && (
               <div className="relative">
                 {sanitizedLoading ? (
-                  <div className="flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden /></div>
+                  <SkeletonRows count={1} height="h-40" />
                 ) : sanitizedPayload ? (
                   <>
                     <Button variant="ghost" size="sm" className="absolute right-2 top-2 z-10" onClick={() => handleCopy(formatPayload(sanitizedPayload))}>
@@ -188,7 +192,11 @@ export default function EventDetailsSheet({
                     </pre>
                   </>
                 ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">{t('events.details.sanitizedUnavailable')}</p>
+                  <EmptyState
+                    icon={Shield}
+                    title={t('events.details.sanitizedUnavailable')}
+                    className="flex flex-col items-center justify-center py-8"
+                  />
                 )}
               </div>
             )}
@@ -196,17 +204,16 @@ export default function EventDetailsSheet({
             {activeTab === 'deliveries' && (
               <div className="space-y-2">
                 {deliveriesLoading ? (
-                  <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden /></div>
+                  <SkeletonRows count={3} height="h-14" />
                 ) : deliveries.length === 0 ? (
-                  <div className="space-y-2 py-8 text-center">
-                    <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
-                    {event.eventType && (
-                      <p className="mx-auto max-w-sm text-xs text-muted-foreground">
-                        <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
-                      </p>
-                    )}
-                    <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
-                  </div>
+                  <EmptyState
+                    icon={Send}
+                    title={t('events.details.noDeliveries')}
+                    description={event.eventType
+                      ? <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
+                      : t('events.details.noDeliveriesHint')}
+                    className="flex flex-col items-center justify-center py-8"
+                  />
                 ) : (
                   deliveries.map((d) => {
                     const rail = railFromCounts(d.attemptCount, d.maxAttempts, d.status);
@@ -263,10 +270,19 @@ export default function EventDetailsSheet({
               )}
             </div>
           </div>
+        ) : isError ? (
+          <ErrorState
+            error={error}
+            onRetry={() => refetch()}
+            retrying={isRefetching}
+            className="flex flex-col items-center justify-center pt-6"
+          />
         ) : (
-          <div className="pt-6 text-center text-sm text-muted-foreground">
-            {t('events.details.notFound')}
-          </div>
+          <EmptyState
+            icon={Radio}
+            title={t('events.details.notFound')}
+            className="flex flex-col items-center justify-center pt-6"
+          />
         )}
       </SheetContent>
     </Sheet>

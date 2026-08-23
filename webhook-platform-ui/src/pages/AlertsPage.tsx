@@ -16,7 +16,7 @@ import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -626,7 +626,7 @@ export default function AlertsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-halt text-destructive-foreground hover:bg-halt/90">
+            <AlertDialogAction onClick={handleDelete} className={buttonVariants({ variant: 'destructive' })}>
               {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>

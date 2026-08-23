@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { GitCompare, Loader2, Search, ChevronLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
+import { GitCompare, Search, ChevronLeft, ChevronRight, AlertTriangle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError } from '../lib/toast';
-import PageSkeleton from '../components/PageSkeleton';
+import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import { eventDiffApi, type EventDiffResponse } from '../api/eventDiff.api';
 import { eventsApi, type EventResponse } from '../api/events.api';
@@ -30,12 +31,15 @@ interface EventPickerProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   loading: boolean;
+  /** The caught error from the last event fetch, if it failed. */
+  error?: unknown;
+  onRetry: () => void;
   totalElements: number;
 }
 
 function EventPicker({
   label, events, selectedId, onSelect, totalPages, currentPage,
-  onPageChange, searchQuery, onSearchChange, loading, totalElements,
+  onPageChange, searchQuery, onSearchChange, loading, error, onRetry, totalElements,
 }: EventPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -108,13 +112,19 @@ function EventPicker({
 
             <div className="max-h-64 overflow-y-auto">
               {loading ? (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />
-                </div>
+                <div className="p-2"><SkeletonRows count={3} height="h-11" /></div>
+              ) : error !== undefined ? (
+                <ErrorState
+                  error={error}
+                  onRetry={onRetry}
+                  className="flex flex-col items-center justify-center py-6"
+                />
               ) : events.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  {searchQuery ? t('eventDiff.noSearchResults') : t('eventDiff.noEvents')}
-                </p>
+                <EmptyState
+                  icon={Search}
+                  title={searchQuery ? t('eventDiff.noSearchResults') : t('eventDiff.noEvents')}
+                  className="flex flex-col items-center justify-center py-6"
+                />
               ) : (
                 events.map((ev) => (
                   <button
@@ -172,6 +182,7 @@ export default function EventDiffPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [eventsPage, setEventsPage] = useState(0);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [eventsError, setEventsError] = useState<unknown>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [leftId, setLeftId] = useState(searchParams.get('left') || '');
@@ -189,7 +200,9 @@ export default function EventDiffPage() {
       setAllEvents(data.content);
       setTotalElements(data.totalElements);
       setTotalPages(data.totalPages);
+      setEventsError(undefined);
     } catch (err: any) {
+      setEventsError(err);
       showApiError(err, 'eventDiff.toast.loadEventsFailed');
     } finally {
       setLoadingEvents(false);
@@ -265,6 +278,8 @@ export default function EventDiffPage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           loading={loadingEvents}
+          error={eventsError}
+          onRetry={() => loadEvents(eventsPage)}
           totalElements={totalElements}
         />
         <EventPicker
@@ -278,6 +293,8 @@ export default function EventDiffPage() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           loading={loadingEvents}
+          error={eventsError}
+          onRetry={() => loadEvents(eventsPage)}
           totalElements={totalElements}
         />
 
