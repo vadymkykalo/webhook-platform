@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
@@ -104,13 +105,14 @@ class AuditLogAspectTest {
     }
 
     @Test
-    void unauthenticatedAction_hasNoOrganizationAndIsWrittenAsSystem() throws Throwable {
+    void unauthenticatedAction_isWrittenUnderTheSystemSentinel() throws Throwable {
         aspect.audit(joinPoint(new String[]{"email"}, new Object[]{"someone@example.com"}),
                 auditable(AuditAction.LOGIN, "User"));
 
-        // Left unset on purpose: the @TenantId generator fills in the root value under
-        // runAsSystem, so the row carries the SYSTEM sentinel rather than a real organization.
-        assertThat(savedRow().getOrganizationId()).isNull();
+        // Login, register and password reset have no organization, and the row says so with the
+        // sentinel rather than leaving the field unset for Hibernate's @TenantId generator to fill
+        // in. Same value on the row either way; this way the code states it.
+        assertThat(savedRow().getOrganizationId()).isEqualTo(TenantContext.SYSTEM);
     }
 
     private AuditLog savedRow() {

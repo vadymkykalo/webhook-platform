@@ -26,12 +26,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Pins the three ADR-0006 failures that produced no error anybody would see.
@@ -54,6 +60,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       organization you belong to" read was filtered to the one the current token names.</li>
  * </ul>
  *
+ * <p>Each of the three is now also held by a guard, and this class carries a case per guard
+ * rather than a case per endpoint: the transaction guard in {@link TenantContext#callAs} and the
+ * propagation {@link TenantPropagatingTaskDecorator#wrap} gives a hand-built pool, both exercised
+ * here against a real transaction manager and a real session rather than a set flag. The third
+ * guard — {@code NativeQueryTenantPredicateTest} — has no runtime counterpart on purpose: it
+ * asserts on the SQL string, because a runtime check would only ever cover the queries some test
+ * happens to call.
+ *
  * <p>Named {@code *IntegrationTest} so it routes to the Docker-backed job — see
  * {@code scripts/check-test-routing.sh}.
  */
@@ -71,6 +85,7 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
     @Autowired private WorkflowTriggerService workflowTriggerService;
     @Autowired private OrganizationService organizationService;
     @Autowired private AuditLogAspect auditLogAspect;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     private UUID orgA;
     private UUID orgB;
@@ -198,16 +213,60 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
                     .filter(a -> resourceId.equals(a.getResourceId()))
                     .toList();
             assertThat(written).hasSize(1);
-            // The point of this case is that the row is written at all. What lands in
-            // organization_id is Hibernate's, not ours: under the root tenant its @TenantId
-            // generator keeps an explicitly-set value and otherwise stamps the root value
-            // itself, so a null organization becomes the SYSTEM sentinel rather than SQL NULL.
-            // Harmless — the sentinel is the nil UUID precisely so it matches no organization,
-            // and every reader of audit_log is either tenant-scoped (sees neither) or system-
-            // scoped (sees both) — but it is a real difference from the pre-ADR-0006 NULL, so
-            // pin it rather than let it drift unnoticed.
+            // The point of this case is that the row is written at all. The sentinel is now
+            // chosen in the aspect rather than left to Hibernate's @TenantId generator, but the
+            // value is the same one it used to fill in: the nil UUID, which matches no
+            // organization, so a tenant-scoped reader sees this row no more than it saw the
+            // pre-ADR-0006 SQL NULL. Pinned because it is a real difference from that NULL.
             assertThat(written.get(0).getOrganizationId()).isEqualTo(TenantContext.SYSTEM);
         });
+    }
+
+    // ── 2b. The guards that turned each of these into a build failure ───
+
+    @Test
+    @DisplayName("entering a tenant scope inside an open transaction fails instead of mis-stamping")
+    void tenantScopeInsideAnOpenTransactionIsRejected() {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+
+        // The shape the guard exists for: the transaction is already open, so Hibernate has
+        // already resolved the tenant for this session and the scope change cannot reach it.
+        // Before the guard this wrote a row belonging to whoever was in scope when the
+        // transaction began, and said nothing.
+        assertThatThrownBy(() -> TenantContext.runAsSystem(() ->
+                transaction.executeWithoutResult(status ->
+                        TenantContext.runAs(orgA, () -> projectRepository.count()))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ADR-0006");
+    }
+
+    @Test
+    @DisplayName("a task on a hand-built pool writes under the submitting thread's organization")
+    void wrappedPoolStampsTheSubmittersOrganization() throws Exception {
+        ExecutorService pool = TenantPropagatingTaskDecorator.wrap(Executors.newSingleThreadExecutor());
+        try {
+            // organizationId is left unset on purpose: the whole claim is that the worker thread
+            // inherited orgA's scope and Hibernate stamped the row from it.
+            UUID projectId = TenantContext.callAs(orgA, () -> {
+                try {
+                    return pool.submit(() -> projectRepository.save(
+                            Project.builder().name("pool-written").build()).getId()).get(10, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    throw new IllegalStateException("the pooled write failed", e);
+                }
+            });
+
+            TenantContext.runAs(orgA, () ->
+                    assertThat(projectRepository.findById(projectId))
+                            .as("written under orgA's scope, so orgA must see it")
+                            .isPresent());
+            TenantContext.runAs(orgB, () ->
+                    assertThat(projectRepository.findById(projectId))
+                            .as("a row stamped with the wrong organization would show up here")
+                            .isEmpty());
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     // ── 3. Organization list ────────────────────────────────────────
