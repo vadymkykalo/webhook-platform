@@ -612,12 +612,6 @@ Worker: http://worker:8081/actuator/prometheus
 | `billing_reconciliation_errors_total` | API | any increase |
 | `delivery_attempts_table_rows` | API | > 10M (cleanup lag) |
 
-### Recommended Dashboards
-
-See [SLOs.md](./runbooks/SLOs.md) for PromQL queries and error budget policy.
-
----
-
 ## 10. Troubleshooting
 
 ### Common Issues
@@ -643,12 +637,3 @@ kubectl -n hookflow logs -l app.kubernetes.io/component=worker -f --tail=100
 # Filter for errors only
 kubectl -n hookflow logs -l app.kubernetes.io/component=api | grep -i error
 ```
-
-### Detailed Runbooks
-
-- [SLOs & Error Budgets](./runbooks/SLOs.md)
-- [High Kafka Lag](./runbooks/high-kafka-lag.md)
-- [Database Issues](./runbooks/database-issues.md)
-- [Failed Deliveries Spike](./runbooks/failed-deliveries-spike.md)
-- [Disaster Recovery](./runbooks/disaster-recovery.md)
-- [Secret Rotation](./runbooks/secret-rotation.md)

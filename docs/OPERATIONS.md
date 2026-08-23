@@ -153,11 +153,10 @@ is the most common cause of an unusable backup; this is what turns "we take
 backups" into a guarantee that they're restorable.
 
 **Open question this repo doesn't fully answer yet — Postgres PITR vs.
-Kafka/Redis state:** see `docs/runbooks/disaster-recovery.md` §1.4
-"After restoring Postgres: outbox, Kafka and Redis consistency" for what a
-point-in-time (or full) Postgres restore does to in-flight outbox rows, Kafka
-messages already published for events the restore rolled back, and Redis
-counters that no longer agree with the restored DB.
+Kafka/Redis state:** a point-in-time (or full) Postgres restore leaves
+in-flight outbox rows, Kafka messages already published for events the restore
+rolled back, and Redis counters that no longer agree with the restored DB.
+There is no written procedure for reconciling the three.
 
 ## Scaling
 
@@ -248,12 +247,6 @@ Key settings:
 ## Detailed Documentation
 
 - **[Self-Hosted Deployment Guide](./SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, Helm install, TLS, monitoring
-- **[SLOs & Error Budgets](./runbooks/SLOs.md)** — service level objectives, PromQL queries, dashboard panels
-- **[High Kafka Lag](./runbooks/high-kafka-lag.md)** — diagnosis, worker scaling, Kafka broker issues
-- **[Database Issues](./runbooks/database-issues.md)** — connection pools, slow queries, disk, locks, replication
-- **[Failed Deliveries Spike](./runbooks/failed-deliveries-spike.md)** — triage, per-endpoint vs platform-wide, mass retry
-- **[Disaster Recovery](./runbooks/disaster-recovery.md)** — PG restore, Kafka rebuild, full cluster recovery, RTO/RPO
-- **[Secret Rotation](./runbooks/secret-rotation.md)** — JWT, encryption keys, DB/Redis passwords, Stripe keys
 
 ## Support
 

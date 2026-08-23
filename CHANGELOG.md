@@ -92,8 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the whole lifecycle rather than of one method. `AttemptRunner` now owns the order of
   operations and the fences; each direction supplies an `AttemptStore` adapter for how it
   records Attempts. `WebhookDeliveryService` went from 922 lines to 263 and
-  `IncomingForwardService` from 760 to 275. See
-  `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+  `IncomingForwardService` from 760 to 275.
 - A Delivery whose URL the platform is not allowed to send to no longer spends a
   concurrency permit and a rate-limit token on being rejected: URL validation moved ahead
   of admission. The permit accounting for failures that happen after admission — a
@@ -128,7 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the worst-case fit against the escalation hard cap. The two directions'
   defaults are now declared once, and stay deliberately different: outgoing gets
   `60,300,900,3600,21600,86400` over 7 attempts, incoming `60,300,900,3600,21600`
-  over 5. See `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+  over 5.
 - Retry ladders are validated when written. `POST`/`PUT` on a subscription or an
   incoming destination now returns `400` for a malformed `retryDelays` or an out
   of range `maxAttempts`, with a message naming the field and the offending tier.
