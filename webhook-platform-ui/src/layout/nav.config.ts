@@ -124,7 +124,7 @@ export const PROJECT_SECTIONS: NavSection[] = [
     nameKey: 'nav.develop',
     path: (projectId) => p(projectId, 'test-console'),
     icon: Wrench,
-    owns: ['test-console', 'transform-studio', 'event-diff', 'test-endpoints', 'dev-workspace', 'tunnels'],
+    owns: ['test-console', 'transform-studio', 'event-diff', 'test-endpoints', 'tunnels'],
     tabs: [
       tab('nav.testConsole', 'test-console', Play),
       tab('nav.transformStudio', 'transform-studio', GitCompare),

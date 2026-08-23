@@ -35,24 +35,24 @@ export default function AuthLayout({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="relative hidden overflow-hidden bg-foreground text-background lg:flex lg:w-[46%] lg:flex-col lg:justify-between lg:p-12">
+      <aside className="surface-ink relative hidden overflow-hidden lg:flex lg:w-[46%] lg:flex-col lg:justify-between lg:p-12">
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-background/10">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15">
             <HookflowIcon className="h-4 w-4" />
           </div>
           <span className="text-[15px] font-semibold tracking-tight">Hookflow</span>
         </Link>
 
         <div>
-          <p className="mono-label mb-4 text-background/50">{t('auth.panel.eyebrow')}</p>
-          <div className="rounded-lg border border-background/15 bg-background/5 p-5 font-mono text-[12px] leading-relaxed">
+          <p className="mono-label mb-4 text-muted-foreground">{t('auth.panel.eyebrow')}</p>
+          <div className="rounded-lg border border-rail bg-card p-5 font-mono text-[12px] leading-relaxed">
             {SAMPLE.map(([k, v]) => (
               <div key={k} className="flex gap-3">
-                <span className="w-44 flex-shrink-0 text-background/40">{k}</span>
-                <span className="truncate text-background/90">{v}</span>
+                <span className="w-[9.5rem] flex-shrink-0 text-muted-foreground">{k}</span>
+                <span className="truncate text-foreground">{v}</span>
               </div>
             ))}
-            <div className="mt-5 border-t border-background/10 pt-4">
+            <div className="mt-5 border-t border-rail pt-4">
               <AttemptRail
                 size="full"
                 ariaLabel={t('auth.panel.railLabel')}
@@ -66,10 +66,10 @@ export default function AuthLayout({
               />
             </div>
           </div>
-          <p className="mt-5 max-w-md text-sm text-background/60">{t('auth.panel.caption')}</p>
+          <p className="mt-5 max-w-md text-sm text-muted-foreground">{t('auth.panel.caption')}</p>
         </div>
 
-        <p className="text-xs text-background/35">
+        <p className="text-xs text-muted-foreground">
           {t('auth.login.copyright', { year: new Date().getFullYear() })}
         </p>
       </aside>

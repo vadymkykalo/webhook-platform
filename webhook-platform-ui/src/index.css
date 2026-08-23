@@ -135,6 +135,39 @@
     border-color: hsl(var(--rail));
   }
 
+  /* ── An always-ink surface ───────────────────────────────────────────
+     Some panels are deliberately dark in both themes — the auth panel, a
+     landing band. Using `bg-foreground` for that inverts in dark mode and
+     turns the panel white. This redeclares the tokens locally instead, so
+     anything nested inside (including AttemptRail, which reads --rail and
+     --background straight out of the cascade) renders correctly on ink
+     without knowing it is on ink. Status hues take their dark-theme
+     values, because the light-theme ones are too dark to read here. */
+  .surface-ink {
+    /* Not black. The ink is the brand teal taken down to near-darkness, so a
+       dark panel still belongs to the palette instead of reading as a neutral
+       slab dropped onto it. */
+    background-color: hsl(192 42% 6.5%);
+    color: hsl(180 12% 95%);
+
+    --background: 192 42% 6.5%;
+    --foreground: 180 12% 95%;
+    --card: 192 32% 12%;
+    --rail: 192 20% 22%;
+    --border: 192 20% 22%;
+    --muted-foreground: 186 10% 64%;
+    --secondary: 192 28% 15%;
+    --secondary-foreground: 180 12% 95%;
+    --primary: 184 72% 52%;
+    --primary-foreground: 192 42% 6.5%;
+    --accent: 192 32% 16%;
+    --accent-foreground: 184 72% 62%;
+    --ok: 152 55% 50%;
+    --retry: 36 82% 56%;
+    --halt: 3 74% 62%;
+    --idle: 192 8% 60%;
+  }
+
   .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
   .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
   .animate-slide-in-right { animation: slideInRight 0.25s ease-out forwards; }
