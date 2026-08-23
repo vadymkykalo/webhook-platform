@@ -40,18 +40,21 @@ enforces that a name matches what a test needs. This tag is a second, orthogonal
 a ratchet* — and it deliberately does not touch routing. A ratchet that needs Docker is still
 named `*IntegrationTest` and still runs in the Docker job.
 
-The two were checked for interference before eight classes were tagged, since surefire's `-Dtest=`
-patterns and JUnit tag filtering are separate mechanisms. They compose as AND: the unit job's
-exclusion list plus `-Dgroups=ratchet` yields the seven non-Docker ratchets, and plain
-`mvn test -Dgroups=ratchet` needs no extra flags on the modules that have none.
+The two were checked for interference before anything was tagged in bulk, since surefire's
+`-Dtest=` patterns and JUnit tag filtering are separate mechanisms. They compose as AND: the unit
+job's exclusion list plus `-Dgroups=ratchet` yields exactly the ratchets that need no Docker, and
+plain `mvn test -Dgroups=ratchet` needs no extra flags on the modules that have none.
+
+How many there are is deliberately not written here — that is the enumeration this ADR exists to
+delete. Run `make ratchets`.
 
 ## Consequences
 
 - **CI is unchanged.** Neither job passes `-Dgroups`, so every ratchet still runs where it
   always did. The tag adds a way to *ask*, not a way to skip.
-- **`make ratchets` needs Docker**, because two of the nine boot Testcontainers
-  (`OpenApiDriftIntegrationTest`, `EntityMappingParityIntegrationTest`). The other seven are
-  reflection or file reads.
+- **`make ratchets` needs Docker**, because two of them boot Testcontainers
+  (`OpenApiDriftIntegrationTest`, `EntityMappingParityIntegrationTest`). The rest are reflection
+  or file reads.
 - **It also found a landmine on its way in.** The Makefile does `include .env` + `export`, so
   every variable in a developer's `.env` reaches any maven it runs — including
   `SWAGGER_ENABLED=false`, which application.yml feeds to `springdoc.api-docs.enabled` and

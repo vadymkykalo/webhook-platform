@@ -200,8 +200,8 @@ CLI ↔ `/ws/tunnel` bridges a public `POST /tunnel/{slug}` to the developer's `
 
 Requests carry either a JWT (dashboard/CLI) or `X-API-Key` (server-to-server); `JwtAuthenticationFilter` / `ApiKeyAuthenticationFilter` both resolve into a single `AuthContext` record, injected into controllers as a plain method parameter via `AuthContextArgumentResolver`. Enforcement layers:
 
-- `@RequireAccess(AccessLevel.WRITE)` — the caller's role, checked by `ScopeEnforcementInterceptor` before the handler runs. This is the declarative half and is what the CI ratchet enforces on new mutating handlers.
-- `AuthContext.requireWriteAccess()` / `requireOwnerAccess()` — the same RBAC question (Owner/Developer/Viewer/API_KEY) asked imperatively, as defence in depth *alongside* the annotation: a handler normally carries both.
+- `@RequireAccess(AccessLevel.WRITE)` — the caller's role, checked by `ScopeEnforcementInterceptor` before the handler runs. This is the declaration *and* the enforcement, and what the CI ratchet enforces on new mutating handlers. It fails closed on a caller with no membership role, and `AccessLevelInterceptorCoverageTest` proves the interceptor is actually reached (it is registered on `/api/**` only).
+- `AuthContext.requireWriteAccess()` / `requireOwnerAccess()` — the same question asked again, through the same `RbacUtil`, so it is *not* a second opinion and cannot disagree. It stays because the `AuthContext` parameter it needs is load-bearing, not because the check is. ADR-0015 has the reasoning; write both on a new handler and don't campaign to remove either.
 - `@RequireScope(ApiKeyScope…)` — API-key scope, checked by `ScopeEnforcementInterceptor`. Scope is what an API key may do, access level what a role may do; a handler may legitimately need one and not the other.
 - `@RequireOrgAccess` — `OrgAccessAspect` compares the `{orgId}` path variable against the token's org and throws 403 on mismatch.
 - `AuthContext.validateProjectAccess(projectId)` — an API key may only touch its own project.
