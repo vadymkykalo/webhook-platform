@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.dto.UpdateOrganizationRequest;
+import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -36,9 +37,18 @@ public class OrganizationService {
         this.entityManager = entityManager;
     }
 
+    /**
+     * Every organization this user belongs to — which is more than the one their current token
+     * names, and is the input the organization switcher needs.
+     *
+     * <p>System-scoped for the same reason {@code AuthService.login} is: {@code Membership}
+     * carries {@code @TenantId}, so under the request's own scope this read would be filtered to
+     * the current organization and a user who accepted a second invite would never see it.
+     */
+    @SystemTenant("lists every organization the user belongs to, which is by definition not one organization")
     public List<OrganizationResponse> getUserOrganizations(UUID userId) {
         List<Membership> memberships = membershipRepository.findByUserId(userId);
-        
+
         return memberships.stream()
                 .map(membership -> {
                     Organization org = organizationRepository.findById(membership.getOrganizationId())

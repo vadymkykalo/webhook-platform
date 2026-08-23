@@ -150,7 +150,6 @@ public class AuthService {
     }
 
     @SystemTenant("same as login: the membership read decides the organization the new token names")
-
     public AuthResponse refreshToken(String refreshToken) {
         if (!jwtUtil.validateToken(refreshToken)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");

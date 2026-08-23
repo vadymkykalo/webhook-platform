@@ -9,9 +9,11 @@ import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.UsageDailyRepository;
+import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -75,8 +77,14 @@ class UsageDailyAggregatorTest {
 
     private UsageDailyAggregator aggregator;
 
+    private static final UUID ORG_ID = UUID.randomUUID();
     private static final UUID PROJECT_ID = UUID.randomUUID();
     private static final LocalDate DATE = LocalDate.of(2026, 8, 21);
+
+    /** aggregateForProject reads the organization off the ambient scope; the scheduler enters it. */
+    private void aggregate(UUID projectId, LocalDate date) {
+        TenantContext.runAs(ORG_ID, () -> aggregator.aggregateForProject(projectId, date));
+    }
 
     @BeforeEach
     void setUp() {
@@ -106,10 +114,10 @@ class UsageDailyAggregatorTest {
         // here, because there'd be no proxy to trigger them.
         when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
         stubCounts(10, 8, 6, 1, 1, 3, 2);
-        when(usageDailyRepository.upsertIfAbsent(eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
+        when(usageDailyRepository.upsertIfAbsent(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(1);
 
-        aggregator.aggregateForProject(PROJECT_ID, DATE);
+        aggregate(PROJECT_ID, DATE);
 
         verify(txManager, times(1)).getTransaction(any());
         verify(txManager, times(1)).commit(transactionStatus);
@@ -120,11 +128,30 @@ class UsageDailyAggregatorTest {
     void aggregateForProject_computesAndInsertsCorrectCounts() {
         when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
         stubCounts(10, 8, 6, 1, 1, 3, 2);
-        when(usageDailyRepository.upsertIfAbsent(PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2)).thenReturn(1);
+        when(usageDailyRepository.upsertIfAbsent(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2)).thenReturn(1);
 
-        aggregator.aggregateForProject(PROJECT_ID, DATE);
+        aggregate(PROJECT_ID, DATE);
 
-        verify(usageDailyRepository).upsertIfAbsent(PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2);
+        verify(usageDailyRepository).upsertIfAbsent(ORG_ID, PROJECT_ID, DATE, 10, 8, 6, 1, 1, 3, 2);
+    }
+
+    @Test
+    void aggregateForProject_stampsTheOrganizationOnTheNativeInsert() {
+        // usage_daily.organization_id went NOT NULL in V056, and this INSERT is native — outside
+        // the @TenantId discriminator, which neither filters it nor fills it in. Losing the
+        // value here is not a compile error and not a test failure anywhere else: it is a
+        // constraint violation at 00:05, swallowed by the per-project catch in aggregateYesterday.
+        when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
+        stubCounts(1, 1, 1, 0, 0, 0, 0);
+        when(usageDailyRepository.upsertIfAbsent(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
+                .thenReturn(1);
+
+        aggregate(PROJECT_ID, DATE);
+
+        ArgumentCaptor<UUID> organizationId = ArgumentCaptor.forClass(UUID.class);
+        verify(usageDailyRepository).upsertIfAbsent(organizationId.capture(), eq(PROJECT_ID), eq(DATE),
+                anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+        assertEquals(ORG_ID, organizationId.getValue());
     }
 
     @Test
@@ -136,10 +163,10 @@ class UsageDailyAggregatorTest {
                 .thenReturn(Optional.of(UsageDaily.builder()
                         .projectId(PROJECT_ID).date(DATE).build()));
 
-        aggregator.aggregateForProject(PROJECT_ID, DATE);
+        aggregate(PROJECT_ID, DATE);
 
         verify(eventRepository, never()).countByProjectIdAndCreatedAtBetween(any(), any(), any());
-        verify(usageDailyRepository, never()).upsertIfAbsent(any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+        verify(usageDailyRepository, never()).upsertIfAbsent(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
         // Still ran inside a (no-op) transaction -- the point is atomicity of the check, not
         // whether work happened.
         verify(txManager).commit(transactionStatus);
@@ -155,12 +182,12 @@ class UsageDailyAggregatorTest {
         // CONFLICT DO NOTHING makes upsertIfAbsent return 0 instead of throwing.
         when(usageDailyRepository.findByProjectIdAndDate(PROJECT_ID, DATE)).thenReturn(Optional.empty());
         stubCounts(5, 4, 3, 1, 0, 2, 1);
-        when(usageDailyRepository.upsertIfAbsent(eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
+        when(usageDailyRepository.upsertIfAbsent(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(0);
 
-        aggregator.aggregateForProject(PROJECT_ID, DATE);
+        aggregate(PROJECT_ID, DATE);
 
-        verify(usageDailyRepository, times(1)).upsertIfAbsent(eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+        verify(usageDailyRepository, times(1)).upsertIfAbsent(eq(ORG_ID), eq(PROJECT_ID), eq(DATE), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
         verify(txManager).commit(transactionStatus);
         verify(txManager, never()).rollback(any());
     }
@@ -174,11 +201,11 @@ class UsageDailyAggregatorTest {
         when(deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(eq(PROJECT_ID), eq(DeliveryStatus.SUCCESS), any(), any()))
                 .thenThrow(new RuntimeException("db unavailable"));
 
-        assertThrows(RuntimeException.class, () -> aggregator.aggregateForProject(PROJECT_ID, DATE));
+        assertThrows(RuntimeException.class, () -> aggregate(PROJECT_ID, DATE));
 
         // No partial row: the insert is the very last statement in the transaction, so a
         // failure before it means upsertIfAbsent is never even called.
-        verify(usageDailyRepository, never()).upsertIfAbsent(any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
+        verify(usageDailyRepository, never()).upsertIfAbsent(any(), any(), any(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong(), anyLong());
         verify(txManager).rollback(transactionStatus);
         verify(txManager, never()).commit(any());
     }
@@ -188,8 +215,8 @@ class UsageDailyAggregatorTest {
         UUID projectA = UUID.randomUUID();
         UUID projectB = UUID.randomUUID();
         when(projectRepository.findAll()).thenReturn(List.of(
-                Project.builder().id(projectA).build(),
-                Project.builder().id(projectB).build()));
+                Project.builder().id(projectA).organizationId(ORG_ID).build(),
+                Project.builder().id(projectB).organizationId(ORG_ID).build()));
 
         LocalDate yesterday = LocalDate.now().minusDays(1);
         when(usageDailyRepository.findByProjectIdAndDate(eq(projectA), eq(yesterday)))

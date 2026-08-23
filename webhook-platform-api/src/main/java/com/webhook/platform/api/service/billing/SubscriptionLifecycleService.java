@@ -202,7 +202,13 @@ public class SubscriptionLifecycleService {
     private void logEvent(BillingSubscription sub, SubscriptionEventType type,
                           SubscriptionStatus fromStatus, SubscriptionStatus toStatus,
                           UUID fromPlanId, UUID toPlanId, String reason) {
+        // Most callers are the billing schedulers and the provider webhook, all system-scoped:
+        // Hibernate leaves the entity's own organization_id alone under the root tenant, and the
+        // column is NOT NULL since V056 — so the value comes off the subscription being changed,
+        // the same way syncOrgPlan below takes it. Without it the whole webhook transaction rolls
+        // back and the status change is lost.
         eventRepository.save(BillingSubscriptionEvent.builder()
+                .organizationId(sub.getOrganizationId())
                 .subscriptionId(sub.getId())
                 .eventType(type)
                 .fromStatus(fromStatus)

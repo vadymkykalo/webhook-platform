@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.WorkflowExecution.ExecutionStatus;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
+import com.webhook.platform.api.tenancy.TenantContext;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -291,13 +292,21 @@ public class WorkflowEngine implements DisposableBean {
         // Capture depth from calling thread (workflow-* pool) and propagate
         // to nodeTimeoutExecutor thread — critical for recursion guard in CreateEventNodeExecutor
         int callerDepth = WorkflowTriggerService.getCurrentDepth();
+        // The tenant crosses the same boundary and for the same reason: nodeTimeoutExecutor is
+        // built by hand here, so TenantPropagatingTaskDecorator never wraps its tasks. Node
+        // executors read endpoints and write deliveries, all @TenantId entities, and without
+        // this the wf-node-timeout thread has no scope and every node fails (ADR-0006).
+        UUID callerTenant = TenantContext.current();
         Future<StepResult> future;
         try {
             future = nodeTimeoutExecutor.submit(() -> {
                 WorkflowTriggerService.setCurrentDepth(callerDepth);
+                UUID previousTenant = TenantContext.current();
+                TenantContext.restore(callerTenant);
                 try {
                     return executor.execute(nodeData, input);
                 } finally {
+                    TenantContext.restore(previousTenant);
                     WorkflowTriggerService.clearCurrentDepth();
                 }
             });

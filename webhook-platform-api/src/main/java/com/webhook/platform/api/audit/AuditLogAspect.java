@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
+import com.webhook.platform.api.tenancy.TenantContext;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -110,22 +111,44 @@ public class AuditLogAspect {
                               UUID userId, UUID orgId, String status, String errorMessage,
                               int durationMs, String clientIp, String details) {
         try {
-            AuditLog entry = AuditLog.builder()
-                    .action(action)
-                    .resourceType(resourceType)
-                    .resourceId(resourceId)
-                    .userId(userId)
-                    .organizationId(orgId)
-                    .status(status)
-                    .errorMessage(errorMessage)
-                    .durationMs(durationMs)
-                    .clientIp(clientIp)
-                    .details(details)
-                    .build();
-            auditLogRepository.save(entry);
+            // The writer thread comes from the pool built in this class, so
+            // TenantPropagatingTaskDecorator never sees it and it starts with no scope at all —
+            // AuditLog carries @TenantId, so its first session would fail (ADR-0006). The
+            // organization is already known here; unauthenticated actions (login, register,
+            // password reset) genuinely have none, and run as the system tenant instead. Their
+            // row is stamped with the SYSTEM sentinel rather than the SQL NULL it carried before
+            // ADR-0006 — that is Hibernate's @TenantId generator filling in the root value for an
+            // unset property, and it is fine: the sentinel is the nil UUID so it matches no real
+            // organization, and a tenant-scoped reader saw neither value anyway.
+            if (orgId == null) {
+                TenantContext.runAsSystem(() -> persist(action, resourceType, resourceId, userId, null,
+                        status, errorMessage, durationMs, clientIp, details));
+            } else {
+                TenantContext.runAs(orgId, () -> persist(action, resourceType, resourceId, userId, orgId,
+                        status, errorMessage, durationMs, clientIp, details));
+            }
         } catch (Exception e) {
-            log.warn("Failed to save audit log: {}", e.getMessage());
+            // Audit writes must not break the audited call, but swallowing the message alone is
+            // how a platform-wide audit outage stayed invisible — keep the stack trace.
+            log.warn("Failed to save audit log: action={}, organizationId={}", action, orgId, e);
         }
+    }
+
+    private void persist(String action, String resourceType, UUID resourceId,
+                         UUID userId, UUID orgId, String status, String errorMessage,
+                         int durationMs, String clientIp, String details) {
+        auditLogRepository.save(AuditLog.builder()
+                .action(action)
+                .resourceType(resourceType)
+                .resourceId(resourceId)
+                .userId(userId)
+                .organizationId(orgId)
+                .status(status)
+                .errorMessage(errorMessage)
+                .durationMs(durationMs)
+                .clientIp(clientIp)
+                .details(details)
+                .build());
     }
 
     private String resolveResourceType(Auditable auditable, ProceedingJoinPoint joinPoint) {
