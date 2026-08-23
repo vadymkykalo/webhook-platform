@@ -52,12 +52,25 @@ check() {
   fi
 }
 
+# The SDKs carry the version in code too — each client builds its User-Agent
+# from it, and Python exposes it as __version__. These were unmanaged until
+# they had drifted two minor versions behind the manifests, which is exactly
+# the class of drift this script exists to catch.
+node_sdk_const=$(sed -nE "s/^const SDK_VERSION = '(.*)';/\1/p" sdks/node/src/client.ts)
+python_sdk_const=$(sed -nE 's/^SDK_VERSION = "(.*)"/\1/p' sdks/python/hookflow/client.py)
+python_dunder=$(sed -nE 's/^__version__ = "(.*)"/\1/p' sdks/python/hookflow/__init__.py)
+php_sdk_const=$(sed -nE "s/.*private const SDK_VERSION = '(.*)';/\1/p" sdks/php/src/Hookflow.php)
+
 check "Chart.yaml version" "$chart_version"
 check "Chart.yaml appVersion" "$chart_app_version"
 check "webhook-platform-ui/package.json" "$ui_version"
 check "sdks/node/package.json" "$node_sdk_version"
 check "sdks/python/pyproject.toml" "$python_sdk_version"
 check "sdks/php/composer.json" "$php_sdk_version"
+check "sdks/node/src/client.ts SDK_VERSION" "$node_sdk_const"
+check "sdks/python/hookflow/client.py SDK_VERSION" "$python_sdk_const"
+check "sdks/python/hookflow/__init__.py __version__" "$python_dunder"
+check "sdks/php/src/Hookflow.php SDK_VERSION" "$php_sdk_const"
 
 # If HEAD is exactly on a release tag (vX.Y.Z), that tag must match too —
 # this is what would have caught v2.2.0/v2.2.1 being tagged while every pom
