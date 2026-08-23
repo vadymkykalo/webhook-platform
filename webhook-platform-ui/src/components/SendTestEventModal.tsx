@@ -139,6 +139,7 @@ export default function SendTestEventModal({
               <Label htmlFor="eventType">{t('events.sendModal.eventType')}</Label>
               <Input
                 id="eventType"
+                className="font-mono text-sm"
                 placeholder="user.created"
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
@@ -163,7 +164,7 @@ export default function SendTestEventModal({
                 placeholder='{\n  "key": "value"\n}'
               />
               {jsonError && (
-                <p className="text-sm text-destructive">{jsonError}</p>
+                <p className="text-sm text-halt">{jsonError}</p>
               )}
               <p className="text-xs text-muted-foreground">
                 {t('events.sendModal.payloadHint')}
@@ -171,27 +172,27 @@ export default function SendTestEventModal({
             </div>
 
             {eventType.trim() && matchingCount === 0 && (
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
-                <p className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="rounded-md border border-retry/30 bg-retry-soft p-3">
+                <p className="flex items-start gap-2 text-sm text-retry">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                   <span>{t('events.sendModal.noMatchWarning')}</span>
                 </p>
               </div>
             )}
 
             {eventType.trim() && matchingCount > 0 && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-md p-3">
-                <p className="text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div className="rounded-md border border-ok/30 bg-ok-soft p-3">
+                <p className="flex items-center gap-2 text-sm text-ok">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{t('events.sendModal.matchInfo', { count: matchingCount })}</span>
                 </p>
               </div>
             )}
 
             {!eventType.trim() && (
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>{t('events.sendModal.noteLabel')}</strong> {t('events.sendModal.noteBody')}
+              <div className="rounded-md border border-rail bg-secondary/50 p-3">
+                <p className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">{t('events.sendModal.noteLabel')}</strong> {t('events.sendModal.noteBody')}
                 </p>
               </div>
             )}

@@ -16,6 +16,10 @@ npm run test:contract
 ```
 
 `CONTRACT_API_BASE_URL` overrides the target (default `http://localhost:8080`).
+Reachability is probed with an intentionally invalid `POST /api/v1/auth/login`
+(permitAll unconditionally), **not** `/v3/api-docs`: springdoc is only exposed
+when `SWAGGER_ENABLED=true`, and `.env.dist` ships it `false`, so probing it
+reported a perfectly healthy stack as unreachable and skipped this whole suite.
 If the API isn't reachable, every test logs a warning and passes trivially —
 this suite is meant to run where a live instance is guaranteed (CI's
 `load-and-contract-tests.yml` workflow, or a developer with `make up` running
@@ -28,12 +32,16 @@ Each test bootstraps its own throwaway user/org/project/API key (see
 tests don't share state or need fixtures:
 
 - `endpoints.create` response shape matches the `Endpoint` type
-- `subscriptions.create` response shape matches `Subscription` (and flags one
-  field — `transformationId` — that the API returns but the SDK's type
-  doesn't declare, as a known drift to watch rather than silently ignore)
+- `subscriptions.create` response shape matches `Subscription`, including the
+  `transformationId` / `transformationName` pair the API sends
 - `events.send` accepted and correctly fans out (`deliveriesCreated`)
 - `deliveries.list` returns the paginated shape `PaginatedResponse` expects
 - an invalid API key is rejected as a 401 `AuthenticationError`
+
+For a full end-to-end walk of the workflow — bootstrap, endpoint, subscription,
+event, deliveries, attempts, incoming, error envelopes, and a signature the
+running server itself produced — see `scripts/live-api-smoke.mjs`
+(`npm run smoke:live`), which fails loudly instead of skipping.
 
 ## Why not generate this from OpenAPI
 

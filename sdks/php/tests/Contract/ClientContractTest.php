@@ -44,7 +44,7 @@ class ClientContractTest extends TestCase
     {
         if (!self::$apiReachable) {
             $this->markTestSkipped(
-                'API not reachable at ' . ContractSupport::baseUrl() . ' (tried /v3/api-docs) — '
+                'API not reachable at ' . ContractSupport::baseUrl() . ' (tried POST /api/v1/auth/login) — '
                 . 'run `make up && make wait-healthy` first. See tests/Contract/README.md.'
             );
         }

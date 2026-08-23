@@ -9,7 +9,7 @@ function FilterNode({ data, selected }: NodeProps) {
   const hasConditions = d.conditions != null;
   return (
     <BaseNode
-      color="#8b5cf6"
+      role="logic"
       icon="🔀"
       label={String(d.label || t('workflows.nodeTypes.filter.label'))}
       subtitle={hasConditions ? t('workflows.nodeStatus.conditionsSet') : t('workflows.nodeStatus.noConditions')}

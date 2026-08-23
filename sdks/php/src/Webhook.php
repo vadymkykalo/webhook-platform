@@ -73,6 +73,17 @@ class Webhook
     /**
      * Construct a webhook event from request, verifying signature.
      *
+     * What Hookflow actually PUTs on the wire is the event's **payload**, not
+     * an envelope: a `$client->events->send(type: 'order.completed', data:
+     * [...])` arrives at your endpoint as the `data` array alone, with the
+     * identifiers carried in headers (`X-Event-Id`, `X-Delivery-Id`,
+     * `X-Timestamp`, `X-Sequence-Number`). So `eventId` / `deliveryId` /
+     * `timestamp` are always populated for a real delivery and `data` is the
+     * decoded body, but `type` is only populated when the body itself carries
+     * a `type` key — which for a default subscription it does not. Route on
+     * the payload, or configure the subscription's `payloadTemplate` to wrap
+     * the event so that `type` becomes part of the body.
+     *
      * @param string $payload Raw request body
      * @param array $headers Request headers (case-insensitive)
      * @param string $secret Endpoint webhook secret

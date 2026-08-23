@@ -24,7 +24,7 @@
     "resolveJsonModule": true,
     "baseUrl": ".",
     "paths": {
-      "@hookflow/node": ["src/index.ts"]
+      "@webhook-platform/node": ["src/index.ts"]
     }
   },
   "include": ["src/**/*"],

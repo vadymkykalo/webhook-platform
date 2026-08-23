@@ -66,3 +66,17 @@ jobs:
             SHA256SUMS
           draft: false
           prerelease: false
+
+  # The release above is created by github-actions[bot] with the default
+  # GITHUB_TOKEN, and GitHub will not start a workflow from an event that token
+  # raised. publish-sdks.yml used to listen for `release: published` and so
+  # never ran for v2.3.0 or v2.4.0 — the SDKs stayed at 2.2.1 through two
+  # releases with nothing failing anywhere to say so. Calling it explicitly
+  # cannot be dropped that way, and it fails loudly if it does fail.
+  publish-sdks:
+    name: Publish SDKs
+    needs: release-cli
+    uses: ./.github/workflows/publish-sdks.yml
+    with:
+      sdk: all
+    secrets: inherit

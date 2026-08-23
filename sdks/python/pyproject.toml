@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hookflow-sdk"
-version = "2.4.0"
+name = "webhook-platform"
+version = "2.5.0"
 description = "Official Python SDK for Hookflow — reliable webhook infrastructure"
 readme = "README.md"
 license = {text = "MIT"}

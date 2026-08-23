@@ -38,23 +38,23 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-muted/30 p-6">
-          <div className="text-center max-w-md">
-            <div className="mx-auto h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-6">
-              <AlertTriangle className="h-8 w-8 text-destructive" />
+        <div className="flex min-h-screen items-center justify-center bg-background p-6">
+          <div role="alert" className="w-full max-w-md text-center">
+            <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+              <AlertTriangle className="h-5 w-5 text-halt" aria-hidden />
             </div>
-            <h1 className="text-2xl font-bold mb-2">{i18n.t('errorBoundary.title')}</h1>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h1 className="text-title">{i18n.t('errorBoundary.title')}</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
               {i18n.t('errorBoundary.description')}
             </p>
             {this.state.error && (
-              <pre className="text-xs text-left bg-muted rounded-lg p-3 mb-6 overflow-auto max-h-32 text-muted-foreground">
+              <pre className="mt-5 max-h-32 overflow-auto rounded-md border border-rail bg-card p-3 text-left font-mono text-xs text-muted-foreground">
                 {this.state.error.message}
               </pre>
             )}
-            <div className="flex items-center justify-center gap-3">
+            <div className="mt-6 flex items-center justify-center gap-2">
               <Button variant="outline" onClick={this.handleReload}>
-                <RefreshCw className="h-4 w-4" /> {i18n.t('errorBoundary.reloadPage')}
+                <RefreshCw className="h-4 w-4" aria-hidden /> {i18n.t('errorBoundary.reloadPage')}
               </Button>
               <Button onClick={this.handleReset}>
                 {i18n.t('errorBoundary.goToDashboard')}

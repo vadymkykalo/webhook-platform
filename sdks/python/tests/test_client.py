@@ -261,20 +261,35 @@ class TestTypeClasses:
         assert delivery.attempt_count == 1
 
     def test_delivery_attempt_from_dict(self):
-        """DeliveryAttempt should parse from dict correctly."""
+        """DeliveryAttempt should parse a real DeliveryAttemptResponse.
+
+        The fixture is deliberately a verbatim copy of what
+        GET /api/v1/deliveries/{id}/attempts actually returns. It used to say
+        httpStatus / latencyMs / attemptedAt — none of which the API has ever
+        sent — so from_dict raised KeyError against a live server while this
+        test stayed green.
+        """
         data = {
             "id": "att_123",
+            "deliveryId": "dlv_123",
             "attemptNumber": 1,
-            "httpStatus": 200,
+            "requestHeaders": '{"X-Signature": "t=1,v1=abc"}',
+            "requestBody": '{"orderId": "ord_1"}',
+            "httpStatusCode": 200,
+            "responseHeaders": '{"Server": "nginx"}',
             "responseBody": "OK",
-            "latencyMs": 150,
-            "attemptedAt": "2024-01-01T00:00:00Z",
+            "errorMessage": None,
+            "durationMs": 150,
+            "createdAt": "2024-01-01T00:00:00Z",
         }
         attempt = DeliveryAttempt.from_dict(data)
         assert attempt.id == "att_123"
+        assert attempt.delivery_id == "dlv_123"
         assert attempt.attempt_number == 1
-        assert attempt.http_status == 200
-        assert attempt.latency_ms == 150
+        assert attempt.http_status_code == 200
+        assert attempt.duration_ms == 150
+        assert attempt.created_at == "2024-01-01T00:00:00Z"
+        assert attempt.response_body == "OK"
 
     def test_delivery_list_params_to_params(self):
         """DeliveryListParams should convert to query params correctly."""

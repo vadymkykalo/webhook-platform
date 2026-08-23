@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select } from './ui/select';
+import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import {
   Dialog,
@@ -23,6 +24,8 @@ interface CreateSubscriptionModalProps {
   projectId: string;
   endpoints: EndpointResponse[];
   subscription?: SubscriptionResponse | null;
+  /** Preselects the endpoint when opened from a connection's own row. */
+  defaultEndpointId?: string;
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
@@ -32,6 +35,7 @@ export default function CreateSubscriptionModal({
   projectId,
   endpoints,
   subscription,
+  defaultEndpointId,
   open,
   onClose,
   onSuccess,
@@ -65,7 +69,7 @@ export default function CreateSubscriptionModal({
       setCustomHeaders(subscription.customHeaders || '');
       setTransformationId(subscription.transformationId || '');
     } else {
-      setEndpointId('');
+      setEndpointId(defaultEndpointId ?? '');
       setEventType('');
       setEnabled(true);
       setOrderingEnabled(false);
@@ -78,7 +82,7 @@ export default function CreateSubscriptionModal({
     }
     setErrors({});
     setShowAdvanced(false);
-  }, [subscription, open]);
+  }, [subscription, defaultEndpointId, open]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -199,7 +203,7 @@ export default function CreateSubscriptionModal({
               {/* Endpoint */}
               <div className="space-y-2">
                 <Label htmlFor="endpoint">
-                  {t('createSubscription.fields.endpoint')} <span className="text-destructive">*</span>
+                  {t('createSubscription.fields.endpoint')} <span className="text-halt">*</span>
                 </Label>
                 <Select
                   id="endpoint"
@@ -216,10 +220,10 @@ export default function CreateSubscriptionModal({
                   ))}
                 </Select>
                 {errors.endpointId && (
-                  <p className="text-sm text-destructive">{errors.endpointId}</p>
+                  <p className="text-sm text-halt">{errors.endpointId}</p>
                 )}
                 {endpoints.length === 0 ? (
-                  <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <p className="flex items-center gap-1 text-sm text-retry">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     {t('createSubscription.fields.noEndpoints')}
                   </p>
@@ -244,7 +248,7 @@ export default function CreateSubscriptionModal({
             </div>
 
             {/* ── Section 2: Behavior ── */}
-            <div className="space-y-3 border-t pt-4">
+            <div className="space-y-3 border-t border-rail pt-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
                 {t('createSubscription.sections.behavior')}
@@ -292,7 +296,7 @@ export default function CreateSubscriptionModal({
             </div>
 
             {/* ── Section 3: Advanced ── */}
-            <div className="border-t pt-4">
+            <div className="border-t border-rail pt-4">
               <button
                 type="button"
                 className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors w-full"
@@ -320,7 +324,7 @@ export default function CreateSubscriptionModal({
                         disabled={saving}
                       />
                       {errors.maxAttempts ? (
-                        <p className="text-[11px] text-destructive">{errors.maxAttempts}</p>
+                        <p className="text-[11px] text-halt">{errors.maxAttempts}</p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">{t('createSubscription.fields.maxAttemptsHint')}</p>
                       )}
@@ -337,7 +341,7 @@ export default function CreateSubscriptionModal({
                         disabled={saving}
                       />
                       {errors.timeoutSeconds ? (
-                        <p className="text-[11px] text-destructive">{errors.timeoutSeconds}</p>
+                        <p className="text-[11px] text-halt">{errors.timeoutSeconds}</p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">{t('createSubscription.fields.timeoutHint')}</p>
                       )}
@@ -352,7 +356,7 @@ export default function CreateSubscriptionModal({
                         disabled={saving}
                       />
                       {errors.retryDelays ? (
-                        <p className="text-[11px] text-destructive">{errors.retryDelays}</p>
+                        <p className="text-[11px] text-halt">{errors.retryDelays}</p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">
                           {retryDelays.trim() ? formatRetryDelaysHuman(retryDelays) : t('createSubscription.fields.retryDelaysHint')}
@@ -408,8 +412,12 @@ export default function CreateSubscriptionModal({
                         disabled={saving}
                       />
                       {errors.payloadTemplate ? (
-                        <p className="text-[11px] text-destructive">{errors.payloadTemplate}</p>
+                        <p className="text-[11px] text-halt">{errors.payloadTemplate}</p>
                       ) : (
+                        // TODO(i18n): the sentence below is the only literal
+                        // English left in JSX. It needs a key (suggest
+                        // createSubscription.fields.payloadTemplateHint); the
+                        // locale files are owned elsewhere on this branch.
                         <p className="text-[11px] text-muted-foreground">
                           JSONPath: <code className="bg-muted px-0.5 rounded">${'{'}$.path{'}'}</code>. Empty = original payload.
                         </p>
@@ -429,7 +437,7 @@ export default function CreateSubscriptionModal({
                         disabled={saving}
                       />
                       {errors.customHeaders ? (
-                        <p className="text-[11px] text-destructive">{errors.customHeaders}</p>
+                        <p className="text-[11px] text-halt">{errors.customHeaders}</p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground">
                           {t('createSubscription.fields.customHeadersHint')}
@@ -522,7 +530,7 @@ function EventTypeField({
   return (
     <div className="space-y-2" ref={wrapperRef}>
       <Label htmlFor="eventType">
-        {t('createSubscription.fields.eventType')} <span className="text-destructive">*</span>
+        {t('createSubscription.fields.eventType')} <span className="text-halt">*</span>
       </Label>
       <div className="relative">
         <Input
@@ -557,10 +565,10 @@ function EventTypeField({
                       <span className="text-[10px] text-muted-foreground">v{et.latestVersion}</span>
                     )}
                     {et.activeVersionStatus === 'ACTIVE' && (
-                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      <CheckCircle2 className="h-3 w-3 text-ok" />
                     )}
                     {et.hasBreakingChanges && (
-                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                      <AlertTriangle className="h-3 w-3 text-retry" />
                     )}
                   </div>
                 </div>
@@ -573,7 +581,7 @@ function EventTypeField({
         )}
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-halt">{error}</p>}
 
       {/* Schema info badge for exact match */}
       {exactMatch && (
@@ -587,14 +595,14 @@ function EventTypeField({
                   <span className="text-muted-foreground">v{exactMatch.latestVersion}</span>
                 )}
                 {exactMatch.activeVersionStatus === 'ACTIVE' && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
+                  <Badge variant="ok" className="text-[10px]">
                     <CheckCircle2 className="h-2.5 w-2.5" /> {t('common.active', 'Active')}
-                  </span>
+                  </Badge>
                 )}
                 {exactMatch.hasBreakingChanges && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                  <Badge variant="retry" className="text-[10px]">
                     <AlertTriangle className="h-2.5 w-2.5" /> {t('createSubscription.fields.breaking', 'Breaking')}
-                  </span>
+                  </Badge>
                 )}
               </div>
               {exactMatch.description && (
@@ -668,15 +676,6 @@ function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; ev
   const fields = parseSchemaFields(latest.schemaJson);
   if (fields.length === 0) return null;
 
-  const TYPE_COLORS: Record<string, string> = {
-    string: 'text-green-600 dark:text-green-400',
-    number: 'text-blue-600 dark:text-blue-400',
-    integer: 'text-blue-600 dark:text-blue-400',
-    boolean: 'text-purple-600 dark:text-purple-400',
-    object: 'text-orange-600 dark:text-orange-400',
-    array: 'text-cyan-600 dark:text-cyan-400',
-  };
-
   return (
     <div className="border-t border-primary/10 px-2.5 py-2 space-y-1">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -689,8 +688,8 @@ function SchemaFieldsPreview({ projectId, eventTypeId }: { projectId: string; ev
             className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted/60 px-1.5 py-0.5 rounded"
           >
             <span className="font-medium">{f.name}</span>
-            <span className={TYPE_COLORS[f.type] || 'text-muted-foreground'}>{f.type}</span>
-            {f.required && <span className="text-destructive">*</span>}
+            <span className="text-muted-foreground">{f.type}</span>
+            {f.required && <span className="text-halt">*</span>}
           </span>
         ))}
         {fields.length > 12 && (

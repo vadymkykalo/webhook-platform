@@ -15,28 +15,40 @@ import type {
 
 // ─── Constants (exported for reuse) ─────────────────────────────
 
-export const OPERATORS: { value: PredicateOperator; label: string; noValue?: boolean }[] = [
-  { value: 'EQ', label: '= equals' },
-  { value: 'NEQ', label: '≠ not equals' },
-  { value: 'GT', label: '> greater than' },
-  { value: 'GTE', label: '≥ greater or equal' },
-  { value: 'LT', label: '< less than' },
-  { value: 'LTE', label: '≤ less or equal' },
-  { value: 'BETWEEN', label: '↔ between' },
-  { value: 'CONTAINS', label: '⊃ contains' },
-  { value: 'NOT_CONTAINS', label: '⊅ not contains' },
-  { value: 'STARTS_WITH', label: 'starts with' },
-  { value: 'ENDS_WITH', label: 'ends with' },
-  { value: 'IN', label: '∈ in list' },
-  { value: 'NOT_IN', label: '∉ not in list' },
-  { value: 'REGEX', label: '~ regex' },
-  { value: 'EXISTS', label: '∃ exists', noValue: true },
-  { value: 'NOT_EXISTS', label: '∄ not exists', noValue: true },
-  { value: 'IS_NULL', label: 'is null', noValue: true },
-  { value: 'NOT_NULL', label: 'not null', noValue: true },
+/**
+ * The operator list, in the order a person scans it. The words live in the
+ * locale bundle under `rules.operators.*` — an operator name is prose, so it
+ * is translated, and only the symbol in front of it is not.
+ */
+export const OPERATORS: { value: PredicateOperator; symbol?: string }[] = [
+  { value: 'EQ', symbol: '=' },
+  { value: 'NEQ', symbol: '≠' },
+  { value: 'GT', symbol: '>' },
+  { value: 'GTE', symbol: '≥' },
+  { value: 'LT', symbol: '<' },
+  { value: 'LTE', symbol: '≤' },
+  { value: 'BETWEEN', symbol: '↔' },
+  { value: 'CONTAINS', symbol: '⊃' },
+  { value: 'NOT_CONTAINS', symbol: '⊅' },
+  { value: 'STARTS_WITH' },
+  { value: 'ENDS_WITH' },
+  { value: 'IN', symbol: '∈' },
+  { value: 'NOT_IN', symbol: '∉' },
+  { value: 'REGEX', symbol: '~' },
+  { value: 'EXISTS', symbol: '∃' },
+  { value: 'NOT_EXISTS', symbol: '∄' },
+  { value: 'IS_NULL' },
+  { value: 'NOT_NULL' },
 ];
 
 export const NO_VALUE_OPS: PredicateOperator[] = ['EXISTS', 'NOT_EXISTS', 'IS_NULL', 'NOT_NULL'];
+
+type Translate = (key: string) => string;
+
+function operatorLabel(t: Translate, op: { value: PredicateOperator; symbol?: string }): string {
+  const name = t(`rules.operators.${op.value}`);
+  return op.symbol ? `${op.symbol} ${name}` : name;
+}
 
 // ─── Helpers (exported for reuse) ───────────────────────────────
 
@@ -89,12 +101,6 @@ export default function ConditionTreeEditor({
     );
   }
 
-  const opColors: Record<string, string> = {
-    AND: 'border-l-blue-400 bg-blue-500/5',
-    OR: 'border-l-amber-400 bg-amber-500/5',
-    NOT: 'border-l-red-400 bg-red-500/5',
-  };
-
   const cycleOp = () => {
     const ops: ConditionGroup['op'][] = ['AND', 'OR', 'NOT'];
     const idx = ops.indexOf(node.op);
@@ -119,26 +125,21 @@ export default function ConditionTreeEditor({
     }
   };
 
-  const opBtnColor: Record<string, string> = {
-    AND: 'bg-blue-600 hover:bg-blue-700',
-    OR: 'bg-amber-600 hover:bg-amber-700',
-    NOT: 'bg-red-600 hover:bg-red-700',
-  };
-
   return (
-    <div className={`rounded-lg border-l-[3px] pl-3 py-2 space-y-2 ${opColors[node.op] || ''}`}>
+    <div className="space-y-2 rounded-lg border-l-[3px] border-rail bg-muted/30 py-2 pl-3">
       {/* Group header */}
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={cycleOp}
-          className={`px-2.5 py-0.5 rounded text-[11px] font-bold text-white transition-colors ${opBtnColor[node.op] || 'bg-gray-600'}`}
+          className="rounded bg-primary px-2.5 py-0.5 font-mono text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           title={t('rules.form.conditionTree.cycleOperator')}
           aria-label={t('rules.form.conditionTree.cycleOperator')}
         >
           {node.op}
         </button>
         <span className="text-[10px] text-muted-foreground">
-          {node.op === 'AND' ? 'All must match' : node.op === 'OR' ? 'Any must match' : 'Negate'}
+          {t(`rules.form.conditionTree.groupHint.${node.op}`)}
         </span>
         <div className="flex-1" />
         <button
@@ -171,7 +172,7 @@ export default function ConditionTreeEditor({
 
       {/* Children */}
       {node.children.length === 0 ? (
-        <div className="text-[11px] text-muted-foreground italic pl-1">Empty group — add a condition</div>
+        <p className="pl-1 text-[11px] italic text-muted-foreground">{t('rules.form.conditionTree.emptyGroup')}</p>
       ) : (
         <div className="space-y-2">
           {node.children.map((child, i) => (
@@ -245,15 +246,15 @@ function PredicateEditor({
             className="h-7 text-xs"
           >
             {OPERATORS.map(op => (
-              <option key={op.value} value={op.value}>{op.label}</option>
+              <option key={op.value} value={op.value}>{operatorLabel(t, op)}</option>
             ))}
           </Select>
           {needsValue && (
             <Input
-              placeholder="value"
+              placeholder={t('rules.form.valuePlaceholder')}
               value={node.value === undefined || node.value === null ? '' : String(node.value)}
               onChange={(e) => handleValueChange(e.target.value)}
-              className="text-xs h-7"
+              className="h-7 text-xs"
             />
           )}
         </div>
@@ -277,15 +278,15 @@ function PredicateEditor({
           className="h-8 text-xs"
         >
           {OPERATORS.map(op => (
-            <option key={op.value} value={op.value}>{op.label}</option>
+            <option key={op.value} value={op.value}>{operatorLabel(t, op)}</option>
           ))}
         </Select>
         {needsValue && (
           <Input
-            placeholder="value"
+            placeholder={t('rules.form.valuePlaceholder')}
             value={node.value === undefined || node.value === null ? '' : String(node.value)}
             onChange={(e) => handleValueChange(e.target.value)}
-            className="text-xs h-8"
+            className="h-8 text-xs"
           />
         )}
       </div>

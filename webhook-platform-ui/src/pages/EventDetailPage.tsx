@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Radio, ArrowLeft, Copy, Send, Share2, Terminal, FileJson, Shield,
-  FileType, Loader2, CheckCircle2, XCircle, Clock, AlertTriangle, ExternalLink
+  Copy, Send, Share2, Terminal, FileJson, Shield,
+  FileType, Loader2, ExternalLink,
 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useEvent, useEventTypes } from '../api/queries';
@@ -11,21 +11,17 @@ import { debugLinksApi } from '../api/debugLinks.api';
 import { useQuery } from '@tanstack/react-query';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import { showSuccess, showApiError } from '../lib/toast';
-import PageSkeleton from '../components/PageSkeleton';
+import PageSkeleton, { SkeletonTable } from '../components/PageSkeleton';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { usePermissions } from '../auth/usePermissions';
 import type { DeliveryResponse, PageResponse } from '../types/api.types';
+import { railFromCounts } from './attemptRailData';
+import { AttemptCell, CopyId, TimeCell } from './tableParts';
 
-const STATUS_COLORS: Record<string, string> = {
-  SUCCESS: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  FAILED: 'bg-red-500/10 text-red-700 dark:text-red-400',
-  DLQ: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
-  PENDING: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-  PROCESSING: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
-};
 
 export default function EventDetailPage() {
   const { t } = useTranslation();
@@ -36,10 +32,12 @@ export default function EventDetailPage() {
   const [activeTab, setActiveTab] = useState<'raw' | 'sanitized' | 'schema' | 'deliveries' | 'debug'>('raw');
   const [sharingDebug, setSharingDebug] = useState(false);
 
-  const { data: event, isLoading } = useEvent(projectId, eventId);
+  const {
+    data: event, isLoading, isError, error, refetch, isRefetching,
+  } = useEvent(projectId, eventId);
   const { data: eventTypes } = useEventTypes(projectId);
 
-  const { data: deliveriesData, isLoading: deliveriesLoading } = useQuery({
+  const { data: deliveriesData, isLoading: deliveriesLoading, refetch: refetchDeliveries } = useQuery({
     queryKey: ['event-deliveries', projectId, eventId],
     queryFn: () => deliveriesApi.listByProject(projectId!, { eventId, size: 50 }),
     enabled: !!projectId && !!eventId,
@@ -83,21 +81,34 @@ export default function EventDetailPage() {
     }
   };
 
-  const handleReplayFailed = async () => {
-    const failedDeliveries = deliveries.filter(d => d.status === 'FAILED' || d.status === 'DLQ');
-    for (const d of failedDeliveries) {
-      try { await deliveriesApi.replay(d.id); } catch { /* continue */ }
+  const handleReplayUndelivered = async () => {
+    const undelivered = deliveries.filter(d => d.status === 'FAILED' || d.status === 'DLQ');
+    for (const d of undelivered) {
+      try { await deliveriesApi.replay(d.id); } catch { /* keep going: one failure must not stop the rest */ }
     }
-    showSuccess(t('eventDetail.replayedFailed', { count: failedDeliveries.length }));
+    showSuccess(t('eventDetail.replayedFailed', { count: undelivered.length }));
+    refetchDeliveries();
   };
 
-  // Find matching schema for event type
   const matchingSchema = eventTypes?.find((et: any) => et.name === event?.eventType);
 
-  if (isLoading) return <PageSkeleton maxWidth="max-w-7xl" />;
-  if (!event) return <div className="p-8 text-center text-muted-foreground">{t('events.details.notFound')}</div>;
+  if (isLoading) return <PageSkeleton maxWidth="max-w-none" />;
+  if (isError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
+      </div>
+    );
+  }
+  if (!event) {
+    return (
+      <div className="p-4 lg:p-6">
+        <EmptyState icon={FileJson} title={t('events.details.notFound')} />
+      </div>
+    );
+  }
 
-  const failedCount = deliveries.filter(d => d.status === 'FAILED' || d.status === 'DLQ').length;
+  const undeliveredCount = deliveries.filter(d => d.status === 'FAILED' || d.status === 'DLQ').length;
 
   const tabs = [
     { id: 'raw' as const, label: t('eventDetail.tabs.raw'), icon: FileJson },
@@ -108,260 +119,251 @@ export default function EventDetailPage() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/projects/${projectId}/events`)} title={t('eventDetail.back')} aria-label={t('eventDetail.back')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Radio className="h-5 w-5 text-primary flex-shrink-0" />
-            <h1 className="text-2xl font-bold tracking-tight truncate">{event.eventType}</h1>
-          </div>
-          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground flex-wrap">
-            <div className="flex items-center gap-1.5 group">
-              <code className="font-mono text-xs">{event.id}</code>
-              <Button variant="ghost" size="icon-sm" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => handleCopy(event.id, t('eventDetail.eventIdCopied'))} title={t('common.copyId')} aria-label={t('common.copyId')}>
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-            <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {formatDateTime(event.createdAt)}</span>
-            <span className="text-xs">({formatRelativeTime(event.createdAt)})</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="outline" size="sm" onClick={() => handleCopy(generateCurl(), t('eventDetail.curlCopied'))}>
-            <Terminal className="h-4 w-4 mr-1" /> cURL
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleShareDebug} disabled={sharingDebug}>
-            {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Share2 className="h-4 w-4 mr-1" />}
-            {t('eventDetail.share')}
-          </Button>
-          {failedCount > 0 && canManageEndpoints && (
-            <Button size="sm" variant="destructive" onClick={handleReplayFailed}>
-              <Send className="h-4 w-4 mr-1" /> {t('eventDetail.replayFailed', { count: failedCount })}
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={
+          <span className="flex items-center gap-2">
+            {t('events.eventId')}
+            <span className="normal-case tracking-normal text-foreground">{event.id}</span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="h-5 w-5"
+              onClick={() => handleCopy(event.id, t('eventDetail.eventIdCopied'))}
+              title={t('common.copyId')}
+              aria-label={t('common.copyId')}
+            >
+              <Copy className="h-3 w-3" />
             </Button>
-          )}
-        </div>
-      </div>
+          </span>
+        }
+        title={event.eventType}
+        description={`${formatDateTime(event.createdAt)} · ${formatRelativeTime(event.createdAt)}`}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => handleCopy(generateCurl(), t('eventDetail.curlCopied'))}>
+              <Terminal className="h-4 w-4" /> {t('eventDetail.copyCurl')}
+            </Button>
+            <Button variant="outline" onClick={handleShareDebug} disabled={sharingDebug}>
+              {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+              {t('eventDetail.share')}
+            </Button>
+            {undeliveredCount > 0 && canManageEndpoints && (
+              <Button onClick={handleReplayUndelivered}>
+                <Send className="h-4 w-4" /> {t('eventDetail.replayFailed', { count: undeliveredCount })}
+              </Button>
+            )}
+          </>
+        }
+      />
 
-      {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.eventType')}</p>
-            <Badge variant="secondary" className="font-mono text-xs">{event.eventType}</Badge>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.deliveriesCount')}</p>
-            <p className="text-xl font-bold">{event.deliveriesCreated ?? deliveries.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.payloadSize')}</p>
-            <p className="text-xl font-bold">{event.payload ? `${(event.payload.length / 1024).toFixed(1)} KB` : '—'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">{t('eventDetail.project')}</p>
-            <code className="text-xs font-mono">{event.projectId.substring(0, 8)}…</code>
-          </CardContent>
-        </Card>
-      </div>
+      <dl className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: t('eventDetail.eventType'), value: event.eventType },
+          { label: t('eventDetail.deliveriesCount'), value: String(event.deliveriesCreated ?? deliveries.length) },
+          { label: t('eventDetail.payloadSize'), value: event.payload ? `${(event.payload.length / 1024).toFixed(1)} KB` : '—' },
+          { label: t('eventDetail.project'), value: event.projectId.substring(0, 8) },
+        ].map((metric) => (
+          <div key={metric.label} className="rounded-lg border border-rail bg-card px-4 py-3">
+            <dt className="mono-label">{metric.label}</dt>
+            <dd className="mt-1 truncate font-mono text-[15px]" title={metric.value}>{metric.value}</dd>
+          </div>
+        ))}
+      </dl>
 
-      {/* Tabs */}
-      <div className="border-b">
-        <div className="flex gap-1 overflow-x-auto">
+      <div className="border-b border-rail">
+        <div role="tablist" className="flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`flex items-center gap-1.5 px-3 pb-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] transition-colors ${
+                activeTab === tab.id
+                  ? 'border-primary font-medium text-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-rail hover:text-foreground'
               }`}
               onClick={() => setActiveTab(tab.id)}
             >
-              <tab.icon className="h-3.5 w-3.5" />
+              <tab.icon className="h-3.5 w-3.5" aria-hidden />
               {tab.label}
               {tab.badge !== undefined && tab.badge > 0 && (
-                <span className="ml-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{tab.badge}</span>
+                <span className="ml-1 rounded-full bg-secondary px-1.5 py-0.5 font-mono text-[10px]">{tab.badge}</span>
               )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Tab content */}
-      <div className="animate-fade-in">
-        {/* Raw Payload */}
+      <div className="animate-fade-in pt-5">
         {activeTab === 'raw' && (
-          <Card>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">{t('eventDetail.rawPayload')}</CardTitle>
+          <section className="overflow-hidden rounded-lg border border-rail bg-card">
+            <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
+              <h3 className="text-[13px] font-medium">{t('eventDetail.rawPayload')}</h3>
               <Button variant="ghost" size="sm" onClick={() => handleCopy(formatPayload(event.payload), t('eventDetail.payloadCopied'))}>
-                <Copy className="h-3.5 w-3.5 mr-1" /> {t('common.copy')}
+                <Copy className="h-3.5 w-3.5" /> {t('common.copy')}
               </Button>
-            </CardHeader>
-            <CardContent>
-              <pre className="bg-muted/50 border rounded-lg p-4 text-xs font-mono overflow-x-auto max-h-[60vh] whitespace-pre-wrap break-words">
-                {formatPayload(event.payload) || <span className="italic text-muted-foreground">{t('events.details.noPayload')}</span>}
-              </pre>
-            </CardContent>
-          </Card>
+            </div>
+            <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs">
+              {formatPayload(event.payload) || <span className="italic text-muted-foreground">{t('events.details.noPayload')}</span>}
+            </pre>
+          </section>
         )}
 
-        {/* Sanitized (PII-masked) */}
         {activeTab === 'sanitized' && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Shield className="h-4 w-4 text-green-600" />
-                {t('eventDetail.sanitized')}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">{t('eventDetail.sanitizedHint')}</p>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                {t('eventDetail.sanitizedUseDebug')}
-              </p>
-              {debugLinks.length > 0 && (
-                <div className="border-t pt-4">
-                  <p className="text-xs text-muted-foreground mb-2">{t('eventDetail.existingLinks')}</p>
-                  {debugLinks.map((link) => (
-                    <div key={link.id} className="flex items-center gap-2 py-1">
-                      <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-primary hover:underline truncate flex-1">
-                        {link.shareUrl}
-                      </a>
-                      <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, t('eventDetail.linkCopied'))} title={t('eventDetail.copyLink')} aria-label={t('eventDetail.copyLink')}>
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Schema */}
-        {activeTab === 'schema' && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{t('eventDetail.schemaInfo')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {matchingSchema ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{matchingSchema.name}</Badge>
-                    {matchingSchema.latestVersion && <Badge variant="outline">v{matchingSchema.latestVersion}</Badge>}
+          <section className="rounded-lg border border-rail bg-card p-4">
+            <h3 className="flex items-center gap-2 text-[13px] font-medium">
+              <Shield className="h-4 w-4 text-muted-foreground" aria-hidden />
+              {t('eventDetail.sanitized')}
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">{t('eventDetail.sanitizedHint')}</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t('eventDetail.sanitizedUseDebug')}</p>
+            {debugLinks.length > 0 && (
+              <div className="border-t border-rail pt-4">
+                <p className="mono-label mb-2">{t('eventDetail.existingLinks')}</p>
+                {debugLinks.map((link) => (
+                  <div key={link.id} className="flex items-center gap-2 py-1">
+                    <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="flex-1 truncate font-mono text-xs text-primary hover:underline">
+                      {link.shareUrl}
+                    </a>
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(link.shareUrl, t('eventDetail.linkCopied'))} title={t('eventDetail.copyLink')} aria-label={t('eventDetail.copyLink')}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
                   </div>
-                  {matchingSchema.description && <p className="text-sm text-muted-foreground">{matchingSchema.description}</p>}
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/schemas`)}>
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" /> {t('eventDetail.viewSchemaRegistry')}
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground py-8 text-center">
-                  {t('eventDetail.noSchema', { type: event.eventType })}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
-        {/* Linked Deliveries */}
+        {activeTab === 'schema' && (
+          <section className="rounded-lg border border-rail bg-card p-4">
+            <h3 className="text-[13px] font-medium">{t('eventDetail.schemaInfo')}</h3>
+            {matchingSchema ? (
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center gap-2 font-mono text-[13px]">
+                  <span>{matchingSchema.name}</span>
+                  {matchingSchema.latestVersion && <span className="text-muted-foreground">v{matchingSchema.latestVersion}</span>}
+                </div>
+                {matchingSchema.description && <p className="text-sm text-muted-foreground">{matchingSchema.description}</p>}
+                <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/schemas`)}>
+                  <ExternalLink className="h-3.5 w-3.5" /> {t('eventDetail.viewSchemaRegistry')}
+                </Button>
+              </div>
+            ) : (
+              <EmptyState
+                icon={FileType}
+                title={t('eventDetail.noSchema', { type: event.eventType })}
+                className="flex flex-col items-center justify-center py-8"
+              />
+            )}
+          </section>
+        )}
+
         {activeTab === 'deliveries' && (
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{t('eventDetail.linkedDeliveries')} ({deliveries.length})</CardTitle>
-            </CardHeader>
+          <section className="overflow-hidden rounded-lg border border-rail bg-card">
             {deliveriesLoading ? (
-              <CardContent><Loader2 className="h-5 w-5 animate-spin mx-auto my-8" /></CardContent>
+              <SkeletonTable rows={4} />
             ) : deliveries.length === 0 ? (
-              <CardContent>
-                <div className="text-center py-8 space-y-2">
-                  <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
-                  <Button variant="outline" size="sm" className="mt-3" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
+              <EmptyState
+                icon={Send}
+                title={t('events.details.noDeliveries')}
+                description={(
+                  <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
+                )}
+                action={(
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
                     {t('deliveries.noDeliveriesForEventAction')}
                   </Button>
-                </div>
-              </CardContent>
+                )}
+                className="flex flex-col items-center justify-center py-10"
+              />
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px]">{t('deliveries.columns.status')}</TableHead>
+                    <TableHead>{t('deliveries.columns.status')}</TableHead>
                     <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
-                    <TableHead className="w-[80px]">{t('deliveries.columns.attempts')}</TableHead>
-                    <TableHead className="w-[140px]">{t('deliveries.columns.time')}</TableHead>
+                    <TableHead>{t('deliveries.columns.attempts')}</TableHead>
+                    <TableHead>{t('deliveries.columns.created')}</TableHead>
+                    <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
                     <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {deliveries.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[d.status] || ''}`}>
-                          {d.status === 'SUCCESS' ? <CheckCircle2 className="h-3 w-3" /> :
-                           d.status === 'DLQ' ? <AlertTriangle className="h-3 w-3" /> :
-                           d.status === 'FAILED' ? <XCircle className="h-3 w-3" /> :
-                           <Clock className="h-3 w-3" />}
-                          {t(`deliveries.status.${d.status}`)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-xs font-mono">{d.endpointId?.substring(0, 8)}…</code>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{d.attemptCount}/{d.maxAttempts}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{formatRelativeTime(d.createdAt)}</TableCell>
-                      <TableCell>
-                        {(d.status === 'FAILED' || d.status === 'DLQ') && canManageEndpoints && (
-                          <Button variant="ghost" size="icon-sm" onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess(t('eventDetail.replayed')))} title={t('events.details.replay')} aria-label={t('events.details.replay')}>
-                            <Send className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {deliveries.map((d) => {
+                    const rail = railFromCounts(d.attemptCount, d.maxAttempts, d.status);
+                    return (
+                      <TableRow key={d.id} className="group/row">
+                        <TableCell>
+                          <StatusBadge kind={kindOfDeliveryStatus(d.status)} label={t(`deliveries.status.${d.status}`)} />
+                        </TableCell>
+                        <TableCell>
+                          <Link
+                            to={`/admin/projects/${projectId}/endpoints`}
+                            className="block max-w-[220px] truncate font-mono text-[13px] underline-offset-4 hover:underline"
+                          >
+                            {d.endpointId.substring(0, 8)}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <AttemptCell
+                            rail={rail.attempts}
+                            maxAttempts={rail.maxAttempts}
+                            attemptCount={d.attemptCount}
+                            ladderLength={d.maxAttempts}
+                            nextRetryAt={d.status === 'PENDING' ? d.nextRetryAt : undefined}
+                          />
+                        </TableCell>
+                        <TableCell><TimeCell value={d.createdAt} /></TableCell>
+                        <TableCell><CopyId value={d.id} /></TableCell>
+                        <TableCell>
+                          {(d.status === 'FAILED' || d.status === 'DLQ') && canManageEndpoints && (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => deliveriesApi.replay(d.id).then(() => { showSuccess(t('eventDetail.replayed')); refetchDeliveries(); })}
+                              title={t('events.details.replay')}
+                              aria-label={t('events.details.replay')}
+                            >
+                              <Send className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
-          </Card>
+          </section>
         )}
 
-        {/* Debug Links */}
         {activeTab === 'debug' && (
-          <Card>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">{t('eventDetail.tabs.debug')}</CardTitle>
+          <section className="rounded-lg border border-rail bg-card">
+            <div className="flex items-center justify-between border-b border-rail px-4 py-2.5">
+              <h3 className="text-[13px] font-medium">{t('eventDetail.tabs.debug')}</h3>
               <Button size="sm" onClick={handleShareDebug} disabled={sharingDebug}>
-                {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Share2 className="h-4 w-4 mr-1" />}
+                {sharingDebug ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
                 {t('eventDetail.createLink')}
               </Button>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="p-4">
               {debugLinks.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">{t('eventDetail.noDebugLinks')}</p>
+                <EmptyState
+                  icon={Share2}
+                  title={t('eventDetail.noDebugLinks')}
+                  className="flex flex-col items-center justify-center py-8"
+                />
               ) : (
                 <div className="space-y-3">
                   {debugLinks.map((link) => (
-                    <div key={link.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                    <div key={link.id} className="flex items-center justify-between gap-3 rounded-lg border border-rail p-3">
                       <div className="min-w-0 flex-1">
-                        <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-mono text-primary hover:underline truncate block">
+                        <a href={link.shareUrl} target="_blank" rel="noopener noreferrer" className="block truncate font-mono text-sm text-primary hover:underline">
                           {link.shareUrl}
                         </a>
-                        <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
+                        <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
                           <span>{t('eventDetail.views', { count: link.viewCount })}</span>
                           <span>{t('eventDetail.expires', { time: formatRelativeTime(link.expiresAt) })}</span>
                         </div>
@@ -373,8 +375,8 @@ export default function EventDetailPage() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         )}
       </div>
     </div>

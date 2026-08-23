@@ -1,20 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Key, Calendar, Loader2, Trash2, Copy, Eye, EyeOff, ChevronLeft, ChevronRight, Shield, Clock } from 'lucide-react';
-import { Trans, useTranslation } from 'react-i18next';
+import { Plus, Key, Loader2, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import StatusBadge from '../components/StatusBadge';
+import PermissionGate from '../components/PermissionGate';
+import DangerConfirmDialog from '../components/DangerConfirmDialog';
 import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
-import { Select } from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
+import { cn } from '../lib/utils';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Select } from '../components/ui/select';
 import { Card, CardContent } from '../components/ui/card';
+import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog,
   DialogContent,
@@ -23,67 +28,69 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
+
+const SCOPES: ApiKeyScope[] = ['READ_WRITE', 'READ_ONLY'];
+const PAGE_SIZE = 20;
+
+/** A key is identified by its prefix and nothing else once it has been issued. */
+function KeyFingerprint({ prefix }: { prefix: string }) {
+  return (
+    <span className="font-mono text-[13px] text-muted-foreground">
+      {prefix}
+      <span aria-hidden>{'•'.repeat(12)}</span>
+    </span>
+  );
+}
 
 export default function ApiKeysPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManageApiKeys } = usePermissions();
+
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKeyResponse[]>([]);
+  const [pageInfo, setPageInfo] = useState<PageResponse<ApiKeyResponse> | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [name, setName] = useState('');
   const [scope, setScope] = useState<ApiKeyScope>('READ_WRITE');
   const [expiresIn, setExpiresIn] = useState('');
   const [creating, setCreating] = useState(false);
-  const [revokeId, setRevokeId] = useState<string | null>(null);
-  const [revoking, setRevoking] = useState(false);
+
+  const [revoking, setRevoking] = useState<ApiKeyResponse | null>(null);
+  const [revokePending, setRevokePending] = useState(false);
   const [newApiKey, setNewApiKey] = useState<ApiKeyResponse | null>(null);
-  const [showKey, setShowKey] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [pageInfo, setPageInfo] = useState<PageResponse<ApiKeyResponse> | null>(null);
-  const PAGE_SIZE = 20;
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (projectId) {
-      loadData();
-    }
-  }, [projectId, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!projectId) return;
-    
     try {
       setLoading(true);
       const [projectData, apiKeysData] = await Promise.all([
         projectsApi.get(projectId),
-        apiKeysApi.listPaged(projectId, currentPage, PAGE_SIZE),
+        apiKeysApi.listPaged(projectId, currentPage, pageSize),
       ]);
       setProject(projectData);
       setApiKeys(apiKeysData.content);
       setPageInfo(apiKeysData);
+      setLoadError(null);
     } catch (err: any) {
-      showApiError(err, 'apiKeys.toast.loadFailed', { retry: loadData });
+      setLoadError(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId, currentPage, pageSize]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return;
-    
     setCreating(true);
     try {
       let expiresAt: string | undefined;
@@ -97,8 +104,8 @@ export default function ApiKeysPage() {
       setName('');
       setScope('READ_WRITE');
       setExpiresIn('');
+      setCopied(false);
       setNewApiKey(response);
-      showSuccess(t('apiKeys.toast.created'));
       loadData();
     } catch (err: any) {
       showApiError(err, 'apiKeys.toast.createFailed');
@@ -108,34 +115,25 @@ export default function ApiKeysPage() {
   };
 
   const handleRevoke = async () => {
-    if (!revokeId || !projectId) return;
-    
-    setRevoking(true);
+    if (!revoking || !projectId) return;
+    setRevokePending(true);
     try {
-      await apiKeysApi.revoke(projectId, revokeId);
+      await apiKeysApi.revoke(projectId, revoking.id);
       showSuccess(t('apiKeys.toast.revoked'));
-      setRevokeId(null);
+      setRevoking(null);
       loadData();
     } catch (err: any) {
       showApiError(err, 'apiKeys.toast.revokeFailed');
     } finally {
-      setRevoking(false);
+      setRevokePending(false);
     }
   };
 
-  const handleCopyKey = (key: string) => {
-    navigator.clipboard.writeText(key);
+  const handleCopyKey = () => {
+    if (!newApiKey?.key) return;
+    navigator.clipboard.writeText(newApiKey.key);
+    setCopied(true);
     showSuccess(t('apiKeys.toast.copied'));
-  };
-
-  const closeKeyDialog = () => {
-    setNewApiKey(null);
-    setShowKey(false);
-  };
-
-  const formatRelativeTimeOrNever = (dateString: string | null) => {
-    if (!dateString) return t('apiKeys.never');
-    return formatRelativeTime(dateString);
   };
 
   if (loading) {
@@ -146,29 +144,28 @@ export default function ApiKeysPage() {
     );
   }
 
-  if (!project) {
+  if (loadError || !project) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-        <EmptyState icon={Key} title={t('apiKeys.projectNotFound')} />
+      <div className="p-4 lg:p-6">
+        <ErrorState error={loadError} fallbackKey="apiKeys.toast.loadFailed" onRetry={loadData} />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-title tracking-tight">{t('apiKeys.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            <Trans i18nKey="apiKeys.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
-          </p>
-        </div>
-        {canManageApiKeys && (
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4" /> {t('apiKeys.createKey')}
-          </Button>
-        )}
-      </div>
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={project.name}
+        title={t('apiKeys.title')}
+        description={t('apiKeys.subtitlePlain')}
+        actions={
+          <PermissionGate allowed={canManageApiKeys}>
+            <Button onClick={() => setShowCreateDialog(true)}>
+              <Plus className="h-4 w-4" aria-hidden /> {t('apiKeys.createKey')}
+            </Button>
+          </PermissionGate>
+        }
+      />
 
       {apiKeys.length === 0 ? (
         <EmptyState
@@ -177,96 +174,93 @@ export default function ApiKeysPage() {
           description={canManageApiKeys ? t('apiKeys.noKeysDesc') : t('apiKeys.noKeysDescViewer')}
           action={canManageApiKeys ? (
             <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4" /> {t('apiKeys.createKey')}
+              <Plus className="h-4 w-4" aria-hidden /> {t('apiKeys.createKey')}
             </Button>
           ) : undefined}
         />
       ) : (
-        <div className="space-y-3 animate-fade-in">
-          {apiKeys.map((apiKey) => (
-            <Card key={apiKey.id}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Key className="h-4 w-4 text-primary" />
+        <div className="animate-fade-in space-y-3">
+          {apiKeys.map((apiKey) => {
+            const expired = !!apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date();
+            return (
+              <Card key={apiKey.id}>
+                <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4 lg:p-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{apiKey.name}</p>
+                      <StatusBadge
+                        kind={expired ? 'halt' : 'ok'}
+                        label={t(expired ? 'apiKeys.expired' : 'apiKeys.activeKey')}
+                      />
+                      <span className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                        {t(apiKey.scope === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">{apiKey.name}</p>
-                      <code className="text-[13px] font-mono text-muted-foreground">{apiKey.keyPrefix}...</code>
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground flex-wrap">
-                        <Badge variant="outline" className="text-[10px] gap-1 py-0 px-1.5">
-                          <Shield className="h-2.5 w-2.5" />
-                          {apiKey.scope === 'READ_ONLY' ? t('apiKeys.scopeReadOnly') : t('apiKeys.scopeReadWrite')}
-                        </Badge>
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDateTimeShort(apiKey.createdAt)}</span>
-                        <span>{t('apiKeys.lastUsed')}: {formatRelativeTimeOrNever(apiKey.lastUsedAt)}</span>
-                        {apiKey.expiresAt && (
-                          <span className={`flex items-center gap-1 ${new Date(apiKey.expiresAt) < new Date() ? 'text-destructive' : ''}`}>
-                            <Clock className="h-3 w-3" />
-                            {new Date(apiKey.expiresAt) < new Date()
-                              ? t('apiKeys.expired')
-                              : t('apiKeys.expiresAt', { date: formatDateTimeShort(apiKey.expiresAt) })}
-                          </span>
-                        )}
+                    <div className="mt-1.5">
+                      <KeyFingerprint prefix={apiKey.keyPrefix} />
+                    </div>
+                    <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
+                      <div className="flex gap-1.5">
+                        <dt className="mono-label">{t('apiKeys.created')}</dt>
+                        <dd className="text-muted-foreground">{formatDateTimeShort(apiKey.createdAt)}</dd>
                       </div>
-                    </div>
+                      <div className="flex gap-1.5">
+                        <dt className="mono-label">{t('apiKeys.lastUsed')}</dt>
+                        <dd className="text-muted-foreground">
+                          {apiKey.lastUsedAt ? formatRelativeTime(apiKey.lastUsedAt) : t('apiKeys.never')}
+                        </dd>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <dt className="mono-label">{t('apiKeys.expires')}</dt>
+                        <dd className={cn('text-muted-foreground', expired && 'text-halt')}>
+                          {apiKey.expiresAt ? formatDateTimeShort(apiKey.expiresAt) : t('apiKeys.createDialog.noExpiration')}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                   {canManageApiKeys && (
-                    <Button variant="ghost" size="icon-sm" onClick={() => setRevokeId(apiKey.id)} title={t('apiKeys.revoke')} aria-label={t('apiKeys.revoke')} className="text-muted-foreground hover:text-destructive flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setRevoking(apiKey)}
+                      title={t('apiKeys.revoke')}
+                      aria-label={t('apiKeys.revokeNamed', { name: apiKey.name })}
+                      className="flex-shrink-0 text-muted-foreground hover:text-halt"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
 
-          {pageInfo && pageInfo.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
-              <p className="text-sm text-muted-foreground">
-                {t('common.showing', { from: currentPage * PAGE_SIZE + 1, to: Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements), total: pageInfo.totalElements })}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  disabled={pageInfo.first}
-                >
-                  <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
-                </Button>
-                <span className="text-sm text-muted-foreground px-2">
-                  {currentPage + 1} / {pageInfo.totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  disabled={pageInfo.last}
-                >
-                  {t('common.next')} <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          {pageInfo && (
+            <TablePagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalElements={pageInfo.totalElements}
+              totalPages={pageInfo.totalPages}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
           )}
         </div>
       )}
 
+      {/* Create */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('apiKeys.createDialog.title')}</DialogTitle>
-            <DialogDescription>
-              {t('apiKeys.createDialog.description')}
-            </DialogDescription>
+            <DialogDescription>{t('apiKeys.createDialog.description')}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate}>
-            <div className="space-y-4 py-4">
+            <div className="space-y-5 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">{t('apiKeys.createDialog.name')}</Label>
+                <Label htmlFor="key-name">{t('apiKeys.createDialog.name')}</Label>
                 <Input
-                  id="name"
+                  id="key-name"
                   placeholder={t('apiKeys.createDialog.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -274,42 +268,55 @@ export default function ApiKeysPage() {
                   disabled={creating}
                   autoFocus
                 />
-                <p className="text-xs text-muted-foreground">
-                  {t('apiKeys.createDialog.nameHint')}
-                </p>
+                <p className="text-xs text-muted-foreground">{t('apiKeys.createDialog.nameHint')}</p>
               </div>
+
               <div className="space-y-2">
-                <Label>{t('apiKeys.createDialog.scope')}</Label>
-                <Select value={scope} onChange={(e) => setScope(e.target.value as ApiKeyScope)} disabled={creating}>
-                  <option value="READ_WRITE">{t('apiKeys.scopeReadWrite')}</option>
-                  <option value="READ_ONLY">{t('apiKeys.scopeReadOnly')}</option>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {scope === 'READ_ONLY' ? t('apiKeys.createDialog.scopeReadOnlyHint') : t('apiKeys.createDialog.scopeReadWriteHint')}
-                </p>
+                <span className="text-sm font-medium leading-none">{t('apiKeys.createDialog.scope')}</span>
+                <div role="radiogroup" aria-label={t('apiKeys.createDialog.scope')} className="grid gap-2.5 sm:grid-cols-2">
+                  {SCOPES.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      role="radio"
+                      aria-checked={scope === s}
+                      disabled={creating}
+                      onClick={() => setScope(s)}
+                      className={cn(
+                        'rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                        scope === s ? 'border-primary bg-accent/40' : 'border-rail bg-card hover:border-primary/40'
+                      )}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium">
+                        {t(s === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
+                        {scope === s && <Check className="ml-auto h-4 w-4 text-primary" aria-hidden />}
+                      </span>
+                      <span className="mt-1 block text-xs leading-snug text-muted-foreground">
+                        {t(s === 'READ_ONLY' ? 'apiKeys.createDialog.scopeReadOnlyHint' : 'apiKeys.createDialog.scopeReadWriteHint')}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label>{t('apiKeys.createDialog.expiration')}</Label>
-                <Select value={expiresIn} onChange={(e) => setExpiresIn(e.target.value)} disabled={creating}>
+                <Label htmlFor="key-expiry">{t('apiKeys.createDialog.expiration')}</Label>
+                <Select id="key-expiry" value={expiresIn} onChange={(e) => setExpiresIn(e.target.value)} disabled={creating}>
                   <option value="">{t('apiKeys.createDialog.noExpiration')}</option>
                   <option value="7">{t('apiKeys.createDialog.expires7d')}</option>
                   <option value="30">{t('apiKeys.createDialog.expires30d')}</option>
                   <option value="90">{t('apiKeys.createDialog.expires90d')}</option>
                   <option value="365">{t('apiKeys.createDialog.expires1y')}</option>
                 </Select>
+                <p className="text-xs text-muted-foreground">{t('apiKeys.createDialog.expirationHint')}</p>
               </div>
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowCreateDialog(false)}
-                disabled={creating}
-              >
+              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)} disabled={creating}>
                 {t('common.cancel')}
               </Button>
               <Button type="submit" disabled={creating}>
-                {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {creating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
                 {creating ? t('apiKeys.createDialog.submitting') : t('apiKeys.createDialog.submit')}
               </Button>
             </DialogFooter>
@@ -317,82 +324,73 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!revokeId} onOpenChange={(open) => !open && setRevokeId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('apiKeys.revokeDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('apiKeys.revokeDialog.description')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={revoking}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRevoke}
-              disabled={revoking}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {revoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {revoking ? t('apiKeys.revoking') : t('apiKeys.revoke')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Revoke */}
+      <DangerConfirmDialog
+        open={!!revoking}
+        onOpenChange={(open) => !open && setRevoking(null)}
+        title={t('apiKeys.revokeDialog.title')}
+        description={t('apiKeys.revokeDialog.description')}
+        confirmName={revoking?.name ?? ''}
+        impact={[
+          t('apiKeys.revokeDialog.impactImmediate'),
+          t('apiKeys.revokeDialog.impactCallers'),
+          t('apiKeys.revokeDialog.impactPermanent'),
+        ]}
+        onConfirm={handleRevoke}
+        loading={revokePending}
+        confirmLabel={t('apiKeys.revoke')}
+      />
 
-      <Dialog open={!!newApiKey} onOpenChange={closeKeyDialog}>
-        <DialogContent>
+      {/* The one and only sighting of the secret. */}
+      <Dialog open={!!newApiKey} onOpenChange={(open) => { if (!open) { setNewApiKey(null); setCopied(false); } }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t('apiKeys.keyDialog.title')}</DialogTitle>
-            <DialogDescription>
-              {t('apiKeys.keyDialog.description')}
-            </DialogDescription>
+            <DialogTitle>{t('apiKeys.keyDialog.title', { name: newApiKey?.name ?? '' })}</DialogTitle>
+            <DialogDescription>{t('apiKeys.keyDialog.description')}</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t('apiKeys.keyDialog.label')}</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={newApiKey?.key || ''}
-                    type={showKey ? 'text' : 'password'}
-                    readOnly
-                    className="font-mono text-sm"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowKey(!showKey)}
-                    title={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
-                    aria-label={showKey ? t('apiKeys.keyDialog.hideKey') : t('apiKeys.keyDialog.showKey')}
-                  >
-                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => newApiKey?.key && handleCopyKey(newApiKey.key)}
-                    title={t('apiKeys.keyDialog.copyKey')}
-                    aria-label={t('apiKeys.keyDialog.copyKey')}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {t('apiKeys.keyDialog.hint')}
-                </p>
+
+          <div className="space-y-4 py-2">
+            <p className="flex items-start gap-2.5 rounded-lg border border-retry/40 bg-retry-soft p-3.5 text-sm font-medium text-retry">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
+              {t('apiKeys.keyDialog.onlyChance')}
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="new-key">{t('apiKeys.keyDialog.label')}</Label>
+              <div className="rounded-lg border border-rail bg-secondary/60 p-3">
+                <code id="new-key" className="block break-all font-mono text-[13px] leading-relaxed">
+                  {newApiKey?.key}
+                </code>
               </div>
-              <div className="bg-muted p-3 rounded-lg">
-                <p className="text-xs font-mono">
-                  curl -X POST https://your-domain.com/api/v1/events \<br />
-                  &nbsp;&nbsp;-H "X-API-Key: {newApiKey?.key || 'YOUR_KEY'}" \<br />
-                  &nbsp;&nbsp;-H "Content-Type: application/json" \<br />
-                  &nbsp;&nbsp;-d '{`{"type":"user.created","data":{"userId":"123"}}`}'
-                </p>
-              </div>
+              <Button
+                type="button"
+                onClick={handleCopyKey}
+                variant={copied ? 'success' : 'default'}
+                className="w-full"
+              >
+                {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+                {t(copied ? 'apiKeys.keyDialog.copied' : 'apiKeys.keyDialog.copyKey')}
+              </Button>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="mono-label">{t('apiKeys.keyDialog.howToUse')}</p>
+              <pre className="overflow-x-auto rounded-lg border border-rail bg-secondary/60 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+{`curl -X POST https://your-domain.com/api/v1/events \\
+  -H "X-API-Key: $HOOKFLOW_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"type":"user.created","data":{"userId":"123"}}'`}
+              </pre>
             </div>
           </div>
+
           <DialogFooter>
-            <Button onClick={closeKeyDialog}>{t('apiKeys.keyDialog.done')}</Button>
+            <Button
+              variant={copied ? 'default' : 'outline'}
+              onClick={() => { setNewApiKey(null); setCopied(false); }}
+            >
+              {t('apiKeys.keyDialog.done')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

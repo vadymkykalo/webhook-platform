@@ -24,8 +24,16 @@ No Maven, no npm, no clone — two files and Docker. **Dashboard** → http://lo
 </div>
 
 <div align="center">
-  <img src="docs/img.png" alt="Hookflow Dashboard" width="100%">
+  <img src="docs/img.png" alt="Every delivery, its attempts and the response each one got" width="100%">
+  <p><em>Deliveries — every attempt on the record, with the retry ladder each one is on.</em></p>
 </div>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/connections.png" alt="Connection map: endpoints, what each is subscribed to, and its verification state"><br><em>Connections — what you receive from, what you forward to, and whether the last deliveries arrived.</em></td>
+<td width="50%"><img src="docs/screenshots/analytics.png" alt="Delivery outcome over time, latency percentiles and per-endpoint health"><br><em>Analytics — outcome over time, p50/p95/p99 latency and per-endpoint health.</em></td>
+</tr>
+</table>
 
 <div align="center">
 
@@ -313,20 +321,30 @@ sequenceDiagram
 
 ### SDK coverage
 
-The official SDKs ([`sdks/node`](sdks/node), [`sdks/python`](sdks/python), [`sdks/php`](sdks/php) — package names are mid-rename to the `hookflow` brand, check each `README.md` for the exact current install command) cover the "send an event / manage endpoints / verify a signature" workflow, not the full dashboard surface. As of this writing that's **7 of the platform's 33 REST controllers**:
+The official SDKs ([`sdks/node`](sdks/node) — `@webhook-platform/node` on npm, [`sdks/python`](sdks/python) — `webhook-platform` on PyPI, [`sdks/php`](sdks/php) — `webhook-platform/php` on Packagist) cover the "send an event / manage endpoints / verify a signature" workflow, not the full dashboard surface. As of this writing that's **7 of the platform's 35 REST controllers**:
 
 | Covered by the SDKs | REST-only (use `openapi.yaml` / the dashboard) |
 |---|---|
-| Events (send, list) | Auth, Device Authentication |
+| Events (send) | Auth, Device Authentication |
 | Endpoints (CRUD) | Organizations, Projects, Members, API Keys |
 | Subscriptions | Dashboard, Usage, Billing |
 | Deliveries (status, replay) | Rules, Workflows, Schema Registry |
 | Incoming Sources | Transformations, Transform Preview |
 | Incoming Destinations | Alerts, Incidents, Audit Log |
 | Incoming Events | DLQ, Encryption Admin, PII Masking |
-| Signature verification (client-side helper, not a controller) | Tunnels, Tunnel Ingress, Ingress, Webhook Capture, Debug Links, Test Endpoints |
+| Signature verification (client-side helper, not a controller) | Tunnels, Tunnel Ingress, Ingress, Webhook Capture, Debug Links, Test Endpoints, Project Events |
 
 If you need something from the right-hand column, call the REST API directly (each SDK exposes a generic authenticated-request escape hatch for this — see its README) or use the dashboard.
+
+All three SDKs authenticate with `X-API-Key` only. They have no login surface, so registering an organization, creating a project and minting the API key are a one-time step you do with the dashboard, the CLI or plain HTTP — not through the SDK.
+
+Each SDK carries a live-API smoke check that drives its own public methods against a running instance (`make up` first) and fails loudly rather than skipping, unlike the mocked unit suites. These are scripts, not tests, and are never collected by the unit runs:
+
+```bash
+cd sdks/node   && npm run smoke:live
+cd sdks/python && python scripts/live_api_smoke.py
+cd sdks/php    && php scripts/live-api-smoke.php
+```
 
 ---
 

@@ -13,7 +13,7 @@ use Hookflow\Api\IncomingEvents;
 
 class Hookflow
 {
-    private const SDK_VERSION = '2.2.1';
+    private const SDK_VERSION = '2.5.0';
 
     private string $apiKey;
     private string $baseUrl;
@@ -141,6 +141,16 @@ class Hookflow
             case 'DELETE':
                 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
                 break;
+            case 'GET':
+                break;
+            default:
+                // Without this, anything the switch does not name (OPTIONS,
+                // HEAD, …) fell through and went out as a GET.
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, strtoupper($method));
+                if ($body !== null) {
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+                }
+                break;
         }
 
         $response = curl_exec($ch);
@@ -171,6 +181,10 @@ class Hookflow
         return $data;
     }
 
+    /**
+     * @return array{limit:int,remaining:int,reset:int}|null `reset` is a Unix
+     *         timestamp in **seconds** — the raw X-RateLimit-Reset value.
+     */
     private function extractRateLimitInfo(string $headers): ?array
     {
         $limit = null;
@@ -202,12 +216,17 @@ class Hookflow
             401 => new Exception\AuthenticationException($message),
             404 => new Exception\NotFoundException($message),
             429 => new Exception\RateLimitException($message, $rateLimitInfo ?? [
+                // `reset` is a Unix timestamp in seconds, matching the raw
+                // X-RateLimit-Reset header — not milliseconds.
                 'limit' => 0,
                 'remaining' => 0,
-                'reset' => time() * 1000 + 60000,
+                'reset' => time() + 60,
             ]),
             400 => new Exception\ValidationException($message, $body['fieldErrors'] ?? []),
-            default => new Exception\HookflowException($message, $status),
+            // Everything the match does not name (403, 413, 422, 5xx) keeps the
+            // envelope's own `error` code, so getErrorCode() is not null for
+            // exactly the statuses the README's error table documents.
+            default => new Exception\HookflowException($message, $status, $body['error'] ?? null),
         };
     }
 }

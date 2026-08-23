@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Cable, Loader2, Trash2, Copy, Activity, Clock, Monitor, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Cable, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import StatusBadge from '../components/StatusBadge';
+import PermissionGate from '../components/PermissionGate';
 import { tunnelsApi, TunnelSessionResponse, TunnelStatusResponse } from '../api/tunnels.api';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import {
   AlertDialog,
@@ -21,34 +23,32 @@ import {
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 
+/** A tunnel lives only as long as a CLI stays connected, so the page is a live roster. */
 export default function TunnelsPage() {
   const { t } = useTranslation();
   const { canManageEndpoints: canCloseTunnels } = usePermissions();
   const [tunnels, setTunnels] = useState<TunnelSessionResponse[]>([]);
   const [status, setStatus] = useState<TunnelStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [closeId, setCloseId] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tunnelsData, statusData] = await Promise.all([
-        tunnelsApi.list(),
-        tunnelsApi.status(),
-      ]);
+      const [tunnelsData, statusData] = await Promise.all([tunnelsApi.list(), tunnelsApi.status()]);
       setTunnels(tunnelsData);
       setStatus(statusData);
+      setLoadError(null);
     } catch (err: any) {
-      showApiError(err, 'tunnels.toast.loadFailed', { retry: loadData });
+      setLoadError(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleClose = async () => {
     if (!closeId) return;
@@ -79,125 +79,99 @@ export default function TunnelsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-title tracking-tight">{t('tunnels.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t('tunnels.subtitle')}</p>
-        </div>
-        <Button variant="outline" onClick={loadData} disabled={loading}>
-          <RefreshCw className="h-4 w-4" /> {t('tunnels.refresh')}
-        </Button>
-      </div>
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={status ? t('tunnels.openCount', { count: status.activeTunnels }) : undefined}
+        title={t('tunnels.title')}
+        description={t('tunnels.subtitle')}
+        actions={
+          <Button variant="outline" onClick={loadData}>
+            <RefreshCw className="h-4 w-4" aria-hidden /> {t('tunnels.refresh')}
+          </Button>
+        }
+      />
 
-      {/* Status cards */}
       {status && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                <Cable className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{status.activeTunnels}</p>
-                <p className="text-xs text-muted-foreground">{t('tunnels.stats.active')}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Activity className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{status.pendingRequests}</p>
-                <p className="text-xs text-muted-foreground">{t('tunnels.stats.pending')}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Monitor className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{status.myTunnels.length}</p>
-                <p className="text-xs text-muted-foreground">{t('tunnels.stats.mine')}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <dl className="mb-6 grid grid-cols-3 divide-x divide-rail rounded-lg border border-rail bg-card">
+          {([
+            ['tunnels.stats.active', status.activeTunnels],
+            ['tunnels.stats.pending', status.pendingRequests],
+            ['tunnels.stats.mine', status.myTunnels.length],
+          ] as const).map(([key, value]) => (
+            <div key={key} className="px-4 py-3">
+              <dt className="mono-label">{t(key)}</dt>
+              <dd className="mt-1 font-mono text-xl">{value}</dd>
+            </div>
+          ))}
+        </dl>
       )}
 
-      {tunnels.length === 0 ? (
+      {loadError ? (
+        <ErrorState error={loadError} fallbackKey="tunnels.toast.loadFailed" onRetry={loadData} />
+      ) : tunnels.length === 0 ? (
         <EmptyState
           icon={Cable}
           title={t('tunnels.noTunnels')}
           description={t('tunnels.noTunnelsDesc')}
         />
       ) : (
-        <div className="space-y-3 animate-fade-in">
+        <div className="animate-fade-in space-y-3">
           {tunnels.map((tunnel) => (
             <Card key={tunnel.id}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Cable className="h-4 w-4 text-green-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <code className="text-sm font-semibold font-mono">{tunnel.publicSlug}</code>
-                        <Badge variant="default" className="text-[10px] bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
-                          {t('tunnels.active')}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <code className="text-[13px] text-muted-foreground truncate max-w-[400px]">{tunnel.publicUrl}</code>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => handleCopyUrl(tunnel.publicUrl)}
-                          title={t('tunnels.copyUrl')}
-                          aria-label={t('tunnels.copyUrl')}
-                          className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Monitor className="h-3 w-3" />
-                          localhost:{tunnel.localPort}
-                        </span>
-                        {tunnel.clientInfo && (
-                          <span>{tunnel.clientInfo}</span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {t('tunnels.created')}: {formatRelativeTime(tunnel.createdAt)}
-                        </span>
-                        {tunnel.lastHeartbeat && (
-                          <span>
-                            {t('tunnels.lastHeartbeat')}: {formatRelativeTime(tunnel.lastHeartbeat)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+              <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4 lg:p-5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="font-mono text-sm font-medium">{tunnel.publicSlug}</code>
+                    <StatusBadge kind="ok" label={t('tunnels.active')} />
                   </div>
-                  {canCloseTunnels && (
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <code className="min-w-0 truncate font-mono text-[13px] text-muted-foreground">{tunnel.publicUrl}</code>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => setCloseId(tunnel.id)}
-                      title={t('tunnels.close')}
-                      aria-label={t('tunnels.close')}
-                      className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                      onClick={() => handleCopyUrl(tunnel.publicUrl)}
+                      title={t('tunnels.copyUrl')}
+                      aria-label={t('tunnels.copyUrl')}
+                      className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-foreground"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Copy className="h-3 w-3" />
                     </Button>
-                  )}
+                  </div>
+                  <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
+                    <div className="flex gap-1.5">
+                      <dt className="mono-label">{t('tunnels.localPort')}</dt>
+                      <dd className="font-mono text-muted-foreground">localhost:{tunnel.localPort}</dd>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <dt className="mono-label">{t('tunnels.created')}</dt>
+                      <dd className="text-muted-foreground">{formatRelativeTime(tunnel.createdAt)}</dd>
+                    </div>
+                    {tunnel.lastHeartbeat && (
+                      <div className="flex gap-1.5">
+                        <dt className="mono-label">{t('tunnels.lastHeartbeat')}</dt>
+                        <dd className="text-muted-foreground">{formatRelativeTime(tunnel.lastHeartbeat)}</dd>
+                      </div>
+                    )}
+                    {tunnel.clientInfo && (
+                      <div className="flex gap-1.5">
+                        <dt className="mono-label">{t('tunnels.client')}</dt>
+                        <dd className="text-muted-foreground">{tunnel.clientInfo}</dd>
+                      </div>
+                    )}
+                  </dl>
                 </div>
+                <PermissionGate allowed={canCloseTunnels} fallback="hide">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setCloseId(tunnel.id)}
+                    title={t('tunnels.close')}
+                    aria-label={t('tunnels.closeNamed', { name: tunnel.publicSlug })}
+                    className="flex-shrink-0 text-muted-foreground hover:text-halt"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </PermissionGate>
               </CardContent>
             </Card>
           ))}
@@ -208,18 +182,15 @@ export default function TunnelsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('tunnels.closeDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('tunnels.closeDialog.description')}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t('tunnels.closeDialog.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={closing}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleClose}
               disabled={closing}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={buttonVariants({ variant: 'destructive' })}
             >
-              {closing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {closing ? t('tunnels.closing') : t('tunnels.close')}
             </AlertDialogAction>
           </AlertDialogFooter>

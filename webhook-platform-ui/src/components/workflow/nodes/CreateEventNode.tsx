@@ -9,7 +9,7 @@ function CreateEventNode({ data, selected }: NodeProps) {
   const eventType = d.eventType ? String(d.eventType) : '';
   return (
     <BaseNode
-      color="#7c3aed"
+      role="action"
       icon="📤"
       label={String(d.label || t('workflows.nodeTypes.createEvent.label'))}
       subtitle={eventType || t('workflows.nodeStatus.notConfigured')}

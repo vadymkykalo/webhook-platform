@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { Loader2, ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import AuthLayout from './AuthLayout';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
+import { cn } from '../lib/utils';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
@@ -52,119 +53,86 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-background">
-        <div className="w-full max-w-[420px] animate-fade-in-up text-center">
-          <div className="h-14 w-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="h-7 w-7 text-destructive" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.resetPassword.invalidLink')}</h1>
-          <p className="text-muted-foreground mb-6">
-            {t('auth.resetPassword.invalidLinkMessage')}
-          </p>
-          <div className="flex flex-col gap-3">
-            <Link to="/forgot-password">
-              <Button className="w-full">{t('auth.resetPassword.requestNew')}</Button>
-            </Link>
-            <Link to="/login">
-              <Button variant="ghost" className="w-full">{t('auth.resetPassword.backToSignIn')}</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
+      <AuthLayout
+        title={t('auth.resetPassword.invalidLink')}
+        subtitle={t('auth.resetPassword.invalidLinkMessage')}
+        footer={
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            {t('auth.resetPassword.backToSignIn')}
+          </Link>
+        }
+      >
+        <Link to="/forgot-password" className={cn(buttonVariants(), 'h-10 w-full')}>
+          {t('auth.resetPassword.requestNew')}
+        </Link>
+      </AuthLayout>
+    );
+  }
+
+  if (success) {
+    return (
+      <AuthLayout
+        title={t('auth.resetPassword.success')}
+        subtitle={t('auth.resetPassword.successMessage')}
+      >
+        <Button className="h-10 w-full" onClick={() => navigate('/login')}>
+          {t('auth.resetPassword.signIn')}
+        </Button>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-background">
-      <div className="w-full max-w-[420px] animate-fade-in-up">
-        <Link
-          to="/login"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {t('auth.resetPassword.backToLogin')}
+    <AuthLayout
+      title={t('auth.resetPassword.title')}
+      subtitle={t('auth.resetPassword.subtitle')}
+      footer={
+        <Link to="/login" className="font-medium text-primary hover:underline">
+          {t('auth.resetPassword.backToSignIn')}
         </Link>
-
-        <div className="mb-8">
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <HookflowIcon className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-bold">Hookflow</span>
-          </div>
-
-          {success ? (
-            <div className="space-y-4">
-              <div className="h-14 w-14 rounded-2xl bg-success/10 flex items-center justify-center">
-                <CheckCircle2 className="h-7 w-7 text-success" />
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight">{t('auth.resetPassword.success')}</h1>
-              <p className="text-muted-foreground">
-                {t('auth.resetPassword.successMessage')}
-              </p>
-              <Button className="w-full" onClick={() => navigate('/login')}>
-                {t('auth.resetPassword.signIn')}
-              </Button>
-            </div>
-          ) : (
-            <>
-              <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.resetPassword.title')}</h1>
-              <p className="text-muted-foreground">
-                {t('auth.resetPassword.subtitle')}
-              </p>
-            </>
-          )}
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="password">{t('auth.resetPassword.newPassword')}</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="new-password"
+            autoFocus
+          />
         </div>
 
-        {!success && (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">{t('auth.resetPassword.newPassword')}</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="new-password"
-                autoFocus
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium">{t('auth.resetPassword.confirmPassword')}</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="new-password"
-                className="h-11"
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword">{t('auth.resetPassword.confirmPassword')}</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="new-password"
+          />
+        </div>
 
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3 animate-scale-in">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full h-11"
-              disabled={loading}
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? t('auth.resetPassword.submitting') : t('auth.resetPassword.submit')}
-            </Button>
-          </form>
+        {error && (
+          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+            {error}
+          </div>
         )}
-      </div>
-    </div>
+
+        <Button type="submit" className="h-10 w-full" disabled={loading}>
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading ? t('auth.resetPassword.submitting') : t('auth.resetPassword.submit')}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

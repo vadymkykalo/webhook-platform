@@ -1,37 +1,33 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../auth/auth.store';
-import { authApi } from '../api/auth.api';
-import { User, Building2, Loader2, KeyRound, CheckCircle2, ShieldCheck, AlertTriangle, RotateCcw, Lock, Eye, Pencil, Globe, Bell } from 'lucide-react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Check, Loader2, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../auth/auth.store';
+import { usePermissions } from '../auth/usePermissions';
+import { authApi } from '../api/auth.api';
 import { showApiError, showSuccess } from '../lib/toast';
-import { formatDate, getStoredTimezone, setStoredTimezone } from '../lib/date';
+import { getStoredTimezone, setStoredTimezone } from '../lib/date';
+import PageHeader from '../components/PageHeader';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import StatusBadge from '../components/StatusBadge';
+import { RoleCard } from '../components/PermissionGate';
+import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Separator } from '../components/ui/separator';
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
-import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+
+/**
+ * The profile form. Each section answers one question and carries its own save
+ * control in the same place, because the page it replaced was a single stack of
+ * inputs with save buttons wherever they happened to fit.
+ */
 
 const COMMON_TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Sao_Paulo',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Kyiv',
-  'Asia/Dubai',
-  'Asia/Kolkata',
-  'Asia/Shanghai',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'Australia/Sydney',
-  'Pacific/Auckland',
+  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+  'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Kyiv',
+  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul',
+  'Australia/Sydney', 'Pacific/Auckland',
 ];
 
 const NOTIF_STORAGE_KEY = 'hookflow_notification_prefs';
@@ -54,19 +50,93 @@ function setNotifPrefs(prefs: NotificationPrefs) {
   localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(prefs));
 }
 
+/**
+ * One titled section of a settings form: what it is on the left, the fields on
+ * the right, and — when the section can be saved — its control on the same
+ * baseline every other section uses.
+ */
+export function FormSection({
+  title, description, children, footer,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <section className="border-t border-rail pt-8 first:border-t-0 first:pt-0">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:gap-10">
+        <div>
+          <h3 className="text-[15px] font-medium">{title}</h3>
+          {description && <p className="mt-1 text-sm leading-snug text-muted-foreground">{description}</p>}
+        </div>
+        <div className="min-w-0 space-y-4">
+          {children}
+          {footer && (
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-rail pt-4">{footer}</div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The save control, in the same place in every section, with what it did. */
+export function SaveControl({
+  label, savingLabel, saving, disabled, saved, onClick, type = 'button',
+}: {
+  label: string;
+  savingLabel: string;
+  saving: boolean;
+  disabled?: boolean;
+  /** True once a save landed and nothing has changed since. */
+  saved?: boolean;
+  onClick?: () => void;
+  type?: 'button' | 'submit';
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {saved && !saving && (
+        <span className="flex items-center gap-1.5 text-[13px] text-ok" role="status">
+          <Check className="h-3.5 w-3.5" aria-hidden />
+          {t('settings.saved')}
+        </span>
+      )}
+      <Button type={type} onClick={onClick} disabled={disabled || saving} size="sm">
+        {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+        {saving ? savingLabel : label}
+      </Button>
+    </>
+  );
+}
+
+/** A read-only fact about the signed-in person: the product said it, so it is mono. */
+function FactRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rail py-2.5 last:border-b-0">
+      <span className="mono-label w-40 flex-shrink-0">{label}</span>
+      <span className="min-w-0 break-words text-sm">{children}</span>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { user, updateUser } = useAuth();
+  const { role } = usePermissions();
+
+  const [fullName, setFullName] = useState(user?.user?.fullName || '');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const profileDirty = fullName !== (user?.user?.fullName || '');
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-
-  const [fullName, setFullName] = useState(user?.user?.fullName || '');
-  const [savingProfile, setSavingProfile] = useState(false);
-  const profileDirty = fullName !== (user?.user?.fullName || '');
+  const [passwordSaved, setPasswordSaved] = useState(false);
 
   const [selectedTz, setSelectedTz] = useState(getStoredTimezone);
   const [notifPrefs, setNotifPrefsState] = useState<NotificationPrefs>(getNotifPrefs);
@@ -82,6 +152,7 @@ export default function SettingsPage() {
       if (user) {
         updateUser({ ...user, user: { ...user.user, fullName: updated.fullName } });
       }
+      setProfileSaved(true);
       showSuccess(t('settings.toast.profileUpdated'));
     } catch (err: any) {
       showApiError(err, 'settings.profileUpdateFailed');
@@ -93,13 +164,12 @@ export default function SettingsPage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
-    setPasswordSuccess(false);
+    setPasswordSaved(false);
 
     if (newPassword !== confirmPassword) {
       setPasswordError(t('settings.passwordMismatch'));
       return;
     }
-
     if (newPassword.length < 8) {
       setPasswordError(t('settings.passwordTooShort'));
       return;
@@ -108,7 +178,7 @@ export default function SettingsPage() {
     setChangingPassword(true);
     try {
       await authApi.changePassword(currentPassword, newPassword);
-      setPasswordSuccess(true);
+      setPasswordSaved(true);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -122,221 +192,187 @@ export default function SettingsPage() {
     }
   };
 
+  const verified = user?.user?.status !== 'PENDING_VERIFICATION';
+
+  // Everything below reads out of the auth store. Until the session restore in
+  // App.tsx lands, that store is empty and the form would render as blank
+  // fields with a blank email beside them. There is no error branch to pair
+  // with this: a restore that fails clears the session and routes to login, so
+  // this page never sees a failure it could report.
+  if (!user) {
+    return (
+      <PageSkeleton maxWidth="max-w-4xl">
+        <SkeletonCards count={3} height="h-44" cols="grid-cols-1" />
+      </PageSkeleton>
+    );
+  }
+
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-title tracking-tight">{t('settings.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t('settings.subtitle')}
-        </p>
-      </div>
+    <div className="p-4 lg:p-6">
+      <div className="max-w-4xl">
+        <PageHeader
+          eyebrow={user?.organization?.name}
+          title={t('settings.title')}
+          description={t('settings.subtitle')}
+        />
 
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />
-              <CardTitle>{t('settings.profile')}</CardTitle>
+        <div className="space-y-8">
+          <FormSection
+            title={t('settings.profile')}
+            description={t('settings.profileDesc')}
+            footer={
+              <SaveControl
+                label={t('common.save')}
+                savingLabel={t('common.saving')}
+                saving={savingProfile}
+                disabled={!profileDirty}
+                saved={profileSaved && !profileDirty}
+                onClick={handleSaveProfile}
+              />
+            }
+          >
+            <div className="space-y-2">
+              <Label htmlFor="fullName">{t('settings.fullName')}</Label>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => { setFullName(e.target.value); setProfileSaved(false); }}
+                placeholder={t('settings.fullNamePlaceholder')}
+                disabled={savingProfile}
+                className="max-w-sm"
+              />
+              <p className="text-xs text-muted-foreground">{t('settings.fullNameHint')}</p>
             </div>
-            <CardDescription>
-              {t('settings.profileDesc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">{t('settings.fullName')}</Label>
-                <div className="flex gap-2 max-w-md">
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder={t('settings.fullNamePlaceholder')}
-                    disabled={savingProfile}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleSaveProfile}
-                    disabled={!profileDirty || savingProfile}
-                    className="shrink-0"
-                  >
-                    {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-3.5 w-3.5 mr-1" />}
-                    {savingProfile ? t('common.saving') : t('common.save')}
-                  </Button>
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">{t('settings.email')}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user?.user?.email || ''}
-                  disabled
-                  className="bg-muted"
+            <div className="pt-1">
+              <FactRow label={t('settings.email')}>
+                <span className="font-mono text-[13px]">{user?.user?.email}</span>
+              </FactRow>
+              <FactRow label={t('settings.emailStatus')}>
+                <StatusBadge
+                  kind={verified ? 'ok' : 'retry'}
+                  label={t(verified ? 'settings.emailVerified' : 'settings.emailUnverified')}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">{t('settings.role')}</Label>
-                <Input
-                  id="role"
-                  value={user?.role || ''}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">{t('settings.accountStatus')}</Label>
-                <Input
-                  id="status"
-                  value={user?.user?.status || ''}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
+              </FactRow>
+              <FactRow label={t('settings.organization')}>
+                {user?.organization?.name}
+              </FactRow>
             </div>
-          </CardContent>
-        </Card>
+          </FormSection>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-primary" />
-              <CardTitle>{t('settings.changePassword')}</CardTitle>
+          <FormSection
+            title={t('settings.yourAccess')}
+            description={t('settings.yourAccessDesc')}
+          >
+            <div className="max-w-md">
+              <RoleCard role={role} />
             </div>
-            <CardDescription>
-              {t('settings.changePasswordDesc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleChangePassword} className="space-y-4">
+          </FormSection>
+
+          <form onSubmit={handleChangePassword}>
+            <FormSection
+              title={t('settings.changePassword')}
+              description={t('settings.changePasswordDesc')}
+              footer={
+                <SaveControl
+                  type="submit"
+                  label={t('settings.changePasswordBtn')}
+                  savingLabel={t('settings.changingPassword')}
+                  saving={changingPassword}
+                  disabled={!currentPassword || !newPassword || !confirmPassword}
+                  saved={passwordSaved}
+                />
+              }
+            >
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">{t('settings.currentPassword')}</Label>
                 <Input
                   id="currentPassword"
                   type="password"
+                  autoComplete="current-password"
                   value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  onChange={(e) => { setCurrentPassword(e.target.value); setPasswordSaved(false); }}
                   required
                   disabled={changingPassword}
-                  placeholder="••••••••"
-                  className="max-w-md"
+                  className="max-w-sm"
                 />
               </div>
-
-              <Separator />
-
               <div className="space-y-2">
                 <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
                 <Input
                   id="newPassword"
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => { setNewPassword(e.target.value); setPasswordSaved(false); }}
                   required
                   disabled={changingPassword}
-                  placeholder="••••••••"
-                  className="max-w-md"
+                  className="max-w-sm"
                 />
-                <PasswordStrengthIndicator password={newPassword} />
+                <div className="max-w-sm">
+                  <PasswordStrengthIndicator password={newPassword} />
+                </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">{t('settings.confirmPassword')}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setPasswordSaved(false); }}
                   required
                   disabled={changingPassword}
-                  placeholder="••••••••"
-                  className="max-w-md"
+                  className="max-w-sm"
                 />
               </div>
-
               {passwordError && (
-                <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3 max-w-md">
+                <p role="alert" className="max-w-sm rounded-md border border-halt/30 bg-halt-soft px-3 py-2 text-sm text-halt">
                   {passwordError}
-                </div>
-              )}
-
-              {passwordSuccess && (
-                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 max-w-md">
-                  <CheckCircle2 className="h-4 w-4" />
-                  {t('settings.passwordChanged')}
-                </div>
-              )}
-
-              <div>
-                <Button type="submit" disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}>
-                  {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {changingPassword ? t('settings.changingPassword') : t('settings.changePasswordBtn')}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-primary" />
-              <CardTitle>{t('settings.timezone.title')}</CardTitle>
-            </div>
-            <CardDescription>
-              {t('settings.timezone.description')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t('settings.timezone.select')}</Label>
-                <Select
-                  value={selectedTz}
-                  onChange={(e) => {
-                    const tz = e.target.value;
-                    setSelectedTz(tz);
-                    setStoredTimezone(tz);
-                    showSuccess(t('settings.timezone.saved'));
-                  }}
-                  className="max-w-md"
-                >
-                  {!COMMON_TIMEZONES.includes(selectedTz) && (
-                    <option value={selectedTz}>{selectedTz}</option>
-                  )}
-                  {COMMON_TIMEZONES.map(tz => (
-                    <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
-                  ))}
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.timezone.hint', { tz: selectedTz })}
                 </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </FormSection>
+          </form>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-primary" />
-              <CardTitle>{t('settings.notifications.title')}</CardTitle>
+          <FormSection
+            title={t('settings.timezone.title')}
+            description={t('settings.timezone.description')}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="timezone">{t('settings.timezone.select')}</Label>
+              <Select
+                id="timezone"
+                value={selectedTz}
+                onChange={(e) => {
+                  const tz = e.target.value;
+                  setSelectedTz(tz);
+                  setStoredTimezone(tz);
+                  showSuccess(t('settings.timezone.saved'));
+                }}
+                className="max-w-sm font-mono text-[13px]"
+              >
+                {!COMMON_TIMEZONES.includes(selectedTz) && (
+                  <option value={selectedTz}>{selectedTz}</option>
+                )}
+                {COMMON_TIMEZONES.map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ))}
+              </Select>
+              <p className="text-xs text-muted-foreground">{t('settings.timezone.hint', { tz: selectedTz })}</p>
             </div>
-            <CardDescription>
-              {t('settings.notifications.description')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          </FormSection>
+
+          <FormSection
+            title={t('settings.notifications.title')}
+            description={t('settings.notifications.description')}
+          >
+            <div className="divide-y divide-rail">
               {(['inApp', 'email', 'browser'] as const).map((channel) => (
-                <label key={channel} className="flex items-center justify-between max-w-md cursor-pointer">
-                  <div>
-                    <p className="text-sm font-medium">{t(`settings.notifications.${channel}`)}</p>
-                    <p className="text-xs text-muted-foreground">{t(`settings.notifications.${channel}Desc`)}</p>
-                  </div>
+                <label key={channel} className="flex cursor-pointer items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{t(`settings.notifications.${channel}`)}</span>
+                    <span className="block text-xs text-muted-foreground">{t(`settings.notifications.${channel}Desc`)}</span>
+                  </span>
                   <Switch
                     checked={notifPrefs[channel]}
                     onCheckedChange={(checked) => {
@@ -349,128 +385,23 @@ export default function SettingsPage() {
                 </label>
               ))}
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-xs text-muted-foreground">{t('settings.deviceOnly')}</p>
+          </FormSection>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <CardTitle>{t('settings.organization')}</CardTitle>
-            </div>
-            <CardDescription>
-              {t('settings.organizationDesc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>{t('settings.orgName')}</Label>
-                <Input
-                  value={user?.organization?.name || ''}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('settings.orgId')}</Label>
-                <Input
-                  value={user?.organization?.id || ''}
-                  disabled
-                  className="bg-muted font-mono text-sm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('settings.createdAt')}</Label>
-                <Input
-                  value={
-                    user?.organization?.createdAt
-                      ? formatDate(user.organization.createdAt)
-                      : ''
-                  }
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              <CardTitle>{t('settings.security.title')}</CardTitle>
-            </div>
-            <CardDescription>
-              {t('settings.security.subtitle')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <RotateCcw className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{t('settings.security.secretRotation')}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t('settings.security.secretRotationDesc')}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Lock className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{t('settings.security.hmacVerification')}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t('settings.security.hmacVerificationDesc')}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Eye className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium">{t('settings.security.auditLogging')}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t('settings.security.auditLoggingDesc')}</p>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{t('settings.security.bestPracticeTitle')}</p>
-                  <ul className="text-xs text-amber-700 dark:text-amber-300 mt-1 space-y-1 list-disc list-inside">
-                    <li>{t('settings.security.tip1')}</li>
-                    <li>{t('settings.security.tip2')}</li>
-                    <li>{t('settings.security.tip3')}</li>
-                    <li>{t('settings.security.tip4')}</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">{t('settings.dangerZone')}</CardTitle>
-            <CardDescription>
-              {t('settings.dangerZoneDesc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">{t('settings.deleteAccount')}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t('settings.deleteAccountDesc')}
-                  </p>
-                </div>
-                <Button variant="destructive" disabled>
-                  {t('settings.deleteAccount')}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <FormSection
+            title={t('settings.security.title')}
+            description={t('settings.security.subtitle')}
+          >
+            <ul className="space-y-2.5">
+              {(['tip1', 'tip2', 'tip3', 'tip4'] as const).map((tip) => (
+                <li key={tip} className="flex gap-2.5 text-sm">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
+                  <span>{t(`settings.security.${tip}`)}</span>
+                </li>
+              ))}
+            </ul>
+          </FormSection>
+        </div>
       </div>
     </div>
   );

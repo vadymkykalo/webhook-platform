@@ -35,10 +35,15 @@ class RateLimitError(HookflowError):
 
     @property
     def retry_after_ms(self) -> int:
-        """Milliseconds to wait before retrying."""
+        """Milliseconds to wait before retrying.
+
+        ``rate_limit_info.reset`` is the raw ``X-RateLimit-Reset`` header, which
+        the API sends as a Unix timestamp in **seconds**; subtracting a
+        millisecond clock from it directly always yields 0.
+        """
         import time
         now_ms = int(time.time() * 1000)
-        return max(0, self.rate_limit_info.reset - now_ms)
+        return max(0, self.rate_limit_info.reset * 1000 - now_ms)
 
 
 class ValidationError(HookflowError):

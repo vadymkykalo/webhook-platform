@@ -1,5 +1,6 @@
 package com.webhook.platform.api.exception;
 
+import com.webhook.platform.common.security.UrlValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -138,6 +140,50 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNPROCESSABLE_ENTITY.value()
         );
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
+    }
+
+    /**
+     * A URL the SSRF validator rejected is the caller's mistake, not ours.
+     *
+     * InvalidUrlException is a RuntimeException, so without this it fell to the
+     * catch-all below and came back as 500 "An unexpected error occurred".
+     * EndpointService validates on create and on update without catching (only
+     * testEndpoint catches), so anyone who typed a host that does not resolve
+     * was told the server had broken, with nothing naming the URL.
+     */
+    /**
+     * A path that matches no handler is a 404, not a server error.
+     *
+     * Spring raises NoResourceFoundException for an unmapped path, and with no
+     * handler for it that fell to the catch-all below — so *every* unknown URL
+     * on this port answered 500 "An unexpected error occurred". The symptom
+     * that surfaced it was GET /actuator/health returning 500: actuator binds
+     * to the management port, so on 8080 the path simply matches nothing.
+     * Anything probing this service for liveness reads a 500 and concludes the
+     * API is broken.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(
+            NoResourceFoundException ex, WebRequest request) {
+        log.debug("No handler for {}", ex.getResourcePath());
+        ErrorResponse error = new ErrorResponse(
+                "not_found",
+                "The requested resource was not found",
+                HttpStatus.NOT_FOUND.value()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(UrlValidator.InvalidUrlException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidUrlException(
+            UrlValidator.InvalidUrlException ex, WebRequest request) {
+        log.warn("Rejected webhook URL: {}", ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                "invalid_url",
+                ex.getMessage(),
+                HttpStatus.BAD_REQUEST.value()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     @ExceptionHandler(RuntimeException.class)

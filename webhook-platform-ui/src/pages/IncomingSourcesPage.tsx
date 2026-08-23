@@ -1,24 +1,29 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Plus, ArrowDownToLine, Calendar, Loader2, Trash2, Pencil, Copy, ChevronLeft, ChevronRight,
-  Power, PowerOff, ShieldCheck, ShieldOff, ExternalLink, AlertTriangle
+  ArrowDownToLine, AlertTriangle, Copy, Loader2, Pencil, Plus, Trash2,
 } from 'lucide-react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatRelativeTime } from '../lib/date';
+import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { incomingSourcesApi } from '../api/incomingSources.api';
-import { projectsApi } from '../api/projects.api';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import StatusBadge from '../components/StatusBadge';
+import {
+  useProject, useIncomingSources, useCreateIncomingSource, useUpdateIncomingSource,
+  useDeleteIncomingSource,
+} from '../api/queries';
 import type {
-  IncomingSourceResponse, IncomingSourceRequest, ProjectResponse, PageResponse,
-  ProviderType, VerificationMode,
+  IncomingSourceResponse, IncomingSourceRequest, ProviderType, VerificationMode,
 } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Card, CardContent } from '../components/ui/card';
+import { Card } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
@@ -31,9 +36,17 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 
+/**
+ * Incoming sources — the same shape as Connections, one direction over.
+ *
+ * A source is a third-party provider a customer has connected, together with
+ * what Hookflow needs to prove a webhook genuinely came from it. Its
+ * destinations live on its own page, the way subscriptions live on a
+ * connection: open a source to see where its incoming events are forwarded.
+ */
+
 const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'CUSTOM'];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
-const PAGE_SIZE = 20;
 
 export default function IncomingSourcesPage() {
   const { t } = useTranslation();
@@ -41,13 +54,21 @@ export default function IncomingSourcesPage() {
   const navigate = useNavigate();
   const { canManageIncomingSources } = usePermissions();
 
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [sources, setSources] = useState<IncomingSourceResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [pageInfo, setPageInfo] = useState<PageResponse<IncomingSourceResponse> | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
 
-  // Create / Edit dialog
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const {
+    data: pageInfo, isLoading: sourcesLoading, isError, error, refetch,
+  } = useIncomingSources(projectId, currentPage, pageSize);
+
+  const createSource = useCreateIncomingSource(projectId!);
+  const updateSource = useUpdateIncomingSource(projectId!);
+  const deleteSource = useDeleteIncomingSource(projectId!);
+
+  const sources = pageInfo?.content ?? [];
+  const loading = projectLoading || sourcesLoading;
+
   const [showDialog, setShowDialog] = useState(false);
   const [editSource, setEditSource] = useState<IncomingSourceResponse | null>(null);
   const [formName, setFormName] = useState('');
@@ -57,34 +78,10 @@ export default function IncomingSourcesPage() {
   const [formHmacSecret, setFormHmacSecret] = useState('');
   const [formHmacHeader, setFormHmacHeader] = useState('');
   const [formHmacPrefix, setFormHmacPrefix] = useState('');
-  const [formRateLimit, setFormRateLimit] = useState<string>('');
-  const [saving, setSaving] = useState(false);
-
-  // Delete
+  const [formRateLimit, setFormRateLimit] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    if (projectId) loadData();
-  }, [projectId, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadData = async () => {
-    if (!projectId) return;
-    try {
-      setLoading(true);
-      const [proj, data] = await Promise.all([
-        projectsApi.get(projectId),
-        incomingSourcesApi.list(projectId, currentPage, PAGE_SIZE),
-      ]);
-      setProject(proj);
-      setSources(data.content);
-      setPageInfo(data);
-    } catch (err) {
-      showApiError(err, 'incomingSources.toast.loadFailed', { retry: loadData });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const saving = createSource.isPending || updateSource.isPending;
 
   const openCreate = () => {
     setEditSource(null);
@@ -114,8 +111,6 @@ export default function IncomingSourcesPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId) return;
-
     const data: IncomingSourceRequest = {
       name: formName,
       slug: formSlug || undefined,
@@ -127,255 +122,289 @@ export default function IncomingSourcesPage() {
       rateLimitPerSecond: formRateLimit ? parseInt(formRateLimit) : null,
     };
 
-    setSaving(true);
     try {
       if (editSource) {
-        await incomingSourcesApi.update(projectId, editSource.id, data);
+        await updateSource.mutateAsync({ id: editSource.id, data });
         showSuccess(t('incomingSources.toast.updated'));
       } else {
-        await incomingSourcesApi.create(projectId, data);
+        await createSource.mutateAsync(data);
         showSuccess(t('incomingSources.toast.created'));
       }
       setShowDialog(false);
-      loadData();
     } catch (err) {
       showApiError(err, editSource ? 'incomingSources.toast.updateFailed' : 'incomingSources.toast.createFailed');
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!deleteId || !projectId) return;
-    setDeleting(true);
+    if (!deleteId) return;
     try {
-      await incomingSourcesApi.delete(projectId, deleteId);
+      await deleteSource.mutateAsync(deleteId);
       showCriticalSuccess(t('incomingSources.toast.deleted'));
       setDeleteId(null);
-      loadData();
     } catch (err) {
       showApiError(err, 'incomingSources.toast.deleteFailed');
-    } finally {
-      setDeleting(false);
     }
   };
 
-  const copyIngressUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
+  const copyIngressUrl = async (url: string) => {
+    await navigator.clipboard.writeText(url);
     showSuccess(t('incomingSources.toast.urlCopied'));
   };
 
-  const showHmacFields = formVerification === 'HMAC_GENERIC';
+  const openSource = (source: IncomingSourceResponse) =>
+    navigate(`/admin/projects/${projectId}/incoming-sources/${source.id}`);
 
   if (loading) {
-    return <PageSkeleton><SkeletonRows count={3} height="h-32" /></PageSkeleton>;
-  }
-
-  if (!project) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-        <EmptyState icon={ArrowDownToLine} title={t('endpoints.projectNotFound')} />
-      </div>
+      <PageSkeleton>
+        <SkeletonRows count={4} height="h-16" />
+      </PageSkeleton>
     );
   }
 
-  return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-title tracking-tight">{t('incomingSources.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            <Trans i18nKey="incomingSources.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
-          </p>
-        </div>
-        <PermissionGate allowed={canManageIncomingSources}>
-          <VerificationGate>
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> {t('incomingSources.create')}
-            </Button>
-          </VerificationGate>
-        </PermissionGate>
-      </div>
+  const newSourceButton = (
+    <PermissionGate allowed={canManageIncomingSources}>
+      <VerificationGate>
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4" /> {t('incomingSources.create')}
+        </Button>
+      </VerificationGate>
+    </PermissionGate>
+  );
 
-      {sources.length === 0 ? (
+  return (
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={project?.name}
+        title={t('incomingSources.title')}
+        description={t('incomingSources.descriptionV2', 'Providers whose webhooks arrive here, and how each one is proven genuine before it is forwarded.')}
+        actions={!isError && sources.length > 0 ? newSourceButton : undefined}
+      />
+
+      {isError ? (
+        <ErrorState error={error} fallbackKey="incomingSources.toast.loadFailed" onRetry={() => refetch()} />
+      ) : sources.length === 0 ? (
         <EmptyState
           icon={ArrowDownToLine}
           title={t('incomingSources.noSources')}
           description={t('incomingSources.noSourcesDesc')}
-          action={
-            <PermissionGate allowed={canManageIncomingSources}>
-              <VerificationGate>
-                <Button onClick={openCreate}>
-                  <Plus className="h-4 w-4" /> {t('incomingSources.create')}
-                </Button>
-              </VerificationGate>
-            </PermissionGate>
-          }
+          action={newSourceButton}
           docsLink="/docs#incoming-webhooks"
         />
       ) : (
-        <div className="space-y-3 animate-fade-in">
-          {sources.map((source) => (
-            <Card key={source.id} className="overflow-hidden cursor-pointer hover:border-primary/30 transition-colors"
-              onClick={() => navigate(`/admin/projects/${projectId}/incoming-sources/${source.id}`)}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                      source.status === 'ACTIVE' ? 'bg-success/10' : 'bg-muted'
-                    }`}>
-                      <ArrowDownToLine className={`h-4 w-4 ${source.status === 'ACTIVE' ? 'text-success' : 'text-muted-foreground'}`} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate">{source.name}</p>
-                        {source.status === 'ACTIVE' ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                            <Power className="h-3 w-3" /> {t('incomingSources.active')}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                            <PowerOff className="h-3 w-3" /> {t('incomingSources.disabled')}
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                          {source.providerType}
-                        </span>
-                        {source.hmacSecretConfigured ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                            <ShieldCheck className="h-3 w-3" /> {t('incomingSources.hmacConfigured')}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                            <ShieldOff className="h-3 w-3" /> {t('incomingSources.hmacNotConfigured')}
-                          </span>
-                        )}
+        <>
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('incomingSources.columnSource', 'Source')}</TableHead>
+                  <TableHead>{t('incomingSources.ingressUrl')}</TableHead>
+                  <TableHead>{t('incomingSources.verification')}</TableHead>
+                  <TableHead>{t('endpoints.status')}</TableHead>
+                  <TableHead>{t('subscriptions.created')}</TableHead>
+                  <TableHead className="w-[100px] text-right">
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sources.map((source) => (
+                  <TableRow key={source.id}>
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => openSource(source)}
+                        className="text-left text-[13px] font-medium hover:text-primary hover:underline"
+                      >
+                        {source.name}
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] text-muted-foreground">{source.slug}</span>
+                        <Badge variant="outline" className="font-mono text-[10px]">{source.providerType}</Badge>
                       </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <code className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground truncate max-w-[400px]">
+                    </TableCell>
+                    <TableCell className="max-w-[280px]">
+                      <div className="flex items-center gap-1">
+                        <code className="truncate font-mono text-[12px] text-muted-foreground" title={source.ingressUrl}>
                           {source.ingressUrl}
                         </code>
-                        <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); copyIngressUrl(source.ingressUrl); }} title={t('incomingSources.howToSend.copy')} aria-label={t('incomingSources.howToSend.copy')}>
+                        <Button
+                          variant="ghost" size="icon-sm"
+                          onClick={() => copyIngressUrl(source.ingressUrl)}
+                          title={t('incomingSources.howToSend.copy')}
+                          aria-label={t('incomingSources.howToSend.copy')}
+                        >
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatRelativeTime(source.createdAt)}</span>
-                        <span className="font-mono">{source.slug}</span>
-                        {source.rateLimitPerSecond && (
-                          <span>{source.rateLimitPerSecond} req/s</span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        kind={source.hmacSecretConfigured ? 'ok' : 'retry'}
+                        label={source.hmacSecretConfigured
+                          ? t('incomingSources.hmacConfigured')
+                          : t('incomingSources.hmacNotConfigured')}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        kind={source.status === 'ACTIVE' ? 'ok' : 'idle'}
+                        label={source.status === 'ACTIVE' ? t('incomingSources.active') : t('incomingSources.disabled')}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {formatRelativeTime(source.createdAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {canManageIncomingSources && (
+                          <>
+                            <Button
+                              variant="ghost" size="icon-sm" onClick={() => openEdit(source)}
+                              title={t('common.edit')} aria-label={t('common.edit')}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon-sm" onClick={() => setDeleteId(source.id)}
+                              title={t('common.delete')} aria-label={t('common.delete')}
+                              className="text-muted-foreground hover:text-halt"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
                         )}
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {canManageIncomingSources && (
-                      <>
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEdit(source)} title={t('common.edit')} aria-label={t('common.edit')}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/incoming-sources/${source.id}`)} title={t('incomingSources.viewDetails')} aria-label={t('incomingSources.viewDetails')}>
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteId(source.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
 
-          {pageInfo && pageInfo.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
-              <p className="text-sm text-muted-foreground">
-                {t('common.showing', { from: currentPage * PAGE_SIZE + 1, to: Math.min((currentPage + 1) * PAGE_SIZE, pageInfo.totalElements), total: pageInfo.totalElements })}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p - 1)} disabled={pageInfo.first}>
-                  <ChevronLeft className="h-4 w-4" /> {t('common.previous')}
-                </Button>
-                <span className="text-sm text-muted-foreground px-2">{currentPage + 1} / {pageInfo.totalPages}</span>
-                <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => p + 1)} disabled={pageInfo.last}>
-                  {t('common.next')} <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          {pageInfo && (
+            <TablePagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalElements={pageInfo.totalElements}
+              totalPages={pageInfo.totalPages}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
           )}
-        </div>
+        </>
       )}
 
-      {/* Create / Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editSource ? t('incomingSources.editDialog.title') : t('incomingSources.createDialog.title')}</DialogTitle>
-            <DialogDescription>{editSource ? t('incomingSources.editDialog.description') : t('incomingSources.createDialog.description')}</DialogDescription>
+            <DialogTitle>
+              {editSource ? t('incomingSources.editDialog.title') : t('incomingSources.createDialog.title')}
+            </DialogTitle>
+            <DialogDescription>
+              {editSource ? t('incomingSources.editDialog.description') : t('incomingSources.createDialog.description')}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSave}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="src-name">{t('incomingSources.createDialog.name')}</Label>
-                <Input id="src-name" placeholder={t('incomingSources.createDialog.namePlaceholder')} value={formName} onChange={(e) => setFormName(e.target.value)} required disabled={saving} autoFocus />
+                <Input
+                  id="src-name" placeholder={t('incomingSources.createDialog.namePlaceholder')}
+                  value={formName} onChange={(e) => setFormName(e.target.value)}
+                  required disabled={saving} autoFocus
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="src-slug">{t('incomingSources.createDialog.slug')}</Label>
-                <Input id="src-slug" placeholder={t('incomingSources.createDialog.slugPlaceholder')} value={formSlug} onChange={(e) => setFormSlug(e.target.value)} disabled={saving} />
+                <Input
+                  id="src-slug" className="font-mono text-sm"
+                  placeholder={t('incomingSources.createDialog.slugPlaceholder')}
+                  value={formSlug} onChange={(e) => setFormSlug(e.target.value)} disabled={saving}
+                />
                 <p className="text-xs text-muted-foreground">{t('incomingSources.createDialog.slugHint')}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>{t('incomingSources.createDialog.provider')}</Label>
-                  <Select value={formProvider} onChange={(e) => setFormProvider(e.target.value as ProviderType)} disabled={saving}>
+                  <Label htmlFor="src-provider">{t('incomingSources.createDialog.provider')}</Label>
+                  <Select
+                    id="src-provider" value={formProvider}
+                    onChange={(e) => setFormProvider(e.target.value as ProviderType)} disabled={saving}
+                  >
                     {PROVIDER_TYPES.map((p) => <option key={p} value={p}>{p}</option>)}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t('incomingSources.createDialog.verificationMode')}</Label>
-                  <Select value={formVerification} onChange={(e) => setFormVerification(e.target.value as VerificationMode)} disabled={saving}>
+                  <Label htmlFor="src-verification">{t('incomingSources.createDialog.verificationMode')}</Label>
+                  <Select
+                    id="src-verification" value={formVerification}
+                    onChange={(e) => setFormVerification(e.target.value as VerificationMode)} disabled={saving}
+                  >
                     {VERIFICATION_MODES.map((v) => <option key={v} value={v}>{v}</option>)}
                   </Select>
                 </div>
               </div>
+
               {formVerification === 'NONE' && (
-                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
                   <div>
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{t('incomingSources.security.noVerificationTitle')}</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{t('incomingSources.security.noVerificationDesc')}</p>
+                    <p className="text-sm font-medium text-retry">{t('incomingSources.security.noVerificationTitle')}</p>
+                    <p className="mt-0.5 text-xs text-retry">{t('incomingSources.security.noVerificationDesc')}</p>
                   </div>
                 </div>
               )}
-              {showHmacFields && (
+
+              {formVerification === 'HMAC_GENERIC' && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="src-hmac-secret">{t('incomingSources.createDialog.hmacSecret')}</Label>
-                    <Input id="src-hmac-secret" type="password" placeholder={t('incomingSources.createDialog.hmacSecretPlaceholder')} value={formHmacSecret} onChange={(e) => setFormHmacSecret(e.target.value)} disabled={saving} />
+                    <Input
+                      id="src-hmac-secret" type="password" className="font-mono text-sm"
+                      placeholder={t('incomingSources.createDialog.hmacSecretPlaceholder')}
+                      value={formHmacSecret} onChange={(e) => setFormHmacSecret(e.target.value)} disabled={saving}
+                    />
                     <p className="text-xs text-muted-foreground">{t('incomingSources.createDialog.hmacSecretHint')}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="src-hmac-header">{t('incomingSources.createDialog.hmacHeaderName')}</Label>
-                      <Input id="src-hmac-header" placeholder={t('incomingSources.createDialog.hmacHeaderPlaceholder')} value={formHmacHeader} onChange={(e) => setFormHmacHeader(e.target.value)} disabled={saving} />
+                      <Input
+                        id="src-hmac-header" className="font-mono text-sm"
+                        placeholder={t('incomingSources.createDialog.hmacHeaderPlaceholder')}
+                        value={formHmacHeader} onChange={(e) => setFormHmacHeader(e.target.value)} disabled={saving}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="src-hmac-prefix">{t('incomingSources.createDialog.hmacSignaturePrefix')}</Label>
-                      <Input id="src-hmac-prefix" placeholder={t('incomingSources.createDialog.hmacPrefixPlaceholder')} value={formHmacPrefix} onChange={(e) => setFormHmacPrefix(e.target.value)} disabled={saving} />
+                      <Input
+                        id="src-hmac-prefix" className="font-mono text-sm"
+                        placeholder={t('incomingSources.createDialog.hmacPrefixPlaceholder')}
+                        value={formHmacPrefix} onChange={(e) => setFormHmacPrefix(e.target.value)} disabled={saving}
+                      />
                     </div>
                   </div>
                 </>
               )}
+
               <div className="space-y-2">
                 <Label htmlFor="src-rate-limit">{t('incomingSources.createDialog.rateLimit')}</Label>
-                <Input id="src-rate-limit" type="number" min="1" max="10000" placeholder={t('incomingSources.createDialog.rateLimitPlaceholder')} value={formRateLimit} onChange={(e) => setFormRateLimit(e.target.value)} disabled={saving} />
+                <Input
+                  id="src-rate-limit" type="number" min="1" max="10000" className="font-mono text-sm"
+                  placeholder={t('incomingSources.createDialog.rateLimitPlaceholder')}
+                  value={formRateLimit} onChange={(e) => setFormRateLimit(e.target.value)} disabled={saving}
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>{t('common.cancel')}</Button>
+              <Button type="button" variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
+                {t('common.cancel')}
+              </Button>
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {saving ? t('common.saving') : t('common.save')}
               </Button>
             </DialogFooter>
@@ -383,7 +412,6 @@ export default function IncomingSourcesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -391,10 +419,14 @@ export default function IncomingSourcesPage() {
             <AlertDialogDescription>{t('incomingSources.deleteDialog.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deleting ? t('common.deleting') : t('common.delete')}
+            <AlertDialogCancel disabled={deleteSource.isPending}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteSource.isPending}
+              className="bg-halt text-primary-foreground hover:bg-halt/90"
+            >
+              {deleteSource.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deleteSource.isPending ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

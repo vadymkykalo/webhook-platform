@@ -1,92 +1,162 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import {
-  CreditCard, Zap, BarChart3, Users, FolderKanban, Globe,
-  Clock, Check, X, Loader2, ExternalLink, Shield
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
+import { Check, ExternalLink, Loader2, Minus, ShieldCheck } from 'lucide-react';
+import { Card, CardContent } from '../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
-import { billingApi, PlanResponse } from '../api/billing.api';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import PageHeader from '../components/PageHeader';
+import StatusBadge, { type StatusKind } from '../components/StatusBadge';
+import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
+import { ErrorState } from '../components/EmptyState';
+import { FormSection, SaveControl } from './SettingsPage';
+import { billingApi, PlanResponse, ResourceUsage } from '../api/billing.api';
+import { formatDate } from '../lib/date';
+import { cn } from '../lib/utils';
 import { showSuccess, showApiError } from '../lib/toast';
 
-function UsageBar({ label, current, limit, icon: Icon }: {
-  label: string; current: number; limit: number; icon: React.ElementType;
-}) {
+/** -1 is how the plan catalog spells "no ceiling". It must never reach a reader as "-1". */
+const UNLIMITED = (n: number) => n < 0;
+
+function useFormatters() {
+  const { t, i18n } = useTranslation();
+  const num = (n: number) => n.toLocaleString(i18n.language);
+  /** A quota, or the word for having none. */
+  const limit = (n: number) => (UNLIMITED(n) ? t('billing.unlimited') : num(n));
+  const compact = (n: number) => {
+    if (UNLIMITED(n)) return t('billing.unlimited');
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(0)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return num(n);
+  };
+  const price = (cents: number) => `$${(cents / 100).toFixed(0)}`;
+  return { num, limit, compact, price };
+}
+
+/**
+ * How close this organization is to one of its ceilings. Nearing a limit is the
+ * same kind of fact as an attempt still owed — it wants attention, not alarm —
+ * so it takes the retry token; being over it takes halt.
+ */
+function kindOfUsage(percent: number): StatusKind {
+  if (percent >= 100) return 'halt';
+  if (percent >= 80) return 'retry';
+  return 'ok';
+}
+
+const BAR_COLOR: Record<StatusKind, string> = {
+  ok: 'bg-primary',
+  retry: 'bg-retry',
+  halt: 'bg-halt',
+  idle: 'bg-idle',
+};
+
+function UsageMeter({ label, usage }: { label: string; usage: ResourceUsage }) {
   const { t } = useTranslation();
-  const unlimited = limit <= 0;
-  const pct = unlimited ? 0 : Math.min(100, (current / limit) * 100);
-  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-primary';
+  const { num, limit } = useFormatters();
+  const unlimited = UNLIMITED(usage.limit);
+  const percent = unlimited ? 0 : Math.round(usage.percentUsed ?? (usage.limit ? (usage.current / usage.limit) * 100 : 0));
+  const kind = kindOfUsage(percent);
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="flex items-center gap-2 font-medium">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          {label}
-        </span>
-        <span className="text-muted-foreground">
-          {current.toLocaleString()} {unlimited ? '' : t('billing.of', { limit: limit.toLocaleString() })}
-          {unlimited && <span className="ml-1 text-xs">({t('billing.unlimited')})</span>}
+    <div className="border-b border-rail py-3.5 last:border-b-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="font-mono text-[13px] text-muted-foreground">
+          {num(usage.current)}
+          <span className="text-rail"> / </span>
+          {limit(usage.limit)}
         </span>
       </div>
-      {!unlimited && (
-        <div className="h-2 rounded-full bg-muted overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-        </div>
+      {unlimited ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">{t('billing.noCeiling')}</p>
+      ) : (
+        <>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div
+              className={cn('h-full rounded-full transition-[width] duration-500', BAR_COLOR[kind])}
+              style={{ width: `${Math.min(100, percent)}%` }}
+              role="progressbar"
+              aria-valuenow={percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={label}
+            />
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="font-mono text-[11px] text-muted-foreground">{t('billing.used', { percent })}</span>
+            {kind !== 'ok' && (
+              <StatusBadge
+                kind={kind}
+                icon={false}
+                label={t(kind === 'halt' ? 'billing.overLimit' : 'billing.nearLimit')}
+              />
+            )}
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function FeatureRow({ name, included }: { name: string; included: boolean }) {
+function PlanLimits({ plan }: { plan: PlanResponse }) {
+  const { t } = useTranslation();
+  const { compact, limit } = useFormatters();
+  const rows: [string, string][] = [
+    [t('billing.events'), compact(plan.maxEventsPerMonth)],
+    [t('billing.projects'), limit(plan.maxProjects)],
+    [t('billing.endpoints'), limit(plan.maxEndpointsPerProject)],
+    [t('billing.members'), limit(plan.maxMembers)],
+    [t('billing.rateLimit'), UNLIMITED(plan.rateLimitPerSecond) ? t('billing.unlimited') : t('billing.perSecond', { count: plan.rateLimitPerSecond })],
+    [t('billing.retention'), UNLIMITED(plan.maxRetentionDays) ? t('billing.unlimited') : t('billing.days', { count: plan.maxRetentionDays })],
+    [t('billing.tunnels'), plan.maxActiveTunnels === 0 ? t('billing.tunnelsDisabled') : limit(plan.maxActiveTunnels)],
+  ];
   return (
-    <div className="flex items-center justify-between py-1.5 text-sm">
-      <span>{name}</span>
-      {included
-        ? <Check className="h-4 w-4 text-green-500" />
-        : <X className="h-4 w-4 text-muted-foreground/40" />
-      }
-    </div>
+    <dl className="space-y-1">
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex items-baseline justify-between gap-3 text-[12px]">
+          <dt className="text-muted-foreground">{k}</dt>
+          <dd className="font-mono text-foreground">{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
-function formatPrice(cents: number) {
-  if (cents <= 0) return null;
-  return `$${(cents / 100).toFixed(0)}`;
-}
+const FEATURE_KEYS = ['workflows', 'rules', 'replay', 'mTLS', 'sso'] as const;
+const FEATURE_LABEL: Record<(typeof FEATURE_KEYS)[number], string> = {
+  workflows: 'billing.featureWorkflows',
+  rules: 'billing.featureRules',
+  replay: 'billing.featureReplay',
+  mTLS: 'billing.featureMtls',
+  sso: 'billing.featureSso',
+};
 
 export default function BillingPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { num, price } = useFormatters();
+
   const [billingEmail, setBillingEmail] = useState('');
   const [emailDirty, setEmailDirty] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
   const [annual, setAnnual] = useState(false);
 
-  const { data: billing, isLoading: billingLoading } = useQuery({
+  const billingQuery = useQuery({
     queryKey: ['billing', 'organization'],
     queryFn: billingApi.getOrganizationBilling,
   });
+  const billing = billingQuery.data;
+
+  const { data: usage } = useQuery({ queryKey: ['billing', 'usage'], queryFn: billingApi.getUsage });
+  const { data: plans = [] } = useQuery({ queryKey: ['billing', 'plans'], queryFn: billingApi.listPlans });
+  const { data: invoices = [] } = useQuery({ queryKey: ['billing', 'invoices'], queryFn: billingApi.listInvoices });
 
   useEffect(() => {
     if (billing && !emailDirty) setBillingEmail(billing.billingEmail || '');
   }, [billing, emailDirty]);
-
-  const { data: usage, isLoading: usageLoading } = useQuery({
-    queryKey: ['billing', 'usage'],
-    queryFn: billingApi.getUsage,
-  });
-
-  const { data: plans = [] } = useQuery({
-    queryKey: ['billing', 'plans'],
-    queryFn: billingApi.listPlans,
-  });
-
-  const { data: invoices = [] } = useQuery({
-    queryKey: ['billing', 'invoices'],
-    queryFn: billingApi.listInvoices,
-  });
 
   const changePlanMutation = useMutation({
     mutationFn: (planName: string) => billingApi.changePlan({ planName }),
@@ -94,7 +164,7 @@ export default function BillingPage() {
       showSuccess(t('billing.changePlanSuccess'));
       queryClient.invalidateQueries({ queryKey: ['billing'] });
     },
-    onError: (err) => showApiError(err, t('billing.changePlanFailed')),
+    onError: (err) => showApiError(err, 'billing.changePlanFailed'),
   });
 
   const checkoutMutation = useMutation({
@@ -105,10 +175,8 @@ export default function BillingPage() {
         successUrl: `${window.location.origin}/admin/billing?checkout=success`,
         cancelUrl: `${window.location.origin}/admin/billing?checkout=cancel`,
       }),
-    onSuccess: (data) => {
-      if (data.url) window.location.href = data.url;
-    },
-    onError: (err) => showApiError(err, t('billing.checkoutFailed')),
+    onSuccess: (data) => { if (data.url) window.location.href = data.url; },
+    onError: (err) => showApiError(err, 'billing.checkoutFailed'),
   });
 
   const updateEmailMutation = useMutation({
@@ -116,299 +184,294 @@ export default function BillingPage() {
     onSuccess: () => {
       showSuccess(t('billing.billingEmailUpdated'));
       setEmailDirty(false);
+      setEmailSaved(true);
       queryClient.invalidateQueries({ queryKey: ['billing'] });
     },
-    onError: (err) => showApiError(err, t('billing.billingEmailFailed')),
+    onError: (err) => showApiError(err, 'billing.billingEmailFailed'),
   });
 
-  if (billingLoading || usageLoading) {
+  if (billingQuery.isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <PageSkeleton>
+        <SkeletonRows count={4} height="h-24" />
+      </PageSkeleton>
+    );
+  }
+
+  if (billingQuery.isError || !billing) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState
+          error={billingQuery.error}
+          fallbackKey="billing.loadFailed"
+          onRetry={() => billingQuery.refetch()}
+          retrying={billingQuery.isRefetching}
+        />
       </div>
     );
   }
 
-  const plan = billing?.plan;
-  const features = plan?.features || {};
+  const plan = billing.plan;
   const isSelfHosted = plan?.name === 'self_hosted';
-
-  const featureList = [
-    { key: 'workflows', label: t('billing.featureWorkflows') },
-    { key: 'rules', label: t('billing.featureRules') },
-    { key: 'replay', label: t('billing.featureReplay') },
-    { key: 'mTLS', label: t('billing.featureMtls') },
-  ];
+  const features = plan?.features || {};
+  const paid = !isSelfHosted && plan && plan.priceMonthlyCents > 0;
+  const statusKind: StatusKind = billing.billingStatus === 'ACTIVE' ? 'ok' : 'halt';
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-title tracking-tight">{t('billing.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t('billing.subtitle')}</p>
-      </div>
+    <div className="p-4 lg:p-6">
+      <div className="max-w-4xl">
+        <PageHeader
+          eyebrow={usage ? `${formatDate(usage.periodStart)} — ${formatDate(usage.periodEnd)}` : undefined}
+          title={t('billing.title')}
+          description={t('billing.subtitle')}
+        />
 
-      {/* Self-hosted banner */}
-      {isSelfHosted && (
-        <Card className="border-green-500/30 bg-green-500/5">
-          <CardContent className="flex items-center gap-4 py-5">
-            <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center shrink-0">
-              <Shield className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <p className="font-semibold text-green-700 dark:text-green-400">{plan?.displayName}</p>
-              <p className="text-sm text-muted-foreground">{t('billing.selfHosted')}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Current plan + features */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              {t('billing.currentPlan')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-bold">{plan?.displayName}</span>
-              {!isSelfHosted && plan && plan.priceMonthlyCents > 0 && (
-                <span className="text-muted-foreground">
-                  {formatPrice(plan.priceMonthlyCents)}{t('billing.perMonth')}
-                </span>
-              )}
-              {!isSelfHosted && plan && plan.priceMonthlyCents === 0 && (
-                <Badge variant="secondary">{t('billing.free')}</Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Zap className="h-3.5 w-3.5" />
-                {plan && plan.rateLimitPerSecond > 0 && !isSelfHosted
-                  ? t('billing.perSecond', { count: plan.rateLimitPerSecond })
-                  : t('billing.unlimited')
-                }
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                {plan && plan.maxRetentionDays > 0 && !isSelfHosted
-                  ? t('billing.days', { count: plan.maxRetentionDays })
-                  : t('billing.unlimited')
-                }
-              </span>
-            </div>
-            {!isSelfHosted && billing?.billingStatus && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">{t('billing.billingStatus')}:</span>
-                <Badge variant={billing.billingStatus === 'ACTIVE' ? 'default' : 'destructive'}>
-                  {billing.billingStatus}
-                </Badge>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              {t('billing.planFeatures')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y">
-              {featureList.map((f) => (
-                <FeatureRow key={f.key} name={f.label} included={isSelfHosted || features[f.key] === true} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Usage — show counts but with unlimited labels for self-hosted */}
-      {usage && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              {t('billing.usage')}
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">{t('billing.usageSubtitle')}</p>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <UsageBar label={t('billing.events')} current={usage.events.current} limit={usage.events.limit} icon={Zap} />
-            <UsageBar label={t('billing.projects')} current={usage.projects.current} limit={usage.projects.limit} icon={FolderKanban} />
-            <UsageBar label={t('billing.endpoints')} current={usage.endpoints.current} limit={usage.endpoints.limit} icon={Globe} />
-            <UsageBar label={t('billing.members')} current={usage.members.current} limit={usage.members.limit} icon={Users} />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Available plans — only in SaaS mode */}
-      {!isSelfHosted && plans.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{t('billing.availablePlans')}</CardTitle>
-              <div className="inline-flex items-center gap-2 p-1 rounded-lg border bg-muted/50">
-                <button
-                  onClick={() => setAnnual(false)}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${!annual ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  {t('billing.monthly')}
-                </button>
-                <button
-                  onClick={() => setAnnual(true)}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 ${annual ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  {t('billing.yearly')}
-                  <span className="px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[9px] font-bold">
-                    {t('billing.yearlySave')}
-                  </span>
-                </button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {plans.map((p: PlanResponse) => {
-                const isCurrent = plan?.name === p.name;
-                const price = annual ? p.priceYearlyCents : p.priceMonthlyCents;
-                const isCustom = price < 0;
-                const isPaid = price > 0;
-                const interval = annual ? 'YEARLY' : 'MONTHLY';
-                const suffix = annual ? t('billing.perYear') : t('billing.perMonth');
-
-                const handleUpgrade = () => {
-                  if (isPaid) {
-                    checkoutMutation.mutate({ planName: p.name, interval });
-                  } else {
-                    changePlanMutation.mutate(p.name);
-                  }
-                };
-
-                return (
-                  <div key={p.id}
-                    className={`rounded-lg border p-4 space-y-3 transition-all ${isCurrent ? 'border-primary bg-primary/5' : 'hover:border-primary/30'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{p.displayName}</span>
-                      {isCurrent && <Badge variant="default" className="text-[10px]">{t('billing.currentBadge')}</Badge>}
+        <div className="space-y-8">
+          {/* What this organization is on */}
+          <section>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex flex-wrap items-start justify-between gap-5">
+                  <div className="min-w-0">
+                    <p className="mono-label">{t('billing.currentPlan')}</p>
+                    <div className="mt-1 flex flex-wrap items-baseline gap-3">
+                      <h3 className="text-title">{plan?.displayName}</h3>
+                      {isSelfHosted ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <ShieldCheck className="h-4 w-4 text-primary" aria-hidden />
+                          {t('billing.selfHosted')}
+                        </span>
+                      ) : paid ? (
+                        <span className="font-mono text-sm text-muted-foreground">
+                          {price(plan.priceMonthlyCents)}{t('billing.perMonth')}
+                        </span>
+                      ) : (
+                        <span className="font-mono text-sm text-muted-foreground">{t('billing.free')}</span>
+                      )}
                     </div>
-                    <div className="text-2xl font-bold">
-                      {isCustom
-                        ? <span className="text-lg">{t('billing.custom')}</span>
-                        : price === 0
-                          ? t('billing.free')
-                          : <>{formatPrice(price)}<span className="text-sm font-normal text-muted-foreground">{suffix}</span></>
-                      }
-                    </div>
-                    <ul className="text-xs text-muted-foreground space-y-1">
-                      <li>{p.maxEventsPerMonth > 0 ? (p.maxEventsPerMonth >= 1000000 ? `${(p.maxEventsPerMonth / 1000000).toFixed(0)}M` : `${(p.maxEventsPerMonth / 1000).toFixed(0)}K`) : t('billing.unlimited')} {t('billing.events').toLowerCase()}</li>
-                      <li>{p.maxProjects > 0 ? p.maxProjects : t('billing.unlimited')} {t('billing.projects').toLowerCase()}</li>
-                      <li>{p.maxEndpointsPerProject > 0 ? p.maxEndpointsPerProject : t('billing.unlimited')} {t('billing.endpoints').toLowerCase()}</li>
-                      <li>{p.rateLimitPerSecond > 0 ? t('billing.perSecond', { count: p.rateLimitPerSecond }) : t('billing.unlimited')}</li>
-                      <li>{p.maxActiveTunnels === 0 ? t('billing.tunnelsDisabled') : p.maxActiveTunnels < 0 ? `${t('billing.unlimited')} ${t('billing.tunnels').toLowerCase()}` : `${p.maxActiveTunnels} ${t('billing.tunnels').toLowerCase()}`}</li>
-                    </ul>
-                    {!isCurrent && !isCustom && (
-                      <Button size="sm" variant={isPaid ? 'default' : 'outline'} className="w-full"
-                        disabled={changePlanMutation.isPending || checkoutMutation.isPending}
-                        onClick={handleUpgrade}>
-                        {(changePlanMutation.isPending || checkoutMutation.isPending)
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : isPaid ? t('billing.upgrade') : t('billing.switchPlan')}
-                      </Button>
-                    )}
-                    {!isCurrent && isCustom && (
-                      <a href="mailto:vadymkykalo@gmail.com">
-                        <Button size="sm" variant="outline" className="w-full">
-                          {t('billing.contactSales')}
-                        </Button>
-                      </a>
+                    {!isSelfHosted && billing.billingStatus && (
+                      <div className="mt-3">
+                        <StatusBadge kind={statusKind} label={t(`billing.statuses.${billing.billingStatus}`, { defaultValue: billing.billingStatus })} />
+                      </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Billing info — only in SaaS mode */}
-      {!isSelfHosted && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('billing.billingInfo')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-3 max-w-md">
-              <div className="flex-1 space-y-1.5">
-                <label className="text-sm font-medium">{t('billing.billingEmail')}</label>
-                <input
+                  <ul className="grid min-w-[13rem] gap-1.5">
+                    {FEATURE_KEYS.map((key) => {
+                      const included = isSelfHosted || features[key] === true;
+                      return (
+                        <li key={key} className="flex items-center gap-2 text-[13px]">
+                          {included
+                            ? <Check className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden />
+                            : <Minus className="h-3.5 w-3.5 flex-shrink-0 text-rail" aria-hidden />}
+                          <span className={included ? '' : 'text-muted-foreground line-through decoration-rail'}>
+                            {t(FEATURE_LABEL[key])}
+                          </span>
+                          <span className="sr-only">{t(included ? 'billing.included' : 'billing.notIncluded')}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* How close it is to its ceilings */}
+          {usage && (
+            <FormSection title={t('billing.usage')} description={t('billing.usageSubtitle')}>
+              <div>
+                <UsageMeter label={t('billing.events')} usage={usage.events} />
+                <UsageMeter label={t('billing.projects')} usage={usage.projects} />
+                <UsageMeter label={t('billing.endpoints')} usage={usage.endpoints} />
+                <UsageMeter label={t('billing.members')} usage={usage.members} />
+              </div>
+              <dl className="flex flex-wrap gap-x-8 gap-y-2 border-t border-rail pt-4">
+                <div className="flex gap-2">
+                  <dt className="mono-label">{t('billing.rateLimit')}</dt>
+                  <dd className="font-mono text-[13px]">
+                    {UNLIMITED(usage.rateLimitPerSecond) ? t('billing.unlimited') : t('billing.perSecond', { count: usage.rateLimitPerSecond })}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="mono-label">{t('billing.retention')}</dt>
+                  <dd className="font-mono text-[13px]">
+                    {UNLIMITED(usage.retentionDays) ? t('billing.unlimited') : t('billing.days', { count: usage.retentionDays })}
+                  </dd>
+                </div>
+              </dl>
+            </FormSection>
+          )}
+
+          {/* What else it could be on */}
+          {!isSelfHosted && plans.length > 0 && (
+            <FormSection title={t('billing.availablePlans')} description={t('billing.availablePlansDesc')}>
+              <div className="inline-flex items-center gap-1 rounded-lg border border-rail p-1" role="group" aria-label={t('billing.billingInterval')}>
+                {([false, true] as const).map((yearly) => (
+                  <button
+                    key={String(yearly)}
+                    type="button"
+                    aria-pressed={annual === yearly}
+                    onClick={() => setAnnual(yearly)}
+                    className={cn(
+                      'rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      annual === yearly ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {t(yearly ? 'billing.yearly' : 'billing.monthly')}
+                    {yearly && <span className="ml-1.5 font-mono text-[10px] text-primary">{t('billing.yearlySave')}</span>}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {plans.map((p) => {
+                  const isCurrent = plan?.name === p.name;
+                  const shown = annual ? p.priceYearlyCents : p.priceMonthlyCents;
+                  const isCustom = shown < 0;
+                  const isPaid = shown > 0;
+                  const busy = changePlanMutation.isPending || checkoutMutation.isPending;
+                  return (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        'rounded-lg border p-4',
+                        isCurrent ? 'border-primary bg-accent/30' : 'border-rail bg-card'
+                      )}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium">{p.displayName}</span>
+                        {isCurrent && (
+                          <span className="mono-label text-primary">{t('billing.currentBadge')}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 font-mono text-lg">
+                        {isCustom
+                          ? t('billing.custom')
+                          : shown === 0
+                            ? t('billing.free')
+                            : <>{price(shown)}<span className="text-xs text-muted-foreground">{t(annual ? 'billing.perYear' : 'billing.perMonth')}</span></>}
+                      </p>
+                      <div className="mt-3 border-t border-rail pt-3">
+                        <PlanLimits plan={p} />
+                      </div>
+                      {!isCurrent && (
+                        <div className="mt-3">
+                          {isCustom ? (
+                            <Button asChild size="sm" variant="outline" className="w-full">
+                              <a href="mailto:vadymkykalo@gmail.com">{t('billing.contactSales')}</a>
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant={isPaid ? 'default' : 'outline'}
+                              className="w-full"
+                              disabled={busy}
+                              onClick={() => isPaid
+                                ? checkoutMutation.mutate({ planName: p.name, interval: annual ? 'YEARLY' : 'MONTHLY' })
+                                : changePlanMutation.mutate(p.name)}
+                            >
+                              {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+                              {t(isPaid ? 'billing.upgrade' : 'billing.switchPlan', { plan: p.displayName })}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </FormSection>
+          )}
+
+          {!isSelfHosted && (
+            <FormSection
+              title={t('billing.billingInfo')}
+              description={t('billing.billingInfoDesc')}
+              footer={
+                <SaveControl
+                  label={t('common.save')}
+                  savingLabel={t('common.saving')}
+                  saving={updateEmailMutation.isPending}
+                  disabled={!emailDirty}
+                  saved={emailSaved && !emailDirty}
+                  onClick={() => updateEmailMutation.mutate()}
+                />
+              }
+            >
+              <div className="space-y-2">
+                <Label htmlFor="billingEmail">{t('billing.billingEmail')}</Label>
+                <Input
+                  id="billingEmail"
                   type="email"
                   value={billingEmail}
-                  onChange={(e) => { setBillingEmail(e.target.value); setEmailDirty(true); }}
+                  onChange={(e) => { setBillingEmail(e.target.value); setEmailDirty(true); setEmailSaved(false); }}
                   placeholder={t('billing.billingEmailPlaceholder')}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="max-w-sm"
                 />
+                <p className="text-xs text-muted-foreground">{t('billing.billingEmailHint')}</p>
               </div>
-              <Button size="sm" disabled={!emailDirty || updateEmailMutation.isPending}
-                onClick={() => updateEmailMutation.mutate()}>
-                {updateEmailMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : t('billing.save')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </FormSection>
+          )}
 
-      {/* Invoices — only in SaaS mode */}
-      {!isSelfHosted && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('billing.invoices')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {invoices.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">{t('billing.invoicesEmpty')}</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">{t('billing.invoiceDate')}</th>
-                      <th className="pb-2 font-medium">{t('billing.invoicePlan')}</th>
-                      <th className="pb-2 font-medium">{t('billing.invoiceAmount')}</th>
-                      <th className="pb-2 font-medium">{t('billing.invoiceStatus')}</th>
-                      <th className="pb-2 font-medium"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-b last:border-0">
-                        <td className="py-2">{inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : '—'}</td>
-                        <td className="py-2">{inv.planName}</td>
-                        <td className="py-2">${(inv.amountCents / 100).toFixed(2)} {inv.currency?.toUpperCase()}</td>
-                        <td className="py-2">
-                          <Badge variant={inv.status === 'paid' ? 'default' : 'secondary'}>{inv.status}</Badge>
-                        </td>
-                        <td className="py-2">
-                          {inv.invoiceUrl && (
-                            <a href={inv.invoiceUrl} target="_blank" rel="noopener noreferrer"
-                              className="text-primary hover:underline inline-flex items-center gap-1">
-                              {t('billing.invoiceView')} <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+          {!isSelfHosted && (
+            <FormSection title={t('billing.invoices')} description={t('billing.invoicesDesc')}>
+              {invoices.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-rail px-4 py-8 text-center text-sm text-muted-foreground">
+                  {t('billing.invoicesEmpty')}
+                </p>
+              ) : (
+                <Card className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('billing.invoiceDate')}</TableHead>
+                        <TableHead>{t('billing.invoicePlan')}</TableHead>
+                        <TableHead>{t('billing.invoiceAmount')}</TableHead>
+                        <TableHead>{t('billing.invoiceStatus')}</TableHead>
+                        <TableHead><span className="sr-only">{t('common.actions')}</span></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoices.map((inv) => (
+                        <TableRow key={inv.id}>
+                          <TableCell className="whitespace-nowrap text-[13px] text-muted-foreground">
+                            {inv.paidAt ? formatDate(inv.paidAt) : '—'}
+                          </TableCell>
+                          <TableCell className="text-[13px]">{inv.planName}</TableCell>
+                          <TableCell className="whitespace-nowrap font-mono text-[13px]">
+                            ${num(inv.amountCents / 100)} {inv.currency?.toUpperCase()}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge
+                              kind={inv.status === 'paid' ? 'ok' : 'idle'}
+                              icon={false}
+                              label={t(`billing.invoiceStatuses.${inv.status}`, { defaultValue: inv.status })}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {inv.invoiceUrl && (
+                              <a
+                                href={inv.invoiceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[13px] text-primary hover:underline"
+                              >
+                                {t('billing.invoiceView')}
+                                <ExternalLink className="h-3 w-3" aria-hidden />
+                              </a>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
+            </FormSection>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

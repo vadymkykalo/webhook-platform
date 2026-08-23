@@ -1,23 +1,47 @@
 import { type SVGProps } from 'react';
 
 /**
- * Unique Hookflow brand icon — a stylized hook with flow arrow.
- * Drop-in replacement for Lucide icons (accepts className for sizing).
+ * The Hookflow mark: a hook whose tail turns up into a delivery arrow.
+ *
+ * Redrawn because the first version was built at 24px and collapsed into an
+ * unreadable squiggle by the time it reached the 14–16px it is actually used
+ * at — in the sidebar, the nav and inside the hero diagram. This one is drawn
+ * on a 20-unit grid with a heavier stroke, a wider hook radius and the arrow
+ * moved clear of the stem, so the two halves stay distinguishable when the
+ * whole mark is 14 pixels across.
  */
+/**
+ * The mark's geometry on its own 20-unit grid, exported because the hero
+ * diagram draws the same mark inline in SVG. It used to hand-roll a rounded
+ * hook of its own, which read as a different logo sitting next to the real one.
+ */
+export const HOOKFLOW_MARK = {
+  /** The hook: down the stem, round the bend, back up. */
+  hook: 'M5.25 3.5v6.75a4 4 0 0 0 8 0V8.5',
+  /** The flow: the tail leaving as an arrow. */
+  flow: 'M10.25 6.25l3-2.75 3 2.75',
+  /** The origin. */
+  origin: { cx: 5.25, cy: 3.5, r: 1.75 },
+  viewBox: 20,
+} as const;
+
 export function HookflowIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="0 0 20 20"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2"
+      strokeWidth="2.25"
       strokeLinecap="round"
       strokeLinejoin="round"
       {...props}
     >
-      <path d="M5 4v9c0 3.3 2.7 6 6 6s6-2.7 6-6V9" />
-      <path d="M14 12l3-3 3 3" />
-      <circle cx="5" cy="4" r="1.5" fill="currentColor" stroke="none" />
+      {/* The hook: down the stem, round the bend, back up */}
+      <path d={HOOKFLOW_MARK.hook} />
+      {/* The flow: the tail leaving as an arrow */}
+      <path d={HOOKFLOW_MARK.flow} />
+      {/* The origin */}
+      <circle cx={HOOKFLOW_MARK.origin.cx} cy={HOOKFLOW_MARK.origin.cy} r={HOOKFLOW_MARK.origin.r} fill="currentColor" stroke="none" />
     </svg>
   );
 }

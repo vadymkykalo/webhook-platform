@@ -11,6 +11,7 @@ export default {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        rail: "hsl(var(--rail))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
@@ -20,18 +21,6 @@ export default {
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
-        },
-        warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -49,6 +38,38 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+
+        // Status — reserved for statuses. Never use these for chrome.
+        ok: {
+          DEFAULT: "hsl(var(--ok))",
+          soft: "hsl(var(--ok-soft))",
+        },
+        retry: {
+          DEFAULT: "hsl(var(--retry))",
+          soft: "hsl(var(--retry-soft))",
+        },
+        halt: {
+          DEFAULT: "hsl(var(--halt))",
+          soft: "hsl(var(--halt-soft))",
+        },
+        idle: {
+          DEFAULT: "hsl(var(--idle))",
+          soft: "hsl(var(--idle-soft))",
+        },
+
+        // Legacy aliases kept while shadcn primitives migrate to the above.
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
@@ -57,23 +78,28 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        // One family, two voices. Geologica is a technical grotesk with full
+        // Cyrillic — which decides it, because the product ships in English and
+        // Ukrainian and the previous display face (Bricolage Grotesque) has no
+        // Cyrillic at all, so every Ukrainian headline would have silently
+        // fallen back. `display` and `sans` are the same family; the landing's
+        // voice comes from weight and tracking, not from a second typeface.
+        display: ['Geologica', 'system-ui', 'sans-serif'],
+        sans: ['Geologica', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       fontSize: {
-        'display': ['3.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
-        'headline': ['2.25rem', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '700' }],
-        'title': ['1.5rem', { lineHeight: '1.3', letterSpacing: '-0.01em', fontWeight: '600' }],
-        'body-lg': ['1.125rem', { lineHeight: '1.6' }],
+        'display': ['3.75rem', { lineHeight: '1.04', letterSpacing: '-0.04em', fontWeight: '600' }],
+        'headline': ['2.375rem', { lineHeight: '1.1', letterSpacing: '-0.032em', fontWeight: '600' }],
+        'title': ['1.3125rem', { lineHeight: '1.28', letterSpacing: '-0.018em', fontWeight: '600' }],
+        'body-lg': ['1.0625rem', { lineHeight: '1.65' }],
       },
       boxShadow: {
-        'glow': '0 0 20px -5px hsl(238 76% 60% / 0.35), 0 0 40px -10px hsl(280 76% 55% / 0.15)',
-        'glow-lg': '0 0 40px -10px hsl(238 76% 60% / 0.45), 0 0 80px -20px hsl(280 76% 55% / 0.2)',
-        'glow-xl': '0 0 60px -10px hsl(238 76% 60% / 0.35), 0 0 120px -30px hsl(280 76% 55% / 0.15)',
-        'card': '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
-        'card-hover': '0 10px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04)',
-        'elevated': '0 20px 40px -8px rgb(0 0 0 / 0.1), 0 8px 16px -6px rgb(0 0 0 / 0.06)',
-        'elevated-lg': '0 25px 50px -12px rgb(0 0 0 / 0.15), 0 12px 24px -8px rgb(0 0 0 / 0.08)',
+        // No glows. Elevation is a shadow you would get from paper on paper.
+        'card': '0 1px 2px 0 rgb(16 20 24 / 0.04)',
+        'card-hover': '0 2px 8px -2px rgb(16 20 24 / 0.08), 0 1px 2px 0 rgb(16 20 24 / 0.04)',
+        'elevated': '0 8px 24px -6px rgb(16 20 24 / 0.12), 0 2px 6px -2px rgb(16 20 24 / 0.06)',
+        'elevated-lg': '0 16px 40px -10px rgb(16 20 24 / 0.16), 0 4px 10px -4px rgb(16 20 24 / 0.08)',
       },
       spacing: {
         '18': '4.5rem',
@@ -83,12 +109,12 @@ export default {
         '250': '250ms',
       },
       animation: {
-        'fade-in': 'fadeIn 0.4s ease-out forwards',
-        'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
-        'slide-in-right': 'slideInRight 0.3s ease-out forwards',
-        'scale-in': 'scaleIn 0.3s ease-out forwards',
+        'fade-in': 'fadeIn 0.3s ease-out forwards',
+        'fade-in-up': 'fadeInUp 0.4s ease-out forwards',
+        'slide-in-right': 'slideInRight 0.25s ease-out forwards',
+        'scale-in': 'scaleIn 0.25s ease-out forwards',
       },
     },
   },
-  plugins: [],
+  plugins: [require('tailwindcss-animate')],
 }

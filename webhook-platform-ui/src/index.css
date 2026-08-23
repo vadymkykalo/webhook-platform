@@ -2,60 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Hookflow design tokens
+
+   One rule governs this palette: the four status hues — ok, retry, halt,
+   idle — belong to statuses and to nothing else. Chrome never borrows them.
+   That is why the brand accent is teal and not blue or green: a "retrying"
+   badge and a primary button must never read as the same thing in a table
+   full of both.
+   ───────────────────────────────────────────────────────────────────────── */
+
 @layer base {
   :root {
-    --background: 0 0% 99%;
-    --foreground: 222 47% 11%;
+    /* Surfaces.
+       The page is a distinctly warm grey and cards are white, because the
+       first pass put them 2% of lightness apart and the result was white on
+       white — a card had to be found rather than seen. The gap below is what
+       lets a surface read as a surface without a shadow doing the work. */
+    --background: 55 14% 95%;      /* #F4F3EE  paper */
+    --foreground: 218 22% 7%;      /* #0E1116  ink   */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 218 22% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 238 76% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 238 76% 97%;
-    --accent-foreground: 238 76% 44%;
-    --destructive: 0 84% 60%;
+    --popover-foreground: 218 22% 7%;
+
+    /* Brand — deep teal. Disjoint from every status hue. */
+    --primary: 186 80% 26%;        /* #0D6E78 */
+    --primary-foreground: 55 14% 95%;
+    --accent: 186 44% 94%;
+    --accent-foreground: 186 80% 22%;
+
+    /* Neutrals, warmed to match the paper */
+    --secondary: 55 13% 90%;
+    --secondary-foreground: 218 22% 7%;
+    --muted: 55 13% 91%;
+    --muted-foreground: 70 7% 38%;
+
+    /* Rails — the hairlines and tick marks the whole system is drawn with.
+       Darkened from the first pass: at 86% they vanished against the page and
+       every boundary in the product is drawn with one of these. */
+    --rail: 60 8% 82%;             /* #D5D5CD */
+    --border: 60 8% 82%;
+    --input: 60 8% 82%;
+    --ring: 186 80% 26%;
+
+    /* Status — reserved. Never chrome. */
+    --ok: 152 69% 28%;             /* #167A4B  delivered      */
+    --ok-soft: 152 44% 93%;
+    --retry: 36 100% 35%;          /* #B26A00  attempt pending */
+    --retry-soft: 36 78% 92%;
+    --halt: 3 71% 41%;             /* #B3261E  abandoned, DLQ  */
+    --halt-soft: 3 70% 95%;
+    --idle: 220 9% 46%;            /* #6B7280  nothing yet     */
+    --idle-soft: 220 14% 94%;
+
+    /* Legacy aliases — shadcn primitives still reference these names */
+    --destructive: 3 71% 41%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 76% 36%;
+    --success: 152 69% 28%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 36 100% 35%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 238 76% 60%;
-    --radius: 0.625rem;
-    --sidebar-width: 16.5rem;
-    --header-height: 4rem;
+
+    --radius: 0.5rem;
+    --sidebar-width: 15rem;
+    --header-height: 3.5rem;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 8%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 238 76% 65%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 238 76% 15%;
-    --accent-foreground: 238 76% 70%;
-    --destructive: 0 63% 55%;
+    --background: 220 20% 7%;
+    --foreground: 60 12% 96%;
+    --card: 220 16% 13%;
+    --card-foreground: 60 12% 96%;
+    --popover: 220 18% 11%;
+    --popover-foreground: 60 12% 96%;
+
+    --primary: 185 79% 45%;        /* brand-bright — teal needs lifting on ink */
+    --primary-foreground: 220 20% 8%;
+    --accent: 186 50% 16%;
+    --accent-foreground: 185 79% 62%;
+
+    --secondary: 220 14% 18%;
+    --secondary-foreground: 60 12% 96%;
+    --muted: 220 14% 18%;
+    --muted-foreground: 70 5% 62%;
+
+    --rail: 220 12% 24%;
+    --border: 220 12% 24%;
+    --input: 220 12% 24%;
+    --ring: 185 79% 45%;
+
+    --ok: 152 55% 46%;
+    --ok-soft: 152 40% 14%;
+    --retry: 36 82% 52%;
+    --retry-soft: 36 50% 14%;
+    --halt: 3 72% 58%;
+    --halt-soft: 3 45% 15%;
+    --idle: 220 9% 60%;
+    --idle-soft: 220 12% 18%;
+
+    --destructive: 3 72% 58%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 238 76% 65%;
+    --success: 152 55% 46%;
+    --success-foreground: 220 20% 8%;
+    --warning: 36 82% 52%;
+    --warning-foreground: 220 20% 8%;
   }
 }
 
@@ -65,7 +116,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-feature-settings: "tnum";  /* tabular figures — columns of numbers must align */
   }
   html {
     scroll-behavior: smooth;
@@ -73,214 +124,89 @@
 }
 
 @layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.4s ease-out forwards;
+  /* ── The mono voice ──────────────────────────────────────────────────
+     Event types, HTTP codes, ids, URLs, column heads and eyebrows are all
+     machine facts. They are set in mono so a reader can tell at a glance
+     what the product said from what a person wrote. */
+  .mono-label {
+    font-family: theme('fontFamily.mono');
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
   }
-  .animate-fade-in-up {
-    animation: fadeInUp 0.5s ease-out forwards;
+
+  .hairline {
+    border-color: hsl(var(--rail));
   }
-  .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out forwards;
+
+  /* ── An always-ink surface ───────────────────────────────────────────
+     Some panels are deliberately dark in both themes — the auth panel, a
+     landing band. Using `bg-foreground` for that inverts in dark mode and
+     turns the panel white. This redeclares the tokens locally instead, so
+     anything nested inside (including AttemptRail, which reads --rail and
+     --background straight out of the cascade) renders correctly on ink
+     without knowing it is on ink. Status hues take their dark-theme
+     values, because the light-theme ones are too dark to read here. */
+  .surface-ink {
+    /* Not black. The ink is the brand teal taken down to near-darkness, so a
+       dark panel still belongs to the palette instead of reading as a neutral
+       slab dropped onto it. */
+    background-color: hsl(192 42% 6.5%);
+    color: hsl(180 12% 95%);
+
+    --background: 192 42% 6.5%;
+    --foreground: 180 12% 95%;
+    --card: 192 32% 12%;
+    --rail: 192 20% 22%;
+    --border: 192 20% 22%;
+    --muted-foreground: 186 10% 64%;
+    --secondary: 192 28% 15%;
+    --secondary-foreground: 180 12% 95%;
+    --primary: 184 72% 52%;
+    --primary-foreground: 192 42% 6.5%;
+    --accent: 192 32% 16%;
+    --accent-foreground: 184 72% 62%;
+    --ok: 152 55% 50%;
+    --retry: 36 82% 56%;
+    --halt: 3 74% 62%;
+    --idle: 192 8% 60%;
+
+    /* The soft tints have to come with their hues. A Badge reads
+       `bg-ok-soft text-ok`; leaving the tint at its paper value paints a
+       near-white pill on near-black the moment a badge lands on this panel. */
+    --ok-soft: 152 40% 14%;
+    --retry-soft: 36 45% 15%;
+    --halt-soft: 3 40% 16%;
+    --idle-soft: 192 14% 16%;
+
+    /* Read by components that render in place rather than through a portal:
+       the tooltip, the global form-control rule, skeletons, ErrorBoundary. */
+    --card-foreground: 180 12% 95%;
+    --popover: 192 32% 12%;
+    --popover-foreground: 180 12% 95%;
+    --muted: 192 24% 16%;
+    --input: 192 20% 22%;
+    --ring: 184 72% 52%;
+
+    /* shadcn aliases, kept in step with the hues above. */
+    --destructive: 3 74% 62%;
+    --destructive-foreground: 192 42% 6.5%;
+    --success: 152 55% 50%;
+    --success-foreground: 192 42% 6.5%;
+    --warning: 36 82% 56%;
+    --warning-foreground: 192 42% 6.5%;
   }
-  .animate-slide-in-left {
-    animation: slideInLeft 0.3s ease-out forwards;
-  }
-  .animate-scale-in {
-    animation: scaleIn 0.3s ease-out forwards;
-  }
-  .animate-shimmer {
-    animation: shimmer 2s infinite;
-    background: linear-gradient(90deg, transparent 0%, hsl(var(--muted)) 50%, transparent 100%);
-    background-size: 200% 100%;
-  }
+
+  .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+  .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+  .animate-slide-in-left { animation: slideInLeft 0.25s ease-out forwards; }
+  .animate-scale-in { animation: scaleIn 0.25s ease-out forwards; }
   .glass {
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    background-color: hsla(0, 0%, 100%, 0.72);
-  }
-  .dark .glass {
-    background-color: hsla(222, 47%, 6%, 0.72);
-  }
-  .glass-dark {
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    background-color: hsla(222, 47%, 6%, 0.72);
-  }
-  .gradient-text {
-    background: linear-gradient(135deg, hsl(238, 76%, 62%) 0%, hsl(280, 72%, 58%) 40%, hsl(320, 72%, 58%) 70%, hsl(238, 76%, 62%) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .gradient-border {
-    position: relative;
-  }
-  .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, hsl(238, 76%, 60%), hsl(280, 76%, 55%));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-
-  /* Subtle noise overlay for depth — apply to sections */
-  .noise {
-    position: relative;
-  }
-  .noise::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 256px 256px;
-    pointer-events: none;
-    z-index: 0;
-    border-radius: inherit;
-  }
-  .dark .noise::before {
-    opacity: 0.4;
-  }
-
-  /* Animated shimmer border for CTA buttons */
-  .btn-shimmer {
-    position: relative;
-    overflow: hidden;
-  }
-  .btn-shimmer::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-      115deg,
-      transparent 0%,
-      transparent 40%,
-      rgba(255, 255, 255, 0.15) 45%,
-      rgba(255, 255, 255, 0.25) 50%,
-      rgba(255, 255, 255, 0.15) 55%,
-      transparent 60%,
-      transparent 100%
-    );
-    animation: btn-shimmer-sweep 3s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  /* Gradient hover border for feature cards */
-  .card-glow {
-    position: relative;
-  }
-  .card-glow::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, hsl(238 76% 60% / 0), hsl(280 76% 55% / 0));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    transition: background 0.5s ease;
-    z-index: 1;
-  }
-  .card-glow:hover::before {
-    background: linear-gradient(135deg, hsl(238 76% 60% / 0.5), hsl(280 76% 55% / 0.4), hsl(320 72% 58% / 0.3));
-  }
-
-  /* Section divider gradient line */
-  .section-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.15), hsl(280 76% 55% / 0.15), transparent);
-  }
-
-  /* Mesh gradient background for hero — strong enough to actually see */
-  .hero-mesh {
-    background:
-      radial-gradient(ellipse 80% 50% at 15% 30%, hsl(238 76% 60% / 0.28) 0%, transparent 70%),
-      radial-gradient(ellipse 65% 55% at 85% 15%, hsl(280 76% 55% / 0.22) 0%, transparent 60%),
-      radial-gradient(ellipse 55% 45% at 50% 85%, hsl(320 72% 58% / 0.14) 0%, transparent 55%),
-      radial-gradient(ellipse 45% 50% at 70% 55%, hsl(200 80% 55% / 0.08) 0%, transparent 45%);
-  }
-  .dark .hero-mesh {
-    background:
-      radial-gradient(ellipse 80% 50% at 15% 30%, hsl(238 76% 65% / 0.3) 0%, transparent 70%),
-      radial-gradient(ellipse 65% 55% at 85% 15%, hsl(280 76% 55% / 0.25) 0%, transparent 60%),
-      radial-gradient(ellipse 55% 45% at 50% 85%, hsl(320 72% 58% / 0.15) 0%, transparent 55%),
-      radial-gradient(ellipse 45% 50% at 70% 55%, hsl(200 80% 60% / 0.1) 0%, transparent 45%);
-  }
-
-  /* Page-level aurora — slow-breathing colored blobs behind content */
-  .page-aurora {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
-  }
-  .page-aurora::before,
-  .page-aurora::after {
-    content: '';
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    will-change: transform;
-  }
-  /* Blob 1 — indigo, top-left, breathes slowly */
-  .page-aurora::before {
-    width: 55vw;
-    height: 55vw;
-    max-width: 800px;
-    max-height: 800px;
-    top: -15%;
-    left: -12%;
-    background: radial-gradient(circle, hsl(238 76% 60% / 0.18) 0%, hsl(238 76% 60% / 0.07) 50%, transparent 70%);
-    animation: aurora-drift-1 20s ease-in-out infinite;
-  }
-  /* Blob 2 — purple-pink, bottom-right, counter-drifts */
-  .page-aurora::after {
-    width: 50vw;
-    height: 50vw;
-    max-width: 700px;
-    max-height: 700px;
-    bottom: -8%;
-    right: -10%;
-    background: radial-gradient(circle, hsl(280 72% 55% / 0.15) 0%, hsl(320 72% 58% / 0.06) 50%, transparent 70%);
-    animation: aurora-drift-2 25s ease-in-out infinite;
-  }
-  /* Blob 3 — teal accent, center, smaller & brighter (the "izuminка") */
-  .page-aurora > span {
-    display: block;
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(90px);
-    will-change: transform;
-    width: 30vw;
-    height: 30vw;
-    max-width: 450px;
-    max-height: 450px;
-    top: 30%;
-    left: 40%;
-    background: radial-gradient(circle, hsl(192 80% 55% / 0.1) 0%, hsl(210 76% 55% / 0.04) 50%, transparent 70%);
-    animation: aurora-drift-3 18s ease-in-out infinite;
-  }
-  .dark .page-aurora::before {
-    background: radial-gradient(circle, hsl(238 76% 65% / 0.24) 0%, hsl(238 76% 65% / 0.1) 50%, transparent 70%);
-  }
-  .dark .page-aurora::after {
-    background: radial-gradient(circle, hsl(280 72% 55% / 0.2) 0%, hsl(320 72% 58% / 0.08) 50%, transparent 70%);
-  }
-  .dark .page-aurora > span {
-    background: radial-gradient(circle, hsl(192 80% 55% / 0.14) 0%, hsl(210 76% 55% / 0.05) 50%, transparent 70%);
+    backdrop-filter: blur(10px) saturate(150%);
+    -webkit-backdrop-filter: blur(10px) saturate(150%);
+    background-color: hsl(var(--background) / 0.82);
   }
 }
 
@@ -289,93 +215,32 @@
   to { opacity: 1; }
 }
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(16px); }
-  to { opacity: 1; transform: translateX(0); }
-}
 @keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-16px); }
+  from { opacity: 0; transform: translateX(-12px); }
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+
+/* ── The attempt rail ────────────────────────────────────────────────────
+   The signature device. A hairline with tick marks at exponential spacing,
+   because that is what a retry ladder actually is: 1m, 5m, 15m, 1h, 6h, 24h.
+   Even spacing would be a lie about the product. */
+@keyframes rail-tick-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
 }
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.15); }
-}
-@keyframes btn-shimmer-sweep {
-  0% { transform: translateX(-100%) rotate(0deg); }
-  100% { transform: translateX(100%) rotate(0deg); }
-}
-@keyframes aurora-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(8vw, 5vh) scale(1.1); }
-  50% { transform: translate(3vw, 12vh) scale(0.95); }
-  75% { transform: translate(-4vw, 6vh) scale(1.05); }
-}
-@keyframes aurora-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  30% { transform: translate(-6vw, -8vh) scale(1.08); }
-  60% { transform: translate(-2vw, -4vh) scale(0.92); }
-  80% { transform: translate(5vw, -6vh) scale(1.04); }
-}
-@keyframes aurora-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
-  20% { transform: translate(5vw, -4vh) scale(1.15); opacity: 1; }
-  45% { transform: translate(-3vw, 6vh) scale(0.9); opacity: 0.6; }
-  70% { transform: translate(7vw, 3vh) scale(1.1); opacity: 0.9; }
-}
-@keyframes data-packet {
-  0% { left: 0%; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
-}
-.marquee-track {
-  display: flex;
-  animation: marquee 30s linear infinite;
-  width: max-content;
-}
-.marquee-track:hover {
-  animation-play-state: paused;
+.rail-tick-in {
+  animation: rail-tick-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
 }
 
-/* Flow diagram SVG animated dashed paths */
-@keyframes flow-dash-svg {
-  0% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -26; }
-}
-.flow-svg-path {
-  animation: flow-dash-svg 1s linear infinite;
-}
 
-/* Hub subtle pulse glow */
-@keyframes hub-glow {
-  0%, 100% { box-shadow: 0 8px 24px -4px hsl(var(--primary) / 0.25), 0 0 0 4px hsl(var(--primary) / 0.12); }
-  50% { box-shadow: 0 12px 40px -2px hsl(var(--primary) / 0.4), 0 0 0 8px hsl(var(--primary) / 0.18); }
-}
-.hub-pulse {
-  animation: hub-glow 3s ease-in-out infinite;
-}
-
-/* Scrollbar styling */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -384,7 +249,7 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: hsl(var(--rail));
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -394,11 +259,11 @@
 /* ── Universal form control styling (low specificity via :where) ── */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]),
 textarea) {
-  height: 2.5rem;
+  height: 2.25rem;
   width: 100%;
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) - 2px);
   border: 1px solid hsl(var(--input));
-  background-color: hsl(var(--background));
+  background-color: hsl(var(--card));
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   line-height: 1.25rem;
@@ -417,28 +282,31 @@ textarea) {
   opacity: 0.5;
 }
 
-/* Focus ring — subtle, consistent */
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):focus,
 input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]):focus-visible,
 textarea:focus, textarea:focus-visible) {
   outline: none;
   border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.1);
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.15);
 }
 
-/* Kill default browser focus outline globally, components handle their own */
-*:focus-visible {
-  outline: none;
-}
-
-/* Buttons & interactive elements — subtle ring on keyboard focus only */
+/* The blanket reset used to be `*:focus-visible { outline: none }` paired with
+   an allowlist that restored the ring. Checkboxes matched neither — they carry
+   no role and no tabindex, and the form-control rule above excludes them — so
+   the select-all and select-row controls on Events, Deliveries, DLQ and
+   Incoming Events had no visible focus at all. The reset now names the
+   elements whose native outline is actually being replaced. */
 :where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]):focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) - 2px);
 }
 
-/* Accessibility: respect reduced motion preference */
+:where(input[type="checkbox"], input[type="radio"], summary):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

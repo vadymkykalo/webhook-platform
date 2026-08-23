@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { Loader2, Mail } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
+import AuthLayout from './AuthLayout';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
 import { http } from '../api/http';
@@ -11,7 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import IntentPicker from '../components/IntentPicker';
-import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+import PasswordStrengthIndicator, { passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
 
 export default function RegisterPage() {
   const { t } = useTranslation();
@@ -45,7 +45,14 @@ export default function RegisterPage() {
       showSuccess(t('auth.register.success'));
       setRegistered(true);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || t('auth.register.failed');
+      // The API answers a rejected field with fieldErrors {field: reason} and a
+      // generic "Invalid request parameters" summary. Showing the summary threw
+      // away the only part that says what to change.
+      const data = err.response?.data;
+      const fieldDetail = data?.fieldErrors
+        ? Object.values(data.fieldErrors as Record<string, string>).join('. ')
+        : '';
+      const errorMessage = fieldDetail || data?.message || t('auth.register.failed');
       setError(errorMessage);
       showApiError(err, 'auth.register.failed');
     } finally {
@@ -65,203 +72,123 @@ export default function RegisterPage() {
     }
   };
 
+  if (registered && showIntent) {
+    return (
+      <AuthLayout title={t('auth.intent.title')} subtitle={t('auth.intent.subtitle')}>
+        <IntentPicker onSelect={() => navigate('/admin/dashboard')} />
+      </AuthLayout>
+    );
+  }
+
+  if (registered) {
+    return (
+      <AuthLayout
+        title={t('auth.register.checkEmail')}
+        subtitle={<Trans i18nKey="auth.register.verificationSent" values={{ email }} components={{ strong: <strong className="font-medium text-foreground" /> }} />}
+      >
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-3">
+            <Mail className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
+            <span className="truncate font-mono text-[13px]">{email}</span>
+          </div>
+          <Button onClick={() => setShowIntent(true)} className="h-10 w-full">
+            {t('auth.register.continueToDashboard')}
+          </Button>
+          <Button variant="outline" onClick={handleResend} disabled={resending} className="h-10 w-full">
+            {resending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {resending ? t('common.sending') : t('auth.register.resendVerification')}
+          </Button>
+          <p className="text-xs text-muted-foreground">{t('auth.register.resendHint')}</p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-purple-700 dark:from-primary/30 dark:via-primary/20 dark:to-purple-900/40 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <HookflowIcon className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold">Hookflow</span>
+    <AuthLayout
+      title={t('auth.register.title')}
+      subtitle={t('auth.register.subtitle')}
+      footer={
+        <>
+          {t('auth.register.hasAccount')}{' '}
+          <Link to="/login" className="font-medium text-primary hover:underline">
+            {t('auth.register.signIn')}
           </Link>
-
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-4xl font-bold leading-tight mb-4">
-                {t('auth.register.brandTitle').split('\n').map((line, i, arr) => (
-                  <span key={i}>
-                    {line}
-                    {i < arr.length - 1 && <br />}
-                  </span>
-                ))}
-              </h2>
-              <p className="text-white/70 text-lg max-w-md">
-                {t('auth.register.brandSubtitle')}
-              </p>
-            </div>
-            <div className="space-y-3">
-              {[
-                t('auth.register.benefit1'),
-                t('auth.register.benefit2'),
-                t('auth.register.benefit3'),
-                t('auth.register.benefit4'),
-              ].map((text) => (
-                <div key={text} className="flex items-center gap-3 text-white/80">
-                  <CheckCircle2 className="h-4 w-4 text-green-300 flex-shrink-0" />
-                  <span className="text-sm">{text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-white/40 text-sm">
-            {t('auth.login.copyright', { year: new Date().getFullYear() })}
-          </p>
-        </div>
-      </div>
-
-      {/* Right panel - form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-background">
-        <div className="w-full max-w-[420px] animate-fade-in-up">
-
-          {registered && showIntent ? (
-            <IntentPicker onSelect={() => navigate('/admin/dashboard')} />
-          ) : registered ? (
-            <div className="text-center space-y-6">
-              <div className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Mail className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.register.checkEmail')}</h1>
-                <p className="text-muted-foreground">
-                  <Trans i18nKey="auth.register.verificationSent" values={{ email }} components={{ strong: <strong /> }} />
-                </p>
-              </div>
-              <div className="space-y-3">
-                <Button onClick={() => setShowIntent(true)} className="w-full">
-                  {t('auth.register.continueToDashboard')}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleResend}
-                  disabled={resending}
-                  className="w-full"
-                >
-                  {resending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {resending ? t('common.sending') : t('auth.register.resendVerification')}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t('auth.register.resendHint')}
-              </p>
-            </div>
-          ) : (
-          <>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t('common.backToHome')}
-          </Link>
-
-          <div className="mb-8">
-            <div className="lg:hidden flex items-center gap-2.5 mb-6">
-              <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-                <HookflowIcon className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold">Hookflow</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.register.title')}</h1>
-            <p className="text-muted-foreground">
-              {t('auth.register.subtitle')}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-sm font-medium">{t('auth.register.fullName')}</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder={t('auth.register.fullNamePlaceholder')}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  disabled={loading}
-                  autoComplete="name"
-                  className="h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="organizationName" className="text-sm font-medium">{t('auth.register.organization')}</Label>
-                <Input
-                  id="organizationName"
-                  type="text"
-                  placeholder={t('auth.register.organizationPlaceholder')}
-                  value={organizationName}
-                  onChange={(e) => setOrganizationName(e.target.value)}
-                  required
-                  disabled={loading}
-                  autoComplete="organization"
-                  className="h-11"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">{t('auth.register.email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="email"
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">{t('auth.register.password')}</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder={t('auth.register.passwordPlaceholder')}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="new-password"
-                className="h-11"
-              />
-              <PasswordStrengthIndicator password={password} />
-            </div>
-
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3 animate-scale-in">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full h-11"
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="fullName">{t('auth.register.fullName')}</Label>
+            <Input
+              id="fullName"
+              type="text"
+              placeholder={t('auth.register.fullNamePlaceholder')}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
               disabled={loading}
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? t('auth.register.submitting') : t('auth.register.submit')}
-            </Button>
-          </form>
-
-          <p className="text-xs text-muted-foreground text-center mt-6">
-            {t('auth.register.terms')}
-          </p>
-
-          <p className="text-sm text-muted-foreground text-center mt-4">
-            {t('auth.register.hasAccount')}{' '}
-            <Link to="/login" className="text-primary hover:underline font-semibold">
-              {t('auth.register.signIn')}
-            </Link>
-          </p>
-          </>
-          )}
+              autoComplete="name"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="organizationName">{t('auth.register.organization')}</Label>
+            <Input
+              id="organizationName"
+              type="text"
+              placeholder={t('auth.register.organizationPlaceholder')}
+              value={organizationName}
+              onChange={(e) => setOrganizationName(e.target.value)}
+              required
+              disabled={loading}
+              autoComplete="organization"
+            />
+          </div>
         </div>
-      </div>
-    </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="email">{t('auth.register.email')}</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="email"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="password">{t('auth.register.password')}</Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder={t('auth.register.passwordPlaceholder')}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="new-password"
+          />
+          <PasswordStrengthIndicator password={password} />
+        </div>
+
+        {error && (
+          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="h-10 w-full" disabled={loading || !passwordMeetsPolicy(password)}>
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading ? t('auth.register.submitting') : t('auth.register.submit')}
+        </Button>
+
+        <p className="text-xs text-muted-foreground">{t('auth.register.terms')}</p>
+      </form>
+    </AuthLayout>
   );
 }

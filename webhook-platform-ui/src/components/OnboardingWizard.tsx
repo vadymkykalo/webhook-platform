@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Sparkles, ArrowRight, ArrowLeft, X, FolderKanban,
+  Sparkles, ArrowRight, ArrowLeft, FolderKanban,
   Webhook, Bell, Key, Send, CheckCircle2, Rocket, Clock, Copy, Check
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,11 @@ interface OnboardingWizardProps {
 interface WizardStep {
   key: string;
   icon: React.ElementType;
+  /**
+   * Chrome, not status. Every step but the last wears the brand; the last one
+   * is the only one that reports a state ("this is done"), so it is the only
+   * one allowed a status hue.
+   */
   iconColor: string;
   iconBg: string;
 }
@@ -41,18 +46,23 @@ export function markWizardSeen(): void {
 }
 
 const STEPS: WizardStep[] = [
-  { key: 'welcome', icon: Sparkles, iconColor: 'text-primary', iconBg: 'bg-primary/10' },
-  { key: 'project', icon: FolderKanban, iconColor: 'text-blue-600', iconBg: 'bg-blue-100 dark:bg-blue-900/30' },
-  { key: 'endpoint', icon: Webhook, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  { key: 'subscription', icon: Bell, iconColor: 'text-amber-600', iconBg: 'bg-amber-100 dark:bg-amber-900/30' },
-  { key: 'apiKey', icon: Key, iconColor: 'text-purple-600', iconBg: 'bg-purple-100 dark:bg-purple-900/30' },
-  { key: 'send', icon: Send, iconColor: 'text-rose-600', iconBg: 'bg-rose-100 dark:bg-rose-900/30' },
-  { key: 'done', icon: Rocket, iconColor: 'text-success', iconBg: 'bg-success/10' },
+  { key: 'welcome', icon: Sparkles, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'project', icon: FolderKanban, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'endpoint', icon: Webhook, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'subscription', icon: Bell, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'apiKey', icon: Key, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'send', icon: Send, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'done', icon: Rocket, iconColor: 'text-ok', iconBg: 'bg-ok-soft' },
 ];
+
+// The same origin the app already talks to: empty VITE_API_URL means the API
+// is served beside the UI, so the page's own origin is the honest default.
+// The hardcoded localhost:8080 this replaced shipped to every hosted install.
+const API_ORIGIN = import.meta.env.VITE_API_URL || window.location.origin;
 
 function CurlSnippet({ t }: { t: (key: string) => string }) {
   const [copied, setCopied] = useState(false);
-  const curlCmd = `curl -X POST http://localhost:8080/api/v1/events \\
+  const curlCmd = `curl -X POST ${API_ORIGIN}/api/v1/events \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: YOUR_API_KEY" \\
   -d '{
@@ -72,7 +82,7 @@ function CurlSnippet({ t }: { t: (key: string) => string }) {
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{t('wizard.send.curlLabel')}</span>
         <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors" title={t('common.copy')} aria-label={t('common.copy')}>
-          {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
       </div>
       <pre className="text-[11px] font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap leading-relaxed">
@@ -131,15 +141,6 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
       <DialogContent className="sm:max-w-md">
-        <button
-          onClick={handleClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-          title={t('common.close')}
-          aria-label={t('common.close')}
-        >
-          <X className="h-4 w-4" />
-        </button>
-
         <DialogHeader className="text-center items-center pt-2">
           <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center mb-3", step.iconBg)}>
             <Icon className={cn("h-8 w-8", step.iconColor)} />
@@ -151,7 +152,7 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
             {t(`wizard.${step.key}.description`)}
           </DialogDescription>
           {step.key === 'welcome' && (
-            <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+            <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-xs font-medium">
               <Clock className="h-3.5 w-3.5" />
               {t('wizard.welcome.timeEstimate')}
             </div>
@@ -194,9 +195,9 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
             <div className="flex items-center gap-3 py-2">
               {[FolderKanban, Webhook, Bell, Key, Send].map((_, i) => (
                 <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <div className="w-4 h-px bg-success/30" />}
-                  <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-success" />
+                  {i > 0 && <div className="w-4 h-px bg-rail" />}
+                  <div className="h-8 w-8 rounded-lg bg-ok-soft flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4 text-ok" />
                   </div>
                 </div>
               ))}

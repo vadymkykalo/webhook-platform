@@ -348,6 +348,14 @@ jobs:
       - name: Check generated API types match openapi.yaml
         run: scripts/check-types-drift.sh
 
+      # The in-app API reference is rendered from a derived index generated from
+      # the same openapi.yaml, and that index is committed. Before this, the
+      # reference was 2,100 lines of hand-written endpoint tables that nothing
+      # kept in sync — this is what stops the replacement rotting the same way.
+      - name: Check generated docs API index matches openapi.yaml
+        working-directory: webhook-platform-ui
+        run: npm run docs:api-index:check
+
       - name: Run ESLint
         working-directory: webhook-platform-ui
         run: npm run lint

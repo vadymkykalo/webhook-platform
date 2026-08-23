@@ -9,7 +9,7 @@ function DelayNode({ data, selected }: NodeProps) {
   const seconds = d.delaySeconds ? Number(d.delaySeconds) : 5;
   return (
     <BaseNode
-      color="#eab308"
+      role="logic"
       icon="⏱️"
       label={String(d.label || t('workflows.nodeTypes.delay.label'))}
       subtitle={t('workflows.nodeStatus.delaySeconds', { count: seconds })}

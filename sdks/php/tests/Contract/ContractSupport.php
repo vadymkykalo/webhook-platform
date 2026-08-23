@@ -22,16 +22,27 @@ final class ContractSupport
         return getenv('CONTRACT_API_BASE_URL') ?: 'http://localhost:8080';
     }
 
+    /**
+     * Probes with an intentionally invalid login: any HTTP response at all
+     * proves the API is answering.
+     *
+     * Deliberately does NOT hit /actuator/health/liveness: under `make up`
+     * (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT
+     * (8082) which is never published to the host — and on the main port
+     * /actuator/health is a 500, not a 404, because nothing maps it. Nor
+     * /v3/api-docs: springdoc is only permitAll when SWAGGER_ENABLED=true
+     * (SecurityConfig.java) and .env.dist ships it false, so probing it
+     * reports a perfectly healthy stack as unreachable and silently skips
+     * this whole suite. /api/v1/auth/login is permitAll unconditionally.
+     */
     public static function isApiReachable(): bool
     {
-        // Deliberately does NOT hit /actuator/health/liveness: under `make up`
-        // (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT
-        // (8082), never published to the host. /v3/api-docs is permitAll on
-        // the main port (SecurityConfig.java) and always present (springdoc
-        // is on the classpath — OpenApiConfig.java).
-        $ch = curl_init(self::baseUrl() . '/v3/api-docs');
+        $ch = curl_init(self::baseUrl() . '/api/v1/auth/login');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => '{}',
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_TIMEOUT => 3,
         ]);
         curl_exec($ch);
@@ -39,7 +50,7 @@ final class ContractSupport
         $error = curl_error($ch);
         curl_close($ch);
 
-        return $error === '' && $httpCode >= 200 && $httpCode < 300;
+        return $error === '' && $httpCode > 0;
     }
 
     private static function call(string $method, string $path, array $body, array $headers = []): array

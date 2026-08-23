@@ -20,11 +20,34 @@ export const nodeTypes = {
   createEvent: CreateEventNode,
 };
 
+/**
+ * Nine node types, three roles, and the colour says the role — not the type.
+ *
+ * The old canvas gave every type its own hex (#f59e0b, #8b5cf6, #e11d48 …),
+ * which meant nine hues competing on one surface, none of them legible on ink,
+ * and several of them close enough to the reserved status hues to read as a
+ * status. What a person actually needs to see at a glance is where a run
+ * *starts*, where it *branches or waits*, and where it *leaves the workflow*.
+ * The emoji and the label already say which of the nine it is.
+ *
+ * Every value here is a token expression, so the canvas follows the theme.
+ */
+export type NodeRole = 'trigger' | 'logic' | 'action';
+
+export const NODE_ROLE_COLOR: Record<NodeRole, string> = {
+  /** Where a run begins. The brand accent, because there is exactly one of them. */
+  trigger: 'hsl(var(--primary))',
+  /** Decides whether, when, or in what shape the run continues. */
+  logic: 'hsl(var(--muted-foreground))',
+  /** Reaches outside the workflow — an HTTP call, a delivery, a new event. */
+  action: 'hsl(var(--foreground))',
+};
+
 export interface NodeTemplate {
   type: string;
   /** i18n key under `workflows.nodeTypes.<type>` — resolve via t() at render time, never hardcode English here. */
   icon: string;
-  color: string;
+  role: NodeRole;
   defaultData: Record<string, unknown>;
 }
 
@@ -35,55 +58,55 @@ export const nodeTemplates: NodeTemplate[] = [
   {
     type: 'webhookTrigger',
     icon: '⚡',
-    color: '#f59e0b',
+    role: 'trigger',
     defaultData: { eventTypePattern: '*' },
   },
   {
     type: 'filter',
     icon: '🔀',
-    color: '#8b5cf6',
+    role: 'logic',
     defaultData: { conditions: null },
   },
   {
     type: 'transform',
     icon: '🔄',
-    color: '#06b6d4',
+    role: 'logic',
     defaultData: { template: '{}' },
   },
   {
     type: 'http',
     icon: '🌐',
-    color: '#10b981',
+    role: 'action',
     defaultData: { url: '', method: 'POST', headers: {}, body: null, timeout: 30 },
   },
   {
     type: 'slack',
     icon: '💬',
-    color: '#e11d48',
+    role: 'action',
     defaultData: { webhookUrl: '', message: '', channel: '' },
   },
   {
     type: 'delivery',
     icon: '📦',
-    color: '#3b82f6',
+    role: 'action',
     defaultData: { endpointId: '' },
   },
   {
     type: 'branch',
     icon: '🔀',
-    color: '#f97316',
+    role: 'logic',
     defaultData: { conditions: null },
   },
   {
     type: 'delay',
     icon: '⏱️',
-    color: '#eab308',
+    role: 'logic',
     defaultData: { delaySeconds: 5 },
   },
   {
     type: 'createEvent',
     icon: '📤',
-    color: '#7c3aed',
+    role: 'action',
     defaultData: { projectId: '', eventType: '', payloadTemplate: '' },
   },
 ];
