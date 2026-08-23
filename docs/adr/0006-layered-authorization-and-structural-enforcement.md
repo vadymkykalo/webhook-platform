@@ -194,3 +194,9 @@ refusal to write across tenants, and failure when unscoped).
   an aspect asserting that `validateProjectOwnership` ran. Both leave the parameter, so both
   leave the caller choosing which organization to pass; the aspect would have checked that *a*
   call happened, not that it named the right one.
+
+## Follow-up
+
+Three of the invariants above were enforced by prose alone and were each violated at least once
+afterwards. [ADR-0012](0012-tenancy-invariants-are-guarded-not-documented.md) gives them checks;
+it finishes this decision rather than reopening it.

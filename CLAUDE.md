@@ -23,24 +23,24 @@ Several are *ratchets* — they demand the known exception list stop growing, no
 be perfect. Adding to a documented-exemption list is a review decision with a stated reason,
 never a way to get green.
 
+**`make ratchets` (`mvn test -Dgroups=ratchet`) is the live set** — every guard test carries
+`@Tag("ratchet")`, so ask the build rather than a list here, which goes stale (ADR-0014). Each
+failure names what to do. What the tag means: the test asserts something about the codebase as a
+whole, not the behaviour of one class. Two guards are written out below anyway, because their
+remediation is a command nobody guesses:
+
 - **`openapi.yaml` is committed and semantically diffed** against the spec springdoc serves, by `OpenApiDriftIntegrationTest`. After an intentional API change, regenerate rather than hand-edit:
   `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`, then review and commit the file.
-  A backend DTO change also lands in `webhook-platform-ui/src/types/api.types.ts`, which mirrors
-  these types by hand — nothing generates or diffs it, so a missed field surfaces as a runtime
-  `undefined`, not a red build.
-- **`OpenApiOperationIdTest`** fails when two handlers collide on a springdoc-derived operationId.
-  Those become generated-SDK method names — fix it at the source with an explicit
-  `@Operation(operationId = …)`, never in the spec file.
+  A backend DTO change then also lands in the UI: `npm run types:generate` regenerates
+  `webhook-platform-ui/src/types/api.generated.ts` (`make types-check` fails on a stale one), and
+  `src/types/api.contract.ts` fails the typecheck until the hand-written mirror in `api.types.ts`
+  agrees with it again. ADR-0013 has why the mirror still exists.
 - **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version *and* appVersion), `webhook-platform-ui/package.json`, and all three SDK manifests under `sdks/`. Never bump one by hand: `make version-set VERSION=2.4.0`, and `make version-check` runs the same drift check CI does.
-- **A new mutating handler must declare who may call it.** Two reflection-only unit tests
-  (`MutatingHandlerScopeDeclarationTest`, `MutatingHandlerAccessDeclarationTest`) fail the build
-  when a `POST`/`PUT`/`PATCH`/`DELETE` handler carries neither `@RequireScope` / `@RequireAccess`
-  nor an entry in that test's exemption list. Both interceptor defaults are *allow*, which is why
-  the omission is otherwise silent. `AccessLevelEnforcementTest` separately proves the annotation
-  is enforced.
-- **Schema parity** — `SchemaRetryLadderDefaultsTest` (Flyway column defaults drifting from
-  `RetryLadderDefaults`) and `EntityMappingParityIntegrationTest` (see *Architecture*).
-- **Tenancy** — `ServiceTenantParameterTest`; see *Auth & tenancy* below.
+
+Two more things fail CI without being ratchets:
+
+- **`AccessLevelEnforcementTest`** proves `@RequireAccess` is actually enforced — the declaration
+  ratchets only prove it is present.
 - **Per-module JaCoCo ratchets** bind to `verify`, and CI runs them only in the aggregate job,
   after merging the unit *and* integration exec files. `mvn verify` locally over a partial test
   selection trips them against partial data — use `mvn test` for ordinary work.
@@ -209,8 +209,11 @@ Requests carry either a JWT (dashboard/CLI) or `X-API-Key` (server-to-server); `
 Org ownership is **not** on that list, because it is no longer something an endpoint does. `TenantContextFilter` puts the caller's organization into `TenantContext`, and `@TenantId` makes Hibernate add `organization_id = <current tenant>` to every query — `findById` included. A service method that takes an `organizationId` fails `ServiceTenantParameterTest`. ADR-0006 has the whole shape; three things follow from it that are easy to trip over:
 
 - **Anything without a request needs a scope of its own.** `@SystemTenant` on a scheduler or consumer; `TenantContext.runAs(orgId, …)` on a public path after it resolves whose data it is handling. No scope is a 500, deliberately.
-- **Enter the scope outside the transaction.** Hibernate reads the tenant when it opens the session, so a scope entered inside one is too late and the row gets the wrong organization stamped on it.
-- **Native queries are exempt from the filter** and must carry their own `organization_id` predicate unless they are system paths — see the repository package's `package-info.java`.
+- **Enter the scope outside the transaction.** Hibernate reads the tenant when it opens the session, so a scope entered inside one is too late and the row gets the wrong organization stamped on it. `TenantContext.callAs` now throws rather than letting that happen; `runAsSystem` does not, because root stamps nothing.
+- **Native queries are exempt from the filter** and must carry their own `organization_id` predicate unless they are system paths — see the repository package's `package-info.java`, and `NativeQueryTenantPredicateTest`, which makes each one say which it is.
+- **A thread pool you build yourself gets no tenant propagation.** `TaskDecorator` is a Spring hook, so it reaches `AsyncConfig`'s beans and nothing else — hand `TenantPropagatingTaskDecorator.wrap(…)` any other pool.
+
+ADR-0012 covers the last three; all of them fail the build now rather than only the review.
 
 New tenant-scoped endpoints must go through the checks above; don't hand-roll org checks. Public paths are whitelisted in `SecurityConfig` (`/ingress/**`, `/tunnel/**`, `/hook/**`, `/ws/tunnel`, auth + billing webhooks).
 
