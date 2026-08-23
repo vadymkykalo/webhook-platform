@@ -1,6 +1,7 @@
 package com.webhook.platform.api.security;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -39,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Deliberately a plain {@code *Test}: pure reflection over the classpath, so it must run in
  * the no-Docker unit job — see {@code scripts/check-test-routing.sh}.
  */
+@Tag("ratchet")
 class MutatingHandlerAccessDeclarationTest {
 
     private static final String CONTROLLER_PACKAGE = "com.webhook.platform.api.controller";

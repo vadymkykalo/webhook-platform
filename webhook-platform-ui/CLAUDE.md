@@ -10,7 +10,9 @@ from the other — otherwise the gap stays invisible until it renders as a raw k
 
 Page tests render through `src/test/renderPage.tsx`, not a bare `render()`: it supplies a fresh
 no-retry `QueryClient` (retries hang error-state tests), a `MemoryRouter` and a fake
-authenticated `OWNER`. One file: `npm test -- EndpointsPage`.
+authenticated `OWNER`. One file: `npm test -- EndpointsPage`. `no-restricted-imports` enforces
+this for `src/pages/**/*.test.tsx`; component tests outside `src/pages` are not covered, because
+they have no route to render through.
 
 `src/types/api.types.ts` mirrors the backend DTOs by hand, so a backend API change lands here
 too. Nothing generates or diffs this file: `npm run typecheck` only checks the app against the

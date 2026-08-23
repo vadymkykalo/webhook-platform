@@ -2,7 +2,6 @@ package com.webhook.platform.api.tenancy;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -25,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>Deliberately a plain {@code *Test}: pure {@code ThreadLocal} manipulation, no Spring context
  * and no container, so it belongs in the no-Docker unit job.
  */
-@Tag("ratchet")
 class TenantContextTransactionGuardTest {
 
     private static final UUID ORG = UUID.fromString("11111111-1111-1111-1111-111111111111");

@@ -41,6 +41,32 @@ module.exports = {
   },
   overrides: [
     {
+      // A bare render() builds its own QueryClient with retries ON, so an
+      // error-state test sits through three exponential-backoff retries before
+      // the assertion can run — it does not fail, it hangs, and the afternoon
+      // goes into finding out why. renderPage() supplies a no-retry client, a
+      // MemoryRouter for useParams and an authenticated OWNER for
+      // usePermissions, which is also what the real app supplies.
+      //
+      // Scoped to page tests, not every test: the convention is about pages,
+      // and a plain component test (components/__tests__/EmptyState.test.tsx)
+      // has no route to render through — renderPage would need a path and an
+      // initialEntry it does not have, so a blanket ban would be unfixable
+      // there rather than merely inconvenient. src/test/renderPage.tsx itself
+      // is outside src/pages and so is unaffected; it has to import the real
+      // render.
+      files: ['src/pages/**/*.test.tsx'],
+      rules: {
+        'no-restricted-imports': ['error', {
+          paths: [{
+            name: '@testing-library/react',
+            importNames: ['render'],
+            message: 'Use renderPage() from src/test/renderPage.tsx — a bare render() gets a retrying QueryClient, which hangs error-state tests.',
+          }],
+        }],
+      },
+    },
+    {
       // These are the "core operational" pages an audit found leaking
       // raw hardcoded English JSX text instead of going through t() — status
       // filters, workflow node labels, rule action badges, etc. Scoped here

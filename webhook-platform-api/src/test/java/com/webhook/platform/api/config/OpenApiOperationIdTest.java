@@ -2,6 +2,7 @@ package com.webhook.platform.api.config;
 
 import io.swagger.v3.oas.annotations.Operation;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -49,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>A plain unit test on purpose: it scans bytecode, needs no Spring context or
  * database, and so belongs to the fast CI job.
  */
+@Tag("ratchet")
 class OpenApiOperationIdTest {
 
     private static final String CONTROLLER_PACKAGE = "com.webhook.platform.api.controller";

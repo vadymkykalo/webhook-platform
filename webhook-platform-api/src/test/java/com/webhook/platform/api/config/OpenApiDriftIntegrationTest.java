@@ -2,6 +2,7 @@ package com.webhook.platform.api.config;
 
 import com.webhook.platform.api.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
@@ -58,6 +59,7 @@ import static org.assertj.core.api.Assertions.fail;
  * then review and commit the resulting {@code openapi.yaml}.
  */
 @TestPropertySource(properties = "swagger.enabled=true")
+@Tag("ratchet")
 class OpenApiDriftIntegrationTest extends AbstractIntegrationTest {
 
     /** Cap on reported differences, so a wholesale regeneration doesn't dump thousands of lines. */
