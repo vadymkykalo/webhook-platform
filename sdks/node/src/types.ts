@@ -27,6 +27,9 @@ export interface Endpoint {
   allowedSourceIps?: string;
   mtlsEnabled?: boolean;
   verificationStatus?: string;
+  verificationAttemptedAt?: string;
+  verificationCompletedAt?: string;
+  verificationSkipReason?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -34,15 +37,21 @@ export interface Endpoint {
 export interface EndpointCreateParams {
   url: string;
   description?: string;
+  /** Supply your own signing secret. Omit to have the API generate one. */
+  secret?: string;
   enabled?: boolean;
   rateLimitPerSecond?: number;
+  /** Comma-separated CIDRs the endpoint is allowed to be reached from. */
+  allowedSourceIps?: string;
 }
 
 export interface EndpointUpdateParams {
   url?: string;
   description?: string;
+  secret?: string;
   enabled?: boolean;
   rateLimitPerSecond?: number;
+  allowedSourceIps?: string;
 }
 
 export interface Subscription {
@@ -57,6 +66,8 @@ export interface Subscription {
   retryDelays?: string;
   payloadTemplate?: string;
   customHeaders?: string;
+  transformationId?: string;
+  transformationName?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -71,6 +82,7 @@ export interface SubscriptionCreateParams {
   retryDelays?: string;
   payloadTemplate?: string;
   customHeaders?: string;
+  transformationId?: string;
 }
 
 export interface Delivery {
@@ -92,20 +104,39 @@ export type DeliveryStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | '
 
 export interface DeliveryAttempt {
   id: string;
+  deliveryId: string;
   attemptNumber: number;
-  httpStatus?: number;
+  /** JSON object, serialized as a string, of the headers that were sent. */
+  requestHeaders?: string;
+  requestBody?: string;
+  httpStatusCode?: number;
+  /** JSON object, serialized as a string, of the headers that came back. */
+  responseHeaders?: string;
   responseBody?: string;
   errorMessage?: string;
-  latencyMs: number;
-  attemptedAt: string;
+  /** Wall-clock duration of the HTTP request, in milliseconds. */
+  durationMs?: number;
+  /** When the attempt was recorded. */
+  createdAt: string;
 }
 
 export interface PaginatedResponse<T> {
   content: T[];
   totalElements: number;
   totalPages: number;
+  /** Page size requested. */
   size: number;
+  /** Zero-based index of this page. */
   number: number;
+  numberOfElements?: number;
+  first?: boolean;
+  last?: boolean;
+  empty?: boolean;
+}
+
+export interface EndpointListParams {
+  page?: number;
+  size?: number;
 }
 
 export interface DeliveryListParams {
@@ -119,14 +150,22 @@ export interface DeliveryListParams {
 
 export interface EndpointTestResult {
   success: boolean;
-  httpStatus?: number;
-  latencyMs: number;
+  httpStatusCode?: number;
+  responseBody?: string;
   errorMessage?: string;
+  latencyMs: number;
+  /** Human-readable summary, e.g. "Endpoint returned non-2xx status". */
+  message?: string;
 }
 
 export interface RateLimitInfo {
   limit: number;
   remaining: number;
+  /**
+   * Unix timestamp in **seconds** at which the window resets — the raw value
+   * of the `X-RateLimit-Reset` header, which the API sends in seconds, not
+   * milliseconds.
+   */
   reset: number;
 }
 
@@ -198,6 +237,8 @@ export interface IncomingDestination {
   timeoutSeconds: number;
   retryDelays?: string;
   payloadTransform?: string;
+  transformationId?: string;
+  transformationName?: string;
   createdAt: string;
   updatedAt?: string;
 }

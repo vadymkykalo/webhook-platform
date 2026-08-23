@@ -88,7 +88,22 @@ export function verifySignature(
 }
 
 /**
- * Constructs a webhook event from the request
+ * Constructs a webhook event from the request.
+ *
+ * What Hookflow actually PUTs on the wire is the event's **payload**, not an
+ * envelope: a `client.events.send({ type: 'order.completed', data: {...} })`
+ * arrives at your endpoint as the `data` object alone, with the identifiers
+ * carried in headers (`X-Event-Id`, `X-Delivery-Id`, `X-Timestamp`,
+ * `X-Sequence-Number`). So:
+ *
+ * - `eventId` / `deliveryId` / `timestamp` come from the headers and are
+ *   always populated for a real delivery.
+ * - `data` is the parsed body.
+ * - `type` is only populated when the body happens to carry a `type` key —
+ *   which for a default subscription it does not. Route on the payload, or
+ *   configure the subscription's `payloadTemplate` to wrap the event so that
+ *   `type` is part of the body.
+ *
  * @param payload - Raw request body as string
  * @param headers - Request headers
  * @param secret - Endpoint webhook secret

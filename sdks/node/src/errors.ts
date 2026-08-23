@@ -28,8 +28,15 @@ export class RateLimitError extends HookflowError {
     this.rateLimitInfo = rateLimitInfo;
   }
 
+  /**
+   * Milliseconds to wait before retrying.
+   *
+   * `rateLimitInfo.reset` is the raw `X-RateLimit-Reset` header, which the API
+   * sends as a Unix timestamp in **seconds**; comparing it to `Date.now()`
+   * (milliseconds) directly always yields a large negative number, i.e. 0.
+   */
   get retryAfter(): number {
-    return Math.max(0, this.rateLimitInfo.reset - Date.now());
+    return Math.max(0, this.rateLimitInfo.reset * 1000 - Date.now());
   }
 }
 

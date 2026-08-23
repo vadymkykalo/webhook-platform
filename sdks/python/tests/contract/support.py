@@ -26,14 +26,21 @@ class ContractContext:
 
 
 def is_api_reachable() -> bool:
-    # Deliberately does NOT hit /actuator/health/liveness: under `make up`
-    # (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT
-    # (8082), never published to the host. /v3/api-docs is permitAll on the
-    # main port (SecurityConfig.java) and always present (springdoc is on
-    # the classpath — OpenApiConfig.java).
+    """Probe with an intentionally invalid login: any HTTP response proves the
+    API is answering.
+
+    Deliberately does NOT hit /actuator/health/liveness: under ``make up``
+    (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT (8082)
+    which is never published to the host — and on the main port
+    /actuator/health is a 500, not a 404, because nothing maps it. Nor
+    /v3/api-docs: springdoc is only permitAll when ``SWAGGER_ENABLED=true``
+    (SecurityConfig.java) and .env.dist ships it false, so probing it reports
+    a perfectly healthy stack as unreachable and silently skips this whole
+    suite. /api/v1/auth/login is permitAll unconditionally.
+    """
     try:
-        res = requests.get(f"{BASE_URL}/v3/api-docs", timeout=3)
-        return res.ok
+        requests.post(f"{BASE_URL}/api/v1/auth/login", json={}, timeout=3)
+        return True
     except requests.RequestException:
         return False
 

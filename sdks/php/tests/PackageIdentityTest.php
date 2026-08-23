@@ -8,23 +8,23 @@ use PHPUnit\Framework\TestCase;
 use Hookflow\Hookflow;
 
 /**
- * Regression test for the package rename (webhook-platform/php -> hookflow/php).
- * The Hookflow\ namespace was always correct; only the Packagist package
- * name changes here. This must fail loudly if either drifts.
+ * Guards the published identity of this SDK: the Packagist package is
+ * webhook-platform/php while the PHP namespace is Hookflow\. The two names
+ * differ on purpose, so this fails loudly if either drifts.
  */
-class PackageRenameTest extends TestCase
+class PackageIdentityTest extends TestCase
 {
-    public function testPackagePublishedAsHookflowPhp(): void
+    public function testPackagePublishedAsWebhookPlatformPhp(): void
     {
         $composerJson = json_decode(
             file_get_contents(__DIR__ . '/../composer.json'),
             true
         );
 
-        $this->assertSame('hookflow/php', $composerJson['name']);
+        $this->assertSame('webhook-platform/php', $composerJson['name']);
     }
 
-    public function testSmokeConstructsClientUnderNewPackageNamespace(): void
+    public function testSmokeConstructsClientUnderHookflowNamespace(): void
     {
         $client = new Hookflow('test_api_key');
 

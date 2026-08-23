@@ -1,16 +1,16 @@
-import { Hookflow } from '@hookflow/node';
+import { Hookflow } from '@webhook-platform/node';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../../package.json');
 
-// Regression test for the package rename (@webhook-platform/node -> @hookflow/node).
-// This must fail loudly if either the manifest or the published export surface
-// ever drifts away from the new package identity.
-describe('package rename (@hookflow/node)', () => {
-  it('is published under the new package name', () => {
-    expect(pkg.name).toBe('@hookflow/node');
+// Guards the published identity of this SDK: the manifest name and the export
+// surface a consumer gets from `npm install @webhook-platform/node` must not
+// drift apart.
+describe('package identity (@webhook-platform/node)', () => {
+  it('is published under the @webhook-platform/node package name', () => {
+    expect(pkg.name).toBe('@webhook-platform/node');
   });
 
-  it('smoke: importing "@hookflow/node" constructs a working client', () => {
+  it('smoke: importing "@webhook-platform/node" constructs a working client', () => {
     const client = new Hookflow({ apiKey: 'test_api_key' });
     expect(client).toBeInstanceOf(Hookflow);
     expect(client.events).toBeDefined();

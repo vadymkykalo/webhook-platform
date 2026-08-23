@@ -1,6 +1,6 @@
 // Contract tests: run the node SDK against a REAL API instance and assert
 // its request/response shapes still match what the API actually does. The
-// 56 cases in src/__tests__/ stub the HTTP layer entirely — they'd stay
+// cases in src/__tests__/ stub the HTTP layer entirely — they'd stay
 // green even if the API renamed a field out from under this SDK. These
 // exist to catch that drift instead of a user finding it in production.
 //
@@ -25,7 +25,7 @@ beforeAll(async () => {
   if (!apiReachable) {
     // eslint-disable-next-line no-console
     console.warn(
-      `[contract] ${BASE_URL} is not reachable (tried /v3/api-docs) — ` +
+      `[contract] ${BASE_URL} is not reachable (tried POST /api/v1/auth/login) — ` +
         'skipping contract assertions. Run `make up && make wait-healthy` first. See tests/contract/README.md.'
     );
     return;
@@ -67,12 +67,12 @@ describe('Hookflow client contract', () => {
     expect(typeof subscription.enabled).toBe('boolean');
     expect(typeof subscription.orderingEnabled).toBe('boolean');
     expect(typeof subscription.maxAttempts).toBe('number');
-    // Field the API sends that the SDK's Subscription type does not declare
-    // (see SubscriptionResponse.java) — documented drift, not a bug this
-    // test should fail on. Recorded here so it doesn't silently regress
-    // into a *worse* drift (e.g. the field disappearing or changing type)
-    // without a human noticing.
-    expect((subscription as unknown as Record<string, unknown>).transformationId).not.toBeUndefined();
+    // transformationId / transformationName are part of SubscriptionResponse
+    // and the SDK's Subscription type now declares both. Asserted as *present*
+    // (they are null for a subscription with no transformation) so the mirror
+    // cannot quietly fall behind the response again.
+    expect('transformationId' in subscription).toBe(true);
+    expect('transformationName' in subscription).toBe(true);
   });
 
   test('events.send accepted and fans out to the subscribed endpoint (deliveriesCreated=1)', async () => {
