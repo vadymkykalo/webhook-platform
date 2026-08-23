@@ -52,6 +52,15 @@ exclusion list plus `-Dgroups=ratchet` yields the seven non-Docker ratchets, and
 - **`make ratchets` needs Docker**, because two of the nine boot Testcontainers
   (`OpenApiDriftIntegrationTest`, `EntityMappingParityIntegrationTest`). The other seven are
   reflection or file reads.
+- **It also found a landmine on its way in.** The Makefile does `include .env` + `export`, so
+  every variable in a developer's `.env` reaches any maven it runs — including
+  `SWAGGER_ENABLED=false`, which application.yml feeds to `springdoc.api-docs.enabled` and
+  `springdoc.swagger-ui.enabled`. `OpenApiDriftIntegrationTest` then compared the committed spec
+  against springdoc's bare default and reported the whole document as drift. It is the first
+  make target to run maven, which is why nothing had hit this. The test now pins all three
+  properties itself, so it asserts what the application serves rather than what the shell had
+  set. Any other test that reads a variable `.env` also names is exposed the same way; this is
+  the only one that does today.
 - **A ratchet added without the tag is invisible to the command** and nothing catches that. A
   meta-ratchet over the tag was considered and is not worth its own exemption list; the tag is
   discoverable enough that the next author copies it from the neighbouring test.
