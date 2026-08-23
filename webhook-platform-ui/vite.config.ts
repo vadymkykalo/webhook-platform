@@ -7,7 +7,19 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    strictPort: true
+    strictPort: true,
+    // The app calls /api/v1/... on its own origin, because in production nginx
+    // serves the bundle and the API from one host. In dev there is no nginx, so
+    // without this every API call lands on Vite itself and comes back 404 —
+    // which the UI renders as "the requested resource was not found", sending
+    // you looking for a bug in the endpoint rather than at a missing backend.
+    // VITE_API_URL still wins when set; this is only the zero-config default.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_DEV_API_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     globals: true,

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { TableHead } from './table';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -17,13 +18,18 @@ interface SortableTableHeadProps {
   className?: string;
 }
 
+/* Composes TableHead rather than rendering its own <th>. It used to declare
+   `h-12 px-4 font-medium text-xs`, which is what shadcn shipped before the
+   header row was restyled — so any table mixing a sortable column with a plain
+   one showed a 12px height jog and two typefaces in the same row. Everything
+   here is now only what sorting adds: the pointer affordance and the arrow. */
 export function SortableTableHead({ field, sort, onSort, children, className }: SortableTableHeadProps) {
   const isActive = sort.field === field;
 
   return (
-    <th
+    <TableHead
       className={cn(
-        'h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs cursor-pointer select-none hover:text-foreground transition-colors',
+        'cursor-pointer select-none transition-colors hover:text-foreground',
         isActive && 'text-foreground',
         className
       )}
@@ -37,7 +43,7 @@ export function SortableTableHead({ field, sort, onSort, children, className }: 
           <ArrowUpDown className="h-3 w-3 opacity-30" />
         )}
       </div>
-    </th>
+    </TableHead>
   );
 }
 

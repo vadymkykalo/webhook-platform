@@ -48,6 +48,8 @@ export default function Sparkline({
 
   return (
     <svg
+      aria-hidden
+      focusable="false"
       viewBox={`0 0 ${width} ${height}`}
       width={width}
       height={height}

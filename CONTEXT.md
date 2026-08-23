@@ -39,6 +39,14 @@ The obligation to get one event to one endpoint, held until it succeeds or is ab
 Distinct from the individual tries it takes.
 _Avoid_: send, dispatch, job
 
+**Connection**:
+One Endpoint together with the Subscriptions that point at it, named as one thing because
+that is the unit a person configures, tests and turns off. It is a view, not a record:
+nothing stores a Connection, and a change to one is a change to the Endpoint or to its
+Subscriptions. The incoming direction's counterpart is a Source together with its
+Destinations.
+_Avoid_: integration, pipeline, link, channel
+
 ### Incoming
 
 **Source**:
@@ -97,7 +105,18 @@ _Avoid_: backoff policy, retry config
 **DLQ**:
 Where a Delivery or Forward lands once its Retry Ladder is exhausted: abandoned by
 Hookflow, kept for a human to decide about.
-_Avoid_: dead letters, failed queue, graveyard
+_Avoid_: dead letters, graveyard
+_In the UI_: **Failed Messages**. The term the code and this document use is DLQ; the
+term the product shows an operator is Failed Messages, because "DLQ" is vocabulary you
+have to already know. The two are the same thing on purpose — do not rename one to
+match the other.
+
+**Replay**:
+Building fresh Deliveries from Events already in the store, with the same content and
+new Sequence Numbers, rather than re-sending the original Delivery.
+_Avoid_: resend, retry (a retry is the next Attempt on the *same* Delivery; a replay is
+a new Delivery)
+_In the UI_: **Time Machine**.
 
 ### Ordering
 

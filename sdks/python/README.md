@@ -1,18 +1,13 @@
-# hookflow-sdk
+# webhook-platform
 
 Official Python SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
 
-> Renamed from `webhook-platform` on PyPI (the importable module was always
-> called `hookflow` — that part doesn't change). The old `webhook-platform`
-> distribution had zero real usage (no downloads) and was abandoned rather
-> than kept alive as a deprecation shim. Switch your `pip install` /
-> `requirements.txt` to `hookflow-sdk`; your `from hookflow import ...` code
-> doesn't need to change. (The bare name `hookflow` was already taken on
-> PyPI by an unrelated project, hence `hookflow-sdk`.)
+> The PyPI distribution is `webhook-platform`; the module you import is
+> `hookflow`. `pip install webhook-platform`, then `from hookflow import ...`.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
 Incoming Sources, Incoming Events, and webhook signature verification —
-about 6 of the platform's 35 API controllers. It does not wrap
+7 of the platform's 35 API controllers. It does not wrap
 Transformations, Rules, Workflows, Schemas, DLQ, Analytics, Usage, Alerts,
 Incidents, PII rules, Audit Log, Tunnels, API keys, Members, or Projects —
 use the [Generic Requests](#generic-requests) helpers for those until the
@@ -21,16 +16,18 @@ SDK grows to cover them.
 ## Installation
 
 ```bash
-pip install hookflow-sdk
+pip install webhook-platform
 ```
 
 ## Quick Start
 
 ```python
+import os
+
 from hookflow import Hookflow, Event
 
 client = Hookflow(
-    api_key="wh_live_your_api_key",
+    api_key=os.environ["HOOKFLOW_API_KEY"],  # e.g. "Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk"
     base_url="http://localhost:8080",  # optional
 )
 
@@ -79,8 +76,11 @@ endpoint = client.endpoints.create(
     ),
 )
 
-# List endpoints
-endpoints = client.endpoints.list(project_id)
+# List endpoints — the API paginates this one, so the endpoints are in .content
+# (iterating the page yields them directly)
+page = client.endpoints.list(project_id, page=0, size=20)
+for endpoint in page:
+    print(endpoint.url)
 
 # Update endpoint
 client.endpoints.update(
@@ -99,6 +99,7 @@ print(f"New secret: {updated.secret}")
 # Test endpoint connectivity
 result = client.endpoints.test(project_id, endpoint_id)
 print(f"Test {'passed' if result.success else 'failed'}: {result.latency_ms}ms")
+print(f"{result.http_status_code} — {result.message}")
 ```
 
 ### Subscriptions
@@ -116,7 +117,7 @@ subscription = client.subscriptions.create(
     ),
 )
 
-# List subscriptions
+# List subscriptions — a bare list; unlike endpoints, this one is not paginated
 subscriptions = client.subscriptions.list(project_id)
 
 # Update subscription
@@ -146,7 +147,7 @@ print(f"Total failed: {deliveries.total_elements}")
 # Get delivery attempts
 attempts = client.deliveries.get_attempts(delivery_id)
 for attempt in attempts:
-    print(f"Attempt {attempt.attempt_number}: {attempt.http_status} ({attempt.latency_ms}ms)")
+    print(f"Attempt {attempt.attempt_number}: {attempt.http_status_code} ({attempt.duration_ms}ms)")
 
 # Replay failed delivery
 client.deliveries.replay(delivery_id)
@@ -261,11 +262,12 @@ def handle_webhook():
         # Option 2: Verify and parse
         event = construct_event(payload, headers, secret)
 
-        print(f"Received {event.type}: {event.data}")
-
-        # Handle the event
-        if event.type == "order.completed":
-            handle_order_completed(event.data)
+        # event.data is the parsed body; event.event_id / event.delivery_id /
+        # event.timestamp come from the X-Event-Id / X-Delivery-Id /
+        # X-Timestamp headers. See "What lands on your endpoint" below for
+        # event.type.
+        print(f"Delivery {event.delivery_id} of event {event.event_id}: {event.data}")
+        handle_order_completed(event.data)
 
         return "OK", 200
 
@@ -273,6 +275,40 @@ def handle_webhook():
         print(f"Webhook verification failed: {e.message}")
         return "Invalid signature", 400
 ```
+
+### What lands on your endpoint
+
+Hookflow PUTs the event's **payload** on the wire, not an envelope. This:
+
+```python
+client.events.send(Event(type="order.completed", data={"order_id": "ord_1"}))
+```
+
+arrives at your endpoint as the ``data`` object alone —
+
+```http
+POST /webhooks HTTP/1.1
+Content-Type: application/json
+X-Signature: t=1738000000000,v1=<hex hmac-sha256>
+X-Timestamp: 1738000000000
+X-Event-Id: 6f0e…
+X-Delivery-Id: 91ab…
+X-Sequence-Number: 0
+Idempotency-Key: 6f0e…-<endpoint-id>
+
+{"order_id":"ord_1"}
+```
+
+So `construct_event` fills `event_id`, `delivery_id` and `timestamp` from the
+headers and `data` from the body, but **`type` is empty**: the event type is
+not on the wire for a default subscription. Route on the payload, on the
+endpoint you registered, or set the subscription's `payload_template` to wrap
+the event so `type` becomes part of the body.
+
+The signature is computed over `f"{timestamp}.{raw_body}"` with HMAC-SHA256 and
+the endpoint secret, and the server rejects timestamps more than **300
+seconds** old — verify against the *raw* body bytes, before any JSON parse and
+re-serialize.
 
 ### FastAPI Example
 
@@ -314,7 +350,8 @@ from hookflow import (
 try:
     client.events.send(Event(type="test", data={}))
 except RateLimitError as e:
-    # Wait and retry
+    # retry_after_ms is milliseconds. e.rate_limit_info.reset is the raw
+    # X-RateLimit-Reset header, which the API sends in Unix *seconds*.
     print(f"Rate limited. Retry after {e.retry_after_ms}ms")
     time.sleep(e.retry_after_ms / 1000)
 except AuthenticationError:
@@ -387,11 +424,34 @@ All generic methods use the same authentication, error handling, and rate-limit 
 
 ```python
 client = Hookflow(
-    api_key="wh_live_xxx",          # Required: Your API key
-    base_url="https://api.example.com",  # Optional: API base URL
+    api_key=os.environ["HOOKFLOW_API_KEY"],  # Required: Your project API key
+    base_url="https://api.example.com",  # Optional (default: http://localhost:8080)
     timeout=30,                     # Optional: Request timeout in seconds (default: 30)
 )
 ```
+
+### Timeouts and retries
+
+`timeout` is passed straight to `requests`; hitting it raises `HookflowError`
+with `code="timeout"` and `status=0`. A connection-level failure raises the
+same class with `code="network_error"`.
+
+**The client does not retry.** One SDK call is exactly one HTTP request — no
+backoff, no idempotent replay, and no `urllib3` `Retry` adapter is installed.
+That is deliberate: `events.send` accepts an `idempotency_key`, so a retry
+policy belongs to the caller who knows whether reissuing the request is safe.
+What *is* retried is the delivery itself, by the platform, on the
+subscription's `retry_delays` ladder.
+
+## Authentication
+
+Every request the client makes carries `X-API-Key: <your key>` — the project
+API key, created in the dashboard or via
+`POST /api/v1/projects/{project_id}/api-keys`. The SDK never sends a bearer
+token and has no login surface: JWT-authenticated endpoints (auth, projects,
+organizations, members, API keys) are not part of it. Bootstrapping a project
+and a key is a one-time step you do with the dashboard, the CLI, or plain
+HTTP.
 
 ## Type Hints
 
@@ -421,6 +481,22 @@ pytest
 ```bash
 docker run --rm -v $(pwd):/app -w /app python:3.11-slim sh -c "pip install -e '.[dev]' && pytest"
 ```
+
+### Live-API smoke check
+
+`pytest` stubs the transport, so it cannot see a renamed field. To drive the
+SDK against a real instance:
+
+```bash
+make up                          # from the repo root
+python scripts/live_api_smoke.py # SMOKE_API_BASE_URL overrides the target
+```
+
+It registers a throwaway org, walks endpoint → subscription → event →
+deliveries → attempts → incoming, checks each error envelope, and verifies a
+signature the running server itself produced. It is not collected by `pytest`
+(`testpaths = tests`, `python_files = test_*.py`), so the unit suite still
+passes with no backend.
 
 ## License
 

@@ -54,8 +54,14 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           id={id}
           aria-label={rest['aria-label']}
           aria-labelledby={rest['aria-labelledby']}
+          /* The trigger is a <button>, so the global form-control rule in
+             index.css cannot reach it — it has to spell out the field shape
+             itself, and it spells out the same one: h-9 to sit level with
+             Input and Button, bg-card so it is not paper-grey on white. Focus
+             is left to the global `:focus-visible` outline; the old
+             `focus:ring-ring/20 focus:border-ring` was a third focus look. */
           className={cn(
-            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+            "flex h-9 w-full items-center justify-between rounded-md border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
             className
           )}
         >

@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import AuthLayout from './AuthLayout';
 import { authApi } from '../api/auth.api';
 import { Button } from '../components/ui/button';
 import { useAuth } from './auth.store';
 
+/**
+ * An outcome screen, not a form: the token in the URL has already decided what
+ * happens. Each state says plainly what happened and offers exactly one way on.
+ */
 export default function VerifyEmailPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -33,41 +38,40 @@ export default function VerifyEmailPage() {
       });
   }, [token, t]);
 
+  if (status === 'loading') {
+    return (
+      <AuthLayout title={t('verifyEmail.verifying')} subtitle={t('verifyEmail.pleaseWait')}>
+        <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
+          {t('verifyEmail.verifying')}
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <AuthLayout title={t('verifyEmail.errorTitle')} subtitle={t('verifyEmail.failed')}>
+        <div className="space-y-5">
+          <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+            {errorMessage}
+          </div>
+          <Button className="h-10 w-full" onClick={() => navigate('/login')}>
+            {t('verifyEmail.goToLogin')}
+          </Button>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <div className="w-full max-w-md bg-card border rounded-xl shadow-sm p-8 text-center space-y-4">
-        {status === 'loading' && (
-          <>
-            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <h2 className="text-xl font-semibold">{t('verifyEmail.verifying')}</h2>
-            <p className="text-sm text-muted-foreground">{t('verifyEmail.pleaseWait')}</p>
-          </>
-        )}
-
-        {status === 'success' && (
-          <>
-            <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-            <h2 className="text-xl font-semibold text-green-700">{t('verifyEmail.success')}</h2>
-            <p className="text-sm text-muted-foreground">{t('verifyEmail.successDesc')}</p>
-            <Button onClick={() => navigate(isAuthenticated ? '/admin/dashboard' : '/login')} className="mt-4">
-              {isAuthenticated ? t('verifyEmail.goToDashboard') : t('verifyEmail.goToLogin')}
-            </Button>
-          </>
-        )}
-
-        {status === 'error' && (
-          <>
-            <XCircle className="h-12 w-12 text-red-500 mx-auto" />
-            <h2 className="text-xl font-semibold text-red-600">{t('verifyEmail.errorTitle')}</h2>
-            <p className="text-sm text-muted-foreground">{errorMessage}</p>
-            <div className="flex gap-3 justify-center mt-4">
-              <Link to="/login">
-                <Button variant="outline">{t('verifyEmail.goToLogin')}</Button>
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+    <AuthLayout title={t('verifyEmail.success')} subtitle={t('verifyEmail.successDesc')}>
+      <Button
+        className="h-10 w-full"
+        onClick={() => navigate(isAuthenticated ? '/admin/dashboard' : '/login')}
+      >
+        {isAuthenticated ? t('verifyEmail.goToDashboard') : t('verifyEmail.goToLogin')}
+      </Button>
+    </AuthLayout>
   );
 }

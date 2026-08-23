@@ -19,8 +19,10 @@ interface NodeConfigPanelProps {
   onClose: () => void;
 }
 
-const inputCls = 'w-full px-2.5 py-1.5 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50';
-const inputErrCls = 'w-full px-2.5 py-1.5 border border-red-400 rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-red-400/50';
+// The global control style in index.css owns the height, border and focus ring;
+// these only add what a required-but-empty field needs on top of it.
+const inputCls = 'w-full text-sm';
+const inputErrCls = 'w-full text-sm !border-halt focus:!border-halt';
 
 export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigPanelProps) {
   const { t } = useTranslation();
@@ -47,9 +49,9 @@ export default function NodeConfigPanel({ node, onUpdate, onClose }: NodeConfigP
   };
 
   return (
-    <div className="w-80 border-l bg-card h-full overflow-y-auto flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <h3 className="font-semibold text-sm">{t('workflows.builder.configureNode')}</h3>
+    <div className="flex h-full w-80 flex-col overflow-y-auto border-l border-rail bg-card">
+      <div className="flex items-center justify-between border-b border-rail px-4 py-3">
+        <h3 className="mono-label">{t('workflows.builder.configureNode')}</h3>
         <Button variant="ghost" size="icon-sm" onClick={onClose} title={t('common.close')} aria-label={t('common.close')}>
           <X className="h-4 w-4" />
         </Button>
@@ -328,8 +330,8 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
           {t('workflows.nodeConfig.createEndpoint')}
         </Button>
       ) : (
-        <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t('workflows.nodeConfig.newEndpoint')}</p>
+        <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+          <p className="mono-label">{t('workflows.nodeConfig.newEndpoint')}</p>
           <Field label="URL" required error={showCreate && !newUrl ? t('workflows.validation.required') : undefined}>
             <input
               value={newUrl}
@@ -408,22 +410,22 @@ function ApiKeyInfo() {
   const activeKeys = keys?.filter(k => !k.revokedAt) || [];
 
   return (
-    <div className="border rounded-lg p-3 bg-muted/30 space-y-2">
+    <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
       <div className="flex items-center gap-1.5">
         <Key className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="mono-label">
           {t('workflows.nodeConfig.apiKeys')}
         </span>
       </div>
 
       {/* Created key banner — shown once */}
       {createdKey && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-md p-2 space-y-1">
-          <p className="text-[10px] font-semibold text-green-700 dark:text-green-400">{t('workflows.nodeConfig.apiKeyCopyWarning')}</p>
+        <div className="space-y-1 rounded-md border border-ok/30 bg-ok-soft p-2">
+          <p className="text-[10px] font-medium text-ok">{t('workflows.nodeConfig.apiKeyCopyWarning')}</p>
           <div className="flex items-center gap-1">
             <code className="flex-1 text-[10px] font-mono bg-background rounded px-1.5 py-0.5 truncate select-all">{createdKey}</code>
             <button onClick={handleCopy} className="p-1 rounded hover:bg-muted transition-colors shrink-0" title={t('apiKeys.keyDialog.copyKey')} aria-label={t('apiKeys.keyDialog.copyKey')}>
-              {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+              {copied ? <Check className="h-3 w-3 text-ok" aria-hidden /> : <Copy className="h-3 w-3 text-muted-foreground" aria-hidden />}
             </button>
           </div>
           <Button variant="ghost" size="sm" className="w-full text-[10px] mt-1" onClick={() => setCreatedKey(null)}>
@@ -436,7 +438,7 @@ function ApiKeyInfo() {
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> ...</div>
       ) : activeKeys.length === 0 ? (
-        <p className="text-[10px] text-amber-500 flex items-center gap-1">
+        <p className="flex items-center gap-1 text-[10px] text-retry">
           <AlertCircle className="h-3 w-3" />
           {t('workflows.nodeConfig.noApiKeys')}
         </p>
@@ -444,7 +446,7 @@ function ApiKeyInfo() {
         <div className="space-y-1">
           {activeKeys.slice(0, 3).map(k => (
             <div key={k.id} className="flex items-center gap-2 text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-ok" />
               <span className="font-mono text-muted-foreground">{k.keyPrefix}•••</span>
               <span className="truncate">{k.name}</span>
             </div>
@@ -462,7 +464,7 @@ function ApiKeyInfo() {
           {t('workflows.nodeConfig.createApiKey')}
         </Button>
       ) : (
-        <div className="space-y-2 pt-1 border-t">
+        <div className="space-y-2 border-t border-rail pt-1">
           <Field label={t('workflows.nodeConfig.apiKeyName')}>
             <input
               value={newKeyName}
@@ -532,15 +534,15 @@ function SubscriptionInfo() {
   const activeSubs = subscriptions?.filter(s => s.enabled) || [];
 
   return (
-    <div className="border rounded-lg p-3 bg-muted/30 space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="space-y-2 rounded-md border border-rail bg-secondary/30 p-3">
+      <p className="mono-label">
         {t('workflows.nodeConfig.subscriptions')}
       </p>
       <p className="text-[10px] text-muted-foreground">{t('workflows.nodeConfig.subscriptionsHint')}</p>
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> ...</div>
       ) : activeSubs.length === 0 ? (
-        <p className="text-[10px] text-amber-500 flex items-center gap-1">
+        <p className="flex items-center gap-1 text-[10px] text-retry">
           <AlertCircle className="h-3 w-3" />
           {t('workflows.nodeConfig.noSubscriptions')}
         </p>
@@ -548,7 +550,7 @@ function SubscriptionInfo() {
         <div className="space-y-1 max-h-24 overflow-y-auto">
           {activeSubs.slice(0, 5).map(s => (
             <div key={s.id} className="flex items-center gap-2 text-[10px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-ok" />
               <span className="font-mono">{s.eventType}</span>
               <span className="text-muted-foreground">→</span>
               <span className="truncate text-muted-foreground">{s.endpointId.substring(0, 8)}…</span>
@@ -566,7 +568,7 @@ function SubscriptionInfo() {
           {t('workflows.nodeConfig.createSubscription')}
         </Button>
       ) : (
-        <div className="space-y-2 pt-1 border-t">
+        <div className="space-y-2 border-t border-rail pt-1">
           <Field label={t('workflows.nodeConfig.eventType')}>
             <input
               value={subEventType}
@@ -657,11 +659,11 @@ function Field({ label, hint, required, error, children }: {
     <div className="space-y-1">
       <label className="text-xs font-medium text-foreground">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="ml-0.5 text-halt">*</span>}
       </label>
       {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
       {children}
-      {error && <p className="text-[10px] text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{error}</p>}
+      {error && <p role="alert" className="flex items-center gap-1 text-[10px] text-halt"><AlertCircle className="h-3 w-3" aria-hidden />{error}</p>}
     </div>
   );
 }

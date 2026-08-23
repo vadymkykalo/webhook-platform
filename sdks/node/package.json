@@ -1,5 +1,5 @@
 {
-  "name": "@hookflow/node",
+  "name": "@webhook-platform/node",
   "version": "2.4.0",
   "description": "Official Node.js SDK for Hookflow — reliable webhook infrastructure",
   "main": "dist/index.js",
@@ -14,6 +14,7 @@
     "build": "tsc",
     "test": "jest",
     "test:contract": "jest --config jest.contract.config.js",
+    "smoke:live": "npm run build && node scripts/live-api-smoke.mjs",
     "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build"
   },

@@ -1,5 +1,15 @@
-import { DiffEntry, DiffType } from '../api/eventDiff.api';
 import { useTranslation } from 'react-i18next';
+import type { DiffEntry, DiffType } from '../api/eventDiff.api';
+import JsonEditor from './JsonEditor';
+
+/**
+ * Two payloads and what moved between them.
+ *
+ * The marks do the work: `+` a field appeared, `−` it went, `~` it changed.
+ * They used to be green/red/amber fills, which is the status palette this
+ * product reserves for what a Delivery is doing — a diff is not a status, so
+ * the difference is carried by the mark, the mono voice and the rail instead.
+ */
 
 interface EventDiffViewProps {
   leftPayload: string;
@@ -9,10 +19,10 @@ interface EventDiffViewProps {
   rightLabel?: string;
 }
 
-const diffColors: Record<DiffType, { bg: string; text: string; border: string }> = {
-  ADDED: { bg: 'bg-success/10', text: 'text-success', border: 'border-success/30' },
-  REMOVED: { bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive/30' },
-  CHANGED: { bg: 'bg-warning/10', text: 'text-warning', border: 'border-warning/30' },
+const MARK: Record<DiffType, string> = {
+  ADDED: '+',
+  REMOVED: '−',
+  CHANGED: '~',
 };
 
 function formatValue(value: unknown): string {
@@ -36,62 +46,44 @@ export default function EventDiffView({ leftPayload, rightPayload, diffs, leftLa
     <div className="space-y-4">
       {diffs.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t('eventDiff.changes', { count: diffs.length })}
-          </p>
-          <div className="space-y-1">
+          <p className="mono-label">{t('eventDiff.changes', { count: diffs.length })}</p>
+          <ul className="divide-y divide-rail overflow-hidden rounded-lg border border-rail">
             {diffs.map((diff, i) => (
-              <div
-                key={i}
-                className={`flex items-start gap-3 px-3 py-2 rounded-lg border text-xs ${diffColors[diff.type].bg} ${diffColors[diff.type].border}`}
-              >
-                <span className={`font-bold uppercase text-[10px] min-w-[60px] ${diffColors[diff.type].text}`}>
-                  {diff.type}
+              <li key={`${diff.path}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2 text-xs">
+                <span className="w-3 flex-shrink-0 font-mono font-medium text-muted-foreground" aria-hidden>
+                  {MARK[diff.type]}
                 </span>
-                <span className="font-mono text-foreground">{diff.path}</span>
-                <span className="ml-auto flex gap-2 text-muted-foreground font-mono">
+                <span className="sr-only">{t(`eventDiff.diffType.${diff.type}`)}</span>
+                <span className="min-w-0 flex-1 truncate font-mono">{diff.path}</span>
+                <span className="flex flex-wrap items-baseline gap-1.5 font-mono text-[11px] text-muted-foreground">
                   {diff.type === 'CHANGED' && (
                     <>
-                      <span className="text-destructive line-through">{formatValue(diff.leftValue)}</span>
-                      <span>→</span>
-                      <span className="text-success">{formatValue(diff.rightValue)}</span>
+                      <span className="line-through">{formatValue(diff.leftValue)}</span>
+                      <span aria-hidden>→</span>
+                      <span className="text-foreground">{formatValue(diff.rightValue)}</span>
                     </>
                   )}
-                  {diff.type === 'ADDED' && (
-                    <span className="text-success">{formatValue(diff.rightValue)}</span>
-                  )}
-                  {diff.type === 'REMOVED' && (
-                    <span className="text-destructive line-through">{formatValue(diff.leftValue)}</span>
-                  )}
+                  {diff.type === 'ADDED' && <span className="text-foreground">{formatValue(diff.rightValue)}</span>}
+                  {diff.type === 'REMOVED' && <span className="line-through">{formatValue(diff.leftValue)}</span>}
                 </span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 
       {diffs.length === 0 && (
-        <div className="text-center py-6 text-sm text-muted-foreground">
-          {t('eventDiff.noDiffs')}
-        </div>
+        <p className="py-4 text-center text-sm text-muted-foreground">{t('eventDiff.noDiffs')}</p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            {leftLabel || t('eventDiff.left')}
-          </p>
-          <pre className="bg-muted/50 border rounded-lg p-3 text-[11px] font-mono overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap">
-            {formatPayload(leftPayload)}
-          </pre>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-1.5">
+          <p className="mono-label truncate">{leftLabel || t('eventDiff.left')}</p>
+          <JsonEditor value={formatPayload(leftPayload)} readOnly minHeight="220px" maxHeight="380px" />
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            {rightLabel || t('eventDiff.right')}
-          </p>
-          <pre className="bg-muted/50 border rounded-lg p-3 text-[11px] font-mono overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap">
-            {formatPayload(rightPayload)}
-          </pre>
+        <div className="space-y-1.5">
+          <p className="mono-label truncate">{rightLabel || t('eventDiff.right')}</p>
+          <JsonEditor value={formatPayload(rightPayload)} readOnly minHeight="220px" maxHeight="380px" />
         </div>
       </div>
     </div>

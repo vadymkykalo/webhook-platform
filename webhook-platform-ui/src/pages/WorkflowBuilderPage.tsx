@@ -22,7 +22,10 @@ import { ArrowLeft, Save, ToggleLeft, ToggleRight, Loader2, Play, History, Check
 import type { WorkflowExecutionResponse } from '../api/workflows.api';
 import { workflowsApi } from '../api/workflows.api';
 import { Button } from '../components/ui/button';
+import PageSkeleton from '../components/PageSkeleton';
+import EmptyState, { ErrorState } from '../components/EmptyState';
 import { showApiError, showSuccess } from '../lib/toast';
+import { formatDateTime } from '../lib/date';
 import { nodeTypes, nodeTemplates, type NodeTemplate } from '../components/workflow/nodes/nodeTypes';
 import NodeConfigPanel from '../components/workflow/NodeConfigPanel';
 
@@ -46,7 +49,9 @@ function WorkflowBuilderInner() {
   const [triggerPayload, setTriggerPayload] = useState('{"type":"test.event","data":{}}');
   const [showTriggerDialog, setShowTriggerDialog] = useState(false);
 
-  const { data: workflow, isLoading } = useQuery({
+  const {
+    data: workflow, isLoading, isError, error, refetch, isRefetching,
+  } = useQuery({
     queryKey: ['workflow', projectId, workflowId],
     queryFn: () => workflowsApi.get(projectId!, workflowId!),
     enabled: !!projectId && !!workflowId,
@@ -228,29 +233,47 @@ function WorkflowBuilderInner() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <PageSkeleton maxWidth="max-w-none">
+        <div className="h-[70vh] animate-pulse rounded-lg border border-rail bg-muted" />
+      </PageSkeleton>
+    );
+  }
+
+  // A fetch that failed is not a workflow that was deleted, and the canvas
+  // below writes back to whatever this returned.
+  if (isError) {
+    return (
+      <div className="p-4 lg:p-6">
+        <ErrorState error={error} onRetry={() => refetch()} retrying={isRefetching} />
       </div>
     );
   }
 
   if (!workflow) {
-    return <div className="p-6 text-center text-muted-foreground">{t('workflows.builder.notFound')}</div>;
+    return (
+      <div className="p-4 lg:p-6">
+        <EmptyState icon={Activity} title={t('workflows.builder.notFound')} />
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-card gap-3">
+      <div className="flex items-center justify-between gap-3 border-b border-rail bg-card px-4 py-2">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="icon-sm" onClick={() => navigate(`/admin/projects/${projectId}/workflows`)} title={t('workflows.builder.back')} aria-label={t('workflows.builder.back')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">
-            <h2 className="font-semibold text-sm truncate">{workflow.name}</h2>
-            <p className="text-[10px] text-muted-foreground">
-              v{workflow.version} · {t('workflows.builder.nodesCount', { count: nodes.length })} · {t('workflows.builder.edgesCount', { count: edges.length })}
-              {hasUnsaved && <span className="text-amber-500 ml-1">● {t('workflows.builder.unsaved')}</span>}
+            <h2 className="truncate text-sm font-medium">{workflow.name}</h2>
+            <p className="font-mono text-[10px] text-muted-foreground">
+              {[
+                t('workflows.version', { version: workflow.version }),
+                t('workflows.builder.nodesCount', { count: nodes.length }),
+                t('workflows.builder.edgesCount', { count: edges.length }),
+              ].join(' · ')}
+              {hasUnsaved && <span className="ml-1 text-retry">{`● ${t('workflows.builder.unsaved')}`}</span>}
             </p>
           </div>
         </div>
@@ -279,7 +302,7 @@ function WorkflowBuilderInner() {
             className="gap-1.5 text-xs"
             onClick={() => toggleMutation.mutate(!workflow.enabled)}
           >
-            {workflow.enabled ? <ToggleRight className="h-4 w-4 text-green-500" /> : <ToggleLeft className="h-4 w-4" />}
+            {workflow.enabled ? <ToggleRight className="h-4 w-4 text-ok" aria-hidden /> : <ToggleLeft className="h-4 w-4" aria-hidden />}
             {workflow.enabled ? t('workflows.builder.enabled') : t('workflows.builder.disabled')}
           </Button>
           <Button
@@ -297,8 +320,8 @@ function WorkflowBuilderInner() {
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Node palette sidebar */}
-        <div className="w-48 border-r bg-card/50 overflow-y-auto p-3 space-y-2 flex-shrink-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
+        <div className="w-48 flex-shrink-0 space-y-2 overflow-y-auto border-r border-rail bg-card p-3">
+          <p className="mono-label px-1">
             {t('workflows.builder.dragToAdd')}
           </p>
           {nodeTemplates.map((template) => (
@@ -309,7 +332,7 @@ function WorkflowBuilderInner() {
                 e.dataTransfer.setData('application/workflow-node', JSON.stringify(template));
                 e.dataTransfer.effectAllowed = 'move';
               }}
-              className="flex items-center gap-2 px-2.5 py-2 rounded-lg border bg-card cursor-grab hover:shadow-sm hover:border-primary/30 transition-all active:cursor-grabbing"
+              className="flex cursor-grab items-center gap-2 rounded-md border border-rail bg-card px-2.5 py-2 transition-colors hover:border-primary/40 hover:bg-secondary/50 active:cursor-grabbing"
             >
               <span className="text-sm">{template.icon}</span>
               <div className="min-w-0">
@@ -336,17 +359,25 @@ function WorkflowBuilderInner() {
             fitView
             fitViewOptions={{ padding: 0.3 }}
             deleteKeyCode={null}
-            defaultEdgeOptions={{ animated: true, style: { stroke: '#6366f1', strokeWidth: 2 } }}
+            defaultEdgeOptions={{ animated: true, style: { stroke: 'hsl(var(--rail))', strokeWidth: 2 } }}
             proOptions={{ hideAttribution: true }}
           >
             <Controls position="bottom-left" />
             <MiniMap
               position="bottom-right"
-              className="!bg-card !border !rounded-lg"
-              maskColor="rgba(0,0,0,0.1)"
+              className="!rounded-lg !border !border-rail !bg-card"
+              maskColor="hsl(var(--muted) / 0.6)"
+              nodeColor="hsl(var(--muted-foreground))"
+              nodeStrokeColor="hsl(var(--rail))"
               nodeStrokeWidth={3}
             />
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} className="!bg-muted/20" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color="hsl(var(--rail))"
+              className="!bg-background"
+            />
           </ReactFlow>
         </div>
 
@@ -362,9 +393,9 @@ function WorkflowBuilderInner() {
 
       {/* Execution history drawer */}
       {showHistory && (
-        <div className="border-t bg-card max-h-80 overflow-y-auto">
-          <div className="flex items-center justify-between px-4 py-2 border-b sticky top-0 bg-card z-10">
-            <h3 className="text-xs font-semibold">{t('workflows.builder.executionHistory')}</h3>
+        <div className="max-h-80 overflow-y-auto border-t border-rail bg-card">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-rail bg-card px-4 py-2">
+            <h3 className="mono-label">{t('workflows.builder.executionHistory')}</h3>
             <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory(false)} title={t('workflows.builder.closeHistory')} aria-label={t('workflows.builder.closeHistory')}>
               <ChevronDown className="h-4 w-4" />
             </Button>
@@ -379,40 +410,40 @@ function WorkflowBuilderInner() {
             const execs = executions?.content ?? [];
             const avgMs = execs.length > 0 ? Math.round(execs.reduce((s, e) => s + (e.durationMs ?? 0), 0) / execs.length) : 0;
             return (
-              <div className="px-4 py-2.5 border-b bg-muted/30 grid grid-cols-5 gap-3">
+              <div className="grid grid-cols-5 gap-3 border-b border-rail bg-secondary/40 px-4 py-2.5">
                 <div className="flex items-center gap-1.5">
-                  <Activity className="h-3 w-3 text-blue-500" />
+                  <Activity className="h-3 w-3 text-muted-foreground" aria-hidden />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsTotal')}</div>
-                    <div className="text-xs font-bold">{total}</div>
+                    <div className="mono-label">{t('workflows.builder.statsTotal')}</div>
+                    <div className="font-mono text-xs font-medium">{total}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  <CheckCircle2 className="h-3 w-3 text-ok" aria-hidden />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsSuccess')}</div>
-                    <div className="text-xs font-bold text-green-600">{success}</div>
+                    <div className="mono-label">{t('workflows.builder.statsSuccess')}</div>
+                    <div className="font-mono text-xs font-medium text-ok">{success}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <XCircle className="h-3 w-3 text-red-500" />
+                  <XCircle className="h-3 w-3 text-halt" aria-hidden />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsFailed')}</div>
-                    <div className="text-xs font-bold text-red-600">{failed}</div>
+                    <div className="mono-label">{t('workflows.builder.statsFailed')}</div>
+                    <div className="font-mono text-xs font-medium text-halt">{failed}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <BarChart3 className="h-3 w-3 text-primary" />
+                  <BarChart3 className="h-3 w-3 text-primary" aria-hidden />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsRate')}</div>
-                    <div className="text-xs font-bold">{rate}%</div>
+                    <div className="mono-label">{t('workflows.builder.statsRate')}</div>
+                    <div className="font-mono text-xs font-medium">{rate}%</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <Clock className="h-3 w-3 text-muted-foreground" aria-hidden />
                   <div>
-                    <div className="text-[10px] text-muted-foreground">{t('workflows.builder.statsAvg')}</div>
-                    <div className="text-xs font-bold">{avgMs}ms</div>
+                    <div className="mono-label">{t('workflows.builder.statsAvg')}</div>
+                    <div className="font-mono text-xs font-medium">{avgMs}ms</div>
                   </div>
                 </div>
               </div>
@@ -420,9 +451,13 @@ function WorkflowBuilderInner() {
           })()}
 
           {!executions?.content?.length ? (
-            <p className="text-xs text-muted-foreground p-4 text-center">{t('workflows.builder.noExecutions')}</p>
+            <EmptyState
+              icon={History}
+              title={t('workflows.builder.noExecutions')}
+              className="flex flex-col items-center justify-center p-6"
+            />
           ) : (
-            <div className="divide-y">
+            <div className="divide-y divide-rail">
               {executions.content.map((exec: WorkflowExecutionResponse) => (
                 <ExecutionRow key={exec.id} exec={exec} />
               ))}
@@ -434,14 +469,14 @@ function WorkflowBuilderInner() {
       {/* Manual trigger dialog */}
       {showTriggerDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowTriggerDialog(false)}>
-          <div className="bg-card border rounded-xl p-5 w-[480px] max-w-[90vw] shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold">{t('workflows.builder.testRun')}</h3>
+          <div className="w-[480px] max-w-[90vw] space-y-4 rounded-lg border border-rail bg-card p-5 shadow-elevated" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[15px] font-medium">{t('workflows.builder.testRun')}</h3>
             <p className="text-xs text-muted-foreground">{t('workflows.builder.testRunHint')}</p>
             <textarea
               value={triggerPayload}
               onChange={(e) => setTriggerPayload(e.target.value)}
               rows={8}
-              className="w-full px-3 py-2 border rounded-lg bg-background text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+              className="w-full resize-y font-mono text-xs"
             />
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" size="sm" onClick={() => setShowTriggerDialog(false)}>
@@ -456,7 +491,7 @@ function WorkflowBuilderInner() {
                     const payload = JSON.parse(triggerPayload);
                     triggerMutation.mutate(payload);
                   } catch {
-                    showApiError(new Error('Invalid JSON'), t('workflows.toast.triggerFailed'));
+                    showApiError(new Error(t('workflows.builder.invalidJson')), t('workflows.toast.triggerFailed'));
                   }
                 }}
               >
@@ -476,25 +511,28 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
   const [expanded, setExpanded] = useState(false);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
-  const statusIcon = exec.status === 'COMPLETED' ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-    : exec.status === 'FAILED' ? <XCircle className="h-3.5 w-3.5 text-red-500" />
-    : exec.status === 'RUNNING' ? <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />
-    : <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+  // An execution and its steps are domain statuses, so they resolve to the four
+  // reserved hues like every other status in the product: done, still owed,
+  // abandoned, nothing tried.
+  const statusIcon = exec.status === 'COMPLETED' ? <CheckCircle2 className="h-3.5 w-3.5 text-ok" aria-hidden />
+    : exec.status === 'FAILED' ? <XCircle className="h-3.5 w-3.5 text-halt" aria-hidden />
+    : exec.status === 'RUNNING' ? <Loader2 className="h-3.5 w-3.5 animate-spin text-retry" aria-hidden />
+    : <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />;
 
   const stepStatusCls: Record<string, string> = {
-    SUCCESS: 'bg-green-500',
-    FAILED: 'bg-red-500',
-    SKIPPED: 'bg-gray-400',
-    RUNNING: 'bg-blue-500 animate-pulse',
-    PENDING: 'bg-gray-300',
+    SUCCESS: 'bg-ok',
+    FAILED: 'bg-halt',
+    SKIPPED: 'bg-idle',
+    RUNNING: 'bg-retry animate-pulse',
+    PENDING: 'bg-idle',
   };
 
   const stepStatusBadge: Record<string, string> = {
-    SUCCESS: 'text-green-600 bg-green-500/10',
-    FAILED: 'text-red-600 bg-red-500/10',
-    SKIPPED: 'text-gray-500 bg-gray-500/10',
-    RUNNING: 'text-blue-600 bg-blue-500/10',
-    PENDING: 'text-gray-400 bg-gray-500/10',
+    SUCCESS: 'text-ok bg-ok-soft',
+    FAILED: 'text-halt bg-halt-soft',
+    SKIPPED: 'text-idle bg-idle-soft',
+    RUNNING: 'text-retry bg-retry-soft',
+    PENDING: 'text-idle bg-idle-soft',
   };
 
   const steps = exec.steps;
@@ -502,14 +540,14 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
   return (
     <div>
       <div
-        className="flex items-center gap-3 px-4 py-2 text-xs hover:bg-muted/50 cursor-pointer"
+        className="flex cursor-pointer items-center gap-3 px-4 py-2 text-xs transition-colors hover:bg-secondary/50"
         onClick={() => setExpanded(!expanded)}
       >
         {statusIcon}
         <span className="font-medium">{t(`workflows.execStatus.${exec.status}`)}</span>
-        <span className="text-muted-foreground">{exec.startedAt ? new Date(exec.startedAt).toLocaleString() : ''}</span>
-        {exec.durationMs != null && <span className="text-muted-foreground">{exec.durationMs}ms</span>}
-        {exec.errorMessage && <span className="text-red-500 truncate flex-1">{exec.errorMessage}</span>}
+        <span className="font-mono text-muted-foreground">{exec.startedAt ? formatDateTime(exec.startedAt) : ''}</span>
+        {exec.durationMs != null && <span className="font-mono text-muted-foreground">{exec.durationMs}ms</span>}
+        {exec.errorMessage && <span className="flex-1 truncate text-halt">{exec.errorMessage}</span>}
         {expanded ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
       </div>
       {expanded && (
@@ -517,43 +555,43 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
           {steps && steps.length > 0 ? (
             <div className="space-y-0.5">
               {steps.map((step, i) => (
-                <div key={step.id} className="rounded border bg-muted/20">
+                <div key={step.id} className="rounded-md border border-rail bg-secondary/30">
                   <div
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-[10px] cursor-pointer hover:bg-muted/40 transition-colors"
+                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[10px] transition-colors hover:bg-secondary/60"
                     onClick={(e) => { e.stopPropagation(); setExpandedStep(expandedStep === step.id ? null : step.id); }}
                   >
                     <span className="text-muted-foreground w-4 text-center font-mono">{i + 1}</span>
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${stepStatusCls[step.status] || 'bg-gray-300'}`} />
-                    <span className="font-semibold">{step.nodeType}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${stepStatusBadge[step.status] || ''}`}>
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stepStatusCls[step.status] || 'bg-idle'}`} />
+                    <span className="font-mono font-medium">{step.nodeType}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${stepStatusBadge[step.status] || ''}`}>
                       {t(`workflows.stepStatus.${step.status}`)}
                     </span>
-                    {step.durationMs != null && <span className="text-muted-foreground">{step.durationMs}ms</span>}
-                    {step.errorMessage && <span className="text-red-500 truncate flex-1">{step.errorMessage}</span>}
+                    {step.durationMs != null && <span className="font-mono text-muted-foreground">{step.durationMs}ms</span>}
+                    {step.errorMessage && <span className="flex-1 truncate text-halt">{step.errorMessage}</span>}
                     <ChevronDown className={`h-2.5 w-2.5 ml-auto text-muted-foreground transition-transform ${expandedStep === step.id ? 'rotate-180' : ''}`} />
                   </div>
                   {expandedStep === step.id && (
-                    <div className="px-2.5 pb-2 space-y-1.5 border-t">
+                    <div className="space-y-1.5 border-t border-rail px-2.5 pb-2">
                       {step.outputData != null && (
                         <div className="pt-1.5">
-                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">{t('workflows.builder.stepOutput')}</span>
-                          <pre className="text-[9px] font-mono bg-background rounded p-1.5 mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all border">
+                          <span className="mono-label !text-[9px]">{t('workflows.builder.stepOutput')}</span>
+                          <pre className="mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-rail bg-background p-1.5 font-mono text-[9px]">
                             {typeof step.outputData === 'string' ? step.outputData : JSON.stringify(step.outputData, null, 2)}
                           </pre>
                         </div>
                       )}
                       {step.inputData != null && (
                         <div>
-                          <span className="text-[9px] font-semibold uppercase text-muted-foreground">{t('workflows.builder.stepInput')}</span>
-                          <pre className="text-[9px] font-mono bg-background rounded p-1.5 mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all border">
+                          <span className="mono-label !text-[9px]">{t('workflows.builder.stepInput')}</span>
+                          <pre className="mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-rail bg-background p-1.5 font-mono text-[9px]">
                             {typeof step.inputData === 'string' ? step.inputData : JSON.stringify(step.inputData, null, 2)}
                           </pre>
                         </div>
                       )}
                       {step.errorMessage && (
                         <div>
-                          <span className="text-[9px] font-semibold uppercase text-red-500">{t('workflows.builder.stepError')}</span>
-                          <pre className="text-[9px] font-mono bg-red-500/5 text-red-600 rounded p-1.5 mt-0.5 border border-red-500/20 break-all">
+                          <span className="mono-label !text-[9px] !text-halt">{t('workflows.builder.stepError')}</span>
+                          <pre className="mt-0.5 break-all rounded border border-halt/25 bg-halt-soft p-1.5 font-mono text-[9px] text-halt">
                             {step.errorMessage}
                           </pre>
                         </div>
@@ -564,7 +602,7 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground italic px-2 py-1">{t('workflows.builder.noStepData')}</p>
+            <p className="px-2 py-1 text-[10px] text-muted-foreground">{t('workflows.builder.noStepData')}</p>
           )}
         </div>
       )}

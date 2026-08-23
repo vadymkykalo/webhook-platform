@@ -45,6 +45,11 @@ class Endpoint:
     created_at: str
     description: Optional[str] = None
     rate_limit_per_second: Optional[int] = None
+    project_id: Optional[str] = None
+    allowed_source_ips: Optional[str] = None
+    mtls_enabled: bool = False
+    verification_status: Optional[str] = None
+    updated_at: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Endpoint":
@@ -56,6 +61,11 @@ class Endpoint:
             created_at=data["createdAt"],
             description=data.get("description"),
             rate_limit_per_second=data.get("rateLimitPerSecond"),
+            project_id=data.get("projectId"),
+            allowed_source_ips=data.get("allowedSourceIps"),
+            mtls_enabled=data.get("mtlsEnabled") or False,
+            verification_status=data.get("verificationStatus"),
+            updated_at=data.get("updatedAt"),
         )
 
 
@@ -65,6 +75,8 @@ class EndpointCreateParams:
     description: Optional[str] = None
     enabled: bool = True
     rate_limit_per_second: Optional[int] = None
+    secret: Optional[str] = None
+    allowed_source_ips: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {"url": self.url, "enabled": self.enabled}
@@ -72,6 +84,10 @@ class EndpointCreateParams:
             result["description"] = self.description
         if self.rate_limit_per_second:
             result["rateLimitPerSecond"] = self.rate_limit_per_second
+        if self.secret is not None:
+            result["secret"] = self.secret
+        if self.allowed_source_ips is not None:
+            result["allowedSourceIps"] = self.allowed_source_ips
         return result
 
 
@@ -81,6 +97,8 @@ class EndpointUpdateParams:
     description: Optional[str] = None
     enabled: Optional[bool] = None
     rate_limit_per_second: Optional[int] = None
+    secret: Optional[str] = None
+    allowed_source_ips: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
@@ -92,6 +110,10 @@ class EndpointUpdateParams:
             result["enabled"] = self.enabled
         if self.rate_limit_per_second is not None:
             result["rateLimitPerSecond"] = self.rate_limit_per_second
+        if self.secret is not None:
+            result["secret"] = self.secret
+        if self.allowed_source_ips is not None:
+            result["allowedSourceIps"] = self.allowed_source_ips
         return result
 
 
@@ -109,6 +131,8 @@ class Subscription:
     retry_delays: Optional[str] = None
     payload_template: Optional[str] = None
     custom_headers: Optional[str] = None
+    transformation_id: Optional[str] = None
+    transformation_name: Optional[str] = None
     updated_at: Optional[str] = None
 
     @classmethod
@@ -126,6 +150,8 @@ class Subscription:
             retry_delays=data.get("retryDelays"),
             payload_template=data.get("payloadTemplate"),
             custom_headers=data.get("customHeaders"),
+            transformation_id=data.get("transformationId"),
+            transformation_name=data.get("transformationName"),
             updated_at=data.get("updatedAt"),
         )
 
@@ -141,6 +167,7 @@ class SubscriptionCreateParams:
     retry_delays: Optional[str] = None
     payload_template: Optional[str] = None
     custom_headers: Optional[str] = None
+    transformation_id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {
@@ -160,6 +187,8 @@ class SubscriptionCreateParams:
             result["payloadTemplate"] = self.payload_template
         if self.custom_headers is not None:
             result["customHeaders"] = self.custom_headers
+        if self.transformation_id is not None:
+            result["transformationId"] = self.transformation_id
         return result
 
 
@@ -172,8 +201,12 @@ class Delivery:
     attempt_count: int
     max_attempts: int
     created_at: str
-    next_attempt_at: Optional[str] = None
+    subscription_id: Optional[str] = None
+    #: The API field is ``nextRetryAt``.
+    next_retry_at: Optional[str] = None
+    last_attempt_at: Optional[str] = None
     succeeded_at: Optional[str] = None
+    failed_at: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Delivery":
@@ -185,8 +218,11 @@ class Delivery:
             attempt_count=data["attemptCount"],
             max_attempts=data["maxAttempts"],
             created_at=data["createdAt"],
-            next_attempt_at=data.get("nextAttemptAt"),
+            subscription_id=data.get("subscriptionId"),
+            next_retry_at=data.get("nextRetryAt"),
+            last_attempt_at=data.get("lastAttemptAt"),
             succeeded_at=data.get("succeededAt"),
+            failed_at=data.get("failedAt"),
         )
 
 
@@ -194,22 +230,34 @@ class Delivery:
 class DeliveryAttempt:
     id: str
     attempt_number: int
-    latency_ms: int
-    attempted_at: str
-    http_status: Optional[int] = None
+    #: When the attempt was recorded (API field ``createdAt``).
+    created_at: str
+    delivery_id: Optional[str] = None
+    #: JSON object, serialized as a string, of the headers that were sent.
+    request_headers: Optional[str] = None
+    request_body: Optional[str] = None
+    http_status_code: Optional[int] = None
+    #: JSON object, serialized as a string, of the headers that came back.
+    response_headers: Optional[str] = None
     response_body: Optional[str] = None
     error_message: Optional[str] = None
+    #: Wall-clock duration of the HTTP request, in milliseconds.
+    duration_ms: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DeliveryAttempt":
         return cls(
             id=data["id"],
             attempt_number=data["attemptNumber"],
-            latency_ms=data["latencyMs"],
-            attempted_at=data["attemptedAt"],
-            http_status=data.get("httpStatus"),
+            created_at=data["createdAt"],
+            delivery_id=data.get("deliveryId"),
+            request_headers=data.get("requestHeaders"),
+            request_body=data.get("requestBody"),
+            http_status_code=data.get("httpStatusCode"),
+            response_headers=data.get("responseHeaders"),
             response_body=data.get("responseBody"),
             error_message=data.get("errorMessage"),
+            duration_ms=data.get("durationMs"),
         )
 
 
@@ -240,8 +288,21 @@ class PaginatedResponse:
     content: List[Any]
     total_elements: int
     total_pages: int
+    #: Page size requested.
     size: int
+    #: Zero-based index of this page.
     number: int
+    number_of_elements: Optional[int] = None
+    first: Optional[bool] = None
+    last: Optional[bool] = None
+    empty: Optional[bool] = None
+
+    def __iter__(self):
+        """Iterating a page walks its ``content``, not its envelope keys."""
+        return iter(self.content)
+
+    def __len__(self) -> int:
+        return len(self.content)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], item_cls: Any = None) -> "PaginatedResponse":
@@ -253,6 +314,10 @@ class PaginatedResponse:
             total_pages=data["totalPages"],
             size=data["size"],
             number=data["number"],
+            number_of_elements=data.get("numberOfElements"),
+            first=data.get("first"),
+            last=data.get("last"),
+            empty=data.get("empty"),
         )
 
 
@@ -260,16 +325,21 @@ class PaginatedResponse:
 class EndpointTestResult:
     success: bool
     latency_ms: int
-    http_status: Optional[int] = None
+    http_status_code: Optional[int] = None
+    response_body: Optional[str] = None
     error_message: Optional[str] = None
+    #: Human-readable summary, e.g. "Endpoint returned non-2xx status".
+    message: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EndpointTestResult":
         return cls(
             success=data["success"],
             latency_ms=data["latencyMs"],
-            http_status=data.get("httpStatus"),
+            http_status_code=data.get("httpStatusCode"),
+            response_body=data.get("responseBody"),
             error_message=data.get("errorMessage"),
+            message=data.get("message"),
         )
 
 
@@ -277,6 +347,8 @@ class EndpointTestResult:
 class RateLimitInfo:
     limit: int
     remaining: int
+    #: Unix timestamp in **seconds** at which the window resets — the raw value
+    #: of the ``X-RateLimit-Reset`` header, which the API sends in seconds.
     reset: int
 
 
@@ -438,6 +510,8 @@ class IncomingDestination:
     custom_headers_json: Optional[str] = None
     retry_delays: Optional[str] = None
     payload_transform: Optional[str] = None
+    transformation_id: Optional[str] = None
+    transformation_name: Optional[str] = None
     updated_at: Optional[str] = None
 
     @classmethod
@@ -455,6 +529,8 @@ class IncomingDestination:
             custom_headers_json=data.get("customHeadersJson"),
             retry_delays=data.get("retryDelays"),
             payload_transform=data.get("payloadTransform"),
+            transformation_id=data.get("transformationId"),
+            transformation_name=data.get("transformationName"),
             updated_at=data.get("updatedAt"),
         )
 
@@ -551,7 +627,8 @@ class IncomingForwardAttempt:
     id: str
     incoming_event_id: str
     destination_id: str
-    destination_url: str
+    #: Null on the wire when the destination row has since been removed.
+    destination_url: Optional[str]
     attempt_number: int
     status: str
     created_at: str
@@ -569,7 +646,7 @@ class IncomingForwardAttempt:
             id=data["id"],
             incoming_event_id=data["incomingEventId"],
             destination_id=data["destinationId"],
-            destination_url=data["destinationUrl"],
+            destination_url=data.get("destinationUrl"),
             attempt_number=data["attemptNumber"],
             status=data["status"],
             created_at=data["createdAt"],

@@ -32,20 +32,27 @@ async function json(res: Response, label: string): Promise<any> {
 /**
  * True once verified reachable; checked once via isApiReachable().
  *
+ * Probes with an intentionally invalid login: any HTTP response at all proves
+ * the API is answering.
+ *
  * Deliberately does NOT hit /actuator/health/liveness: under `make up`
  * (docker-compose.yml), actuator is served on its own MANAGEMENT_PORT
- * (8082) which is never published to the host — see the MANAGEMENT_PORT
- * comment in docker-compose.yml. /v3/api-docs is permitAll on the main
- * port (see SecurityConfig.java) and always present (springdoc is on the
- * classpath — see OpenApiConfig.java), so it works whether the API was
- * started via docker-compose.yml or docker-compose.pull.yml.
+ * (8082) which is never published to the host — and on the main port
+ * /actuator/health is a 500, not a 404, because nothing maps it. Nor
+ * /v3/api-docs: springdoc is only permitAll when SWAGGER_ENABLED=true
+ * (SecurityConfig.java) and .env.dist ships it false, so probing it reports
+ * a perfectly healthy stack as unreachable and silently skips this whole
+ * suite. /api/v1/auth/login is permitAll unconditionally.
  */
 export async function isApiReachable(): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}/v3/api-docs`, {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
       signal: AbortSignal.timeout(3000),
     });
-    return res.ok;
+    return res.status > 0;
   } catch {
     return false;
   }

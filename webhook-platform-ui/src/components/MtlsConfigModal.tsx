@@ -120,18 +120,18 @@ export default function MtlsConfigModal({
         </DialogHeader>
 
         {endpoint.mtlsEnabled && (
-          <Alert className="border-green-500/50 bg-green-500/10">
-            <ShieldCheck className="h-4 w-4 text-green-500" />
-            <AlertDescription className="text-green-700 dark:text-green-400">
+          <Alert className="border-ok/30 bg-ok-soft">
+            <ShieldCheck className="h-4 w-4 text-ok" />
+            <AlertDescription className="text-ok">
               {t('mtls.enabledBanner')}
             </AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-4 py-4">
-          <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <AlertDescription className="text-amber-700 dark:text-amber-400">
+          <Alert className="border-retry/30 bg-retry-soft">
+            <AlertTriangle className="h-4 w-4 text-retry" />
+            <AlertDescription className="text-retry">
               {t('mtls.securityWarning')}
             </AlertDescription>
           </Alert>
@@ -144,7 +144,7 @@ export default function MtlsConfigModal({
                 placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
                 value={clientCert}
                 onChange={(e) => setClientCert(e.target.value)}
-                className="font-mono text-xs min-h-[120px]"
+                className="min-h-[120px] font-mono text-xs"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -170,6 +170,7 @@ export default function MtlsConfigModal({
                   variant="ghost"
                   size="sm"
                   onClick={() => setClientCert('')}
+                  aria-label={t('mtls.clearCert', 'Clear certificate')}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -184,7 +185,7 @@ export default function MtlsConfigModal({
               placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
               value={clientKey}
               onChange={(e) => setClientKey(e.target.value)}
-              className="font-mono text-xs min-h-[120px]"
+              className="min-h-[120px] font-mono text-xs"
             />
             <div className="flex items-center gap-2">
               <input
@@ -209,6 +210,7 @@ export default function MtlsConfigModal({
                   variant="ghost"
                   size="sm"
                   onClick={() => setClientKey('')}
+                  aria-label={t('mtls.clearKey', 'Clear private key')}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -223,7 +225,7 @@ export default function MtlsConfigModal({
               placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
               value={caCert}
               onChange={(e) => setCaCert(e.target.value)}
-              className="font-mono text-xs min-h-[100px]"
+              className="min-h-[100px] font-mono text-xs"
             />
             <p className="text-xs text-muted-foreground">
               {t('mtls.caCertHint')}
@@ -251,6 +253,7 @@ export default function MtlsConfigModal({
                   variant="ghost"
                   size="sm"
                   onClick={() => setCaCert('')}
+                  aria-label={t('mtls.clearCa', 'Clear CA certificate')}
                 >
                   <X className="h-4 w-4" />
                 </Button>

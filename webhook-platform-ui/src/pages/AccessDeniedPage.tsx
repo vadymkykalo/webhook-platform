@@ -1,35 +1,41 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ShieldOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../auth/auth.store';
+import { usePermissions } from '../auth/usePermissions';
+import { RoleCard } from '../components/PermissionGate';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 
+/**
+ * Rendered by ProtectedRoute when a role is not enough for a route. It says
+ * which role the reader holds and what that role can do, because "access
+ * denied" on its own leaves a person with nowhere to go.
+ */
 export default function AccessDeniedPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const role = user?.role || 'VIEWER';
+  const { role } = usePermissions();
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center p-6">
-      <div className="text-center max-w-md">
-        <div className="mx-auto h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-6">
-          <ShieldOff className="h-8 w-8 text-destructive" />
+    <div className="flex min-h-[60vh] items-center justify-center p-4 lg:p-6">
+      <div className="w-full max-w-md">
+        <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+          <ShieldOff className="h-5 w-5 text-muted-foreground" aria-hidden />
         </div>
-        <h1 className="text-7xl font-bold text-foreground mb-2">403</h1>
-        <h2 className="text-xl font-semibold mb-2">{t('accessDenied.title')}</h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          {t('accessDenied.description')}
-        </p>
-        <Badge variant="outline" className="mb-8">
-          {t('accessDenied.yourRole', { role })}
-        </Badge>
-        <div className="flex items-center justify-center gap-3">
-          <Link to="/admin/dashboard">
-            <Button>
-              <ArrowLeft className="h-4 w-4" /> {t('accessDenied.backToDashboard')}
-            </Button>
-          </Link>
+        <p className="mono-label">403</p>
+        <h2 className="mt-1 text-title">{t('accessDenied.title')}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{t('accessDenied.description')}</p>
+
+        <div className="mt-5">
+          <p className="mono-label mb-2">{t('accessDenied.yourRoleLabel')}</p>
+          <RoleCard role={role} />
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Button asChild>
+            <Link to="/admin/dashboard">
+              <ArrowLeft className="h-4 w-4" aria-hidden /> {t('accessDenied.backToDashboard')}
+            </Link>
+          </Button>
+          <span className="text-[13px] text-muted-foreground">{t('permissions.contactOwner')}</span>
         </div>
       </div>
     </div>

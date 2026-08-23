@@ -10,7 +10,7 @@ function SlackNode({ data, selected }: NodeProps) {
   const hasUrl = d.webhookUrl && String(d.webhookUrl).length > 0;
   return (
     <BaseNode
-      color="#e11d48"
+      role="action"
       icon="💬"
       label={String(d.label || t('workflows.nodeTypes.slack.label'))}
       subtitle={channel || (hasUrl ? t('workflows.nodeStatus.webhookConfigured') : t('workflows.nodeStatus.notConfigured'))}

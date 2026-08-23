@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import {
-  Copy, Radio, Send, Clock, FileJson, Shield, ExternalLink,
-  CheckCircle2, XCircle, Loader2, RotateCcw
-} from 'lucide-react';
+import { Copy, Radio, Send, FileJson, Shield, ExternalLink } from 'lucide-react';
 import { useEvent } from '../api/queries';
 import { useQuery } from '@tanstack/react-query';
 import { deliveriesApi } from '../api/deliveries.api';
 import { debugLinksApi } from '../api/debugLinks.api';
-import { formatDateTime, formatRelativeTime } from '../lib/date';
+import { formatDateTime } from '../lib/date';
 import { showSuccess, showApiError } from '../lib/toast';
+import { railFromCounts } from '../pages/attemptRailData';
+import AttemptRail from './AttemptRail';
+import StatusBadge, { kindOfDeliveryStatus } from './StatusBadge';
+import EmptyState, { ErrorState } from './EmptyState';
+import { SkeletonRows } from './PageSkeleton';
 import {
   Sheet,
   SheetContent,
@@ -19,15 +21,6 @@ import {
   SheetDescription,
 } from './ui/sheet';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-
-const DELIVERY_STATUS_COLORS: Record<string, string> = {
-  SUCCESS: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  FAILED: 'bg-red-500/10 text-red-700 dark:text-red-400',
-  DLQ: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
-  PENDING: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
-  PROCESSING: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400',
-};
 
 interface EventDetailsSheetProps {
   projectId: string;
@@ -36,6 +29,11 @@ interface EventDetailsSheetProps {
   onViewDeliveries?: (eventId: string) => void;
 }
 
+/**
+ * The quick look at one Event: what was announced, and what became of the
+ * Deliveries it created. Each delivery carries its own attempt rail, so the
+ * answer to "is anything still owed" is visible without opening a second view.
+ */
 export default function EventDetailsSheet({
   projectId,
   eventId,
@@ -44,18 +42,18 @@ export default function EventDetailsSheet({
 }: EventDetailsSheetProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: event, isLoading } = useEvent(projectId, eventId ?? undefined);
+  const {
+    data: event, isLoading, isError, error, refetch, isRefetching,
+  } = useEvent(projectId, eventId ?? undefined);
   const [activeTab, setActiveTab] = useState<'raw' | 'sanitized' | 'deliveries'>('raw');
 
-  // Fetch deliveries for this event
-  const { data: deliveriesData, isLoading: deliveriesLoading } = useQuery({
+  const { data: deliveriesData, isLoading: deliveriesLoading, refetch: refetchDeliveries } = useQuery({
     queryKey: ['deliveries', projectId, eventId, 'sheet'],
     queryFn: () => deliveriesApi.listByProject(projectId, { eventId: eventId!, size: 50 }),
     enabled: !!eventId && activeTab === 'deliveries',
   });
   const deliveries = deliveriesData?.content ?? [];
 
-  // Fetch sanitized view from debug link (create a temporary one)
   const [sanitizedPayload, setSanitizedPayload] = useState<string | null>(null);
   const [sanitizedLoading, setSanitizedLoading] = useState(false);
 
@@ -67,15 +65,15 @@ export default function EventDetailsSheet({
       const pub = await debugLinksApi.viewPublic(link.token);
       setSanitizedPayload(pub.sanitizedPayload);
     } catch {
-      setSanitizedPayload(t('events.details.sanitizedUnavailable', 'Sanitized view unavailable. Configure PII rules first.'));
+      setSanitizedPayload(null);
     } finally {
       setSanitizedLoading(false);
     }
   };
 
-  const handleCopy = (text: string, label: string) => {
+  const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    showSuccess(`${label} copied`);
+    showSuccess(t('common.copied'));
   };
 
   const formatPayload = (payload: string | undefined) => {
@@ -87,209 +85,206 @@ export default function EventDetailsSheet({
     }
   };
 
+  const tabs = [
+    { id: 'raw' as const, label: t('events.details.raw'), icon: FileJson },
+    { id: 'sanitized' as const, label: t('events.details.sanitized'), icon: Shield },
+    { id: 'deliveries' as const, label: t('events.details.deliveries'), icon: Send },
+  ];
+
   return (
     <Sheet open={!!eventId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="sm:max-w-2xl w-full overflow-y-auto">
-        <SheetHeader className="pb-4 border-b">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        <SheetHeader className="border-b border-rail pb-4">
           <SheetTitle className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-primary" />
-            {t('events.details.title', 'Event Details')}
+            <Radio className="h-4 w-4 text-muted-foreground" aria-hidden />
+            {t('events.details.title')}
           </SheetTitle>
-          <SheetDescription>
-            {event?.eventType && (
-              <Badge variant="secondary" className="font-mono text-xs">
-                {event.eventType}
-              </Badge>
-            )}
-          </SheetDescription>
+          <SheetDescription className="font-mono">{event?.eventType}</SheetDescription>
         </SheetHeader>
 
         {isLoading ? (
           <div className="space-y-4 pt-6">
-            <div className="h-4 w-48 bg-muted animate-pulse rounded" />
-            <div className="h-32 bg-muted animate-pulse rounded" />
-            <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-48 animate-pulse rounded bg-muted" />
+            <div className="h-32 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-32 animate-pulse rounded bg-muted" />
           </div>
         ) : event ? (
-          <div className="pt-4 space-y-6">
-            {/* Meta info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('events.eventId', 'Event ID')}
-                </p>
-                <div className="flex items-center gap-1.5 group">
-                  <code className="text-xs font-mono text-foreground break-all">{event.id}</code>
+          <div className="space-y-6 pt-4">
+            <dl className="grid grid-cols-2 gap-4">
+              <div className="min-w-0">
+                <dt className="mono-label">{t('events.eventId')}</dt>
+                <dd className="mt-1 flex items-center gap-1.5">
+                  <code className="break-all font-mono text-xs">{event.id}</code>
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                    onClick={() => handleCopy(event.id, 'Event ID')}
+                    className="h-5 w-5 flex-shrink-0"
+                    onClick={() => handleCopy(event.id)}
                     title={t('common.copyId')}
                     aria-label={t('common.copyId')}
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
-                </div>
+                </dd>
               </div>
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('events.created', 'Created')}
-                </p>
-                <div className="flex items-center gap-1.5 text-xs">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  {formatDateTime(event.createdAt)}
-                </div>
+              <div>
+                <dt className="mono-label">{t('events.created')}</dt>
+                <dd className="mt-1 font-mono text-xs">{formatDateTime(event.createdAt)}</dd>
               </div>
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('events.eventType', 'Event Type')}
-                </p>
-                <code className="text-xs font-mono font-semibold">{event.eventType}</code>
+              <div>
+                <dt className="mono-label">{t('events.eventType')}</dt>
+                <dd className="mt-1 font-mono text-xs">{event.eventType}</dd>
               </div>
               {event.deliveriesCreated !== undefined && (
-                <div className="space-y-1">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                    {t('events.details.deliveries', 'Deliveries')}
-                  </p>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Send className="h-3.5 w-3.5 text-muted-foreground" />
-                    {event.deliveriesCreated}
-                  </div>
+                <div>
+                  <dt className="mono-label">{t('events.details.deliveries')}</dt>
+                  <dd className="mt-1 font-mono text-xs">{event.deliveriesCreated}</dd>
                 </div>
               )}
-            </div>
+            </dl>
 
-            {/* Tabs */}
-            <div className="border-b">
-              <div className="flex gap-4">
-                {(['raw', 'sanitized', 'deliveries'] as const).map((tab) => (
+            <div className="border-b border-rail">
+              <div role="tablist" className="flex gap-1">
+                {tabs.map((tab) => (
                   <button
-                    key={tab}
-                    className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    key={tab.id}
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    className={`flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-[13px] transition-colors ${
+                      activeTab === tab.id
+                        ? 'border-primary font-medium text-foreground'
+                        : 'border-transparent text-muted-foreground hover:border-rail hover:text-foreground'
                     }`}
                     onClick={() => {
-                      setActiveTab(tab);
-                      if (tab === 'sanitized') loadSanitized();
+                      setActiveTab(tab.id);
+                      if (tab.id === 'sanitized') loadSanitized();
                     }}
                   >
-                    {tab === 'raw' && <><FileJson className="h-3.5 w-3.5 inline mr-1.5" />{t('events.details.raw', 'Raw')}</>}
-                    {tab === 'sanitized' && <><Shield className="h-3.5 w-3.5 inline mr-1.5" />{t('events.details.sanitized', 'Sanitized')}</>}
-                    {tab === 'deliveries' && <><Send className="h-3.5 w-3.5 inline mr-1.5" />{t('events.details.deliveries', 'Deliveries')}
-                      {event.deliveriesCreated != null && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{event.deliveriesCreated}</Badge>}
-                    </>}
+                    <tab.icon className="h-3.5 w-3.5" aria-hidden />
+                    {tab.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Raw tab */}
             {activeTab === 'raw' && (
               <div className="relative">
-                <Button variant="ghost" size="sm" className="absolute top-2 right-2 h-7 text-xs z-10" onClick={() => handleCopy(formatPayload(event.payload), 'Payload')}>
-                  <Copy className="h-3 w-3 mr-1" /> {t('common.copy', 'Copy')}
+                <Button variant="ghost" size="sm" className="absolute right-2 top-2 z-10" onClick={() => handleCopy(formatPayload(event.payload))}>
+                  <Copy className="h-3 w-3" /> {t('common.copy')}
                 </Button>
-                <pre className="bg-muted/50 border rounded-lg p-4 text-xs font-mono overflow-x-auto max-h-[50vh] whitespace-pre-wrap break-words">
-                  {formatPayload(event.payload) || <span className="text-muted-foreground italic">{t('events.details.noPayload', 'No payload')}</span>}
+                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rail p-4 font-mono text-xs">
+                  {formatPayload(event.payload) || <span className="italic text-muted-foreground">{t('events.details.noPayload')}</span>}
                 </pre>
               </div>
             )}
 
-            {/* Sanitized tab */}
             {activeTab === 'sanitized' && (
               <div className="relative">
                 {sanitizedLoading ? (
-                  <div className="flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                  <SkeletonRows count={1} height="h-40" />
                 ) : sanitizedPayload ? (
                   <>
-                    <Button variant="ghost" size="sm" className="absolute top-2 right-2 h-7 text-xs z-10" onClick={() => handleCopy(formatPayload(sanitizedPayload), 'Sanitized')}>
-                      <Copy className="h-3 w-3 mr-1" /> {t('common.copy', 'Copy')}
+                    <Button variant="ghost" size="sm" className="absolute right-2 top-2 z-10" onClick={() => handleCopy(formatPayload(sanitizedPayload))}>
+                      <Copy className="h-3 w-3" /> {t('common.copy')}
                     </Button>
-                    <pre className="bg-muted/50 border rounded-lg p-4 text-xs font-mono overflow-x-auto max-h-[50vh] whitespace-pre-wrap break-words">
+                    <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rail p-4 font-mono text-xs">
                       {formatPayload(sanitizedPayload)}
                     </pre>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground py-8 text-center">{t('events.details.sanitizedUnavailable', 'Sanitized view unavailable')}</p>
+                  <EmptyState
+                    icon={Shield}
+                    title={t('events.details.sanitizedUnavailable')}
+                    className="flex flex-col items-center justify-center py-8"
+                  />
                 )}
               </div>
             )}
 
-            {/* Deliveries tab */}
             {activeTab === 'deliveries' && (
               <div className="space-y-2">
                 {deliveriesLoading ? (
-                  <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                  <SkeletonRows count={3} height="h-14" />
                 ) : deliveries.length === 0 ? (
-                  <div className="py-8 text-center space-y-2">
-                    <p className="text-sm font-medium">{t('events.details.noDeliveries')}</p>
-                    {event.eventType && (
-                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                        <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
-                      </p>
-                    )}
-                    <p className="text-[11px] text-muted-foreground">{t('events.details.noDeliveriesHint')}</p>
-                  </div>
+                  <EmptyState
+                    icon={Send}
+                    title={t('events.details.noDeliveries')}
+                    description={event.eventType
+                      ? <Trans i18nKey="events.details.noDeliveriesNoSub" values={{ eventType: event.eventType }} components={{ strong: <strong /> }} />
+                      : t('events.details.noDeliveriesHint')}
+                    className="flex flex-col items-center justify-center py-8"
+                  />
                 ) : (
-                  deliveries.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between px-3 py-2 border rounded-lg hover:bg-muted/30">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {d.status === 'SUCCESS' ? <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" /> :
-                         d.status === 'FAILED' || d.status === 'DLQ' ? <XCircle className="h-4 w-4 text-red-500 flex-shrink-0" /> :
-                         <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />}
-                        <div className="min-w-0">
+                  deliveries.map((d) => {
+                    const rail = railFromCounts(d.attemptCount, d.maxAttempts, d.status);
+                    return (
+                      <div key={d.id} className="flex items-center justify-between gap-3 rounded-lg border border-rail px-3 py-2.5">
+                        <div className="min-w-0 space-y-1.5">
                           <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${DELIVERY_STATUS_COLORS[d.status] || ''}`}>{d.status}</span>
-                            <code className="text-[11px] font-mono text-muted-foreground">{d.endpointId.substring(0, 8)}…</code>
+                            <StatusBadge kind={kindOfDeliveryStatus(d.status)} label={t(`deliveries.status.${d.status}`)} />
+                            <code className="font-mono text-[11px] text-muted-foreground">{d.endpointId.substring(0, 8)}</code>
                           </div>
-                          <span className="text-[10px] text-muted-foreground">{d.attemptCount}/{d.maxAttempts} attempts · {formatRelativeTime(d.createdAt)}</span>
+                          <AttemptRail
+                            attempts={rail.attempts}
+                            maxAttempts={rail.maxAttempts}
+                            size="inline"
+                            ariaLabel={t('deliveries.rail.label', { count: d.attemptCount, total: d.maxAttempts })}
+                          />
+                          <span className="block font-mono text-[10px] text-muted-foreground">
+                            {d.attemptCount}/{d.maxAttempts}
+                          </span>
                         </div>
+                        {(d.status === 'FAILED' || d.status === 'DLQ') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deliveriesApi.replay(d.id)
+                              .then(() => { showSuccess(t('eventDetail.replayed')); refetchDeliveries(); })
+                              .catch(e => showApiError(e, 'deliveries.toast.replayFailed'))}
+                          >
+                            {t('events.details.replay')}
+                          </Button>
+                        )}
                       </div>
-                      {(d.status === 'FAILED' || d.status === 'DLQ') && (
-                        <Button variant="ghost" size="icon-sm" title={t('events.details.replay')} aria-label={t('events.details.replay')} onClick={() => deliveriesApi.replay(d.id).then(() => showSuccess('Replayed')).catch(e => showApiError(e, 'deliveries.replayFailed'))}>
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
 
-            {/* Actions */}
-            <div className="pt-2 border-t flex gap-2">
+            <div className="flex gap-2 border-t border-rail pt-4">
               <Button
                 variant="outline"
                 size="sm"
                 className="flex-1"
                 onClick={() => { onClose(); navigate(`/admin/projects/${projectId}/events/${event.id}`); }}
               >
-                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                {t('events.details.openFull', 'Open Full Details')}
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t('events.details.openFull')}
               </Button>
               {onViewDeliveries && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => onViewDeliveries(event.id)}
-                >
-                  <Send className="h-3.5 w-3.5 mr-1.5" />
-                  {t('events.viewDeliveries', 'View Deliveries')}
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => onViewDeliveries(event.id)}>
+                  <Send className="h-3.5 w-3.5" />
+                  {t('events.viewDeliveries')}
                 </Button>
               )}
             </div>
           </div>
+        ) : isError ? (
+          <ErrorState
+            error={error}
+            onRetry={() => refetch()}
+            retrying={isRefetching}
+            className="flex flex-col items-center justify-center pt-6"
+          />
         ) : (
-          <div className="pt-6 text-center text-sm text-muted-foreground">
-            {t('events.details.notFound', 'Event not found')}
-          </div>
+          <EmptyState
+            icon={Radio}
+            title={t('events.details.notFound')}
+            className="flex flex-col items-center justify-center pt-6"
+          />
         )}
       </SheetContent>
     </Sheet>
   );
 }
-

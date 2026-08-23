@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, AlertCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, Minus, GitCompare, Flame, Plus } from 'lucide-react';
+import { Copy, RefreshCw, Loader2, Clock, CheckCircle2, XCircle, Eye, SkipForward, Lightbulb, AlertTriangle, Info, ExternalLink, Timer, TrendingUp, TrendingDown, GitCompare, Flame, Plus } from 'lucide-react';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeFuture } from '../lib/date';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,11 @@ import type { DryRunReplayResponse } from '../api/deliveries.api';
 import type { DeliveryResponse, DeliveryAttemptResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import AttemptRail from '../components/AttemptRail';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import { SkeletonRows } from '../components/PageSkeleton';
+import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
+import { railFromDeliveryAttempts } from './attemptRailData';
 import {
   Sheet,
   SheetContent,
@@ -49,6 +54,7 @@ export default function DeliveryDetailsSheet({
   const [delivery, setDelivery] = useState<DeliveryResponse | null>(null);
   const [attempts, setAttempts] = useState<DeliveryAttemptResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
   const [showReplayDialog, setShowReplayDialog] = useState(false);
   const [replaying, setReplaying] = useState(false);
@@ -82,7 +88,9 @@ export default function DeliveryDetailsSheet({
       setLoading(true);
       const data = await deliveriesApi.get(deliveryId);
       setDelivery(data);
+      setLoadError(null);
     } catch (err: any) {
+      setLoadError(err);
       showApiError(err, 'deliveryDetails.toast.loadFailed', { retry: loadDelivery });
     } finally {
       setLoading(false);
@@ -172,25 +180,14 @@ export default function DeliveryDetailsSheet({
     showSuccess(t('deliveryDetails.toast.copied', { label }));
   };
 
-  const getStatusBadge = (status: DeliveryResponse['status']) => {
-    const variants: Record<typeof status, { variant: any; icon: any }> = {
-      SUCCESS: { variant: 'success', icon: CheckCircle2 },
-      FAILED: { variant: 'destructive', icon: XCircle },
-      DLQ: { variant: 'destructive', icon: AlertCircle },
-      PENDING: { variant: 'secondary', icon: Clock },
-      PROCESSING: { variant: 'info', icon: RefreshCw },
-    };
-    
-    const config = variants[status];
-    const Icon = config.icon;
-    
-    return (
-      <Badge variant={config.variant} className="gap-1">
-        <Icon className="h-3 w-3" />
-        {t(`deliveries.status.${status}`)}
-      </Badge>
-    );
-  };
+  // The measured ladder — real waits, real codes — from the attempts fetched above.
+  const rail = delivery
+    ? railFromDeliveryAttempts(attempts, delivery)
+    : { attempts: [], maxAttempts: 0 };
+
+  const getStatusBadge = (status: DeliveryResponse['status']) => (
+    <StatusBadge kind={kindOfDeliveryStatus(status)} label={t(`deliveries.status.${status}`)} />
+  );
 
 
   const getDiagnosisPanel = () => {
@@ -201,9 +198,9 @@ export default function DeliveryDetailsSheet({
 
     const classification = classifyError(lastFailed);
     const severityConfig = {
-      error: { border: 'border-destructive/30', bg: 'bg-destructive/5', icon: XCircle, iconColor: 'text-destructive' },
-      warning: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/5', icon: AlertTriangle, iconColor: 'text-yellow-600' },
-      info: { border: 'border-blue-500/30', bg: 'bg-blue-500/5', icon: Info, iconColor: 'text-blue-600' },
+      error: { border: 'border-halt/30', bg: 'bg-halt-soft', icon: XCircle, iconColor: 'text-halt' },
+      warning: { border: 'border-retry/30', bg: 'bg-retry-soft', icon: AlertTriangle, iconColor: 'text-retry' },
+      info: { border: 'border-rail', bg: 'bg-secondary/50', icon: Info, iconColor: 'text-muted-foreground' },
     }[classification.severity];
 
     const SeverityIcon = severityConfig.icon;
@@ -231,40 +228,10 @@ export default function DeliveryDetailsSheet({
             <p className="text-sm mt-0.5">{t(classification.fixKey)}</p>
           </div>
 
-          {attempts.length > 1 && (
-            <div>
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('deliveryDetails.diagnosis.retryTimeline')}
-              </span>
-              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                {attempts.map((attempt, i) => {
-                  const isSuccess = attempt.httpStatusCode && attempt.httpStatusCode >= 200 && attempt.httpStatusCode < 300;
-                  const isFail = attempt.errorMessage || (attempt.httpStatusCode && attempt.httpStatusCode >= 400);
-                  return (
-                    <div key={attempt.id} className="flex items-center gap-1">
-                      {i > 0 && <div className="w-3 h-px bg-border" />}
-                      <div
-                        className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          isSuccess
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : isFail
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : 'bg-muted text-muted-foreground'
-                        }`}
-                        title={`${t('deliveryDetails.diagnosis.attemptLabel', { number: attempt.attemptNumber })} — ${attempt.httpStatusCode || attempt.errorMessage || 'pending'}`}
-                      >
-                        {attempt.attemptNumber}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {delivery.status === 'DLQ' && (
-                <p className="text-xs text-muted-foreground mt-1.5 italic">
-                  {t('deliveryDetails.diagnosis.noMoreRetries')}
-                </p>
-              )}
-            </div>
+          {delivery.status === 'DLQ' && (
+            <p className="text-xs italic text-muted-foreground">
+              {t('deliveryDetails.diagnosis.noMoreRetries')}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -283,22 +250,20 @@ export default function DeliveryDetailsSheet({
           </SheetHeader>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
+            <div className="mt-6"><SkeletonRows count={4} height="h-20" /></div>
           ) : delivery ? (
             <div className="space-y-6 mt-6">
               {/* Status Banner */}
               {delivery.status === 'PROCESSING' && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('deliveries.statusExplain.PROCESSING')}</span>
+                <div className="flex items-center gap-3 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                  <Loader2 className="h-4 w-4 animate-spin text-retry" aria-hidden />
+                  <span className="text-sm font-medium text-retry">{t('deliveries.statusExplain.PROCESSING')}</span>
                 </div>
               )}
               {delivery.status === 'PENDING' && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                  <Clock className="h-4 w-4 text-amber-600" />
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                <div className="flex items-center gap-3 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                  <Clock className="h-4 w-4 text-retry" aria-hidden />
+                  <span className="text-sm font-medium text-retry">
                     {delivery.attemptCount > 0 && delivery.nextRetryAt
                       ? t('deliveries.statusExplain.PENDING_RETRY', { time: formatRelativeFuture(delivery.nextRetryAt) })
                       : t('deliveries.statusExplain.PENDING_NEW')}
@@ -306,15 +271,15 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
               {delivery.status === 'SUCCESS' && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-700 dark:text-green-300">{t('deliveries.statusExplain.SUCCESS')}</span>
+                <div className="flex items-center gap-3 rounded-lg border border-ok/30 bg-ok-soft p-3">
+                  <CheckCircle2 className="h-4 w-4 text-ok" aria-hidden />
+                  <span className="text-sm font-medium text-ok">{t('deliveries.statusExplain.SUCCESS')}</span>
                 </div>
               )}
               {(delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                <div className="flex items-center gap-3 rounded-lg border border-halt/30 bg-halt-soft p-3">
+                  <XCircle className="h-4 w-4 text-halt" aria-hidden />
+                  <span className="text-sm font-medium text-halt">
                     {delivery.status === 'DLQ'
                       ? t('deliveries.statusExplain.DLQ', { count: delivery.attemptCount })
                       : t('deliveries.statusExplain.FAILED')}
@@ -373,12 +338,12 @@ export default function DeliveryDetailsSheet({
 
               {/* Quick Actions — incident integration */}
               {projectId && (delivery.status === 'FAILED' || delivery.status === 'DLQ') && (
-                <Card className="border-orange-200/50 dark:border-orange-800/30">
+                <Card className="border-rail">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link to={`/admin/projects/${projectId}/incidents`} onClick={onClose}>
                         <Button variant="outline" size="sm">
-                          <Flame className="h-3.5 w-3.5 mr-1.5 text-orange-500" />
+                          <Flame className="mr-1.5 h-3.5 w-3.5 text-halt" aria-hidden />
                           {t('deliveryDetails.openIncidents')}
                         </Button>
                       </Link>
@@ -405,23 +370,21 @@ export default function DeliveryDetailsSheet({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">{t('deliveryDetails.attempts')}</span>
-                      <span className="text-sm font-semibold">
-                        {delivery.attemptCount} / {delivery.maxAttempts}
+                      <span className="font-mono text-sm">
+                        {delivery.attemptCount}/{delivery.maxAttempts}
                       </span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all ${
-                          delivery.status === 'SUCCESS' ? 'bg-green-500' :
-                          delivery.status === 'FAILED' || delivery.status === 'DLQ' ? 'bg-red-500' :
-                          'bg-blue-500'
-                        }`}
-                        style={{ width: `${Math.max(5, (delivery.attemptCount / delivery.maxAttempts) * 100)}%` }}
-                      />
-                    </div>
+                    {/* The ladder this delivery actually walked: HTTP code above each
+                        tick, the wait that preceded it below, placed on a log scale. */}
+                    <AttemptRail
+                      attempts={rail.attempts}
+                      maxAttempts={rail.maxAttempts}
+                      size="full"
+                      ariaLabel={t('deliveries.rail.label', { count: delivery.attemptCount, total: delivery.maxAttempts })}
+                    />
                   </div>
 
                   <div className="border-t pt-3 space-y-2">
@@ -441,7 +404,7 @@ export default function DeliveryDetailsSheet({
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{t('deliveryDetails.nextRetry')}</span>
                         <div className="text-right">
-                          <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{formatRelativeFuture(delivery.nextRetryAt)}</span>
+                          <span className="text-sm font-semibold text-retry">{formatRelativeFuture(delivery.nextRetryAt)}</span>
                           <span className="text-[11px] text-muted-foreground block">{formatDateTime(delivery.nextRetryAt)}</span>
                         </div>
                       </div>
@@ -450,14 +413,14 @@ export default function DeliveryDetailsSheet({
                     {delivery.succeededAt && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{t('deliveryDetails.succeededAt')}</span>
-                        <span className="text-sm font-medium text-green-600 dark:text-green-400">{formatDateTime(delivery.succeededAt)}</span>
+                        <span className="text-sm font-medium text-ok">{formatDateTime(delivery.succeededAt)}</span>
                       </div>
                     )}
 
                     {delivery.failedAt && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">{t('deliveryDetails.failedAt')}</span>
-                        <span className="text-sm font-medium text-red-600 dark:text-red-400">{formatDateTime(delivery.failedAt)}</span>
+                        <span className="text-sm font-medium text-halt">{formatDateTime(delivery.failedAt)}</span>
                       </div>
                     )}
                   </div>
@@ -489,17 +452,16 @@ export default function DeliveryDetailsSheet({
                           return (
                             <div key={attempt.id} className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
                               <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                                {prevDur != null && attempt.durationMs > prevDur && <TrendingUp className="h-2.5 w-2.5 text-red-500" />}
-                                {prevDur != null && attempt.durationMs < prevDur && <TrendingDown className="h-2.5 w-2.5 text-green-500" />}
-                                {prevDur != null && attempt.durationMs === prevDur && <Minus className="h-2.5 w-2.5" />}
-                                <span>{attempt.durationMs}ms</span>
+                                {prevDur != null && attempt.durationMs > prevDur && <TrendingUp className="h-2.5 w-2.5 text-halt" aria-hidden />}
+                                {prevDur != null && attempt.durationMs < prevDur && <TrendingDown className="h-2.5 w-2.5 text-ok" aria-hidden />}
+                                <span className="font-mono">{attempt.durationMs}ms</span>
                               </div>
                               <div
-                                className={`w-full rounded-t transition-all ${isSuccess ? 'bg-green-500' : 'bg-red-400'}`}
+                                className={`w-full rounded-t transition-all ${isSuccess ? 'bg-ok' : 'bg-halt'}`}
                                 style={{ height: `${Math.max(4, pct)}%` }}
                                 title={`#${attempt.attemptNumber}: ${attempt.durationMs}ms — ${attempt.httpStatusCode || 'no response'}`}
                               />
-                              <span className="text-[9px] text-muted-foreground">#{attempt.attemptNumber}</span>
+                              <span className="font-mono text-[9px] text-muted-foreground">#{attempt.attemptNumber}</span>
                             </div>
                           );
                         })}
@@ -541,31 +503,40 @@ export default function DeliveryDetailsSheet({
                     const right = attempts.find(a => a.attemptNumber === compareRight);
                     if (!left || !right) return null;
                     const diffs: { field: string; left: string; right: string; changed: boolean }[] = [
-                      { field: 'HTTP Status', left: String(left.httpStatusCode ?? '—'), right: String(right.httpStatusCode ?? '—'), changed: left.httpStatusCode !== right.httpStatusCode },
-                      { field: 'Duration', left: left.durationMs != null ? `${left.durationMs}ms` : '—', right: right.durationMs != null ? `${right.durationMs}ms` : '—', changed: left.durationMs !== right.durationMs },
-                      { field: 'Error', left: left.errorMessage || '—', right: right.errorMessage || '—', changed: left.errorMessage !== right.errorMessage },
+                      { field: t('deliveryDetails.compare.httpStatus'), left: String(left.httpStatusCode ?? '—'), right: String(right.httpStatusCode ?? '—'), changed: left.httpStatusCode !== right.httpStatusCode },
+                      { field: t('deliveryDetails.compare.duration'), left: left.durationMs != null ? `${left.durationMs}ms` : '—', right: right.durationMs != null ? `${right.durationMs}ms` : '—', changed: left.durationMs !== right.durationMs },
+                      { field: t('deliveryDetails.compare.error'), left: left.errorMessage || '—', right: right.errorMessage || '—', changed: left.errorMessage !== right.errorMessage },
                     ];
                     const leftBody = left.responseBody || '';
                     const rightBody = right.responseBody || '';
                     const bodyChanged = leftBody !== rightBody;
                     return (
-                      <div className="mb-4 border rounded-lg p-4 bg-muted/30 space-y-3">
+                      <div className="mb-4 space-y-3 rounded-lg border border-rail p-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold flex items-center gap-1.5">
-                            <GitCompare className="h-4 w-4 text-primary" />
-                            {t('deliveryDetails.attemptNumber', { number: compareLeft })} vs {t('deliveryDetails.attemptNumber', { number: compareRight })}
+                          <span className="flex items-center gap-1.5 text-sm font-semibold">
+                            <GitCompare className="h-4 w-4 text-primary" aria-hidden />
+                            {t('deliveryDetails.compare.versus', {
+                              left: t('deliveryDetails.attemptNumber', { number: compareLeft }),
+                              right: t('deliveryDetails.attemptNumber', { number: compareRight }),
+                            })}
                           </span>
-                          <Button variant="ghost" size="sm" onClick={() => { setCompareLeft(null); setCompareRight(null); }}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => { setCompareLeft(null); setCompareRight(null); }}
+                            title={t('deliveryDetails.compare.clear')}
+                            aria-label={t('deliveryDetails.compare.clear')}
+                          >
                             <XCircle className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                         <div className="space-y-1">
                           {diffs.map(d => (
-                            <div key={d.field} className={`flex items-center justify-between text-xs px-2 py-1.5 rounded ${d.changed ? 'bg-yellow-500/10 border border-yellow-500/20' : ''}`}>
-                              <span className="font-medium text-muted-foreground w-24 shrink-0">{d.field}</span>
-                              <span className={`font-mono ${d.changed ? 'text-red-500 line-through' : 'text-muted-foreground'}`}>{d.left}</span>
-                              {d.changed && <span className="text-muted-foreground mx-1">→</span>}
-                              {d.changed && <span className="font-mono text-green-600">{d.right}</span>}
+                            <div key={d.field} className={`flex items-center justify-between rounded px-2 py-1.5 text-xs ${d.changed ? 'bg-secondary' : ''}`}>
+                              <span className="w-24 shrink-0 font-medium text-muted-foreground">{d.field}</span>
+                              <span className={`font-mono ${d.changed ? 'text-halt line-through' : 'text-muted-foreground'}`}>{d.left}</span>
+                              {d.changed && <span className="mx-1 text-muted-foreground">→</span>}
+                              {d.changed && <span className="font-mono text-ok">{d.right}</span>}
                             </div>
                           ))}
                         </div>
@@ -575,10 +546,10 @@ export default function DeliveryDetailsSheet({
                               {t('deliveryDetails.responseBodyDiff')}
                             </summary>
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                              <pre className="text-[10px] font-mono p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded overflow-x-auto max-h-32">
+                              <pre className="max-h-32 overflow-x-auto rounded border border-halt/30 bg-halt-soft p-2 font-mono text-[10px]">
                                 {(() => { try { return JSON.stringify(JSON.parse(leftBody), null, 2); } catch { return leftBody; } })()}
                               </pre>
-                              <pre className="text-[10px] font-mono p-2 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded overflow-x-auto max-h-32">
+                              <pre className="max-h-32 overflow-x-auto rounded border border-ok/30 bg-ok-soft p-2 font-mono text-[10px]">
                                 {(() => { try { return JSON.stringify(JSON.parse(rightBody), null, 2); } catch { return rightBody; } })()}
                               </pre>
                             </div>
@@ -589,13 +560,13 @@ export default function DeliveryDetailsSheet({
                   })()}
 
                   {attemptsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    </div>
+                    <SkeletonRows count={3} height="h-16" />
                   ) : attempts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t('deliveryDetails.noAttempts')}
-                    </p>
+                    <EmptyState
+                      icon={Clock}
+                      title={t('deliveryDetails.noAttempts')}
+                      className="flex flex-col items-center justify-center py-8"
+                    />
                   ) : (
                     <div className="relative">
                       {attempts.map((attempt, i) => {
@@ -620,18 +591,18 @@ export default function DeliveryDetailsSheet({
                             <div className="flex gap-3">
                               {/* Timeline dot + line */}
                               <div className="flex flex-col items-center pt-1">
-                                <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
                                   isSuccess
-                                    ? 'border-green-500 bg-green-100 dark:bg-green-900/40'
+                                    ? 'border-ok bg-ok-soft'
                                     : isFail
-                                      ? 'border-red-500 bg-red-100 dark:bg-red-900/40'
-                                      : 'border-muted-foreground bg-muted'
+                                      ? 'border-halt bg-halt-soft'
+                                      : 'border-idle bg-idle-soft'
                                 }`}>
-                                  {isSuccess && <CheckCircle2 className="h-2.5 w-2.5 text-green-600" />}
-                                  {isFail && <XCircle className="h-2.5 w-2.5 text-red-600" />}
-                                  {!isSuccess && !isFail && <Clock className="h-2.5 w-2.5 text-muted-foreground" />}
+                                  {isSuccess && <CheckCircle2 className="h-2.5 w-2.5 text-ok" aria-hidden />}
+                                  {isFail && <XCircle className="h-2.5 w-2.5 text-halt" aria-hidden />}
+                                  {!isSuccess && !isFail && <Clock className="h-2.5 w-2.5 text-idle" aria-hidden />}
                                 </div>
-                                {i < attempts.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
+                                {i < attempts.length - 1 && <div className="mt-1 w-px flex-1 bg-rail" />}
                               </div>
 
                               {/* Attempt content */}
@@ -640,8 +611,8 @@ export default function DeliveryDetailsSheet({
                                   className={`border rounded-lg p-4 space-y-2 ${
                                     compareMode
                                       ? `cursor-pointer transition-all ${
-                                          compareLeft === attempt.attemptNumber ? 'ring-2 ring-red-400 bg-red-50/30 dark:bg-red-950/10' :
-                                          compareRight === attempt.attemptNumber ? 'ring-2 ring-green-400 bg-green-50/30 dark:bg-green-950/10' :
+                                          compareLeft === attempt.attemptNumber ? 'ring-2 ring-halt/50' :
+                                          compareRight === attempt.attemptNumber ? 'ring-2 ring-ok/50' :
                                           'hover:ring-2 hover:ring-primary/30'
                                         }`
                                       : ''
@@ -662,10 +633,10 @@ export default function DeliveryDetailsSheet({
                                   <div className="flex items-center justify-between flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
                                       {compareMode && (
-                                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                                          compareLeft === attempt.attemptNumber ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' :
-                                          compareRight === attempt.attemptNumber ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' :
-                                          'bg-muted text-muted-foreground'
+                                        <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase ${
+                                          compareLeft === attempt.attemptNumber ? 'bg-halt-soft text-halt' :
+                                          compareRight === attempt.attemptNumber ? 'bg-ok-soft text-ok' :
+                                          'bg-secondary text-muted-foreground'
                                         }`}>
                                           {compareLeft === attempt.attemptNumber ? 'A' : compareRight === attempt.attemptNumber ? 'B' : '·'}
                                         </span>
@@ -674,7 +645,7 @@ export default function DeliveryDetailsSheet({
                                         {t('deliveryDetails.attemptNumber', { number: attempt.attemptNumber })}
                                       </span>
                                       {attempt.httpStatusCode && (
-                                        <Badge variant={isSuccess ? 'success' : 'destructive'} className="text-[10px] px-1.5 py-0">
+                                        <Badge variant={isSuccess ? 'ok' : 'halt'} className="px-1.5 py-0 font-mono text-[10px]">
                                           {attempt.httpStatusCode}
                                         </Badge>
                                       )}
@@ -684,9 +655,9 @@ export default function DeliveryDetailsSheet({
                                           {attempt.durationMs}ms
                                           {prev?.durationMs != null && (
                                             attempt.durationMs > prev.durationMs
-                                              ? <TrendingUp className="h-3 w-3 text-red-500 ml-0.5" />
+                                              ? <TrendingUp className="ml-0.5 h-3 w-3 text-halt" aria-hidden />
                                               : attempt.durationMs < prev.durationMs
-                                                ? <TrendingDown className="h-3 w-3 text-green-500 ml-0.5" />
+                                                ? <TrendingDown className="ml-0.5 h-3 w-3 text-ok" aria-hidden />
                                                 : null
                                           )}
                                         </span>
@@ -699,7 +670,7 @@ export default function DeliveryDetailsSheet({
 
                                   {attempt.errorMessage && (
                                     <div className="mt-1">
-                                      <p className="text-xs text-red-600 dark:text-red-400 font-mono bg-red-50 dark:bg-red-950/30 p-2 rounded">
+                                      <p className="rounded bg-halt-soft p-2 font-mono text-xs text-halt">
                                         {attempt.errorMessage}
                                       </p>
                                     </div>
@@ -763,10 +734,10 @@ export default function DeliveryDetailsSheet({
               </Card>
 
               {dryRunResult && (
-                <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+                <Card className="border-rail bg-secondary/40">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Eye className="h-4 w-4 text-blue-600" />
+                      <Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
                       {t('deliveryDetails.dryRun.title')}
                     </CardTitle>
                   </CardHeader>
@@ -836,10 +807,20 @@ export default function DeliveryDetailsSheet({
                 </div>
               )}
             </div>
+          ) : loadError ? (
+            <ErrorState
+              error={loadError}
+              fallbackKey="deliveryDetails.toast.loadFailed"
+              onRetry={loadDelivery}
+              retrying={loading}
+              className="flex flex-col items-center justify-center py-16"
+            />
           ) : (
-            <div className="flex items-center justify-center py-16">
-              <p className="text-muted-foreground">{t('deliveryDetails.noData')}</p>
-            </div>
+            <EmptyState
+              icon={Info}
+              title={t('deliveryDetails.noData')}
+              className="flex flex-col items-center justify-center py-16"
+            />
           )}
         </SheetContent>
       </Sheet>

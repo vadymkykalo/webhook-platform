@@ -8,6 +8,7 @@ import {
   Endpoint,
   EndpointCreateParams,
   EndpointUpdateParams,
+  EndpointListParams,
   Subscription,
   SubscriptionCreateParams,
   Delivery,
@@ -37,7 +38,7 @@ import {
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_TIMEOUT = 30000;
-const SDK_VERSION = '2.2.1';
+const SDK_VERSION = '2.4.0';
 
 export class Hookflow {
   private readonly apiKey: string;
@@ -211,7 +212,9 @@ export class Hookflow {
       case 429:
         return new RateLimitError(
           message,
-          rateLimitInfo || { limit: 0, remaining: 0, reset: Date.now() + 60000 }
+          // `reset` is a Unix timestamp in seconds (see RateLimitInfo), so the
+          // fallback has to be in seconds too, not Date.now() + 60000.
+          rateLimitInfo || { limit: 0, remaining: 0, reset: Math.floor(Date.now() / 1000) + 60 }
         );
       case 400:
         return new ValidationError(
@@ -255,11 +258,24 @@ class Endpoints {
     );
   }
 
-  async list(projectId: string): Promise<Endpoint[]> {
-    return this.client.request<Endpoint[]>(
-      'GET',
-      `/api/v1/projects/${projectId}/endpoints`
-    );
+  /**
+   * Lists a project's endpoints.
+   *
+   * The API returns a Spring page envelope here, not a bare array — the
+   * endpoints themselves are in `.content`.
+   */
+  async list(
+    projectId: string,
+    params: EndpointListParams = {}
+  ): Promise<PaginatedResponse<Endpoint>> {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set('page', params.page.toString());
+    if (params.size !== undefined) query.set('size', params.size.toString());
+
+    const queryString = query.toString();
+    const path = `/api/v1/projects/${projectId}/endpoints${queryString ? `?${queryString}` : ''}`;
+
+    return this.client.request<PaginatedResponse<Endpoint>>('GET', path);
   }
 
   async update(

@@ -134,7 +134,10 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           urlToEndpointId.set(created.url, created.id);
           endpointsCreated++;
         } catch (err: any) {
-          errors.push(`Endpoint ${ep.url}: ${err.response?.data?.message || err.message}`);
+          errors.push(t('configExport.toast.endpointFailed', {
+            url: ep.url,
+            reason: err.response?.data?.message || err.message,
+          }));
         }
       }
 
@@ -160,7 +163,11 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           await subscriptionsApi.create(projectId, req);
           subscriptionsCreated++;
         } catch (err: any) {
-          errors.push(`Subscription ${sub.eventType} → ${sub.endpointUrl}: ${err.response?.data?.message || err.message}`);
+          errors.push(t('configExport.toast.subscriptionFailed', {
+            eventType: sub.eventType,
+            url: sub.endpointUrl,
+            reason: err.response?.data?.message || err.message,
+          }));
         }
       }
 
@@ -219,11 +226,11 @@ export default function ConfigExportImport({ projectId, projectName }: ConfigExp
           <p className="text-xs text-muted-foreground">{t('configExport.hint')}</p>
 
           {importResult && (
-            <div className={`rounded-lg border p-3 text-sm ${importResult.errors.length > 0 ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800' : 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'}`}>
-              <div className="flex items-center gap-2 mb-1">
+            <div className={`rounded-lg border p-3 text-sm ${importResult.errors.length > 0 ? 'border-retry/30 bg-retry-soft' : 'border-ok/30 bg-ok-soft'}`}>
+              <div className="mb-1 flex items-center gap-2">
                 {importResult.errors.length > 0
-                  ? <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  : <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ? <AlertTriangle className="h-4 w-4 text-retry" aria-hidden />
+                  : <CheckCircle2 className="h-4 w-4 text-ok" aria-hidden />
                 }
                 <span className="font-medium">
                   {t('configExport.importResult', { endpoints: importResult.endpoints, subscriptions: importResult.subscriptions })}

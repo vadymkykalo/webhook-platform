@@ -1,21 +1,19 @@
-import { useState, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { Send, Eye, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, Bell, Info, Radio } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { Send, RefreshCw, AlertTriangle, Loader2, Radio, X } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showWarning } from '../lib/toast';
-import { formatRelativeTime, formatDateTime, formatRelativeFuture } from '../lib/date';
+import { formatRelativeFuture } from '../lib/date';
 import { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import { useProject, useEndpoints, useDeliveries, useEvent, useBulkReplayDeliveries } from '../api/queries';
 import type { DeliveryResponse } from '../types/api.types';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
 import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
 import { TablePagination } from '../components/ui/table-pagination';
-import { Badge } from '../components/ui/badge';
-import { Card, CardContent } from '../components/ui/card';
 import {
   Table,
   TableBody,
@@ -32,6 +30,8 @@ import DeliveryDetailsSheet from './DeliveryDetailsSheet';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
+import { railFromCounts } from './attemptRailData';
+import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
 
 const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
@@ -67,6 +67,21 @@ function dateRangeBounds(dateRange: string, nowMinute: number): { fromDate?: str
   return { fromDate: new Date(now - span).toISOString(), toDate };
 }
 
+/** What the status badge says under itself: why this delivery is where it is. */
+function explainOf(delivery: DeliveryResponse): { key: string; values?: Record<string, string | number> } | null {
+  if (delivery.status === 'PENDING' && delivery.attemptCount > 0 && delivery.nextRetryAt) {
+    return { key: 'deliveries.statusExplain.PENDING_RETRY', values: { time: formatRelativeFuture(delivery.nextRetryAt) } };
+  }
+  if (delivery.status === 'PENDING') return { key: 'deliveries.statusExplain.PENDING_NEW' };
+  if (delivery.status === 'PROCESSING') return { key: 'deliveries.statusExplain.PROCESSING' };
+  if (delivery.status === 'DLQ') return { key: 'deliveries.statusExplain.DLQ', values: { count: delivery.attemptCount } };
+  if (delivery.status === 'FAILED') return { key: 'deliveries.statusExplain.FAILED' };
+  return null;
+}
+
+/** A delivered obligation has nothing left to replay. */
+const isReplayable = (d: DeliveryResponse) => d.status !== 'SUCCESS';
+
 export default function DeliveriesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -84,6 +99,7 @@ export default function DeliveriesPage() {
   const { sort, toggle: toggleSort, param: sortParam } = useSort('createdAt', 'desc');
 
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
   const { canReplayDeliveries } = usePermissions();
 
@@ -119,7 +135,7 @@ export default function DeliveriesPage() {
     fromDate: eventIdFilter ? undefined : fromDate,
     toDate: eventIdFilter ? undefined : toDate,
   });
-  const deliveries = deliveriesData?.content ?? [];
+  const deliveries = useMemo(() => deliveriesData?.content ?? [], [deliveriesData]);
   const totalElements = deliveriesData?.totalElements ?? 0;
   const totalPages = deliveriesData?.totalPages ?? 0;
 
@@ -130,65 +146,63 @@ export default function DeliveriesPage() {
   const bulkReplayMutation = useBulkReplayDeliveries();
   const bulkReplaying = bulkReplayMutation.isPending;
 
-  const getStatusBadge = (status: DeliveryResponse['status']) => {
-    const variants: Record<typeof status, { variant: any; icon: any }> = {
-      SUCCESS: { variant: 'success', icon: CheckCircle2 },
-      FAILED: { variant: 'destructive', icon: XCircle },
-      DLQ: { variant: 'destructive', icon: AlertCircle },
-      PENDING: { variant: 'secondary', icon: Clock },
-      PROCESSING: { variant: 'info', icon: RefreshCw },
-    };
-    
-    const config = variants[status];
-    const Icon = config.icon;
-    
-    return (
-      <Badge variant={config.variant} className="gap-1">
-        <Icon className="h-3 w-3" />
-        {t(`deliveries.status.${status}`)}
-      </Badge>
-    );
+  const selectable = useMemo(() => deliveries.filter(isReplayable), [deliveries]);
+  const selectedCount = selectedIds.size;
+  const allSelected = selectable.length > 0 && selectable.every((d) => selectedIds.has(d.id));
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(selectable.map((d) => d.id)));
+  };
 
   const getEndpointName = (endpointId: string) => {
     const endpoint = endpoints.find(e => e.id === endpointId);
-    return endpoint?.url || endpointId.substring(0, 8);
+    return endpoint?.url ?? endpointId.substring(0, 8);
   };
 
-  const handleBulkReplay = async () => {
-    if (!projectId) return;
-
-    const hasFilters = statusFilter || endpointFilter;
-    const failedOrDlqSelected = statusFilter === 'FAILED' || statusFilter === 'DLQ';
-
-    if (!hasFilters && !failedOrDlqSelected) {
-      showApiError(new Error('Filter required'), 'deliveries.replayError');
-      return;
-    }
-
+  const handleReplaySelected = async () => {
+    if (!projectId || selectedCount === 0) return;
     try {
-      const response = await bulkReplayMutation.mutateAsync({
-        projectId,
-        status: statusFilter || undefined,
-        endpointId: endpointFilter || undefined,
-      });
-
-      if (response.hasMore) {
-        showWarning(t('deliveries.bulkReplayHasMore', { replayed: response.replayed, total: response.totalMatched }));
+      const response = await bulkReplayMutation.mutateAsync({ deliveryIds: Array.from(selectedIds), projectId });
+      setSelectedIds(new Set());
+      if (response.skipped > 0) {
+        showWarning(t('deliveries.replayedSomeSkipped', { replayed: response.replayed, skipped: response.skipped }));
       } else {
-        showSuccess(response.message);
+        showSuccess(t('deliveries.replayedCount', { count: response.replayed }));
       }
     } catch (err: any) {
       showApiError(err, 'deliveries.toast.replayFailed');
     }
   };
 
-  const filteredDeliveries = deliveries;
+  const handleReplayMatching = async () => {
+    if (!projectId) return;
+    try {
+      const response = await bulkReplayMutation.mutateAsync({
+        projectId,
+        status: statusFilter || undefined,
+        endpointId: endpointFilter || undefined,
+      });
+      if (response.hasMore) {
+        showWarning(t('deliveries.bulkReplayHasMore', { replayed: response.replayed, total: response.totalMatched }));
+      } else {
+        showSuccess(t('deliveries.replayedCount', { count: response.replayed }));
+      }
+    } catch (err: any) {
+      showApiError(err, 'deliveries.toast.replayFailed');
+    }
+  };
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-4 lg:p-6">
         <SkeletonRows count={5} />
       </div>
     );
@@ -196,111 +210,90 @@ export default function DeliveriesPage() {
 
   if (isError) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-4 lg:p-6">
         <ErrorState error={projectError ?? deliveriesError} fallbackKey="deliveries.toast.loadFailed" onRetry={retry} />
       </div>
     );
   }
 
-  if (!project) {
-    return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <EmptyState icon={Send} title={t('deliveries.projectNotFound')} />
-      </div>
-    );
-  }
+  const replayAllMatching = (statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
+    <PermissionGate allowed={canReplayDeliveries}>
+      <VerificationGate>
+        <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline">
+          {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+          {t('deliveries.replayMatching', { count: totalElements })}
+        </Button>
+      </VerificationGate>
+    </PermissionGate>
+  );
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-title tracking-tight">{t('deliveries.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          <Trans i18nKey="deliveries.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
-        </p>
-      </div>
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={t('nav.outgoing')}
+        title={t('deliveries.allTitle')}
+        description={<Trans i18nKey="deliveries.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
+        actions={replayAllMatching || undefined}
+      />
 
       {eventIdFilter && (
-        <div className="flex items-center gap-3 p-3 mb-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-          <Send className="h-4 w-4 text-blue-600 shrink-0" />
-          <span className="text-sm text-blue-700 dark:text-blue-300">
-            {t('deliveries.filteringByEvent')} <code className="font-mono text-xs bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">{eventIdFilter.substring(0, 8)}...</code>
-          </span>
-          <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" onClick={() => setSearchParams({})}>
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-rail bg-secondary/50 px-3 py-2">
+          <Send className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
+          <span className="text-sm text-muted-foreground">{t('deliveries.filteringByEvent')}</span>
+          <code className="font-mono text-[13px]">{eventIdFilter.substring(0, 8)}</code>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSearchParams({})}>
+            <X className="h-3.5 w-3.5" />
             {t('deliveries.clearEventFilter')}
           </Button>
         </div>
       )}
 
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="status" className="text-xs">{t('deliveries.filters.status')}</Label>
-              <Select id="status" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
-                {statusOptions(t).map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="endpoint" className="text-xs">{t('deliveries.filters.endpoint')}</Label>
-              <Select id="endpoint" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
-                <option value="">{t('deliveries.filters.allEndpoints')}</option>
-                {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dateRange" className="text-xs">{t('deliveries.filters.dateRange')}</Label>
-              <Select id="dateRange" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-                {dateRangeOptions(t).map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="search" className="text-xs">{t('deliveries.filters.searchByEventType')}</Label>
-              <Input id="search" placeholder={t('deliveries.filters.eventTypePlaceholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            </div>
-          </div>
-          {(statusFilter === 'FAILED' || statusFilter === 'DLQ') && totalElements > 0 && (
-            <div className="flex justify-end mt-3">
-              <PermissionGate allowed={canReplayDeliveries}>
-                <VerificationGate>
-                <Button onClick={() => setShowBulkReplayDialog(true)} disabled={bulkReplaying} variant="outline" size="sm">
-                  {bulkReplaying && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                  {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplay', { status: t(`deliveries.status.${statusFilter}`) })}
-                </Button>
-                </VerificationGate>
-              </PermissionGate>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <FilterBar>
+        <FilterField id="status" label={t('deliveries.filters.status')}>
+          <Select id="status" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
+            {statusOptions(t).map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+          </Select>
+        </FilterField>
+        <FilterField id="endpoint" label={t('deliveries.filters.endpoint')} className="min-w-[14rem]">
+          <Select id="endpoint" value={endpointFilter} onChange={(e) => { setEndpointFilter(e.target.value); setPage(0); }}>
+            <option value="">{t('deliveries.filters.allEndpoints')}</option>
+            {endpoints.map(endpoint => (<option key={endpoint.id} value={endpoint.id}>{endpoint.url}</option>))}
+          </Select>
+        </FilterField>
+        <FilterField id="dateRange" label={t('deliveries.filters.dateRange')}>
+          <Select id="dateRange" value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+            {dateRangeOptions(t).map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+          </Select>
+        </FilterField>
+        <SearchField
+          id="search"
+          label={t('deliveries.filters.searchByEventType')}
+          placeholder={t('deliveries.filters.eventTypePlaceholder')}
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+      </FilterBar>
 
-      {filteredDeliveries.length === 0 ? (
+      {deliveries.length === 0 ? (
         eventIdFilter && filteredEventType ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
-            <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
-              <Info className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">{t('deliveries.noDeliveriesForEvent')}</h3>
-            <p className="text-sm text-muted-foreground max-w-md mb-6">
-              <Trans i18nKey="deliveries.noDeliveriesForEventDesc" values={{ eventType: filteredEventType }} components={{ strong: <strong /> }} />
-            </p>
-            <div className="flex gap-3">
-              <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
-                <Bell className="h-3.5 w-3.5 mr-1.5" />
-                {t('deliveries.viewSubscriptions')}
-              </Button>
-              <Button size="sm" onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('deliveries.noDeliveriesForEvent')}
+            description={t('deliveries.noDeliveriesForEventPlain', { eventType: filteredEventType })}
+            action={
+              <Button onClick={() => navigate(`/admin/projects/${projectId}/subscriptions`)}>
                 {t('deliveries.noDeliveriesForEventAction')}
               </Button>
-            </div>
-          </div>
+            }
+          />
         ) : (
           <EmptyState
             icon={Send}
             title={t('deliveries.noDeliveries')}
             description={t('deliveries.noDeliveriesDesc')}
             action={
-              <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
-                <Radio className="h-3.5 w-3.5 mr-1.5" />
+              <Button variant="outline" onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
+                <Radio className="h-3.5 w-3.5" />
                 {t('deliveries.goToEvents')}
               </Button>
             }
@@ -309,77 +302,107 @@ export default function DeliveriesPage() {
         )
       ) : (
         <div className="animate-fade-in">
-          <Card className="overflow-hidden">
+          <PermissionGate allowed={canReplayDeliveries}>
+            <SelectionBar count={selectedCount} onClear={() => setSelectedIds(new Set())}>
+              <VerificationGate>
+                <Button size="sm" onClick={handleReplaySelected} disabled={bulkReplaying}>
+                  {bulkReplaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  {t('deliveries.replaySelected', { count: selectedCount })}
+                </Button>
+              </VerificationGate>
+            </SelectionBar>
+          </PermissionGate>
+
+          <div className="overflow-hidden rounded-lg border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.created')}</SortableTableHead>
-                  <SortableTableHead field="status" sort={sort} onSort={toggleSort}>{t('deliveries.columns.status')}</SortableTableHead>
-                  <TableHead className="text-xs">{t('deliveries.columns.endpoint')}</TableHead>
-                  <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort}>{t('deliveries.columns.attempts')}</SortableTableHead>
-                  <SortableTableHead field="nextRetryAt" sort={sort} onSort={toggleSort}>{t('deliveries.columns.nextRetry')}</SortableTableHead>
-                  <TableHead className="text-xs hidden lg:table-cell">{t('deliveries.columns.lastError')}</TableHead>
-                  <TableHead className="w-[50px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
+                  {canReplayDeliveries && (
+                    <TableHead className="w-10">
+                      <SelectBox
+                        checked={allSelected}
+                        indeterminate={selectedCount > 0}
+                        onChange={toggleAll}
+                        label={t(allSelected ? 'common.deselectAll' : 'common.selectAll')}
+                      />
+                    </TableHead>
+                  )}
+                  <SortableTableHead field="status" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.status')}</SortableTableHead>
+                  <TableHead>{t('deliveries.columns.event')}</TableHead>
+                  <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
+                  <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.attempts')}</SortableTableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.created')}</SortableTableHead>
+                  <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDeliveries.map((delivery) => (
-                  <TableRow key={delivery.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedDeliveryId(delivery.id)}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{formatRelativeTime(delivery.createdAt)}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatDateTime(delivery.createdAt)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        {getStatusBadge(delivery.status)}
-                        <span className="text-[11px] text-muted-foreground">
-                          {delivery.status === 'PENDING' && delivery.attemptCount > 0 && delivery.nextRetryAt
-                            ? t('deliveries.statusExplain.PENDING_RETRY', { time: formatRelativeFuture(delivery.nextRetryAt) })
-                            : delivery.status === 'PENDING' && delivery.attemptCount === 0
-                              ? t('deliveries.statusExplain.PENDING_NEW')
-                              : delivery.status === 'PROCESSING'
-                                ? t('deliveries.statusExplain.PROCESSING')
-                                : delivery.status === 'DLQ'
-                                  ? t('deliveries.statusExplain.DLQ', { count: delivery.attemptCount })
-                                  : null}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-[13px] truncate max-w-[200px] block">{getEndpointName(delivery.endpointId)}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm font-medium">{delivery.attemptCount}<span className="text-muted-foreground">/{delivery.maxAttempts}</span></span>
-                    </TableCell>
-                    <TableCell>
-                      {delivery.status === 'PENDING' && delivery.nextRetryAt ? (
-                        <div className="flex flex-col">
-                          <span className="text-[13px] font-medium">{formatRelativeFuture(delivery.nextRetryAt)}</span>
-                          <span className="text-[11px] text-muted-foreground">{formatDateTime(delivery.nextRetryAt)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-[13px] text-muted-foreground">—</span>
+                {deliveries.map((delivery) => {
+                  const rail = railFromCounts(delivery.attemptCount, delivery.maxAttempts, delivery.status);
+                  const explain = explainOf(delivery);
+                  return (
+                    <TableRow
+                      key={delivery.id}
+                      className="group/row cursor-pointer"
+                      data-state={selectedIds.has(delivery.id) ? 'selected' : undefined}
+                      onClick={() => setSelectedDeliveryId(delivery.id)}
+                    >
+                      {canReplayDeliveries && (
+                        <TableCell>
+                          {isReplayable(delivery) ? (
+                            <SelectBox
+                              checked={selectedIds.has(delivery.id)}
+                              onChange={() => toggleRow(delivery.id)}
+                              label={t('common.selectRow')}
+                            />
+                          ) : (
+                            <span className="sr-only">{t('deliveries.nothingToReplay')}</span>
+                          )}
+                        </TableCell>
                       )}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {delivery.status === 'FAILED' || delivery.status === 'DLQ' ? (
-                        <span className="text-[12px] text-red-600 dark:text-red-400 truncate max-w-[180px] block" title={delivery.lastAttemptAt ? '' : ''}>
-                          {delivery.status === 'FAILED' ? 'Non-retryable error' : `Exhausted ${delivery.attemptCount}/${delivery.maxAttempts} attempts`}
+                      <TableCell>
+                        <span className="flex flex-col gap-1">
+                          <StatusBadge
+                            kind={kindOfDeliveryStatus(delivery.status)}
+                            label={t(`deliveries.status.${delivery.status}`)}
+                          />
+                          {explain && (
+                            <span className="text-[11px] text-muted-foreground">{t(explain.key, explain.values)}</span>
+                          )}
                         </span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon-sm" onClick={(e) => { e.stopPropagation(); setSelectedDeliveryId(delivery.id); }} title={t('common.viewAll')} aria-label={t('common.viewAll')}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <CopyId
+                          value={delivery.eventId}
+                          to={`/admin/projects/${projectId}/events/${delivery.eventId}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          to={`/admin/projects/${projectId}/endpoints`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="block max-w-[220px] truncate rounded font-mono text-[13px] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          title={getEndpointName(delivery.endpointId)}
+                        >
+                          {getEndpointName(delivery.endpointId)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <AttemptCell
+                          rail={rail.attempts}
+                          maxAttempts={rail.maxAttempts}
+                          attemptCount={delivery.attemptCount}
+                          ladderLength={delivery.maxAttempts}
+                          nextRetryAt={delivery.status === 'PENDING' ? delivery.nextRetryAt : undefined}
+                        />
+                      </TableCell>
+                      <TableCell><TimeCell value={delivery.createdAt} /></TableCell>
+                      <TableCell><CopyId value={delivery.id} /></TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
-          </Card>
+          </div>
 
           <TablePagination
             page={page}
@@ -399,7 +422,6 @@ export default function DeliveriesPage() {
         onRefresh={refetchDeliveries}
       />
 
-      {/* Bulk Replay Confirmation */}
       <AlertDialog open={showBulkReplayDialog} onOpenChange={setShowBulkReplayDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -408,15 +430,15 @@ export default function DeliveriesPage() {
               {t('deliveries.bulkReplayDialog.description', { status: t(`deliveries.status.${statusFilter}`), count: totalElements })}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg mx-1">
-            <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-warning">{t('deliveries.bulkReplayDialog.warning')}</p>
+          <div className="mx-1 flex items-start gap-2 rounded-lg border border-retry/30 bg-retry-soft p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
+            <p className="text-sm text-retry">{t('deliveries.bulkReplayDialog.warning')}</p>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={bulkReplaying}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { handleBulkReplay(); setShowBulkReplayDialog(false); }} disabled={bulkReplaying}>
-              {bulkReplaying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {bulkReplaying ? t('deliveries.replaying') : t('deliveries.bulkReplayDialog.confirm')}
+            <AlertDialogAction onClick={() => { handleReplayMatching(); setShowBulkReplayDialog(false); }} disabled={bulkReplaying}>
+              {bulkReplaying && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('deliveries.bulkReplayDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

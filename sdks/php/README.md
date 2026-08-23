@@ -1,15 +1,13 @@
-# hookflow/php
+# webhook-platform/php
 
 Official PHP SDK for [Hookflow](https://github.com/vadymkykalo/webhook-platform).
 
-> Renamed from `webhook-platform/php` on Packagist. The `Hookflow\` namespace
-> doesn't change. The old package had zero real usage (no installs) and was
-> abandoned rather than kept alive as a deprecation shim — point Composer at
-> `hookflow/php` going forward.
+> The Packagist package is `webhook-platform/php`; the PHP namespace is
+> `Hookflow\`. The two names differ on purpose.
 
 **Scope.** This SDK covers Events, Endpoints, Subscriptions, Deliveries,
 Incoming Sources, Incoming Events, and webhook signature verification —
-about 6 of the platform's 35 API controllers. It does not wrap
+7 of the platform's 35 API controllers. It does not wrap
 Transformations, Rules, Workflows, Schemas, DLQ, Analytics, Usage, Alerts,
 Incidents, PII rules, Audit Log, Tunnels, API keys, Members, or Projects —
 use the [Generic Requests](#generic-requests) helpers for those until the
@@ -24,7 +22,7 @@ SDK grows to cover them.
 ## Installation
 
 ```bash
-composer require hookflow/php
+composer require webhook-platform/php
 ```
 
 ## Quick Start
@@ -35,7 +33,7 @@ composer require hookflow/php
 use Hookflow\Hookflow;
 
 $client = new Hookflow(
-    apiKey: 'wh_live_your_api_key',
+    apiKey: getenv('HOOKFLOW_API_KEY'), // e.g. 'Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk'
     baseUrl: 'http://localhost:8080' // optional
 );
 
@@ -76,8 +74,11 @@ $endpoint = $client->endpoints->create($projectId, [
     'enabled' => true,
 ]);
 
-// List endpoints
-$endpoints = $client->endpoints->list($projectId);
+// List endpoints — the API paginates this one, so the endpoints are in ['content']
+$page = $client->endpoints->list($projectId);
+foreach ($page['content'] as $endpoint) {
+    echo "{$endpoint['url']}\n";
+}
 
 // Update endpoint
 $client->endpoints->update($projectId, $endpointId, [
@@ -95,6 +96,7 @@ echo "New secret: {$updated['secret']}\n";
 $result = $client->endpoints->test($projectId, $endpointId);
 $status = $result['success'] ? 'passed' : 'failed';
 echo "Test {$status}: {$result['latencyMs']}ms\n";
+echo "{$result['httpStatusCode']} — {$result['message']}\n";
 ```
 
 ### Subscriptions
@@ -107,7 +109,7 @@ $subscription = $client->subscriptions->create($projectId, [
     'enabled' => true,
 ]);
 
-// List subscriptions
+// List subscriptions — a bare array; unlike endpoints, this one is not paginated
 $subscriptions = $client->subscriptions->list($projectId);
 
 // Update subscription
@@ -135,7 +137,7 @@ echo "Total failed: {$deliveries['totalElements']}\n";
 // Get delivery attempts
 $attempts = $client->deliveries->getAttempts($deliveryId);
 foreach ($attempts as $attempt) {
-    echo "Attempt {$attempt['attemptNumber']}: {$attempt['httpStatus']} ({$attempt['latencyMs']}ms)\n";
+    echo "Attempt {$attempt['attemptNumber']}: {$attempt['httpStatusCode']} ({$attempt['durationMs']}ms)\n";
 }
 
 // Replay failed delivery
@@ -240,14 +242,12 @@ try {
     // Option 2: Verify and parse
     $event = Webhook::constructEvent($payload, $headers, $secret);
 
-    echo "Received {$event['type']}: " . json_encode($event['data']) . "\n";
-
-    // Handle the event
-    switch ($event['type']) {
-        case 'order.completed':
-            handleOrderCompleted($event['data']);
-            break;
-    }
+    // $event['data'] is the decoded body; eventId / deliveryId / timestamp come
+    // from the X-Event-Id / X-Delivery-Id / X-Timestamp headers. See "What
+    // lands on your endpoint" below for $event['type'].
+    echo "Delivery {$event['deliveryId']} of event {$event['eventId']}: "
+        . json_encode($event['data']) . "\n";
+    handleOrderCompleted($event['data']);
 
     http_response_code(200);
     echo 'OK';
@@ -258,6 +258,40 @@ try {
     echo 'Invalid signature';
 }
 ```
+
+### What lands on your endpoint
+
+Hookflow PUTs the event's **payload** on the wire, not an envelope. This:
+
+```php
+$client->events->send('order.completed', ['orderId' => 'ord_1']);
+```
+
+arrives at your endpoint as the `data` array alone —
+
+```http
+POST /webhooks HTTP/1.1
+Content-Type: application/json
+X-Signature: t=1738000000000,v1=<hex hmac-sha256>
+X-Timestamp: 1738000000000
+X-Event-Id: 6f0e…
+X-Delivery-Id: 91ab…
+X-Sequence-Number: 0
+Idempotency-Key: 6f0e…-<endpoint-id>
+
+{"orderId":"ord_1"}
+```
+
+So `constructEvent` fills `eventId`, `deliveryId` and `timestamp` from the
+headers and `data` from the body, but **`type` is empty**: the event type is
+not on the wire for a default subscription. Route on the payload, on the
+endpoint you registered, or set the subscription's `payloadTemplate` to wrap
+the event so `type` becomes part of the body.
+
+The signature is computed over `"{$timestamp}.{$rawBody}"` with HMAC-SHA256 and
+the endpoint secret, and the server rejects timestamps more than **300
+seconds** old — verify against the *raw* body from `php://input`, before any
+`json_decode` and re-encode.
 
 ### Laravel Example
 
@@ -345,7 +379,8 @@ use Hookflow\Exception\ValidationException;
 try {
     $client->events->send('test', []);
 } catch (RateLimitException $e) {
-    // Wait and retry
+    // getRetryAfterMs() is milliseconds. getRateLimitInfo()['reset'] is the raw
+    // X-RateLimit-Reset header, which the API sends in Unix *seconds*.
     $retryAfterMs = $e->getRetryAfterMs();
     echo "Rate limited. Retry after {$retryAfterMs}ms\n";
     usleep($retryAfterMs * 1000);
@@ -423,11 +458,32 @@ All generic methods use the same authentication, error handling, and rate-limit 
 
 ```php
 $client = new Hookflow(
-    apiKey: 'wh_live_xxx',           // Required: Your API key
-    baseUrl: 'https://api.example.com', // Optional: API base URL
+    apiKey: getenv('HOOKFLOW_API_KEY'), // Required: Your project API key
+    baseUrl: 'https://api.example.com', // Optional (default: http://localhost:8080)
     timeout: 30                      // Optional: Request timeout in seconds (default: 30)
 );
 ```
+
+### Timeouts and retries
+
+`timeout` is `CURLOPT_TIMEOUT`; hitting it throws `HookflowException` with
+status `0` and a `cURL error: …` message, as does any connection-level failure.
+
+**The client does not retry.** One SDK call is exactly one HTTP request — no
+backoff, no idempotent replay. That is deliberate: `events->send()` accepts an
+`$idempotencyKey`, so a retry policy belongs to the caller who knows whether
+reissuing the request is safe. What *is* retried is the delivery itself, by the
+platform, on the subscription's `retryDelays` ladder.
+
+## Authentication
+
+Every request the client makes carries `X-API-Key: <your key>` — the project
+API key, created in the dashboard or via
+`POST /api/v1/projects/{projectId}/api-keys`. The SDK never sends a bearer
+token and has no login surface: JWT-authenticated endpoints (auth, projects,
+organizations, members, API keys) are not part of it. Bootstrapping a project
+and a key is a one-time step you do with the dashboard, the CLI, or plain
+HTTP.
 
 ## Development
 
@@ -443,6 +499,26 @@ composer test
 ```bash
 docker run --rm -v $(pwd):/app -w /app composer:2 sh -c "composer install && composer test"
 ```
+
+### Live-API smoke check
+
+`composer test` stubs cURL, so it cannot see a renamed field. To drive the SDK
+against a real instance:
+
+```bash
+make up                          # from the repo root
+php scripts/live-api-smoke.php   # SMOKE_API_BASE_URL overrides the target
+
+# or, with no local PHP:
+docker run --rm --network host -v "$PWD":/app -w /app php:8.2-cli php scripts/live-api-smoke.php
+```
+
+It registers a throwaway org, walks endpoint → subscription → event →
+deliveries → attempts → incoming, checks each error envelope, and verifies a
+signature the running server itself produced. It is a script, not a test —
+`phpunit.xml`'s only testsuite is `tests/`, so PHPUnit never collects it and
+the unit suite still passes with no backend. It falls back to a PSR-4 shim when
+`vendor/` is absent, so it runs without `composer install`.
 
 ## License
 

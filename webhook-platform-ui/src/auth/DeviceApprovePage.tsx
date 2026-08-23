@@ -1,18 +1,38 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { CheckCircle2, XCircle, Loader2, Terminal, AlertTriangle } from 'lucide-react';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import AuthLayout from './AuthLayout';
 import { showApiError, showSuccess } from '../lib/toast';
 import { http } from '../api/http';
 import { useAuth } from './auth.store';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
+import { cn } from '../lib/utils';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+
+/**
+ * Approving a CLI login is a security decision, so the code the person is
+ * approving is the loudest thing on the screen and it is set in mono — it came
+ * out of a terminal, and it has to be comparable character by character with
+ * what is still on that terminal.
+ */
+function DeviceCode({ code }: { code: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-lg border border-rail bg-card p-5 text-center">
+      <p className="mono-label mb-3">{t('auth.device.codeLabel')}</p>
+      <p className="font-mono text-[28px] font-semibold leading-none tracking-[0.2em] text-foreground">
+        {code}
+      </p>
+    </div>
+  );
+}
 
 export default function DeviceApprovePage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
   const codeFromUrl = searchParams.get('code') || '';
@@ -63,109 +83,110 @@ export default function DeviceApprovePage() {
     return clean;
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <div className="w-full max-w-md bg-card border rounded-xl shadow-sm p-8 text-center space-y-5">
-        <div className="flex items-center justify-center gap-2.5 mb-2">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-            <HookflowIcon className="h-4 w-4 text-primary-foreground" />
+  if (status === 'needsLogin') {
+    return (
+      <AuthLayout title={t('auth.device.loginRequired')} subtitle={t('auth.device.loginRequiredDesc')}>
+        <Link
+          to={`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+          className={cn(buttonVariants(), 'h-10 w-full')}
+        >
+          {t('auth.device.goToLogin')}
+        </Link>
+      </AuthLayout>
+    );
+  }
+
+  if (status === 'confirming') {
+    return (
+      <AuthLayout title={t('auth.device.confirmTitle')} subtitle={t('auth.device.confirmDesc')}>
+        <div className="space-y-5">
+          <DeviceCode code={formatCode(userCode)} />
+
+          <div className="rounded-md border border-retry/25 bg-retry-soft p-3 text-sm text-retry">
+            {t('auth.device.confirmWarning')}
           </div>
-          <span className="text-lg font-bold">Hookflow</span>
-        </div>
 
-        {status === 'needsLogin' && (
-          <>
-            <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto" />
-            <h2 className="text-xl font-semibold">{t('auth.device.loginRequired')}</h2>
-            <p className="text-sm text-muted-foreground">{t('auth.device.loginRequiredDesc')}</p>
-            <Link to={`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
-              <Button className="w-full mt-2">{t('auth.device.goToLogin')}</Button>
-            </Link>
-          </>
-        )}
-
-        {status === 'input' && (
-          <>
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-              <Terminal className="h-6 w-6 text-primary" />
-            </div>
-            <h2 className="text-xl font-semibold">{t('auth.device.title')}</h2>
-            <p className="text-sm text-muted-foreground">{t('auth.device.subtitle')}</p>
-
-            <form onSubmit={handleSubmitCode} className="space-y-4 text-left">
-              <div className="space-y-2">
-                <Label htmlFor="userCode" className="text-sm font-medium">{t('auth.device.codeLabel')}</Label>
-                <Input
-                  id="userCode"
-                  type="text"
-                  placeholder="XXXX-XXXX"
-                  value={formatCode(userCode)}
-                  onChange={(e) => setUserCode(e.target.value.replace(/[^A-Za-z0-9-]/g, ''))}
-                  maxLength={9}
-                  className="h-12 text-center text-xl font-mono tracking-widest"
-                  autoFocus
-                  autoComplete="off"
-                />
-              </div>
-              <Button type="submit" className="w-full h-11" disabled={userCode.replace(/[^A-Za-z0-9]/g, '').length < 8}>
-                {t('auth.device.continue')}
-              </Button>
-            </form>
-          </>
-        )}
-
-        {status === 'confirming' && (
-          <>
-            <div className="h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto">
-              <Terminal className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-            </div>
-            <h2 className="text-xl font-semibold">{t('auth.device.confirmTitle')}</h2>
-            <p className="text-sm text-muted-foreground">{t('auth.device.confirmDesc')}</p>
-
-            <div className="bg-muted rounded-lg p-4">
-              <p className="text-2xl font-mono font-bold tracking-widest">{formatCode(userCode)}</p>
-            </div>
-
-            <p className="text-xs text-muted-foreground">{t('auth.device.confirmWarning')}</p>
-
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={handleReset} className="flex-1">
-                {t('common.cancel')}
-              </Button>
-              <Button onClick={handleApprove} className="flex-1">
-                {t('auth.device.approve')}
-              </Button>
-            </div>
-          </>
-        )}
-
-        {status === 'loading' && (
-          <>
-            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <h2 className="text-xl font-semibold">{t('auth.device.approving')}</h2>
-          </>
-        )}
-
-        {status === 'success' && (
-          <>
-            <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-            <h2 className="text-xl font-semibold text-green-700 dark:text-green-400">{t('auth.device.successTitle')}</h2>
-            <p className="text-sm text-muted-foreground">{t('auth.device.successDesc')}</p>
-            <p className="text-xs text-muted-foreground">{t('auth.device.successHint')}</p>
-          </>
-        )}
-
-        {status === 'error' && (
-          <>
-            <XCircle className="h-12 w-12 text-red-500 mx-auto" />
-            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">{t('auth.device.errorTitle')}</h2>
-            <p className="text-sm text-muted-foreground">{errorMessage}</p>
-            <Button variant="outline" onClick={handleReset}>
-              {t('auth.device.tryAgain')}
+          <div className="space-y-2">
+            <Button onClick={handleApprove} className="h-10 w-full">
+              {t('auth.device.approve')}
             </Button>
-          </>
-        )}
-      </div>
-    </div>
+            <Button variant="ghost" onClick={handleReset} className="h-10 w-full">
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (status === 'loading') {
+    return (
+      <AuthLayout title={t('auth.device.approving')} subtitle={t('auth.device.confirmDesc')}>
+        <div className="space-y-5">
+          <DeviceCode code={formatCode(userCode)} />
+          <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
+            {t('auth.device.approving')}
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (status === 'success') {
+    return (
+      <AuthLayout title={t('auth.device.successTitle')} subtitle={t('auth.device.successDesc')}>
+        <div className="space-y-5">
+          <DeviceCode code={formatCode(userCode)} />
+          <p className="text-sm text-muted-foreground">{t('auth.device.successHint')}</p>
+          <Button className="h-10 w-full" onClick={() => navigate('/admin/dashboard')}>
+            {t('auth.device.goToDashboard')}
+          </Button>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <AuthLayout title={t('auth.device.errorTitle')} subtitle={t('auth.device.failed')}>
+        <div className="space-y-5">
+          <div role="alert" className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+            {errorMessage}
+          </div>
+          <Button className="h-10 w-full" onClick={handleReset}>
+            {t('auth.device.tryAgain')}
+          </Button>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout title={t('auth.device.title')} subtitle={t('auth.device.subtitle')}>
+      <form onSubmit={handleSubmitCode} className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="userCode">{t('auth.device.codeLabel')}</Label>
+          <Input
+            id="userCode"
+            type="text"
+            placeholder="XXXX-XXXX"
+            value={formatCode(userCode)}
+            onChange={(e) => setUserCode(e.target.value.replace(/[^A-Za-z0-9-]/g, ''))}
+            maxLength={9}
+            className="text-center font-mono text-lg tracking-[0.2em]"
+            autoFocus
+            autoComplete="off"
+          />
+        </div>
+        <Button
+          type="submit"
+          className="h-10 w-full"
+          disabled={userCode.replace(/[^A-Za-z0-9]/g, '').length < 8}
+        >
+          {t('auth.device.continue')}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

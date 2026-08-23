@@ -16,6 +16,14 @@ pytest tests/contract -v
 ```
 
 `CONTRACT_API_BASE_URL` overrides the target (default `http://localhost:8080`).
+Reachability is probed with an intentionally invalid `POST /api/v1/auth/login`
+(permitAll unconditionally), **not** `/v3/api-docs`: springdoc is only exposed
+when `SWAGGER_ENABLED=true`, and `.env.dist` ships it `false`, so probing it
+reported a perfectly healthy stack as unreachable and skipped this whole suite.
+
+For a full end-to-end walk of the workflow that fails loudly instead of
+skipping, see `scripts/live_api_smoke.py`.
+
 If the API isn't reachable, every test is skipped (via the session-scoped
 `contract_ctx` fixture in `conftest.py`) rather than failed — this suite is
 meant to run where a live instance is guaranteed (CI's

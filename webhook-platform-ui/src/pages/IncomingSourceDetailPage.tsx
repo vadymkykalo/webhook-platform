@@ -1,28 +1,34 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
-  ArrowDownToLine, ArrowLeft, Plus, Loader2, Trash2, Pencil, Copy, Power, PowerOff,
-  ShieldCheck, ShieldOff, Globe, Calendar, Terminal, ChevronLeft, ChevronRight,
-  CheckCircle2, XCircle, Play, Wand2
+  ArrowDownToLine, CheckCircle2, Copy, Globe, Loader2, Pencil, Play, Plus,
+  Trash2, Wand2, XCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess, showCriticalSuccess } from '../lib/toast';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
+import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
-import { incomingSourcesApi } from '../api/incomingSources.api';
-import { incomingDestinationsApi } from '../api/incomingDestinations.api';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import StatusBadge from '../components/StatusBadge';
+import AttemptRail from '../components/AttemptRail';
+import { ladderTicks } from './ConnectionSetupPage';
 import type {
-  IncomingSourceResponse, IncomingDestinationResponse, IncomingDestinationRequest,
-  IncomingAuthType, PageResponse,
+  IncomingDestinationResponse, IncomingDestinationRequest, IncomingAuthType,
 } from '../types/api.types';
 import { transformApi } from '../api/transform.api';
-import { useTransformations } from '../api/queries';
+import {
+  useTransformations, useIncomingSource, useIncomingDestinations,
+  useCreateIncomingDestination, useUpdateIncomingDestination, useDeleteIncomingDestination,
+} from '../api/queries';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
@@ -33,12 +39,21 @@ import {
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { usePermissions } from '../auth/usePermissions';
+import PermissionGate from '../components/PermissionGate';
+import VerificationGate from '../components/VerificationGate';
+
+/**
+ * One incoming source and the destinations its events are forwarded to.
+ *
+ * The incoming direction has the same shape as the outgoing one — a thing that
+ * receives, and standing statements about where what it receives goes — but
+ * never borrows its words: these are Destinations receiving Forwards, not
+ * subscriptions receiving deliveries.
+ */
 
 const AUTH_TYPES: IncomingAuthType[] = ['NONE', 'BEARER', 'BASIC', 'CUSTOM_HEADER'];
-const PAGE_SIZE = 20;
 
-// `key` maps to incomingDestinations.retryPresets.<key>.{label,desc} — resolved
-// via t() at render time instead of storing English text directly.
+// `key` maps to incomingDestinations.retryPresets.<key>.{label,desc}.
 const RETRY_PRESETS: { key: string; delays: string; attempts: string }[] = [
   { key: 'aggressive', delays: '10,30,60,120', attempts: '4' },
   { key: 'standard', delays: '60,300,900,3600', attempts: '5' },
@@ -66,17 +81,30 @@ function formatJson(value: string): string {
 export default function IncomingSourceDetailPage() {
   const { t } = useTranslation();
   const { projectId, sourceId } = useParams<{ projectId: string; sourceId: string }>();
-  const navigate = useNavigate();
   const { canManageIncomingSources } = usePermissions();
   const { data: transformationsList } = useTransformations(projectId!);
 
-  const [source, setSource] = useState<IncomingSourceResponse | null>(null);
-  const [destinations, setDestinations] = useState<IncomingDestinationResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [destPageInfo, setDestPageInfo] = useState<PageResponse<IncomingDestinationResponse> | null>(null);
   const [destPage, setDestPage] = useState(0);
+  const [destPageSize, setDestPageSize] = useState(20);
 
-  // Destination dialog
+  const {
+    data: source, isLoading: sourceLoading, isError: sourceFailed, error: sourceError,
+    refetch: refetchSource,
+  } = useIncomingSource(projectId, sourceId);
+  const {
+    data: destPageInfo, isLoading: destsLoading, isError: destsFailed, error: destsError,
+    refetch: refetchDests,
+  } = useIncomingDestinations(projectId, sourceId, destPage, destPageSize);
+
+  const createDest = useCreateIncomingDestination(projectId!, sourceId!);
+  const updateDest = useUpdateIncomingDestination(projectId!, sourceId!);
+  const deleteDest = useDeleteIncomingDestination(projectId!, sourceId!);
+
+  const destinations = destPageInfo?.content ?? [];
+  const loading = sourceLoading || destsLoading;
+  const failed = sourceFailed || destsFailed;
+  const destSaving = createDest.isPending || updateDest.isPending;
+
   const [showDestDialog, setShowDestDialog] = useState(false);
   const [editDest, setEditDest] = useState<IncomingDestinationResponse | null>(null);
   const [destUrl, setDestUrl] = useState('');
@@ -89,49 +117,21 @@ export default function IncomingSourceDetailPage() {
   const [destRetryDelays, setDestRetryDelays] = useState('60,300,900,3600');
   const [destPayloadTransform, setDestPayloadTransform] = useState('');
   const [destTransformationId, setDestTransformationId] = useState('');
-  const [destSaving, setDestSaving] = useState(false);
 
-  // Validation & transform preview state
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationOk, setValidationOk] = useState(false);
   const [transformPreview, setTransformPreview] = useState<string | null>(null);
   const [transformPreviewLoading, setTransformPreviewLoading] = useState(false);
   const [transformPreviewErrors, setTransformPreviewErrors] = useState<string[]>([]);
 
-  // Delete destination
   const [deleteDestId, setDeleteDestId] = useState<string | null>(null);
-  const [deletingDest, setDeletingDest] = useState(false);
 
-  useEffect(() => {
-    if (projectId && sourceId) loadData();
-  }, [projectId, sourceId, destPage]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadData = async () => {
-    if (!projectId || !sourceId) return;
-    try {
-      setLoading(true);
-      const [src, dests] = await Promise.all([
-        incomingSourcesApi.get(projectId, sourceId),
-        incomingDestinationsApi.list(projectId, sourceId, destPage, PAGE_SIZE),
-      ]);
-      setSource(src);
-      setDestinations(dests.content);
-      setDestPageInfo(dests);
-    } catch (err) {
-      showApiError(err, 'incomingSources.toast.loadFailed', { retry: loadData });
-    } finally {
-      setLoading(false);
-    }
+  const copyIngressUrl = async () => {
+    if (!source) return;
+    await navigator.clipboard.writeText(source.ingressUrl);
+    showSuccess(t('incomingSources.toast.urlCopied'));
   };
 
-  const copyIngressUrl = () => {
-    if (source) {
-      navigator.clipboard.writeText(source.ingressUrl);
-      showSuccess(t('incomingSources.toast.urlCopied'));
-    }
-  };
-
-  // ── Destination CRUD ──
   const resetValidation = () => {
     setValidationErrors([]);
     setValidationOk(false);
@@ -182,9 +182,8 @@ export default function IncomingSourceDetailPage() {
     const timeout = parseInt(destTimeout);
     if (isNaN(timeout) || timeout < 1 || timeout > 120) errors.push(t('incomingDestinations.validation.timeoutRange'));
     if (destRetryDelays) {
-      const parts = destRetryDelays.split(',');
-      for (const p of parts) {
-        if (isNaN(Number(p.trim())) || Number(p.trim()) < 0) {
+      for (const part of destRetryDelays.split(',')) {
+        if (isNaN(Number(part.trim())) || Number(part.trim()) < 0) {
           errors.push(t('incomingDestinations.validation.retryDelaysFormat'));
           break;
         }
@@ -201,7 +200,11 @@ export default function IncomingSourceDetailPage() {
     setTransformPreview(null);
     setTransformPreviewErrors([]);
     try {
-      const samplePayload = JSON.stringify({ event: 'test.event', data: { id: 1, name: 'sample', nested: { key: 'value' } }, timestamp: new Date().toISOString() }, null, 2);
+      const samplePayload = JSON.stringify(
+        { event: 'test.event', data: { id: 1, name: 'sample', nested: { key: 'value' } }, timestamp: new Date().toISOString() },
+        null,
+        2
+      );
       const result = await transformApi.preview(projectId, {
         inputPayload: samplePayload,
         transformExpression: destPayloadTransform || undefined,
@@ -211,7 +214,7 @@ export default function IncomingSourceDetailPage() {
         setTransformPreview(result.outputPayload ? formatJson(result.outputPayload) : samplePayload);
       }
       setTransformPreviewErrors(result.errors || []);
-    } catch (err) {
+    } catch {
       setTransformPreviewErrors([t('incomingDestinations.validation.previewFailed')]);
     } finally {
       setTransformPreviewLoading(false);
@@ -220,8 +223,6 @@ export default function IncomingSourceDetailPage() {
 
   const handleSaveDest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId || !sourceId) return;
-
     const data: IncomingDestinationRequest = {
       url: destUrl,
       authType: destAuthType,
@@ -235,100 +236,92 @@ export default function IncomingSourceDetailPage() {
       transformationId: destTransformationId || null,
     };
 
-    setDestSaving(true);
     try {
       if (editDest) {
-        await incomingDestinationsApi.update(projectId, sourceId, editDest.id, data);
+        await updateDest.mutateAsync({ id: editDest.id, data });
         showSuccess(t('incomingDestinations.toast.updated'));
       } else {
-        await incomingDestinationsApi.create(projectId, sourceId, data);
+        await createDest.mutateAsync(data);
         showSuccess(t('incomingDestinations.toast.created'));
       }
       setShowDestDialog(false);
-      loadData();
     } catch (err) {
       showApiError(err, editDest ? 'incomingDestinations.toast.updateFailed' : 'incomingDestinations.toast.createFailed');
-    } finally {
-      setDestSaving(false);
     }
   };
 
   const handleDeleteDest = async () => {
-    if (!deleteDestId || !projectId || !sourceId) return;
-    setDeletingDest(true);
+    if (!deleteDestId) return;
     try {
-      await incomingDestinationsApi.delete(projectId, sourceId, deleteDestId);
+      await deleteDest.mutateAsync(deleteDestId);
       showCriticalSuccess(t('incomingDestinations.toast.deleted'));
       setDeleteDestId(null);
-      loadData();
     } catch (err) {
       showApiError(err, 'incomingDestinations.toast.deleteFailed');
-    } finally {
-      setDeletingDest(false);
     }
   };
 
   if (loading) {
-    return <PageSkeleton><SkeletonRows count={4} height="h-24" /></PageSkeleton>;
+    return (
+      <PageSkeleton>
+        <SkeletonRows count={4} height="h-24" />
+      </PageSkeleton>
+    );
   }
 
-  if (!source) {
+  if (failed || !source) {
     return (
-      <div className="p-6 lg:p-8 max-w-6xl mx-auto">
-        <EmptyState icon={ArrowDownToLine} title={t('endpoints.projectNotFound')} />
+      <div className="p-4 lg:p-6">
+        <ErrorState
+          error={sourceError ?? destsError}
+          fallbackKey="incomingSources.toast.loadFailed"
+          onRetry={() => { refetchSource(); refetchDests(); }}
+        />
       </div>
     );
   }
 
-  return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-      {/* Back button + Header */}
-      <div>
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => navigate(`/admin/projects/${projectId}/incoming-sources`)}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> {t('incomingSources.title')}
+  const newDestinationButton = (
+    <PermissionGate allowed={canManageIncomingSources}>
+      <VerificationGate>
+        <Button onClick={openCreateDest}>
+          <Plus className="h-4 w-4" /> {t('incomingDestinations.create')}
         </Button>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-title tracking-tight">{source.name}</h1>
-              {source.status === 'ACTIVE' ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
-                  <Power className="h-3.5 w-3.5" /> {t('incomingSources.active')}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                  <PowerOff className="h-3.5 w-3.5" /> {t('incomingSources.disabled')}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {source.providerType} &middot; {source.slug} &middot; {t('incomingSources.created')} {formatDateTime(source.createdAt)}
-            </p>
-          </div>
-        </div>
-      </div>
+      </VerificationGate>
+    </PermissionGate>
+  );
 
-      {/* Source Info Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Ingress URL card */}
+  return (
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={`${source.providerType} · ${source.slug}`}
+        title={source.name}
+        description={t('incomingSources.detailDescription', 'Webhooks arriving at this URL are verified, then forwarded to every destination below.')}
+        actions={newDestinationButton}
+      />
+
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Globe className="h-4 w-4" /> {t('incomingSources.ingressUrl')}
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <ArrowDownToLine className="h-4 w-4" aria-hidden /> {t('incomingSources.ingressUrl')}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="flex items-center gap-2">
-              <code className="text-xs font-mono bg-muted px-3 py-2 rounded flex-1 truncate">{source.ingressUrl}</code>
-              <Button variant="outline" size="icon-sm" onClick={copyIngressUrl} title={t('incomingSources.howToSend.copy')} aria-label={t('incomingSources.howToSend.copy')}>
+              <code className="min-w-0 flex-1 truncate rounded-md border border-rail bg-secondary/50 px-3 py-2 font-mono text-xs">
+                {source.ingressUrl}
+              </code>
+              <Button
+                variant="outline" size="icon-sm" onClick={copyIngressUrl}
+                title={t('incomingSources.howToSend.copy')} aria-label={t('incomingSources.howToSend.copy')}
+              >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <div className="mt-3 p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs font-semibold mb-1.5 flex items-center gap-1.5">
-                <Terminal className="h-3.5 w-3.5" /> {t('incomingSources.howToSend.curlExample')}
-              </p>
-              <pre className="text-[11px] font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">
+            <div>
+              <div className="mono-label mb-1.5">{t('incomingSources.howToSend.curlExample')}</div>
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-rail bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
 {`curl -X POST ${source.ingressUrl} \\
   -H "Content-Type: application/json" \\
   -d '{"event": "test", "data": {}}'`}
@@ -337,172 +330,215 @@ export default function IncomingSourceDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Configuration card */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" /> {t('incomingSources.verification')}
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              {t('incomingSources.verification')}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('incomingSources.createDialog.verificationMode')}</span>
-                <span className="font-medium">{source.verificationMode}</span>
+            <dl className="space-y-2.5 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-muted-foreground">{t('endpoints.status')}</dt>
+                <dd>
+                  <StatusBadge
+                    kind={source.status === 'ACTIVE' ? 'ok' : 'idle'}
+                    label={source.status === 'ACTIVE' ? t('incomingSources.active') : t('incomingSources.disabled')}
+                  />
+                </dd>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">HMAC</span>
-                <span>{source.hmacSecretConfigured ? (
-                  <span className="inline-flex items-center gap-1 text-success text-xs font-medium"><ShieldCheck className="h-3 w-3" /> {t('incomingSources.hmacConfigured')}</span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-muted-foreground text-xs"><ShieldOff className="h-3 w-3" /> {t('incomingSources.hmacNotConfigured')}</span>
-                )}</span>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-muted-foreground">{t('incomingSources.createDialog.verificationMode')}</dt>
+                <dd className="font-mono text-xs">{source.verificationMode}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacSecret')}</dt>
+                <dd>
+                  <StatusBadge
+                    kind={source.hmacSecretConfigured ? 'ok' : 'retry'}
+                    label={source.hmacSecretConfigured
+                      ? t('incomingSources.hmacConfigured')
+                      : t('incomingSources.hmacNotConfigured')}
+                  />
+                </dd>
               </div>
               {source.hmacHeaderName && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('incomingSources.createDialog.hmacHeaderName')}</span>
-                  <code className="text-xs font-mono">{source.hmacHeaderName}</code>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted-foreground">{t('incomingSources.createDialog.hmacHeaderName')}</dt>
+                  <dd className="font-mono text-xs">{source.hmacHeaderName}</dd>
                 </div>
               )}
-              {source.rateLimitPerSecond && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">{t('incomingSources.rateLimit')}</span>
-                  <span>{source.rateLimitPerSecond} req/s</span>
-                </div>
-              )}
-            </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-muted-foreground">{t('incomingSources.rateLimit')}</dt>
+                <dd className="font-mono text-xs">
+                  {source.rateLimitPerSecond ? `${source.rateLimitPerSecond}/s` : '—'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-muted-foreground">{t('incomingSources.created')}</dt>
+                <dd className="font-mono text-xs">{formatDateTime(source.createdAt)}</dd>
+              </div>
+            </dl>
           </CardContent>
         </Card>
       </div>
 
-      {/* Destinations Section */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold">{t('incomingDestinations.title')}</h2>
-            <p className="text-sm text-muted-foreground">{t('incomingDestinations.subtitle')}</p>
-          </div>
-          {canManageIncomingSources && (
-            <Button onClick={openCreateDest} size="sm">
-              <Plus className="h-4 w-4" /> {t('incomingDestinations.create')}
-            </Button>
-          )}
-        </div>
-
-        {destinations.length === 0 ? (
-          <EmptyState
-            icon={Globe}
-            title={t('incomingDestinations.noDestinations')}
-            description={t('incomingDestinations.noDestinationsDesc')}
-            action={canManageIncomingSources ? (
-              <Button onClick={openCreateDest} size="sm">
-                <Plus className="h-4 w-4" /> {t('incomingDestinations.create')}
-              </Button>
-            ) : undefined}
-          />
-        ) : (
-          <div className="space-y-3">
-            {destinations.map((dest) => (
-              <Card key={dest.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold truncate">{dest.url}</p>
-                        {dest.enabled ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                            <Power className="h-3 w-3" /> {t('incomingDestinations.enabled')}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                            <PowerOff className="h-3 w-3" /> {t('incomingDestinations.disabled')}
-                          </span>
-                        )}
-                        {dest.authType !== 'NONE' && (
-                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            {dest.authType}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground flex-wrap">
-                        <span>{t('incomingDestinations.maxAttempts')}: {dest.maxAttempts}</span>
-                        <span>{t('incomingDestinations.timeout')}: {dest.timeoutSeconds}s</span>
-                        {dest.retryDelays && <span>{t('incomingDestinations.retryDelays')}: {dest.retryDelays}</span>}
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatRelativeTime(dest.createdAt)}</span>
-                      </div>
-                    </div>
-                    {canManageIncomingSources && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openEditDest(dest)} title={t('common.edit')} aria-label={t('common.edit')}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setDeleteDestId(dest.id)} title={t('common.delete')} aria-label={t('common.delete')} className="text-muted-foreground hover:text-destructive">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {destPageInfo && destPageInfo.totalPages > 1 && (
-              <div className="flex items-center justify-between pt-2">
-                <p className="text-sm text-muted-foreground">
-                  {t('common.showing', { from: destPage * PAGE_SIZE + 1, to: Math.min((destPage + 1) * PAGE_SIZE, destPageInfo.totalElements), total: destPageInfo.totalElements })}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p - 1)} disabled={destPageInfo.first} title={t('common.previous')} aria-label={t('common.previous')}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground px-2">{destPage + 1} / {destPageInfo.totalPages}</span>
-                  <Button variant="outline" size="sm" onClick={() => setDestPage(p => p + 1)} disabled={destPageInfo.last} title={t('common.next')} aria-label={t('common.next')}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+      <div className="mb-3">
+        <h3 className="text-[15px] font-medium">{t('incomingDestinations.title')}</h3>
+        <p className="text-sm text-muted-foreground">{t('incomingDestinations.subtitle')}</p>
       </div>
 
-      {/* Create / Edit Destination Dialog */}
+      {destinations.length === 0 ? (
+        <EmptyState
+          icon={Globe}
+          title={t('incomingDestinations.noDestinations')}
+          description={t('incomingDestinations.noDestinationsDesc')}
+          action={newDestinationButton}
+        />
+      ) : (
+        <>
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('incomingDestinations.createDialog.url')}</TableHead>
+                  <TableHead>{t('incomingDestinations.createDialog.authType')}</TableHead>
+                  <TableHead>{t('connections.detailLadder', 'Retry ladder')}</TableHead>
+                  <TableHead>{t('endpoints.status')}</TableHead>
+                  <TableHead>{t('subscriptions.created')}</TableHead>
+                  <TableHead className="w-[90px] text-right">
+                    <span className="sr-only">{t('common.actions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {destinations.map((dest) => (
+                  <TableRow key={dest.id}>
+                    <TableCell className="max-w-[280px]">
+                      <div className="truncate font-mono text-[13px]" title={dest.url}>{dest.url}</div>
+                      {dest.transformationName && (
+                        <span className="text-xs text-muted-foreground">{dest.transformationName}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-[10px]">{dest.authType}</Badge>
+                    </TableCell>
+                    <TableCell className="w-[220px]">
+                      <AttemptRail
+                        attempts={ladderTicks(dest.retryDelays ?? '', dest.maxAttempts)}
+                        ariaLabel={t('incomingDestinations.ladderLabel', 'Retry ladder: {{count}} attempts', { count: dest.maxAttempts })}
+                      />
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {t('incomingDestinations.ladderSummary', '{{attempts}} attempts · {{timeout}}s timeout', {
+                          attempts: dest.maxAttempts,
+                          timeout: dest.timeoutSeconds,
+                        })}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        kind={dest.enabled ? 'ok' : 'idle'}
+                        label={dest.enabled ? t('incomingDestinations.enabled') : t('incomingDestinations.disabled')}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {formatRelativeTime(dest.createdAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {canManageIncomingSources && (
+                          <>
+                            <Button
+                              variant="ghost" size="icon-sm" onClick={() => openEditDest(dest)}
+                              title={t('common.edit')} aria-label={t('common.edit')}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost" size="icon-sm" onClick={() => setDeleteDestId(dest.id)}
+                              title={t('common.delete')} aria-label={t('common.delete')}
+                              className="text-muted-foreground hover:text-halt"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {destPageInfo && (
+            <TablePagination
+              page={destPage}
+              pageSize={destPageSize}
+              totalElements={destPageInfo.totalElements}
+              totalPages={destPageInfo.totalPages}
+              onPageChange={setDestPage}
+              onPageSizeChange={setDestPageSize}
+            />
+          )}
+        </>
+      )}
+
       <Dialog open={showDestDialog} onOpenChange={setShowDestDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editDest ? t('incomingDestinations.editDialog.title') : t('incomingDestinations.createDialog.title')}</DialogTitle>
-            <DialogDescription>{editDest ? t('incomingDestinations.editDialog.description') : t('incomingDestinations.createDialog.description')}</DialogDescription>
+            <DialogTitle>
+              {editDest ? t('incomingDestinations.editDialog.title') : t('incomingDestinations.createDialog.title')}
+            </DialogTitle>
+            <DialogDescription>
+              {editDest ? t('incomingDestinations.editDialog.description') : t('incomingDestinations.createDialog.description')}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveDest}>
-            <div className="space-y-4 py-4 max-h-[65vh] overflow-y-auto pr-1">
-              {/* URL */}
+            <div className="max-h-[65vh] space-y-4 overflow-y-auto py-4 pr-1">
               <div className="space-y-2">
                 <Label htmlFor="dest-url">{t('incomingDestinations.createDialog.url')}</Label>
-                <Input id="dest-url" type="url" placeholder={t('incomingDestinations.createDialog.urlPlaceholder')} value={destUrl} onChange={(e) => { setDestUrl(e.target.value); resetValidation(); }} required disabled={destSaving} autoFocus />
+                <Input
+                  id="dest-url" type="url" className="font-mono text-sm"
+                  placeholder={t('incomingDestinations.createDialog.urlPlaceholder')}
+                  value={destUrl}
+                  onChange={(e) => { setDestUrl(e.target.value); resetValidation(); }}
+                  required disabled={destSaving} autoFocus
+                />
               </div>
 
-              {/* Auth */}
               <div className="space-y-2">
-                <Label>{t('incomingDestinations.createDialog.authType')}</Label>
-                <Select value={destAuthType} onChange={(e) => setDestAuthType(e.target.value as IncomingAuthType)} disabled={destSaving}>
+                <Label htmlFor="dest-auth">{t('incomingDestinations.createDialog.authType')}</Label>
+                <Select
+                  id="dest-auth" value={destAuthType}
+                  onChange={(e) => setDestAuthType(e.target.value as IncomingAuthType)} disabled={destSaving}
+                >
                   {AUTH_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
                 </Select>
               </div>
               {destAuthType !== 'NONE' && (
                 <div className="space-y-2">
                   <Label htmlFor="dest-auth-config">{t('incomingDestinations.createDialog.authConfig')}</Label>
-                  <Input id="dest-auth-config" placeholder={t('incomingDestinations.createDialog.authConfigPlaceholder')} value={destAuthConfig} onChange={(e) => setDestAuthConfig(e.target.value)} disabled={destSaving} />
+                  <Input
+                    id="dest-auth-config" className="font-mono text-sm"
+                    placeholder={t('incomingDestinations.createDialog.authConfigPlaceholder')}
+                    value={destAuthConfig} onChange={(e) => setDestAuthConfig(e.target.value)} disabled={destSaving}
+                  />
                   <p className="text-xs text-muted-foreground">{t('incomingDestinations.createDialog.authConfigHint')}</p>
                 </div>
               )}
 
-              {/* Custom Headers — JSON Textarea */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="dest-headers">{t('incomingDestinations.createDialog.customHeaders')}</Label>
                   {destCustomHeaders && (
-                    <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { setDestCustomHeaders(formatJson(destCustomHeaders)); resetValidation(); }}>
-                      <Wand2 className="h-3 w-3 mr-1" /> {t('incomingDestinations.validation.format')}
+                    <Button
+                      type="button" variant="ghost" size="sm"
+                      onClick={() => { setDestCustomHeaders(formatJson(destCustomHeaders)); resetValidation(); }}
+                    >
+                      <Wand2 className="h-3 w-3" /> {t('incomingDestinations.validation.format')}
                     </Button>
                   )}
                 </div>
@@ -512,54 +548,81 @@ export default function IncomingSourceDetailPage() {
                   value={destCustomHeaders}
                   onChange={(e) => { setDestCustomHeaders(e.target.value); resetValidation(); }}
                   disabled={destSaving}
-                  className={`font-mono text-xs min-h-[80px] ${destCustomHeaders && !isValidJson(destCustomHeaders) ? 'border-destructive' : ''}`}
+                  className={`min-h-[80px] font-mono text-xs ${destCustomHeaders && !isValidJson(destCustomHeaders) ? 'border-halt' : ''}`}
                   rows={3}
                 />
                 {destCustomHeaders && !isValidJson(destCustomHeaders) && (
-                  <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('incomingDestinations.validation.invalidJson', 'Invalid JSON format')}</p>
-                )}
-                {destCustomHeaders && isValidJson(destCustomHeaders) && (
-                  <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {t('incomingDestinations.validation.validJson')}</p>
+                  <p className="flex items-center gap-1 text-xs text-halt">
+                    <XCircle className="h-3 w-3" aria-hidden /> {t('incomingDestinations.validation.invalidJson')}
+                  </p>
                 )}
               </div>
 
-              {/* Retry Policy — Presets */}
               <div className="space-y-3">
-                <Label>{t('incomingDestinations.createDialog.retryPolicy', 'Retry Policy')}</Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {RETRY_PRESETS.map((preset) => (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      className={`text-left border rounded-lg px-3 py-2 transition-colors hover:border-primary/50 ${
-                        destRetryDelays === preset.delays && destMaxAttempts === preset.attempts
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                          : 'border-border'
-                      }`}
-                      onClick={() => { setDestRetryDelays(preset.delays); setDestMaxAttempts(preset.attempts); resetValidation(); }}
-                    >
-                      <span className="text-xs font-medium">{t(`incomingDestinations.retryPresets.${preset.key}.label`)}</span>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{t(`incomingDestinations.retryPresets.${preset.key}.desc`)}</p>
-                    </button>
-                  ))}
+                <Label>{t('incomingDestinations.createDialog.retryPolicy')}</Label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {RETRY_PRESETS.map((preset) => {
+                    const active = destRetryDelays === preset.delays && destMaxAttempts === preset.attempts;
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        aria-pressed={active}
+                        className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                          active ? 'border-primary bg-primary/5' : 'border-rail hover:border-primary/50'
+                        }`}
+                        onClick={() => {
+                          setDestRetryDelays(preset.delays);
+                          setDestMaxAttempts(preset.attempts);
+                          resetValidation();
+                        }}
+                      >
+                        <span className="text-xs font-medium">{t(`incomingDestinations.retryPresets.${preset.key}.label`)}</span>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          {t(`incomingDestinations.retryPresets.${preset.key}.desc`)}
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label htmlFor="dest-attempts" className="text-[11px]">{t('incomingDestinations.createDialog.maxAttempts')}</Label>
-                    <Input id="dest-attempts" type="number" min="1" max="20" value={destMaxAttempts} onChange={(e) => { setDestMaxAttempts(e.target.value); resetValidation(); }} disabled={destSaving} className="h-8 text-xs" />
+                    <Input
+                      id="dest-attempts" type="number" min="1" max="20" className="h-8 font-mono text-xs"
+                      value={destMaxAttempts}
+                      onChange={(e) => { setDestMaxAttempts(e.target.value); resetValidation(); }}
+                      disabled={destSaving}
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="dest-timeout" className="text-[11px]">{t('incomingDestinations.createDialog.timeout')}</Label>
-                    <Input id="dest-timeout" type="number" min="1" max="120" value={destTimeout} onChange={(e) => { setDestTimeout(e.target.value); resetValidation(); }} disabled={destSaving} className="h-8 text-xs" />
+                    <Input
+                      id="dest-timeout" type="number" min="1" max="120" className="h-8 font-mono text-xs"
+                      value={destTimeout}
+                      onChange={(e) => { setDestTimeout(e.target.value); resetValidation(); }}
+                      disabled={destSaving}
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="dest-retry" className="text-[11px]">{t('incomingDestinations.createDialog.retryDelays')}</Label>
-                    <Input id="dest-retry" placeholder="60,300,900" value={destRetryDelays} onChange={(e) => { setDestRetryDelays(e.target.value); resetValidation(); }} disabled={destSaving} className="h-8 text-xs font-mono" />
+                    <Input
+                      id="dest-retry" placeholder="60,300,900" className="h-8 font-mono text-xs"
+                      value={destRetryDelays}
+                      onChange={(e) => { setDestRetryDelays(e.target.value); resetValidation(); }}
+                      disabled={destSaving}
+                    />
                   </div>
+                </div>
+                <div className="rounded-lg border border-rail p-3">
+                  <AttemptRail
+                    attempts={ladderTicks(destRetryDelays, parseInt(destMaxAttempts) || 1)}
+                    size="full"
+                    ariaLabel={t('incomingDestinations.ladderLabel', 'Retry ladder: {{count}} attempts', { count: parseInt(destMaxAttempts) || 1 })}
+                  />
                 </div>
               </div>
 
-              {/* Transformation selector */}
               <div className="space-y-2">
                 <Label htmlFor="dest-transformation">{t('incomingDestinations.createDialog.transformation')}</Label>
                 <Select
@@ -569,22 +632,10 @@ export default function IncomingSourceDetailPage() {
                   disabled={destSaving}
                 >
                   <option value="">{t('incomingDestinations.createDialog.noTransformation')}</option>
-                  {(transformationsList ?? []).filter(tr => tr.enabled).map(tr => (
-                    <option key={tr.id} value={tr.id}>{tr.name} (v{tr.version})</option>
+                  {(transformationsList ?? []).filter((tr) => tr.enabled).map((tr) => (
+                    <option key={tr.id} value={tr.id}>{`${tr.name} (v${tr.version})`}</option>
                   ))}
                 </Select>
-                {destTransformationId && (() => {
-                  const selected = (transformationsList ?? []).find(tr => tr.id === destTransformationId);
-                  return selected ? (
-                    <div className="rounded-md border bg-muted/30 p-2.5 text-xs space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{selected.name}</span>
-                        <span className="text-muted-foreground">v{selected.version}</span>
-                      </div>
-                      {selected.description && <p className="text-muted-foreground">{selected.description}</p>}
-                    </div>
-                  ) : null;
-                })()}
                 <p className="text-xs text-muted-foreground">
                   {destTransformationId
                     ? t('incomingDestinations.createDialog.transformationOverrides')
@@ -592,18 +643,23 @@ export default function IncomingSourceDetailPage() {
                 </p>
               </div>
 
-              {/* Payload Transform — JSON Textarea + Preview */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="dest-transform">{t('incomingDestinations.createDialog.payloadTransform')}</Label>
                   <div className="flex items-center gap-1">
                     {destPayloadTransform && (
-                      <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { setDestPayloadTransform(formatJson(destPayloadTransform)); resetValidation(); }}>
-                        <Wand2 className="h-3 w-3 mr-1" /> {t('incomingDestinations.validation.format')}
+                      <Button
+                        type="button" variant="ghost" size="sm"
+                        onClick={() => { setDestPayloadTransform(formatJson(destPayloadTransform)); resetValidation(); }}
+                      >
+                        <Wand2 className="h-3 w-3" /> {t('incomingDestinations.validation.format')}
                       </Button>
                     )}
-                    <Button type="button" variant="outline" size="sm" className="h-6 text-[11px] px-2" onClick={runTransformPreview} disabled={transformPreviewLoading}>
-                      {transformPreviewLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      onClick={runTransformPreview} disabled={transformPreviewLoading}
+                    >
+                      {transformPreviewLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                       {t('incomingDestinations.validation.testPreview')}
                     </Button>
                   </div>
@@ -614,33 +670,32 @@ export default function IncomingSourceDetailPage() {
                   value={destPayloadTransform}
                   onChange={(e) => { setDestPayloadTransform(e.target.value); resetValidation(); setTransformPreview(null); }}
                   disabled={destSaving}
-                  className={`font-mono text-xs min-h-[80px] ${destPayloadTransform && !isValidJson(destPayloadTransform) ? 'border-destructive' : ''}`}
+                  className={`min-h-[80px] font-mono text-xs ${destPayloadTransform && !isValidJson(destPayloadTransform) ? 'border-halt' : ''}`}
                   rows={4}
                 />
                 {destPayloadTransform && !isValidJson(destPayloadTransform) && (
-                  <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('incomingDestinations.validation.invalidJson', 'Invalid JSON format')}</p>
-                )}
-                {destPayloadTransform && isValidJson(destPayloadTransform) && (
-                  <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {t('incomingDestinations.validation.validJson')}</p>
+                  <p className="flex items-center gap-1 text-xs text-halt">
+                    <XCircle className="h-3 w-3" aria-hidden /> {t('incomingDestinations.validation.invalidJson')}
+                  </p>
                 )}
                 <p className="text-xs text-muted-foreground">{t('incomingDestinations.createDialog.payloadTransformHint')}</p>
 
-                {/* Transform Preview Output */}
                 {(transformPreview || transformPreviewErrors.length > 0) && (
-                  <div className="mt-2 border rounded-lg overflow-hidden">
+                  <div className="overflow-hidden rounded-lg border border-rail">
                     {transformPreview && (
-                      <div className="bg-muted/50 p-3">
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <CheckCircle2 className="h-3 w-3 text-green-600" />
-                          <span className="text-[11px] font-medium text-green-700 dark:text-green-400">{t('incomingDestinations.validation.previewOutput')}</span>
-                        </div>
-                        <pre className="text-[11px] font-mono overflow-x-auto max-h-[120px] whitespace-pre-wrap">{transformPreview}</pre>
+                      <div className="bg-secondary/40 p-3">
+                        <div className="mono-label mb-1.5">{t('incomingDestinations.validation.previewOutput')}</div>
+                        <pre className="max-h-[120px] overflow-x-auto whitespace-pre-wrap font-mono text-[11px]">
+                          {transformPreview}
+                        </pre>
                       </div>
                     )}
                     {transformPreviewErrors.length > 0 && (
-                      <div className="bg-destructive/5 p-3">
+                      <div className="bg-halt-soft p-3">
                         {transformPreviewErrors.map((err, i) => (
-                          <p key={i} className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3 flex-shrink-0" /> {err}</p>
+                          <p key={i} className="flex items-center gap-1 text-xs text-halt">
+                            <XCircle className="h-3 w-3 flex-shrink-0" aria-hidden /> {err}
+                          </p>
                         ))}
                       </div>
                     )}
@@ -648,34 +703,38 @@ export default function IncomingSourceDetailPage() {
                 )}
               </div>
 
-              {/* Enabled toggle */}
               <div className="flex items-center justify-between">
                 <Label htmlFor="dest-enabled">{t('common.enabled')}</Label>
                 <Switch id="dest-enabled" checked={destEnabled} onCheckedChange={setDestEnabled} disabled={destSaving} />
               </div>
 
-              {/* Validation Results */}
               {validationErrors.length > 0 && (
-                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 space-y-1">
+                <div className="space-y-1 rounded-lg border border-halt/30 bg-halt-soft p-3">
                   {validationErrors.map((err, i) => (
-                    <p key={i} className="text-xs text-destructive flex items-center gap-1.5"><XCircle className="h-3 w-3 flex-shrink-0" /> {err}</p>
+                    <p key={i} className="flex items-center gap-1.5 text-xs text-halt">
+                      <XCircle className="h-3 w-3 flex-shrink-0" aria-hidden /> {err}
+                    </p>
                   ))}
                 </div>
               )}
               {validationOk && (
-                <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
-                  <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3" /> {t('incomingDestinations.validation.allValid')}</p>
+                <div className="rounded-lg border border-ok/30 bg-ok-soft p-3">
+                  <p className="flex items-center gap-1.5 text-xs text-ok">
+                    <CheckCircle2 className="h-3 w-3" aria-hidden /> {t('incomingDestinations.validation.allValid')}
+                  </p>
                 </div>
               )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button type="button" variant="ghost" size="sm" onClick={validateConfig} disabled={destSaving}>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t('incomingDestinations.validation.validate')}
+                <CheckCircle2 className="h-3.5 w-3.5" /> {t('incomingDestinations.validation.validate')}
               </Button>
               <div className="flex-1" />
-              <Button type="button" variant="outline" onClick={() => setShowDestDialog(false)} disabled={destSaving}>{t('common.cancel')}</Button>
+              <Button type="button" variant="outline" onClick={() => setShowDestDialog(false)} disabled={destSaving}>
+                {t('common.cancel')}
+              </Button>
               <Button type="submit" disabled={destSaving}>
-                {destSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {destSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {destSaving ? t('common.saving') : t('common.save')}
               </Button>
             </DialogFooter>
@@ -683,7 +742,6 @@ export default function IncomingSourceDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Destination Confirmation */}
       <AlertDialog open={!!deleteDestId} onOpenChange={(open) => !open && setDeleteDestId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -691,10 +749,14 @@ export default function IncomingSourceDetailPage() {
             <AlertDialogDescription>{t('incomingDestinations.deleteDialog.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingDest}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteDest} disabled={deletingDest} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deletingDest && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {deletingDest ? t('common.deleting') : t('common.delete')}
+            <AlertDialogCancel disabled={deleteDest.isPending}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDest}
+              disabled={deleteDest.isPending}
+              className="bg-halt text-primary-foreground hover:bg-halt/90"
+            >
+              {deleteDest.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deleteDest.isPending ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

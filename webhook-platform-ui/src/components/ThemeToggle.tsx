@@ -28,7 +28,7 @@ export default function ThemeToggle({ variant = 'icon', className }: ThemeToggle
         title={t('nav.toggleTheme')}
       >
         {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
+        <span>{t(isDark ? 'nav.lightMode' : 'nav.darkMode')}</span>
       </button>
     );
   }

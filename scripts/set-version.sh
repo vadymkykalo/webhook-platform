@@ -75,5 +75,17 @@ fs.writeFileSync(f, JSON.stringify(data, null, 2) + '\n');
 "
 
 echo ""
+# The SDKs also carry the version in code, not just in the manifest: each client
+# builds its User-Agent from it, and Python exposes it as __version__. Those four
+# constants were unmanaged and drifted two minor versions behind the manifests,
+# so every SDK reported a wrong User-Agent and hookflow.__version__ lied.
+echo "Setting SDK in-code version constants to $RELEASE_VERSION"
+sed -i.bak -E "s/^const SDK_VERSION = '.*';/const SDK_VERSION = '$RELEASE_VERSION';/" sdks/node/src/client.ts
+sed -i.bak -E "s/^SDK_VERSION = \".*\"/SDK_VERSION = \"$RELEASE_VERSION\"/" sdks/python/hookflow/client.py
+sed -i.bak -E "s/^__version__ = \".*\"/__version__ = \"$RELEASE_VERSION\"/" sdks/python/hookflow/__init__.py
+sed -i.bak -E "s/private const SDK_VERSION = '.*';/private const SDK_VERSION = '$RELEASE_VERSION';/" sdks/php/src/Hookflow.php
+rm -f sdks/node/src/client.ts.bak sdks/python/hookflow/client.py.bak \
+      sdks/python/hookflow/__init__.py.bak sdks/php/src/Hookflow.php.bak
+
 echo "Done. Reactor is at $NEW_VERSION; Chart.yaml, UI and SDKs are at $RELEASE_VERSION."
 echo "Verify with: scripts/check-version-drift.sh"

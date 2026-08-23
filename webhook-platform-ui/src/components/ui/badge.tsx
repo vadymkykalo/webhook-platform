@@ -2,24 +2,31 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
+/**
+ * Status variants draw from the reserved status tokens and nothing else.
+ * `default` is the only variant that uses the brand colour, so a badge tinted
+ * like a primary button always means "brand", never "this delivery is fine".
+ */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-        outline: "text-foreground",
-        success:
-          "border-transparent bg-green-100 text-green-700 hover:bg-green-100/80",
-        warning:
-          "border-transparent bg-yellow-100 text-yellow-700 hover:bg-yellow-100/80",
-        info:
-          "border-transparent bg-blue-100 text-blue-700 hover:bg-blue-100/80",
+        default: "border-transparent bg-primary text-primary-foreground",
+        secondary: "border-transparent bg-secondary text-secondary-foreground",
+        outline: "border-rail text-muted-foreground",
+
+        ok: "border-transparent bg-ok-soft text-ok",
+        retry: "border-transparent bg-retry-soft text-retry",
+        halt: "border-transparent bg-halt-soft text-halt",
+        idle: "border-transparent bg-idle-soft text-idle",
+
+        // Aliases kept so existing call sites keep compiling; they resolve to
+        // the same tokens as the status variants above.
+        success: "border-transparent bg-ok-soft text-ok",
+        warning: "border-transparent bg-retry-soft text-retry",
+        destructive: "border-transparent bg-halt-soft text-halt",
+        info: "border-transparent bg-accent text-accent-foreground",
       },
     },
     defaultVariants: {

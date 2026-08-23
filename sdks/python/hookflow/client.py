@@ -37,7 +37,7 @@ from .errors import (
 
 DEFAULT_BASE_URL = "http://localhost:8080"
 DEFAULT_TIMEOUT = 30
-SDK_VERSION = "2.2.1"
+SDK_VERSION = "2.4.0"
 
 
 class Hookflow:
@@ -165,8 +165,10 @@ class Hookflow:
             return NotFoundError(message)
         elif status == 429:
             import time
+            # `reset` is a Unix timestamp in seconds (see RateLimitInfo), so the
+            # fallback has to be in seconds too.
             info = rate_limit_info or RateLimitInfo(
-                limit=0, remaining=0, reset=int(time.time() * 1000) + 60000
+                limit=0, remaining=0, reset=int(time.time()) + 60
             )
             return RateLimitError(message, info)
         elif status == 400:
@@ -217,13 +219,21 @@ class Endpoints:
         )
         return Endpoint.from_dict(data)
 
-    def list(self, project_id: str) -> List[Endpoint]:
-        """List all endpoints for a project."""
+    def list(
+        self, project_id: str, page: int = 0, size: int = 20
+    ) -> PaginatedResponse:
+        """List a project's endpoints.
+
+        The API returns a Spring page envelope here, not a bare array — the
+        endpoints themselves are in ``.content`` (iterating the page yields
+        them directly).
+        """
         data = self._client._request(
             "GET",
             f"/api/v1/projects/{project_id}/endpoints",
+            params={"page": page, "size": size},
         )
-        return [Endpoint.from_dict(e) for e in data]
+        return PaginatedResponse.from_dict(data, Endpoint)
 
     def update(
         self, project_id: str, endpoint_id: str, params: EndpointUpdateParams
@@ -305,6 +315,7 @@ class Subscriptions:
         retry_delays: Optional[str] = None,
         payload_template: Optional[str] = None,
         custom_headers: Optional[str] = None,
+        transformation_id: Optional[str] = None,
     ) -> Subscription:
         """Update subscription."""
         body: Dict[str, Any] = {}
@@ -324,6 +335,8 @@ class Subscriptions:
             body["payloadTemplate"] = payload_template
         if custom_headers is not None:
             body["customHeaders"] = custom_headers
+        if transformation_id is not None:
+            body["transformationId"] = transformation_id
 
         data = self._client._request(
             "PUT",
