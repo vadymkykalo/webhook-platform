@@ -87,7 +87,7 @@ public class MemberController {
             @PathVariable("userId") UUID userId,
             AuthContext auth) {
         auth.requireJwt();
-        membershipService.removeMember( userId, auth.role());
+        membershipService.removeMember(userId, auth.role());
         return ResponseEntity.noContent().build();
     }
 

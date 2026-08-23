@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.repository.*;
@@ -46,7 +47,11 @@ public class UsageDailyAggregator {
 
         for (Project project : projects) {
             try {
-                aggregateForProject(project.getId(), yesterday);
+                // The scheduler walks every organization, so it has no ambient one — enter each
+                // project's before touching its rows, and outside the transaction below, since
+                // Hibernate reads the tenant when it opens the session (ADR-0006).
+                TenantContext.runAs(project.getOrganizationId(),
+                        () -> aggregateForProject(project.getId(), yesterday));
                 count++;
             } catch (Exception e) {
                 log.error("Failed to aggregate usage for project {} on {}", project.getId(), yesterday, e);
@@ -56,6 +61,7 @@ public class UsageDailyAggregator {
         log.info("Daily usage aggregation complete: {} projects processed for {}", count, yesterday);
     }
 
+    /** Aggregates one project's day. Must be called inside that project's organization scope. */
     public void aggregateForProject(UUID projectId, LocalDate date) {
         transactionTemplate.executeWithoutResult(status -> aggregateForProjectInTransaction(projectId, date));
     }
@@ -79,9 +85,11 @@ public class UsageDailyAggregator {
         // Atomic check-then-insert via the DB's UNIQUE (project_id, date) constraint (see
         // V020__alerts_and_usage.sql) instead of the prior findByProjectIdAndDate-then-save,
         // which raced under concurrent/duplicate runs and depended on ShedLock alone for safety.
+        // usage_daily.organization_id is NOT NULL (V056) and this insert is native, so the
+        // discriminator neither filters it nor fills it in — the value has to be handed over.
         int inserted = usageDailyRepository.upsertIfAbsent(
-                projectId, date, eventsCount, deliveriesCount, successCount, failedCount,
-                dlqCount, incomingEventsCount, incomingForwardsCount);
+                TenantContext.require(), projectId, date, eventsCount, deliveriesCount,
+                successCount, failedCount, dlqCount, incomingEventsCount, incomingForwardsCount);
 
         if (inserted == 0) {
             log.debug("Usage row for project {} on {} already exists (concurrent aggregation), skipping", projectId, date);

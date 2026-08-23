@@ -6,6 +6,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
 import java.util.Map;
 
@@ -31,7 +33,13 @@ public class TenancyConfig {
      *
      * <p>From here on, code that reaches the database without saying whose data it is looking at
      * fails instead of quietly seeing everything.
+     *
+     * <p>Ordered last so it does not close the window on the other listeners of this event while
+     * they are still using it. Ordering alone is not the guarantee — an unordered listener sorts
+     * to the same precedence — so startup work that touches the database declares
+     * {@code @SystemTenant} as well; this just makes the intent explicit and the race narrower.
      */
+    @Order(Ordered.LOWEST_PRECEDENCE)
     @EventListener(ApplicationReadyEvent.class)
     public void endStartupTenantGrace() {
         resolver.applicationStarted();

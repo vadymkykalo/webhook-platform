@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.Workflow;
 import com.webhook.platform.api.domain.entity.WorkflowExecution;
 import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
 import com.webhook.platform.api.domain.repository.WorkflowRepository;
+import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.util.EventTypeMatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -115,45 +116,63 @@ public class WorkflowTriggerService {
         }
 
         for (Workflow workflow : workflows) {
+            if (!matchesTrigger(workflow, eventType)) continue;
             try {
-                if (!matchesTrigger(workflow, eventType)) continue;
-
-                // ── Idempotency guard ────────────────────────────
-                if (eventId != null && executionRepository.existsByWorkflowIdAndTriggerEventId(
-                        workflow.getId(), eventId)) {
-                    log.debug("Skipping duplicate: workflow {} already triggered for event {}",
-                            workflow.getId(), eventId);
-                    continue;
-                }
-
-                // ── Create execution with depth tracking ─────────
-                WorkflowExecution execution;
-                try {
-                    execution = executionRepository.save(WorkflowExecution.builder()
-                            .workflowId(workflow.getId())
-                            .triggerEventId(eventId)
-                            .triggerData(eventPayload)
-                            .depth(depth)
-                            .build());
-                } catch (DataIntegrityViolationException e) {
-                    log.debug("Concurrent duplicate prevented: workflow {} event {}", workflow.getId(), eventId);
-                    continue;
-                }
-
-                log.info("Triggering workflow '{}' (id={}) for event {} (type={}) depth={}",
-                        workflow.getName(), workflow.getId(), eventId, eventType, depth);
-
-                // ── Set depth ThreadLocal before engine execution ─
-                try {
-                    setCurrentDepth(depth);
-                    workflowEngine.execute(execution.getId(), workflow.getDefinition(), eventJson);
-                } finally {
-                    clearCurrentDepth();
-                }
+                // The only caller is the outbox poller, which runs under TenantContext.SYSTEM:
+                // Hibernate adds no predicate and, more importantly, stamps nothing on insert.
+                // Everything below belongs to the workflow's organization — the execution row,
+                // and the endpoints and deliveries its nodes go on to touch — so enter that
+                // organization's scope here, outside any transaction (ADR-0006).
+                TenantContext.runAs(workflow.getOrganizationId(),
+                        () -> triggerOne(workflow, eventId, eventType, eventPayload, eventJson, depth));
             } catch (Exception e) {
                 log.error("Failed to trigger workflow '{}' for event {}: {}",
                         workflow.getName(), eventId, e.getMessage(), e);
             }
+        }
+    }
+
+    /** Runs one matched workflow. Called inside that workflow's organization scope. */
+    private void triggerOne(Workflow workflow, UUID eventId, String eventType,
+                            String eventPayload, JsonNode eventJson, int depth) {
+        // ── Idempotency guard ────────────────────────────
+        if (eventId != null && executionRepository.existsByWorkflowIdAndTriggerEventId(
+                workflow.getId(), eventId)) {
+            log.debug("Skipping duplicate: workflow {} already triggered for event {}",
+                    workflow.getId(), eventId);
+            return;
+        }
+
+        // ── Create execution with depth tracking ─────────
+        WorkflowExecution execution;
+        try {
+            execution = executionRepository.save(WorkflowExecution.builder()
+                    .workflowId(workflow.getId())
+                    .triggerEventId(eventId)
+                    .triggerData(eventPayload)
+                    .depth(depth)
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            // The unique index on (workflow_id, trigger_event_id) is the only violation this
+            // path expects. Reporting every other one as a duplicate is what kept the missing
+            // organization_id stamp invisible: confirm the duplicate, or let the failure out.
+            if (eventId == null || !executionRepository.existsByWorkflowIdAndTriggerEventId(
+                    workflow.getId(), eventId)) {
+                throw e;
+            }
+            log.debug("Concurrent duplicate prevented: workflow {} event {}", workflow.getId(), eventId);
+            return;
+        }
+
+        log.info("Triggering workflow '{}' (id={}) for event {} (type={}) depth={}",
+                workflow.getName(), workflow.getId(), eventId, eventType, depth);
+
+        // ── Set depth ThreadLocal before engine execution ─
+        try {
+            setCurrentDepth(depth);
+            workflowEngine.execute(execution.getId(), workflow.getDefinition(), eventJson);
+        } finally {
+            clearCurrentDepth();
         }
     }
 

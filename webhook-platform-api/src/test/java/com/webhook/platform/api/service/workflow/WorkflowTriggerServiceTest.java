@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.entity.Workflow;
 import com.webhook.platform.api.domain.entity.WorkflowExecution;
 import com.webhook.platform.api.domain.repository.WorkflowExecutionRepository;
 import com.webhook.platform.api.domain.repository.WorkflowRepository;
+import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -39,6 +41,7 @@ class WorkflowTriggerServiceTest {
     @Mock private WorkflowEngine workflowEngine;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final UUID organizationId = UUID.randomUUID();
     private final UUID projectId = UUID.randomUUID();
     private final UUID eventId = UUID.randomUUID();
 
@@ -50,6 +53,7 @@ class WorkflowTriggerServiceTest {
     private Workflow enabledWorkflow(String pattern) {
         return Workflow.builder()
                 .id(UUID.randomUUID())
+                .organizationId(organizationId)
                 .projectId(projectId)
                 .name("wf")
                 .enabled(true)
@@ -225,7 +229,8 @@ class WorkflowTriggerServiceTest {
     @Test
     void malformedTriggerConfig_treatsAsNonMatching() {
         WorkflowTriggerService service = newService(3);
-        Workflow workflow = Workflow.builder().id(UUID.randomUUID()).projectId(projectId).name("bad")
+        Workflow workflow = Workflow.builder().id(UUID.randomUUID()).organizationId(organizationId)
+                .projectId(projectId).name("bad")
                 .enabled(true).definition("{}").triggerConfig("{not valid json").build();
         when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
 
@@ -300,5 +305,43 @@ class WorkflowTriggerServiceTest {
         assertThat(captor.getValue().getDepth()).isEqualTo(3);
         assertThat(captor.getValue().getWorkflowId()).isEqualTo(workflow.getId());
         assertThat(captor.getValue().getTriggerEventId()).isEqualTo(eventId);
+    }
+
+    // ─── Tenant scope ────────────────────────────────────────────────────
+
+    @Test
+    void triggering_entersTheWorkflowsOrganizationScope_notTheCallersSystemScope() {
+        // The only caller is the outbox poller, which runs as the system tenant. Under root,
+        // Hibernate stamps nothing: whatever scope is live when executionRecord is saved is what
+        // decides the row's organization_id, and NOT NULL makes "no scope" a rollback, not a
+        // warning. Assert on the ambient scope rather than on the entity, because after ADR-0006
+        // the entity deliberately does not carry the value.
+        WorkflowTriggerService service = newService(3);
+        Workflow workflow = enabledWorkflow(null);
+        when(workflowRepository.findEnabledWebhookWorkflows(projectId)).thenReturn(List.of(workflow));
+        when(executionRepository.existsByWorkflowIdAndTriggerEventId(any(), eq(eventId))).thenReturn(false);
+
+        AtomicReference<UUID> scopeAtSave = new AtomicReference<>();
+        AtomicReference<UUID> scopeAtExecute = new AtomicReference<>();
+        when(executionRepository.save(any(WorkflowExecution.class))).thenAnswer(inv -> {
+            scopeAtSave.set(TenantContext.current());
+            WorkflowExecution e = inv.getArgument(0);
+            e.setId(UUID.randomUUID());
+            return e;
+        });
+        doAnswer(inv -> {
+            scopeAtExecute.set(TenantContext.current());
+            return null;
+        }).when(workflowEngine).execute(any(), any(), any());
+
+        TenantContext.runAsSystem(() ->
+                service.triggerWorkflowsSync(projectId, eventId, "order.created", "{}", 0));
+
+        assertThat(scopeAtSave.get()).isEqualTo(organizationId);
+        // The engine and the node executors it drives write deliveries and outbox rows of their
+        // own, so the scope has to still be there when they run — not only for the insert above.
+        assertThat(scopeAtExecute.get()).isEqualTo(organizationId);
+        // And it is given back: the poller goes on to mark the outbox row done as the system.
+        assertThat(TenantContext.current()).isNull();
     }
 }

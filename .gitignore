@@ -95,3 +95,7 @@ deploy/helm/**/Chart.lock
 # Working files for coordinating parallel coding-agent runs — not project
 # documentation, not meant to be published in the repo.
 .claude/features/
+
+# === Agent TODO board ===
+# Task breakdowns for work in flight — scratch, same lifetime as .claude/features/.
+.claude/tasks/
