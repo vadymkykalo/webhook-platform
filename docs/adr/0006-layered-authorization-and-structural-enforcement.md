@@ -200,3 +200,7 @@ refusal to write across tenants, and failure when unscoped).
 Three of the invariants above were enforced by prose alone and were each violated at least once
 afterwards. [ADR-0012](0012-tenancy-invariants-are-guarded-not-documented.md) gives them checks;
 it finishes this decision rather than reopening it.
+
+[ADR-0015](0015-requireaccess-is-the-declaration-and-the-enforcement.md) does the same on the
+authorization side: it settles what the declarative and imperative RBAC checks are each for, and
+makes `@RequireAccess` fail closed rather than pass through a caller it cannot map to a role.

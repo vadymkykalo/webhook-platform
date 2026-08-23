@@ -65,9 +65,16 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
      * {@code AuthContextArgumentResolver}, which resolves an API key's Project to find its
      * Organization, nothing here needs a database lookup.
      *
-     * <p>A platform-admin token is not a tenant identity and carries no membership role;
-     * {@code /api/v1/admin/**} is gated on the PLATFORM_ADMIN authority in
-     * {@code SecurityConfig} instead, so those requests pass through untouched.
+     * <p>An authentication this cannot map to a membership role — a platform-admin token, or no
+     * authentication at all on a permitAll path — is <b>refused</b> when a level above READ is
+     * declared. It used to pass through, on the grounds that a platform admin is not a tenant
+     * identity and {@code /api/v1/admin/**} is gated on the PLATFORM_ADMIN authority in
+     * {@code SecurityConfig} instead. That is still true, and it is why refusing here costs the
+     * admin endpoints nothing: none of them declares a level. What the pass-through actually
+     * covered was platform-admin tokens aimed at <em>tenant</em> handlers, which were already
+     * refused a step later by {@code AuthContextArgumentResolver} — but only because all 79
+     * annotated handlers happen to take an {@code AuthContext}. A handler that did not would have
+     * been open. ADR-0015 has the reasoning.
      */
     private void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
         RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);
@@ -86,7 +93,13 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
             role = MembershipRole.API_KEY;
             scope = apiKey.getScope();
         } else {
-            return;
+            log.warn("Access level denied: {} declares {} but the caller carries no membership role ({})",
+                    handlerMethod.getMethod().getName(), required.value(),
+                    authentication == null ? "unauthenticated" : authentication.getClass().getSimpleName());
+            throw new ForbiddenException(
+                    "This endpoint requires a membership role the caller does not have. A handler that "
+                            + "declares an access level is a tenant endpoint; platform-admin credentials "
+                            + "belong on /api/v1/admin/**.");
         }
 
         // Deliberately the same RbacUtil the handlers call, rather than a second implementation

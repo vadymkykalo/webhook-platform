@@ -74,6 +74,12 @@ public class OrganizationController {
                     + "No decrypted secrets are included. Owner only.")
     @ApiResponse(responseCode = "200", description = "Data export as JSON")
     @ApiResponse(responseCode = "403", description = "Forbidden — requires OWNER role")
+    // A read, so no ratchet asks it to declare anything — MutatingHandlerAccessDeclarationTest
+    // covers state-changing handlers only, and most reads legitimately require nothing. This one
+    // returns every member, project, endpoint and audit row in the organization, and until this
+    // annotation its OWNER requirement lived only in the call below, while its sibling
+    // deleteOrganization declared it. ADR-0015.
+    @RequireAccess(AccessLevel.OWNER)
     @GetMapping("/{orgId}/export")
     public ResponseEntity<GdprExportDto> exportOrganizationData(
             @PathVariable("orgId") UUID orgId,

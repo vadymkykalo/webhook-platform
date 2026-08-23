@@ -150,13 +150,38 @@ class AccessLevelEnforcementTest {
         }
 
         @Test
-        @DisplayName("a platform-admin token passes an OWNER handler untouched")
-        void platformAdminIsNotATenantIdentity() {
-            // A platform admin holds no membership role; /api/v1/admin/** is gated on the
-            // PLATFORM_ADMIN authority in SecurityConfig instead. Running RbacUtil against it
-            // would reject the one caller those endpoints are for.
+        @DisplayName("a platform-admin token is refused by a level it cannot satisfy")
+        void platformAdminCannotSatisfyAMembershipLevel() {
+            // Reversed deliberately; ADR-0015 has the reasoning. This used to pass through, on
+            // the grounds that running RbacUtil against a platform admin would reject the one
+            // caller /api/v1/admin/** is for. That reason does not reach here: no admin handler
+            // carries @RequireAccess (EncryptionAdminController is gated on the PLATFORM_ADMIN
+            // authority in SecurityConfig), so the pass-through only ever applied to *tenant*
+            // handlers, where a platform admin is not the intended caller. It was already
+            // refused there — by AuthContextArgumentResolver, one step later, because every
+            // annotated handler happens to take an AuthContext. Refusing here means the guard
+            // no longer depends on that coincidence holding.
             HandlerMethod handler = handlerFor(OrganizationController.class, "deleteOrganization");
+            ForbiddenException e = assertThrows(ForbiddenException.class,
+                    () -> preHandle(handler, new PlatformAdminAuthenticationToken()));
+            assertTrue(e.getMessage().contains("membership role"), e.getMessage());
+        }
+
+        @Test
+        @DisplayName("a platform-admin token still reaches the admin handlers, which declare no level")
+        void platformAdminStillReachesAdminHandlers() {
+            // The blast radius of the reversal above, stated as a test: /api/v1/admin/** works
+            // because it declares nothing, not because the interceptor makes an exception.
+            HandlerMethod handler = handlerFor(
+                    com.webhook.platform.api.controller.EncryptionAdminController.class, "rotateEncryptionKeys");
             assertDoesNotThrow(() -> preHandle(handler, new PlatformAdminAuthenticationToken()));
+        }
+
+        @Test
+        @DisplayName("an unauthenticated request is refused by a declared level rather than waved through")
+        void anonymousCannotSatisfyAMembershipLevel() {
+            HandlerMethod handler = handlerFor(OrganizationController.class, "deleteOrganization");
+            assertThrows(ForbiddenException.class, () -> preHandle(handler, null));
         }
 
         @Test
