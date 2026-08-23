@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import AttemptRail from '../../components/AttemptRail';
-import { Reveal, Section, SectionHeader } from './primitives';
+import { panel, Reveal, Section, SectionHeader } from './primitives';
+import { cn } from '../../lib/utils';
 
 /**
  * The ladder, drawn at full size with the same component the admin uses.
@@ -38,7 +39,7 @@ export default function ReliabilitySection() {
           <Fact title={t('landing.reliability.orderTitle')} body={t('landing.reliability.orderBody')} />
         </Reveal>
 
-        <Reveal delay={90} className="flex flex-col rounded-xl border border-rail bg-card p-5 sm:p-6">
+        <Reveal delay={90} className={cn('flex flex-col p-5 sm:p-6', panel())}>
           <p className="mono-label">{t('landing.reliability.ladderLabel')}</p>
           <div className="mt-7">
             <AttemptRail attempts={[]} maxAttempts={7} size="full" ariaLabel={t('landing.reliability.ladderAria')} />

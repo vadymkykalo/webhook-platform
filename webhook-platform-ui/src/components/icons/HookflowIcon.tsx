@@ -10,6 +10,21 @@ import { type SVGProps } from 'react';
  * moved clear of the stem, so the two halves stay distinguishable when the
  * whole mark is 14 pixels across.
  */
+/**
+ * The mark's geometry on its own 20-unit grid, exported because the hero
+ * diagram draws the same mark inline in SVG. It used to hand-roll a rounded
+ * hook of its own, which read as a different logo sitting next to the real one.
+ */
+export const HOOKFLOW_MARK = {
+  /** The hook: down the stem, round the bend, back up. */
+  hook: 'M5.25 3.5v6.75a4 4 0 0 0 8 0V8.5',
+  /** The flow: the tail leaving as an arrow. */
+  flow: 'M10.25 6.25l3-2.75 3 2.75',
+  /** The origin. */
+  origin: { cx: 5.25, cy: 3.5, r: 1.75 },
+  viewBox: 20,
+} as const;
+
 export function HookflowIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -22,11 +37,11 @@ export function HookflowIcon(props: SVGProps<SVGSVGElement>) {
       {...props}
     >
       {/* The hook: down the stem, round the bend, back up */}
-      <path d="M5.25 3.5v6.75a4 4 0 0 0 8 0V8.5" />
+      <path d={HOOKFLOW_MARK.hook} />
       {/* The flow: the tail leaving as an arrow */}
-      <path d="M10.25 6.25l3-2.75 3 2.75" />
+      <path d={HOOKFLOW_MARK.flow} />
       {/* The origin */}
-      <circle cx="5.25" cy="3.5" r="1.75" fill="currentColor" stroke="none" />
+      <circle cx={HOOKFLOW_MARK.origin.cx} cy={HOOKFLOW_MARK.origin.cy} r={HOOKFLOW_MARK.origin.r} fill="currentColor" stroke="none" />
     </svg>
   );
 }

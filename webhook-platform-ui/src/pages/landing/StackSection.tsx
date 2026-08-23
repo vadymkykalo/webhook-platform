@@ -1,6 +1,7 @@
 import { KeyRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { LogoMark, Reveal, Section, SectionHeader } from './primitives';
+import { panel, LogoMark, Reveal, Section, SectionHeader } from './primitives';
+import { cn } from '../../lib/utils';
 
 /**
  * Three groups, deliberately three different shapes.
@@ -35,7 +36,7 @@ const CLIENTS = [
 ];
 
 /** Hover lifts the rail to brand teal and the mark out of its resting opacity. */
-const CARD = 'group flex h-full flex-col rounded-xl border border-rail bg-card p-5 transition-colors duration-200 hover:border-primary/60';
+const CARD = cn('group flex h-full flex-col p-5', panel(true));
 
 export default function StackSection() {
   const { t } = useTranslation();
@@ -48,7 +49,7 @@ export default function StackSection() {
           title={t('landing.stack.title')}
           body={t('landing.stack.body')}
           aside={
-            <div className="rounded-xl border border-rail bg-card p-5 sm:w-72">
+            <div className={cn('p-5 sm:w-72', panel())}>
               <p className="mono-label">{t('landing.stack.runsOnLabel')}</p>
               <ul className="mt-4 flex flex-wrap items-center gap-3">
                 {RUNTIME.map((mark) => (
@@ -78,7 +79,7 @@ export default function StackSection() {
                 className="h-7 w-7 transition-opacity duration-200 group-hover:opacity-100"
               />
               <h3 className="mt-4 text-[15px] font-semibold text-foreground">{provider.name}</h3>
-              <p className="mt-1 pb-4 text-[13px] text-muted-foreground">{t(provider.detailKey)}</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{t(provider.detailKey)}</p>
               <p className="mt-auto truncate border-t border-rail pt-3 font-mono text-[11px] text-muted-foreground transition-colors duration-200 group-hover:text-primary">
                 {provider.header}
               </p>
@@ -89,7 +90,7 @@ export default function StackSection() {
           <div className={CARD}>
             <KeyRound className="h-7 w-7 text-muted-foreground transition-colors duration-200 group-hover:text-primary" aria-hidden="true" />
             <h3 className="mt-4 text-[15px] font-semibold text-foreground">{t('landing.stack.genericName')}</h3>
-            <p className="mt-1 pb-4 text-[13px] text-muted-foreground">{t('landing.stack.genericNote')}</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{t('landing.stack.genericNote')}</p>
             <p className="mt-auto truncate border-t border-rail pt-3 font-mono text-[11px] text-muted-foreground transition-colors duration-200 group-hover:text-primary">
               {t('landing.stack.genericDetail')}
             </p>

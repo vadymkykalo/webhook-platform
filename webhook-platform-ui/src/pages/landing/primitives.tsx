@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
+import SyntaxHighlight, { normalizeLanguage } from '../../components/SyntaxHighlight';
 
 /**
  * The landing page's shared furniture.
@@ -51,6 +52,24 @@ export function RailRule({ className }: { className?: string }) {
   );
 }
 
+/**
+ * The landing's card surface, in one place because eight sections were each
+ * spelling it out and four of them had drifted.
+ *
+ * `interactive` is the hover state: the rail warms to brand teal and the panel
+ * rises one step off the paper. It is opt-in rather than universal so the lift
+ * still means something — a panel that merely holds a fact does not move, and a
+ * panel you are meant to read as an option does.
+ */
+export function panel(interactive = false): string {
+  return cn(
+    'rounded-xl border border-rail bg-card',
+    interactive
+      && 'transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 '
+       + 'hover:border-primary/50 hover:shadow-elevated motion-reduce:hover:translate-y-0',
+  );
+}
+
 export function Section({
   id,
   children,
@@ -65,7 +84,7 @@ export function Section({
   return (
     <section id={id} className={cn('relative', className)}>
       {ruled && <RailRule />}
-      <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 lg:py-20">{children}</div>
+      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 lg:py-14">{children}</div>
     </section>
   );
 }
@@ -83,25 +102,56 @@ export function SectionHeader({
   className?: string;
   aside?: ReactNode;
 }) {
-  return (
-    <div className={cn('flex flex-col gap-6 md:flex-row md:items-end md:justify-between', className)}>
-      <div className="max-w-2xl">
-        <p className="mono-label">{eyebrow}</p>
-        <h2 className="mt-3 font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
-          {title}
-        </h2>
-        {body && <p className="mt-4 text-body-lg text-muted-foreground">{body}</p>}
+  const heading = (
+    <div>
+      <p className="mono-label">{eyebrow}</p>
+      <h2 className="mt-3 font-display text-3xl leading-[1.1] tracking-tight text-foreground sm:text-headline">
+        {title}
+      </h2>
+    </div>
+  );
+
+  /* With an aside, the deck stays under the headline and the aside takes the
+     right column. Without one, the deck *is* the right column: stacking it
+     under the headline left the right half of every section header empty and
+     made the block twice as tall, which is what read as filler. */
+  if (aside) {
+    return (
+      <div className={cn('flex flex-col gap-6 md:flex-row md:items-end md:justify-between', className)}>
+        <div className="max-w-2xl">
+          {heading}
+          {body && <p className="mt-4 text-body-lg text-muted-foreground">{body}</p>}
+        </div>
+        <div className="shrink-0">{aside}</div>
       </div>
-      {aside && <div className="shrink-0">{aside}</div>}
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-end lg:gap-14',
+        className,
+      )}
+    >
+      <div className="max-w-2xl">{heading}</div>
+      {body && <p className="max-w-xl text-body-lg text-muted-foreground lg:pb-1">{body}</p>}
     </div>
   );
 }
 
 /**
- * A service mark from public/logos. The files are a mix of brand-coloured and
- * monochrome SVGs, so they are flattened to one treatment: grey on paper,
- * inverted on ink. That keeps a logo strip quiet and readable in both themes
- * instead of half of it disappearing in the dark.
+ * A service mark from public/logos.
+ *
+ * Flattened to one treatment — grey on paper, inverted on ink — because the
+ * files are a mix of brand-coloured and monochrome SVGs, and a strip where half
+ * the marks shout their own colour and half do not is louder than anything on
+ * the page it sits under. A logo strip is evidence, not decoration.
+ *
+ * Tried and reverted: masking each glyph and painting it in the service's brand
+ * hex. A mask keeps only the silhouette, so any mark carrying internal detail —
+ * the Postgres elephant, the Kafka glyph — collapsed into a blob, and the row
+ * of brand colours fought the palette instead of sitting inside it.
  */
 export function LogoMark({ src, name, className }: { src: string; name: string; className?: string }) {
   return (
@@ -110,7 +160,7 @@ export function LogoMark({ src, name, className }: { src: string; name: string; 
       alt={name}
       loading="lazy"
       className={cn(
-        'h-6 w-6 opacity-70 grayscale transition-opacity duration-250 dark:opacity-80 dark:invert',
+        'h-6 w-6 shrink-0 opacity-70 grayscale transition-opacity duration-250 dark:opacity-80 dark:invert',
         className,
       )}
     />
@@ -164,13 +214,17 @@ export function CodeBlock({
           {copied ? t('landing.quickstart.copied') : t('landing.quickstart.copy')}
         </button>
       </div>
+      {/* Same highlighter the docs use, so a sample does not read one way on
+          the marketing page and another way in the documentation it links to. */}
       <pre
         className={cn(
           'px-4 py-3.5 font-mono text-[12.5px] leading-relaxed text-foreground',
           wrap ? 'whitespace-pre-wrap break-words' : 'overflow-x-auto',
         )}
       >
-        <code>{code}</code>
+        <code>
+          <SyntaxHighlight code={code} language={normalizeLanguage(label)} />
+        </code>
       </pre>
     </div>
   );

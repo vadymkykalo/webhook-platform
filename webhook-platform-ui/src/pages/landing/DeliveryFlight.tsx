@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { HOOKFLOW_MARK } from '../../components/icons/HookflowIcon';
 import { useTranslation } from 'react-i18next';
 import AttemptRail, { type RailAttempt } from '../../components/AttemptRail';
 
@@ -138,15 +139,29 @@ function Node({
       {logo ? (
         <image href={logo} x={x + 33} y={RAIL_Y - 11} width={22} height={22} className="grayscale dark:invert" />
       ) : (
-        <g>
-          <rect x={x + 34} y={RAIL_Y - 10} width={20} height={20} rx={5} fill="hsl(var(--primary))" opacity={0.12} />
-          <path
-            d={`M ${x + 39} ${RAIL_Y - 4} h 5 a 4 4 0 0 1 0 8 h -3`}
+        /* The real mark, from its exported geometry. The hand-drawn hook that
+           used to sit here was a different shape from the logo in the nav
+           directly above it. */
+        <g transform={`translate(${x + 34} ${RAIL_Y - 10})`}>
+          <rect width={20} height={20} rx={5} fill="hsl(var(--primary))" opacity={0.12} />
+          <g
             fill="none"
             stroke="hsl(var(--primary))"
-            strokeWidth={1.6}
+            strokeWidth={2}
             strokeLinecap="round"
-          />
+            strokeLinejoin="round"
+            transform="translate(10 10) scale(0.68) translate(-10 -10)"
+          >
+            <path d={HOOKFLOW_MARK.hook} />
+            <path d={HOOKFLOW_MARK.flow} />
+            <circle
+              cx={HOOKFLOW_MARK.origin.cx}
+              cy={HOOKFLOW_MARK.origin.cy}
+              r={HOOKFLOW_MARK.origin.r}
+              fill="hsl(var(--primary))"
+              stroke="none"
+            />
+          </g>
         </g>
       )}
       <text
@@ -176,10 +191,27 @@ function Node({
 export default function DeliveryFlight() {
   const { t } = useTranslation();
   const packetRef = useRef<SVGGElement | null>(null);
+  const figureRef = useRef<HTMLElement | null>(null);
   const [phase, setPhase] = useState<Phase>(prefersReducedMotion() ? 'delivered' : 'announced');
+  /* The loop only runs while the panel is on screen. It used to run for the
+     whole session — a reader six sections down was still paying for a delivery
+     animation nobody could see, on a page whose own pitch is not wasting
+     attempts on something that is not going to land. */
+  const [onScreen, setOnScreen] = useState(true);
 
   useEffect(() => {
-    if (prefersReducedMotion()) return;
+    const node = figureRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => setOnScreen(entries.some((entry) => entry.isIntersecting)),
+      { threshold: 0 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion() || !onScreen) return;
     let raf = 0;
     let started: number | null = null;
     let current: Phase = 'announced';
@@ -207,7 +239,7 @@ export default function DeliveryFlight() {
 
     raf = window.requestAnimationFrame(step);
     return () => window.cancelAnimationFrame(raf);
-  }, []);
+  }, [onScreen]);
 
   const failing = phase === 'failed' || phase === 'returning';
   const status =
@@ -220,7 +252,7 @@ export default function DeliveryFlight() {
   const walked = phase === 'delivered' ? DEST_IN : phase === 'announced' ? SOURCE_OUT : HUB_IN;
 
   return (
-    <figure className="overflow-hidden rounded-xl border border-rail bg-card shadow-card">
+    <figure ref={figureRef} className="overflow-hidden rounded-xl border border-rail bg-card shadow-card">
       <figcaption className="flex items-center justify-between gap-3 border-b border-rail px-4 py-2.5">
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="mono-label">{t('landing.hero.panelLabel')}</span>

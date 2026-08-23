@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Reveal, Section, SectionHeader } from './primitives';
+import { panel, Reveal, Section, SectionHeader } from './primitives';
+import { cn } from '../../lib/utils';
 
 /**
  * The one place the two directions are explained, and the direction is drawn
@@ -165,7 +166,7 @@ function DirectionCard({
   diagram: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col rounded-xl border border-rail bg-card p-6 sm:p-7">
+    <div className={cn('flex flex-col p-6 sm:p-7', panel(true))}>
       <p className="mono-label">{label}</p>
       <h3 className="mt-3 text-title text-foreground">{title}</h3>
       <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{body}</p>

@@ -92,9 +92,9 @@ export function Footer() {
             <ul className="space-y-2">
               <FooterExternal href={REPO_URL}>{t('footer.sourceCode')}</FooterExternal>
               <FooterExternal href={API_REFERENCE_URL}>{t('footer.apiReference')}</FooterExternal>
-              <FooterExternal href="https://www.npmjs.com/package/@hookflow/node">Node.js SDK</FooterExternal>
-              <FooterExternal href="https://pypi.org/project/hookflow-sdk/">Python SDK</FooterExternal>
-              <FooterExternal href="https://packagist.org/packages/hookflow/php">PHP SDK</FooterExternal>
+              <FooterExternal href="https://www.npmjs.com/package/@webhook-platform/node">Node.js SDK</FooterExternal>
+              <FooterExternal href="https://pypi.org/project/webhook-platform/">Python SDK</FooterExternal>
+              <FooterExternal href="https://packagist.org/packages/webhook-platform/php">PHP SDK</FooterExternal>
             </ul>
           </div>
         </div>

@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../components/ui/button';
-import { Reveal, Section, SectionHeader } from './primitives';
+import { panel, Reveal, Section, SectionHeader } from './primitives';
+import { cn } from '../../lib/utils';
 
 /**
  * The fork: run it yourself, or let us run it.
@@ -14,6 +16,16 @@ import { Reveal, Section, SectionHeader } from './primitives';
  */
 
 const REPO_URL = 'https://github.com/vadymkykalo/webhook-platform';
+
+/**
+ * The only way to reach a human about a paid plan.
+ *
+ * Enterprise used to render "Custom" and stop there, so the page priced the
+ * largest deal on it and then offered no way to ask about it. There is no
+ * /contact route to point at yet — when there is one, both of these should
+ * become links to it.
+ */
+const SALES_MAILTO = 'mailto:vadymkykalo@gmail.com?subject=Hookflow%20Enterprise';
 
 interface Plan {
   key: 'free' | 'starter' | 'pro' | 'enterprise';
@@ -54,7 +66,7 @@ export default function PricingSection() {
       </Reveal>
 
       <div className="mt-10 grid gap-5 md:grid-cols-2">
-        <div className="flex flex-col rounded-xl border border-rail bg-card p-6 sm:p-7">
+        <div className={cn('flex flex-col p-6 sm:p-7', panel(true))}>
           <p className="mono-label">{t('landing.pricing.selfHostedLabel')}</p>
           <h3 className="mt-3 text-title text-foreground">{t('landing.pricing.selfHostedName')}</h3>
           <p className="mt-3 flex items-baseline gap-2">
@@ -76,13 +88,13 @@ export default function PricingSection() {
             <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
               <Button>{t('landing.pricing.selfHostedCta')}</Button>
             </a>
-            <a href="#quickstart">
+            <Link to="/docs">
               <Button variant="outline">{t('landing.pricing.selfHostedCtaSecondary')}</Button>
-            </a>
+            </Link>
           </div>
         </div>
 
-        <div className="flex flex-col rounded-xl border border-rail bg-card p-6 sm:p-7">
+        <div className={cn('flex flex-col p-6 sm:p-7', panel(true))}>
           <p className="mono-label">{t('landing.pricing.cloudLabel')}</p>
           <h3 className="mt-3 text-title text-foreground">{t('landing.pricing.cloudName')}</h3>
           <p className="mt-3 flex items-baseline gap-2">
@@ -106,8 +118,8 @@ export default function PricingSection() {
             <Link to="/register">
               <Button>{t('landing.pricing.cloudCta')}</Button>
             </Link>
-            <a href="#plans">
-              <Button variant="outline">{t('landing.pricing.cloudCtaSecondary')}</Button>
+            <a href={SALES_MAILTO}>
+              <Button variant="outline">{t('landing.pricing.contactSales')}</Button>
             </a>
           </div>
         </div>
@@ -116,7 +128,7 @@ export default function PricingSection() {
       <div id="plans" className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((plan, i) => (
           <Reveal key={plan.key} delay={i * 60} className="h-full">
-          <div className="group h-full rounded-lg border border-rail bg-card p-5 transition-colors duration-200 hover:border-primary/60">
+          <div className={cn('group h-full p-5', panel(true))}>
             <div className="flex items-baseline justify-between gap-2">
               <h3 className="text-[15px] font-semibold text-foreground">{t(`landing.pricing.${plan.key}`)}</h3>
               <span className="font-mono text-[13px] text-foreground">
@@ -164,6 +176,14 @@ export default function PricingSection() {
                 </dd>
               </div>
             </dl>
+            {plan.monthly === null && (
+              <a
+                href={SALES_MAILTO}
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                {t('landing.pricing.contactSales')} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            )}
           </div>
           </Reveal>
         ))}

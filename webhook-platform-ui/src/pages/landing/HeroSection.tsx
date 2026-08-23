@@ -9,6 +9,18 @@ import { Reveal } from './primitives';
 
 const REPO_URL = 'https://github.com/vadymkykalo/webhook-platform';
 
+/**
+ * The headline is the outcome, not the topology.
+ *
+ * It used to lead with "on your own servers" and follow with four technical
+ * facts in one breath — HMAC, the ladder, the DLQ, the two directions. Where
+ * the software runs is an implementation detail; not losing a webhook is the
+ * reason to buy. The proof still appears, one rung down: the chips under the
+ * fold carry it, and the sections below spell it out once each.
+ *
+ * The primary button is the account, not the repository. A visitor deciding
+ * whether to buy should not have their first click land on GitHub.
+ */
 export default function HeroSection() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
@@ -34,16 +46,16 @@ export default function HeroSection() {
                 </Link>
               ) : (
                 <>
-                  <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+                  <Link to="/register">
                     <Button size="lg" className="w-full sm:w-auto">
                       {t('landing.hero.ctaPrimary')} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </Button>
-                  </a>
-                  <Link to="/register">
+                  </Link>
+                  <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
                     <Button size="lg" variant="outline" className="w-full sm:w-auto">
                       {t('landing.hero.ctaSecondary')}
                     </Button>
-                  </Link>
+                  </a>
                 </>
               )}
             </div>
