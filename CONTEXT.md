@@ -39,6 +39,14 @@ The obligation to get one event to one endpoint, held until it succeeds or is ab
 Distinct from the individual tries it takes.
 _Avoid_: send, dispatch, job
 
+**Connection**:
+One Endpoint together with the Subscriptions that point at it, named as one thing because
+that is the unit a person configures, tests and turns off. It is a view, not a record:
+nothing stores a Connection, and a change to one is a change to the Endpoint or to its
+Subscriptions. The incoming direction's counterpart is a Source together with its
+Destinations.
+_Avoid_: integration, pipeline, link, channel
+
 ### Incoming
 
 **Source**:

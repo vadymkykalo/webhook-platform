@@ -99,6 +99,7 @@
     "collapseSidebar": "Collapse sidebar",
     "connectionSetup": "Connection Setup",
     "connections": "Connections",
+    "darkMode": "Dark mode",
     "dashboard": "Dashboard",
     "deliveries": "Deliveries",
     "devTools": "Developer Tools",
@@ -116,6 +117,7 @@
     "incoming": "Incoming",
     "incomingEvents": "Received",
     "incomingSources": "Sources",
+    "lightMode": "Light mode",
     "loggedOut": "Logged out successfully",
     "logout": "Logout",
     "members": "Members",
@@ -156,6 +158,55 @@
     "workflows": "Workflows"
   },
   "auth": {
+    "device": {
+      "title": "Authorize Device",
+      "subtitle": "Enter the code shown in your CLI terminal to authorize this device.",
+      "codeLabel": "Device code",
+      "continue": "Continue",
+      "confirmTitle": "Confirm Authorization",
+      "confirmDesc": "You are about to authorize a CLI session with this code:",
+      "confirmWarning": "Only approve if you initiated this request from the Hookflow CLI.",
+      "approve": "Approve",
+      "approving": "Approving...",
+      "approved": "Device authorized successfully!",
+      "successTitle": "Device Authorized",
+      "successDesc": "The CLI session has been authorized. You can return to your terminal.",
+      "successHint": "You can close this page now.",
+      "errorTitle": "Authorization Failed",
+      "failed": "Failed to authorize device. The code may be invalid or expired.",
+      "tryAgain": "Try again",
+      "loginRequired": "Sign in required",
+      "loginRequiredDesc": "You need to be signed in to authorize a device.",
+      "goToLogin": "Sign in"
+    },
+    "forgotPassword": {
+      "title": "Forgot your password?",
+      "subtitle": "Enter your email address and we'll send you a link to reset your password.",
+      "backToLogin": "Back to login",
+      "email": "Email address",
+      "submit": "Send reset link",
+      "submitting": "Sending...",
+      "remember": "Remember your password?",
+      "signIn": "Sign in",
+      "checkEmail": "Check your email",
+      "sentMessage": "If an account exists for <strong>{{email}}</strong>, we've sent a password reset link. The link expires in 1 hour.",
+      "tryDifferent": "Try a different email",
+      "backToSignIn": "Back to sign in",
+      "tooMany": "Too many requests. Please try again later.",
+      "genericError": "Something went wrong. Please try again.",
+      "failedToast": "Failed to send reset email"
+    },
+    "intent": {
+      "title": "What brings you to Hookflow?",
+      "subtitle": "This helps us tailor your experience. You can always change later.",
+      "send": "I send webhooks",
+      "sendDesc": "Deliver events to your customers' endpoints with retries, monitoring, and delivery guarantees.",
+      "receive": "I receive webhooks",
+      "receiveDesc": "Ingest webhooks from providers like Stripe or GitHub, verify signatures, and forward to your services.",
+      "both": "Both",
+      "bothDesc": "Full bidirectional webhook infrastructure — send and receive.",
+      "continue": "Continue"
+    },
     "login": {
       "title": "Welcome back",
       "subtitle": "Sign in to your account to continue",
@@ -175,6 +226,11 @@
       "feature2": "HMAC signature verification",
       "feature3": "Full delivery transparency",
       "copyright": "© {{year}} Hookflow. Built for production systems."
+    },
+    "panel": {
+      "caption": "Every event Hookflow sends is signed, and every attempt it takes is recorded. When one fails, the ladder backs off and tries again — this one landed on the fourth attempt, fifteen minutes in.",
+      "eyebrow": "A signed delivery",
+      "railLabel": "Four attempts: three failed, the fourth returned 200"
     },
     "register": {
       "title": "Create your account",
@@ -207,23 +263,6 @@
       "resendVerification": "Resend verification email",
       "resendHint": "Didn't receive it? Check your spam folder or click resend above."
     },
-    "forgotPassword": {
-      "title": "Forgot your password?",
-      "subtitle": "Enter your email address and we'll send you a link to reset your password.",
-      "backToLogin": "Back to login",
-      "email": "Email address",
-      "submit": "Send reset link",
-      "submitting": "Sending...",
-      "remember": "Remember your password?",
-      "signIn": "Sign in",
-      "checkEmail": "Check your email",
-      "sentMessage": "If an account exists for <strong>{{email}}</strong>, we've sent a password reset link. The link expires in 1 hour.",
-      "tryDifferent": "Try a different email",
-      "backToSignIn": "Back to sign in",
-      "tooMany": "Too many requests. Please try again later.",
-      "genericError": "Something went wrong. Please try again.",
-      "failedToast": "Failed to send reset email"
-    },
     "resetPassword": {
       "title": "Set new password",
       "subtitle": "Enter your new password below. It must be at least 8 characters and include uppercase, lowercase, a number, and a special character.",
@@ -251,38 +290,6 @@
       "sent": "Verification email sent!",
       "failed": "Failed to resend",
       "gateTooltip": "Verify your email to unlock this action"
-    },
-    "intent": {
-      "title": "What brings you to Hookflow?",
-      "subtitle": "This helps us tailor your experience. You can always change later.",
-      "send": "I send webhooks",
-      "sendDesc": "Deliver events to your customers' endpoints with retries, monitoring, and delivery guarantees.",
-      "receive": "I receive webhooks",
-      "receiveDesc": "Ingest webhooks from providers like Stripe or GitHub, verify signatures, and forward to your services.",
-      "both": "Both",
-      "bothDesc": "Full bidirectional webhook infrastructure — send and receive.",
-      "continue": "Continue"
-    },
-    "device": {
-      "title": "Authorize Device",
-      "subtitle": "Enter the code shown in your CLI terminal to authorize this device.",
-      "codeLabel": "Device code",
-      "continue": "Continue",
-      "confirmTitle": "Confirm Authorization",
-      "confirmDesc": "You are about to authorize a CLI session with this code:",
-      "confirmWarning": "Only approve if you initiated this request from the Hookflow CLI.",
-      "approve": "Approve",
-      "approving": "Approving...",
-      "approved": "Device authorized successfully!",
-      "successTitle": "Device Authorized",
-      "successDesc": "The CLI session has been authorized. You can return to your terminal.",
-      "successHint": "You can close this page now.",
-      "errorTitle": "Authorization Failed",
-      "failed": "Failed to authorize device. The code may be invalid or expired.",
-      "tryAgain": "Try again",
-      "loginRequired": "Sign in required",
-      "loginRequiredDesc": "You need to be signed in to authorize a device.",
-      "goToLogin": "Sign in"
     }
   },
   "projects": {

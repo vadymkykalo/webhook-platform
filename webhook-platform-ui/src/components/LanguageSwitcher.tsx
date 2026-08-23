@@ -1,8 +1,19 @@
 import { useTranslation } from 'react-i18next';
+import { cn } from '../lib/utils';
+
+/**
+ * A segmented control rather than a flag.
+ *
+ * Emoji flags were the previous design and they are unreliable: Windows renders
+ * them as bare letter pairs, so the control looked different on every other
+ * machine. A language is also not a country. Two mono labels in a rail-ruled
+ * track show both choices at once and say which one is active, which a
+ * single-button toggle never did.
+ */
 
 const LANGUAGES = [
-  { code: 'en', label: 'EN', flag: '🇬🇧' },
-  { code: 'uk', label: 'UA', flag: '🇺🇦' },
+  { code: 'en', label: 'EN', name: 'English' },
+  { code: 'uk', label: 'UK', name: 'Українська' },
 ] as const;
 
 interface LanguageSwitcherProps {
@@ -12,34 +23,69 @@ interface LanguageSwitcherProps {
 
 export default function LanguageSwitcher({ variant = 'icon', className }: LanguageSwitcherProps) {
   const { i18n } = useTranslation();
-  const current = LANGUAGES.find(l => l.code === i18n.language) || LANGUAGES[0];
-  const next = LANGUAGES.find(l => l.code !== i18n.language) || LANGUAGES[1];
-
-  const toggle = () => {
-    i18n.changeLanguage(next.code);
-  };
+  const activeIndex = Math.max(
+    LANGUAGES.findIndex((l) => i18n.language?.startsWith(l.code)),
+    0
+  );
 
   if (variant === 'full') {
     return (
-      <button
-        type="button"
-        onClick={toggle}
-        className={className ?? 'flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent w-full'}
-      >
-        <span className="text-base leading-none">{current.flag}</span>
-        <span>{current.label} → {next.label}</span>
-      </button>
+      <div className={cn('flex flex-col gap-1', className)}>
+        {LANGUAGES.map((lang, i) => (
+          <button
+            key={lang.code}
+            type="button"
+            onClick={() => i18n.changeLanguage(lang.code)}
+            aria-current={i === activeIndex ? 'true' : undefined}
+            className={cn(
+              'flex items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] transition-colors',
+              i === activeIndex
+                ? 'bg-secondary font-medium text-foreground'
+                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+            )}
+          >
+            <span className="font-mono text-[11px] tracking-wider">{lang.label}</span>
+            <span>{lang.name}</span>
+          </button>
+        ))}
+      </div>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      className={className ?? 'p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-semibold'}
-      title={`Switch to ${next.label}`}
+    <div
+      role="group"
+      aria-label="Language"
+      className={cn(
+        'relative inline-flex h-7 items-center rounded-md border border-rail bg-card p-0.5',
+        className
+      )}
     >
-      {current.flag} {current.label}
-    </button>
+      {/* The indicator slides rather than snapping, so the change reads as one control. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0.5 w-[calc(50%-2px)] rounded-[5px] bg-secondary transition-transform duration-200 ease-out"
+        style={{ transform: `translateX(${activeIndex * 100}%)` }}
+      />
+      {LANGUAGES.map((lang) => {
+        const active = LANGUAGES[activeIndex].code === lang.code;
+        return (
+          <button
+            key={lang.code}
+            type="button"
+            lang={lang.code}
+            onClick={() => i18n.changeLanguage(lang.code)}
+            aria-pressed={active}
+            title={lang.name}
+            className={cn(
+              'relative z-10 px-2 font-mono text-[11px] font-medium tracking-wider transition-colors',
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {lang.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

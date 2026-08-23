@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Loader2, ArrowLeft, Shield, Zap, Eye } from 'lucide-react';
-import { HookflowIcon } from '../components/icons/HookflowIcon';
+import { Loader2 } from 'lucide-react';
+import AuthLayout from './AuthLayout';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { authApi } from '../api/auth.api';
@@ -44,140 +44,63 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary/90 to-purple-700 dark:from-primary/30 dark:via-primary/20 dark:to-purple-900/40 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNCI+PHBhdGggZD0iTTM2IDM0djZoLTZWMzRoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAgLTEydjZoLTZ2LTZoNnptLTI0IDI0djZIMnYtNmg2em0wLTMwdjZIMlY0aDZ6bTAgMjR2Nkgydi02aDZ6bTAtMTJ2Nkgydi02aDZ6bTEyIDEydjZoLTZ2LTZoNnptMC0zMHY2aC02VjRoNnptMCAyNHY2aC02di02aDZ6bTAtMTJ2NmgtNnYtNmg2eiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <HookflowIcon className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold">Hookflow</span>
+    <AuthLayout
+      title={t('auth.login.title')}
+      subtitle={t('auth.login.subtitle')}
+      footer={
+        <>
+          {t('auth.login.noAccount')}{' '}
+          <Link to="/register" className="font-medium text-primary hover:underline">
+            {t('auth.login.createAccount')}
           </Link>
-
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-4xl font-bold leading-tight mb-4">
-                {t('auth.login.brandTitle').split('\n').map((line, i, arr) => (
-                  <span key={i}>
-                    {line}
-                    {i < arr.length - 1 && <br />}
-                  </span>
-                ))}
-              </h2>
-              <p className="text-white/70 text-lg max-w-md">
-                {t('auth.login.brandSubtitle')}
-              </p>
-            </div>
-            <div className="space-y-4">
-              {[
-                { icon: Zap, text: t('auth.login.feature1') },
-                { icon: Shield, text: t('auth.login.feature2') },
-                { icon: Eye, text: t('auth.login.feature3') },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} className="flex items-center gap-3 text-white/80">
-                  <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <span className="text-sm font-medium">{text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <p className="text-white/40 text-sm">
-            {t('auth.login.copyright', { year: new Date().getFullYear() })}
-          </p>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="email">{t('auth.login.email')}</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="email"
+          />
         </div>
-      </div>
 
-      {/* Right panel - form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-background">
-        <div className="w-full max-w-[420px] animate-fade-in-up">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {t('common.backToHome')}
-          </Link>
-
-          <div className="mb-8">
-            <div className="lg:hidden flex items-center gap-2.5 mb-6">
-              <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-                <HookflowIcon className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold">Hookflow</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight mb-2">{t('auth.login.title')}</h1>
-            <p className="text-muted-foreground">
-              {t('auth.login.subtitle')}
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">{t('auth.login.email')}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="email"
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-sm font-medium">{t('auth.login.password')}</Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  {t('auth.login.forgotPassword')}
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                autoComplete="current-password"
-                className="h-11"
-              />
-            </div>
-
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3 animate-scale-in">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full h-11"
-              disabled={loading}
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? t('auth.login.submitting') : t('auth.login.submit')}
-            </Button>
-          </form>
-
-          <p className="text-sm text-muted-foreground text-center mt-8">
-            {t('auth.login.noAccount')}{' '}
-            <Link to="/register" className="text-primary hover:underline font-semibold">
-              {t('auth.login.createAccount')}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">{t('auth.login.password')}</Label>
+            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+              {t('auth.login.forgotPassword')}
             </Link>
-          </p>
+          </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="current-password"
+          />
         </div>
-      </div>
-    </div>
+
+        {error && (
+          <div role="alert" className="animate-scale-in rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+            {error}
+          </div>
+        )}
+
+        <Button type="submit" className="h-10 w-full" disabled={loading}>
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading ? t('auth.login.submitting') : t('auth.login.submit')}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
