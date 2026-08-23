@@ -172,39 +172,42 @@
     --retry: 36 82% 56%;
     --halt: 3 74% 62%;
     --idle: 192 8% 60%;
+
+    /* The soft tints have to come with their hues. A Badge reads
+       `bg-ok-soft text-ok`; leaving the tint at its paper value paints a
+       near-white pill on near-black the moment a badge lands on this panel. */
+    --ok-soft: 152 40% 14%;
+    --retry-soft: 36 45% 15%;
+    --halt-soft: 3 40% 16%;
+    --idle-soft: 192 14% 16%;
+
+    /* Read by components that render in place rather than through a portal:
+       the tooltip, the global form-control rule, skeletons, ErrorBoundary. */
+    --card-foreground: 180 12% 95%;
+    --popover: 192 32% 12%;
+    --popover-foreground: 180 12% 95%;
+    --muted: 192 24% 16%;
+    --input: 192 20% 22%;
+    --ring: 184 72% 52%;
+
+    /* shadcn aliases, kept in step with the hues above. */
+    --destructive: 3 74% 62%;
+    --destructive-foreground: 192 42% 6.5%;
+    --success: 152 55% 50%;
+    --success-foreground: 192 42% 6.5%;
+    --warning: 36 82% 56%;
+    --warning-foreground: 192 42% 6.5%;
   }
 
   .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
   .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
-  .animate-slide-in-right { animation: slideInRight 0.25s ease-out forwards; }
   .animate-slide-in-left { animation: slideInLeft 0.25s ease-out forwards; }
   .animate-scale-in { animation: scaleIn 0.25s ease-out forwards; }
-  .animate-shimmer {
-    animation: shimmer 2s infinite;
-    background: linear-gradient(90deg, transparent 0%, hsl(var(--muted)) 50%, transparent 100%);
-    background-size: 200% 100%;
-  }
-
   .glass {
     backdrop-filter: blur(10px) saturate(150%);
     -webkit-backdrop-filter: blur(10px) saturate(150%);
     background-color: hsl(var(--background) / 0.82);
   }
-
-  /* ── Deprecated decoration ───────────────────────────────────────────
-     These were the aurora blobs, gradient headlines and glow borders.
-     They are neutralised rather than deleted so the pages that still
-     reference them keep rendering; the references go with the landing
-     rewrite, and then so do these. */
-  .gradient-text { color: hsl(var(--primary)); }
-  .gradient-border { position: relative; border: 1px solid hsl(var(--rail)); }
-  .noise { position: relative; }
-  .btn-shimmer { position: relative; }
-  .card-glow { position: relative; }
-  .hero-mesh { background: none; }
-  .page-aurora { display: none; }
-  .hub-pulse { animation: none; }
-  .section-divider { height: 1px; background: hsl(var(--rail)); }
 }
 
 @keyframes fadeIn {
@@ -215,10 +218,6 @@
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
-}
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-12px); }
   to { opacity: 1; transform: translateX(0); }
@@ -227,34 +226,11 @@
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-.marquee-track {
-  display: flex;
-  animation: marquee 40s linear infinite;
-  width: max-content;
-}
-.marquee-track:hover {
-  animation-play-state: paused;
-}
 
 /* ── The attempt rail ────────────────────────────────────────────────────
    The signature device. A hairline with tick marks at exponential spacing,
    because that is what a retry ladder actually is: 1m, 5m, 15m, 1h, 6h, 24h.
    Even spacing would be a lie about the product. */
-@keyframes rail-advance {
-  from { stroke-dashoffset: var(--rail-length, 100); }
-  to { stroke-dashoffset: 0; }
-}
-.rail-advance {
-  animation: rail-advance 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-}
 @keyframes rail-tick-in {
   from { opacity: 0; transform: scale(0.4); }
   to { opacity: 1; transform: scale(1); }
@@ -263,14 +239,6 @@
   animation: rail-tick-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
 }
 
-/* Flow diagram SVG animated dashed paths */
-@keyframes flow-dash-svg {
-  0% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -26; }
-}
-.flow-svg-path {
-  animation: flow-dash-svg 1.4s linear infinite;
-}
 
 /* Scrollbar */
 ::-webkit-scrollbar {
@@ -322,14 +290,21 @@ textarea:focus, textarea:focus-visible) {
   box-shadow: 0 0 0 3px hsl(var(--ring) / 0.15);
 }
 
-*:focus-visible {
-  outline: none;
-}
-
+/* The blanket reset used to be `*:focus-visible { outline: none }` paired with
+   an allowlist that restored the ring. Checkboxes matched neither — they carry
+   no role and no tabindex, and the form-control rule above excludes them — so
+   the select-all and select-row controls on Events, Deliveries, DLQ and
+   Incoming Events had no visible focus at all. The reset now names the
+   elements whose native outline is actually being replaced. */
 :where(button, a, [role="button"], [role="tab"], [role="menuitem"], [role="option"], [tabindex]):focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
   border-radius: calc(var(--radius) - 2px);
+}
+
+:where(input[type="checkbox"], input[type="radio"], summary):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
