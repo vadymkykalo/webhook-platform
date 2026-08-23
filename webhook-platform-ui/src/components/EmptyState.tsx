@@ -17,13 +17,13 @@ interface EmptyStateProps {
 export default function EmptyState({ icon: Icon, title, description, action, docsLink, className }: EmptyStateProps) {
   const { t } = useTranslation();
   return (
-    <div className={className ?? 'flex flex-col items-center justify-center py-20 border border-dashed rounded-xl'}>
-      <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
-        <Icon className="h-8 w-8 text-primary" />
+    <div className={className ?? 'flex flex-col items-center justify-center rounded-lg border border-dashed border-rail py-16'}>
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-rail bg-card">
+        <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <h3 className="mb-1.5 text-[15px] font-medium">{title}</h3>
       {description && (
-        <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">{description}</p>
+        <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">{description}</p>
       )}
       {action && <div className="mb-3">{action}</div>}
       {docsLink && (
@@ -75,13 +75,13 @@ export function ErrorState({
     <div
       data-testid={testId}
       role="alert"
-      className={className ?? 'flex flex-col items-center justify-center py-20 border border-dashed border-destructive/30 rounded-xl'}
+      className={className ?? 'flex flex-col items-center justify-center rounded-lg border border-dashed border-halt/30 py-16'}
     >
-      <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-6">
-        <AlertTriangle className="h-8 w-8 text-destructive" />
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-halt/30 bg-halt-soft">
+        <AlertTriangle className="h-5 w-5 text-halt" />
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title ?? t('common.loadErrorTitle')}</h3>
-      <p className="text-sm text-muted-foreground text-center mb-6 max-w-sm">{resolvedDescription}</p>
+      <h3 className="mb-1.5 text-[15px] font-medium">{title ?? t('common.loadErrorTitle')}</h3>
+      <p className="mb-5 max-w-sm text-center text-sm text-muted-foreground">{resolvedDescription}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry} disabled={retrying}>
           <RefreshCw className={`h-3.5 w-3.5 ${retrying ? 'animate-spin' : ''}`} />
