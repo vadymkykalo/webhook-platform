@@ -335,6 +335,19 @@ jobs:
         working-directory: webhook-platform-ui
         run: npm ci
       
+      # openapi.yaml is drift-checked against springdoc by OpenApiDriftIntegrationTest,
+      # so it describes the real backend. This carries that guarantee across to the
+      # frontend: api.generated.ts is committed, and a DTO change that never reached
+      # it fails here instead of surfacing as a runtime `undefined` in the browser.
+      # The typecheck step below is the other half — src/types/api.contract.ts asserts
+      # the hand-written mirror the app imports still matches these schemas.
+      #
+      # A step in this job rather than a job of its own: `main` requires a fixed list
+      # of status checks, and a new job would have to be added to that list before it
+      # could gate anything.
+      - name: Check generated API types match openapi.yaml
+        run: scripts/check-types-drift.sh
+
       - name: Run ESLint
         working-directory: webhook-platform-ui
         run: npm run lint

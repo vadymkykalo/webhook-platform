@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets version-check version-set
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -214,6 +214,9 @@ test-ui: ## Run frontend unit tests (Vitest)
 ratchets: ## Run every @Tag("ratchet") guard test (needs Docker)
 	@echo "$(GREEN)Running ratchet guards...$(NC)"
 	@mvn test -B -Dgroups=ratchet
+
+types-check: ## Fail if the UI's generated API types are stale vs openapi.yaml (same check CI runs)
+	@scripts/check-types-drift.sh
 
 ##@ Scaling
 scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
