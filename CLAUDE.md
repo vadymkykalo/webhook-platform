@@ -19,32 +19,31 @@ For running or writing Java tests, use the `backend-tests` skill — test class 
 
 ### Checks that fail CI for reasons that aren't in the diff
 
-Several of these are *ratchets*: they don't demand the codebase be perfect, they demand the
-known exception list stop growing. Where one has a documented-exemption list, adding to it is a
-review decision with a stated reason, never a way to get green.
+Several are *ratchets* — they demand the known exception list stop growing, not that the codebase
+be perfect. Adding to a documented-exemption list is a review decision with a stated reason,
+never a way to get green.
 
 - **`openapi.yaml` is committed and semantically diffed** against the spec springdoc serves, by `OpenApiDriftIntegrationTest`. After an intentional API change, regenerate rather than hand-edit:
   `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`, then review and commit the file.
-  `OpenApiOperationIdTest` additionally fails when two handlers would collide on a springdoc-derived
-  operationId — those are generated-SDK method names, so fix it at the source with an explicit
-  `@Operation(operationId = …)`, not in the spec file.
+  A backend DTO change also lands in `webhook-platform-ui/src/types/api.types.ts`, which mirrors
+  these types by hand — nothing generates or diffs it, so a missed field surfaces as a runtime
+  `undefined`, not a red build.
+- **`OpenApiOperationIdTest`** fails when two handlers collide on a springdoc-derived operationId.
+  Those become generated-SDK method names — fix it at the source with an explicit
+  `@Operation(operationId = …)`, never in the spec file.
 - **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version *and* appVersion), `webhook-platform-ui/package.json`, and all three SDK manifests under `sdks/`. Never bump one by hand: `make version-set VERSION=2.4.0`, and `make version-check` runs the same drift check CI does.
 - **A new mutating handler must declare who may call it.** Two reflection-only unit tests
   (`MutatingHandlerScopeDeclarationTest`, `MutatingHandlerAccessDeclarationTest`) fail the build
   when a `POST`/`PUT`/`PATCH`/`DELETE` handler carries neither `@RequireScope` / `@RequireAccess`
   nor an entry in that test's exemption list. Both interceptor defaults are *allow*, which is why
   the omission is otherwise silent. `AccessLevelEnforcementTest` separately proves the annotation
-  is actually enforced and not decoration.
-- **Schema and entity parity** — `EntityMappingParityIntegrationTest` (a column of a shared table
-  unmapped by api or worker) and `SchemaRetryLadderDefaultsTest` (Flyway column defaults drifting
-  from `RetryLadderDefaults`).
-- **Tenancy** — `ServiceTenantParameterTest` fails on any service method that takes an
-  `organizationId` parameter. See *Auth & tenancy* below.
-- **Locale parity** — `webhook-platform-ui/src/i18n/__tests__/locales.test.ts` fails when a key exists in `en.json`
-  but not `uk.json` or vice versa. Every user-facing string needs both.
-- **Per-module JaCoCo ratchets** are bound to `verify`, and CI only runs them in the aggregate
-  job after merging the unit *and* integration exec files. Running `mvn verify` locally over a
-  partial test selection trips them against partial data — use `mvn test` for ordinary work.
+  is enforced.
+- **Schema parity** — `SchemaRetryLadderDefaultsTest` (Flyway column defaults drifting from
+  `RetryLadderDefaults`) and `EntityMappingParityIntegrationTest` (see *Architecture*).
+- **Tenancy** — `ServiceTenantParameterTest`; see *Auth & tenancy* below.
+- **Per-module JaCoCo ratchets** bind to `verify`, and CI runs them only in the aggregate job,
+  after merging the unit *and* integration exec files. `mvn verify` locally over a partial test
+  selection trips them against partial data — use `mvn test` for ordinary work.
 
 ## Git workflow (GitFlow)
 
@@ -128,13 +127,12 @@ Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `r
 
 `CONTEXT.md` is the project's domain model: what an Event, a Delivery, a Forward, a Claim, an
 Attempt, a Deferral, a Source, a Destination each mean here, and — for every one of them — the
-near-synonyms to **avoid**. It is deliberate that "outgoing/incoming" are the two directions and
-"outbound/inbound/egress/relay" are not, and that a Delivery is the *obligation* while an Attempt
-is one *try* at it.
+near-synonyms to **avoid** — it carries an `_Avoid_:` line for every term it defines, so treat it
+as the list rather than recalling a sample of it.
 
 Read it before naming a class, a column, a metric or a UI string, and before writing an ADR.
-Where the code and `CONTEXT.md` disagree, that is a bug in one of them worth raising, not a
-licence to pick either word.
+Where the code and `CONTEXT.md` disagree, that is a bug in one of them, not a licence to pick
+either word.
 
 ## Working notes and decisions
 
@@ -177,25 +175,22 @@ FIFO ordering is not a Kafka guarantee here: `SequenceGeneratorService` (API) st
 
 ### One attempt lifecycle, two stores
 
-The two pipelines diverge in *what* they carry and converge in *how* one try is made.
 `worker/attempt/AttemptRunner` owns the order of operations for a single Attempt — claim, admit
 (rate limit, concurrency permit, circuit breaker), transform, send, classify, finalise — and both
-directions run it. What differs is behind `AttemptStore`, of which there are exactly two:
-`OutgoingAttemptStore` (Deliveries, HMAC-signed) and `IncomingAttemptStore` (Forwards,
-destination auth). ADR-0011 has the rationale; the short version is that the incoming pipeline
-began as a copy of the outgoing one and four separate fixes then had to be hand-ported between
-them.
+directions run it. What differs is behind `AttemptStore`: `OutgoingAttemptStore` (Deliveries,
+HMAC-signed) and `IncomingAttemptStore` (Forwards, destination auth). ADR-0011 has the rationale;
+the short version is that the incoming pipeline began as a copy of the outgoing one and four
+separate fixes then had to be hand-ported between them.
 
 **A fix to attempt behaviour belongs in the Runner, not in one direction.** If it cannot go
-there, that is the signal it is genuinely store-specific. The `AttemptRunner` javadoc lists the
-invariants it exists to hold — no DB/Redis/Kafka work inside the reactive chain, no successor
-unless `finalise` reports it wrote, every permit released on every path — each of which was once
-a real duplicate-delivery or stuck-throttle bug.
+there, that is the signal it is genuinely store-specific. Read the `AttemptRunner` javadoc before
+touching it: it enumerates the invariants the class exists to hold, each of which was once a real
+duplicate-delivery or stuck-throttle bug.
 
-`RetryLadderDefaults` (common) is the **single declaration** of both default ladders. The two
-directions differ on purpose — outgoing 7 attempts out to 24h, incoming 5 out to 6h — because
-holding a customer's own event for a day is a reasonable promise and holding somebody else's
-relayed webhook that long is not. That asymmetry is not drift; do not "fix" it into agreement.
+`RetryLadderDefaults` (common) is the **single declaration** of both default ladders, and its
+javadoc has the figures. The two directions differ on purpose — holding a customer's own event
+for a day is a reasonable promise, holding somebody else's relayed webhook that long is not. Do
+not "fix" that asymmetry into agreement.
 
 ### Tunnel
 
@@ -206,8 +201,8 @@ CLI ↔ `/ws/tunnel` bridges a public `POST /tunnel/{slug}` to the developer's `
 Requests carry either a JWT (dashboard/CLI) or `X-API-Key` (server-to-server); `JwtAuthenticationFilter` / `ApiKeyAuthenticationFilter` both resolve into a single `AuthContext` record, injected into controllers as a plain method parameter via `AuthContextArgumentResolver`. Enforcement layers:
 
 - `@RequireAccess(AccessLevel.WRITE)` — the caller's role, checked by `ScopeEnforcementInterceptor` before the handler runs. This is the declarative half and is what the CI ratchet enforces on new mutating handlers.
-- `AuthContext.requireWriteAccess()` / `requireOwnerAccess()` — the same RBAC question (Owner/Developer/Viewer/API_KEY) asked imperatively. Kept as defence in depth *alongside* the annotation, not replaced by it — a handler normally carries both.
-- `@RequireScope(ApiKeyScope…)` — API-key scope, checked by `ScopeEnforcementInterceptor`. Distinct from the above: scope is what an API key may do, access level is what a role may do, and a handler may legitimately need one and not the other.
+- `AuthContext.requireWriteAccess()` / `requireOwnerAccess()` — the same RBAC question (Owner/Developer/Viewer/API_KEY) asked imperatively, as defence in depth *alongside* the annotation: a handler normally carries both.
+- `@RequireScope(ApiKeyScope…)` — API-key scope, checked by `ScopeEnforcementInterceptor`. Scope is what an API key may do, access level what a role may do; a handler may legitimately need one and not the other.
 - `@RequireOrgAccess` — `OrgAccessAspect` compares the `{orgId}` path variable against the token's org and throws 403 on mismatch.
 - `AuthContext.validateProjectAccess(projectId)` — an API key may only touch its own project.
 
@@ -225,14 +220,12 @@ Secrets (endpoint signing secrets, source secrets, destination auth) are AES-256
 
 ## Conventions
 
-- **New behaviour is written test-first.** A `.claude/tasks/` step that adds functionality starts
-  with a test that states the expected result and fails, and only then the implementation — use
-  the `tdd` skill for the loop and `backend-tests` for what to name the class (the name decides
-  which CI job it lands in). Changes that don't alter behaviour — refactors, `docs:`, `chore:` —
-  are exempt. The point of writing it down: a test added after the fact proves the code does what
-  it does, not what it was supposed to do.
+- **New behaviour is written test-first.** Work that adds functionality starts with a failing
+  test stating the expected result, then the implementation — use the `tdd` skill for the loop
+  and `backend-tests` for what to name the class (the name decides which CI job it lands in).
+  Refactors, `docs:` and `chore:` are exempt. A test added after the fact proves the code does
+  what it does, not what it was supposed to do.
 - Config is env-var-driven: every variable is documented in `.env.dist`, consumed through `docker-compose.yml` into `application.yml`. Add new settings there rather than hardcoding, and keep `ProductionSafetyValidator` / `SecurityConfigValidator` in mind — they fail startup on unsafe production config.
 - Runbooks and operational procedures: `docs/OPERATIONS.md`, `docs/runbooks/`.
-- `webhook-platform-ui/CLAUDE.md` carries the frontend-specific conventions (the shared axios
-  client, centralized query keys, locale parity, the page-test harness). It loads automatically
-  when you work in that directory — add UI rules there, not here.
+- `webhook-platform-ui/CLAUDE.md` carries the frontend conventions and loads automatically in
+  that directory — add UI rules there, not here.

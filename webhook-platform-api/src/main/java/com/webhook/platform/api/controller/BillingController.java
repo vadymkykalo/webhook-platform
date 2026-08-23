@@ -113,7 +113,7 @@ public class BillingController {
             @Valid @RequestBody ChangePlanRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        billingService.assignPlan(request.getPlanName());
+        billingService.assignPlan( request.getPlanName());
         return getOrganizationBilling(auth);
     }
 

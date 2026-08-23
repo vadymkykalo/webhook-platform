@@ -301,8 +301,7 @@ public class WorkflowEngine implements DisposableBean {
         try {
             future = nodeTimeoutExecutor.submit(() -> {
                 WorkflowTriggerService.setCurrentDepth(callerDepth);
-                UUID previousTenant = TenantContext.current();
-                TenantContext.restore(callerTenant);
+                UUID previousTenant = TenantContext.set(callerTenant);
                 try {
                     return executor.execute(nodeData, input);
                 } finally {

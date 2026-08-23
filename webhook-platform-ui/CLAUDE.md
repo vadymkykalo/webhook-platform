@@ -13,4 +13,6 @@ no-retry `QueryClient` (retries hang error-state tests), a `MemoryRouter` and a 
 authenticated `OWNER`. One file: `npm test -- EndpointsPage`.
 
 `src/types/api.types.ts` mirrors the backend DTOs by hand, so a backend API change lands here
-too; `npm run typecheck` is what catches the ones that were missed.
+too. Nothing generates or diffs this file: `npm run typecheck` only checks the app against the
+mirror, so a field the mirror never learned about type-checks green and arrives as `undefined` at
+runtime. Reconcile against `openapi.yaml` when a DTO changes.

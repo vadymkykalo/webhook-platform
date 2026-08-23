@@ -78,12 +78,16 @@ public class AuditLogAspect {
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             userId = jwtAuth.getUserId();
             orgId = jwtAuth.getOrganizationId();
-        } else if (auth instanceof ApiKeyAuthenticationToken) {
-            // API Key auth — resolve orgId from method args (organizationId parameter)
-            orgId = extractOrganizationId(joinPoint);
+        } else if (auth instanceof ApiKeyAuthenticationToken apiKeyAuth) {
+            orgId = apiKeyAuth.getOrganizationId();
         }
 
-        // Fallback: if orgId is still null, try extracting from method args
+        // Not dead code, and not a fallback for the two branches above: it exists for the one
+        // audited method that legitimately takes the organization as a parameter —
+        // MembershipService.acceptInvite, which is @SystemTenant because the accepting user's
+        // ambient tenant is a *different* organization, so neither the token nor TenantContext
+        // names the organization the invite belongs to. Everywhere else this returns null,
+        // because ServiceTenantParameterTest forbids the parameter it looks for.
         if (orgId == null) {
             orgId = extractOrganizationId(joinPoint);
         }

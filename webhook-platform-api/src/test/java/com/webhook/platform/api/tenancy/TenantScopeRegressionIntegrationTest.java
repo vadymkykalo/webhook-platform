@@ -22,7 +22,6 @@ import com.webhook.platform.api.domain.repository.WorkflowRepository;
 import com.webhook.platform.api.dto.OrganizationResponse;
 import com.webhook.platform.api.service.OrganizationService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -104,11 +103,6 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
         TenantContext.runAs(orgB, () ->
                 membershipRepository.save(Membership.builder()
                         .userId(userId).organizationId(orgB).role(MembershipRole.DEVELOPER).build()));
-    }
-
-    @AfterEach
-    void clearScope() {
-        TenantContext.clear();
     }
 
     // ── 1. Workflow executions ──────────────────────────────────────
