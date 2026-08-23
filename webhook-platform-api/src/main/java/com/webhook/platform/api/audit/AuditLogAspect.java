@@ -6,6 +6,7 @@ import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +38,19 @@ public class AuditLogAspect {
     private final AuditLogRepository auditLogRepository;
     private final TrustedProxyResolver trustedProxyResolver;
     private final ObjectMapper objectMapper;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "audit-log-writer");
-        t.setDaemon(true);
-        return t;
-    });
+    /**
+     * Deliberately single-threaded and daemon: audit writes are ordered and must never keep the
+     * JVM alive at shutdown. Wrapped so the writer thread inherits the submitting request's tenant
+     * — a hand-built pool gets no {@code TaskDecorator} from {@code AsyncConfig}, and
+     * {@code AuditLog} carries {@code @TenantId}, so an unscoped writer thread would fail on its
+     * first session (ADR-0006).
+     */
+    private final ExecutorService executor = TenantPropagatingTaskDecorator.wrap(
+            Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "audit-log-writer");
+                t.setDaemon(true);
+                return t;
+            }));
 
     public AuditLogAspect(AuditLogRepository auditLogRepository, TrustedProxyResolver trustedProxyResolver) {
         this.auditLogRepository = auditLogRepository;
@@ -114,23 +123,16 @@ public class AuditLogAspect {
     public void saveAuditLog(String action, String resourceType, UUID resourceId,
                               UUID userId, UUID orgId, String status, String errorMessage,
                               int durationMs, String clientIp, String details) {
+        // The writer thread already inherits the submitting request's scope, but the row's
+        // organization is not always the caller's ambient one: acceptInvite is @SystemTenant and
+        // names its organization in a parameter. So state it rather than inherit it.
+        // Unauthenticated actions (login, register, password reset) genuinely have none and are
+        // written under the SYSTEM sentinel — the nil UUID, which matches no real organization,
+        // so a tenant-scoped reader sees them no more than it did before.
+        UUID rowTenant = orgId != null ? orgId : TenantContext.SYSTEM;
         try {
-            // The writer thread comes from the pool built in this class, so
-            // TenantPropagatingTaskDecorator never sees it and it starts with no scope at all —
-            // AuditLog carries @TenantId, so its first session would fail (ADR-0006). The
-            // organization is already known here; unauthenticated actions (login, register,
-            // password reset) genuinely have none, and run as the system tenant instead. Their
-            // row is stamped with the SYSTEM sentinel rather than the SQL NULL it carried before
-            // ADR-0006 — that is Hibernate's @TenantId generator filling in the root value for an
-            // unset property, and it is fine: the sentinel is the nil UUID so it matches no real
-            // organization, and a tenant-scoped reader saw neither value anyway.
-            if (orgId == null) {
-                TenantContext.runAsSystem(() -> persist(action, resourceType, resourceId, userId, null,
-                        status, errorMessage, durationMs, clientIp, details));
-            } else {
-                TenantContext.runAs(orgId, () -> persist(action, resourceType, resourceId, userId, orgId,
-                        status, errorMessage, durationMs, clientIp, details));
-            }
+            TenantContext.runAs(rowTenant, () -> persist(action, resourceType, resourceId, userId, rowTenant,
+                    status, errorMessage, durationMs, clientIp, details));
         } catch (Exception e) {
             // Audit writes must not break the audited call, but swallowing the message alone is
             // how a platform-wide audit outage stayed invisible — keep the stack trace.

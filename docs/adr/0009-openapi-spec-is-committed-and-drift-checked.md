@@ -47,3 +47,9 @@ then review the diff and commit it.
   addresses.
 - **Diff textually.** Fails on formatting and springdoc version bumps, which trains
   everyone to regenerate without reading.
+
+## Follow-up
+
+[ADR-0013](0013-ui-api-types-are-checked-against-the-spec.md) extends this guarantee to the
+frontend: because `openapi.yaml` is trustworthy without a running server, the UI's types can be
+generated from it and checked in CI.

@@ -22,6 +22,11 @@ public class AsyncConfig {
      * Async work inherits the tenant scope of whoever submitted it — see
      * {@link TenantPropagatingTaskDecorator}. Every executor here gets it: a pool whose tasks
      * started with no scope would fail on its first query.
+     *
+     * <p>{@code TaskDecorator} is a Spring hook, so it reaches these beans and nothing else. A
+     * pool built with {@code Executors.new*} elsewhere needs
+     * {@link TenantPropagatingTaskDecorator#wrap} instead, which
+     * {@code HandBuiltExecutorTenantPropagationTest} enforces.
      */
     private static final TenantPropagatingTaskDecorator TENANT_DECORATOR = new TenantPropagatingTaskDecorator();
 

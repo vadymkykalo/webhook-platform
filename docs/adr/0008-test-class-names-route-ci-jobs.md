@@ -45,3 +45,9 @@ that is *not* named for the integration job contains `@Testcontainers`, `@Spring
   makes the fast feedback loop depend on container startup.
 - **Detect Docker need at runtime and skip.** Turns a misrouted test into a silent skip,
   which is worse than a loud failure.
+
+## Follow-up
+
+[ADR-0014](0014-ratchets-are-discovered-by-tag.md) introduces `@Tag("ratchet")` as a *second,
+orthogonal* axis — "is this test a ratchet" — and deliberately not for routing. The rejection
+above stands: the unit/integration split is still by class-name suffix.

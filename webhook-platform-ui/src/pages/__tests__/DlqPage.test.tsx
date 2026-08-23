@@ -31,7 +31,6 @@ import { dlqApi } from '../../api/dlq.api';
 const PROJECT: ProjectResponse = {
   id: TEST_PROJECT_ID,
   name: 'Test Project',
-  organizationId: 'org-1',
   schemaValidationEnabled: false,
   schemaValidationPolicy: 'WARN',
   idempotencyPolicy: 'NONE',
