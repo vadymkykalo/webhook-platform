@@ -25,7 +25,8 @@ For running or writing Java tests, use the `backend-tests` skill — test class 
 
 ## Git workflow (GitFlow)
 
-This repo follows GitFlow. Respect it in every change: **never commit or push directly to `main`**, and never open a feature PR against `main`.
+Two rules carry the rest: **never commit or push directly to `main`**, and **never open a
+`feature/*` PR against `main`**.
 
 | Branch | Cut from | Merges into | Purpose |
 |--------|----------|-------------|---------|
@@ -35,23 +36,70 @@ This repo follows GitFlow. Respect it in every change: **never commit or push di
 | `release/*` | `develop` | `main` **and** back into `develop` | Release preparation, version bumps |
 | `hotfix/*` | `main` | `main` **and** back into `develop` | Production fixes |
 
-Rules that follow from the table and are easy to get wrong:
+- Start work from an up-to-date `develop` (`git checkout develop && git pull`), branch as
+  `feature/<short-kebab-description>`.
+- A hotfix branches from `main`, not from `develop` — branching it from `develop` drags
+  unreleased work into production.
+- Release: `release/1.x.0` from `develop` → `make version-set VERSION=…` → PR to `main` →
+  tag `v1.x.0` after merge → merge back into `develop`.
+- **Anything that lands on `main` must be merged back into `develop`**, or the fix disappears at
+  the next release. That back-merge is a local operation — `git checkout develop && git merge
+  origin/main`, then push `develop` — not a PR.
 
-- Start work from an up-to-date `develop` (`git checkout develop && git pull`), branch as `feature/<short-kebab-description>`.
-- Anything merged to `main` must also be merged back into `develop`, or the fix silently disappears at the next release.
-- A hotfix branches from `main`, not from `develop` — branching it from `develop` drags unreleased work into production.
-- PRs need at least one approval and green CI.
-- **Merge style depends on the target.** `feature/*` → `develop`: squash, so a
-  feature's work-in-progress commits land as one. `release/*` and `hotfix/*` →
-  `main`: **a merge commit, never squash or rebase.** Squashing collapses the
-  branch into a new SHA with no shared ancestry, so `main` and `develop` stop
-  having a common base — the back-merge then conflicts on every file either side
-  has touched, including files that are byte-identical. Release 2.3.0 hit exactly
-  this: PR #100 was squash-merged, and the next release's merge reported 19
-  conflicts of which 12 were between identical files.
-- Release: `release/1.x.0` from `develop` → bump versions → PR to `main` → tag `v1.x.0` after merge → merge back to `develop`.
+### Merge style, and why `main` is the exception
 
-Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. See `CONTRIBUTING.md` for the full policy.
+`feature/*` → `develop`: **squash** by default, so a branch's work-in-progress commits land as
+one. Use `--no-ff` instead when the branch carries two or more deliberate, separately-meaningful
+commits that are worth keeping apart. Either is safe here: the branch is deleted afterwards and
+nothing else builds on it, so a rewritten SHA costs nothing.
+
+`release/*` and `hotfix/*` → `main`: **a merge commit. Never squash, never rebase.** Both
+rewrite the branch into new SHAs with no shared ancestry, so `main` and `develop` stop having a
+common base and every later merge between them conflicts on files that are byte-identical.
+
+This has now happened twice, which is why the rule is stated this bluntly:
+
+- PR #100 (release 2.3.0) was squash-merged; the next release's back-merge reported 19 conflicts,
+  12 of them between identical files.
+- PR #160 squashed a feature branch straight into `main` — against the second rule at the top of
+  this section — and the back-merge reported 9 conflicts, *all* of them between identical files.
+
+A repository ruleset on `main` now allows only merge commits, so the GitHub UI cannot offer
+squash or rebase there. `develop` is deliberately left unrestricted.
+
+### Repairing a broken ancestry
+
+If it happens anyway, do not hand-resolve the conflicts: that fixes one merge and leaves the
+ancestry broken for the next one. Check first whether `main` contributes anything at all.
+
+```bash
+# 1. does main's tip hold the same tree as develop's own commit of that work?
+git diff <main-tip> <develop-commit>          # empty  → identical trees
+# 2. is that develop commit already in develop's history?
+git merge-base --is-ancestor <develop-commit> develop
+```
+
+Both true means `main`'s content is a point that already sits inside `develop`'s history, so the
+merge has nothing to contribute and `git merge -s ours origin/main` is correct — it records only
+the parent link and leaves the tree byte-identical. Verify afterwards that `git diff
+<pre-merge-sha> HEAD` is empty and that `git merge-tree --write-tree origin/main develop` reports
+no conflicts; the second one is the check that the *next* release merge is actually fixed.
+
+Without that containment proof `-s ours` silently discards the other side, so do not reach for it
+on a hunch.
+
+### What is actually enforced
+
+Worth knowing, because the settings and the conventions are not the same thing:
+
+- `main` — PR required, 11 status checks must be green, conversations resolved, merge commits
+  only, force-push and deletion blocked, and the rules apply to admins too. **Reviews are not
+  gated** (`required_approving_review_count` is 0); asking for one is a convention.
+- `develop` — force-push and deletion blocked, nothing else. Direct pushes are the normal way it
+  is updated.
+
+Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`,
+`chore:`. See `CONTRIBUTING.md` for the full policy.
 
 ## Working notes and decisions
 
