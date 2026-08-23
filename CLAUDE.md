@@ -37,6 +37,12 @@ rather than a list here. Each failure names its remedy. Three whose remedy nobod
   A backend DTO change then also lands in the UI: `npm run types:generate` regenerates
   `src/types/api.generated.ts` (`make types-check` mirrors CI), and `src/types/api.contract.ts`
   fails the typecheck until the hand-written mirror in `api.types.ts` agrees with it again.
+- **The in-app API reference is generated, not written.** `src/pages/docs/api-index.generated.json`
+  is derived from `openapi.yaml` and committed; `make docs-check` (and CI) fails when it is
+  stale. Regenerate with `cd webhook-platform-ui && npm run docs:api-index`. The guides under
+  `src/pages/docs/` stay hand-written — they explain *why*, which a spec cannot. Never
+  hand-write an endpoint table: that is what the 4,000-line page this replaced was, and nothing
+  kept it in sync.
 - **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version
   *and* appVersion), `webhook-platform-ui/package.json`, all three SDK manifests under `sdks/`.
   Never bump one by hand: `make version-set VERSION=2.4.0`; `make version-check` mirrors CI.

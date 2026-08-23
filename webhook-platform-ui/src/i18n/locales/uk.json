@@ -44,7 +44,9 @@
       "threshold": "Поріг",
       "type": "Тип сповіщення",
       "webhookUrl": "Webhook URL",
-      "window": "Вікно (хв)"
+      "window": "Вікно (хв)",
+      "namePlaceholder": "Висока частка невдач",
+      "descriptionPlaceholder": "Для чого це правило"
     },
     "mute": "Приглушити",
     "muted": "Вимкнено",
@@ -100,7 +102,35 @@
     },
     "unmute": "Увімкнути звук",
     "unresolved": "невирішених",
-    "window": "Вікно"
+    "window": "Вікно",
+    "loadFailed": "Не вдалося завантажити сповіщення цього проєкту",
+    "resolvedAtLabel": "Закрито {{time}}",
+    "triggeredBy": "Спрацювало правило",
+    "investigate": "Переглянути доставки",
+    "snooze": "Відкласти",
+    "snoozeFor": "Відкласти на {{hours}} год",
+    "toggleRule": "Увімкнути {{name}}",
+    "windowMinutes_one": "{{count}} хвилина",
+    "windowMinutes_few": "{{count}} хвилини",
+    "windowMinutes_many": "{{count}} хвилин",
+    "windowMinutes_other": "{{count}} хвилин",
+    "tiles": {
+      "unresolved": "Незакриті",
+      "unresolvedHint": "Сповіщення чекають на рішення",
+      "allClear": "Усе чисто",
+      "armed": "Активні правила",
+      "armedHint": "з {{total}} правил",
+      "silenced": "Приглушені",
+      "silencedHint": "Вимкнені, приглушені або відкладені"
+    },
+    "history": {
+      "title": "Що спрацювало",
+      "desc": "Усі сповіщення цього проєкту, найновіші вгорі"
+    },
+    "rules": {
+      "title": "Що стежить",
+      "desc": "Умови, за яких піднімається сповіщення"
+    }
   },
   "analytics": {
     "avgLatency": "Сер. затримка",
@@ -139,7 +169,33 @@
     "subtitle": "Метрики доставки webhook в реальному часі",
     "successRate": "Успішність",
     "throughput": "Пропускна здатність",
-    "title": "Аналітика"
+    "title": "Аналітика",
+    "loadFailed": "Не вдалося завантажити аналітику цього проєкту",
+    "periodLabel": "Період",
+    "periods": {
+      "24h": "24 год",
+      "7d": "7 дн",
+      "30d": "30 дн"
+    },
+    "outcome": {
+      "title": "Результат доставок",
+      "desc": "Доставлені та невдалі за обраний період",
+      "delivered": "Доставлено",
+      "failed": "Невдалі"
+    },
+    "latencySeries": "Затримка",
+    "eventTypesSeries": "Події",
+    "tiles": {
+      "successRateHint": "Доставлено {{delivered}} із {{total}}",
+      "latencyHint": "p95 {{p95}} · p99 {{p99}}",
+      "failedHint": "{{percent}}% усіх доставок",
+      "failedBadge": "Повторюються"
+    },
+    "endpointStatus": {
+      "HEALTHY": "Справний",
+      "DEGRADED": "Погіршений",
+      "FAILING": "Збоїть"
+    }
   },
   "apiKeys": {
     "createDialog": {
@@ -742,7 +798,11 @@
       "empty": "Немає нещодавніх подій",
       "emptyDesc": "Події з'являться тут після надсилання",
       "subtitle": "Нещодавні webhook події",
-      "title": "Останні події"
+      "title": "Останні події",
+      "deliveryCount_one": "{{count}} доставка",
+      "deliveryCount_few": "{{count}} доставки",
+      "deliveryCount_many": "{{count}} доставок",
+      "deliveryCount_other": "{{count}} доставок"
     },
     "stats": {
       "dlq": "Невдалі повідомлення",
@@ -754,12 +814,69 @@
       "successRate": "{{rate}}% успішних",
       "successful": "Успішні",
       "totalDeliveries": "Всього доставок",
-      "totalDeliveriesDesc": "Надіслано webhook доставок"
+      "totalDeliveriesDesc": "Надіслано webhook доставок",
+      "deliveries": "Доставки",
+      "window": "Останні 7 днів",
+      "delivered": "Доставлено",
+      "deliveredHint": "{{percent}}% усього надісланого",
+      "inFlight": "У процесі",
+      "inFlightHint": "Ще винні спробу",
+      "abandoned": "Полишені",
+      "abandonedHint": "Драбину повторів вичерпано",
+      "dlqBadge": "У DLQ"
     },
     "subtitle": "Огляд активності вашої webhook платформи",
     "title": "Дашборд",
     "toast": {
       "loadFailed": "Не вдалося завантажити дані дашборду"
+    },
+    "headline": "Стан доставок",
+    "headlineDesc": "Що зараз відбувається з вашим вебхук-трафіком.",
+    "openAnalytics": "Відкрити аналітику",
+    "projectPicker": "Проєкт",
+    "verdict": {
+      "label": "Частка успішних",
+      "ok": "Усе доходить",
+      "retry": "Частина доставок потребує уваги",
+      "halt": "Доставки не проходять",
+      "idle": "Ще нічого не доставлено",
+      "detail": "Доставлено {{delivered}} із {{total}}.",
+      "idleDetail": "Надішліть першу подію — і тут з’являться дані."
+    },
+    "outcome": {
+      "title": "Результат доставок",
+      "desc": "Доставлені та невдалі за останні 7 днів",
+      "delivered": "Доставлено",
+      "failed": "Невдалі",
+      "empty": "У цьому вікні доставок не було"
+    },
+    "share": {
+      "delivered": "Доставлено",
+      "inFlight": "У процесі",
+      "failed": "Невдалі",
+      "abandoned": "Полишені"
+    },
+    "attention": {
+      "title": "Потребує людини",
+      "desc": "Робота, яку Hookflow більше не робить сам",
+      "clearBadge": "Усе чисто",
+      "dlq": "Полишені в DLQ",
+      "failed": "Невдалі, повторюються",
+      "alerts": "Незакриті сповіщення",
+      "incidents": "Відкриті інциденти"
+    },
+    "inFlight": {
+      "title": "У процесі",
+      "desc": "Доставки, що ще йдуть драбиною повторів",
+      "empty": "Нічого в процесі",
+      "rail": "Спроба {{count}} з {{total}}",
+      "status": {
+        "PENDING": "Очікує",
+        "PROCESSING": "Виконується",
+        "SUCCESS": "Доставлено",
+        "FAILED": "Невдала",
+        "DLQ": "Полишена"
+      }
     }
   },
   "debugLinks": {
@@ -1656,7 +1773,8 @@
     "emptyDesc": "Інциденти групують повʼязані збої для відстеження та аналізу причин",
     "form": {
       "severity": "Важливість",
-      "title": "Назва"
+      "title": "Назва",
+      "titlePlaceholder": "Платіжний ендпоінт віддає 503"
     },
     "investigate": "Розслідувати",
     "noOpen": "Немає відкритих інцидентів",
@@ -1664,7 +1782,9 @@
       "detail": "Деталі (необов'язково)",
       "noteTitle": "Заголовок",
       "submit": "Додати нотатку",
-      "title": "Додати нотатку до хронології"
+      "title": "Додати нотатку до хронології",
+      "titlePlaceholder": "Звернувся до підтримки постачальника",
+      "detailPlaceholder": "Що з’ясували і що зробили"
     },
     "openCount": "{{count}} відкритих інцидентів",
     "openOnly": "Тільки відкриті",
@@ -1681,7 +1801,29 @@
       "noteAdded": "Нотатку додано",
       "rcaSaved": "Нотатки RCA збережено",
       "statusUpdated": "Статус оновлено",
-      "updateFailed": "Не вдалося оновити інцидент"
+      "updateFailed": "Не вдалося оновити інцидент",
+      "createFailed": "Не вдалося створити інцидент",
+      "addNoteFailed": "Не вдалося додати нотатку"
+    },
+    "subtitle": "Групуйте пов’язані збої, фіксуйте зроблене й записуйте причину.",
+    "loadFailed": "Не вдалося завантажити інциденти цього проєкту",
+    "filterLabel": "Які інциденти",
+    "pageOf": "{{page}} / {{total}}",
+    "investigateDeliveries": "Переглянути доставки",
+    "resolvedAtLabel": "Закрито {{time}}",
+    "statuses": {
+      "OPEN": "Відкритий",
+      "INVESTIGATING": "Розслідується",
+      "RESOLVED": "Закритий"
+    },
+    "tiles": {
+      "open": "Відкриті",
+      "openHint": "Ними ще ніхто не зайнявся",
+      "allClear": "Усе чисто",
+      "investigating": "Розслідуються",
+      "investigatingHint": "Хтось уже цим займається",
+      "critical": "Критичні",
+      "criticalHint": "Незакриті й позначені критичними"
     }
   },
   "incomingDestinations": {
@@ -2419,7 +2561,8 @@
       "orderTitle": "Порядок у межах ендпоінта",
       "replayBody": "Відтворення створює нові доставки з подій, які вже є у сховищі — той самий payload, нові порядкові номери — пакетами по 200, до двох сесій на проєкт одночасно.",
       "replayTitle": "Відтворення з того, що збережено",
-      "title": "Драбина — це і є продукт"
+      "title": "Драбина — це і є продукт",
+      "ladderEnd": "після останнього щабля → DLQ"
     },
     "socialProof": {
       "quote1": "Ми замінили 3 місяці кастомного webhook-коду на Hookflow за один день. Ретраї, підписи, моніторинг — просто працює.",
@@ -2448,15 +2591,21 @@
       "titleHighlight": " продакшн навантажень"
     },
     "stack": {
-      "body": "Вхідні джерела мають перевірку підпису для Stripe, GitHub, GitLab, Shopify, Slack і Twilio, а для решти — загальний HMAC-верифікатор. Вихідні доставки йдуть на будь-який HTTPS-URL, який зареєстрували ваші користувачі, а за потреби — з mTLS.",
+      "body": "Вхідне джерело перевіряється перш за все інше. Stripe, GitHub, GitLab, Slack і Shopify мають власний верифікатор; решта — загальний HMAC-верифікатор із заголовком і префіксом, які ви назвете.",
       "eyebrow": "З ЧИМ ВІН З'ЄДНУЄТЬСЯ",
       "runsOnLabel": "ПРАЦЮЄ НА",
-      "runsOnNote": "Postgres 16 · Kafka 3.7 · Redis 7 · Docker Compose",
+      "runsOnNote": "Один compose-файл. Postgres тримає запис, Kafka рухає роботу, Redis тримає захоплення.",
       "sdkLabel": "НАДСИЛАТИ З",
       "sdkNote": "@hookflow/node · hookflow-sdk · hookflow/php · або звичайний HTTP",
       "title": "Приймає від провайдерів, які підписують. Доставляє будь-куди, де є HTTP.",
       "verifiedLabel": "ПЕРЕВІРЕНІ ДЖЕРЕЛА",
-      "verifiedMore": "GitLab · Shopify · загальний HMAC · власний"
+      "verifiedMore": "GitLab · Shopify · загальний HMAC",
+      "genericName": "Будь-який HMAC-провайдер",
+      "genericDetail": "ваш заголовок, ваш префікс",
+      "genericNote": "Охоплює GitLab і Shopify та все, що підписує тіло спільним секретом.",
+      "stripeDetail": "часова мітка + підпис v1",
+      "githubDetail": "префікс sha256",
+      "slackDetail": "підпис v0 + часова мітка"
     },
     "trust": {
       "apiKeys": "Автентифікація API ключами",
@@ -3500,7 +3649,9 @@
       "events": "Події",
       "failed": "Невдалі",
       "success": "Успішні",
-      "title": "Щоденна історія"
+      "title": "Щоденна історія",
+      "desc": "Кожен день обраного періоду",
+      "empty": "Ще немає жодного дня"
     },
     "noData": "Немає даних використання",
     "noDataDesc": "Почніть надсилати події, щоб побачити метрики використання",
@@ -3521,7 +3672,47 @@
       "successRate": "Успішність"
     },
     "subtitle": "Використання ресурсів для <strong>{{project}}</strong>",
-    "title": "Використання та метрики"
+    "title": "Використання та метрики",
+    "description": "Що цей проєкт витратив і що дозволяє ваш тариф.",
+    "loadFailed": "Не вдалося завантажити використання цього проєкту",
+    "periodLabel": "Період",
+    "quota": {
+      "title": "Ліміти тарифу",
+      "desc": "Цей розрахунковий період, {{from}} — {{to}}",
+      "descPending": "Цей розрахунковий період, по всій організації",
+      "events": "Події",
+      "endpoints": "Ендпоінти",
+      "projects": "Проєкти",
+      "members": "Учасники",
+      "ofLimit": "{{percent}}% з {{limit}}",
+      "unlimited": "Без ліміту на вашому тарифі",
+      "approaching": "Близько до ліміту",
+      "over": "Понад ліміт"
+    },
+    "traffic": {
+      "title": "Доставки за днями",
+      "desc": "Доставлені та невдалі, по одному стовпчику на день",
+      "delivered": "Доставлено",
+      "failed": "Невдалі",
+      "empty": "У цьому вікні доставок не було"
+    },
+    "mix": {
+      "title": "Чим завершилися доставки",
+      "desc": "За обраний період",
+      "delivered": "Доставлено",
+      "inFlight": "У процесі",
+      "failed": "Невдалі",
+      "abandoned": "Полишені",
+      "total": "Усього {{total}} доставок"
+    },
+    "tiles": {
+      "events": "Події",
+      "eventsHint": "Оголошені вашими системами",
+      "incoming": "Вхідні події",
+      "incomingHint": "Отримані від ваших джерел",
+      "endpointsHint": "Зареєстровані й увімкнені",
+      "alertRulesHint": "Стежать за цим проєктом"
+    }
   },
   "verifyEmail": {
     "errorTitle": "Помилка верифікації",
@@ -3765,5 +3956,8 @@
     "validation": {
       "required": "Це поле обов'язкове"
     }
+  },
+  "charts": {
+    "empty": "Поки нема що показати"
   }
 }

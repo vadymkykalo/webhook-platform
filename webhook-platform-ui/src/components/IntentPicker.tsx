@@ -21,10 +21,15 @@ interface IntentPickerProps {
   onSelect: (intent: WebhookIntent) => void;
 }
 
-const INTENTS: { key: WebhookIntent; icon: React.ElementType; iconColor: string; iconBg: string }[] = [
-  { key: 'send', icon: Send, iconColor: 'text-blue-600', iconBg: 'bg-blue-100 dark:bg-blue-900/30' },
-  { key: 'receive', icon: Radio, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  { key: 'both', icon: ArrowLeftRight, iconColor: 'text-purple-600', iconBg: 'bg-purple-100 dark:bg-purple-900/30' },
+/**
+ * The three choices are the two directions and both, so they are told apart by
+ * their icons and their words — never by colour. The status hues are reserved,
+ * and the only accent here is the brand mark on the selected card.
+ */
+const INTENTS: { key: WebhookIntent; icon: React.ElementType }[] = [
+  { key: 'send', icon: Send },
+  { key: 'receive', icon: Radio },
+  { key: 'both', icon: ArrowLeftRight },
 ];
 
 export default function IntentPicker({ onSelect }: IntentPickerProps) {
@@ -39,38 +44,46 @@ export default function IntentPicker({ onSelect }: IntentPickerProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-xl font-bold tracking-tight">{t('auth.intent.title')}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t('auth.intent.subtitle')}</p>
+    <div className="space-y-5">
+      <div className="space-y-2.5" role="radiogroup" aria-label={t('auth.intent.title')}>
+        {INTENTS.map(({ key, icon: Icon }) => {
+          const active = selected === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => setSelected(key)}
+              className={cn(
+                'flex w-full items-start gap-3.5 rounded-lg border p-4 text-left transition-colors',
+                active
+                  ? 'border-primary bg-accent'
+                  : 'border-rail bg-card hover:border-primary/40 hover:bg-secondary/50',
+              )}
+            >
+              <div
+                className={cn(
+                  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border',
+                  active ? 'border-primary/30 bg-primary text-primary-foreground' : 'border-rail bg-secondary text-muted-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <span className="block text-sm font-medium">{t(`auth.intent.${key}`)}</span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                  {t(`auth.intent.${key}Desc`)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="space-y-3">
-        {INTENTS.map(({ key, icon: Icon, iconColor, iconBg }) => (
-          <button
-            key={key}
-            onClick={() => setSelected(key)}
-            className={cn(
-              'w-full flex items-start gap-4 p-4 rounded-xl border text-left transition-all',
-              selected === key
-                ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                : 'border-border hover:border-primary/30 hover:bg-muted/30'
-            )}
-          >
-            <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center shrink-0', iconBg)}>
-              <Icon className={cn('h-5 w-5', iconColor)} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-sm font-semibold block">{t(`auth.intent.${key}`)}</span>
-              <span className="text-xs text-muted-foreground mt-0.5 block">{t(`auth.intent.${key}Desc`)}</span>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      <Button onClick={handleContinue} disabled={!selected} className="w-full">
+      <Button onClick={handleContinue} disabled={!selected} className="h-10 w-full">
         {t('auth.intent.continue')}
-        <ArrowRight className="h-4 w-4 ml-1.5" />
+        <ArrowRight className="h-4 w-4" aria-hidden />
       </Button>
     </div>
   );

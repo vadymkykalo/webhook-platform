@@ -1,10 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Shield, Clock, Eye, AlertTriangle } from 'lucide-react';
+import { Shield, Clock, Eye } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatDateTime } from '../lib/date';
 import { debugLinksApi, SharedDebugLinkPublicResponse } from '../api/debugLinks.api';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { ErrorState } from '../components/EmptyState';
+import PageSkeleton from '../components/PageSkeleton';
+
+/**
+ * A public page: whoever opens it has a link and nothing else, so it stands on
+ * its own outside the admin shell. The facts the product produced — event type,
+ * payload — are set in mono; the words around them are not.
+ */
+function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="rounded-lg border border-rail bg-card p-3.5">
+      <p className="mono-label mb-1.5">{label}</p>
+      <p className={`truncate text-sm ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
+  );
+}
 
 export default function SharedDebugPage() {
   const { t } = useTranslation();
@@ -45,86 +60,67 @@ export default function SharedDebugPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">{t('sharedDebug.loading')}</div>
+      <div className="min-h-screen bg-background">
+        <PageSkeleton maxWidth="max-w-4xl" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="flex flex-col items-center py-12">
-            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-            <h2 className="text-lg font-semibold mb-2">{t('sharedDebug.unavailable')}</h2>
-            <p className="text-sm text-muted-foreground text-center">{error}</p>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="w-full max-w-md">
+          <ErrorState
+            title={t('sharedDebug.unavailable')}
+            description={error ?? t('sharedDebug.error')}
+            onRetry={loadData}
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6 lg:p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Shield className="h-5 w-5 text-primary" />
+      <div className="mx-auto max-w-4xl p-4 lg:p-6">
+        <div className="flex items-start gap-3 pb-5">
+          <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-rail bg-card">
+            <Shield className="h-4 w-4 text-primary" aria-hidden />
           </div>
-          <div>
-            <h1 className="text-xl font-semibold">{t('sharedDebug.title')}</h1>
-            <p className="text-xs text-muted-foreground">{t('sharedDebug.subtitle')}</p>
+          <div className="min-w-0">
+            <h1 className="text-title">{t('sharedDebug.title')}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{t('sharedDebug.subtitle')}</p>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{t('sharedDebug.project')}</p>
-              <p className="text-sm font-medium">{data.projectName}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{t('sharedDebug.eventType')}</p>
-              <p className="text-sm font-mono font-medium">{data.eventType}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{t('sharedDebug.eventTime')}</p>
-              <p className="text-sm">{formatDateTime(data.eventCreatedAt)}</p>
-            </CardContent>
-          </Card>
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <Fact label={t('sharedDebug.project')} value={data.projectName} />
+          <Fact label={t('sharedDebug.eventType')} value={data.eventType} mono />
+          <Fact label={t('sharedDebug.eventTime')} value={formatDateTime(data.eventCreatedAt)} mono />
         </div>
 
-        <div className="flex items-center gap-4 mb-4 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" aria-hidden />
             {t('sharedDebug.expiresAt', { date: formatDateTime(data.linkExpiresAt) })}
           </span>
-          <span className="flex items-center gap-1">
-            <Eye className="h-3.5 w-3.5" />
+          <span className="flex items-center gap-1.5">
+            <Eye className="h-3.5 w-3.5" aria-hidden />
             {t('sharedDebug.piiMasked')}
           </span>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Shield className="h-4 w-4 text-primary" />
-              {t('sharedDebug.sanitizedPayload')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-muted/50 border rounded-lg p-4 text-xs font-mono overflow-x-auto max-h-[600px] overflow-y-auto whitespace-pre-wrap">
-              {formatPayload(data.sanitizedPayload)}
-            </pre>
-          </CardContent>
-        </Card>
+        <section className="overflow-hidden rounded-lg border border-rail bg-card">
+          <div className="flex items-center gap-2 border-b border-rail px-4 py-2.5">
+            <Shield className="h-3.5 w-3.5 text-primary" aria-hidden />
+            <h2 className="mono-label">{t('sharedDebug.sanitizedPayload')}</h2>
+          </div>
+          <pre className="max-h-[600px] overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-relaxed">
+            {formatPayload(data.sanitizedPayload)}
+          </pre>
+        </section>
 
-        <p className="text-[11px] text-muted-foreground text-center mt-6">
+        <p className="mt-6 text-center text-xs text-muted-foreground">
           {t('sharedDebug.footer')}
         </p>
       </div>

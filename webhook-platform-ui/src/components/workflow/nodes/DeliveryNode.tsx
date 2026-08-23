@@ -10,7 +10,7 @@ function DeliveryNode({ data, selected }: NodeProps) {
   const shortId = endpointId.length > 12 ? endpointId.substring(0, 12) + '…' : endpointId;
   return (
     <BaseNode
-      color="#3b82f6"
+      role="action"
       icon="📦"
       label={String(d.label || t('workflows.nodeTypes.delivery.label'))}
       subtitle={endpointId ? shortId : t('workflows.nodeStatus.notConfigured')}

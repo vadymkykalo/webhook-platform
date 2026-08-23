@@ -14,9 +14,13 @@
 
 @layer base {
   :root {
-    /* Surfaces — warm paper, not clinical white */
-    --background: 60 17% 98%;      /* #FAFAF8 paper  */
-    --foreground: 218 22% 7%;      /* #0E1116 ink    */
+    /* Surfaces.
+       The page is a distinctly warm grey and cards are white, because the
+       first pass put them 2% of lightness apart and the result was white on
+       white — a card had to be found rather than seen. The gap below is what
+       lets a surface read as a surface without a shadow doing the work. */
+    --background: 55 14% 95%;      /* #F4F3EE  paper */
+    --foreground: 218 22% 7%;      /* #0E1116  ink   */
     --card: 0 0% 100%;
     --card-foreground: 218 22% 7%;
     --popover: 0 0% 100%;
@@ -24,20 +28,22 @@
 
     /* Brand — deep teal. Disjoint from every status hue. */
     --primary: 186 80% 26%;        /* #0D6E78 */
-    --primary-foreground: 60 17% 98%;
+    --primary-foreground: 55 14% 95%;
     --accent: 186 44% 94%;
     --accent-foreground: 186 80% 22%;
 
     /* Neutrals, warmed to match the paper */
-    --secondary: 60 15% 94%;
+    --secondary: 55 13% 90%;
     --secondary-foreground: 218 22% 7%;
-    --muted: 60 15% 95%;
-    --muted-foreground: 70 6% 40%;
+    --muted: 55 13% 91%;
+    --muted-foreground: 70 7% 38%;
 
-    /* Rails — the hairlines and tick marks the whole system is drawn with */
-    --rail: 70 9% 86%;             /* #DEDFD9 */
-    --border: 70 9% 86%;
-    --input: 70 9% 86%;
+    /* Rails — the hairlines and tick marks the whole system is drawn with.
+       Darkened from the first pass: at 86% they vanished against the page and
+       every boundary in the product is drawn with one of these. */
+    --rail: 60 8% 82%;             /* #D5D5CD */
+    --border: 60 8% 82%;
+    --input: 60 8% 82%;
     --ring: 186 80% 26%;
 
     /* Status — reserved. Never chrome. */
@@ -64,9 +70,9 @@
   }
 
   .dark {
-    --background: 220 20% 8%;
+    --background: 220 20% 7%;
     --foreground: 60 12% 96%;
-    --card: 220 18% 11%;
+    --card: 220 16% 13%;
     --card-foreground: 60 12% 96%;
     --popover: 220 18% 11%;
     --popover-foreground: 60 12% 96%;
@@ -76,14 +82,14 @@
     --accent: 186 50% 16%;
     --accent-foreground: 185 79% 62%;
 
-    --secondary: 220 14% 16%;
+    --secondary: 220 14% 18%;
     --secondary-foreground: 60 12% 96%;
-    --muted: 220 14% 16%;
+    --muted: 220 14% 18%;
     --muted-foreground: 70 5% 62%;
 
-    --rail: 220 12% 21%;
-    --border: 220 12% 21%;
-    --input: 220 12% 21%;
+    --rail: 220 12% 24%;
+    --border: 220 12% 24%;
+    --input: 220 12% 24%;
     --ring: 185 79% 45%;
 
     --ok: 152 55% 46%;
@@ -110,7 +116,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    font-feature-settings: "tnum";  /* tabular figures — columns of numbers must align */
   }
   html {
     scroll-behavior: smooth;

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
-  Flame, Plus, Loader2, CheckCircle2, AlertTriangle, Search as SearchIcon,
-  XCircle, Send, RotateCcw, MessageSquare, ArrowRight, ChevronDown, ChevronUp
+  ArrowRight, ChevronDown, ChevronUp, Flame, Loader2, MessageSquare, Plus, RotateCcw,
+  Search as SearchIcon, Send, XCircle, CheckCircle2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
@@ -11,14 +11,15 @@ import {
 } from '../api/queries';
 import type { IncidentStatus, IncidentTimelineType } from '../api/incidents.api';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
-import PageSkeleton from '../components/PageSkeleton';
-import EmptyState from '../components/EmptyState';
+import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import PageHeader from '../components/PageHeader';
+import EmptyState, { ErrorState } from '../components/EmptyState';
+import StatusBadge from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
 import { Textarea } from '../components/ui/textarea';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
@@ -26,20 +27,14 @@ import VerificationGate from '../components/VerificationGate';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
+import { cn } from '../lib/utils';
+import {
+  STATUS_FILL, STATUS_TEXT, StatTile, formatCompact, kindOfIncidentStatus, kindOfSeverity,
+} from '../components/charts';
 
-const STATUS_COLORS: Record<string, string> = {
-  OPEN: 'bg-red-500/10 text-red-700 dark:text-red-400',
-  INVESTIGATING: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
-  RESOLVED: 'bg-green-500/10 text-green-700 dark:text-green-400',
-};
+const SEVERITY_VALUES = ['INFO', 'WARNING', 'CRITICAL'] as const;
 
-const STATUS_ICONS: Record<string, React.ElementType> = {
-  OPEN: XCircle,
-  INVESTIGATING: SearchIcon,
-  RESOLVED: CheckCircle2,
-};
-
-const TIMELINE_ICONS: Record<string, React.ElementType> = {
+const TIMELINE_ICON: Record<IncidentTimelineType, React.ElementType> = {
   FAILURE: XCircle,
   RETRY: RotateCcw,
   REPLAY: Send,
@@ -47,13 +42,14 @@ const TIMELINE_ICONS: Record<string, React.ElementType> = {
   STATUS_CHANGE: ArrowRight,
 };
 
-const TIMELINE_COLORS: Record<string, string> = {
-  FAILURE: 'text-red-500',
-  RETRY: 'text-yellow-500',
-  REPLAY: 'text-blue-500',
-  NOTE: 'text-muted-foreground',
-  STATUS_CHANGE: 'text-purple-500',
-};
+/** A timeline entry's type is a lifecycle state, so it maps onto the same four. */
+const TIMELINE_KIND = {
+  FAILURE: 'halt',
+  RETRY: 'retry',
+  REPLAY: 'retry',
+  NOTE: 'idle',
+  STATUS_CHANGE: 'idle',
+} as const;
 
 export default function IncidentsPage() {
   const { t } = useTranslation();
@@ -66,29 +62,29 @@ export default function IncidentsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showNoteDialog, setShowNoteDialog] = useState<string | null>(null);
 
-  // Create form
   const [formTitle, setFormTitle] = useState('');
-  const [formSeverity, setFormSeverity] = useState('WARNING');
-
-  // Note form
+  const [formSeverity, setFormSeverity] = useState<string>('WARNING');
   const [noteTitle, setNoteTitle] = useState('');
   const [noteDetail, setNoteDetail] = useState('');
 
-  const { data: incidentsData, isLoading } = useIncidents(projectId, openOnly, page);
+  const {
+    data: incidentsData, isLoading, isError, error, refetch,
+  } = useIncidents(projectId, openOnly, page);
   const { data: openCount } = useOpenIncidentCount(projectId);
   const createIncident = useCreateIncident(projectId!);
   const updateIncident = useUpdateIncident(projectId!);
   const addTimeline = useAddTimelineEntry(projectId!);
-
-  // Expanded incident detail
   const { data: expandedIncident } = useIncident(projectId, expandedId ?? undefined);
 
   const incidents = incidentsData?.content ?? [];
+  const openIncidents = openCount?.count ?? 0;
+  const investigating = incidents.filter((i) => i.status === 'INVESTIGATING').length;
+  const critical = incidents.filter((i) => i.severity === 'CRITICAL' && i.status !== 'RESOLVED').length;
 
   const handleCreate = async () => {
     try {
       await createIncident.mutateAsync({ title: formTitle, severity: formSeverity });
-      showSuccess(t('incidents.toast.created', 'Incident created'));
+      showSuccess(t('incidents.toast.created'));
       setShowCreateDialog(false);
       setFormTitle('');
       setFormSeverity('WARNING');
@@ -100,7 +96,7 @@ export default function IncidentsPage() {
   const handleStatusChange = async (incidentId: string, status: IncidentStatus) => {
     try {
       await updateIncident.mutateAsync({ incidentId, data: { status } });
-      showSuccess(t('incidents.toast.statusUpdated', 'Status updated'));
+      showSuccess(t('incidents.toast.statusUpdated'));
     } catch (err: any) {
       showApiError(err, 'incidents.toast.updateFailed');
     }
@@ -109,7 +105,7 @@ export default function IncidentsPage() {
   const handleSaveRca = async (incidentId: string, rcaNotes: string) => {
     try {
       await updateIncident.mutateAsync({ incidentId, data: { rcaNotes } });
-      showSuccess(t('incidents.toast.rcaSaved', 'RCA notes saved'));
+      showSuccess(t('incidents.toast.rcaSaved'));
     } catch (err: any) {
       showApiError(err, 'incidents.toast.updateFailed');
     }
@@ -122,7 +118,7 @@ export default function IncidentsPage() {
         incidentId: showNoteDialog,
         data: { entryType: 'NOTE' as IncidentTimelineType, title: noteTitle, detail: noteDetail || undefined },
       });
-      showSuccess(t('incidents.toast.noteAdded', 'Note added'));
+      showSuccess(t('incidents.toast.noteAdded'));
       setShowNoteDialog(null);
       setNoteTitle('');
       setNoteDetail('');
@@ -131,215 +127,316 @@ export default function IncidentsPage() {
     }
   };
 
-  if (isLoading) return <PageSkeleton maxWidth="max-w-6xl" />;
+  if (isLoading) {
+    return (
+      <PageSkeleton maxWidth="max-w-none">
+        <SkeletonCards count={3} height="h-[104px]" cols="grid-cols-1 lg:grid-cols-3" />
+        <SkeletonCards count={3} height="h-20" cols="grid-cols-1" />
+      </PageSkeleton>
+    );
+  }
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-            <Flame className="h-5 w-5 text-red-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{t('incidents.title', 'Incidents')}</h1>
-            <p className="text-sm text-muted-foreground">
-              {openCount?.count ? t('incidents.openCount', { count: openCount.count, defaultValue: '{{count}} open incidents' }) : t('incidents.noOpen', 'No open incidents')}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant={openOnly ? 'default' : 'outline'} size="sm" onClick={() => { setOpenOnly(!openOnly); setPage(0); }}>
-            {openOnly ? t('incidents.showAll', 'Show All') : t('incidents.openOnly', 'Open Only')}
-          </Button>
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        title={t('incidents.title')}
+        description={t('incidents.subtitle')}
+        actions={
           <PermissionGate allowed={canManageEndpoints}>
             <VerificationGate>
-              <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-1" /> {t('incidents.create', 'Create Incident')}
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4" /> {t('incidents.create')}
               </Button>
             </VerificationGate>
           </PermissionGate>
+        }
+      />
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <StatTile
+            label={t('incidents.tiles.open')}
+            value={formatCompact(openIncidents)}
+            hint={t('incidents.tiles.openHint')}
+            badge={openIncidents > 0
+              ? <StatusBadge kind="halt" label={t('incidents.statuses.OPEN')} icon={false} />
+              : <StatusBadge kind="ok" label={t('incidents.tiles.allClear')} icon={false} />}
+          />
+          <StatTile
+            label={t('incidents.tiles.investigating')}
+            value={formatCompact(investigating)}
+            hint={t('incidents.tiles.investigatingHint')}
+          />
+          <StatTile
+            label={t('incidents.tiles.critical')}
+            value={formatCompact(critical)}
+            hint={t('incidents.tiles.criticalHint')}
+            badge={critical > 0 ? <StatusBadge kind="halt" label={t('alerts.severities.CRITICAL')} icon={false} /> : undefined}
+          />
         </div>
+
+        {/* One filter row, above what it scopes. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            role="group"
+            aria-label={t('incidents.filterLabel')}
+            className="inline-flex rounded-lg border border-rail bg-card p-0.5"
+          >
+            {([true, false] as const).map((only) => (
+              <button
+                key={String(only)}
+                type="button"
+                onClick={() => { setOpenOnly(only); setPage(0); }}
+                aria-pressed={openOnly === only}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-xs transition-colors',
+                  openOnly === only
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {t(only ? 'incidents.openOnly' : 'incidents.showAll')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isError ? (
+          <ErrorState error={error} fallbackKey="incidents.loadFailed" onRetry={() => refetch()} />
+        ) : incidents.length === 0 ? (
+          <EmptyState
+            icon={Flame}
+            title={t('incidents.empty')}
+            description={t('incidents.emptyDesc')}
+            action={
+              <PermissionGate allowed={canManageEndpoints}>
+                <VerificationGate>
+                  <Button onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="h-4 w-4" /> {t('incidents.create')}
+                  </Button>
+                </VerificationGate>
+              </PermissionGate>
+            }
+          />
+        ) : (
+          <div className="animate-fade-in space-y-3">
+            {incidents.map((incident) => {
+              const isExpanded = expandedId === incident.id;
+              const statusKind = kindOfIncidentStatus(incident.status);
+              const severityKind = kindOfSeverity(incident.severity);
+              return (
+                <Card key={incident.id} className="overflow-hidden">
+                  <button
+                    type="button"
+                    className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-secondary/40"
+                    onClick={() => setExpandedId(isExpanded ? null : incident.id)}
+                    aria-expanded={isExpanded}
+                  >
+                    {/* The severity rule: colour and position, before any words. */}
+                    <span
+                      aria-hidden
+                      className={cn('mt-0.5 h-9 w-1 flex-shrink-0 rounded-full', STATUS_FILL[severityKind])}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{incident.title}</span>
+                      <span className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <StatusBadge kind={statusKind} label={t(`incidents.statuses.${incident.status}`)} />
+                        <StatusBadge
+                          kind={severityKind}
+                          label={t(`alerts.severities.${incident.severity}`)}
+                          icon={false}
+                        />
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatRelativeTime(incident.createdAt)}
+                        </span>
+                      </span>
+                    </span>
+                    {isExpanded
+                      ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />
+                      : <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />}
+                  </button>
+
+                  {isExpanded && expandedIncident && (
+                    <div className="space-y-4 border-t border-rail p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/admin/projects/${projectId}/deliveries?status=FAILED`}>
+                            <SearchIcon className="h-3.5 w-3.5" />
+                            {t('incidents.investigateDeliveries')}
+                          </Link>
+                        </Button>
+                        {canManageEndpoints && (
+                          <>
+                            {expandedIncident.status !== 'INVESTIGATING' && (
+                              <Button variant="outline" size="sm" onClick={() => handleStatusChange(incident.id, 'INVESTIGATING')}>
+                                <SearchIcon className="h-3.5 w-3.5" /> {t('incidents.investigate')}
+                              </Button>
+                            )}
+                            {expandedIncident.status !== 'RESOLVED' && (
+                              <Button variant="outline" size="sm" onClick={() => handleStatusChange(incident.id, 'RESOLVED')}>
+                                <CheckCircle2 className="h-3.5 w-3.5" /> {t('incidents.resolve')}
+                              </Button>
+                            )}
+                            {expandedIncident.status === 'RESOLVED' && (
+                              <Button variant="outline" size="sm" onClick={() => handleStatusChange(incident.id, 'OPEN')}>
+                                <XCircle className="h-3.5 w-3.5" /> {t('incidents.reopen')}
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" onClick={() => setShowNoteDialog(incident.id)}>
+                              <MessageSquare className="h-3.5 w-3.5" /> {t('incidents.addNote')}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`rca-${incident.id}`} className="text-xs font-medium">
+                          {t('incidents.rcaNotes')}
+                        </Label>
+                        <Textarea
+                          id={`rca-${incident.id}`}
+                          className="min-h-[80px] text-sm"
+                          placeholder={t('incidents.rcaPlaceholder')}
+                          defaultValue={expandedIncident.rcaNotes || ''}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            if (val !== (expandedIncident.rcaNotes || '')) handleSaveRca(incident.id, val);
+                          }}
+                        />
+                      </div>
+
+                      {expandedIncident.timeline && expandedIncident.timeline.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="mono-label">{t('incidents.timeline')}</p>
+                          <ul className="relative space-y-3 border-l border-rail py-1 pl-6">
+                            {expandedIncident.timeline.map((entry) => {
+                              const EntryIcon = TIMELINE_ICON[entry.entryType] ?? ArrowRight;
+                              const kind = TIMELINE_KIND[entry.entryType] ?? 'idle';
+                              return (
+                                <li key={entry.id} className="relative">
+                                  <span className="absolute -left-[31px] top-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-rail bg-card">
+                                    <EntryIcon className={cn('h-2.5 w-2.5', STATUS_TEXT[kind])} aria-hidden />
+                                  </span>
+                                  <span className="flex flex-wrap items-baseline gap-2">
+                                    <span className="text-sm font-medium">{entry.title}</span>
+                                    <span className="text-[11px] text-muted-foreground">
+                                      {formatRelativeTime(entry.createdAt)}
+                                    </span>
+                                  </span>
+                                  {entry.detail && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">{entry.detail}</p>
+                                  )}
+                                  {entry.deliveryId && (
+                                    <Link
+                                      to={`/admin/projects/${projectId}/deliveries?deliveryId=${entry.deliveryId}`}
+                                      className="mt-0.5 block font-mono text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                                    >
+                                      {entry.deliveryId}
+                                    </Link>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+
+                      {expandedIncident.resolvedAt && (
+                        <p className="text-xs text-muted-foreground">
+                          {t('incidents.resolvedAtLabel', { time: formatDateTime(expandedIncident.resolvedAt) })}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+
+            {(incidentsData?.totalPages ?? 0) > 1 && (
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  {t('common.previous')}
+                </Button>
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {t('incidents.pageOf', { page: page + 1, total: incidentsData?.totalPages ?? 1 })}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= (incidentsData?.totalPages ?? 1) - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  {t('common.next')}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* List */}
-      {incidents.length === 0 ? (
-        <EmptyState
-          icon={Flame}
-          title={t('incidents.empty', 'No incidents')}
-          description={t('incidents.emptyDesc', 'Incidents group related failures for tracking and RCA')}
-          action={<PermissionGate allowed={canManageEndpoints}><VerificationGate><Button onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" /> {t('incidents.create', 'Create Incident')}</Button></VerificationGate></PermissionGate>}
-        />
-      ) : (
-        <div className="space-y-3 animate-fade-in">
-          {incidents.map((incident) => {
-            const isExpanded = expandedId === incident.id;
-            const StatusIcon = STATUS_ICONS[incident.status] || AlertTriangle;
-            return (
-              <Card key={incident.id} className={isExpanded ? 'ring-2 ring-primary/20' : ''}>
-                <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : incident.id)}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <StatusIcon className={`h-5 w-5 flex-shrink-0 ${incident.status === 'OPEN' ? 'text-red-500' : incident.status === 'INVESTIGATING' ? 'text-yellow-500' : 'text-green-500'}`} />
-                      <div className="min-w-0">
-                        <CardTitle className="text-base truncate">{incident.title}</CardTitle>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${STATUS_COLORS[incident.status] || ''}`}>
-                            {incident.status}
-                          </span>
-                          <Badge variant="outline" className="text-[11px]">{incident.severity}</Badge>
-                          <span className="text-[11px] text-muted-foreground">{formatRelativeTime(incident.createdAt)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                </CardHeader>
-
-                {isExpanded && expandedIncident && (
-                  <CardContent className="pt-0 space-y-4">
-                    {/* Status actions */}
-                    <PermissionGate allowed={canManageEndpoints}>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {expandedIncident.status !== 'INVESTIGATING' && (
-                          <Button variant="outline" size="sm" onClick={() => handleStatusChange(incident.id, 'INVESTIGATING')}>
-                            <SearchIcon className="h-3.5 w-3.5 mr-1" /> {t('incidents.investigate', 'Investigate')}
-                          </Button>
-                        )}
-                        {expandedIncident.status !== 'RESOLVED' && (
-                          <Button variant="outline" size="sm" className="text-green-600" onClick={() => handleStatusChange(incident.id, 'RESOLVED')}>
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t('incidents.resolve', 'Resolve')}
-                          </Button>
-                        )}
-                        {expandedIncident.status === 'RESOLVED' && (
-                          <Button variant="outline" size="sm" className="text-red-600" onClick={() => handleStatusChange(incident.id, 'OPEN')}>
-                            <XCircle className="h-3.5 w-3.5 mr-1" /> {t('incidents.reopen', 'Reopen')}
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => setShowNoteDialog(incident.id)}>
-                          <MessageSquare className="h-3.5 w-3.5 mr-1" /> {t('incidents.addNote', 'Add Note')}
-                        </Button>
-                      </div>
-                    </PermissionGate>
-
-                    {/* RCA Notes */}
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">{t('incidents.rcaNotes', 'Root Cause Analysis')}</Label>
-                      <Textarea
-                        className="text-sm min-h-[80px]"
-                        placeholder={t('incidents.rcaPlaceholder', 'Document the root cause, impact, and remediation steps...')}
-                        defaultValue={expandedIncident.rcaNotes || ''}
-                        onBlur={(e) => {
-                          const val = e.target.value;
-                          if (val !== (expandedIncident.rcaNotes || '')) handleSaveRca(incident.id, val);
-                        }}
-                      />
-                    </div>
-
-                    {/* Timeline */}
-                    {expandedIncident.timeline && expandedIncident.timeline.length > 0 && (
-                      <div className="space-y-1">
-                        <Label className="text-xs font-medium">{t('incidents.timeline', 'Timeline')}</Label>
-                        <div className="relative pl-6 border-l-2 border-muted space-y-3 py-2">
-                          {expandedIncident.timeline.map((entry) => {
-                            const EntryIcon = TIMELINE_ICONS[entry.entryType] || ArrowRight;
-                            return (
-                              <div key={entry.id} className="relative">
-                                <div className={`absolute -left-[25px] top-0.5 h-4 w-4 rounded-full bg-background border-2 border-muted flex items-center justify-center`}>
-                                  <EntryIcon className={`h-2.5 w-2.5 ${TIMELINE_COLORS[entry.entryType] || ''}`} />
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">{entry.title}</span>
-                                    <span className="text-[10px] text-muted-foreground">{formatRelativeTime(entry.createdAt)}</span>
-                                  </div>
-                                  {entry.detail && <p className="text-xs text-muted-foreground mt-0.5">{entry.detail}</p>}
-                                  {entry.deliveryId && <code className="text-[10px] font-mono text-muted-foreground">delivery: {entry.deliveryId.substring(0, 8)}…</code>}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Meta */}
-                    {expandedIncident.resolvedAt && (
-                      <p className="text-xs text-muted-foreground">
-                        {t('incidents.resolvedAt', 'Resolved')}: {formatDateTime(expandedIncident.resolvedAt)}
-                      </p>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
-
-          {/* Pagination */}
-          {(incidentsData?.totalPages ?? 0) > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4">
-              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>{t('common.previous', 'Previous')}</Button>
-              <span className="text-sm text-muted-foreground">
-                {page + 1} / {incidentsData?.totalPages}
-              </span>
-              <Button variant="outline" size="sm" disabled={page >= (incidentsData?.totalPages ?? 1) - 1} onClick={() => setPage(p => p + 1)}>{t('common.next', 'Next')}</Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Create dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('incidents.createDialog.title', 'Create Incident')}</DialogTitle>
-            <DialogDescription>{t('incidents.createDialog.desc', 'Track a group of related failures')}</DialogDescription>
+            <DialogTitle>{t('incidents.createDialog.title')}</DialogTitle>
+            <DialogDescription>{t('incidents.createDialog.desc')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>{t('incidents.form.title', 'Title')}</Label>
-              <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="e.g. Payment endpoint returning 503" />
+              <Label htmlFor="incident-title">{t('incidents.form.title')}</Label>
+              <Input
+                id="incident-title"
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder={t('incidents.form.titlePlaceholder')}
+              />
             </div>
             <div className="space-y-2">
-              <Label>{t('incidents.form.severity', 'Severity')}</Label>
-              <Select value={formSeverity} onChange={(e) => setFormSeverity(e.target.value)}>
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="CRITICAL">Critical</option>
+              <Label htmlFor="incident-severity">{t('incidents.form.severity')}</Label>
+              <Select id="incident-severity" value={formSeverity} onChange={(e) => setFormSeverity(e.target.value)}>
+                {SEVERITY_VALUES.map((v) => <option key={v} value={v}>{t(`alerts.severities.${v}`)}</option>)}
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleCreate} disabled={!formTitle || createIncident.isPending}>
-              {createIncident.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              {t('incidents.createDialog.submit', 'Create')}
+              {createIncident.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('incidents.createDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Note dialog */}
       <Dialog open={!!showNoteDialog} onOpenChange={() => setShowNoteDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('incidents.noteDialog.title', 'Add Timeline Note')}</DialogTitle>
+            <DialogTitle>{t('incidents.noteDialog.title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>{t('incidents.noteDialog.noteTitle', 'Title')}</Label>
-              <Input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="e.g. Contacted vendor support" />
+              <Label htmlFor="note-title">{t('incidents.noteDialog.noteTitle')}</Label>
+              <Input
+                id="note-title"
+                value={noteTitle}
+                onChange={(e) => setNoteTitle(e.target.value)}
+                placeholder={t('incidents.noteDialog.titlePlaceholder')}
+              />
             </div>
             <div className="space-y-2">
-              <Label>{t('incidents.noteDialog.detail', 'Detail (optional)')}</Label>
-              <Textarea value={noteDetail} onChange={(e) => setNoteDetail(e.target.value)} placeholder="Additional context..." />
+              <Label htmlFor="note-detail">{t('incidents.noteDialog.detail')}</Label>
+              <Textarea
+                id="note-detail"
+                value={noteDetail}
+                onChange={(e) => setNoteDetail(e.target.value)}
+                placeholder={t('incidents.noteDialog.detailPlaceholder')}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNoteDialog(null)}>{t('common.cancel', 'Cancel')}</Button>
+            <Button variant="outline" onClick={() => setShowNoteDialog(null)}>{t('common.cancel')}</Button>
             <Button onClick={handleAddNote} disabled={!noteTitle || addTimeline.isPending}>
-              {addTimeline.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              {t('incidents.noteDialog.submit', 'Add Note')}
+              {addTimeline.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('incidents.noteDialog.submit')}
             </Button>
           </DialogFooter>
         </DialogContent>

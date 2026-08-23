@@ -26,6 +26,11 @@ interface OnboardingWizardProps {
 interface WizardStep {
   key: string;
   icon: React.ElementType;
+  /**
+   * Chrome, not status. Every step but the last wears the brand; the last one
+   * is the only one that reports a state ("this is done"), so it is the only
+   * one allowed a status hue.
+   */
   iconColor: string;
   iconBg: string;
 }
@@ -41,13 +46,13 @@ export function markWizardSeen(): void {
 }
 
 const STEPS: WizardStep[] = [
-  { key: 'welcome', icon: Sparkles, iconColor: 'text-primary', iconBg: 'bg-primary/10' },
-  { key: 'project', icon: FolderKanban, iconColor: 'text-blue-600', iconBg: 'bg-blue-100 dark:bg-blue-900/30' },
-  { key: 'endpoint', icon: Webhook, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  { key: 'subscription', icon: Bell, iconColor: 'text-amber-600', iconBg: 'bg-amber-100 dark:bg-amber-900/30' },
-  { key: 'apiKey', icon: Key, iconColor: 'text-purple-600', iconBg: 'bg-purple-100 dark:bg-purple-900/30' },
-  { key: 'send', icon: Send, iconColor: 'text-rose-600', iconBg: 'bg-rose-100 dark:bg-rose-900/30' },
-  { key: 'done', icon: Rocket, iconColor: 'text-success', iconBg: 'bg-success/10' },
+  { key: 'welcome', icon: Sparkles, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'project', icon: FolderKanban, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'endpoint', icon: Webhook, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'subscription', icon: Bell, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'apiKey', icon: Key, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'send', icon: Send, iconColor: 'text-primary', iconBg: 'bg-accent' },
+  { key: 'done', icon: Rocket, iconColor: 'text-ok', iconBg: 'bg-ok-soft' },
 ];
 
 function CurlSnippet({ t }: { t: (key: string) => string }) {
@@ -72,7 +77,7 @@ function CurlSnippet({ t }: { t: (key: string) => string }) {
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{t('wizard.send.curlLabel')}</span>
         <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors" title={t('common.copy')} aria-label={t('common.copy')}>
-          {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
       </div>
       <pre className="text-[11px] font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap leading-relaxed">
@@ -151,7 +156,7 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
             {t(`wizard.${step.key}.description`)}
           </DialogDescription>
           {step.key === 'welcome' && (
-            <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+            <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-xs font-medium">
               <Clock className="h-3.5 w-3.5" />
               {t('wizard.welcome.timeEstimate')}
             </div>
@@ -194,9 +199,9 @@ export default function OnboardingWizard({ open, onClose, projectId }: Onboardin
             <div className="flex items-center gap-3 py-2">
               {[FolderKanban, Webhook, Bell, Key, Send].map((_, i) => (
                 <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <div className="w-4 h-px bg-success/30" />}
-                  <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-4 w-4 text-success" />
+                  {i > 0 && <div className="w-4 h-px bg-rail" />}
+                  <div className="h-8 w-8 rounded-lg bg-ok-soft flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4 text-ok" />
                   </div>
                 </div>
               ))}

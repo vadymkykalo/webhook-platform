@@ -26,6 +26,19 @@ export function getPasswordStrength(password: string): number {
   return RULES.filter((r) => r.test(password)).length;
 }
 
+/**
+ * The meter reads in three steps, not four: rejected, not yet accepted,
+ * accepted. "Fair" and "Good" are both "not yet strong", so they share a hue
+ * and are told apart by the filled segment count and the label — which is what
+ * a person actually reads. The bar never borrows the brand accent.
+ */
+const LEVEL_STYLE = {
+  weak: { bar: 'bg-halt', text: 'text-halt' },
+  fair: { bar: 'bg-retry', text: 'text-retry' },
+  good: { bar: 'bg-retry', text: 'text-retry' },
+  strong: { bar: 'bg-ok', text: 'text-ok' },
+} as const;
+
 export default function PasswordStrengthIndicator({ password, className }: PasswordStrengthIndicatorProps) {
   const { t } = useTranslation();
 
@@ -36,51 +49,38 @@ export default function PasswordStrengthIndicator({ password, className }: Passw
 
   const strength = results.filter((r) => r.passed).length;
   const level = strength <= 1 ? 'weak' : strength <= 3 ? 'fair' : strength <= 4 ? 'good' : 'strong';
-
-  const barColor = {
-    weak: 'bg-red-500',
-    fair: 'bg-amber-500',
-    good: 'bg-blue-500',
-    strong: 'bg-green-500',
-  }[level];
+  const style = LEVEL_STYLE[level];
 
   if (!password) return null;
 
   return (
-    <div className={cn('space-y-2', className)}>
-      {/* Strength bar */}
+    <div className={cn('space-y-2 pt-1', className)}>
       <div className="flex items-center gap-2">
-        <div className="flex-1 flex gap-1">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="flex flex-1 gap-1">
+          {Array.from({ length: RULES.length }).map((_, i) => (
             <div
               key={i}
               className={cn(
-                'h-1.5 flex-1 rounded-full transition-colors duration-200',
-                i < strength ? barColor : 'bg-muted',
+                'h-1 flex-1 rounded-full transition-colors duration-200',
+                i < strength ? style.bar : 'bg-rail',
               )}
             />
           ))}
         </div>
-        <span className={cn('text-[11px] font-medium', {
-          'text-red-500': level === 'weak',
-          'text-amber-500': level === 'fair',
-          'text-blue-500': level === 'good',
-          'text-green-500': level === 'strong',
-        })}>
+        <span className={cn('font-mono text-[11px] font-medium uppercase tracking-[0.08em]', style.text)}>
           {t(`passwordStrength.${level}`)}
         </span>
       </div>
 
-      {/* Rules checklist */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
         {results.map((r) => (
           <div key={r.key} className="flex items-center gap-1.5 text-[11px]">
             {r.passed ? (
-              <Check className="h-3 w-3 text-green-500 shrink-0" />
+              <Check className="h-3 w-3 flex-shrink-0 text-ok" aria-hidden />
             ) : (
-              <X className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+              <X className="h-3 w-3 flex-shrink-0 text-muted-foreground/50" aria-hidden />
             )}
-            <span className={r.passed ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+            <span className={r.passed ? 'text-foreground' : 'text-muted-foreground'}>
               {t(`passwordStrength.rules.${r.key}`)}
             </span>
           </div>

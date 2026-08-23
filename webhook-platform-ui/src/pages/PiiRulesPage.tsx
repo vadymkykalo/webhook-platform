@@ -1,36 +1,57 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Shield, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Sparkles } from 'lucide-react';
+import { Shield, Plus, Trash2, Loader2, Sparkles, EyeOff, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
-import { piiRulesApi, PiiMaskingRuleResponse, MaskStyle } from '../api/piiRules.api';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
+import { EnabledBadge } from '../components/StatusBadge';
+import { RuleStats, RuleRow, MatchExpression, RuleActionChip } from '../components/RuleLayout';
+import { piiRulesApi, type PiiMaskingRuleResponse, type MaskStyle } from '../api/piiRules.api';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select } from '../components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Switch } from '../components/ui/switch';
+import { Badge } from '../components/ui/badge';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 
+/**
+ * PII masking rules: *when a field matches, mask it like this*.
+ *
+ * The same sentence Rules tells, so it is drawn with the same pieces — see
+ * `src/components/RuleLayout.tsx`. This page used to be a bare table with a
+ * hand-rolled toggle and hand-picked chip colours; the match/action shape and
+ * the status tokens now come from one place for both pages.
+ */
+
 const MASK_STYLE_VALUES: MaskStyle[] = ['PARTIAL', 'FULL', 'HASH'];
+
+function maskExample(style: MaskStyle, pattern: string): string {
+  switch (style) {
+    case 'FULL': return '***';
+    case 'HASH': return 'sha256:a1b2c3d4e5f6';
+    case 'PARTIAL':
+    default:
+      if (pattern === 'email') return 'jo***@example.com';
+      if (pattern === 'phone') return '+1***89';
+      if (pattern === 'card') return '42***56';
+      return 'ab***yz';
+  }
+}
 
 export default function PiiRulesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const { canManagePiiRules } = usePermissions();
+
   const [rules, setRules] = useState<PiiMaskingRuleResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -46,8 +67,7 @@ export default function PiiRulesPage() {
     if (!projectId) return;
     try {
       setLoading(true);
-      const data = await piiRulesApi.list(projectId);
-      setRules(data);
+      setRules(await piiRulesApi.list(projectId));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.loadFailed', { retry: loadRules });
     } finally {
@@ -63,8 +83,7 @@ export default function PiiRulesPage() {
     if (!projectId) return;
     try {
       setSeeding(true);
-      const data = await piiRulesApi.seedDefaults(projectId);
-      setRules(data);
+      setRules(await piiRulesApi.seedDefaults(projectId));
       showSuccess(t('piiRules.toast.seeded'));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.seedFailed');
@@ -96,29 +115,15 @@ export default function PiiRulesPage() {
     }
   };
 
-  const handleToggle = async (rule: PiiMaskingRuleResponse) => {
+  const patchRule = async (rule: PiiMaskingRuleResponse, patch: { maskStyle?: MaskStyle; enabled?: boolean }) => {
     if (!projectId) return;
     try {
       const updated = await piiRulesApi.update(projectId, rule.id, {
         patternName: rule.patternName,
-        maskStyle: rule.maskStyle,
-        enabled: !rule.enabled,
+        maskStyle: patch.maskStyle ?? rule.maskStyle,
+        enabled: patch.enabled ?? rule.enabled,
       });
-      setRules(rules.map(r => r.id === rule.id ? updated : r));
-    } catch (err: any) {
-      showApiError(err, 'piiRules.toast.updateFailed');
-    }
-  };
-
-  const handleChangeMaskStyle = async (rule: PiiMaskingRuleResponse, maskStyle: MaskStyle) => {
-    if (!projectId) return;
-    try {
-      const updated = await piiRulesApi.update(projectId, rule.id, {
-        patternName: rule.patternName,
-        maskStyle,
-        enabled: rule.enabled,
-      });
-      setRules(rules.map(r => r.id === rule.id ? updated : r));
+      setRules(rules.map((r) => (r.id === rule.id ? updated : r)));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.updateFailed');
     }
@@ -129,7 +134,7 @@ export default function PiiRulesPage() {
     try {
       setDeleting(true);
       await piiRulesApi.delete(projectId, deleteId);
-      setRules(rules.filter(r => r.id !== deleteId));
+      setRules(rules.filter((r) => r.id !== deleteId));
       showSuccess(t('piiRules.toast.deleted'));
     } catch (err: any) {
       showApiError(err, 'piiRules.toast.deleteFailed');
@@ -139,212 +144,172 @@ export default function PiiRulesPage() {
     }
   };
 
-  const getMaskStyleBadge = (style: MaskStyle) => {
-    switch (style) {
-      case 'FULL': return 'bg-destructive/10 text-destructive';
-      case 'PARTIAL': return 'bg-warning/10 text-warning';
-      case 'HASH': return 'bg-blue-500/10 text-blue-600';
-    }
-  };
-
-  const getMaskExample = (style: MaskStyle, pattern: string) => {
-    switch (style) {
-      case 'FULL': return '***';
-      case 'PARTIAL':
-        if (pattern === 'email') return 'jo***@example.com';
-        if (pattern === 'phone') return '+1***89';
-        if (pattern === 'card') return '42***56';
-        return 'ab***yz';
-      case 'HASH': return 'sha256:a1b2c3d4e5f6';
-    }
-  };
-
   if (loading) {
-    return (
-      <PageSkeleton>
-        <SkeletonRows count={4} height="h-12" />
-      </PageSkeleton>
-    );
+    return <PageSkeleton><SkeletonRows count={4} height="h-12" /></PageSkeleton>;
   }
 
+  const enabledCount = rules.filter((r) => r.enabled).length;
+  const builtinCount = rules.filter((r) => r.ruleType === 'BUILTIN').length;
+
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-title tracking-tight flex items-center gap-2">
-            <Shield className="h-6 w-6 text-primary" />
-            {t('piiRules.title')}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t('piiRules.subtitle')}
-          </p>
-        </div>
-        <PermissionGate allowed={canManagePiiRules}>
-          <VerificationGate>
-            <div className="flex gap-2">
-              {rules.length === 0 && (
-                <Button variant="outline" onClick={handleSeedDefaults} disabled={seeding}>
-                  {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {t('piiRules.seedDefaults')}
-                </Button>
-              )}
-              <Button onClick={() => setShowAddForm(true)}>
-                <Plus className="h-4 w-4" /> {t('piiRules.addRule')}
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={t('piiRules.count', { count: rules.length })}
+        title={t('piiRules.title')}
+        description={t('piiRules.subtitle')}
+        actions={rules.length > 0 ? (
+          <PermissionGate allowed={canManagePiiRules}>
+            <VerificationGate>
+              <Button variant={showAddForm ? 'secondary' : 'default'} onClick={() => setShowAddForm(!showAddForm)}>
+                {showAddForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {showAddForm ? t('common.cancel') : t('piiRules.addRule')}
               </Button>
-            </div>
-          </VerificationGate>
-        </PermissionGate>
-      </div>
+            </VerificationGate>
+          </PermissionGate>
+        ) : undefined}
+      />
 
       {showAddForm && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">{t('piiRules.newRule')}</CardTitle>
-            <CardDescription>{t('piiRules.newRuleDesc')}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section className="mb-4 rounded-xl border border-rail bg-card shadow-card">
+          <header className="border-b border-rail px-4 py-2.5">
+            <div className="mono-label">{t('piiRules.newRuleEyebrow')}</div>
+            <h3 className="text-[13px] font-medium">{t('piiRules.newRule')}</h3>
+          </header>
+          <div className="space-y-4 p-4">
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>{t('piiRules.patternName')}</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="pii-pattern" className="text-xs">{t('piiRules.patternName')}</Label>
                 <Input
-                  placeholder="e.g. ssn, address"
+                  id="pii-pattern"
+                  placeholder={t('piiRules.patternNamePlaceholder')}
                   value={newPatternName}
                   onChange={(e) => setNewPatternName(e.target.value)}
+                  className="font-mono text-sm"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>{t('piiRules.jsonPath')}</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="pii-path" className="text-xs">{t('piiRules.jsonPath')}</Label>
                 <Input
-                  placeholder="e.g. $.user.ssn"
+                  id="pii-path"
+                  placeholder="$.user.ssn"
                   value={newJsonPath}
                   onChange={(e) => setNewJsonPath(e.target.value)}
+                  className="font-mono text-sm"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>{t('piiRules.maskStyle')}</Label>
-                <Select
-                  value={newMaskStyle}
-                  onChange={(e) => setNewMaskStyle(e.target.value as MaskStyle)}
-                >
-                  {MASK_STYLE_VALUES.map(value => (
+              <div className="space-y-1.5">
+                <Label htmlFor="pii-style" className="text-xs">{t('piiRules.maskStyle')}</Label>
+                <Select id="pii-style" value={newMaskStyle} onChange={(e) => setNewMaskStyle(e.target.value as MaskStyle)}>
+                  {MASK_STYLE_VALUES.map((value) => (
                     <option key={value} value={value}>{t(`piiRules.maskStyles.${value}`)}</option>
                   ))}
                 </Select>
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
+            <div className="flex items-center gap-2">
               <Button onClick={handleCreate} disabled={creating || !newPatternName.trim()}>
                 {creating && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t('common.create')}
               </Button>
-              <Button variant="ghost" onClick={() => setShowAddForm(false)}>
-                {t('common.cancel')}
-              </Button>
+              <Button variant="ghost" onClick={() => setShowAddForm(false)}>{t('common.cancel')}</Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       {rules.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 border border-dashed rounded-xl">
-          <Shield className="h-10 w-10 text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground mb-1">{t('piiRules.noRules')}</p>
-          <p className="text-xs text-muted-foreground">{t('piiRules.noRulesHint')}</p>
-        </div>
+        <EmptyState
+          icon={Shield}
+          title={t('piiRules.noRules')}
+          description={t('piiRules.noRulesHint')}
+          action={
+            <PermissionGate allowed={canManagePiiRules}>
+              <VerificationGate>
+                <Button onClick={handleSeedDefaults} disabled={seeding}>
+                  {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {t('piiRules.seedDefaults')}
+                </Button>
+              </VerificationGate>
+            </PermissionGate>
+          }
+        />
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('piiRules.pattern')}</TableHead>
-                <TableHead>{t('piiRules.type')}</TableHead>
-                <TableHead>{t('piiRules.maskStyle')}</TableHead>
-                <TableHead>{t('piiRules.example')}</TableHead>
-                <TableHead>{t('piiRules.status')}</TableHead>
-                {canManagePiiRules && <TableHead className="w-[80px]" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rules.map((rule) => (
-                <TableRow key={rule.id}>
-                  <TableCell>
-                    <div>
-                      <span className="font-mono text-sm font-medium">{rule.patternName}</span>
-                      {rule.jsonPath && (
-                        <span className="block text-[11px] text-muted-foreground font-mono">{rule.jsonPath}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      rule.ruleType === 'BUILTIN' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                    }`}>
+        <div className="space-y-4">
+          <RuleStats
+            items={[
+              { label: t('piiRules.stats.total'), value: rules.length },
+              { label: t('piiRules.stats.active'), value: enabledCount },
+              { label: t('piiRules.stats.builtin'), value: builtinCount },
+              { label: t('piiRules.stats.custom'), value: rules.length - builtinCount },
+            ]}
+          />
+
+          <ul className="space-y-2.5">
+            {rules.map((rule) => (
+              <li key={rule.id}>
+                <RuleRow
+                  muted={!rule.enabled}
+                  name={<span className="font-mono">{rule.patternName}</span>}
+                  meta={
+                    <Badge variant={rule.ruleType === 'BUILTIN' ? 'secondary' : 'outline'} className="text-[10px]">
                       {rule.ruleType === 'BUILTIN' ? t('piiRules.builtin') : t('piiRules.custom')}
+                    </Badge>
+                  }
+                  match={
+                    <MatchExpression title={rule.jsonPath || undefined}>
+                      {rule.jsonPath || t('piiRules.anyField')}
+                    </MatchExpression>
+                  }
+                  then={
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {canManagePiiRules ? (
+                        <Select
+                          value={rule.maskStyle}
+                          onChange={(e) => patchRule(rule, { maskStyle: e.target.value as MaskStyle })}
+                          className="h-7 w-32 text-xs"
+                          aria-label={t('piiRules.maskStyle')}
+                        >
+                          {MASK_STYLE_VALUES.map((value) => (
+                            <option key={value} value={value}>{t(`piiRules.maskStyles.${value}`)}</option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <RuleActionChip icon={EyeOff} label={t(`piiRules.maskStyles.${rule.maskStyle}`)} />
+                      )}
+                      <code className="font-mono text-[11px] text-muted-foreground">
+                        {maskExample(rule.maskStyle, rule.patternName)}
+                      </code>
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    {canManagePiiRules ? (
-                      <Select
-                        value={rule.maskStyle}
-                        onChange={(e) => handleChangeMaskStyle(rule, e.target.value as MaskStyle)}
-                        className="h-8 text-xs w-28"
-                      >
-                        {MASK_STYLE_VALUES.map(value => (
-                          <option key={value} value={value}>{t(`piiRules.maskStyles.${value}`)}</option>
-                        ))}
-                      </Select>
-                    ) : (
-                      <span className={`text-xs px-2 py-0.5 rounded ${getMaskStyleBadge(rule.maskStyle)}`}>
-                        {t(`piiRules.maskStyles.${rule.maskStyle}`)}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-[11px] text-muted-foreground">
-                      {getMaskExample(rule.maskStyle, rule.patternName)}
-                    </code>
-                  </TableCell>
-                  <TableCell>
-                    {canManagePiiRules ? (
-                      <button
-                        onClick={() => handleToggle(rule)}
-                        className="flex items-center gap-1 text-sm"
-                        title={t(rule.enabled ? 'common.disable' : 'common.enable')}
-                        aria-label={t(rule.enabled ? 'common.disable' : 'common.enable')}
-                      >
-                        {rule.enabled ? (
-                          <ToggleRight className="h-5 w-5 text-success" />
-                        ) : (
-                          <ToggleLeft className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </button>
-                    ) : (
-                      <span className={`text-xs ${rule.enabled ? 'text-success' : 'text-muted-foreground'}`}>
-                        {rule.enabled ? t('piiRules.enabled') : t('piiRules.disabled')}
-                      </span>
-                    )}
-                  </TableCell>
-                  {canManagePiiRules && (
-                    <TableCell>
-                      {rule.ruleType !== 'BUILTIN' && (
+                  }
+                  status={<EnabledBadge enabled={rule.enabled} />}
+                  controls={
+                    <>
+                      {canManagePiiRules && (
+                        <Switch
+                          checked={rule.enabled}
+                          onCheckedChange={() => patchRule(rule, { enabled: !rule.enabled })}
+                          aria-label={t(rule.enabled ? 'common.disable' : 'common.enable')}
+                        />
+                      )}
+                      {canManagePiiRules && rule.ruleType !== 'BUILTIN' && (
                         <Button
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => setDeleteId(rule.id)}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-halt"
                           title={t('common.delete')}
                           aria-label={t('common.delete')}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                    </>
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
@@ -355,12 +320,8 @@ export default function PiiRulesPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-halt text-white hover:bg-halt/90">
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
               {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>

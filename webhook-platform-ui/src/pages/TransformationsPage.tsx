@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, CheckCircle2, XCircle, ArrowRight, Info, ArrowDown, Link2 } from 'lucide-react';
+import { Repeat2, Plus, Loader2, Trash2, Settings, Copy, Wand2, Search, ArrowDown, Link2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
 import { formatDate } from '../lib/date';
 import PageSkeleton from '../components/PageSkeleton';
+import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import { EnabledBadge } from '../components/StatusBadge';
 import {
   useProject,
   useTransformations,
@@ -14,41 +16,30 @@ import {
   useDeleteTransformation,
 } from '../api/queries';
 import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
+import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import JsonEditor from '../components/JsonEditor';
+import { OutputBlock } from '../components/Workbench';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import type { TransformationResponse, TransformationRequest } from '../types/api.types';
 
-const sampleInput = {
-  id: "evt_abc123",
-  type: "order.created",
-  data: { orderId: "ord_456", amount: 99.99, currency: "USD" },
-  createdAt: "2026-03-04T11:00:00Z"
+const SAMPLE_INPUT = {
+  id: 'evt_abc123',
+  type: 'order.created',
+  data: { orderId: 'ord_456', amount: 99.99, currency: 'USD' },
+  createdAt: '2026-03-04T11:00:00Z',
 };
 
 export default function TransformationsPage() {
@@ -66,7 +57,6 @@ export default function TransformationsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
 
-  // Form state
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formTemplate, setFormTemplate] = useState('');
@@ -75,11 +65,11 @@ export default function TransformationsPage() {
 
   const isValidJson = (s: string) => { try { JSON.parse(s); return true; } catch { return false; } };
   const formatJson = (s: string) => { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } };
-  const countExpressions = (s: string) => (s.match(/\$\{[^}]*\}/g) || []).length;
   const templateHasContent = formTemplate.trim().length > 0;
   const templateIsJson = templateHasContent && isValidJson(formTemplate);
-  const exprCount = countExpressions(formTemplate);
+  const exprCount = (formTemplate.match(/\$\{[^}]*\}/g) || []).length;
 
+  /** What the sample event would come out as, resolved locally. */
   const livePreview = useMemo(() => {
     if (!templateHasContent || !templateIsJson) return null;
     try {
@@ -87,9 +77,9 @@ export default function TransformationsPage() {
       const exprRegex = /\$\{([^}]+)\}/g;
       let match;
       while ((match = exprRegex.exec(formTemplate)) !== null) {
-        const path = match[1]; // e.g. $.type or $.data.amount
+        const path = match[1];
         const parts = path.replace(/^\$\.?/, '').split('.');
-        let value: any = sampleInput;
+        let value: any = SAMPLE_INPUT;
         for (const p of parts) {
           if (value && typeof value === 'object' && p in value) value = value[p];
           else { value = `<${path}>`; break; }
@@ -118,12 +108,18 @@ export default function TransformationsPage() {
     setEditing(item);
     setFormName(item.name);
     setFormDescription(item.description || '');
-    try {
-      setFormTemplate(JSON.stringify(JSON.parse(item.template), null, 2));
-    } catch {
-      setFormTemplate(item.template);
-    }
+    setFormTemplate(formatJson(item.template));
     setFormEnabled(item.enabled);
+    setFormTouched(false);
+    setShowDialog(true);
+  };
+
+  const handleDuplicate = (item: TransformationResponse) => {
+    setEditing(null);
+    setFormName(t('transformations.copyOfName', { name: item.name }));
+    setFormDescription(item.description || '');
+    setFormTemplate(formatJson(item.template));
+    setFormEnabled(true);
     setFormTouched(false);
     setShowDialog(true);
   };
@@ -140,22 +136,13 @@ export default function TransformationsPage() {
     };
 
     if (editing) {
-      updateMutation.mutate(
-        { id: editing.id, data },
-        {
-          onSuccess: () => {
-            showSuccess(t('transformations.toast.updated'));
-            setShowDialog(false);
-          },
-          onError: (err) => showApiError(err, t('transformations.toast.updateFailed')),
-        },
-      );
+      updateMutation.mutate({ id: editing.id, data }, {
+        onSuccess: () => { showSuccess(t('transformations.toast.updated')); setShowDialog(false); },
+        onError: (err) => showApiError(err, t('transformations.toast.updateFailed')),
+      });
     } else {
       createMutation.mutate(data, {
-        onSuccess: () => {
-          showSuccess(t('transformations.toast.created'));
-          setShowDialog(false);
-        },
+        onSuccess: () => { showSuccess(t('transformations.toast.created')); setShowDialog(false); },
         onError: (err) => showApiError(err, t('transformations.toast.createFailed')),
       });
     }
@@ -164,148 +151,113 @@ export default function TransformationsPage() {
   const handleDelete = () => {
     if (!deleteId) return;
     deleteMutation.mutate(deleteId, {
-      onSuccess: () => {
-        showSuccess(t('transformations.toast.deleted'));
-        setDeleteId(null);
-      },
+      onSuccess: () => { showSuccess(t('transformations.toast.deleted')); setDeleteId(null); },
       onError: (err) => showApiError(err, t('transformations.toast.deleteFailed')),
     });
   };
 
-  const handleDuplicate = (item: TransformationResponse) => {
-    setEditing(null);
-    setFormName(item.name + ' (copy)');
-    setFormDescription(item.description || '');
-    try {
-      setFormTemplate(JSON.stringify(JSON.parse(item.template), null, 2));
-    } catch {
-      setFormTemplate(item.template);
-    }
-    setFormEnabled(true);
-    setFormTouched(false);
-    setShowDialog(true);
-  };
-
-  const filtered = transformations.filter((t) => {
+  const filtered = transformations.filter((item) => {
     if (!searchFilter) return true;
     const q = searchFilter.toLowerCase();
-    return t.name.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
+    return item.name.toLowerCase().includes(q) || (item.description || '').toLowerCase().includes(q);
   });
 
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  if (loading) return <PageSkeleton maxWidth="max-w-7xl" />;
+  if (loading) return <PageSkeleton />;
 
   if (!project) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-4 lg:p-6">
         <EmptyState icon={Repeat2} title={t('transformations.projectNotFound')} />
       </div>
     );
   }
 
-  return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-title tracking-tight">{t('transformations.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t('transformations.subtitle')}</p>
-        </div>
-        <PermissionGate allowed={canManage}>
-          <VerificationGate>
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> {t('transformations.create')}
-            </Button>
-          </VerificationGate>
-        </PermissionGate>
-      </div>
+  const createButton = (label: string) => (
+    <PermissionGate allowed={canManage}>
+      <VerificationGate>
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4" /> {label}
+        </Button>
+      </VerificationGate>
+    </PermissionGate>
+  );
 
-      {/* Search */}
+  return (
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={t('transformations.count', { count: transformations.length })}
+        title={t('transformations.title')}
+        description={t('transformations.subtitle')}
+        actions={transformations.length > 0 ? createButton(t('transformations.create')) : undefined}
+      />
+
       {transformations.length > 0 && (
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="max-w-sm space-y-1.5">
-              <Label htmlFor="searchFilter" className="text-xs">{t('transformations.search')}</Label>
-              <Input
-                id="searchFilter"
-                placeholder={t('transformations.searchPlaceholder')}
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="relative mb-4 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            aria-label={t('transformations.search')}
+            placeholder={t('transformations.searchPlaceholder')}
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            className="pl-9"
+          />
+        </div>
       )}
 
-      {/* List */}
-      {filtered.length === 0 ? (
+      {transformations.length === 0 ? (
         <EmptyState
           icon={Repeat2}
-          title={transformations.length === 0 ? t('transformations.empty') : t('transformations.noMatching')}
-          description={transformations.length === 0 ? t('transformations.emptyDesc') : t('transformations.noMatchingDesc')}
-          action={
-            transformations.length === 0 ? (
-              <PermissionGate allowed={canManage}>
-                <VerificationGate>
-                  <Button onClick={openCreate}>
-                    <Plus className="h-4 w-4" /> {t('transformations.createFirst')}
-                  </Button>
-                </VerificationGate>
-              </PermissionGate>
-            ) : undefined
-          }
+          title={t('transformations.empty')}
+          description={t('transformations.emptyDesc')}
+          action={createButton(t('transformations.createFirst'))}
         />
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-rail px-6 py-12 text-center">
+          <p className="text-sm font-medium">{t('transformations.noMatching')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('transformations.noMatchingDesc')}</p>
+        </div>
       ) : (
-        <Card className="overflow-hidden animate-fade-in">
+        <Card className="overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs">{t('transformations.name')}</TableHead>
-                <TableHead className="text-xs">{t('transformations.description')}</TableHead>
-                <TableHead className="text-xs">{t('transformations.version')}</TableHead>
-                <TableHead className="text-xs">{t('transformations.status')}</TableHead>
-                <TableHead className="text-xs">{t('transformations.usedBy', 'Used by')}</TableHead>
-                <TableHead className="text-xs">{t('transformations.updated')}</TableHead>
-                {canManage && <TableHead className="w-[100px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
+                <TableHead>{t('transformations.name')}</TableHead>
+                <TableHead>{t('transformations.description')}</TableHead>
+                <TableHead>{t('transformations.version')}</TableHead>
+                <TableHead>{t('transformations.status')}</TableHead>
+                <TableHead>{t('transformations.usedBy')}</TableHead>
+                <TableHead>{t('transformations.updated')}</TableHead>
+                {canManage && <TableHead className="w-[110px]"><span className="sr-only">{t('common.actions')}</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((item) => (
-                <TableRow key={item.id} className="hover:bg-muted/30">
+                <TableRow key={item.id}>
+                  <TableCell><span className="text-[13px] font-medium">{item.name}</span></TableCell>
                   <TableCell>
-                    <span className="font-medium text-[13px]">{item.name}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-[13px] text-muted-foreground truncate max-w-[250px] block">
+                    <span className="block max-w-[250px] truncate text-[13px] text-muted-foreground">
                       {item.description || '—'}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[10px]">v{item.version}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.enabled ? 'success' : 'secondary'}>
-                      {item.enabled ? t('common.enabled') : t('common.disabled')}
-                    </Badge>
-                  </TableCell>
+                  <TableCell><span className="font-mono text-xs">v{item.version}</span></TableCell>
+                  <TableCell><EnabledBadge enabled={item.enabled} /></TableCell>
                   <TableCell>
                     {(item.subscriptionCount > 0 || item.destinationCount > 0) ? (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Link2 className="h-3 w-3" />
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Link2 className="h-3 w-3" aria-hidden />
                         <span>
-                          {item.subscriptionCount > 0 && `${item.subscriptionCount} sub${item.subscriptionCount > 1 ? 's' : ''}`}
-                          {item.subscriptionCount > 0 && item.destinationCount > 0 && ', '}
-                          {item.destinationCount > 0 && `${item.destinationCount} dest${item.destinationCount > 1 ? 's' : ''}`}
+                          {item.subscriptionCount > 0 && t('transformations.subscriptionCount', { count: item.subscriptionCount })}
+                          {item.subscriptionCount > 0 && item.destinationCount > 0 && ' · '}
+                          {item.destinationCount > 0 && t('transformations.destinationCount', { count: item.destinationCount })}
                         </span>
-                      </div>
+                      </span>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    <span className="text-[13px] text-muted-foreground">{formatDate(item.updatedAt)}</span>
-                  </TableCell>
+                  <TableCell><span className="font-mono text-xs text-muted-foreground">{formatDate(item.updatedAt)}</span></TableCell>
                   {canManage && (
                     <TableCell>
                       <div className="flex gap-1">
@@ -321,7 +273,7 @@ export default function TransformationsPage() {
                           onClick={() => setDeleteId(item.id)}
                           title={t('common.delete')}
                           aria-label={t('common.delete')}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="text-muted-foreground hover:text-halt"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -335,66 +287,36 @@ export default function TransformationsPage() {
         </Card>
       )}
 
-      {/* Create / Edit Dialog */}
+      {/* Create / edit */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Repeat2 className="h-5 w-5 text-primary" />
-              {editing ? t('transformations.editTitle') : t('transformations.createTitle')}
-            </DialogTitle>
+            <DialogTitle>{editing ? t('transformations.editTitle') : t('transformations.createTitle')}</DialogTitle>
             <DialogDescription>
               {editing ? t('transformations.editDesc') : t('transformations.createDesc')}
             </DialogDescription>
           </DialogHeader>
 
-          {/* How it works */}
-          <div className="bg-muted/40 border rounded-lg p-4 space-y-3">
-            <p className="text-xs font-semibold flex items-center gap-1.5">
-              <Info className="h-3.5 w-3.5 text-primary" />
-              {t('transformations.howItWorks.title')}
-            </p>
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex-1 bg-background border rounded-md p-2.5 text-center">
-                <p className="font-semibold text-foreground">{t('transformations.howItWorks.incomingEvent')}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.incomingEventDesc')}</p>
-              </div>
-              <ArrowRight className="h-4 w-4 text-primary shrink-0" />
-              <div className="flex-1 bg-primary/10 border border-primary/20 rounded-md p-2.5 text-center">
-                <p className="font-semibold text-primary">{t('transformations.howItWorks.templateStep')}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.templateStepDesc')}</p>
-              </div>
-              <ArrowRight className="h-4 w-4 text-primary shrink-0" />
-              <div className="flex-1 bg-background border rounded-md p-2.5 text-center">
-                <p className="font-semibold text-foreground">{t('transformations.howItWorks.deliveredPayload')}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{t('transformations.howItWorks.deliveredPayloadDesc')}</p>
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded">
-              <Trans i18nKey="transformations.howItWorks.hint" components={{ code: <code /> }} />
-            </p>
-          </div>
-
           <div className="space-y-4 py-2">
-            {/* Name + Description row */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="tf-name">{t('transformations.name')} <span className="text-destructive">*</span></Label>
+                <Label htmlFor="tf-name">{t('transformations.name')}</Label>
                 <Input
                   id="tf-name"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder={t('transformations.namePlaceholder')}
-                  className={formTouched && !formName.trim() ? 'border-destructive' : ''}
+                  className={formTouched && !formName.trim() ? 'border-halt' : ''}
                 />
-                {formTouched && !formName.trim() ? (
-                  <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.nameRequired')}</p>
-                ) : (
-                  <p className="text-[11px] text-muted-foreground">{t('transformations.nameHint')}</p>
-                )}
+                <p className={`text-[11px] ${formTouched && !formName.trim() ? 'text-halt' : 'text-muted-foreground'}`}>
+                  {formTouched && !formName.trim() ? t('transformations.validation.nameRequired') : t('transformations.nameHint')}
+                </p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="tf-desc">{t('transformations.description')} <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Label htmlFor="tf-desc">
+                  {t('transformations.description')}{' '}
+                  <span className="text-xs font-normal text-muted-foreground">{t('common.optional')}</span>
+                </Label>
                 <Input
                   id="tf-desc"
                   value={formDescription}
@@ -405,139 +327,91 @@ export default function TransformationsPage() {
               </div>
             </div>
 
-            {/* Template + Live Preview side by side */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Left: Template editor */}
+            <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="tf-template">{t('transformations.template')} <span className="text-destructive">*</span></Label>
-                  <div className="flex items-center gap-1">
-                    {templateHasContent && (
-                      <Button type="button" variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => setFormTemplate(formatJson(formTemplate))}>
-                        <Wand2 className="h-3 w-3 mr-1" /> {t('transformations.format')}
-                      </Button>
-                    )}
-                  </div>
+                  <Label htmlFor="tf-template">{t('transformations.template')}</Label>
+                  {templateHasContent && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setFormTemplate(formatJson(formTemplate))}>
+                      <Wand2 className="h-3 w-3" /> {t('transformations.format')}
+                    </Button>
+                  )}
                 </div>
                 <JsonEditor
                   value={formTemplate}
                   onChange={setFormTemplate}
-                  placeholder='{\n  "event": "${$.type}",\n  "order_id": "${$.data.orderId}",\n  "amount": "${$.data.amount}"\n}'
                   minHeight="220px"
                   maxHeight="300px"
-                  className={templateHasContent && !templateIsJson ? 'ring-1 ring-destructive rounded-md' : templateHasContent && templateIsJson ? 'ring-1 ring-green-500/50 rounded-md' : ''}
                 />
-                <div className="flex items-center justify-between">
-                  <div>
-                    {templateHasContent && !templateIsJson && (
-                      <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.invalidJson')}</p>
-                    )}
-                    {templateHasContent && templateIsJson && (
-                      <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {t('transformations.validation.validJson')}</p>
-                    )}
-                    {formTouched && !templateHasContent && (
-                      <p className="text-xs text-destructive flex items-center gap-1"><XCircle className="h-3 w-3" /> {t('transformations.validation.templateRequired')}</p>
-                    )}
-                  </div>
-                  {templateHasContent && templateIsJson && exprCount > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {exprCount} {'${...}'} {exprCount === 1 ? t('transformations.validation.expression') : t('transformations.validation.expressions')}
-                    </p>
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className={templateHasContent && !templateIsJson ? 'text-halt' : 'text-muted-foreground'}>
+                    {templateHasContent && !templateIsJson
+                      ? t('transformations.validation.invalidJson')
+                      : formTouched && !templateHasContent
+                        ? t('transformations.validation.templateRequired')
+                        : templateIsJson
+                          ? t('transformations.validation.validJson')
+                          : ''}
+                  </span>
+                  {templateIsJson && exprCount > 0 && (
+                    <span className="font-mono text-muted-foreground">
+                      {t('transformations.expressionCount', { count: exprCount })}
+                    </span>
                   )}
                 </div>
-                <div className="text-[11px] text-muted-foreground space-y-1">
-                  <p className="font-medium">{t('transformations.expressionsAvailable')}</p>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                    <code className="bg-muted px-1 rounded">${'{'}$.id{'}'}</code>
-                    <span>{t('transformations.expressionEventId')}</span>
-                    <code className="bg-muted px-1 rounded">${'{'}$.type{'}'}</code>
-                    <span>{t('transformations.expressionEventType')}</span>
-                    <code className="bg-muted px-1 rounded">${'{'}$.data{'}'}</code>
-                    <span>{t('transformations.expressionFullPayload')}</span>
-                    <code className="bg-muted px-1 rounded">${'{'}$.data.field{'}'}</code>
-                    <span>{t('transformations.expressionNestedField')}</span>
-                    <code className="bg-muted px-1 rounded">${'{'}$.createdAt{'}'}</code>
-                    <span>{t('transformations.expressionTimestamp')}</span>
-                  </div>
-                </div>
+                <p className="text-[11px] text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1">
+                  <Trans i18nKey="transformations.howItWorks.hint" components={{ code: <code /> }} />
+                </p>
               </div>
 
-              {/* Right: Live Preview */}
-              <div className="space-y-1.5">
-                <Label className="text-xs">{t('transformations.livePreview')}</Label>
-
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{t('transformations.sampleInputEvent')}</p>
-                    <pre className="bg-muted/50 border rounded-md p-2.5 text-[11px] font-mono overflow-x-auto max-h-[120px] text-muted-foreground">
-                      {JSON.stringify(sampleInput, null, 2)}
-                    </pre>
-                  </div>
-
-                  <div className="flex justify-center">
-                    <ArrowDown className="h-4 w-4 text-primary" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider font-semibold text-green-600 dark:text-green-400">{t('transformations.outputPreview')}</p>
-                    {livePreview ? (
-                      <pre className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md p-2.5 text-[11px] font-mono overflow-x-auto max-h-[160px] text-green-800 dark:text-green-300">
-                        {livePreview}
-                      </pre>
-                    ) : templateHasContent && !templateIsJson ? (
-                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md p-3 text-xs text-red-600 dark:text-red-400 flex items-center gap-2">
-                        <XCircle className="h-4 w-4 shrink-0" />
-                        {t('transformations.previewFixJson')}
-                      </div>
-                    ) : (
-                      <div className="bg-muted/30 border border-dashed rounded-md p-6 text-xs text-muted-foreground text-center">
-                        {t('transformations.previewEmpty')}
-                      </div>
-                    )}
-                  </div>
+              <div className="space-y-2">
+                <Label>{t('transformations.livePreview')}</Label>
+                <OutputBlock label={t('transformations.sampleInputEvent')}>
+                  <pre className="max-h-[130px] overflow-auto p-2.5 font-mono text-[11px] text-muted-foreground">
+                    {JSON.stringify(SAMPLE_INPUT, null, 2)}
+                  </pre>
+                </OutputBlock>
+                <div className="flex justify-center">
+                  <ArrowDown className="h-4 w-4 text-muted-foreground" aria-hidden />
                 </div>
+                <OutputBlock label={t('transformations.outputPreview')}>
+                  {livePreview ? (
+                    <pre className="max-h-[170px] overflow-auto p-2.5 font-mono text-[11px]">{livePreview}</pre>
+                  ) : (
+                    <p className="p-4 text-center text-[11px] text-muted-foreground">
+                      {templateHasContent && !templateIsJson
+                        ? t('transformations.previewFixJson')
+                        : t('transformations.previewEmpty')}
+                    </p>
+                  )}
+                </OutputBlock>
               </div>
             </div>
 
-            {/* Enabled */}
-            <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <Switch id="tf-enabled" checked={formEnabled} onCheckedChange={setFormEnabled} />
-                <div>
-                  <Label htmlFor="tf-enabled" className="cursor-pointer">{t('common.enabled')}</Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    {formEnabled
-                      ? t('transformations.enabledHint')
-                      : t('transformations.disabledHint')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* How to use hint */}
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2.5">
-              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-              <div className="text-xs space-y-1">
-                <p className="font-medium text-blue-900 dark:text-blue-200">{t('transformations.howToApply.title')}</p>
-                <p className="text-blue-700 dark:text-blue-300">
-                  <Trans i18nKey="transformations.howToApply.body" components={{ strong: <strong /> }} />
+            <div className="flex items-center gap-3 rounded-lg border border-rail p-3">
+              <Switch id="tf-enabled" checked={formEnabled} onCheckedChange={setFormEnabled} />
+              <div>
+                <Label htmlFor="tf-enabled" className="cursor-pointer">{t('common.enabled')}</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  {formEnabled ? t('transformations.enabledHint') : t('transformations.disabledHint')}
                 </p>
               </div>
             </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>
               {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {editing ? t('common.save') : t('common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
+      {/* Delete */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -549,9 +423,9 @@ export default function TransformationsPage() {
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-halt text-white hover:bg-halt/90"
             >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>

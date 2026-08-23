@@ -8,7 +8,7 @@ function TriggerNode({ data, selected }: NodeProps) {
   const d = data as Record<string, unknown>;
   return (
     <BaseNode
-      color="#f59e0b"
+      role="trigger"
       icon="⚡"
       label={String(d.label || t('workflows.nodeTypes.webhookTrigger.label'))}
       subtitle={d.eventTypePattern ? String(d.eventTypePattern) : t('workflows.nodeStatus.allEvents')}

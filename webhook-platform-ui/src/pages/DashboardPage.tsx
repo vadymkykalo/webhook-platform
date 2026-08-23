@@ -1,159 +1,215 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FolderKanban, Webhook, Radio, Send, AlertCircle, CheckCircle2, Clock, BarChart3, ArrowRight, Plus, AlertTriangle, ArrowDownToLine, Activity } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  AlertTriangle, ArrowRight, ArrowUpRight, BarChart3, Bell, Flame, FolderKanban, Plus, Radio, Send, Webhook,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useProjects, useDashboardStats, useEndpoints, useOnboardingStatus, useAnalytics } from '../api/queries';
-import { formatDateTime } from '../lib/date';
+import {
+  useAnalytics, useDashboardStats, useDeliveries, useOnboardingStatus, useOpenIncidentCount,
+  useProjects, useUnresolvedAlertCount,
+} from '../api/queries';
+import type { DeliveryFilters } from '../api/deliveries.api';
+import { formatDateTime, formatDateTimeShort, formatRelativeTime, formatTime } from '../lib/date';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
+import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
+import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
+import AttemptRail from '../components/AttemptRail';
+import { railFromCounts } from './attemptRailData';
 import OnboardingChecklist from '../components/OnboardingChecklist';
 import OnboardingWizard, { hasSeenWizard } from '../components/OnboardingWizard';
-import Sparkline from '../components/Sparkline';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { cn } from '../lib/utils';
+import { Card } from '../components/ui/card';
 import { Select } from '../components/ui/select';
 import { Button } from '../components/ui/button';
+import {
+  ChartCard, OutcomeChart, STATUS_FILL, STATUS_TEXT, ShareBar, StatTile, coerceDeliveryStats,
+  formatCompact, formatRate, kindOfSuccessRate, outcomeLegend, share, verdictOfDeliveryStats,
+  type ShareSegment,
+} from '../components/charts';
+import type { StatusKind } from '../components/StatusBadge';
 
-function StatCard({ title, value, icon: Icon, iconColor, subtitle, loading, sparkData, sparkColor }: {
-  title: string; value: number | string; icon: React.ElementType; iconColor: string; subtitle: string; loading: boolean;
-  sparkData?: number[]; sparkColor?: string;
-}) {
-  return (
-    <Card className="relative overflow-hidden">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <p className="text-[13px] font-medium text-muted-foreground">{title}</p>
-          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${iconColor}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <div className="text-2xl font-bold tracking-tight">
-              {loading ? <div className="h-8 w-16 bg-muted animate-pulse rounded" /> : value}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-          </div>
-          {sparkData && sparkData.length >= 2 && (
-            <Sparkline
-              data={sparkData}
-              width={80}
-              height={32}
-              strokeColor={sparkColor || 'hsl(var(--primary))'}
-              fillColor={sparkColor || 'hsl(var(--primary))'}
-            />
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+/** Stable so the deliveries query key does not change on every render. */
+const IN_FLIGHT_FILTER: DeliveryFilters = { status: 'PENDING', page: 0, size: 4, sort: 'createdAt,desc' };
+
+const DASHBOARD_PERIOD = '7d';
 
 function SkeletonDashboard() {
   return (
-    <PageSkeleton maxWidth="max-w-7xl">
-      <SkeletonCards count={5} height="h-[120px]" cols="md:grid-cols-2 lg:grid-cols-5" />
-      <SkeletonCards count={2} height="h-[320px]" cols="md:grid-cols-2" />
+    <PageSkeleton maxWidth="max-w-none">
+      <SkeletonCards count={2} height="h-[292px]" cols="lg:grid-cols-2" />
+      <SkeletonCards count={4} height="h-[104px]" cols="grid-cols-2 lg:grid-cols-4" />
     </PageSkeleton>
+  );
+}
+
+/** One row of the "needs a human" list: a count, what it means, and where it lives. */
+function AttentionRow({
+  to, icon: Icon, label, count, kind,
+}: {
+  to: string;
+  icon: React.ElementType;
+  label: string;
+  count: number;
+  kind: StatusKind;
+}) {
+  const quiet = count === 0;
+  return (
+    <Link
+      to={to}
+      className="group flex items-center justify-between gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/60"
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <Icon
+          className={cn('h-4 w-4 flex-shrink-0', quiet ? 'text-muted-foreground/50' : STATUS_TEXT[kind])}
+          aria-hidden
+        />
+        <span className={quiet ? 'truncate text-sm text-muted-foreground' : 'truncate text-sm'}>{label}</span>
+      </span>
+      <span className="flex flex-shrink-0 items-center gap-1.5">
+        <span
+          className={cn(
+            'font-mono text-sm tabular-nums',
+            quiet ? 'text-muted-foreground' : cn('font-medium', STATUS_TEXT[kind])
+          )}
+        >
+          {formatCompact(count)}
+        </span>
+        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-hover:text-foreground" aria-hidden />
+      </span>
+    </Link>
   );
 }
 
 export default function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data: projects = [], isLoading: loading, isError: projectsIsError, error: projectsError, refetch: refetchProjects } = useProjects();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-
-  // Auto-select first project when loaded
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
-    }
-  }, [projects, selectedProjectId]);
 
   const {
-    data: dashboardStats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats,
-  } = useDashboardStats(selectedProjectId || undefined);
+    data: projects = [], isLoading: projectsLoading, isError: projectsIsError,
+    error: projectsError, refetch: refetchProjects,
+  } = useProjects();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
-  const isError = projectsIsError || statsIsError;
-  const retry = () => { refetchProjects(); refetchStats(); };
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) setSelectedProjectId(projects[0].id);
+  }, [projects, selectedProjectId]);
 
-  const { data: analytics } = useAnalytics(selectedProjectId || undefined, '7d');
+  const projectId = selectedProjectId || undefined;
 
-  const sparkTotal = analytics?.deliveryTimeSeries?.map(p => p.total) || [];
-  const sparkSuccess = analytics?.deliveryTimeSeries?.map(p => p.success) || [];
-  const sparkFailed = analytics?.deliveryTimeSeries?.map(p => p.failed) || [];
+  const {
+    data: dashboardStats, isLoading: statsLoading, isError: statsIsError,
+    error: statsError, refetch: refetchStats,
+  } = useDashboardStats(projectId);
 
-  const { data: endpoints = [] } = useEndpoints(selectedProjectId || undefined);
-  const { data: onboarding } = useOnboardingStatus(selectedProjectId || undefined);
+  const {
+    data: analytics, isLoading: analyticsLoading, isError: analyticsIsError,
+    error: analyticsError, isFetching: analyticsFetching, refetch: refetchAnalytics,
+  } = useAnalytics(projectId, DASHBOARD_PERIOD);
 
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const { data: onboarding } = useOnboardingStatus(projectId);
+  const { data: inFlightPage } = useDeliveries(projectId, IN_FLIGHT_FILTER);
+  const { data: unresolvedAlerts } = useUnresolvedAlertCount(projectId);
+  const { data: openIncidents } = useOpenIncidentCount(projectId);
 
-  // Show wizard on first visit
   const [showWizard, setShowWizard] = useState(() => !hasSeenWizard());
 
-  if (loading) return <SkeletonDashboard />;
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
-  if (isError) {
+  // The page's own failure. A project's stats or its charts failing is reported
+  // inside the card that wanted them, not by blanking the whole dashboard.
+  const pageIsError = projectsIsError || statsIsError;
+  const retryPage = () => { refetchProjects(); refetchStats(); };
+
+  // Every read of the payload goes through here: the dashboard is the first
+  // screen a new account sees, and it has to render before the data does.
+  const stats = coerceDeliveryStats(dashboardStats?.deliveryStats);
+  const recentEvents = dashboardStats?.recentEvents ?? [];
+  const endpointHealth = dashboardStats?.endpointHealth ?? [];
+
+  const verdict = verdictOfDeliveryStats(stats);
+  const series = useMemo(
+    () => (analytics?.deliveryTimeSeries ?? []).map((p) => ({
+      timestamp: p.timestamp,
+      success: p.success ?? 0,
+      failed: p.failed ?? 0,
+    })),
+    [analytics]
+  );
+  const totalSpark = useMemo(() => series.map((p) => p.success + p.failed), [series]);
+
+  const outcomeLabels = {
+    success: t('dashboard.outcome.delivered'),
+    failed: t('dashboard.outcome.failed'),
+  };
+
+  const shareSegments: ShareSegment[] = [
+    { key: 'delivered', label: t('dashboard.share.delivered'), value: stats.successfulDeliveries, token: 'ok' },
+    { key: 'inFlight', label: t('dashboard.share.inFlight'), value: stats.pendingDeliveries, token: 'idle' },
+    { key: 'failed', label: t('dashboard.share.failed'), value: stats.failedDeliveries, token: 'retry' },
+    { key: 'abandoned', label: t('dashboard.share.abandoned'), value: stats.dlqDeliveries, token: 'halt' },
+  ];
+
+  const alertCount = unresolvedAlerts?.count ?? 0;
+  const incidentCount = openIncidents?.count ?? 0;
+  const attentionTotal = stats.dlqDeliveries + stats.failedDeliveries + alertCount + incidentCount;
+
+  const inFlight = inFlightPage?.content ?? [];
+
+  if (projectsLoading) return <SkeletonDashboard />;
+
+  if (pageIsError) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <ErrorState error={projectsError ?? statsError} fallbackKey="dashboard.toast.loadFailed" onRetry={retry} />
+      <div className="p-4 lg:p-6">
+        <ErrorState
+          error={projectsError ?? statsError}
+          fallbackKey="dashboard.toast.loadFailed"
+          onRetry={retryPage}
+        />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-title tracking-tight">{t('dashboard.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t('dashboard.subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {selectedProjectId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/admin/projects/${selectedProjectId}/analytics`)}
-            >
-              <BarChart3 className="h-4 w-4" /> {t('nav.analytics')}
-            </Button>
-          )}
-          {projects.length > 0 && (
-            <div className="w-56">
-              <Select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-              >
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Onboarding Wizard (first login modal) */}
-      <OnboardingWizard
-        open={showWizard}
-        onClose={() => setShowWizard(false)}
-        projectId={selectedProjectId || undefined}
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={selectedProject?.name}
+        title={t('dashboard.headline')}
+        description={t('dashboard.headlineDesc')}
+        actions={
+          <>
+            {projects.length > 1 && (
+              <div className="w-48">
+                <Select
+                  aria-label={t('dashboard.projectPicker')}
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                >
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            {selectedProjectId && (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/admin/projects/${selectedProjectId}/analytics`)}>
+                <BarChart3 className="h-4 w-4" /> {t('dashboard.openAnalytics')}
+              </Button>
+            )}
+          </>
+        }
       />
 
-      {/* Onboarding Checklist (server-derived truth) */}
+      <OnboardingWizard open={showWizard} onClose={() => setShowWizard(false)} projectId={projectId} />
+
       <OnboardingChecklist
-        projectId={selectedProjectId || undefined}
+        projectId={projectId}
         hasProjects={projects.length > 0}
-        hasEndpoints={onboarding?.hasEndpoints ?? endpoints.length > 0}
+        hasEndpoints={onboarding?.hasEndpoints ?? endpointHealth.length > 0}
         hasSubscriptions={onboarding?.hasSubscriptions ?? false}
         hasApiKeys={onboarding?.hasApiKeys ?? false}
-        hasEvents={onboarding?.hasEvents ?? (dashboardStats?.recentEvents?.length ?? 0) > 0}
-        hasDeliveries={onboarding?.hasDeliveries ?? (dashboardStats?.deliveryStats?.totalDeliveries ?? 0) > 0}
+        hasEvents={onboarding?.hasEvents ?? recentEvents.length > 0}
+        hasDeliveries={onboarding?.hasDeliveries ?? stats.totalDeliveries > 0}
         hasIncomingSources={onboarding?.hasIncomingSources ?? false}
         hasIncomingDestinations={onboarding?.hasIncomingDestinations ?? false}
       />
@@ -170,185 +226,296 @@ export default function DashboardPage() {
           }
         />
       ) : (
-        <div className="space-y-6 animate-fade-in">
-          {/* Stat Cards */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-            <StatCard
-              title={t('dashboard.stats.totalDeliveries')}
-              value={dashboardStats?.deliveryStats.totalDeliveries || 0}
-              icon={Send}
-              iconColor="bg-primary/10 text-primary"
-              subtitle={t('dashboard.stats.totalDeliveriesDesc')}
-              loading={statsLoading}
-              sparkData={sparkTotal}
-              sparkColor="hsl(var(--primary))"
+        <div className="animate-fade-in space-y-4">
+          {/* The answer, then the evidence. */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="flex flex-col justify-between p-5">
+              <div>
+                <div className="mono-label">{t('dashboard.verdict.label')}</div>
+                {statsLoading ? (
+                  <div className="mt-3 h-12 w-32 animate-pulse rounded-lg bg-muted" aria-hidden />
+                ) : (
+                  <p
+                    data-testid="delivery-health-figure"
+                    className="mt-2 text-[3rem] font-semibold leading-none tracking-tight"
+                  >
+                    {stats.totalDeliveries > 0 ? `${formatRate(stats.successRate)}%` : '—'}
+                  </p>
+                )}
+                <div className="mt-4">
+                  <StatusBadge kind={verdict} label={t(`dashboard.verdict.${verdict}`)} />
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {stats.totalDeliveries > 0
+                    ? t('dashboard.verdict.detail', {
+                        delivered: formatCompact(stats.successfulDeliveries),
+                        total: formatCompact(stats.totalDeliveries),
+                      })
+                    : t('dashboard.verdict.idleDetail')}
+                </p>
+              </div>
+              <div className="mt-5 border-t border-rail pt-4">
+                <ShareBar segments={shareSegments} total={Math.max(stats.totalDeliveries, 1)} />
+              </div>
+            </Card>
+
+            <ChartCard
+              className="lg:col-span-2"
+              title={t('dashboard.outcome.title')}
+              description={t('dashboard.outcome.desc')}
+              eyebrow={DASHBOARD_PERIOD}
+              legend={outcomeLegend(outcomeLabels)}
+              bodyClass="h-[292px]"
+              isLoading={analyticsLoading}
+              error={analyticsIsError ? analyticsError : undefined}
+              onRetry={() => refetchAnalytics()}
+              isRefetching={analyticsFetching && !analyticsLoading}
+              isEmpty={series.length === 0}
+              emptyLabel={t('dashboard.outcome.empty')}
+            >
+              <OutcomeChart
+                data={series}
+                labels={outcomeLabels}
+                formatTick={formatTime}
+                formatStamp={formatDateTimeShort}
+              />
+            </ChartCard>
+          </div>
+
+          {/* The totals, after the answer rather than instead of it. */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatTile
+              label={t('dashboard.stats.deliveries')}
+              value={formatCompact(stats.totalDeliveries)}
+              hint={t('dashboard.stats.window')}
+              spark={totalSpark}
+              to={`/admin/projects/${selectedProjectId}/deliveries`}
             />
-            <StatCard
-              title={t('dashboard.stats.successful')}
-              value={dashboardStats?.deliveryStats.successfulDeliveries || 0}
-              icon={CheckCircle2}
-              iconColor="bg-success/10 text-success"
-              subtitle={t('dashboard.stats.successRate', { rate: dashboardStats?.deliveryStats.successRate || 0 })}
-              loading={statsLoading}
-              sparkData={sparkSuccess}
-              sparkColor="hsl(var(--success))"
+            <StatTile
+              label={t('dashboard.stats.delivered')}
+              value={formatCompact(stats.successfulDeliveries)}
+              hint={t('dashboard.stats.deliveredHint', { percent: formatRate(share(stats.successfulDeliveries, stats.totalDeliveries)) })}
+              to={`/admin/projects/${selectedProjectId}/deliveries?status=SUCCESS`}
             />
-            <StatCard
-              title={t('dashboard.stats.failed')}
-              value={dashboardStats?.deliveryStats.failedDeliveries || 0}
-              icon={AlertCircle}
-              iconColor="bg-destructive/10 text-destructive"
-              subtitle={t('dashboard.stats.failedDesc')}
-              loading={statsLoading}
-              sparkData={sparkFailed}
-              sparkColor="hsl(var(--destructive))"
+            <StatTile
+              label={t('dashboard.stats.inFlight')}
+              value={formatCompact(stats.pendingDeliveries)}
+              hint={t('dashboard.stats.inFlightHint')}
+              to={`/admin/projects/${selectedProjectId}/deliveries?status=PENDING`}
             />
-            <StatCard
-              title={t('dashboard.stats.dlq')}
-              value={dashboardStats?.deliveryStats.dlqDeliveries || 0}
-              icon={AlertTriangle}
-              iconColor="bg-warning/10 text-warning"
-              subtitle={t('dashboard.stats.dlqDesc')}
-              loading={statsLoading}
-            />
-            <StatCard
-              title={t('dashboard.stats.pending')}
-              value={dashboardStats?.deliveryStats.pendingDeliveries || 0}
-              icon={Clock}
-              iconColor="bg-blue-500/10 text-blue-600"
-              subtitle={t('dashboard.stats.pendingDesc')}
-              loading={statsLoading}
+            <StatTile
+              label={t('dashboard.stats.abandoned')}
+              value={formatCompact(stats.dlqDeliveries)}
+              hint={t('dashboard.stats.abandonedHint')}
+              badge={stats.dlqDeliveries > 0 ? <StatusBadge kind="halt" label={t('dashboard.stats.dlqBadge')} icon={false} /> : undefined}
+              to={`/admin/projects/${selectedProjectId}/dlq`}
             />
           </div>
 
-          {/* Recent Events & Endpoint Health */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base">{t('dashboard.recentEvents.title')}</CardTitle>
-                    <CardDescription className="text-xs">{t('dashboard.recentEvents.subtitle')}</CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
-                    className="text-xs"
-                  >
-                    {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {statsLoading ? (
-                  <SkeletonCards count={3} height="h-14" cols="grid-cols-1" />
-                ) : !dashboardStats || dashboardStats.recentEvents.length === 0 ? (
-                  <EmptyState icon={Radio} title={t('dashboard.recentEvents.empty')} description={t('dashboard.recentEvents.emptyDesc')} className="flex flex-col items-center justify-center py-10" />
-                ) : (
-                  <div className="space-y-1">
-                    {dashboardStats.recentEvents.map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-accent cursor-pointer transition-colors group"
-                        onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Radio className="h-3.5 w-3.5 text-primary" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{event.type}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {formatDateTime(event.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
-                          {event.deliveryCount === 1 ? t('dashboard.recentEvents.delivery', { count: 1 }) : t('dashboard.recentEvents.delivery_other', { count: event.deliveryCount })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base">{t('dashboard.endpointHealth.title')}</CardTitle>
-                    <CardDescription className="text-xs">{t('dashboard.endpointHealth.subtitle')}</CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
-                    className="text-xs"
-                  >
-                    {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {statsLoading ? (
-                  <SkeletonCards count={3} height="h-14" cols="grid-cols-1" />
-                ) : !dashboardStats || dashboardStats.endpointHealth.length === 0 ? (
-                  <EmptyState icon={Webhook} title={t('dashboard.endpointHealth.empty')} description={t('dashboard.endpointHealth.emptyDesc')} className="flex flex-col items-center justify-center py-10" />
-                ) : (
-                  <div className="space-y-1">
-                    {dashboardStats.endpointHealth.slice(0, 5).map((endpoint) => (
-                      <div
-                        key={endpoint.id}
-                        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-accent cursor-pointer transition-colors"
-                        onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className={`h-2 w-2 rounded-full flex-shrink-0 ${endpoint.enabled ? 'bg-success' : 'bg-muted-foreground/30'}`} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{endpoint.url}</p>
-                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>{t('dashboard.endpointHealth.deliveries', { count: endpoint.totalDeliveries })}</span>
-                              <span>·</span>
-                              <span className={endpoint.successRate >= 95 ? 'text-success' : endpoint.successRate >= 80 ? 'text-warning' : 'text-destructive'}>
-                                {t('dashboard.endpointHealth.success', { rate: endpoint.successRate })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            {[
-              { label: t('dashboard.quickActions.endpoints'), path: `/admin/projects/${selectedProjectId}/endpoints`, icon: Webhook },
-              { label: t('dashboard.quickActions.events'), path: `/admin/projects/${selectedProjectId}/events`, icon: Radio },
-              { label: t('dashboard.quickActions.deliveries'), path: `/admin/projects/${selectedProjectId}/deliveries`, icon: Send },
-              { label: t('dashboard.quickActions.dlq'), path: `/admin/projects/${selectedProjectId}/dlq`, icon: AlertTriangle },
-              { label: t('dashboard.quickActions.incomingSources'), path: `/admin/projects/${selectedProjectId}/incoming-sources`, icon: ArrowDownToLine },
-              { label: t('dashboard.quickActions.incomingEvents'), path: `/admin/projects/${selectedProjectId}/incoming-events`, icon: Activity },
-            ].map((action) => (
-              <button
-                key={action.label}
-                onClick={() => navigate(action.path)}
-                className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:bg-accent hover:border-primary/20 transition-all text-left group"
-              >
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                  <action.icon className="h-4 w-4 text-primary" />
-                </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* What needs a human. */}
+            <Card className="p-5">
+              <div className="mb-1 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">{action.label}</p>
-                  <p className="text-[11px] text-muted-foreground">{t('common.manage')}</p>
+                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.attention.title')}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.attention.desc')}</p>
                 </div>
-              </button>
-            ))}
+                {attentionTotal === 0 && <StatusBadge kind="ok" label={t('dashboard.attention.clearBadge')} />}
+              </div>
+              <div className="mt-3 divide-y divide-rail">
+                <AttentionRow
+                  to={`/admin/projects/${selectedProjectId}/dlq`}
+                  icon={AlertTriangle}
+                  label={t('dashboard.attention.dlq')}
+                  count={stats.dlqDeliveries}
+                  kind="halt"
+                />
+                <AttentionRow
+                  to={`/admin/projects/${selectedProjectId}/deliveries?status=FAILED`}
+                  icon={Send}
+                  label={t('dashboard.attention.failed')}
+                  count={stats.failedDeliveries}
+                  kind="retry"
+                />
+                <AttentionRow
+                  to={`/admin/projects/${selectedProjectId}/alerts`}
+                  icon={Bell}
+                  label={t('dashboard.attention.alerts')}
+                  count={alertCount}
+                  kind="retry"
+                />
+                <AttentionRow
+                  to={`/admin/projects/${selectedProjectId}/incidents`}
+                  icon={Flame}
+                  label={t('dashboard.attention.incidents')}
+                  count={incidentCount}
+                  kind="halt"
+                />
+              </div>
+            </Card>
+
+            {/* Anything still walking the ladder. */}
+            <Card className="p-5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.inFlight.title')}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.inFlight.desc')}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => navigate(`/admin/projects/${selectedProjectId}/deliveries?status=PENDING`)}
+                >
+                  {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+              {inFlight.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">{t('dashboard.inFlight.empty')}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {inFlight.map((delivery) => {
+                    const rail = railFromCounts(delivery.attemptCount, delivery.maxAttempts, delivery.status);
+                    return (
+                      <li key={delivery.id} className="flex items-center justify-between gap-4">
+                        <span className="min-w-0">
+                          <span className="block truncate font-mono text-xs text-foreground">{delivery.id}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                            {formatRelativeTime(delivery.createdAt)}
+                          </span>
+                        </span>
+                        <span className="flex flex-shrink-0 items-center gap-3">
+                          <AttemptRail
+                            attempts={rail.attempts}
+                            maxAttempts={rail.maxAttempts}
+                            ariaLabel={t('dashboard.inFlight.rail', {
+                              count: delivery.attemptCount,
+                              total: delivery.maxAttempts,
+                            })}
+                          />
+                          <StatusBadge
+                            kind={kindOfDeliveryStatus(delivery.status)}
+                            label={t(`dashboard.inFlight.status.${delivery.status}`)}
+                            icon={false}
+                          />
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Endpoint health — the "where is it failing" half of the question. */}
+            <Card className="p-5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.endpointHealth.title')}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.endpointHealth.subtitle')}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => navigate(`/admin/projects/${selectedProjectId}/endpoints`)}
+                >
+                  {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+              {statsLoading ? (
+                <SkeletonCards count={3} height="h-12" cols="grid-cols-1" />
+              ) : endpointHealth.length === 0 ? (
+                <EmptyState
+                  icon={Webhook}
+                  title={t('dashboard.endpointHealth.empty')}
+                  description={t('dashboard.endpointHealth.emptyDesc')}
+                  className="flex flex-col items-center justify-center py-8"
+                />
+              ) : (
+                <ul className="space-y-3">
+                  {endpointHealth.slice(0, 5).map((endpoint) => {
+                    const kind = kindOfSuccessRate(endpoint.successRate, endpoint.enabled);
+                    return (
+                      <li key={endpoint.id}>
+                        <Link
+                          to={`/admin/projects/${selectedProjectId}/endpoints`}
+                          className="group block rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary/60"
+                        >
+                          <span className="flex items-baseline justify-between gap-3">
+                            <span className="truncate font-mono text-xs text-foreground">{endpoint.url}</span>
+                            <span className={cn('flex-shrink-0 font-mono text-xs tabular-nums', STATUS_TEXT[kind])}>
+                              {formatRate(endpoint.successRate)}%
+                            </span>
+                          </span>
+                          <span className="mt-1.5 flex items-center gap-2">
+                            <span className="relative h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                              <span
+                                className={cn('absolute inset-y-0 left-0 rounded-full', STATUS_FILL[kind])}
+                                style={{ width: `${Math.min(Math.max(endpoint.successRate, 0), 100)}%` }}
+                              />
+                            </span>
+                            <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
+                              {formatCompact(endpoint.totalDeliveries)}
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+
+            {/* What arrived. */}
+            <Card className="p-5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-medium leading-tight">{t('dashboard.recentEvents.title')}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{t('dashboard.recentEvents.subtitle')}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => navigate(`/admin/projects/${selectedProjectId}/events`)}
+                >
+                  {t('common.viewAll')} <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+              {statsLoading ? (
+                <SkeletonCards count={3} height="h-12" cols="grid-cols-1" />
+              ) : recentEvents.length === 0 ? (
+                <EmptyState
+                  icon={Radio}
+                  title={t('dashboard.recentEvents.empty')}
+                  description={t('dashboard.recentEvents.emptyDesc')}
+                  className="flex flex-col items-center justify-center py-8"
+                />
+              ) : (
+                <ul className="space-y-1">
+                  {recentEvents.slice(0, 5).map((event) => (
+                    <li key={event.id}>
+                      <Link
+                        to={`/admin/projects/${selectedProjectId}/events`}
+                        className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary/60"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-mono text-xs text-foreground">{event.type}</span>
+                          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                            {formatDateTime(event.createdAt)}
+                          </span>
+                        </span>
+                        <span className="flex-shrink-0 font-mono text-[11px] text-muted-foreground">
+                          {t('dashboard.recentEvents.deliveryCount', { count: event.deliveryCount })}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
           </div>
         </div>
       )}

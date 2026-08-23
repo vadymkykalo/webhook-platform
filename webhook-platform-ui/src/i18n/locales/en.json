@@ -44,7 +44,9 @@
       "threshold": "Threshold",
       "type": "Alert Type",
       "webhookUrl": "Webhook URL",
-      "window": "Window (min)"
+      "window": "Window (min)",
+      "namePlaceholder": "High failure rate",
+      "descriptionPlaceholder": "What this rule is for"
     },
     "mute": "Mute",
     "muted": "Muted",
@@ -100,7 +102,33 @@
     },
     "unmute": "Unmute",
     "unresolved": "unresolved",
-    "window": "Window"
+    "window": "Window",
+    "loadFailed": "Couldn't load alerts for this project",
+    "resolvedAtLabel": "Resolved {{time}}",
+    "triggeredBy": "Triggered by",
+    "investigate": "Investigate deliveries",
+    "snooze": "Snooze",
+    "snoozeFor": "Snooze {{hours}}h",
+    "toggleRule": "Enable {{name}}",
+    "windowMinutes_one": "{{count}} minute",
+    "windowMinutes_other": "{{count}} minutes",
+    "tiles": {
+      "unresolved": "Unresolved",
+      "unresolvedHint": "Alerts waiting on a decision",
+      "allClear": "All clear",
+      "armed": "Armed rules",
+      "armedHint": "of {{total}} rules",
+      "silenced": "Silenced",
+      "silencedHint": "Muted, snoozed or turned off"
+    },
+    "history": {
+      "title": "What fired",
+      "desc": "Every alert this project has raised, newest first"
+    },
+    "rules": {
+      "title": "What is watching",
+      "desc": "Conditions that raise an alert when they are met"
+    }
   },
   "analytics": {
     "avgLatency": "Avg Latency",
@@ -139,7 +167,33 @@
     "subtitle": "Real-time webhook delivery metrics",
     "successRate": "Success Rate",
     "throughput": "Throughput",
-    "title": "Analytics"
+    "title": "Analytics",
+    "loadFailed": "Couldn't load analytics for this project",
+    "periodLabel": "Time range",
+    "periods": {
+      "24h": "24h",
+      "7d": "7d",
+      "30d": "30d"
+    },
+    "outcome": {
+      "title": "Delivery outcome",
+      "desc": "Delivered and failed over the selected range",
+      "delivered": "Delivered",
+      "failed": "Failed"
+    },
+    "latencySeries": "Latency",
+    "eventTypesSeries": "Events",
+    "tiles": {
+      "successRateHint": "{{delivered}} of {{total}} delivered",
+      "latencyHint": "p95 {{p95}} · p99 {{p99}}",
+      "failedHint": "{{percent}}% of all deliveries",
+      "failedBadge": "Retrying"
+    },
+    "endpointStatus": {
+      "HEALTHY": "Healthy",
+      "DEGRADED": "Degraded",
+      "FAILING": "Failing"
+    }
   },
   "apiKeys": {
     "createDialog": {
@@ -742,7 +796,9 @@
       "empty": "No recent events",
       "emptyDesc": "Events will appear here when sent",
       "subtitle": "Latest webhook events",
-      "title": "Recent Events"
+      "title": "Recent Events",
+      "deliveryCount_one": "{{count}} delivery",
+      "deliveryCount_other": "{{count}} deliveries"
     },
     "stats": {
       "dlq": "Failed Messages",
@@ -754,12 +810,69 @@
       "successRate": "{{rate}}% success rate",
       "successful": "Successful",
       "totalDeliveries": "Total Deliveries",
-      "totalDeliveriesDesc": "Webhook deliveries sent"
+      "totalDeliveriesDesc": "Webhook deliveries sent",
+      "deliveries": "Deliveries",
+      "window": "Last 7 days",
+      "delivered": "Delivered",
+      "deliveredHint": "{{percent}}% of everything sent",
+      "inFlight": "In flight",
+      "inFlightHint": "Still owed an attempt",
+      "abandoned": "Abandoned",
+      "abandonedHint": "Retry ladder exhausted",
+      "dlqBadge": "In the DLQ"
     },
     "subtitle": "Overview of your Hookflow activity",
     "title": "Dashboard",
     "toast": {
       "loadFailed": "Failed to load dashboard data"
+    },
+    "headline": "Delivery health",
+    "headlineDesc": "How your webhook traffic is doing right now.",
+    "openAnalytics": "Open analytics",
+    "projectPicker": "Project",
+    "verdict": {
+      "label": "Success rate",
+      "ok": "Everything is landing",
+      "retry": "Some deliveries need attention",
+      "halt": "Deliveries are failing",
+      "idle": "Nothing delivered yet",
+      "detail": "{{delivered}} of {{total}} deliveries landed.",
+      "idleDetail": "Send your first event and this fills in."
+    },
+    "outcome": {
+      "title": "Delivery outcome",
+      "desc": "Delivered and failed over the last 7 days",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "empty": "No deliveries in this window"
+    },
+    "share": {
+      "delivered": "Delivered",
+      "inFlight": "In flight",
+      "failed": "Failed",
+      "abandoned": "Abandoned"
+    },
+    "attention": {
+      "title": "Needs a human",
+      "desc": "Work Hookflow has stopped doing on its own",
+      "clearBadge": "All clear",
+      "dlq": "Abandoned in the DLQ",
+      "failed": "Failed, retrying",
+      "alerts": "Unresolved alerts",
+      "incidents": "Open incidents"
+    },
+    "inFlight": {
+      "title": "In flight",
+      "desc": "Deliveries still walking the retry ladder",
+      "empty": "Nothing in flight",
+      "rail": "Attempt {{count}} of {{total}}",
+      "status": {
+        "PENDING": "Pending",
+        "PROCESSING": "Attempting",
+        "SUCCESS": "Delivered",
+        "FAILED": "Failed",
+        "DLQ": "Abandoned"
+      }
     }
   },
   "debugLinks": {
@@ -1656,7 +1769,8 @@
     "emptyDesc": "Incidents group related failures for tracking and RCA",
     "form": {
       "severity": "Severity",
-      "title": "Title"
+      "title": "Title",
+      "titlePlaceholder": "Payment endpoint returning 503"
     },
     "investigate": "Investigate",
     "noOpen": "No open incidents",
@@ -1664,7 +1778,9 @@
       "detail": "Detail (optional)",
       "noteTitle": "Title",
       "submit": "Add Note",
-      "title": "Add Timeline Note"
+      "title": "Add Timeline Note",
+      "titlePlaceholder": "Contacted vendor support",
+      "detailPlaceholder": "What you found, and what you did"
     },
     "openCount": "{{count}} open incidents",
     "openOnly": "Open Only",
@@ -1681,7 +1797,29 @@
       "noteAdded": "Note added",
       "rcaSaved": "RCA notes saved",
       "statusUpdated": "Status updated",
-      "updateFailed": "Failed to update incident"
+      "updateFailed": "Failed to update incident",
+      "createFailed": "Couldn't create the incident",
+      "addNoteFailed": "Couldn't add the note"
+    },
+    "subtitle": "Group related failures, track what was done, and write down why.",
+    "loadFailed": "Couldn't load incidents for this project",
+    "filterLabel": "Which incidents",
+    "pageOf": "{{page}} / {{total}}",
+    "investigateDeliveries": "Investigate deliveries",
+    "resolvedAtLabel": "Resolved {{time}}",
+    "statuses": {
+      "OPEN": "Open",
+      "INVESTIGATING": "Investigating",
+      "RESOLVED": "Resolved"
+    },
+    "tiles": {
+      "open": "Open",
+      "openHint": "Nobody has claimed these yet",
+      "allClear": "All clear",
+      "investigating": "Investigating",
+      "investigatingHint": "Someone is on it",
+      "critical": "Critical",
+      "criticalHint": "Unresolved and marked critical"
     }
   },
   "incomingDestinations": {
@@ -2419,7 +2557,8 @@
       "orderTitle": "Ordered per endpoint",
       "replayBody": "Replay builds fresh deliveries from events already in the store — same payload, new sequence numbers — in batches of 200, two sessions per project at a time.",
       "replayTitle": "Replay from what you stored",
-      "title": "The ladder is the product"
+      "title": "The ladder is the product",
+      "ladderEnd": "after the last rung → DLQ"
     },
     "socialProof": {
       "quote1": "We replaced 3 months of custom webhook code with Hookflow in an afternoon. Retries, signatures, monitoring — it just works.",
@@ -2448,15 +2587,21 @@
       "titleHighlight": " production workloads"
     },
     "stack": {
-      "body": "Incoming sources ship with signature verification for Stripe, GitHub, GitLab, Shopify, Slack and Twilio, and a generic HMAC verifier for everything else. Outgoing deliveries go to any HTTPS URL your users registered, with mTLS when the far end asks for it.",
+      "body": "An incoming source is verified before anything else happens. Stripe, GitHub, GitLab, Slack and Shopify have their own verifier; everything else uses a generic HMAC verifier with the header and prefix you name.",
       "eyebrow": "WHAT IT CONNECTS",
       "runsOnLabel": "RUNS ON",
-      "runsOnNote": "Postgres 16 · Kafka 3.7 · Redis 7 · Docker Compose",
+      "runsOnNote": "One compose file. Postgres holds the record, Kafka moves the work, Redis holds the claims.",
       "sdkLabel": "SEND FROM",
       "sdkNote": "@hookflow/node · hookflow-sdk · hookflow/php · or plain HTTP",
       "title": "Receive from providers that sign. Deliver to anything that speaks HTTP.",
       "verifiedLabel": "VERIFIED SOURCES",
-      "verifiedMore": "GitLab · Shopify · generic HMAC · custom"
+      "verifiedMore": "GitLab · Shopify · generic HMAC",
+      "genericName": "Any HMAC provider",
+      "genericDetail": "your header, your prefix",
+      "genericNote": "Covers GitLab and Shopify, and anything that signs its body with a shared secret.",
+      "stripeDetail": "timestamp + v1 signature",
+      "githubDetail": "sha256 prefix",
+      "slackDetail": "v0 signature + timestamp"
     },
     "trust": {
       "apiKeys": "API key authentication",
@@ -3500,7 +3645,9 @@
       "events": "Events",
       "failed": "Failed",
       "success": "Success",
-      "title": "Daily History"
+      "title": "Daily History",
+      "desc": "Every day in the selected range",
+      "empty": "No days recorded yet"
     },
     "noData": "No usage data",
     "noDataDesc": "Start sending events to see usage metrics",
@@ -3521,7 +3668,47 @@
       "successRate": "Success Rate"
     },
     "subtitle": "Resource usage for <strong>{{project}}</strong>",
-    "title": "Usage & Metrics"
+    "title": "Usage & Metrics",
+    "description": "What this project has used, and what your plan allows.",
+    "loadFailed": "Couldn't load usage for this project",
+    "periodLabel": "Time range",
+    "quota": {
+      "title": "Plan limits",
+      "desc": "This billing period, {{from}} to {{to}}",
+      "descPending": "This billing period, across the organization",
+      "events": "Events",
+      "endpoints": "Endpoints",
+      "projects": "Projects",
+      "members": "Members",
+      "ofLimit": "{{percent}}% of {{limit}}",
+      "unlimited": "No limit on your plan",
+      "approaching": "Near limit",
+      "over": "Over limit"
+    },
+    "traffic": {
+      "title": "Deliveries by day",
+      "desc": "Delivered and failed, one bar per day",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "empty": "No deliveries in this window"
+    },
+    "mix": {
+      "title": "Where deliveries ended up",
+      "desc": "Across the selected range",
+      "delivered": "Delivered",
+      "inFlight": "In flight",
+      "failed": "Failed",
+      "abandoned": "Abandoned",
+      "total": "{{total}} deliveries in total"
+    },
+    "tiles": {
+      "events": "Events",
+      "eventsHint": "Announced by your systems",
+      "incoming": "Incoming events",
+      "incomingHint": "Received from your sources",
+      "endpointsHint": "Registered and enabled",
+      "alertRulesHint": "Watching this project"
+    }
   },
   "verifyEmail": {
     "errorTitle": "Verification Failed",
@@ -3765,5 +3952,8 @@
     "validation": {
       "required": "This field is required"
     }
+  },
+  "charts": {
+    "empty": "Nothing to plot yet"
   }
 }

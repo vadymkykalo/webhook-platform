@@ -39,13 +39,13 @@ function TrackHeader({ icon: Icon, label, completedCount, totalCount, iconColor 
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <Icon className={cn("h-4 w-4", iconColor)} />
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+          <span className="mono-label">{label}</span>
         </div>
-        <span className="text-[11px] text-muted-foreground">{completedCount}/{totalCount}</span>
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{completedCount}/{totalCount}</span>
       </div>
       <div className="h-1 bg-muted rounded-full overflow-hidden">
         <div
-          className={cn("h-full rounded-full transition-all duration-500 ease-out", completedCount === totalCount ? "bg-success" : "bg-primary")}
+          className={cn("h-full rounded-full transition-all duration-500 ease-out", completedCount === totalCount ? "bg-ok" : "bg-primary")}
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -72,7 +72,7 @@ function StepRow({ step, navigate, t }: { step: Step; navigate: (path: string) =
       }}
     >
       {step.done ? (
-        <CheckCircle2 className="h-[18px] w-[18px] text-success flex-shrink-0" />
+        <CheckCircle2 className="h-[18px] w-[18px] text-ok flex-shrink-0" />
       ) : (
         <step.icon className="h-[18px] w-[18px] text-muted-foreground/40 flex-shrink-0" />
       )}
@@ -151,7 +151,7 @@ export default function OnboardingChecklist({
   };
 
   return (
-    <Card className="mb-6 border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card overflow-hidden">
+    <Card className="mb-4 overflow-hidden border-rail">
       <CardContent className="p-0">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
@@ -209,7 +209,7 @@ export default function OnboardingChecklist({
                 {t('onboarding.tabOutgoing')}
                 <span className={cn(
                   'ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                  outCompleted === outgoingSteps.length ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
+                  outCompleted === outgoingSteps.length ? 'bg-ok-soft text-ok' : 'bg-accent text-accent-foreground'
                 )}>
                   {outCompleted}/{outgoingSteps.length}
                 </span>
@@ -227,7 +227,7 @@ export default function OnboardingChecklist({
                 {t('onboarding.tabIncoming')}
                 <span className={cn(
                   'ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
-                  inCompleted === incomingSteps.length ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
+                  inCompleted === incomingSteps.length ? 'bg-ok-soft text-ok' : 'bg-accent text-accent-foreground'
                 )}>
                   {inCompleted}/{incomingSteps.length}
                 </span>
@@ -241,8 +241,8 @@ export default function OnboardingChecklist({
           <div className="px-5 pb-5">
             {allDone ? (
               <div className="flex flex-col items-center text-center py-4">
-                <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center mb-3">
-                  <CheckCircle2 className="h-6 w-6 text-success" />
+                <div className="h-12 w-12 rounded-full bg-ok-soft flex items-center justify-center mb-3">
+                  <CheckCircle2 className="h-6 w-6 text-ok" />
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1">{t('onboarding.allDone')}</p>
                 <Button
@@ -261,7 +261,7 @@ export default function OnboardingChecklist({
                   label={activeTab === 'outgoing' ? t('onboarding.trackOutgoing') : t('onboarding.trackIncoming')}
                   completedCount={activeTab === 'outgoing' ? outCompleted : inCompleted}
                   totalCount={activeSteps.length}
-                  iconColor={activeTab === 'outgoing' ? 'text-primary' : 'text-emerald-500'}
+                  iconColor="text-primary"
                 />
                 <div className="space-y-0.5">
                   {activeSteps.map((step) => (

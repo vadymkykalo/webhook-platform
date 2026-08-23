@@ -1,15 +1,16 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Radio, Plus, Copy, Share2, Loader2, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Radio, Plus, Share2, Loader2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showSuccess, showApiError } from '../lib/toast';
-import { useEvents, useProject } from '../api/queries';
-import { formatRelativeTime, formatDateTime } from '../lib/date';
+import { useEvents, useProject, useDeliveries } from '../api/queries';
 import PageSkeleton from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
+import StatusBadge, { type StatusKind } from '../components/StatusBadge';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/button';
-import { Card } from '../components/ui/card';
+import { Select } from '../components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { SortableTableHead, useSort } from '../components/ui/sortable-table-head';
 import { TablePagination } from '../components/ui/table-pagination';
@@ -19,6 +20,60 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
+import { CopyId, FilterBar, FilterField, SearchField, TimeCell } from './tableParts';
+import type { DeliveryResponse } from '../types/api.types';
+
+const HEAD_CLASS = 'h-9 font-mono text-[11px] uppercase tracking-[0.08em]';
+
+/**
+ * What happened to the Deliveries one Event owed.
+ *
+ * An Event has no status of its own — it exists whether or not anyone was
+ * listening — so the only question this page can answer, and the reason it
+ * exists, is what became of the Deliveries it created. That rollup is derived
+ * here rather than served: no endpoint returns it, so the page fetches the
+ * Deliveries created in the same window as the Events on screen and joins them
+ * by event id.
+ */
+interface Rollup {
+  total: number;
+  delivered: number;
+  owed: number;
+  abandoned: number;
+}
+
+type EventStatus = 'delivered' | 'owed' | 'abandoned' | 'unsubscribed' | 'unknown';
+
+function statusOf(rollup: Rollup | undefined, deliveriesCreated: number | undefined): EventStatus {
+  if (deliveriesCreated === 0) return 'unsubscribed';
+  if (!rollup || rollup.total === 0) return 'unknown';
+  if (rollup.abandoned > 0) return 'abandoned';
+  if (rollup.owed > 0) return 'owed';
+  return 'delivered';
+}
+
+const STATUS_KIND: Record<EventStatus, StatusKind> = {
+  delivered: 'ok',
+  owed: 'retry',
+  abandoned: 'halt',
+  unsubscribed: 'idle',
+  unknown: 'idle',
+};
+
+function rollupOf(deliveries: DeliveryResponse[]): Map<string, Rollup> {
+  const byEvent = new Map<string, Rollup>();
+  for (const d of deliveries) {
+    const r = byEvent.get(d.eventId) ?? { total: 0, delivered: 0, owed: 0, abandoned: 0 };
+    r.total += 1;
+    if (d.status === 'SUCCESS') r.delivered += 1;
+    else if (d.status === 'DLQ' || d.status === 'FAILED') r.abandoned += 1;
+    else r.owed += 1;
+    byEvent.set(d.eventId, r);
+  }
+  return byEvent;
+}
+
+const STATUS_FILTERS: EventStatus[] = ['delivered', 'owed', 'abandoned', 'unsubscribed'];
 
 export default function EventsPage() {
   const { t } = useTranslation();
@@ -32,24 +87,50 @@ export default function EventsPage() {
   const { canSendEvents, canCreateDebugLinks } = usePermissions();
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(0); }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data: project, isError: projectIsError, error: projectError, refetch: refetchProject } = useProject(projectId);
 
   const {
     data: eventsData, isLoading: eventsLoading, isError: eventsIsError, error: eventsError, refetch: refetchEvents,
-  } = useEvents(projectId, page, pageSize, sortParam);
-  const events = eventsData?.content ?? [];
+  } = useEvents(projectId, page, pageSize, sortParam, debouncedSearch || undefined);
+  const events = useMemo(() => eventsData?.content ?? [], [eventsData]);
   const totalElements = eventsData?.totalElements ?? 0;
   const totalPages = eventsData?.totalPages ?? 0;
+
+  // One request, not one per row: the window that covers the events on screen.
+  const fromDate = useMemo(() => {
+    if (events.length === 0) return undefined;
+    const oldest = Math.min(...events.map((e) => new Date(e.createdAt).getTime()));
+    return new Date(oldest - 60_000).toISOString();
+  }, [events]);
+
+  const { data: deliveriesData } = useDeliveries(fromDate ? projectId : undefined, {
+    page: 0,
+    size: 200,
+    sort: 'createdAt,desc',
+    fromDate,
+  });
+  const rollups = useMemo(() => rollupOf(deliveriesData?.content ?? []), [deliveriesData]);
+
+  const rows = useMemo(() => events.map((event) => ({
+    event,
+    rollup: rollups.get(event.id),
+    status: statusOf(rollups.get(event.id), event.deliveriesCreated),
+  })), [events, rollups]);
+
+  const visibleRows = statusFilter ? rows.filter((r) => r.status === statusFilter) : rows;
 
   const loading = eventsLoading;
   const isError = projectIsError || eventsIsError;
   const retry = () => { refetchProject(); refetchEvents(); };
-
-  const handleCopyId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    showSuccess(t('events.toast.idCopied'));
-  };
 
   const handleShareDebugLink = async (eventId: string) => {
     if (!projectId) return;
@@ -65,142 +146,142 @@ export default function EventsPage() {
     }
   };
 
-
   if (loading) {
-    return <PageSkeleton maxWidth="max-w-7xl" />;
+    return <PageSkeleton maxWidth="max-w-none" />;
   }
 
   if (isError) {
     return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-4 lg:p-6">
         <ErrorState error={projectError ?? eventsError} fallbackKey="events.toast.loadFailed" onRetry={retry} />
       </div>
     );
   }
 
-  if (!project) {
-    return (
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <EmptyState icon={Radio} title={t('common.error')} />
-      </div>
-    );
-  }
+  const sendAction = (
+    <PermissionGate allowed={canSendEvents}>
+      <VerificationGate>
+        <Button onClick={() => setShowSendModal(true)}>
+          <Plus className="h-4 w-4" /> {t('events.sendTest')}
+        </Button>
+      </VerificationGate>
+    </PermissionGate>
+  );
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
-        <div>
-          <h1 className="text-title tracking-tight">{t('events.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            <Trans i18nKey="events.subtitle" values={{ project: project.name }} components={{ strong: <strong /> }} />
-          </p>
-        </div>
-        <PermissionGate allowed={canSendEvents}>
-          <VerificationGate>
-            <Button onClick={() => setShowSendModal(true)}>
-              <Plus className="h-4 w-4" /> {t('events.sendTest')}
-            </Button>
-          </VerificationGate>
-        </PermissionGate>
-      </div>
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={t('nav.outgoing')}
+        title={t('events.outgoingTitle')}
+        description={<Trans i18nKey="events.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
+        actions={sendAction}
+      />
+
+      <FilterBar>
+        <FilterField id="event-status" label={t('events.filters.deliveryStatus')}>
+          <Select id="event-status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">{t('events.filters.allStatuses')}</option>
+            {STATUS_FILTERS.map((s) => (
+              <option key={s} value={s}>{t(`events.deliveryStatus.${s}`)}</option>
+            ))}
+          </Select>
+        </FilterField>
+        <SearchField
+          id="event-search"
+          label={t('events.filters.eventType')}
+          placeholder={t('events.filters.eventTypePlaceholder')}
+          value={search}
+          onChange={setSearch}
+        />
+      </FilterBar>
 
       {events.length === 0 ? (
         <EmptyState
           icon={Radio}
-          title={t('events.noEvents')}
-          description={t('events.noEventsDesc')}
-          action={
-            <PermissionGate allowed={canSendEvents}>
-              <VerificationGate>
-                <Button onClick={() => setShowSendModal(true)}>
-                  <Plus className="h-4 w-4" /> {t('events.sendTest')}
-                </Button>
-              </VerificationGate>
-            </PermissionGate>
-          }
-          docsLink="/docs#events-api"
+          title={search ? t('common.noResults') : t('events.noEvents')}
+          description={search ? t('events.noMatchDesc') : t('events.noEventsDesc')}
+          action={search ? (
+            <Button variant="outline" onClick={() => setSearch('')}>{t('common.clearSearch')}</Button>
+          ) : sendAction}
+          docsLink={search ? undefined : '/docs#events-api'}
         />
       ) : (
         <div className="animate-fade-in">
-          <Card className="overflow-hidden">
+          <div className="overflow-hidden rounded-lg border border-rail bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort}>{t('events.eventType')}</SortableTableHead>
-                  <TableHead className="text-xs">{t('events.eventId')}</TableHead>
-                  <TableHead className="text-xs">{t('events.deliveriesCount')}</TableHead>
-                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort}>{t('events.created')}</SortableTableHead>
-                  <TableHead className="w-[80px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
+                  <TableHead className={HEAD_CLASS}>{t('deliveries.columns.status')}</TableHead>
+                  <SortableTableHead field="eventType" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('events.eventType')}</SortableTableHead>
+                  <TableHead className={HEAD_CLASS}>{t('events.deliveriesCount')}</TableHead>
+                  <TableHead className={HEAD_CLASS}>{t('events.eventId')}</TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={HEAD_CLASS}>{t('events.created')}</SortableTableHead>
+                  <TableHead className={`${HEAD_CLASS} w-[60px]`}><span className="sr-only">{t('common.actions')}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => (
-                  <TableRow key={event.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => setSelectedEventId(event.id)}>
+                {visibleRows.map(({ event, rollup, status }) => (
+                  <TableRow
+                    key={event.id}
+                    className="group/row cursor-pointer"
+                    onClick={() => setSelectedEventId(event.id)}
+                  >
                     <TableCell>
-                      <span className="font-mono text-sm font-semibold">{event.eventType}</span>
+                      <StatusBadge kind={STATUS_KIND[status]} label={t(`events.deliveryStatus.${status}`)} />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5 group">
-                        <code className="text-[13px] font-mono text-muted-foreground">{event.id.substring(0, 8)}...</code>
-                        <Button variant="ghost" size="icon-sm" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleCopyId(event.id); }} title={t('common.copyId')} aria-label={t('common.copyId')}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      <Link
+                        to={`/admin/projects/${projectId}/events/${event.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded font-mono text-[13px] font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {event.eventType}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      {event.deliveriesCreated != null && (
-                        <div className="flex items-center gap-1.5">
-                          {event.deliveriesCreated === 0 ? (
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-                          ) : (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                          )}
-                          <span className={`text-sm font-medium ${event.deliveriesCreated === 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
-                            {event.deliveriesCreated}
-                          </span>
-                        </div>
-                      )}
+                      <Link
+                        to={`/admin/projects/${projectId}/deliveries?eventId=${event.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded font-mono text-[13px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {rollup
+                          ? t('events.deliveredOf', { delivered: rollup.delivered, total: rollup.total })
+                          : t('events.deliveredOf', { delivered: 0, total: event.deliveriesCreated ?? 0 })}
+                      </Link>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-sm">{formatRelativeTime(event.createdAt)}</span>
-                        <span className="text-[11px] text-muted-foreground">{formatDateTime(event.createdAt)}</span>
-                      </div>
+                      <CopyId value={event.id} to={`/admin/projects/${projectId}/events/${event.id}`} />
                     </TableCell>
+                    <TableCell><TimeCell value={event.createdAt} /></TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        {canCreateDebugLinks && (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
-                            disabled={sharingEventId === event.id}
-                            title={t('debugLinks.share')}
-                            aria-label={t('debugLinks.share')}
-                          >
-                            {sharingEventId === event.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Share2 className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        )}
+                      {canCreateDebugLinks && (
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => navigate(`/admin/projects/${projectId}/deliveries?eventId=${event.id}`)}
-                          title={t('events.viewDeliveries')}
-                          aria-label={t('events.viewDeliveries')}
+                          onClick={(e) => { e.stopPropagation(); handleShareDebugLink(event.id); }}
+                          disabled={sharingEventId === event.id}
+                          title={t('debugLinks.share')}
+                          aria-label={t('debugLinks.share')}
                         >
-                          <Send className="h-3.5 w-3.5" />
+                          {sharingEventId === event.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Share2 className="h-3.5 w-3.5" />
+                          )}
                         </Button>
-                      </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </Card>
+          </div>
+
+          {statusFilter && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t('events.filters.clientSideNote', { shown: visibleRows.length, count: rows.length })}
+            </p>
+          )}
 
           <TablePagination
             page={page}

@@ -11,7 +11,7 @@ function HttpNode({ data, selected }: NodeProps) {
   const shortUrl = url.length > 30 ? url.substring(0, 30) + '…' : url;
   return (
     <BaseNode
-      color="#10b981"
+      role="action"
       icon="🌐"
       label={String(d.label || t('workflows.nodeTypes.http.label'))}
       subtitle={url ? `${method} ${shortUrl}` : t('workflows.nodeStatus.notConfigured')}

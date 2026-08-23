@@ -9,7 +9,7 @@ function TransformNode({ data, selected }: NodeProps) {
   const hasTemplate = d.template && String(d.template).trim() !== '{}';
   return (
     <BaseNode
-      color="#06b6d4"
+      role="logic"
       icon="🔄"
       label={String(d.label || t('workflows.nodeTypes.transform.label'))}
       subtitle={hasTemplate ? t('workflows.nodeStatus.templateConfigured') : t('workflows.nodeStatus.noTemplate')}

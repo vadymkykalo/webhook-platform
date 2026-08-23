@@ -1,25 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Webhook, CheckCircle2, Circle, Copy, Loader2, Zap, Plus, ArrowRight,
-  Key, Radio, RefreshCw, ChevronDown, ChevronUp, Shield,
+  Check, Copy, Eye, EyeOff, KeyRound, Loader2, Plus, RefreshCw, Send, X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { endpointsApi, type EndpointTestResponse } from '../api/endpoints.api';
 import { subscriptionsApi } from '../api/subscriptions.api';
-import { useProject, useEndpoints, useSubscriptions } from '../api/queries';
-import PageSkeleton from '../components/PageSkeleton';
+import { useEventTypes, useProject, queryKeys } from '../api/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import AttemptRail, { type RailAttempt } from '../components/AttemptRail';
+import PageHeader from '../components/PageHeader';
+import StatusBadge from '../components/StatusBadge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
 import { usePermissions } from '../auth/usePermissions';
-import PermissionGate from '../components/PermissionGate';
-import VerificationGate from '../components/VerificationGate';
+
+/**
+ * Creating a connection.
+ *
+ * This used to be a 693-line page you navigated to — a fourth destination for
+ * the job the Connections tab already names. It is now a flow: `ConnectionsPage`
+ * opens it in a dialog, and the route that still points here renders the same
+ * flow full-page so an existing link keeps working.
+ *
+ * The step order also changed. The old wizard collected the retry ladder in
+ * step 5 but had already written the subscriptions in step 4, so a ladder the
+ * person chose was silently dropped. Here the subscriptions are written once,
+ * at the end, with the ladder that was actually chosen.
+ */
 
 function generateSecret(): string {
   const array = new Uint8Array(32);
@@ -27,11 +39,98 @@ function generateSecret(): string {
   return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/** Seconds → the shortest honest unit, for a ladder preview. */
+export function formatLadderDelay(seconds: number): string {
+  if (seconds >= 86400) return `${Math.round(seconds / 86400)}d`;
+  if (seconds >= 3600) return `${Math.round(seconds / 3600)}h`;
+  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
+  return `${seconds}s`;
+}
+
+/** A comma-separated delay list → rail ticks, ignoring anything unparseable. */
+export function ladderTicks(retryDelays: string, maxAttempts: number): RailAttempt[] {
+  const delays = retryDelays
+    .split(',')
+    .map((d) => Number(d.trim()))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+
+  const ticks: RailAttempt[] = [{ number: 1, outcome: 'scheduled', delayMinutes: 0 }];
+  let cumulative = 0;
+  for (let i = 0; i < Math.max(0, maxAttempts - 1); i++) {
+    cumulative += delays[Math.min(i, delays.length - 1)] ?? 0;
+    ticks.push({ number: i + 2, outcome: 'scheduled', delayMinutes: cumulative / 60 });
+  }
+  return ticks;
+}
+
+/**
+ * A secret, never legible until asked for.
+ *
+ * A signing secret is the one field on this screen that must not survive a
+ * screenshot, a shared screen or a scrolled-past terminal, so it renders as
+ * dots until the reader asks for it and goes back to dots when the dialog
+ * closes. Copy does not require revealing.
+ */
+export function SecretField({ secret, label }: { secret: string; label?: string }) {
+  const { t } = useTranslation();
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(secret);
+      setCopied(true);
+      showSuccess(t('endpoints.toast.secretCopied'));
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showApiError(new Error('clipboard'), 'connectionSetup.secret.copyFailed');
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {label && <div className="mono-label">{label}</div>}
+      <div className="flex w-full items-start gap-2">
+        {/* w-0 + break-all: a 64-character secret must wrap inside the row,
+            never widen the dialog it sits in. */}
+        <code
+          className="w-0 min-w-0 flex-1 break-all rounded-md border border-rail bg-secondary/50 px-3 py-2 font-mono text-xs leading-6"
+          data-testid="signing-secret"
+        >
+          {revealed ? secret : '•'.repeat(Math.min(secret.length, 48))}
+        </code>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="flex-shrink-0"
+          onClick={() => setRevealed((v) => !v)}
+          aria-label={revealed ? t('connectionSetup.secret.hide', 'Hide secret') : t('connectionSetup.secret.reveal', 'Reveal secret')}
+          title={revealed ? t('connectionSetup.secret.hide', 'Hide secret') : t('connectionSetup.secret.reveal', 'Reveal secret')}
+        >
+          {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="flex-shrink-0"
+          onClick={copy}
+          aria-label={t('endpoints.secretDialog.copy')}
+          title={t('endpoints.secretDialog.copy')}
+        >
+          {copied ? <Check className="h-4 w-4 text-ok" /> : <Copy className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 type Step = 'url' | 'secret' | 'test' | 'events' | 'retry';
 
 const STEPS: Step[] = ['url', 'secret', 'test', 'events', 'retry'];
 
-const DEFAULT_EVENT_TYPES = [
+const SUGGESTED_EVENT_TYPES = [
   'order.created',
   'order.updated',
   'payment.succeeded',
@@ -39,159 +138,100 @@ const DEFAULT_EVENT_TYPES = [
   'customer.created',
 ];
 
-export default function ConnectionSetupPage() {
+export interface ConnectionSetupFlowProps {
+  projectId: string;
+  /** Called once the connection exists, so the opener can close and refresh. */
+  onDone?: () => void;
+  /** Rendered as the flow's own cancel control when the opener wants one. */
+  onCancel?: () => void;
+}
+
+/**
+ * The five steps, laid out for whatever frame holds them: a dialog on the
+ * Connections tab, or the full page below.
+ */
+export function ConnectionSetupFlow({ projectId, onDone, onCancel }: ConnectionSetupFlowProps) {
   const { t } = useTranslation();
-  const { projectId } = useParams<{ projectId: string }>();
-  const navigate = useNavigate();
+  const qc = useQueryClient();
   const { canManageEndpoints } = usePermissions();
-  const { data: project, isLoading: projectLoading } = useProject(projectId);
-  const { data: endpoints = [], isLoading: endpointsLoading, refetch: refetchEndpoints } = useEndpoints(projectId);
-  const { refetch: refetchSubs } = useSubscriptions(projectId);
+  const { data: catalog = [] } = useEventTypes(projectId);
 
-  // Wizard state
-  const [activeStep, setActiveStep] = useState<Step>('url');
-  const [expandedSteps, setExpandedSteps] = useState<Set<Step>>(new Set(['url']));
+  const [stepIndex, setStepIndex] = useState(0);
+  const step = STEPS[stepIndex];
 
-  // Step 1: URL
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
   const [creatingEndpoint, setCreatingEndpoint] = useState(false);
-  const [createdEndpointId, setCreatedEndpointId] = useState<string | null>(null);
-
-  // Step 2: Secret
+  const [endpointId, setEndpointId] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
-  const [secretCopied, setSecretCopied] = useState(false);
 
-  // Step 3: Test
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<EndpointTestResponse | null>(null);
 
-  // Step 4: Event types
   const [eventTypes, setEventTypes] = useState<string[]>(['']);
-  const [creatingSubscriptions, setCreatingSubscriptions] = useState(false);
-  const [subscriptionsCreated, setSubscriptionsCreated] = useState(false);
 
-  // Step 5: Retry
   const [maxAttempts, setMaxAttempts] = useState(7);
   const [timeoutSeconds, setTimeoutSeconds] = useState(30);
   const [retryDelays, setRetryDelays] = useState('60,300,900,3600,21600,86400');
-  const [retryConfigured, setRetryConfigured] = useState(false);
+  const [finishing, setFinishing] = useState(false);
 
-  // Detect existing state — resume from where user left off
-  useEffect(() => {
-    if (endpoints.length > 0 && !createdEndpointId) {
-      const latest = endpoints[endpoints.length - 1];
-      setCreatedEndpointId(latest.id);
-      setUrl(latest.url);
-      setDescription(latest.description || '');
-      // Secret can't be recovered, but mark step 1 as done
-      // Open next uncompleted step
-      setExpandedSteps(new Set(['secret']));
-      setActiveStep('secret');
-    }
-  }, [endpoints]); // eslint-disable-line react-hooks/exhaustive-deps
+  const suggestions = useMemo(() => {
+    const fromCatalog = catalog.map((entry) => entry.name).filter(Boolean);
+    return (fromCatalog.length > 0 ? fromCatalog : SUGGESTED_EVENT_TYPES).slice(0, 6);
+  }, [catalog]);
 
-  const stepDone = (step: Step): boolean => {
-    switch (step) {
-      case 'url':
-        return !!createdEndpointId;
-      case 'secret':
-        return secretCopied;
-      case 'test':
-        return testResult?.success === true;
-      case 'events':
-        return subscriptionsCreated;
-      case 'retry':
-        return retryConfigured;
-    }
-  };
+  const chosenTypes = eventTypes.map((type) => type.trim()).filter(Boolean);
+  const ticks = useMemo(() => ladderTicks(retryDelays, maxAttempts), [retryDelays, maxAttempts]);
 
-  const completedCount = STEPS.filter(stepDone).length;
+  const goNext = () => setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
+  const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
 
-  const toggleStep = (step: Step) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      if (next.has(step)) next.delete(step);
-      else next.add(step);
-      return next;
-    });
-    setActiveStep(step);
-  };
-
-  const advanceTo = (step: Step) => {
-    setExpandedSteps((prev) => {
-      const next = new Set(prev);
-      next.add(step);
-      return next;
-    });
-    setActiveStep(step);
-  };
-
-  // ── Step 1: Create endpoint ───────────────────────────────────────
   const handleCreateEndpoint = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectId) return;
-
+    if (!url.trim()) return;
     setCreatingEndpoint(true);
     try {
-      const sec = generateSecret();
+      const generated = generateSecret();
       const endpoint = await endpointsApi.create(projectId, {
-        url,
-        description,
+        url: url.trim(),
+        description: description.trim() || undefined,
         enabled: true,
-        secret: sec,
+        secret: generated,
       });
-      setCreatedEndpointId(endpoint.id);
-      setSecret(sec);
+      setEndpointId(endpoint.id);
+      setSecret(endpoint.secret ?? generated);
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.list(projectId) });
       showSuccess(t('connectionSetup.toast.endpointCreated'));
-      refetchEndpoints();
-      advanceTo('secret');
-    } catch (err: any) {
+      goNext();
+    } catch (err) {
       showApiError(err, 'endpoints.toast.createFailed');
     } finally {
       setCreatingEndpoint(false);
     }
   };
 
-  // ── Step 2: Copy secret ───────────────────────────────────────────
-  const handleCopySecret = () => {
-    if (!secret) return;
-    navigator.clipboard.writeText(secret);
-    setSecretCopied(true);
-    showSuccess(t('connectionSetup.toast.secretCopied'));
-  };
-
-  // ── Step 3: Test ping ─────────────────────────────────────────────
-  const handleTestPing = async () => {
-    if (!projectId || !createdEndpointId) return;
-
+  const handleTest = async () => {
+    if (!endpointId) return;
     setTesting(true);
     setTestResult(null);
     try {
-      const result = await endpointsApi.test(projectId, createdEndpointId);
+      const result = await endpointsApi.test(projectId, endpointId);
       setTestResult(result);
-      if (result.success) {
-        showSuccess(t('connectionSetup.toast.testPassed'));
-      }
-    } catch (err: any) {
+      if (result.success) showSuccess(t('connectionSetup.toast.testPassed'));
+    } catch (err) {
       showApiError(err, 'endpoints.toast.testError');
     } finally {
       setTesting(false);
     }
   };
 
-  // ── Step 4: Create subscriptions ──────────────────────────────────
-  const handleCreateSubscriptions = async () => {
-    if (!projectId || !createdEndpointId) return;
-
-    const types = eventTypes.map((t) => t.trim()).filter(Boolean);
-    if (types.length === 0) return;
-
-    setCreatingSubscriptions(true);
+  const handleFinish = async () => {
+    if (!endpointId || chosenTypes.length === 0) return;
+    setFinishing(true);
     try {
-      for (const eventType of types) {
+      for (const eventType of chosenTypes) {
         await subscriptionsApi.create(projectId, {
-          endpointId: createdEndpointId,
+          endpointId,
           eventType,
           enabled: true,
           maxAttempts,
@@ -199,495 +239,306 @@ export default function ConnectionSetupPage() {
           retryDelays,
         });
       }
-      setSubscriptionsCreated(true);
-      showSuccess(t('connectionSetup.toast.subscriptionsCreated', { count: types.length }));
-      refetchSubs();
-      advanceTo('retry');
-    } catch (err: any) {
+      qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.list(projectId) });
+      showSuccess(t('connectionSetup.toast.connectionCreated', 'Connection created'));
+      onDone?.();
+    } catch (err) {
       showApiError(err, 'toast.errors.server');
     } finally {
-      setCreatingSubscriptions(false);
+      setFinishing(false);
     }
   };
 
-  const addEventType = () => setEventTypes((prev) => [...prev, '']);
-  const updateEventType = (index: number, value: string) =>
-    setEventTypes((prev) => prev.map((v, i) => (i === index ? value : v)));
-  const removeEventType = (index: number) =>
-    setEventTypes((prev) => prev.filter((_, i) => i !== index));
-
-  // ── Step 5: Retry policy ──────────────────────────────────────────
-  const handleSaveRetryPolicy = () => {
-    setRetryConfigured(true);
-    showSuccess(t('connectionSetup.toast.retryConfigured'));
+  const stepTitle: Record<Step, string> = {
+    url: t('connectionSetup.steps.url.title'),
+    secret: t('connectionSetup.steps.secret.title'),
+    test: t('connectionSetup.steps.test.title'),
+    events: t('connectionSetup.steps.events.title'),
+    retry: t('connectionSetup.steps.retry.title'),
   };
 
-  // ── Render ────────────────────────────────────────────────────────
-  if (projectLoading || endpointsLoading) {
-    return <PageSkeleton />;
-  }
-
-  const stepIcon = (step: Step) =>
-    stepDone(step) ? (
-      <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-    ) : (
-      <Circle className={cn('h-5 w-5 shrink-0', activeStep === step ? 'text-primary' : 'text-muted-foreground/40')} />
-    );
-
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-title tracking-tight">{t('connectionSetup.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t('connectionSetup.subtitle', { project: project?.name })}
-        </p>
-        <div className="flex items-center gap-3 mt-4">
-          <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${(completedCount / STEPS.length) * 100}%` }}
+    <div className="space-y-5">
+      {/* Where in the flow we are — ticks, not a progress bar: the steps are
+          discrete and one of them (the test) is optional. */}
+      <div>
+        <div className="mono-label mb-2">
+          {t('connectionSetup.stepCounter', 'Step {{n}} of {{total}} · {{name}}', {
+            n: stepIndex + 1,
+            total: STEPS.length,
+            name: stepTitle[step],
+          })}
+        </div>
+        <ol className="flex items-center gap-1.5" aria-hidden>
+          {STEPS.map((s, i) => (
+            <li
+              key={s}
+              className={cn(
+                'h-1 flex-1 rounded-full transition-colors',
+                i < stepIndex ? 'bg-primary' : i === stepIndex ? 'bg-primary/60' : 'bg-rail'
+              )}
+            />
+          ))}
+        </ol>
+      </div>
+
+      {step === 'url' && (
+        <form id="connection-step-url" onSubmit={handleCreateEndpoint} className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.url.desc')}</p>
+          <div className="space-y-2">
+            <Label htmlFor="connection-url">{t('connectionSetup.steps.url.urlLabel')}</Label>
+            <Input
+              id="connection-url"
+              type="url"
+              className="font-mono text-sm"
+              placeholder="https://api.example.com/webhooks"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+              disabled={creatingEndpoint || !canManageEndpoints}
+              autoFocus
             />
           </div>
-          <span className="text-xs font-medium text-muted-foreground">
-            {completedCount}/{STEPS.length}
-          </span>
-        </div>
-      </div>
-
-      {/* Steps */}
-      <div className="space-y-3">
-        {/* ── STEP 1: Endpoint URL ─────────────────────────────────── */}
-        <Card className={cn(stepDone('url') && 'border-green-200 dark:border-green-900/40')}>
-          <CardHeader
-            className="cursor-pointer select-none"
-            onClick={() => toggleStep('url')}
-          >
-            <div className="flex items-center gap-3">
-              {stepIcon('url')}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Webhook className="h-4 w-4 text-primary" />
-                  {t('connectionSetup.steps.url.title')}
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  {t('connectionSetup.steps.url.desc')}
-                </CardDescription>
-              </div>
-              {expandedSteps.has('url') ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          {expandedSteps.has('url') && (
-            <CardContent className="pt-0">
-              {stepDone('url') ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                  <code className="text-xs font-mono truncate">{url}</code>
-                </div>
-              ) : (
-                <form onSubmit={handleCreateEndpoint} className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="ep-url">{t('connectionSetup.steps.url.urlLabel')}</Label>
-                    <Input
-                      id="ep-url"
-                      type="url"
-                      placeholder="https://api.example.com/webhooks"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      required
-                      disabled={creatingEndpoint}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ep-desc">{t('connectionSetup.steps.url.descLabel')}</Label>
-                    <Textarea
-                      id="ep-desc"
-                      placeholder={t('connectionSetup.steps.url.descPlaceholder')}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      disabled={creatingEndpoint}
-                      rows={2}
-                    />
-                  </div>
-                  <PermissionGate allowed={canManageEndpoints}>
-                    <VerificationGate>
-                      <Button type="submit" disabled={creatingEndpoint} size="sm">
-                        {creatingEndpoint && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        {t('connectionSetup.steps.url.create')}
-                      </Button>
-                    </VerificationGate>
-                  </PermissionGate>
-                </form>
-              )}
-            </CardContent>
-          )}
-        </Card>
-
-        {/* ── STEP 2: Signing Secret ─────────────────────────────────── */}
-        <Card className={cn(stepDone('secret') && 'border-green-200 dark:border-green-900/40')}>
-          <CardHeader
-            className="cursor-pointer select-none"
-            onClick={() => toggleStep('secret')}
-          >
-            <div className="flex items-center gap-3">
-              {stepIcon('secret')}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Key className="h-4 w-4 text-primary" />
-                  {t('connectionSetup.steps.secret.title')}
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  {t('connectionSetup.steps.secret.desc')}
-                </CardDescription>
-              </div>
-              {expandedSteps.has('secret') ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          {expandedSteps.has('secret') && (
-            <CardContent className="pt-0">
-              {!secret ? (
-                <p className="text-xs text-muted-foreground italic">
-                  {t('connectionSetup.steps.secret.pending')}
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={secret}
-                      readOnly
-                      className="font-mono text-xs"
-                    />
-                    <Button variant="outline" size="icon" onClick={handleCopySecret} title={t('common.copy')} aria-label={t('common.copy')}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
-                    <p className="text-xs text-amber-800 dark:text-amber-300">
-                      <Shield className="h-3.5 w-3.5 inline mr-1 -mt-0.5" />
-                      {t('connectionSetup.steps.secret.warning')}
-                    </p>
-                  </div>
-                  {secretCopied && (
-                    <Button size="sm" variant="ghost" onClick={() => advanceTo('test')}>
-                      {t('connectionSetup.next')} <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
-
-        {/* ── STEP 3: Test Ping ──────────────────────────────────────── */}
-        <Card className={cn(stepDone('test') && 'border-green-200 dark:border-green-900/40')}>
-          <CardHeader
-            className="cursor-pointer select-none"
-            onClick={() => toggleStep('test')}
-          >
-            <div className="flex items-center gap-3">
-              {stepIcon('test')}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-primary" />
-                  {t('connectionSetup.steps.test.title')}
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  {t('connectionSetup.steps.test.desc')}
-                </CardDescription>
-              </div>
-              {expandedSteps.has('test') ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          {expandedSteps.has('test') && (
-            <CardContent className="pt-0">
-              {!createdEndpointId ? (
-                <p className="text-xs text-muted-foreground italic">
-                  {t('connectionSetup.steps.test.pending')}
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <Button onClick={handleTestPing} disabled={testing} size="sm">
-                    {testing ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Zap className="h-3.5 w-3.5" />
-                    )}
-                    {t('connectionSetup.steps.test.send')}
-                  </Button>
-
-                  {testResult && (
-                    <div
-                      className={cn(
-                        'p-3 rounded-lg border',
-                        testResult.success
-                          ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30'
-                          : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'
-                      )}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        {testResult.success ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className={cn('text-xs font-semibold', testResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')}>
-                          {testResult.success ? t('connectionSetup.steps.test.passed') : t('connectionSetup.steps.test.failed')}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        HTTP {testResult.httpStatusCode || '—'} · {testResult.latencyMs}ms
-                      </p>
-                      {testResult.errorMessage && (
-                        <p className="text-[11px] text-red-600 mt-1">{testResult.errorMessage}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {testResult?.success && (
-                    <Button size="sm" variant="ghost" onClick={() => advanceTo('events')}>
-                      {t('connectionSetup.next')} <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  )}
-
-                  {testResult && !testResult.success && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {t('connectionSetup.steps.test.retryHint')}
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
-
-        {/* ── STEP 4: Event Types ──────────────────────────────────── */}
-        <Card className={cn(stepDone('events') && 'border-green-200 dark:border-green-900/40')}>
-          <CardHeader
-            className="cursor-pointer select-none"
-            onClick={() => toggleStep('events')}
-          >
-            <div className="flex items-center gap-3">
-              {stepIcon('events')}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-primary" />
-                  {t('connectionSetup.steps.events.title')}
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  {t('connectionSetup.steps.events.desc')}
-                </CardDescription>
-              </div>
-              {expandedSteps.has('events') ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          {expandedSteps.has('events') && (
-            <CardContent className="pt-0">
-              {!createdEndpointId ? (
-                <p className="text-xs text-muted-foreground italic">
-                  {t('connectionSetup.steps.events.pending')}
-                </p>
-              ) : subscriptionsCreated ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                  <span className="text-xs">
-                    {t('connectionSetup.steps.events.done', { count: eventTypes.filter((t) => t.trim()).length })}
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {DEFAULT_EVENT_TYPES.map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => {
-                          if (!eventTypes.includes(type)) {
-                            setEventTypes((prev) => {
-                              const filtered = prev.filter((t) => t.trim());
-                              return [...filtered, type];
-                            });
-                          }
-                        }}
-                        className="px-2 py-0.5 text-[11px] rounded-full border bg-muted hover:bg-accent transition-colors"
-                      >
-                        + {type}
-                      </button>
-                    ))}
-                  </div>
-
-                  {eventTypes.map((type, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Input
-                        value={type}
-                        onChange={(e) => updateEventType(i, e.target.value)}
-                        placeholder="e.g. order.created, payment.*, **"
-                        className="text-xs"
-                      />
-                      {eventTypes.length > 1 && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => removeEventType(i)} title={t('common.delete')} aria-label={t('common.delete')}>
-                          ×
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-
-                  <Button variant="ghost" size="sm" onClick={addEventType}>
-                    <Plus className="h-3.5 w-3.5" /> {t('connectionSetup.steps.events.add')}
-                  </Button>
-
-                  <div className="pt-1">
-                    <PermissionGate allowed={canManageEndpoints}>
-                      <VerificationGate>
-                        <Button
-                          size="sm"
-                          onClick={handleCreateSubscriptions}
-                          disabled={creatingSubscriptions || eventTypes.every((t) => !t.trim())}
-                        >
-                          {creatingSubscriptions && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          {t('connectionSetup.steps.events.create')}
-                        </Button>
-                      </VerificationGate>
-                    </PermissionGate>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
-
-        {/* ── STEP 5: Retry Policy ─────────────────────────────────── */}
-        <Card className={cn(stepDone('retry') && 'border-green-200 dark:border-green-900/40')}>
-          <CardHeader
-            className="cursor-pointer select-none"
-            onClick={() => toggleStep('retry')}
-          >
-            <div className="flex items-center gap-3">
-              {stepIcon('retry')}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4 text-primary" />
-                  {t('connectionSetup.steps.retry.title')}
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  {t('connectionSetup.steps.retry.desc')}
-                </CardDescription>
-              </div>
-              {expandedSteps.has('retry') ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          {expandedSteps.has('retry') && (
-            <CardContent className="pt-0">
-              {retryConfigured ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                  <span className="text-xs">
-                    {t('connectionSetup.steps.retry.done', { attempts: maxAttempts, timeout: timeoutSeconds })}
-                  </span>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">{t('connectionSetup.steps.retry.maxAttempts')}</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={20}
-                        value={maxAttempts}
-                        onChange={(e) => setMaxAttempts(Number(e.target.value))}
-                        className="text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">{t('connectionSetup.steps.retry.timeout')}</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={60}
-                        value={timeoutSeconds}
-                        onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
-                        className="text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">{t('connectionSetup.steps.retry.delays')}</Label>
-                    <Input
-                      value={retryDelays}
-                      onChange={(e) => setRetryDelays(e.target.value)}
-                      placeholder="60,300,900,3600,21600,86400"
-                      className="text-xs font-mono"
-                    />
-                    <p className="text-[10px] text-muted-foreground">{t('connectionSetup.steps.retry.delaysHint')}</p>
-                  </div>
-                  <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 border text-[11px]">
-                    <div>
-                      <span className="font-medium">{t('connectionSetup.steps.retry.preview')}:</span>{' '}
-                      {retryDelays.split(',').map((d, i) => {
-                        const secs = parseInt(d.trim());
-                        if (isNaN(secs)) return null;
-                        const label = secs >= 3600 ? `${Math.round(secs / 3600)}h` : secs >= 60 ? `${Math.round(secs / 60)}m` : `${secs}s`;
-                        return (
-                          <Badge key={i} variant="secondary" className="text-[10px] mr-1">
-                            #{i + 1}: {label}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <PermissionGate allowed={canManageEndpoints}>
-                    <VerificationGate>
-                      <Button size="sm" onClick={handleSaveRetryPolicy}>
-                        {t('connectionSetup.steps.retry.save')}
-                      </Button>
-                    </VerificationGate>
-                  </PermissionGate>
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
-      </div>
-
-      {/* Footer */}
-      {completedCount === STEPS.length && (
-        <div className="mt-8 p-6 rounded-xl border bg-gradient-to-r from-primary/5 to-primary/10 text-center animate-fade-in">
-          <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-3" />
-          <h2 className="text-lg font-bold">{t('connectionSetup.complete.title')}</h2>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            {t('connectionSetup.complete.desc')}
-          </p>
-          <div className="flex justify-center gap-3">
-            <Button variant="outline" onClick={() => navigate(`/admin/projects/${projectId}/endpoints`)}>
-              {t('connectionSetup.complete.viewEndpoints')}
-            </Button>
-            <Button onClick={() => navigate(`/admin/projects/${projectId}/events`)}>
-              {t('connectionSetup.complete.sendEvent')}
-            </Button>
+          <div className="space-y-2">
+            <Label htmlFor="connection-description">{t('connectionSetup.steps.url.descLabel')}</Label>
+            <Textarea
+              id="connection-description"
+              placeholder={t('connectionSetup.steps.url.descPlaceholder')}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={creatingEndpoint || !canManageEndpoints}
+              rows={2}
+            />
           </div>
+        </form>
+      )}
+
+      {step === 'secret' && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.secret.desc')}</p>
+          {secret ? (
+            <>
+              <SecretField secret={secret} label={t('connectionSetup.secret.label', 'Signing secret')} />
+              <div className="flex items-start gap-2.5 rounded-lg border border-retry/30 bg-retry-soft p-3">
+                <KeyRound className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
+                <p className="text-xs text-retry">{t('connectionSetup.steps.secret.warning')}</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.secret.pending')}</p>
+          )}
         </div>
       )}
+
+      {step === 'test' && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.test.desc')}</p>
+          <Button type="button" onClick={handleTest} disabled={testing || !endpointId} variant="outline">
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {t('connectionSetup.steps.test.send')}
+          </Button>
+          {testResult && (
+            <div className="rounded-lg border border-rail p-3">
+              <StatusBadge
+                kind={testResult.success ? 'ok' : 'halt'}
+                label={testResult.success ? t('connectionSetup.steps.test.passed') : t('connectionSetup.steps.test.failed')}
+              />
+              <p className="mt-2 font-mono text-xs text-muted-foreground">
+                HTTP {testResult.httpStatusCode ?? '—'} · {testResult.latencyMs}ms
+              </p>
+              {testResult.errorMessage && (
+                <p className="mt-1 text-xs text-halt">{testResult.errorMessage}</p>
+              )}
+              {!testResult.success && (
+                <p className="mt-2 text-xs text-muted-foreground">{t('connectionSetup.steps.test.retryHint')}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === 'events' && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.events.desc')}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() =>
+                  setEventTypes((prev) =>
+                    prev.includes(type) ? prev : [...prev.filter((v) => v.trim()), type]
+                  )
+                }
+                className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+              >
+                + {type}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {eventTypes.map((type, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  value={type}
+                  onChange={(e) =>
+                    setEventTypes((prev) => prev.map((v, index) => (index === i ? e.target.value : v)))
+                  }
+                  placeholder="order.created"
+                  className="font-mono text-sm"
+                  aria-label={t('connectionSetup.steps.events.rowLabel', 'Event type {{n}}', { n: i + 1 })}
+                />
+                {eventTypes.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setEventTypes((prev) => prev.filter((_, index) => index !== i))}
+                    aria-label={t('connectionSetup.steps.events.remove', 'Remove event type')}
+                    title={t('connectionSetup.steps.events.remove', 'Remove event type')}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setEventTypes((prev) => [...prev, ''])}>
+            <Plus className="h-3.5 w-3.5" /> {t('connectionSetup.steps.events.add')}
+          </Button>
+        </div>
+      )}
+
+      {step === 'retry' && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('connectionSetup.steps.retry.desc')}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="connection-attempts">{t('connectionSetup.steps.retry.maxAttempts')}</Label>
+              <Input
+                id="connection-attempts"
+                type="number"
+                min={1}
+                max={20}
+                value={maxAttempts}
+                onChange={(e) => setMaxAttempts(Number(e.target.value))}
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="connection-timeout">{t('connectionSetup.steps.retry.timeout')}</Label>
+              <Input
+                id="connection-timeout"
+                type="number"
+                min={1}
+                max={60}
+                value={timeoutSeconds}
+                onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
+                className="font-mono text-sm"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="connection-delays">{t('connectionSetup.steps.retry.delays')}</Label>
+            <Input
+              id="connection-delays"
+              value={retryDelays}
+              onChange={(e) => setRetryDelays(e.target.value)}
+              placeholder="60,300,900,3600,21600,86400"
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">{t('connectionSetup.steps.retry.delaysHint')}</p>
+          </div>
+          <div className="rounded-lg border border-rail p-4">
+            <div className="mono-label mb-2">{t('connectionSetup.steps.retry.preview')}</div>
+            <AttemptRail
+              attempts={ticks}
+              size="full"
+              ariaLabel={t('connectionSetup.steps.retry.railLabel', 'Retry ladder: {{count}} attempts over {{span}}', {
+                count: ticks.length,
+                span: formatLadderDelay(Math.round((ticks[ticks.length - 1]?.delayMinutes ?? 0) * 60)),
+              })}
+            />
+          </div>
+          {chosenTypes.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t('connectionSetup.steps.retry.appliesTo', 'Applies to every subscription this connection creates.')}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 border-t border-rail pt-4">
+        <div>
+          {stepIndex > 0 && (
+            <Button type="button" variant="ghost" onClick={goBack} disabled={finishing}>
+              {t('connectionSetup.back', 'Back')}
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel} disabled={finishing}>
+              {t('common.cancel')}
+            </Button>
+          )}
+          {step === 'url' && (
+            <Button type="submit" form="connection-step-url" disabled={creatingEndpoint || !canManageEndpoints}>
+              {creatingEndpoint && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('connectionSetup.steps.url.create')}
+            </Button>
+          )}
+          {(step === 'secret' || step === 'test') && (
+            <Button type="button" onClick={goNext}>
+              {t('connectionSetup.next')}
+            </Button>
+          )}
+          {step === 'events' && (
+            <Button type="button" onClick={goNext} disabled={chosenTypes.length === 0}>
+              {t('connectionSetup.next')}
+            </Button>
+          )}
+          {step === 'retry' && (
+            <Button type="button" onClick={handleFinish} disabled={finishing || chosenTypes.length === 0}>
+              {finishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {t('connectionSetup.finish', 'Create connection')}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The route that used to be the wizard's home. Another workstream owns the
+ * router, so the path stays live and renders the same flow full-page.
+ */
+export default function ConnectionSetupPage() {
+  const { t } = useTranslation();
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const { data: project } = useProject(projectId);
+
+  const backToConnections = () => navigate(`/admin/projects/${projectId}/connections`);
+
+  return (
+    <div className="p-4 lg:p-6">
+      <PageHeader
+        eyebrow={project?.name}
+        title={t('connectionSetup.title')}
+        description={t('connectionSetup.pageDesc', 'One endpoint, its signing secret and the event types it is subscribed to.')}
+      />
+      <div className="max-w-2xl">
+        {projectId && (
+          <ConnectionSetupFlow
+            projectId={projectId}
+            onDone={backToConnections}
+            onCancel={backToConnections}
+          />
+        )}
+      </div>
     </div>
   );
 }

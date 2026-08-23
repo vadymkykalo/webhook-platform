@@ -10,6 +10,8 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "typecheck": "tsc --noEmit",
     "types:generate": "openapi-typescript ../openapi.yaml -o src/types/api.generated.ts",
+    "docs:api-index": "node scripts/generate-docs-api-index.mjs",
+    "docs:api-index:check": "node scripts/generate-docs-api-index.mjs --check",
     "test": "vitest",
     "test:ci": "vitest run --reporter=verbose",
     "test:coverage": "vitest run --coverage"
@@ -62,6 +64,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "jest-axe": "^11.0.0",
+    "js-yaml": "^4.3.1",
     "jsdom": "^30.0.1",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.26",

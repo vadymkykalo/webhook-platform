@@ -78,15 +78,20 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        // Display carries the landing headlines and nothing else.
-        display: ['Bricolage Grotesque', 'Inter', 'system-ui', 'sans-serif'],
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        // One family, two voices. Geologica is a technical grotesk with full
+        // Cyrillic — which decides it, because the product ships in English and
+        // Ukrainian and the previous display face (Bricolage Grotesque) has no
+        // Cyrillic at all, so every Ukrainian headline would have silently
+        // fallen back. `display` and `sans` are the same family; the landing's
+        // voice comes from weight and tracking, not from a second typeface.
+        display: ['Geologica', 'system-ui', 'sans-serif'],
+        sans: ['Geologica', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       fontSize: {
-        'display': ['4rem', { lineHeight: '1.02', letterSpacing: '-0.035em', fontWeight: '600' }],
-        'headline': ['2.5rem', { lineHeight: '1.08', letterSpacing: '-0.03em', fontWeight: '600' }],
-        'title': ['1.375rem', { lineHeight: '1.25', letterSpacing: '-0.015em', fontWeight: '600' }],
+        'display': ['3.75rem', { lineHeight: '1.04', letterSpacing: '-0.04em', fontWeight: '600' }],
+        'headline': ['2.375rem', { lineHeight: '1.1', letterSpacing: '-0.032em', fontWeight: '600' }],
+        'title': ['1.3125rem', { lineHeight: '1.28', letterSpacing: '-0.018em', fontWeight: '600' }],
         'body-lg': ['1.0625rem', { lineHeight: '1.65' }],
       },
       boxShadow: {
