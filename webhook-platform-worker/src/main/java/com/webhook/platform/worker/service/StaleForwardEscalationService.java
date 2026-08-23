@@ -29,8 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Until this existed the Incoming direction had only {@link StuckForwardRecoveryService},
  * which resets an Attempt stuck in PROCESSING back to PENDING. Nothing ever gave up: a Forward
  * whose Destination stayed unreachable, or whose Attempt row was stranded PENDING, sat there
- * indefinitely with no terminal state and no notification. Recorded as a known gap in
- * {@code docs/adr/0011-one-attempt-runner-for-both-directions.md}.
+ * indefinitely with no terminal state and no notification.
  *
  * <h2>Why the age is measured from the Incoming Event, not the Attempt row</h2>
  *

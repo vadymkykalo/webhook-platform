@@ -47,7 +47,6 @@ scrape_configs:
       # userId/projectId/deliveryId/etc. deliberately stay unindexed in the line body —
       # promoting per-request/per-tenant IDs to labels would blow up Loki's index
       # cardinality. Query them with `| json` at query time instead — see
-      # docs/runbooks/trace-webhook-logs.md.
       - json:
           expressions:
             level: level

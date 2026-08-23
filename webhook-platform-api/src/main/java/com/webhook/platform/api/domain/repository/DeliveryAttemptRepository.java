@@ -29,7 +29,8 @@ public interface DeliveryAttemptRepository extends JpaRepository<DeliveryAttempt
         WHERE da.organization_id = :organizationId
         """, nativeQuery = true)
     List<DeliveryAttempt> findLatestAttemptsByDeliveryIds(
- @Param("organizationId") UUID organizationId,@Param("deliveryIds") List<UUID> deliveryIds);
+            @Param("organizationId") UUID organizationId,
+            @Param("deliveryIds") List<UUID> deliveryIds);
 
     @Modifying(clearAutomatically = true)
     @Query(value = """

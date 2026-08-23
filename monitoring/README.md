@@ -123,13 +123,11 @@ into MDC (worker) from the shipped JSON. Both were fixed as part of this change
   per-tenant identifiers (`correlationId`, `organizationId`, `deliveryId`, ...)
   deliberately stay unindexed in the log line body — promoting them to Loki
   labels would blow up index cardinality — and are queried with `| json` /
-  a substring filter instead (see the runbook below).
+  a substring filter instead.
 - **Grafana**: a `Loki` datasource is auto-provisioned alongside `Prometheus`
   (`monitoring/grafana/provisioning/datasources/datasource.yml`), and the new
   **Hookflow — Logs** dashboard below gives a starting point for pivoting on
   `correlationId`/`organizationId`.
-- **Runbook**: `docs/runbooks/trace-webhook-logs.md` — "given a delivery ID,
-  find every log line across api and worker."
 
 ### Grafana Dashboards
 

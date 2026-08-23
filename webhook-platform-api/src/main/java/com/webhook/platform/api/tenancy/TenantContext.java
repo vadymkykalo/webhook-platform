@@ -1,5 +1,7 @@
 package com.webhook.platform.api.tenancy;
 
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
@@ -102,7 +104,11 @@ public final class TenantContext {
         CURRENT.remove();
     }
 
-    /** Runs {@code body} confined to one organization, restoring the previous scope afterwards. */
+    /**
+     * Runs {@code body} confined to one organization, restoring the previous scope afterwards.
+     *
+     * <p>Fails when a transaction is already open — see {@link #requireNoOpenTransaction}.
+     */
     public static void runAs(UUID organizationId, Runnable body) {
         callAs(organizationId, () -> {
             body.run();
@@ -110,16 +116,56 @@ public final class TenantContext {
         });
     }
 
-    /** Calls {@code body} confined to one organization, restoring the previous scope afterwards. */
+    /**
+     * Calls {@code body} confined to one organization, restoring the previous scope afterwards.
+     *
+     * <p>Fails when a transaction is already open — see {@link #requireNoOpenTransaction}.
+     */
     public static <T> T callAs(UUID organizationId, Supplier<T> body) {
         if (organizationId == null) {
             throw new IllegalArgumentException("Cannot enter a null tenant scope; use runAsSystem for system work");
         }
+        requireNoOpenTransaction();
         UUID previous = set(organizationId);
         try {
             return body.get();
         } finally {
             restore(previous);
+        }
+    }
+
+    /**
+     * Rejects a tenant scope entered after the transaction has already opened.
+     *
+     * <p>"Enter the scope outside the transaction" is the most-repeated footgun in ADR-0006, and
+     * until this guard existed it was kept by a comment. Hibernate resolves the tenant once, when
+     * it opens the session, so a scope entered inside an active transaction arrives too late: the
+     * session stays bound to whatever scope was in effect when the transaction began, and every
+     * row written under the new scope is stamped with the old organization. Nothing reports that
+     * — no exception, no constraint violation, just a row in the wrong tenant — which is why this
+     * throws rather than warns. There is no legitimate case for changing tenant mid-transaction,
+     * so there is nothing to carve out.
+     *
+     * <p>The declarative half of the problem was already solved structurally:
+     * {@link SystemTenantAspect} runs at {@code HIGHEST_PRECEDENCE}, so {@code @SystemTenant}
+     * always wraps {@code @Transactional} rather than the other way round. This is the imperative
+     * half.
+     *
+     * <p>{@link #runAsSystem} and {@link #callAsSystem} are deliberately <em>not</em> guarded.
+     * They enter Hibernate's root tenant, for which no predicate is added and no discriminator is
+     * stamped, so entering one inside a transaction cannot put the wrong organization on a row —
+     * and authentication genuinely needs to widen to root from inside whatever scope it is in.
+     *
+     * <p>The fix at a call site is always the same shape: open the scope first and start the
+     * transaction inside it, as {@code IngressService} and {@code TestEndpointService} do on the
+     * two public paths.
+     */
+    private static void requireNoOpenTransaction() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException(
+                    "Tenant scope entered inside an open transaction; Hibernate read the tenant when it "
+                            + "opened the session, so this row would be stamped with the wrong organization. "
+                            + "Enter the scope outside the transaction (ADR-0006).");
         }
     }
 

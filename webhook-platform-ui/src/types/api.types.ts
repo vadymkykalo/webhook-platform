@@ -22,16 +22,17 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   accessToken: string;
-  tokenType: string;
-  expiresIn: number;
+  refreshToken: string;
   emailVerified?: boolean;
 }
+
+export type UserStatus = 'ACTIVE' | 'PENDING_VERIFICATION' | 'DISABLED';
 
 export interface UserResponse {
   id: string;
   email: string;
   fullName: string | null;
-  status: string;
+  status: UserStatus;
 }
 
 export interface CurrentUserResponse {
@@ -58,7 +59,6 @@ export interface ProjectResponse {
   id: string;
   name: string;
   description?: string;
-  organizationId: string;
   schemaValidationEnabled: boolean;
   schemaValidationPolicy: string;
   idempotencyPolicy: string;

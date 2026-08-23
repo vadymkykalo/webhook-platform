@@ -55,7 +55,6 @@ const HOSTILE_NAME = '<img src=x onerror=alert(1)>';
 const PROJECT: ProjectResponse = {
   id: TEST_PROJECT_ID,
   name: HOSTILE_NAME,
-  organizationId: 'org-1',
   schemaValidationEnabled: false,
   schemaValidationPolicy: 'WARN',
   idempotencyPolicy: 'NONE',

@@ -27,8 +27,7 @@ import org.springframework.kafka.support.Acknowledgment;
  * acked.
  *
  * <p>Getting this wrong stalls a partition until a restart, and it was got wrong on the
- * Incoming side for as long as the Outgoing side had it right — see commit {@code 2070d30},
- * and {@code docs/adr/0011-one-attempt-runner-for-both-directions.md}.
+ * Incoming side for as long as the Outgoing side had it right — see commit {@code 2070d30}.
  */
 @Slf4j
 public class BackpressureDispatch {

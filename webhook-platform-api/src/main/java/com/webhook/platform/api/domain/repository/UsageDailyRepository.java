@@ -24,20 +24,25 @@ public interface UsageDailyRepository extends JpaRepository<UsageDaily, UUID> {
      * that runs in its own transaction) to prevent a duplicate row. Returns the number of rows
      * actually inserted: 1 on success, 0 if a row for this project/date already existed (a
      * concurrent aggregation run won the race).
+     *
+     * <p>Native, so Hibernate's {@code @TenantId} discriminator does not reach it and cannot
+     * stamp the row either — see this package's {@code package-info}. {@code organizationId} is
+     * therefore passed explicitly, read off the project being aggregated.
      */
     @Modifying
     @Query(value = """
         INSERT INTO usage_daily (
-            project_id, date, events_count, deliveries_count, successful_deliveries,
+            organization_id, project_id, date, events_count, deliveries_count, successful_deliveries,
             failed_deliveries, dlq_count, incoming_events_count, incoming_forwards_count
         )
         VALUES (
-            :projectId, :date, :eventsCount, :deliveriesCount, :successfulDeliveries,
+            :organizationId, :projectId, :date, :eventsCount, :deliveriesCount, :successfulDeliveries,
             :failedDeliveries, :dlqCount, :incomingEventsCount, :incomingForwardsCount
         )
         ON CONFLICT (project_id, date) DO NOTHING
         """, nativeQuery = true)
     int upsertIfAbsent(
+            @Param("organizationId") UUID organizationId,
             @Param("projectId") UUID projectId,
             @Param("date") LocalDate date,
             @Param("eventsCount") long eventsCount,

@@ -5,6 +5,7 @@ import org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy;
 import org.hibernate.boot.model.naming.Identifier;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -106,6 +107,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Docker job — see {@code scripts/check-test-routing.sh}.
  */
 @Testcontainers
+@Tag("ratchet")
 class EntityMappingParityIntegrationTest {
 
     /**

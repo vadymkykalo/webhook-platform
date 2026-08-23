@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.WorkflowExecution.ExecutionStatus;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
+import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
@@ -39,8 +40,16 @@ public class WorkflowEngine implements DisposableBean {
     private final long defaultNodeTimeoutMs;
     private final int shutdownAwaitSeconds;
 
-    /** Bounded thread pool for per-node timeout enforcement. */
+    /**
+     * Bounded thread pool for per-node timeout enforcement, wrapped so a node runs in the tenant
+     * of the workflow that scheduled it — node executors read endpoints and write deliveries, all
+     * {@code @TenantId} entities, and this pool is built here rather than in {@code AsyncConfig},
+     * so nothing else would give it a scope (ADR-0006).
+     */
     private final ExecutorService nodeTimeoutExecutor;
+
+    /** The same pool, undecorated: {@code nodeTimeoutExecutor} hides its saturation counters. */
+    private final ThreadPoolExecutor nodeTimeoutPool;
 
     private final Map<String, NodeExecutor> executors;
     private final WorkflowExecutionPersistence persistence;
@@ -82,7 +91,8 @@ public class WorkflowEngine implements DisposableBean {
                 new ThreadPoolExecutor.AbortPolicy()
         );
         pool.allowCoreThreadTimeOut(true);
-        this.nodeTimeoutExecutor = pool;
+        this.nodeTimeoutPool = pool;
+        this.nodeTimeoutExecutor = TenantPropagatingTaskDecorator.wrap(pool);
         this.nodeTimeouts = Map.of(
                 "http", httpTimeoutSeconds * 1000L,
                 "slack", slackTimeoutSeconds * 1000L,
@@ -289,7 +299,9 @@ public class WorkflowEngine implements DisposableBean {
                                            JsonNode nodeData, JsonNode input) {
         long timeoutMs = nodeTimeouts.getOrDefault(nodeType, defaultNodeTimeoutMs);
         // Capture depth from calling thread (workflow-* pool) and propagate
-        // to nodeTimeoutExecutor thread — critical for recursion guard in CreateEventNodeExecutor
+        // to nodeTimeoutExecutor thread — critical for recursion guard in CreateEventNodeExecutor.
+        // The tenant crosses the same boundary for the same reason, but that half is the pool's
+        // job: nodeTimeoutExecutor is wrapped in TenantPropagatingTaskDecorator.
         int callerDepth = WorkflowTriggerService.getCurrentDepth();
         Future<StepResult> future;
         try {
@@ -304,8 +316,7 @@ public class WorkflowEngine implements DisposableBean {
         } catch (RejectedExecutionException e) {
             rejectedNodeCounter.increment();
             log.warn("Node execution rejected due to pool saturation (type={}, poolSize={}, queueSize={})",
-                    nodeType, ((ThreadPoolExecutor) nodeTimeoutExecutor).getCorePoolSize(),
-                    ((ThreadPoolExecutor) nodeTimeoutExecutor).getQueue().size());
+                    nodeType, nodeTimeoutPool.getCorePoolSize(), nodeTimeoutPool.getQueue().size());
             return StepResult.failed("Node execution rejected: workflow engine at capacity");
         }
         try {

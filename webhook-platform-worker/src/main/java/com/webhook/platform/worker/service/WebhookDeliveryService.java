@@ -40,8 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>Claiming, admission, sending, classification and finalisation all moved to the Runner;
  * everything specific to how Outgoing stores an Attempt — the {@code claim_token} fence, the
  * FIFO ordering gate, HMAC signing, the {@code delivery_attempts} log, the DLQ notification —
- * moved to {@link OutgoingAttemptStore}. See
- * {@code docs/adr/0011-one-attempt-runner-for-both-directions.md}.
+ * moved to {@link OutgoingAttemptStore}.
  */
 @Service
 @Slf4j

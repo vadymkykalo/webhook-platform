@@ -5,6 +5,8 @@ import com.webhook.platform.api.domain.repository.AuditLogRepository;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
 import com.webhook.platform.api.security.TrustedProxyResolver;
+import com.webhook.platform.api.tenancy.TenantContext;
+import com.webhook.platform.api.tenancy.TenantPropagatingTaskDecorator;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -36,11 +38,19 @@ public class AuditLogAspect {
     private final AuditLogRepository auditLogRepository;
     private final TrustedProxyResolver trustedProxyResolver;
     private final ObjectMapper objectMapper;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "audit-log-writer");
-        t.setDaemon(true);
-        return t;
-    });
+    /**
+     * Deliberately single-threaded and daemon: audit writes are ordered and must never keep the
+     * JVM alive at shutdown. Wrapped so the writer thread inherits the submitting request's tenant
+     * — a hand-built pool gets no {@code TaskDecorator} from {@code AsyncConfig}, and
+     * {@code AuditLog} carries {@code @TenantId}, so an unscoped writer thread would fail on its
+     * first session (ADR-0006).
+     */
+    private final ExecutorService executor = TenantPropagatingTaskDecorator.wrap(
+            Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "audit-log-writer");
+                t.setDaemon(true);
+                return t;
+            }));
 
     public AuditLogAspect(AuditLogRepository auditLogRepository, TrustedProxyResolver trustedProxyResolver) {
         this.auditLogRepository = auditLogRepository;
@@ -77,12 +87,16 @@ public class AuditLogAspect {
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             userId = jwtAuth.getUserId();
             orgId = jwtAuth.getOrganizationId();
-        } else if (auth instanceof ApiKeyAuthenticationToken) {
-            // API Key auth — resolve orgId from method args (organizationId parameter)
-            orgId = extractOrganizationId(joinPoint);
+        } else if (auth instanceof ApiKeyAuthenticationToken apiKeyAuth) {
+            orgId = apiKeyAuth.getOrganizationId();
         }
 
-        // Fallback: if orgId is still null, try extracting from method args
+        // Not dead code, and not a fallback for the two branches above: it exists for the one
+        // audited method that legitimately takes the organization as a parameter —
+        // MembershipService.acceptInvite, which is @SystemTenant because the accepting user's
+        // ambient tenant is a *different* organization, so neither the token nor TenantContext
+        // names the organization the invite belongs to. Everywhere else this returns null,
+        // because ServiceTenantParameterTest forbids the parameter it looks for.
         if (orgId == null) {
             orgId = extractOrganizationId(joinPoint);
         }
@@ -109,23 +123,38 @@ public class AuditLogAspect {
     public void saveAuditLog(String action, String resourceType, UUID resourceId,
                               UUID userId, UUID orgId, String status, String errorMessage,
                               int durationMs, String clientIp, String details) {
+        // The writer thread already inherits the submitting request's scope, but the row's
+        // organization is not always the caller's ambient one: acceptInvite is @SystemTenant and
+        // names its organization in a parameter. So state it rather than inherit it.
+        // Unauthenticated actions (login, register, password reset) genuinely have none and are
+        // written under the SYSTEM sentinel — the nil UUID, which matches no real organization,
+        // so a tenant-scoped reader sees them no more than it did before.
+        UUID rowTenant = orgId != null ? orgId : TenantContext.SYSTEM;
         try {
-            AuditLog entry = AuditLog.builder()
-                    .action(action)
-                    .resourceType(resourceType)
-                    .resourceId(resourceId)
-                    .userId(userId)
-                    .organizationId(orgId)
-                    .status(status)
-                    .errorMessage(errorMessage)
-                    .durationMs(durationMs)
-                    .clientIp(clientIp)
-                    .details(details)
-                    .build();
-            auditLogRepository.save(entry);
+            TenantContext.runAs(rowTenant, () -> persist(action, resourceType, resourceId, userId, rowTenant,
+                    status, errorMessage, durationMs, clientIp, details));
         } catch (Exception e) {
-            log.warn("Failed to save audit log: {}", e.getMessage());
+            // Audit writes must not break the audited call, but swallowing the message alone is
+            // how a platform-wide audit outage stayed invisible — keep the stack trace.
+            log.warn("Failed to save audit log: action={}, organizationId={}", action, orgId, e);
         }
+    }
+
+    private void persist(String action, String resourceType, UUID resourceId,
+                         UUID userId, UUID orgId, String status, String errorMessage,
+                         int durationMs, String clientIp, String details) {
+        auditLogRepository.save(AuditLog.builder()
+                .action(action)
+                .resourceType(resourceType)
+                .resourceId(resourceId)
+                .userId(userId)
+                .organizationId(orgId)
+                .status(status)
+                .errorMessage(errorMessage)
+                .durationMs(durationMs)
+                .clientIp(clientIp)
+                .details(details)
+                .build());
     }
 
     private String resolveResourceType(Auditable auditable, ProceedingJoinPoint joinPoint) {

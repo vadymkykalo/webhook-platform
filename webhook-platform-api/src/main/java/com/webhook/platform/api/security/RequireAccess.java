@@ -16,10 +16,20 @@ import java.lang.annotation.Target;
  * outbound request from the platform — because the guard was an imperative call somebody had
  * not written, and nothing anywhere said it was missing. See ADR-0006.
  *
- * <p>Method-level wins over class-level. The corresponding
- * {@code auth.requireWriteAccess()} / {@code requireOwnerAccess()} calls stay in the handlers
- * as defence in depth: this annotation makes the requirement visible and omission loud, it does
- * not make the imperative check redundant.
+ * <p>Method-level wins over class-level.
+ *
+ * <h2>And the {@code auth.requireWriteAccess()} call in the handler?</h2>
+ *
+ * <p>It stays, and ADR-0015 is why — but not for the reason the earlier wording here gave. It is
+ * not a second opinion: {@link ScopeEnforcementInterceptor} calls the same {@link RbacUtil} the
+ * handler does, so the two cannot disagree about what WRITE means. They can only disagree about
+ * whether they run, and the interceptor is now the more reliable of the two — it cannot be
+ * forgotten, and {@code AccessLevelInterceptorCoverageTest} proves it is reached.
+ *
+ * <p>So the imperative call is redundant as a check. Deleting 79 of them is still the wrong
+ * trade: the change is large, it is on the authorization path, and it buys tidiness. Write the
+ * annotation on a new handler and copy the imperative call from its neighbours; do not start a
+ * campaign in either direction.
  *
  * <p>{@code MutatingHandlerAccessDeclarationTest} fails the build when a state-changing handler
  * carries neither this annotation nor a documented exemption.

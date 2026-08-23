@@ -212,7 +212,6 @@ kubectl delete pvc -l app.kubernetes.io/instance=hookflow
 
 - **[Self-Hosted Guide](../../../docs/SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, TLS, monitoring
 - **[Operations Guide](../../../docs/OPERATIONS.md)** — quick start, scaling, common issues
-- **[Runbooks](../../../docs/runbooks/)** — SLOs, Kafka lag, DB issues, DR, secret rotation
 
 ## Support
 

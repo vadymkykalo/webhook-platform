@@ -3,6 +3,7 @@ package com.webhook.platform.api.domain;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * needs no database, so it must run in the no-Docker unit job — see
  * {@code scripts/check-test-routing.sh}.
  */
+@Tag("ratchet")
 class SchemaRetryLadderDefaultsTest {
 
     /** {@code retry_delays TEXT [NOT NULL] DEFAULT '60,300,...'} */

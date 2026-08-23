@@ -28,8 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * This is what replaces DELETE-based retention for these two tables:
  * {@code DROP TABLE <partition>} is O(1) — it unlinks the partition's files — instead
- * of the O(rows) scan-and-delete the old {@code DataRetentionService} jobs did. See
- * docs/runbooks/partition-high-volume-tables.md.
+ * of the O(rows) scan-and-delete the old {@code DataRetentionService} jobs did.
  * <p>
  * {@code deliveries} and {@code incoming_events} are intentionally NOT partitioned by
  * this service (or the migrations it depends on) — both are the target of a foreign
@@ -37,7 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@code incoming_forward_attempts.incoming_event_id}), and Postgres requires a
  * partitioned table's unique/PK indexes to include the partition key, which would
  * force the partition key onto the child tables too (composite FK) and touch both
- * JPA entity copies. See the runbook for the deferred follow-up plan.
+ * JPA entity copies.
  */
 @Slf4j
 @Service

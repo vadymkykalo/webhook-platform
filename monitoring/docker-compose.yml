@@ -110,7 +110,7 @@ services:
   # shipped or indexed them: docker-compose.prod.yml just sets LOG_LEVEL and logs go
   # to stdout with no collector, so a restarted/rescheduled container's history was
   # simply gone. Loki + Promtail is the natural fit next to the Prometheus/Grafana
-  # already here. See docs/runbooks/trace-webhook-logs.md.
+  # already here.
   loki:
     image: grafana/loki:3.0.0
     container_name: hookflow-loki

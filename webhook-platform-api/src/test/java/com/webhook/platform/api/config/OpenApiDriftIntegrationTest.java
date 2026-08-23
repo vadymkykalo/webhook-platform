@@ -2,6 +2,7 @@ package com.webhook.platform.api.config;
 
 import com.webhook.platform.api.AbstractIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
@@ -57,7 +58,22 @@ import static org.assertj.core.api.Assertions.fail;
  * </pre>
  * then review and commit the resulting {@code openapi.yaml}.
  */
-@TestPropertySource(properties = "swagger.enabled=true")
+// Three properties, three different jobs, and all three have to be on or this test
+// asserts something other than the real spec: swagger.enabled opens the path in
+// SecurityConfig, springdoc.api-docs.enabled registers the handler at all, and
+// springdoc.swagger-ui.enabled is what OpenApiConfig is @ConditionalOnProperty on — without
+// it springdoc serves its own bare default ("OpenAPI definition", v0, no securitySchemes)
+// and every difference is reported as drift.
+//
+// The last two come from the SWAGGER_ENABLED environment variable in application.yml, which
+// .env sets to false and which `make` exports into any maven it runs — so before they were
+// pinned here, `make ratchets` failed and a bare `mvn test` passed, on the same commit.
+@TestPropertySource(properties = {
+        "swagger.enabled=true",
+        "springdoc.api-docs.enabled=true",
+        "springdoc.swagger-ui.enabled=true"
+})
+@Tag("ratchet")
 class OpenApiDriftIntegrationTest extends AbstractIntegrationTest {
 
     /** Cap on reported differences, so a wholesale regeneration doesn't dump thousands of lines. */

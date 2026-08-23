@@ -6,7 +6,6 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.security.ApiKeyAuthenticationToken;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.JwtAuthenticationToken;
-import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -47,7 +46,6 @@ public class QuotaEnforcementAspect {
 
     @Before("@annotation(requireQuota)")
     public void enforceQuota(JoinPoint joinPoint, RequireQuota requireQuota) {
-        UUID organizationId = TenantContext.require();
         if (!entitlementService.isBillingEnabled()) return;
 
         UUID orgId = resolveOrganizationId(joinPoint);
@@ -80,7 +78,6 @@ public class QuotaEnforcementAspect {
 
     @Before("@annotation(requireFeature)")
     public void enforceFeature(JoinPoint joinPoint, RequireFeature requireFeature) {
-        UUID organizationId = TenantContext.require();
         if (!entitlementService.isBillingEnabled()) return;
 
         UUID orgId = resolveOrganizationId(joinPoint);
@@ -91,7 +88,7 @@ public class QuotaEnforcementAspect {
         }
 
         String feature = requireFeature.value();
-        if (!entitlementService.hasFeature( feature)) {
+        if (!entitlementService.hasFeature(feature)) {
             throw new ForbiddenException(
                     "Feature '" + feature + "' is not available on your current plan. Please upgrade.");
         }

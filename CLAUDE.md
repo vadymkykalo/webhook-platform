@@ -1,31 +1,53 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository.
+
+Java 17 + Spring Boot 3.5 (Maven reactor: `common`, `api`, `worker`, `cli`), React + Vite +
+TypeScript in `webhook-platform-ui`. `api` owns all Flyway migrations. README.md has the
+architecture and the sequence diagrams for both delivery pipelines.
 
 ## Commands
 
-Java 17 + Spring Boot 3.5 (Maven reactor), React + Vite + TypeScript in `webhook-platform-ui`.
-
-`make help` lists every target. Non-obvious bits: `make up` also creates `.env` from `.env.dist` and creates the Kafka topics — don't do either by hand; `make dev-api` / `dev-worker` / `dev-ui` rebuild one service with cache and restart it, which is the fast inner loop once the stack is up.
+`make help` lists every target. `make up` also creates `.env` from `.env.dist` and the Kafka
+topics — don't do either by hand. `make dev-api` / `dev-worker` / `dev-ui` rebuild one service and
+restart it: the fast inner loop once the stack is up.
 
 ```bash
 mvn clean compile -B                # what CI compiles with
-mvn package -DskipTests -B          # build all module jars
 make test-ui                        # frontend unit tests (Vitest)
-npm run lint && npm run typecheck    # in webhook-platform-ui/, both gate CI
+npm run lint && npm run typecheck   # in webhook-platform-ui/, both gate CI
 ```
 
-For running or writing Java tests, use the `backend-tests` skill — test class names decide which CI job a test lands in, and `scripts/check-test-routing.sh` fails the build when a Docker-dependent test is named so it routes to the no-Docker unit job.
+For running or writing Java tests, use the `backend-tests` skill — the test class name decides
+which CI job the test lands in, and `scripts/check-test-routing.sh` fails the build on a
+Docker-dependent test named so it routes to the no-Docker unit job.
 
-### Two checks that fail CI for reasons that aren't in the diff
+## Checks that fail CI for reasons that aren't in the diff
 
-- **`openapi.yaml` is committed and semantically diffed** against the spec springdoc serves, by `OpenApiDriftIntegrationTest`. After an intentional API change, regenerate rather than hand-edit:
-  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`, then review and commit the file.
-- **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version *and* appVersion), `webhook-platform-ui/package.json`, and all three SDK manifests under `sdks/`. Never bump one by hand: `make version-set VERSION=2.4.0`, and `make version-check` runs the same drift check CI does.
+Many are *ratchets*: they demand the known exception list stop growing, not that the codebase be
+perfect. Adding to a documented-exemption list is a review decision with a stated reason, never a
+way to get green.
+
+**`make ratchets` is the live set** — every guard carries `@Tag("ratchet")`, so ask the build
+rather than a list here. Each failure names its remedy. Three whose remedy nobody guesses:
+
+- **`openapi.yaml` is committed and semantically diffed** against the spec springdoc serves. After
+  an intentional API change, regenerate rather than hand-edit:
+  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
+  A backend DTO change then also lands in the UI: `npm run types:generate` regenerates
+  `src/types/api.generated.ts` (`make types-check` mirrors CI), and `src/types/api.contract.ts`
+  fails the typecheck until the hand-written mirror in `api.types.ts` agrees with it again.
+- **The version lives in seven places** — reactor pom, `deploy/helm/hookflow/Chart.yaml` (version
+  *and* appVersion), `webhook-platform-ui/package.json`, all three SDK manifests under `sdks/`.
+  Never bump one by hand: `make version-set VERSION=2.4.0`; `make version-check` mirrors CI.
+- **Per-module JaCoCo ratchets** bind to `verify`, and CI runs them only after merging the unit
+  *and* integration exec files. `mvn verify` over a partial test selection trips them against
+  partial data — use `mvn test` for ordinary work.
 
 ## Git workflow (GitFlow)
 
-This repo follows GitFlow. Respect it in every change: **never commit or push directly to `main`**, and never open a feature PR against `main`.
+Two rules carry the rest: **never commit or push directly to `main`**, and **never open a
+`feature/*` PR against `main`**.
 
 | Branch | Cut from | Merges into | Purpose |
 |--------|----------|-------------|---------|
@@ -35,79 +57,49 @@ This repo follows GitFlow. Respect it in every change: **never commit or push di
 | `release/*` | `develop` | `main` **and** back into `develop` | Release preparation, version bumps |
 | `hotfix/*` | `main` | `main` **and** back into `develop` | Production fixes |
 
-Rules that follow from the table and are easy to get wrong:
+- Branch as `feature/<short-kebab-description>` from an up-to-date `develop`. A hotfix branches
+  from `main`, not `develop` — branching it from `develop` drags unreleased work into production.
+- Release: `release/1.x.0` from `develop` → `make version-set VERSION=…` → PR to `main` → tag
+  `v1.x.0` after merge → merge back into `develop`.
+- **Anything that lands on `main` must be merged back into `develop`**, or the fix disappears at
+  the next release. That back-merge is local (`git checkout develop && git merge origin/main`),
+  not a PR.
+- Merge style: `feature/*` → `develop` is **squash** by default (`--no-ff` when the branch carries
+  two or more separately-meaningful commits). `release/*` / `hotfix/*` → `main` is **a merge
+  commit — never squash, never rebase**: both rewrite the branch into new SHAs with no shared
+  ancestry, so `main` and `develop` lose their common base and every later merge conflicts on
+  byte-identical files. This has happened twice; a ruleset on `main` now blocks squash and rebase.
 
-- Start work from an up-to-date `develop` (`git checkout develop && git pull`), branch as `feature/<short-kebab-description>`.
-- Anything merged to `main` must also be merged back into `develop`, or the fix silently disappears at the next release.
-- A hotfix branches from `main`, not from `develop` — branching it from `develop` drags unreleased work into production.
-- PRs need at least one approval and green CI.
-- **Merge style depends on the target.** `feature/*` → `develop`: squash, so a
-  feature's work-in-progress commits land as one. `release/*` and `hotfix/*` →
-  `main`: **a merge commit, never squash or rebase.** Squashing collapses the
-  branch into a new SHA with no shared ancestry, so `main` and `develop` stop
-  having a common base — the back-merge then conflicts on every file either side
-  has touched, including files that are byte-identical. Release 2.3.0 hit exactly
-  this: PR #100 was squash-merged, and the next release's merge reported 19
-  conflicts of which 12 were between identical files.
-- Release: `release/1.x.0` from `develop` → bump versions → PR to `main` → tag `v1.x.0` after merge → merge back to `develop`.
-
-Commit messages use conventional prefixes: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`. See `CONTRIBUTING.md` for the full policy.
-
-## Working notes and decisions
-
-Two places, with different lifetimes — do not conflate them:
-
-- **`docs/adr/`** is tracked and permanent. An ADR records a decision that is load-bearing:
-  one a future reader would otherwise re-litigate, because the code shows *what* was built
-  and not *why the obvious alternative was rejected*. `docs/adr/README.md` has the index and
-  the format. Do not re-open a decision an ADR settles without saying so in the ADR.
-- **`.claude/features/`** is gitignored scratch: one file per piece of work that spans
-  sessions or needs decisions settled before code. It says what we're doing and where we are;
-  the ADR says why. **A feature doc is deleted when its work lands** — whatever is still true
-  moves into the ADR first. `.claude/features/README.md` has the flow and `TEMPLATE.md` the
-  shape. Being gitignored, those two exist only in a working copy that has them; this
-  paragraph is what makes the convention discoverable at all.
-
-## Architecture
-
-Five modules: `common` (shared DTOs, `KafkaTopics`, crypto/signature/PII utils), `api` (REST + ingress + tunnel hub + outbox publisher, **owns all Flyway migrations**), `worker` (Kafka consumers, HTTP delivery/forwarding, retries), `cli` (picocli), `ui`.
-
-API and worker each keep **their own JPA entity + repository copies** of the shared tables (`Event`, `Delivery`, `Endpoint`, `IncomingEvent`, …). Any schema change touches both sides plus a migration — see the `db-migration` skill before editing an entity or `db/migration`. `EntityMappingParityIntegrationTest` fails the build when a column of a shared table goes unmapped by either side; a deliberate omission goes in its `DELIBERATELY_UNMAPPED` list with a reason. ADR-0002 has the rationale.
-
-### Two delivery pipelines
-
-Outgoing (`/api/v1/projects/{id}/events`) and incoming (`/ingress/{token}`) both run through the **same transactional outbox** — nothing is published to Kafka inside a business transaction. `OutboxPublisherService` is a scheduled poller, ShedLock-guarded, with a per-project fairness cap. README.md has the sequence diagrams for both flows.
-
-All topic names live in `KafkaTopics`; adding one also means adding it to the topic-creation step in the `Makefile`.
-
-FIFO ordering is not a Kafka guarantee here: `SequenceGeneratorService` (API) stamps sequence numbers and `OrderingBufferService` (worker) buffers out-of-order deliveries per endpoint in Redis, with `ordering_cursors` in Postgres as the durable fallback.
-
-### Tunnel
-
-CLI ↔ `/ws/tunnel` bridges a public `POST /tunnel/{slug}` to the developer's `localhost:PORT` (README has the diagram). `RedisTunnelCoordinator` exists because a tunnel's WebSocket may be held by a different API instance than the one receiving the request.
-
-### Auth & tenancy
-
-Requests carry either a JWT (dashboard/CLI) or `X-API-Key` (server-to-server); `JwtAuthenticationFilter` / `ApiKeyAuthenticationFilter` both resolve into a single `AuthContext` record, injected into controllers as a plain method parameter via `AuthContextArgumentResolver`. Enforcement layers:
-
-- `AuthContext.requireWriteAccess()` / `requireOwnerAccess()` — RBAC (Owner/Developer/Viewer/API_KEY).
-- `@RequireScope(ApiKeyScope…)` — API-key scope, checked by `ScopeEnforcementInterceptor`.
-- `@RequireOrgAccess` — `OrgAccessAspect` compares the `{orgId}` path variable against the token's org and throws 403 on mismatch.
-- `AuthContext.validateProjectAccess(projectId)` — an API key may only touch its own project.
-
-Org ownership is **not** on that list, because it is no longer something an endpoint does. `TenantContextFilter` puts the caller's organization into `TenantContext`, and `@TenantId` makes Hibernate add `organization_id = <current tenant>` to every query — `findById` included. A service method that takes an `organizationId` fails `ServiceTenantParameterTest`. ADR-0006 has the whole shape; three things follow from it that are easy to trip over:
-
-- **Anything without a request needs a scope of its own.** `@SystemTenant` on a scheduler or consumer; `TenantContext.runAs(orgId, …)` on a public path after it resolves whose data it is handling. No scope is a 500, deliberately.
-- **Enter the scope outside the transaction.** Hibernate reads the tenant when it opens the session, so a scope entered inside one is too late and the row gets the wrong organization stamped on it.
-- **Native queries are exempt from the filter** and must carry their own `organization_id` predicate unless they are system paths — see the repository package's `package-info.java`.
-
-New tenant-scoped endpoints must go through the checks above; don't hand-roll org checks. Public paths are whitelisted in `SecurityConfig` (`/ingress/**`, `/tunnel/**`, `/hook/**`, `/ws/tunnel`, auth + billing webhooks).
-
-Errors: throw `NotFoundException` / `ForbiddenException` / `ConflictException` / `UnauthorizedException` / `QuotaExceededException` — `GlobalExceptionHandler` maps them to the shared `ErrorResponse`.
-
-Secrets (endpoint signing secrets, source secrets, destination auth) are AES-256-GCM encrypted with versioned keys (`EncryptionKeyRegistry`, `EncryptionKeyRotationService`); never persist them in plaintext.
+`main` requires a PR with green checks and merge commits only; reviews are a convention, not a
+gate. `develop` blocks only force-push and deletion. Commit prefixes: `feat:`, `fix:`, `docs:`,
+`test:`, `refactor:`, `chore:` (`CONTRIBUTING.md` has the policy).
 
 ## Conventions
 
-- Config is env-var-driven: every variable is documented in `.env.dist`, consumed through `docker-compose.yml` into `application.yml`. Add new settings there rather than hardcoding, and keep `ProductionSafetyValidator` / `SecurityConfigValidator` in mind — they fail startup on unsafe production config.
-- Runbooks and operational procedures: `docs/OPERATIONS.md`, `docs/runbooks/`.
+- **New behaviour is written test-first** — a failing test stating the expected result, then the
+  implementation (`tdd` skill for the loop, `backend-tests` for the class name). Refactors,
+  `docs:` and `chore:` are exempt.
+- **`CONTEXT.md` is the domain model** — Event, Delivery, Forward, Claim, Attempt, Deferral,
+  Source, Destination, each with an `_Avoid_:` line of near-synonyms not to use. Read it before
+  naming a class, column, metric or UI string. Where the code and `CONTEXT.md` disagree, one of
+  them is a bug — it is not a licence to pick either word.
+- **A schema change touches three places**: the JPA entity in `api`, its copy in `worker`, and a
+  migration. Use the `db-migration` skill; a column left unmapped on either side fails the build.
+- **Never hand-roll an org check.** `@TenantId` makes Hibernate scope every query to the caller's
+  organization, `findById` included; a service method taking an `organizationId` fails the build.
+  What that leaves you responsible for — a scope for work without a request, entering it outside
+  the transaction, native queries, your own thread pools — is enforced by the ratchets, which say
+  what to do when they fail.
+- **A fix to attempt behaviour belongs in `AttemptRunner`, not in one direction.** Read its
+  javadoc first: it enumerates invariants that were each once a real duplicate-delivery or
+  stuck-throttle bug. Same for `RetryLadderDefaults` — the two directions' ladders differ on
+  purpose; don't "fix" that into agreement.
+- Config is env-var-driven: document every variable in `.env.dist`, consumed through
+  `docker-compose.yml` into `application.yml`. `ProductionSafetyValidator` /
+  `SecurityConfigValidator` fail startup on unsafe production config.
+- `.claude/features/` (proposals — **not** work orders) and `.claude/tasks/` (one file per branch,
+  the only one that authorizes writing code) are gitignored scratch; each has a README with its
+  format. A task file is deleted when its branch merges.
+- `webhook-platform-ui/CLAUDE.md` carries the frontend conventions and loads automatically in that
+  directory — add UI rules there, not here.
+- Operational procedures: `docs/OPERATIONS.md`.

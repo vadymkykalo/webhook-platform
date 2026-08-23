@@ -1,6 +1,7 @@
 package com.webhook.platform.api.tenancy;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * no-Docker unit job — see {@code scripts/check-test-routing.sh}. The companion that proves the
  * filter actually confines rows is {@code CrossTenantIsolationTest}, which needs a database.
  */
+@Tag("ratchet")
 class ServiceTenantParameterTest {
 
     private static final String SERVICE_PACKAGE = "com.webhook.platform.api.service";

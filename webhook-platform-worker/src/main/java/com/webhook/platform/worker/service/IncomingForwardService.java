@@ -45,8 +45,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * should not be attempted at all.
  *
  * <p>Before that move this class and {@link WebhookDeliveryService} were near-copies, and
- * commit {@code 2070d30} had to hand-port four separate fixes from one to the other. See
- * {@code docs/adr/0011-one-attempt-runner-for-both-directions.md}.
+ * commit {@code 2070d30} had to hand-port four separate fixes from one to the other.
  */
 @Service
 @Slf4j

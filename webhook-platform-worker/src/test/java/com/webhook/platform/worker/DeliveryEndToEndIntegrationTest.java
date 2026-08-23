@@ -100,6 +100,24 @@ class DeliveryEndToEndIntegrationTest {
     private static final String TEST_ENCRYPTION_KEY = "e2e-test-encryption-key-please-ignore";
     private static final String TEST_ENCRYPTION_SALT = "e2e-test-salt-0123456789abcdef";
 
+    /**
+     * How long {@link #retryClaimedThenAbandoned_isRecoveredNotStranded()} holds the response to
+     * the attempt it is about to abandon.
+     *
+     * <p>This is the width of that test's only race. {@code attemptStarting} increments
+     * attempt_count <em>before</em> the request goes out, so the clock starts when the test
+     * observes attempt_count = 2 and runs out when the held response lands and finalizes the
+     * delivery. Inside it the test has to notice that increment (150ms poll), backdate the row,
+     * and let the stuck sweep (500ms interval) reclaim it - about a second of work.
+     *
+     * <p>It was 4s, which is only about three seconds of slack, and a loaded CI runner ate it:
+     * the response won, the delivery went straight to SUCCESS, and the assertion waiting for the
+     * sweep to hand it back as PENDING timed out against a row that was never recovered because
+     * it had never needed recovering. The number is slack for a stalled runner, nothing more -
+     * no assertion here is about how long a response takes.</p>
+     */
+    private static final int ABANDONED_ATTEMPT_HOLD_MS = 20_000;
+
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("webhook_e2e")
@@ -408,8 +426,9 @@ class DeliveryEndToEndIntegrationTest {
 
         createEndpoint(endpointId, path);
         createEvent(eventId, "{\"n\":1}");
-        // timeoutSeconds=10 comfortably covers the deliberately slow second attempt below.
-        createPendingDelivery(deliveryId, eventId, endpointId, 5, "1", 10);
+        // timeoutSeconds has to outlast ABANDONED_ATTEMPT_HOLD_MS, or the client aborts the
+        // held attempt instead of letting its late response land.
+        createPendingDelivery(deliveryId, eventId, endpointId, 5, "1", 30);
 
         wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("stuck")
                 .whenScenarioStateIs(com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED)
@@ -420,7 +439,7 @@ class DeliveryEndToEndIntegrationTest {
         // right after it, before this response is ever acted on.
         wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("stuck")
                 .whenScenarioStateIs("claimed-attempt-in-flight")
-                .willReturn(aResponse().withStatus(200).withFixedDelay(4000))
+                .willReturn(aResponse().withStatus(200).withFixedDelay(ABANDONED_ATTEMPT_HOLD_MS))
                 .willSetStateTo("up"));
         wireMock.stubFor(WireMock.post(urlEqualTo(path)).inScenario("stuck")
                 .whenScenarioStateIs("up")
@@ -445,6 +464,11 @@ class DeliveryEndToEndIntegrationTest {
         await().atMost(Duration.ofSeconds(15)).pollInterval(Duration.ofMillis(150))
                 .untilAsserted(() -> assertEquals(2, reload(deliveryId).getAttemptCount()));
 
+        // Anchor for the wait at the end of the test. Taken here rather than at the request
+        // itself: this is at or after the moment WireMock started holding the response, so
+        // anchor + ABANDONED_ATTEMPT_HOLD_MS is never earlier than the response actually lands.
+        long heldResponseAnchor = System.currentTimeMillis();
+
         // Simulate "the worker that claimed this retry got hard-killed": backdate the claim so
         // it looks abandoned to StuckDeliveryRecoveryService (threshold configured to 1 minute
         // above), without waiting real wall-clock time.
@@ -461,27 +485,34 @@ class DeliveryEndToEndIntegrationTest {
 
         // ... and the normal retry ladder must pick the recovered row back up and complete it
         // (via a third, independent claim+attempt - the abandoned second attempt is still
-        // sitting inside its 4s-delayed WireMock call at this point).
+        // sitting inside its held WireMock call at this point).
         await().atMost(Duration.ofSeconds(50)).pollInterval(Duration.ofMillis(200))
                 .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.SUCCESS, reload(deliveryId).getStatus()));
 
         Instant succeededAtFromThirdAttempt = reload(deliveryId).getSucceededAt();
         assertNotNull(succeededAtFromThirdAttempt);
 
-        // The abandoned second attempt's WireMock response (4s fixed delay, state
-        // "claimed-attempt-in-flight") lands well after this point and also resolves to 200 -
-        // its handleResponse/markAsSuccess call is a late, stale write for a delivery some
+        // The abandoned second attempt's WireMock response (held for ABANDONED_ATTEMPT_HOLD_MS,
+        // state "claimed-attempt-in-flight") lands well after this point and also resolves to
+        // 200 - its handleResponse/markAsSuccess call is a late, stale write for a delivery some
         // other path has already finalized. Without the guard,
         // markAsSuccess had no "fresh.getStatus() == PROCESSING" guard and would blindly
         // overwrite the row (new succeededAt, same SUCCESS status) regardless of what the
-        // third attempt already committed. Waiting past the 4s delay and asserting succeededAt
+        // third attempt already committed. Waiting past that hold and asserting succeededAt
         // is untouched is a deterministic discriminator for that guard - unlike racing a
         // reactive .timeout() against DB write latency, this doesn't depend on incidental
         // timing to flip.
-        try {
-            TimeUnit.SECONDS.sleep(6);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        //
+        // Anchored rather than a fixed sleep: how long the third attempt took to finalize the
+        // delivery is not fixed, so counting from here could stop short of the hold.
+        long waitPastHoldMs = heldResponseAnchor + ABANDONED_ATTEMPT_HOLD_MS + 2_000
+                - System.currentTimeMillis();
+        if (waitPastHoldMs > 0) {
+            try {
+                TimeUnit.MILLISECONDS.sleep(waitPastHoldMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         Delivery finalDelivery = reload(deliveryId);

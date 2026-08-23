@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-23
+
 ### Changed
 - Event intake decides before it writes. `IntakePlanner` is a pure function turning the
   matching Subscriptions, the rules that fired and the project's fanout entitlement into an
@@ -92,8 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the whole lifecycle rather than of one method. `AttemptRunner` now owns the order of
   operations and the fences; each direction supplies an `AttemptStore` adapter for how it
   records Attempts. `WebhookDeliveryService` went from 922 lines to 263 and
-  `IncomingForwardService` from 760 to 275. See
-  `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+  `IncomingForwardService` from 760 to 275.
 - A Delivery whose URL the platform is not allowed to send to no longer spends a
   concurrency permit and a rate-limit token on being rejected: URL validation moved ahead
   of admission. The permit accounting for failures that happen after admission — a
@@ -128,7 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the worst-case fit against the escalation hard cap. The two directions'
   defaults are now declared once, and stay deliberately different: outgoing gets
   `60,300,900,3600,21600,86400` over 7 attempts, incoming `60,300,900,3600,21600`
-  over 5. See `docs/adr/0011-one-attempt-runner-for-both-directions.md`.
+  over 5.
 - Retry ladders are validated when written. `POST`/`PUT` on a subscription or an
   incoming destination now returns `400` for a malformed `retryDelays` or an out
   of range `maxAttempts`, with a message naming the field and the offending tier.
@@ -450,7 +451,9 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.0.0...v2.1.0
