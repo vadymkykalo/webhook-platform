@@ -8,6 +8,7 @@ import {
   GitBranch,
   Key,
   Package,
+  RefreshCw,
   Shield,
   Terminal,
   Workflow,
@@ -25,6 +26,7 @@ export type SectionId =
   | 'getting-started'
   | 'authentication'
   | 'webhook-security'
+  | 'retries'
   | 'incoming-webhooks'
   | 'rules-engine'
   | 'schema-registry'
@@ -46,6 +48,7 @@ export const GUIDE_SECTIONS: SectionMeta[] = [
   { id: 'getting-started', labelKey: 'docsPage.sections.gettingStarted', icon: Zap },
   { id: 'authentication', labelKey: 'docsPage.sections.authentication', icon: Key },
   { id: 'webhook-security', labelKey: 'docsPage.sections.webhookSecurity', icon: Shield },
+  { id: 'retries', labelKey: 'docsPage.sections.retries', icon: RefreshCw },
   { id: 'incoming-webhooks', labelKey: 'docsPage.sections.incomingWebhooks', icon: ArrowDownToLine },
   { id: 'rules-engine', labelKey: 'docsPage.sections.rulesEngine', icon: GitBranch },
   { id: 'schema-registry', labelKey: 'docsPage.sections.schemaRegistry', icon: FileCheck },

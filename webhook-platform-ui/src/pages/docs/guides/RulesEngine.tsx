@@ -1,7 +1,51 @@
 import { useTranslation } from 'react-i18next';
-import { ArrowRight } from 'lucide-react';
-import { CodeBlock, DefinitionList, DocsArticle, DocsTitle, Note, Section } from '../primitives';
+import {
+  CodeBlock,
+  DefinitionList,
+  Diagram,
+  DocsArticle,
+  DocsTitle,
+  Note,
+  Section,
+  SketchBox,
+  SketchEdge,
+  SketchText,
+  StepRow,
+} from '../primitives';
 import { rulesSample } from '../samples';
+
+/**
+ * The ordering fact, which is the whole reason DROP behaves the way it does:
+ * rules are evaluated before subscriptions are looked up, so a dropped event
+ * has no deliveries to cancel — none were ever created.
+ */
+function RuleOrderDiagram() {
+  const { t } = useTranslation();
+
+  return (
+    <Diagram
+      viewBox="0 0 440 260"
+      label={t('docsPage.rulesEngine.diagAlt')}
+      caption={t('docsPage.rulesEngine.diagCaption')}
+    >
+      <SketchEdge d="M220,62 V84" />
+      <SketchEdge d="M220,138 V160" />
+      <SketchEdge d="M304,112 H326" tone="halt" />
+      <SketchText x={315} y={84} size={12} mono tone="halt">
+        DROP
+      </SketchText>
+
+      <SketchBox x={136} y={16} w={168} label={t('docsPage.concepts.event')} />
+      <SketchBox x={136} y={90} w={168} label={t('docsPage.rulesEngine.diagRules')} />
+      <SketchBox x={330} y={90} w={106} label={t('docsPage.rulesEngine.diagStop')} tone="halt" />
+      <SketchBox x={136} y={166} w={168} label={t('docsPage.rulesEngine.diagSubs')} tone="ok" />
+
+      <SketchText x={220} y={246} size={13}>
+        {t('docsPage.rulesEngine.diagFoot')}
+      </SketchText>
+    </Diagram>
+  );
+}
 
 export default function RulesEngine() {
   const { t } = useTranslation();
@@ -18,20 +62,8 @@ export default function RulesEngine() {
       <DocsTitle title={t('docsPage.rulesEngine.title')} lede={t('docsPage.rulesEngine.subtitle')} />
 
       <Section title={t('docsPage.rulesEngine.howItWorks')}>
-        <ol className="flex flex-col gap-3 lg:flex-row">
-          {steps.map((step, i) => (
-            <li key={step.label} className="flex flex-1 items-center gap-3">
-              <div className="flex-1 rounded-lg border border-rail bg-card p-3">
-                <div className="mono-label mb-1">{i + 1}</div>
-                <div className="text-sm font-medium">{step.label}</div>
-                <div className="text-xs text-muted-foreground">{step.desc}</div>
-              </div>
-              {i < steps.length - 1 && (
-                <ArrowRight className="hidden h-4 w-4 flex-shrink-0 text-muted-foreground lg:block" aria-hidden />
-              )}
-            </li>
-          ))}
-        </ol>
+        <RuleOrderDiagram />
+        <StepRow steps={steps} />
         <Note label={t('docsPage.rulesEngine.importantLabel')}>{t('docsPage.rulesEngine.importantBody')}</Note>
       </Section>
 

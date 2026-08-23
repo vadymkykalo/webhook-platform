@@ -30,6 +30,7 @@ export default function Authentication({
         <SubSection title={t('docsPage.auth.headerFormat')}>
           <CodeBlock code={authSamples.apiKey} label="http" />
         </SubSection>
+        <Note label={t('docsPage.auth.scopesLabel')}>{t('docsPage.auth.scopesDesc')}</Note>
         <Note label={t('docsPage.auth.securityNote')}>{t('docsPage.auth.securityNoteDesc')}</Note>
       </Section>
     </DocsArticle>

@@ -19,7 +19,9 @@ export const authSamples = {
   body: JSON.stringify({ email: 'you@company.com', password: process.env.PASSWORD }),
 });
 const { accessToken } = await res.json();`,
-    python: `import requests
+    python: `import os
+
+import requests
 
 res = requests.post(
     "${BASE}/api/v1/auth/login",
@@ -28,7 +30,7 @@ res = requests.post(
 access_token = res.json()["accessToken"]`,
   },
   bearer: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`,
-  apiKey: `X-API-Key: wh_live_1234567890abcdef`,
+  apiKey: `X-API-Key: Kz1uAIM8VeJUQN7yGSYCst64WxNLabBHfOYbrPlJ1yk`,
 };
 
 export const quickstartSamples = {
@@ -72,7 +74,10 @@ export function verify(rawBody, header, secret) {
     .digest('hex');
 
   // Constant time — a fast reject leaks the signature one byte at a time.
-  const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1));
+  // timingSafeEqual throws on a length mismatch, so check the length first.
+  const provided = Buffer.from(parts.v1 ?? '', 'utf8');
+  const digest = Buffer.from(expected, 'utf8');
+  const ok = provided.length === digest.length && crypto.timingSafeEqual(digest, provided);
   // Reject anything older than five minutes so a captured request cannot be replayed.
   const fresh = Math.abs(Date.now() - Number(parts.t)) < 5 * 60 * 1000;
   return ok && fresh;
@@ -104,8 +109,14 @@ Content-Type: application/json
 };
 
 export const replaySamples = {
-  header: `Idempotency-Key: <event-idempotency-key>-<endpoint-id>
-# under the AUTO policy, when the client sent no key:
+  header: `# the event was sent with an Idempotency-Key:
+Idempotency-Key: <event-idempotency-key>-<endpoint-id>
+
+# under AUTO, where the platform generated one for it (a random UUID):
+Idempotency-Key: <generated-uuid>-<endpoint-id>
+
+# the delivery carries no key of its own — no key was sent under NONE,
+# or the delivery was built by a time-range replay:
 Idempotency-Key: <event-id>-<endpoint-id>`,
   dryRun: `{
   "deliveryId": "…",
@@ -189,7 +200,9 @@ const event = await client.events.send({
   type: 'order.completed',
   data: { orderId: 'ord_12345', amount: 99.99 },
 });`,
-  python: `from hookflow import Hookflow, Event
+  python: `import os
+
+from hookflow import Hookflow, Event
 
 client = Hookflow(api_key=os.environ["HOOKFLOW_API_KEY"])
 

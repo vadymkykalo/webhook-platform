@@ -18,6 +18,7 @@ import ErrorsAndLimits from './docs/guides/ErrorsAndLimits';
 import GettingStarted from './docs/guides/GettingStarted';
 import IncomingWebhooks from './docs/guides/IncomingWebhooks';
 import Overview from './docs/guides/Overview';
+import Retries from './docs/guides/Retries';
 import RulesEngine from './docs/guides/RulesEngine';
 import SchemaRegistry from './docs/guides/SchemaRegistry';
 import Sdks from './docs/guides/Sdks';
@@ -99,6 +100,7 @@ export default function DocumentationPage() {
             {section === 'getting-started' && <GettingStarted {...sampleProps} />}
             {section === 'authentication' && <Authentication {...sampleProps} />}
             {section === 'webhook-security' && <WebhookSecurity {...sampleProps} />}
+            {section === 'retries' && <Retries />}
             {section === 'incoming-webhooks' && <IncomingWebhooks />}
             {section === 'rules-engine' && <RulesEngine />}
             {section === 'schema-registry' && <SchemaRegistry />}
