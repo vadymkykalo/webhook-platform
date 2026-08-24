@@ -1394,7 +1394,11 @@
       "subtitle": "From no instance to a delivered event.",
       "title": "Getting Started",
       "verifyDesc": "A delivery to an endpoint that is neither `VERIFIED` nor `SKIPPED` fails terminally, without a single retry. `POST /api/v1/projects/{projectId}/endpoints/{id}/verify` sends the challenge; Webhook Security has the format of it.",
-      "verifyLabel": "It receives nothing until it is verified"
+      "verifyLabel": "It receives nothing until it is verified",
+      "portsTitle": "Ports it binds",
+      "portApi": "The API and everything under `/api/v1`. Bound to loopback by default; change the host it listens on with `API_BIND` and the port with",
+      "portUi": "The dashboard. Change it with",
+      "portActuator": "Health and Prometheus metrics only — never the API. It runs on its own port so a broken auth configuration cannot take health checks down with it, and compose binds it to loopback. Change it with"
     },
     "incomingWebhooks": {
       "dedupDesc": "Providers resend. When the request carries an id Hookflow recognises — `X-Webhook-Id`, Stripe-Webhook-Id, `X-GitHub-Delivery`, `X-Shopify-Webhook-Id`, `X-Twilio-Webhook-Id`, or Slack's event_id — a second arrival of the same id returns the stored event instead of forwarding it again. A provider that sends none of these is not deduplicated.",
@@ -1425,8 +1429,8 @@
     "mobileTitle": "Documentation",
     "overview": {
       "coreConcepts": "Core concepts",
-      "diagDirAlt": "Two rows. In the outgoing row your system points at Hookflow, which signs and points at an endpoint. In the incoming row a provider points at Hookflow, which verifies and points at a destination.",
-      "diagDirCaption": "The same platform in the middle both times. What changes is who is trusted to prove the request: Hookflow signs what it sends, and checks the signature on what it receives.",
+      "diagDirAlt": "Two rows sharing one layout. Outgoing: your system announces order.created, Hookflow delivers it to an endpoint and writes the X-Signature header on the way out, and the attempt rail under the row shows seven rungs. Incoming: a provider posts to Hookflow, which reads the provider's own Stripe-Signature header on the way in and forwards to a destination, with five rungs on its rail.",
+      "diagDirCaption": "The same platform in the middle both times, and the same attempt rail underneath. What changes is which side of Hookflow the proof sits on: it writes the signature on the way out and reads the provider's on the way in.",
       "diagDirProvider": "A provider",
       "diagDirShared": "one attempt lifecycle, both directions",
       "diagDirSigns": "signs",
@@ -1457,7 +1461,9 @@
       "whatIsDesc2": "Both directions share one attempt log, one retry ladder and one set of screens.",
       "diagFanDelivered": "delivered",
       "diagFanRetrying": "retrying",
-      "diagFanAbandoned": "Failed Messages"
+      "diagFanAbandoned": "Failed Messages",
+      "diagDirAttemptsOut": "7 tries",
+      "diagDirAttemptsIn": "5 tries"
     },
     "paramTable": {
       "description": "Description",

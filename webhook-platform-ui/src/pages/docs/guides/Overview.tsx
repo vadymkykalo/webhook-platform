@@ -1,14 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
-  Prose,
   DefinitionList,
   Diagram,
   DocsArticle,
   DocsTitle,
+  Prose,
   Section,
   SketchBox,
+  SketchChip,
   SketchEdge,
+  SketchRail,
   SketchText,
   StepRow,
 } from '../primitives';
@@ -22,45 +24,65 @@ import {
  * because the labels alone said nothing the sidebar had not already said.
  */
 /**
- * The two directions, as one picture: the same platform in the middle, the
- * arrows pointing opposite ways, and the one word that differs — Hookflow
- * signs what it sends and verifies what it receives.
+ * The two directions, as one picture.
+ *
+ * The version this replaces was six rounded boxes reading "Your system → Hookflow →
+ * Endpoint" and "A provider → Hookflow → Destination", with the words "signs" and "verifies"
+ * floating underneath. That is the paragraph beside it, drawn — the reader learns nothing
+ * from the picture they did not learn from the sentence.
+ *
+ * What is actually worth drawing is the header. In both rows the same platform sits in the
+ * middle and the same lifecycle runs underneath; the only thing that differs is which side of
+ * Hookflow the proof is on. Outgoing, Hookflow writes `X-Signature` on the way out. Incoming,
+ * it reads the provider's own header on the way in — and the chip says `Stripe-Signature`
+ * rather than "verifies", because that is the string the reader will be looking at in their
+ * own logs.
+ *
+ * The rail under each row is the design brief's signature element, and it carries the one
+ * remaining difference between the directions: seven rungs against five.
  */
 function DirectionsDiagram() {
   const { t } = useTranslation();
 
   return (
     <Diagram
-      viewBox="0 0 440 226"
+      viewBox="0 0 440 266"
+      maxWidth={600}
       label={t('docsPage.overview.diagDirAlt')}
       caption={t('docsPage.overview.diagDirCaption')}
     >
-      <SketchText x={10} y={12} anchor="start" size={12}>
-        {t('docsPage.overview.outgoing')}
+      {/* ── outgoing ─────────────────────────────────────────────── */}
+      <SketchText x={8} y={12} anchor="start" size={9.5} mono>
+        {t('docsPage.overview.outgoing').toUpperCase()}
       </SketchText>
-      <SketchEdge d="M122,42 H160" />
-      <SketchText x={141} y={80} size={12}>
-        {t('docsPage.overview.diagDirSigns')}
-      </SketchText>
-      <SketchEdge d="M277,42 H315" />
-      <SketchBox x={10} y={20} w={110} h={44} label={t('docsPage.overview.diagDirYourSystem')} />
-      <SketchBox x={165} y={20} w={110} h={44} label="Hookflow" />
-      <SketchBox x={320} y={20} w={110} h={44} label={t('docsPage.concepts.endpoint')} />
 
-      <SketchText x={10} y={112} anchor="start" size={12}>
-        {t('docsPage.overview.incoming')}
-      </SketchText>
-      <SketchEdge d="M122,142 H160" />
-      <SketchText x={141} y={180} size={12}>
-        {t('docsPage.overview.diagDirVerifies')}
-      </SketchText>
-      <SketchEdge d="M277,142 H315" />
-      <SketchBox x={10} y={120} w={110} h={44} label={t('docsPage.overview.diagDirProvider')} />
-      <SketchBox x={165} y={120} w={110} h={44} label="Hookflow" />
-      <SketchBox x={320} y={120} w={110} h={44} label={t('docsPage.concepts.destination')} />
+      <SketchEdge d="M126,44 H164" />
+      <SketchEdge d="M282,44 H316" />
+      <SketchBox x={8} y={20} w={118} h={48} role={t('docsPage.overview.diagDirYourSystem')} sub="order.created" align="start" />
+      <SketchBox x={168} y={20} w={110} h={48} label="Hookflow" />
+      <SketchBox x={320} y={20} w={112} h={48} role={t('docsPage.concepts.endpoint')} sub="api.acme.io" align="start" />
+      <SketchChip x={299} y={82} leaderFrom={46}>X-Signature</SketchChip>
 
-      <SketchText x={220} y={214} size={13}>
-        {t('docsPage.overview.diagDirShared')}
+      <SketchRail x={168} y={112} w={214} attempts={7} />
+      <SketchText x={390} y={116} anchor="start" size={10} mono>
+        {t('docsPage.overview.diagDirAttemptsOut')}
+      </SketchText>
+
+      {/* ── incoming ─────────────────────────────────────────────── */}
+      <SketchText x={8} y={148} anchor="start" size={9.5} mono>
+        {t('docsPage.overview.incoming').toUpperCase()}
+      </SketchText>
+
+      <SketchEdge d="M126,180 H164" />
+      <SketchEdge d="M282,180 H316" />
+      <SketchBox x={8} y={156} w={118} h={48} role={t('docsPage.overview.diagDirProvider')} sub="stripe.com" align="start" />
+      <SketchBox x={168} y={156} w={110} h={48} label="Hookflow" />
+      <SketchBox x={320} y={156} w={112} h={48} role={t('docsPage.concepts.destination')} sub="internal/orders" align="start" />
+      <SketchChip x={145} y={218} leaderFrom={182}>Stripe-Signature</SketchChip>
+
+      <SketchRail x={168} y={248} w={214} attempts={5} />
+      <SketchText x={390} y={252} anchor="start" size={10} mono>
+        {t('docsPage.overview.diagDirAttemptsIn')}
       </SketchText>
     </Diagram>
   );

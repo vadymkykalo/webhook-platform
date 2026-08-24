@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Check, ExternalLink, Loader2, Minus, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
@@ -369,7 +370,9 @@ export default function BillingPage() {
                         <div className="mt-3">
                           {isCustom ? (
                             <Button asChild size="sm" variant="outline" className="w-full">
-                              <a href="mailto:vadymkykalo@gmail.com">{t('billing.contactSales')}</a>
+                              {/* Was a mailto to the author's personal Gmail, shipped inside
+                                  the product to whoever clicked Enterprise. */}
+                              <Link to="/contact">{t('billing.contactSales')}</Link>
                             </Button>
                           ) : (
                             <Button

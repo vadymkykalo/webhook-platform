@@ -119,7 +119,7 @@ export function Note({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-export function CodeBlock({ code, label }: { code: string; label?: string }) {
+export function CodeBlock({ code, label, wrap = false }: { code: string; label?: string; wrap?: boolean }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const caption = label ?? 'shell';
@@ -153,7 +153,10 @@ export function CodeBlock({ code, label }: { code: string; label?: string }) {
           {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
         </button>
       </figcaption>
-      <pre className="overflow-x-auto p-4">
+      {/* `wrap` is for samples whose length is not the reader's choice — a raw.githubusercontent
+          URL is 90 characters and there is no shorter form of it. Scrolling one of those
+          sideways hides the end of the command, which is the part being copied. */}
+      <pre className={cn('p-4', wrap ? 'whitespace-pre-wrap break-words' : 'overflow-x-auto')}>
         <code className="font-mono text-[13px] leading-relaxed text-foreground">
           <SyntaxHighlight code={code} language={normalizeLanguage(caption)} />
         </code>
@@ -381,60 +384,91 @@ export function Diagram({
   );
 }
 
-const stroke = (tone: SketchTone) => (tone === 'rail' ? 'hsl(var(--muted-foreground))' : `hsl(var(--${tone}))`);
+const stroke = (tone: SketchTone) => (tone === 'rail' ? 'hsl(var(--rail))' : `hsl(var(--${tone}))`);
 const fill = (tone: SketchTone) => (tone === 'rail' ? 'hsl(var(--card))' : `hsl(var(--${tone}-soft))`);
 
 /**
- * A box with a label, and optionally a second mono line under it.
+ * A node in a diagram: a panel, drawn the way every other surface in this product is drawn.
  *
- * The irregularity comes from the filter and nothing else. Tilting the boxes as
- * well was tried and read as sloppy rather than hand-drawn: a row whose members
- * sit at slightly different angles looks like a layout that failed, not like a
- * drawing. Vary the line, keep the geometry exact — same width, same height,
- * even spacing, tops aligned — and let the turbulence supply the hand.
+ * It used to be a pill — a 2px rounded rect with one centred word in it — and a row of those
+ * joined by arrows is a flowchart from a slide deck, not a drawing of this system. Three of
+ * them said "Your system", "Hookflow", "Endpoint", which is the sentence underneath the
+ * figure with boxes around it.
+ *
+ * What makes a node worth drawing is what it carries, so the shape is built for content: a
+ * mono `role` eyebrow above (SOURCE, ENDPOINT — the product's own vocabulary), the name, and
+ * a mono `sub` line for the thing that is actually true of it — a URL, an id, an event type.
+ * Left-aligned, because a label and a URL centred on each other read as a caption; stacked at
+ * the same left edge they read as a record.
+ *
+ * `tone` stays neutral unless a real status is being shown. The colour rule in the design
+ * brief is that the four status hues belong to statuses, and a diagram that paints its boxes
+ * for variety teaches the reader that green means nothing.
  */
 export function SketchBox({
   x,
   y,
   w,
   h = 46,
+  role,
   label,
   sub,
   tone = 'rail',
-  tilt = 0,
+  align = 'center',
 }: {
   x: number;
   y: number;
   w: number;
   h?: number;
+  role?: string;
   label?: string;
   sub?: string;
   tone?: SketchTone;
-  tilt?: number;
+  align?: 'center' | 'start';
 }) {
   const cx = x + w / 2;
   const cy = y + h / 2;
+  const left = align === 'start';
+  const tx = left ? x + 12 : cx;
+  const anchor = left ? 'start' : 'middle';
+
+  // With a role eyebrow the block is three lines and is laid out from the top; without one it
+  // stays optically centred, which is what a two-line node wants.
+  const labelY = role ? y + 26 : sub ? cy - 1 : cy + 4;
+  const subY = role ? y + 40 : cy + 15;
 
   return (
-    <g transform={tilt ? `rotate(${tilt} ${cx} ${cy})` : undefined}>
+    <g>
       <rect
         x={x}
         y={y}
         width={w}
         height={h}
-        rx={9}
+        rx={8}
         fill={fill(tone)}
         stroke={stroke(tone)}
-        strokeWidth={2}
-        strokeLinejoin="round"
+        strokeWidth={1.25}
       />
+      {role && (
+        <text
+          x={tx}
+          y={y + 13}
+          textAnchor={anchor}
+          fontSize={8.5}
+          letterSpacing="0.09em"
+          className="font-mono"
+          fill="hsl(var(--muted-foreground))"
+        >
+          {role.toUpperCase()}
+        </text>
+      )}
       {label && (
-        <text x={cx} y={sub ? cy - 1 : cy + 5} textAnchor="middle" fontSize={15} fill="hsl(var(--foreground))">
+        <text x={tx} y={labelY} textAnchor={anchor} fontSize={13.5} fill="hsl(var(--foreground))">
           {label}
         </text>
       )}
       {sub && (
-        <text x={cx} y={cy + 16} textAnchor="middle" fontSize={12} className="font-mono" fill="hsl(var(--muted-foreground))">
+        <text x={tx} y={subY} textAnchor={anchor} fontSize={10.5} className="font-mono" fill="hsl(var(--muted-foreground))">
           {sub}
         </text>
       )}
@@ -457,13 +491,121 @@ export function SketchEdge({
     <path
       d={d}
       fill="none"
-      stroke={stroke(tone)}
-      strokeWidth={2}
+      stroke={tone === 'rail' ? 'hsl(var(--muted-foreground))' : stroke(tone)}
+      strokeWidth={1.25}
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeDasharray={dashed ? '5 4' : undefined}
+      strokeDasharray={dashed ? '4 4' : undefined}
       markerEnd={`url(#${ids.arrow(tone)})`}
+      opacity={tone === 'rail' ? 0.55 : 1}
     />
+  );
+}
+
+/**
+ * A mono token sitting on a connector: the thing that travels.
+ *
+ * This is the element the old diagrams had no answer for. "Hookflow → Endpoint" with the word
+ * "signs" floating underneath tells the reader a verb; `X-Signature: t=…,v1=…` riding the
+ * arrow tells them what to look for in their own logs. The plate behind it is the page
+ * background rather than a fill, so the line appears to pass behind the text instead of
+ * through it.
+ */
+export function SketchChip({
+  x,
+  y,
+  children,
+  tone = 'rail',
+  leaderFrom,
+}: {
+  x: number;
+  y: number;
+  children: string;
+  tone?: SketchTone;
+  /** y of the connector this annotates: a hairline is drawn from there down to the chip. */
+  leaderFrom?: number;
+}) {
+  const w = children.length * 5.4 + 14;
+  return (
+    <g>
+      {leaderFrom !== undefined && (
+        /* Without it the chip floats under the row and reads as a caption for the whole
+           diagram rather than for the one arrow it belongs to. */
+        <line
+          x1={x}
+          y1={leaderFrom}
+          x2={x}
+          y2={y - 9}
+          stroke="hsl(var(--rail))"
+          strokeWidth={1}
+        />
+      )}
+      <rect
+        x={x - w / 2}
+        y={y - 9}
+        width={w}
+        height={18}
+        rx={4}
+        fill="hsl(var(--card))"
+        stroke={tone === 'rail' ? 'hsl(var(--rail))' : stroke(tone)}
+        strokeWidth={1}
+      />
+      <text
+        x={x}
+        y={y + 3.5}
+        textAnchor="middle"
+        fontSize={10}
+        className="font-mono"
+        fill={tone === 'rail' ? 'hsl(var(--foreground))' : stroke(tone)}
+      >
+        {children}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * The attempt rail, inside a diagram.
+ *
+ * The design brief calls this the product's signature: a hairline with ticks placed on a log
+ * scale of their delay, because the ladder is 1m → 5m → 15m → 1h → 6h → 24h and even spacing
+ * would draw a schedule the product does not run. `AttemptRail` is the React component for
+ * it; this is the same geometry as SVG primitives so a drawing can use it inline.
+ *
+ * `attempts` is how many rungs the ladder has — seven outgoing, five incoming — and the ticks
+ * past that count are drawn faintly, so the difference between the two directions is
+ * something you see rather than read.
+ */
+const LADDER_MINUTES = [0, 1, 5, 15, 60, 360, 1440];
+
+export function SketchRail({
+  x,
+  y,
+  w,
+  attempts = LADDER_MINUTES.length,
+}: {
+  x: number;
+  y: number;
+  w: number;
+  attempts?: number;
+}) {
+  const span = Math.log1p(1440);
+  const at = (minutes: number) => x + (Math.log1p(minutes) / span) * w;
+
+  return (
+    <g>
+      <line x1={x} y1={y} x2={x + w} y2={y} stroke="hsl(var(--rail))" strokeWidth={1.25} />
+      {LADDER_MINUTES.map((m, i) => (
+        <circle
+          key={m}
+          cx={at(m)}
+          cy={y}
+          r={i < attempts ? 3 : 2}
+          fill={i < attempts ? 'hsl(var(--primary))' : 'hsl(var(--rail))'}
+          opacity={i < attempts ? 1 : 0.7}
+        />
+      ))}
+    </g>
   );
 }
 

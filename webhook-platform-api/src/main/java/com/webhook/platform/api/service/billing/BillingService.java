@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.InvoiceResponse;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -107,14 +108,52 @@ public class BillingService {
     }
 
     @Transactional
+    /**
+     * Assigns a plan directly, without a payment.
+     *
+     * <p>This is the downgrade path, and it used to be the upgrade path too: the endpoint
+     * behind it is `PUT /api/v1/billing/organization/plan`, guarded by nothing but the OWNER
+     * role, and it set whatever plan name it was given. Its own OpenAPI description said "for
+     * paid plans, use checkout instead" — a sentence, not a check. Any customer could
+     * {@code PUT {"planName":"pro"}} and be on Pro, or ask for {@code self_hosted}, which is
+     * seeded active and unlimited on everything.
+     *
+     * <p>So the rule is a whitelist rather than a price test: with billing on, an
+     * organization can move itself to a plan it is already paying for, or to a zero-priced
+     * plan that is actually offered for self-service — which is `free` and nothing else.
+     * Everything else goes through checkout. With billing off there is no money involved and
+     * no reason to refuse.
+     */
     public void assignPlan(String planName) {
         UUID organizationId = TenantContext.require();
         Organization org = findOrg();
         Plan plan = getPlanByName(planName);
+        requireSelfAssignable(plan, organizationId);
         org.setPlan(plan);
         organizationRepository.save(org);
         entitlementService.evictPlanCache(organizationId);
         log.info("Plan assigned: org={} plan={}", organizationId, planName);
+    }
+
+    /** The only plan an organization may put itself on without paying for it. */
+    private static final String SELF_SERVICE_PLAN = "free";
+
+    private void requireSelfAssignable(Plan plan, UUID organizationId) {
+        if (!billingEnabled) {
+            return;
+        }
+        if (SELF_SERVICE_PLAN.equals(plan.getName())) {
+            return;
+        }
+        boolean alreadyPaidFor = subscriptionRepository.findActiveByOrganizationId(organizationId)
+                .map(BillingSubscription::getPlan)
+                .filter(current -> current.getId().equals(plan.getId()))
+                .isPresent();
+        if (!alreadyPaidFor) {
+            throw new ForbiddenException(
+                    "Plan '" + plan.getName() + "' cannot be assigned directly. Start a checkout session "
+                            + "for it, or switch to '" + SELF_SERVICE_PLAN + "'.");
+        }
     }
 
     // ── Checkout (create payment page) ──────────────────────────────
