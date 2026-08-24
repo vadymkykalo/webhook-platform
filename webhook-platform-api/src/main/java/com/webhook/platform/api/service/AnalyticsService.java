@@ -89,8 +89,12 @@ public class AnalyticsService {
         long totalDeliveries = deliveryRepository.countByProjectIdAndCreatedAtBetween(projectId, from, to);
         long successfulDeliveries = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
                 projectId, DeliveryStatus.SUCCESS, from, to);
+        // FAILED and DLQ are both terminal failures; the time series counts them
+        // together, so the overview card has to agree or the chart contradicts it.
         long failedDeliveries = deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
-                projectId, DeliveryStatus.FAILED, from, to);
+                projectId, DeliveryStatus.FAILED, from, to)
+                + deliveryRepository.countByProjectIdAndStatusAndCreatedAtBetween(
+                projectId, DeliveryStatus.DLQ, from, to);
 
         double successRate = totalDeliveries > 0 
                 ? (double) successfulDeliveries / totalDeliveries * 100 
