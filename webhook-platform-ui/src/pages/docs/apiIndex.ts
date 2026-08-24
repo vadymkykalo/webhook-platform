@@ -51,6 +51,8 @@ export interface SpecSecurityScheme {
 }
 
 export interface ApiIndex {
+  /** One example body per schema, generated from the spec. */
+  examples: Record<string, unknown>;
   title: string;
   version: string;
   operationCount: number;

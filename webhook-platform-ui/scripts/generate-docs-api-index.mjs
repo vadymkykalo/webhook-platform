@@ -80,6 +80,83 @@ function fieldsOf(name) {
   });
 }
 
+/**
+ * A representative value for one schema node, used to build the example bodies the reference
+ * prints.
+ *
+ * The reference used to render a response as a flat field table, which is readable for a DTO
+ * and unreadable for a paginated one: `PageAlertEventResponse` is eleven rows of Spring's
+ * envelope — totalPages, pageable, sort, first, last, empty — with the thing the caller asked
+ * for hidden behind `content: AlertEventResponse[]`. An example shows the envelope and the
+ * item together, in the shape they arrive in.
+ *
+ * Values are chosen to be recognisably placeholders and to be the right *type*, since the
+ * point is the shape. Enums use their first value; a `$ref` recurses, with a depth limit
+ * because a schema may reference itself (a workflow node holding nodes) and would otherwise
+ * not terminate.
+ */
+const EXAMPLE_MAX_DEPTH = 4;
+
+function exampleFor(node, depth = 0) {
+  if (!node || depth > EXAMPLE_MAX_DEPTH) return null;
+
+  const ref = refName(node);
+  if (ref) return exampleForSchema(ref, depth + 1);
+
+  if (Array.isArray(node.enum) && node.enum.length) return node.enum[0];
+  if (node.example !== undefined) return node.example;
+
+  if (node.type === 'array') {
+    const item = exampleFor(node.items, depth + 1);
+    return item === null ? [] : [item];
+  }
+
+  const composite = node.oneOf || node.anyOf || node.allOf;
+  if (Array.isArray(composite) && composite.length) return exampleFor(composite[0], depth + 1);
+
+  if (node.type === 'object' || node.properties) {
+    if (node.additionalProperties) {
+      const inner = exampleFor(node.additionalProperties, depth + 1);
+      return { key: inner === null ? 'value' : inner };
+    }
+    return objectExample(node, depth);
+  }
+
+  switch (node.format) {
+    case 'uuid': return '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+    case 'date-time': return '2026-01-01T12:00:00Z';
+    case 'date': return '2026-01-01';
+    case 'uri': case 'url': return 'https://api.example.com/webhooks';
+    case 'email': return 'you@example.com';
+    case 'byte': return 'aGVsbG8=';
+    default: break;
+  }
+  switch (node.type) {
+    case 'string': return 'string';
+    case 'integer': return 0;
+    case 'number': return 0;
+    case 'boolean': return true;
+    default: return {};
+  }
+}
+
+function objectExample(schema, depth) {
+  const props = schema.properties ?? {};
+  const out = {};
+  for (const [field, node] of Object.entries(props)) {
+    const value = exampleFor(node, depth + 1);
+    if (value !== null) out[field] = value;
+  }
+  return out;
+}
+
+function exampleForSchema(name, depth = 0) {
+  const schema = schemas[name];
+  if (!schema || depth > EXAMPLE_MAX_DEPTH) return {};
+  if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+  return objectExample(schema, depth);
+}
+
 function paramsOf(op, pathLevel, path) {
   const out = [];
   for (const raw of [...(pathLevel ?? []), ...(op.parameters ?? [])]) {
@@ -185,6 +262,12 @@ const index = {
   })),
   groups: [...groups.values()].sort((a, b) => a.name.localeCompare(b.name)),
   schemas: Object.fromEntries(Object.entries(resolved).sort(([a], [b]) => a.localeCompare(b))),
+  // One example body per schema, so the page can print the shape rather than tabulate it.
+  examples: Object.fromEntries(
+    Object.keys(resolved)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => [name, exampleForSchema(name)]),
+  ),
 };
 
 const json = `${JSON.stringify(index, null, 2)}\n`;

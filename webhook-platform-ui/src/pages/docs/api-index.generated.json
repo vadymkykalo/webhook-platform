@@ -12184,5 +12184,2119 @@
         "required": false
       }
     ]
+  },
+  "examples": {
+    "AddMemberRequest": {
+      "email": "you@example.com",
+      "role": "OWNER"
+    },
+    "AlertEventResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "alertRuleId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "severity": "INFO",
+      "title": "string",
+      "message": "string",
+      "currentValue": 0,
+      "thresholdValue": 0,
+      "resolved": true,
+      "resolvedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "AlertRuleRequest": {
+      "name": "string",
+      "description": "string",
+      "alertType": "FAILURE_RATE",
+      "severity": "INFO",
+      "channel": "IN_APP",
+      "thresholdValue": 0,
+      "windowMinutes": 0,
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "enabled": true,
+      "muted": true,
+      "snoozedUntil": "2026-01-01T12:00:00Z",
+      "webhookUrl": "string",
+      "emailRecipients": "string"
+    },
+    "AlertRuleResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "alertType": "FAILURE_RATE",
+      "severity": "INFO",
+      "channel": "IN_APP",
+      "thresholdValue": 0,
+      "windowMinutes": 0,
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "enabled": true,
+      "muted": true,
+      "snoozedUntil": "2026-01-01T12:00:00Z",
+      "webhookUrl": "string",
+      "emailRecipients": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "AnalyticsResponse": {
+      "timeRange": {
+        "from": "string",
+        "to": "string",
+        "granularity": "string"
+      },
+      "overview": {
+        "totalEvents": 0,
+        "totalDeliveries": 0,
+        "successfulDeliveries": 0,
+        "failedDeliveries": 0,
+        "successRate": 0,
+        "avgLatencyMs": 0,
+        "p50LatencyMs": 0,
+        "p95LatencyMs": 0,
+        "p99LatencyMs": 0,
+        "eventsPerSecond": 0,
+        "deliveriesPerSecond": 0
+      },
+      "deliveryTimeSeries": [
+        {
+          "timestamp": "string",
+          "total": 0,
+          "success": 0,
+          "failed": 0,
+          "avgLatencyMs": 0
+        }
+      ],
+      "latencyTimeSeries": [
+        {
+          "timestamp": "string",
+          "total": 0,
+          "success": 0,
+          "failed": 0,
+          "avgLatencyMs": 0
+        }
+      ],
+      "eventTypeBreakdown": [
+        {
+          "eventType": "string",
+          "count": 0,
+          "percentage": 0,
+          "successCount": 0,
+          "successRate": 0
+        }
+      ],
+      "endpointPerformance": [
+        {
+          "endpointId": "string",
+          "url": "string",
+          "enabled": true,
+          "totalDeliveries": 0,
+          "successfulDeliveries": 0,
+          "failedDeliveries": 0,
+          "successRate": 0,
+          "avgLatencyMs": 0,
+          "p95LatencyMs": 0,
+          "lastDeliveryAt": "string",
+          "status": "string"
+        }
+      ],
+      "latencyPercentiles": {
+        "p50": 0,
+        "p75": 0,
+        "p90": 0,
+        "p95": 0,
+        "p99": 0,
+        "max": 0
+      }
+    },
+    "ApiKeyData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "keyPrefix": "string",
+      "scope": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "expiresAt": "2026-01-01T12:00:00Z",
+      "lastUsedAt": "2026-01-01T12:00:00Z"
+    },
+    "ApiKeyRequest": {
+      "name": "string",
+      "scope": "READ_WRITE",
+      "expiresAt": "2026-01-01T12:00:00Z"
+    },
+    "ApiKeyResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "keyPrefix": "string",
+      "lastUsedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "revokedAt": "2026-01-01T12:00:00Z",
+      "expiresAt": "2026-01-01T12:00:00Z",
+      "scope": "string",
+      "key": "string"
+    },
+    "AuditLogData": {
+      "action": "string",
+      "resourceType": "string",
+      "resourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "status": "string",
+      "clientIp": "string",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "AuditLogResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "action": "string",
+      "resourceType": "string",
+      "resourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "userEmail": "string",
+      "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "status": "string",
+      "errorMessage": "string",
+      "durationMs": 0,
+      "clientIp": "string",
+      "details": "string",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "AuthResponse": {
+      "accessToken": "string",
+      "refreshToken": "string",
+      "emailVerified": true
+    },
+    "BulkReplayRequest": {
+      "deliveryIds": [
+        "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      ],
+      "status": "PENDING",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "limit": 0
+    },
+    "BulkReplayResponse": {
+      "totalRequested": 0,
+      "replayed": 0,
+      "skipped": 0,
+      "totalMatched": 0,
+      "hasMore": true,
+      "message": "string"
+    },
+    "CapturedRequestResponse": {
+      "id": "string",
+      "testEndpointId": "string",
+      "method": "string",
+      "path": "string",
+      "queryString": "string",
+      "headers": "string",
+      "body": "string",
+      "contentType": "string",
+      "sourceIp": "string",
+      "userAgent": "string",
+      "receivedAt": "2026-01-01T12:00:00Z"
+    },
+    "ChangeMemberRoleRequest": {
+      "role": "OWNER"
+    },
+    "ChangePasswordRequest": {
+      "currentPassword": "string",
+      "newPassword": "string"
+    },
+    "ChangePlanRequest": {
+      "planName": "string"
+    },
+    "CheckoutRequest": {
+      "planName": "string",
+      "successUrl": "string",
+      "cancelUrl": "string",
+      "providerCode": "string",
+      "billingInterval": "string"
+    },
+    "CurrentUserResponse": {
+      "user": {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "email": "string",
+        "fullName": "string",
+        "status": "ACTIVE"
+      },
+      "organization": {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "string",
+        "createdAt": "2026-01-01T12:00:00Z"
+      },
+      "role": "OWNER"
+    },
+    "DailyUsage": {
+      "date": "string",
+      "eventsCount": 0,
+      "deliveriesCount": 0,
+      "successfulDeliveries": 0,
+      "failedDeliveries": 0,
+      "dlqCount": 0,
+      "incomingEventsCount": 0,
+      "incomingForwardsCount": 0,
+      "avgLatencyMs": 0,
+      "p95LatencyMs": 0
+    },
+    "DashboardStatsResponse": {
+      "deliveryStats": {
+        "totalDeliveries": 0,
+        "successfulDeliveries": 0,
+        "failedDeliveries": 0,
+        "pendingDeliveries": 0,
+        "dlqDeliveries": 0,
+        "successRate": 0
+      },
+      "recentEvents": [
+        {
+          "id": "string",
+          "type": "string",
+          "createdAt": "string",
+          "deliveryCount": 0
+        }
+      ],
+      "endpointHealth": [
+        {
+          "id": "string",
+          "url": "string",
+          "enabled": true,
+          "totalDeliveries": 0,
+          "successfulDeliveries": 0,
+          "successRate": 0
+        }
+      ]
+    },
+    "DeliveryAttemptResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "deliveryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "attemptNumber": 0,
+      "requestHeaders": "string",
+      "requestBody": "string",
+      "httpStatusCode": 0,
+      "responseHeaders": "string",
+      "responseBody": "string",
+      "errorMessage": "string",
+      "durationMs": 0,
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "DeliveryDryRunRequest": {
+      "payload": {
+        "type": "order.created",
+        "data": {
+          "amount": 100
+        }
+      },
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "payloadTemplate": "string",
+      "customHeaders": {
+        "X-Custom": "value"
+      },
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "order.created"
+    },
+    "DeliveryDryRunResponse": {
+      "transformedPayload": "string",
+      "requestHeaders": {
+        "key": "string"
+      },
+      "signature": "string",
+      "endpointUrl": "string",
+      "success": true,
+      "errors": [
+        "string"
+      ],
+      "transformationName": "string",
+      "transformationVersion": 0
+    },
+    "DeliveryResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "subscriptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "status": "string",
+      "attemptCount": 0,
+      "maxAttempts": 0,
+      "nextRetryAt": "2026-01-01T12:00:00Z",
+      "lastAttemptAt": "2026-01-01T12:00:00Z",
+      "succeededAt": "2026-01-01T12:00:00Z",
+      "failedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "DeliveryStats": {
+      "totalDeliveries": 0,
+      "successfulDeliveries": 0,
+      "failedDeliveries": 0,
+      "pendingDeliveries": 0,
+      "dlqDeliveries": 0,
+      "successRate": 0
+    },
+    "DeviceApproveRequest": {
+      "userCode": "string"
+    },
+    "DeviceCodeResponse": {
+      "deviceCode": "string",
+      "userCode": "string",
+      "verificationUrl": "string",
+      "expiresInSeconds": 0,
+      "pollIntervalSeconds": 0,
+      "expiresAt": "2026-01-01T12:00:00Z"
+    },
+    "DeviceTokenRequest": {
+      "deviceCode": "string"
+    },
+    "DiffEntry": {
+      "path": "string",
+      "type": "ADDED",
+      "leftValue": {},
+      "rightValue": {}
+    },
+    "DlqActionResponse": {
+      "retried": 0,
+      "requested": 0,
+      "purged": 0
+    },
+    "DlqItemResponse": {
+      "deliveryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "subscriptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "string",
+      "endpointUrl": "string",
+      "attemptCount": 0,
+      "maxAttempts": 0,
+      "lastError": "string",
+      "failedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "DlqRetryRequest": {
+      "deliveryIds": [
+        "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      ]
+    },
+    "DlqStatsResponse": {
+      "totalItems": 0,
+      "last24Hours": 0,
+      "last7Days": 0
+    },
+    "EncryptionRotationResponse": {
+      "status": "string",
+      "targetVersion": 0,
+      "endpointsRotated": 0,
+      "sourcesRotated": 0,
+      "destinationsRotated": 0,
+      "errors": 0
+    },
+    "EncryptionStatusResponse": {
+      "activeKeyVersion": 0,
+      "availableVersions": [
+        0
+      ]
+    },
+    "EndpointData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "url": "string",
+      "description": "string",
+      "enabled": true,
+      "mtlsEnabled": true,
+      "rateLimitPerSecond": 0,
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "EndpointHealthSummary": {
+      "id": "string",
+      "url": "string",
+      "enabled": true,
+      "totalDeliveries": 0,
+      "successfulDeliveries": 0,
+      "successRate": 0
+    },
+    "EndpointPerformance": {
+      "endpointId": "string",
+      "url": "string",
+      "enabled": true,
+      "totalDeliveries": 0,
+      "successfulDeliveries": 0,
+      "failedDeliveries": 0,
+      "successRate": 0,
+      "avgLatencyMs": 0,
+      "p95LatencyMs": 0,
+      "lastDeliveryAt": "string",
+      "status": "string"
+    },
+    "EndpointRequest": {
+      "url": "string",
+      "description": "string",
+      "secret": "string",
+      "enabled": true,
+      "rateLimitPerSecond": 0,
+      "allowedSourceIps": "string"
+    },
+    "EndpointResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "url": "string",
+      "description": "string",
+      "enabled": true,
+      "rateLimitPerSecond": 0,
+      "allowedSourceIps": "string",
+      "mtlsEnabled": true,
+      "verificationStatus": "string",
+      "verificationAttemptedAt": "2026-01-01T12:00:00Z",
+      "verificationCompletedAt": "2026-01-01T12:00:00Z",
+      "verificationSkipReason": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z",
+      "secret": "string"
+    },
+    "EndpointTestResponse": {
+      "success": true,
+      "httpStatusCode": 0,
+      "responseBody": "string",
+      "errorMessage": "string",
+      "latencyMs": 0,
+      "message": "string"
+    },
+    "EventDiffResponse": {
+      "leftEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "rightEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "string",
+      "leftCreatedAt": "2026-01-01T12:00:00Z",
+      "rightCreatedAt": "2026-01-01T12:00:00Z",
+      "leftPayload": "string",
+      "rightPayload": "string",
+      "diffs": [
+        {
+          "path": "string",
+          "type": "ADDED",
+          "leftValue": {},
+          "rightValue": {}
+        }
+      ]
+    },
+    "EventIngestRequest": {
+      "type": "string",
+      "data": {}
+    },
+    "EventResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "string",
+      "payload": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "deliveriesCreated": 0
+    },
+    "EventSchemaVersionRequest": {
+      "schemaJson": "string",
+      "compatibilityMode": "string",
+      "description": "string"
+    },
+    "EventSchemaVersionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventTypeId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "version": 0,
+      "schemaJson": "string",
+      "fingerprint": "string",
+      "status": "string",
+      "compatibilityMode": "string",
+      "description": "string",
+      "createdBy": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "EventTypeBreakdown": {
+      "eventType": "string",
+      "count": 0,
+      "percentage": 0,
+      "successCount": 0,
+      "successRate": 0
+    },
+    "EventTypeCatalogRequest": {
+      "name": "string",
+      "description": "string"
+    },
+    "EventTypeCatalogResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "latestVersion": 0,
+      "activeVersionStatus": "string",
+      "hasBreakingChanges": true,
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "ForgotPasswordRequest": {
+      "email": "you@example.com"
+    },
+    "GdprExportDto": {
+      "exportVersion": "string",
+      "exportedAt": "2026-01-01T12:00:00Z",
+      "organization": {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "string",
+        "billingEmail": "string",
+        "plan": "string",
+        "billingStatus": "string",
+        "createdAt": "2026-01-01T12:00:00Z"
+      },
+      "members": [
+        {
+          "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "email": "string",
+          "fullName": "string",
+          "role": "string",
+          "status": "string",
+          "joinedAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "projects": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "name": "string",
+          "description": "string",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "endpoints": [],
+          "subscriptions": [],
+          "incomingSources": [],
+          "apiKeys": []
+        }
+      ],
+      "auditLogs": [
+        {
+          "action": "string",
+          "resourceType": "string",
+          "resourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "status": "string",
+          "clientIp": "string",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ]
+    },
+    "Group": {},
+    "IncidentRequest": {
+      "title": "string",
+      "severity": "INFO",
+      "status": "OPEN",
+      "rcaNotes": "string"
+    },
+    "IncidentResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "title": "string",
+      "status": "OPEN",
+      "severity": "INFO",
+      "rcaNotes": "string",
+      "resolvedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z",
+      "timeline": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "entryType": "string",
+          "title": "string",
+          "detail": "string",
+          "deliveryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ]
+    },
+    "IncomingBulkReplayRequest": {
+      "sourceId": "550e8400-e29b-41d4-a716-446655440000",
+      "from": "2026-01-01T12:00:00Z",
+      "to": "2026-01-01T12:00:00Z",
+      "verified": true,
+      "eventIds": [
+        "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      ],
+      "maxEvents": 1000
+    },
+    "IncomingBulkReplayResponse": {
+      "status": "bulk_replayed",
+      "sourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventsReplayed": 0,
+      "totalForwardAttempts": 0
+    },
+    "IncomingDestinationData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "url": "string",
+      "authType": "string",
+      "enabled": true,
+      "maxAttempts": 0,
+      "timeoutSeconds": 0,
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "IncomingDestinationRequest": {
+      "url": "https://api.example.com/webhooks",
+      "authType": "NONE",
+      "authConfig": "string",
+      "customHeadersJson": {
+        "X-Custom": "value"
+      },
+      "enabled": true,
+      "maxAttempts": 5,
+      "timeoutSeconds": 30,
+      "retryDelays": "60,300,900,3600,21600",
+      "payloadTransform": "$.data",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "IncomingDestinationResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "url": "string",
+      "authType": "NONE",
+      "authConfigured": true,
+      "customHeadersJson": "string",
+      "enabled": true,
+      "maxAttempts": 0,
+      "timeoutSeconds": 0,
+      "retryDelays": "string",
+      "payloadTransform": "string",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "transformationName": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "IncomingEventResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "sourceName": "string",
+      "requestId": "string",
+      "method": "string",
+      "path": "string",
+      "queryParams": "string",
+      "headersJson": "string",
+      "bodyRaw": "string",
+      "bodySha256": "string",
+      "contentType": "string",
+      "clientIp": "string",
+      "userAgent": "string",
+      "verified": true,
+      "verificationError": "string",
+      "receivedAt": "2026-01-01T12:00:00Z"
+    },
+    "IncomingForwardAttemptResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "destinationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "destinationUrl": "string",
+      "attemptNumber": 0,
+      "status": "PENDING",
+      "startedAt": "2026-01-01T12:00:00Z",
+      "finishedAt": "2026-01-01T12:00:00Z",
+      "responseCode": 0,
+      "responseHeadersJson": "string",
+      "responseBodySnippet": "string",
+      "errorMessage": "string",
+      "nextRetryAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "IncomingSourceData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "slug": "string",
+      "providerType": "string",
+      "verificationMode": "string",
+      "status": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "destinations": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "url": "string",
+          "authType": "string",
+          "enabled": true,
+          "maxAttempts": 0,
+          "timeoutSeconds": 0,
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ]
+    },
+    "IncomingSourceRequest": {
+      "name": "GitHub Webhooks",
+      "slug": "github-webhooks",
+      "providerType": "GENERIC",
+      "status": "ACTIVE",
+      "verificationMode": "NONE",
+      "hmacSecret": "string",
+      "hmacHeaderName": "X-Hub-Signature-256",
+      "hmacSignaturePrefix": "sha256=",
+      "rateLimitPerSecond": 100
+    },
+    "IncomingSourceResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "slug": "string",
+      "providerType": "GENERIC",
+      "status": "ACTIVE",
+      "ingressPathToken": "string",
+      "ingressUrl": "string",
+      "verificationMode": "NONE",
+      "hmacHeaderName": "string",
+      "hmacSignaturePrefix": "string",
+      "hmacSecretConfigured": true,
+      "rateLimitPerSecond": 0,
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "IngressResponse": {
+      "status": "accepted",
+      "requestId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "error": "not_found",
+      "message": "Webhook accepted for processing"
+    },
+    "InvoiceResponse": {
+      "id": "string",
+      "status": "string",
+      "amountCents": 0,
+      "currency": "string",
+      "planName": "string",
+      "periodStart": "2026-01-01T12:00:00Z",
+      "periodEnd": "2026-01-01T12:00:00Z",
+      "paidAt": "2026-01-01T12:00:00Z",
+      "invoiceUrl": "string"
+    },
+    "JsonNode": {},
+    "LatencyPercentiles": {
+      "p50": 0,
+      "p75": 0,
+      "p90": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0
+    },
+    "LiveUsage": {
+      "totalEvents": 0,
+      "totalDeliveries": 0,
+      "successfulDeliveries": 0,
+      "failedDeliveries": 0,
+      "dlqDeliveries": 0,
+      "pendingDeliveries": 0,
+      "totalIncomingEvents": 0,
+      "totalIncomingForwards": 0,
+      "activeEndpoints": 0,
+      "activeIncomingSources": 0,
+      "activeAlertRules": 0
+    },
+    "LoginRequest": {
+      "email": "you@example.com",
+      "password": "string"
+    },
+    "LogoutRequest": {
+      "refreshToken": "string"
+    },
+    "MemberData": {
+      "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "email": "string",
+      "fullName": "string",
+      "role": "string",
+      "status": "string",
+      "joinedAt": "2026-01-01T12:00:00Z"
+    },
+    "MemberResponse": {
+      "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "email": "string",
+      "role": "OWNER",
+      "status": "INVITED",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "MtlsConfigRequest": {
+      "clientCert": "string",
+      "clientKey": "string",
+      "caCert": "string"
+    },
+    "OnboardingStatusResponse": {
+      "hasEndpoints": true,
+      "hasSubscriptions": true,
+      "hasApiKeys": true,
+      "hasEvents": true,
+      "hasDeliveries": true,
+      "hasIncomingSources": true,
+      "hasIncomingDestinations": true
+    },
+    "OrganizationBillingResponse": {
+      "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "plan": {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "string",
+        "displayName": "string",
+        "maxEventsPerMonth": 0,
+        "maxEndpointsPerProject": 0,
+        "maxProjects": 0,
+        "maxMembers": 0,
+        "maxActiveTunnels": 0,
+        "rateLimitPerSecond": 0,
+        "maxRetentionDays": 0,
+        "features": {},
+        "priceMonthlyCents": 0,
+        "priceYearlyCents": 0
+      },
+      "billingStatus": "ACTIVE",
+      "billingEmail": "string",
+      "usage": {
+        "eventsThisMonth": 0,
+        "eventsLimit": 0,
+        "projects": 0,
+        "projectsLimit": 0
+      }
+    },
+    "OrganizationData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "billingEmail": "string",
+      "plan": "string",
+      "billingStatus": "string",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "OrganizationResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "OverviewMetrics": {
+      "totalEvents": 0,
+      "totalDeliveries": 0,
+      "successfulDeliveries": 0,
+      "failedDeliveries": 0,
+      "successRate": 0,
+      "avgLatencyMs": 0,
+      "p50LatencyMs": 0,
+      "p95LatencyMs": 0,
+      "p99LatencyMs": 0,
+      "eventsPerSecond": 0,
+      "deliveriesPerSecond": 0
+    },
+    "PageableObject": {
+      "paged": true,
+      "pageNumber": 0,
+      "pageSize": 0,
+      "offset": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "unpaged": true
+    },
+    "PageAlertEventResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "alertRuleId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "severity": "INFO",
+          "title": "string",
+          "message": "string",
+          "currentValue": 0,
+          "thresholdValue": 0,
+          "resolved": true,
+          "resolvedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageApiKeyResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "name": "string",
+          "keyPrefix": "string",
+          "lastUsedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "revokedAt": "2026-01-01T12:00:00Z",
+          "expiresAt": "2026-01-01T12:00:00Z",
+          "scope": "string",
+          "key": "string"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageAuditLogResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "action": "string",
+          "resourceType": "string",
+          "resourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "userEmail": "string",
+          "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "status": "string",
+          "errorMessage": "string",
+          "durationMs": 0,
+          "clientIp": "string",
+          "details": "string",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageCapturedRequestResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "string",
+          "testEndpointId": "string",
+          "method": "string",
+          "path": "string",
+          "queryString": "string",
+          "headers": "string",
+          "body": "string",
+          "contentType": "string",
+          "sourceIp": "string",
+          "userAgent": "string",
+          "receivedAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageDeliveryResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "subscriptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "status": "string",
+          "attemptCount": 0,
+          "maxAttempts": 0,
+          "nextRetryAt": "2026-01-01T12:00:00Z",
+          "lastAttemptAt": "2026-01-01T12:00:00Z",
+          "succeededAt": "2026-01-01T12:00:00Z",
+          "failedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageDlqItemResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "deliveryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "subscriptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "eventType": "string",
+          "endpointUrl": "string",
+          "attemptCount": 0,
+          "maxAttempts": 0,
+          "lastError": "string",
+          "failedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageEndpointResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "url": "string",
+          "description": "string",
+          "enabled": true,
+          "rateLimitPerSecond": 0,
+          "allowedSourceIps": "string",
+          "mtlsEnabled": true,
+          "verificationStatus": "string",
+          "verificationAttemptedAt": "2026-01-01T12:00:00Z",
+          "verificationCompletedAt": "2026-01-01T12:00:00Z",
+          "verificationSkipReason": "string",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "updatedAt": "2026-01-01T12:00:00Z",
+          "secret": "string"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageEventResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "eventType": "string",
+          "payload": "string",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "deliveriesCreated": 0
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageIncidentResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "title": "string",
+          "status": "OPEN",
+          "severity": "INFO",
+          "rcaNotes": "string",
+          "resolvedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "updatedAt": "2026-01-01T12:00:00Z",
+          "timeline": []
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageIncomingDestinationResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "url": "string",
+          "authType": "NONE",
+          "authConfigured": true,
+          "customHeadersJson": "string",
+          "enabled": true,
+          "maxAttempts": 0,
+          "timeoutSeconds": 0,
+          "retryDelays": "string",
+          "payloadTransform": "string",
+          "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "transformationName": "string",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "updatedAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageIncomingEventResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "sourceName": "string",
+          "requestId": "string",
+          "method": "string",
+          "path": "string",
+          "queryParams": "string",
+          "headersJson": "string",
+          "bodyRaw": "string",
+          "bodySha256": "string",
+          "contentType": "string",
+          "clientIp": "string",
+          "userAgent": "string",
+          "verified": true,
+          "verificationError": "string",
+          "receivedAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageIncomingForwardAttemptResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "destinationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "destinationUrl": "string",
+          "attemptNumber": 0,
+          "status": "PENDING",
+          "startedAt": "2026-01-01T12:00:00Z",
+          "finishedAt": "2026-01-01T12:00:00Z",
+          "responseCode": 0,
+          "responseHeadersJson": "string",
+          "responseBodySnippet": "string",
+          "errorMessage": "string",
+          "nextRetryAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageIncomingSourceResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "name": "string",
+          "slug": "string",
+          "providerType": "GENERIC",
+          "status": "ACTIVE",
+          "ingressPathToken": "string",
+          "ingressUrl": "string",
+          "verificationMode": "NONE",
+          "hmacHeaderName": "string",
+          "hmacSignaturePrefix": "string",
+          "hmacSecretConfigured": true,
+          "rateLimitPerSecond": 0,
+          "createdAt": "2026-01-01T12:00:00Z",
+          "updatedAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageReplaySessionResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "createdBy": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "status": "PENDING",
+          "fromDate": "2026-01-01T12:00:00Z",
+          "toDate": "2026-01-01T12:00:00Z",
+          "eventType": "string",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "sourceStatus": "PENDING",
+          "totalEvents": 0,
+          "processedEvents": 0,
+          "deliveriesCreated": 0,
+          "errors": 0,
+          "progressPercent": 0,
+          "errorMessage": "string",
+          "startedAt": "2026-01-01T12:00:00Z",
+          "completedAt": "2026-01-01T12:00:00Z",
+          "cancelledAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "durationMs": 0
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageTunnelRequestLog": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "tunnelSessionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "slug": "string",
+          "requestId": "string",
+          "method": "string",
+          "path": "string",
+          "queryString": "string",
+          "requestHeaders": {
+            "key": "value"
+          },
+          "requestBodySize": 0,
+          "responseStatus": 0,
+          "responseHeaders": {
+            "key": "value"
+          },
+          "responseBodySize": 0,
+          "durationMs": 0,
+          "error": "string",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PageWorkflowExecutionResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "workflowId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "triggerEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "status": "RUNNING",
+          "triggerData": {},
+          "startedAt": "2026-01-01T12:00:00Z",
+          "completedAt": "2026-01-01T12:00:00Z",
+          "errorMessage": "string",
+          "durationMs": 0,
+          "steps": []
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
+    "PiiMaskingRuleRequest": {
+      "patternName": "string",
+      "jsonPath": "string",
+      "maskStyle": "FULL",
+      "enabled": true
+    },
+    "PiiMaskingRuleResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "ruleType": "BUILTIN",
+      "patternName": "string",
+      "jsonPath": "string",
+      "maskStyle": "FULL",
+      "enabled": true,
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "PlanResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "displayName": "string",
+      "maxEventsPerMonth": 0,
+      "maxEndpointsPerProject": 0,
+      "maxProjects": 0,
+      "maxMembers": 0,
+      "maxActiveTunnels": 0,
+      "rateLimitPerSecond": 0,
+      "maxRetentionDays": 0,
+      "features": {},
+      "priceMonthlyCents": 0,
+      "priceYearlyCents": 0
+    },
+    "Predicate": {},
+    "ProjectData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "endpoints": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "url": "string",
+          "description": "string",
+          "enabled": true,
+          "mtlsEnabled": true,
+          "rateLimitPerSecond": 0,
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "subscriptions": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "eventType": "string",
+          "enabled": true,
+          "orderingEnabled": true,
+          "maxAttempts": 0,
+          "timeoutSeconds": 0,
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "incomingSources": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "name": "string",
+          "slug": "string",
+          "providerType": "string",
+          "verificationMode": "string",
+          "status": "string",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "destinations": []
+        }
+      ],
+      "apiKeys": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "name": "string",
+          "keyPrefix": "string",
+          "scope": "string",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "expiresAt": "2026-01-01T12:00:00Z",
+          "lastUsedAt": "2026-01-01T12:00:00Z"
+        }
+      ]
+    },
+    "ProjectRequest": {
+      "name": "string",
+      "description": "string",
+      "schemaValidationEnabled": true,
+      "schemaValidationPolicy": "string",
+      "idempotencyPolicy": "string"
+    },
+    "ProjectResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "schemaValidationEnabled": true,
+      "schemaValidationPolicy": "string",
+      "idempotencyPolicy": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "RecentEventSummary": {
+      "id": "string",
+      "type": "string",
+      "createdAt": "string",
+      "deliveryCount": 0
+    },
+    "RefreshTokenRequest": {
+      "refreshToken": "string"
+    },
+    "RegisterRequest": {
+      "email": "you@example.com",
+      "password": "string",
+      "fullName": "string",
+      "organizationName": "string"
+    },
+    "ReplayEstimateResponse": {
+      "totalEvents": 0,
+      "estimatedDeliveries": 0,
+      "activeSubscriptions": 0,
+      "warning": "string"
+    },
+    "ReplayEventResponse": {
+      "status": "replayed",
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "destinationsCount": 3
+    },
+    "ReplayRequest": {
+      "fromDate": "2026-01-01T12:00:00Z",
+      "toDate": "2026-01-01T12:00:00Z",
+      "eventType": "string",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "sourceStatus": "PENDING"
+    },
+    "ReplaySessionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "createdBy": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "status": "PENDING",
+      "fromDate": "2026-01-01T12:00:00Z",
+      "toDate": "2026-01-01T12:00:00Z",
+      "eventType": "string",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "sourceStatus": "PENDING",
+      "totalEvents": 0,
+      "processedEvents": 0,
+      "deliveriesCreated": 0,
+      "errors": 0,
+      "progressPercent": 0,
+      "errorMessage": "string",
+      "startedAt": "2026-01-01T12:00:00Z",
+      "completedAt": "2026-01-01T12:00:00Z",
+      "cancelledAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "durationMs": 0
+    },
+    "ResetPasswordRequest": {
+      "token": "string",
+      "newPassword": "string"
+    },
+    "ResourceUsage": {
+      "current": 0,
+      "limit": 0,
+      "percentUsed": 0
+    },
+    "RuleActionRequest": {
+      "type": "ROUTE",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "config": {},
+      "sortOrder": 0
+    },
+    "RuleActionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "type": "ROUTE",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointUrl": "string",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "transformationName": "string",
+      "config": {},
+      "sortOrder": 0,
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "RuleRequest": {
+      "name": "string",
+      "description": "string",
+      "enabled": true,
+      "priority": 0,
+      "eventTypePattern": "string",
+      "conditions": {},
+      "actions": [
+        {
+          "type": "ROUTE",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "config": {},
+          "sortOrder": 0
+        }
+      ]
+    },
+    "RuleResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "enabled": true,
+      "priority": 0,
+      "eventTypePattern": "string",
+      "conditions": {},
+      "actions": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "type": "ROUTE",
+          "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "endpointUrl": "string",
+          "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "transformationName": "string",
+          "config": {},
+          "sortOrder": 0,
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "totalExecutions": 0,
+      "totalMatches": 0,
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "SchemaChangeResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventTypeId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventTypeName": "string",
+      "fromVersionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "fromVersion": 0,
+      "toVersionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "toVersion": 0,
+      "changeSummary": "string",
+      "breaking": true,
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "SharedDebugLinkPublicResponse": {
+      "eventType": "string",
+      "sanitizedPayload": "string",
+      "eventCreatedAt": "2026-01-01T12:00:00Z",
+      "linkExpiresAt": "2026-01-01T12:00:00Z",
+      "projectName": "string"
+    },
+    "SharedDebugLinkRequest": {
+      "expiryHours": 0
+    },
+    "SharedDebugLinkResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "token": "string",
+      "shareUrl": "string",
+      "expiresAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "viewCount": 0
+    },
+    "SkipVerificationRequest": {
+      "reason": "string"
+    },
+    "SortObject": {
+      "sorted": true,
+      "empty": true,
+      "unsorted": true
+    },
+    "StepExecutionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "nodeId": "string",
+      "nodeType": "string",
+      "status": "PENDING",
+      "inputData": {},
+      "outputData": {},
+      "errorMessage": "string",
+      "attemptCount": 0,
+      "durationMs": 0,
+      "startedAt": "2026-01-01T12:00:00Z",
+      "completedAt": "2026-01-01T12:00:00Z"
+    },
+    "SubscriptionData": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "string",
+      "enabled": true,
+      "orderingEnabled": true,
+      "maxAttempts": 0,
+      "timeoutSeconds": 0,
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "SubscriptionRequest": {
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "string",
+      "enabled": true,
+      "orderingEnabled": true,
+      "maxAttempts": 0,
+      "timeoutSeconds": 0,
+      "retryDelays": "string",
+      "payloadTemplate": "string",
+      "customHeaders": "string",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "SubscriptionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "eventType": "string",
+      "enabled": true,
+      "orderingEnabled": true,
+      "maxAttempts": 0,
+      "timeoutSeconds": 0,
+      "retryDelays": "string",
+      "payloadTemplate": "string",
+      "customHeaders": "string",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "transformationName": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "TestEndpointRequest": {
+      "name": "string",
+      "description": "string",
+      "ttlHours": 0
+    },
+    "TestEndpointResponse": {
+      "id": "string",
+      "projectId": "string",
+      "slug": "string",
+      "url": "string",
+      "name": "string",
+      "description": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "expiresAt": "2026-01-01T12:00:00Z",
+      "requestCount": 0
+    },
+    "TimelineEntry": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "entryType": "string",
+      "title": "string",
+      "detail": "string",
+      "deliveryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "TimelineEntryRequest": {
+      "entryType": "FAILURE",
+      "title": "string",
+      "detail": "string",
+      "deliveryId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "TimeRange": {
+      "from": "string",
+      "to": "string",
+      "granularity": "string"
+    },
+    "TimeSeriesPoint": {
+      "timestamp": "string",
+      "total": 0,
+      "success": 0,
+      "failed": 0,
+      "avgLatencyMs": 0
+    },
+    "TransformationRequest": {
+      "name": "Stripe v2 → CRM v1",
+      "description": "Normalizes Stripe payment events to CRM format",
+      "template": {
+        "event_type": "${$.type}",
+        "amount": "${$.data.amount}"
+      },
+      "enabled": true
+    },
+    "TransformationResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "template": "string",
+      "version": 0,
+      "enabled": true,
+      "subscriptionCount": 0,
+      "destinationCount": 0,
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "TransformPreviewRequest": {
+      "inputPayload": "string",
+      "transformExpression": "string",
+      "template": "string",
+      "transformationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "customHeaders": "string"
+    },
+    "TransformPreviewResponse": {
+      "outputPayload": "string",
+      "outputHeaders": "string",
+      "success": true,
+      "errors": [
+        "string"
+      ]
+    },
+    "TunnelCreateResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "tunnelToken": "string",
+      "publicSlug": "string",
+      "publicUrl": "string",
+      "localPort": 0,
+      "status": "ACTIVE",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "TunnelRequestLog": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "tunnelSessionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "slug": "string",
+      "requestId": "string",
+      "method": "string",
+      "path": "string",
+      "queryString": "string",
+      "requestHeaders": {
+        "key": "string"
+      },
+      "requestBodySize": 0,
+      "responseStatus": 0,
+      "responseHeaders": {
+        "key": "string"
+      },
+      "responseBodySize": 0,
+      "durationMs": 0,
+      "error": "string",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "TunnelSessionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "publicSlug": "string",
+      "publicUrl": "string",
+      "localPort": 0,
+      "status": "ACTIVE",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "lastHeartbeat": "2026-01-01T12:00:00Z",
+      "closedAt": "2026-01-01T12:00:00Z",
+      "clientInfo": "string"
+    },
+    "UpdateBillingRequest": {
+      "billingEmail": "you@example.com"
+    },
+    "UpdateOrganizationRequest": {
+      "name": "string"
+    },
+    "UpdateProfileRequest": {
+      "fullName": "string"
+    },
+    "UsageResponse": {
+      "events": {
+        "current": 0,
+        "limit": 0,
+        "percentUsed": 0
+      },
+      "endpoints": {
+        "current": 0,
+        "limit": 0,
+        "percentUsed": 0
+      },
+      "projects": {
+        "current": 0,
+        "limit": 0,
+        "percentUsed": 0
+      },
+      "members": {
+        "current": 0,
+        "limit": 0,
+        "percentUsed": 0
+      },
+      "rateLimitPerSecond": 0,
+      "retentionDays": 0,
+      "periodStart": "2026-01-01T12:00:00Z",
+      "periodEnd": "2026-01-01T12:00:00Z"
+    },
+    "UsageSnapshot": {
+      "eventsThisMonth": 0,
+      "eventsLimit": 0,
+      "projects": 0,
+      "projectsLimit": 0
+    },
+    "UsageStatsResponse": {
+      "current": {
+        "totalEvents": 0,
+        "totalDeliveries": 0,
+        "successfulDeliveries": 0,
+        "failedDeliveries": 0,
+        "dlqDeliveries": 0,
+        "pendingDeliveries": 0,
+        "totalIncomingEvents": 0,
+        "totalIncomingForwards": 0,
+        "activeEndpoints": 0,
+        "activeIncomingSources": 0,
+        "activeAlertRules": 0
+      },
+      "history": [
+        {
+          "date": "string",
+          "eventsCount": 0,
+          "deliveriesCount": 0,
+          "successfulDeliveries": 0,
+          "failedDeliveries": 0,
+          "dlqCount": 0,
+          "incomingEventsCount": 0,
+          "incomingForwardsCount": 0,
+          "avgLatencyMs": 0,
+          "p95LatencyMs": 0
+        }
+      ]
+    },
+    "UserResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "email": "string",
+      "fullName": "string",
+      "status": "ACTIVE"
+    },
+    "VerificationResponse": {
+      "success": true,
+      "message": "string",
+      "status": "string"
+    },
+    "WebhookCaptureResponse": {
+      "success": true,
+      "message": "string",
+      "requestId": "string",
+      "receivedAt": "string",
+      "error": "string",
+      "challenge": "string"
+    },
+    "WorkflowExecutionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "workflowId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "triggerEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "status": "RUNNING",
+      "triggerData": {},
+      "startedAt": "2026-01-01T12:00:00Z",
+      "completedAt": "2026-01-01T12:00:00Z",
+      "errorMessage": "string",
+      "durationMs": 0,
+      "steps": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "nodeId": "string",
+          "nodeType": "string",
+          "status": "PENDING",
+          "inputData": {},
+          "outputData": {},
+          "errorMessage": "string",
+          "attemptCount": 0,
+          "durationMs": 0,
+          "startedAt": "2026-01-01T12:00:00Z",
+          "completedAt": "2026-01-01T12:00:00Z"
+        }
+      ]
+    },
+    "WorkflowRequest": {
+      "name": "string",
+      "description": "string",
+      "enabled": true,
+      "definition": {},
+      "triggerType": "WEBHOOK_EVENT",
+      "triggerConfig": {}
+    },
+    "WorkflowResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "description": "string",
+      "enabled": true,
+      "definition": {},
+      "triggerType": "WEBHOOK_EVENT",
+      "triggerConfig": {},
+      "version": 0,
+      "createdAt": "2026-01-01T12:00:00Z",
+      "updatedAt": "2026-01-01T12:00:00Z",
+      "totalExecutions": 0,
+      "successfulExecutions": 0,
+      "failedExecutions": 0
+    }
   }
 }

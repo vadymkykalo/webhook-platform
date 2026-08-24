@@ -1,5 +1,8 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
+
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -121,6 +124,7 @@ public class ReplayService {
                 .build();
     }
 
+    @Auditable(action = AuditAction.REPLAY, resourceType = "ReplaySession")
     @Transactional
     public ReplaySessionResponse create(UUID projectId, ReplayRequest request, UUID userId) {
         validateProjectOwnership(projectId);

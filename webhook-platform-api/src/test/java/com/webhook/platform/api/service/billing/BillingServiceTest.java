@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.*;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.InvoiceResponse;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class BillingServiceTest {
     private TestBillingProvider stripeProvider;
     private BillingService service;
 
+    private Plan freePlan;
     private Plan starterPlan;
     private Plan proPlan;
     private Organization org;
@@ -52,6 +54,8 @@ class BillingServiceTest {
                 .priceMonthlyCents(2900).priceYearlyCents(29000).build();
         proPlan = Plan.builder().id(UUID.randomUUID()).name("pro").displayName("Pro")
                 .priceMonthlyCents(9900).priceYearlyCents(99000).build();
+        freePlan = Plan.builder().id(UUID.randomUUID()).name("free").displayName("Free")
+                .priceMonthlyCents(0).build();
 
         org = Organization.builder().id(ORG_ID).name("Test Org").billingEmail("test@example.com").build();
 
@@ -103,16 +107,80 @@ class BillingServiceTest {
 
     // ── assignPlan ──────────────────────────────────────────────────
 
+    /*
+     * `PUT /api/v1/billing/organization/plan` is guarded by nothing but the OWNER role, and
+     * assignPlan used to set whatever plan name it was handed. Its own OpenAPI description
+     * said "for paid plans, use checkout instead" — a sentence, not a check — so any customer
+     * could PUT {"planName":"pro"} and be on Pro without paying. The test that stood here
+     * asserted exactly that behaviour, which is how it survived.
+     */
+
     @Test
-    void assignPlan_updatesOrgAndEvictsCache() {
+    void assignPlan_allowsTheFreePlan() {
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("free")).thenReturn(Optional.of(freePlan));
+
+        service.assignPlan("free");
+
+        assertThat(org.getPlan()).isEqualTo(freePlan);
+        verify(organizationRepository).save(org);
+        verify(entitlementService).evictPlanCache(any());
+    }
+
+    @Test
+    void assignPlan_refusesAPaidPlanWithNoSubscriptionBehindIt() {
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.assignPlan("pro"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("checkout");
+
+        assertThat(org.getPlan()).isNull();
+        verify(organizationRepository, never()).save(any());
+    }
+
+    @Test
+    void assignPlan_refusesTheSelfHostedPlan() {
+        Plan selfHosted = Plan.builder().id(UUID.randomUUID()).name("self_hosted")
+                .displayName("Self-Hosted").priceMonthlyCents(0).build();
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("self_hosted")).thenReturn(Optional.of(selfHosted));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID)).thenReturn(Optional.empty());
+
+        /* Zero-priced, seeded active, and unlimited on every quota. A price test would have
+           waved it through — which is why the rule is a whitelist of one name. */
+        assertThatThrownBy(() -> service.assignPlan("self_hosted"))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void assignPlan_allowsAPlanTheOrganizationIsAlreadyPayingFor() {
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+        when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
+        when(subscriptionRepository.findActiveByOrganizationId(ORG_ID))
+                .thenReturn(Optional.of(BillingSubscription.builder().id(SUB_ID).plan(proPlan).build()));
+
+        // Re-applying the plan behind a live subscription is a repair, not a purchase.
+        service.assignPlan("pro");
+
+        assertThat(org.getPlan()).isEqualTo(proPlan);
+    }
+
+    @Test
+    void assignPlan_isUnrestrictedWhenBillingIsOff() {
+        BillingService selfHosted = new BillingService(
+                false, providerRegistry, planRepository, organizationRepository,
+                subscriptionRepository, invoiceRepository, paymentRepository,
+                entitlementService, lifecycleService);
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
         when(planRepository.findByName("pro")).thenReturn(Optional.of(proPlan));
 
-        service.assignPlan( "pro");
+        // No money is involved in a self-hosted deployment, so there is nothing to protect.
+        selfHosted.assignPlan("pro");
 
         assertThat(org.getPlan()).isEqualTo(proPlan);
-        verify(organizationRepository).save(org);
-        verify(entitlementService).evictPlanCache(any());
     }
 
     // ── createCheckoutSession ───────────────────────────────────────

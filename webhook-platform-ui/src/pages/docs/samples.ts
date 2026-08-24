@@ -219,3 +219,19 @@ $event = $client->events->send(
     data: ['orderId' => 'ord_12345', 'amount' => 99.99],
 );`,
 };
+
+/**
+ * What a delivery looks like while a rotated secret is inside its grace window.
+ *
+ * The two `v1` values are the same body signed with the new secret and with the one being
+ * retired. A receiver that has deployed either of them verifies; the point of showing the
+ * header rather than describing it is that a verifier written to read "the" v1 will silently
+ * pick one and reject half the traffic.
+ */
+export const rotationSample = `POST /webhooks/orders HTTP/1.1
+Host: api.customer.com
+X-Signature: t=1735689600000,v1=8f2a41c7...new,v1=3b90de55...retired
+X-Event-Id: evt_9c41e8f2
+X-Timestamp: 1735689600000
+Content-Type: application/json`;
+

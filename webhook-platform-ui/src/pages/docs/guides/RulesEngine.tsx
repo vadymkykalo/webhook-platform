@@ -8,6 +8,7 @@ import {
   Note,
   Section,
   SketchBox,
+  SketchChip,
   SketchEdge,
   SketchText,
   StepRow,
@@ -24,23 +25,51 @@ function RuleOrderDiagram() {
 
   return (
     <Diagram
-      viewBox="0 0 440 260"
+      viewBox="0 0 440 248"
+      maxWidth={560}
       label={t('docsPage.rulesEngine.diagAlt')}
       caption={t('docsPage.rulesEngine.diagCaption')}
     >
-      <SketchEdge d="M220,62 V84" />
-      <SketchEdge d="M220,138 V160" />
-      <SketchEdge d="M304,112 H326" tone="halt" />
-      <SketchText x={315} y={84} size={12} mono tone="halt">
-        DROP
-      </SketchText>
+      <SketchEdge d="M180,70 V96" />
+      <SketchEdge d="M180,154 V182" />
 
-      <SketchBox x={136} y={16} w={168} label={t('docsPage.concepts.event')} />
-      <SketchBox x={136} y={90} w={168} label={t('docsPage.rulesEngine.diagRules')} />
-      <SketchBox x={330} y={90} w={106} label={t('docsPage.rulesEngine.diagStop')} tone="halt" />
-      <SketchBox x={136} y={166} w={168} label={t('docsPage.rulesEngine.diagSubs')} tone="ok" />
+      {/* DROP leaves the pipeline; the other three change the event and let it carry on.
+          The earlier drawing named only DROP, so a reader could not tell whether TAG was a
+          terminal action too. */}
+      <SketchEdge d="M264,125 H306" tone="halt" />
+      <SketchChip x={285} y={110} tone="halt" leaderFrom={125}>DROP</SketchChip>
 
-      <SketchText x={220} y={246} size={13}>
+      <SketchBox
+        x={96}
+        y={22}
+        w={168}
+        h={48}
+        role={t('docsPage.concepts.event')}
+        sub="order.created"
+        align="start"
+      />
+      <SketchBox
+        x={96}
+        y={100}
+        w={168}
+        h={54}
+        role={t('docsPage.rulesEngine.diagRules')}
+        sub="ROUTE · TRANSFORM · TAG"
+        align="start"
+      />
+      <SketchBox x={310} y={100} w={118} h={54} label={t('docsPage.rulesEngine.diagStop')} tone="halt" />
+      <SketchBox
+        x={96}
+        y={186}
+        w={168}
+        h={48}
+        role={t('docsPage.rulesEngine.diagSubs')}
+        sub={t('docsPage.rulesEngine.diagSubsSub')}
+        align="start"
+        tone="ok"
+      />
+
+      <SketchText x={310} y={200} anchor="start" size={11}>
         {t('docsPage.rulesEngine.diagFoot')}
       </SketchText>
     </Diagram>

@@ -48,6 +48,16 @@ import VerificationGate from '../components/VerificationGate';
 const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'CUSTOM'];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
 
+/**
+ * The providers WebhookVerifierFactory actually ships a verifier for.
+ *
+ * PROVIDER mode with any other name — GENERIC, TWILIO, CUSTOM — is refused by the API now,
+ * and used to be worse: it saved, and then threw at ingress once the provider was already
+ * sending. Narrowing the list here means the choice that fails cannot be made; the server
+ * check stays the authority.
+ */
+const VERIFIABLE_PROVIDERS: ProviderType[] = ['STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY'];
+
 export default function IncomingSourcesPage() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
@@ -334,14 +344,27 @@ export default function IncomingSourcesPage() {
                     id="src-provider" value={formProvider}
                     onChange={(e) => setFormProvider(e.target.value as ProviderType)} disabled={saving}
                   >
-                    {PROVIDER_TYPES.map((p) => <option key={p} value={p}>{p}</option>)}
+                    {(formVerification === 'PROVIDER' ? VERIFIABLE_PROVIDERS : PROVIDER_TYPES)
+                      .map((p) => <option key={p} value={p}>{p}</option>)}
                   </Select>
+                  {formVerification === 'PROVIDER' && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('incomingSources.createDialog.providerVerifiedHint')}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="src-verification">{t('incomingSources.createDialog.verificationMode')}</Label>
                   <Select
                     id="src-verification" value={formVerification}
-                    onChange={(e) => setFormVerification(e.target.value as VerificationMode)} disabled={saving}
+                    onChange={(e) => {
+                      const next = e.target.value as VerificationMode;
+                      setFormVerification(next);
+                      if (next === 'PROVIDER' && !VERIFIABLE_PROVIDERS.includes(formProvider)) {
+                        setFormProvider('STRIPE');
+                      }
+                    }}
+                    disabled={saving}
                   >
                     {VERIFICATION_MODES.map((v) => <option key={v} value={v}>{v}</option>)}
                   </Select>

@@ -38,6 +38,13 @@ interface RenderPageOptions {
   /** Initial URL to render at, e.g. `/projects/${TEST_PROJECT_ID}/deliveries` */
   initialEntry: string;
   queryClient?: QueryClient;
+  /**
+   * Overrides on the fake auth state. Almost every page here is behind a login,
+   * so the default is an authenticated OWNER — but the public pages render a
+   * different set of calls to action for a signed-out visitor, and that is the
+   * variant worth asserting on.
+   */
+  auth?: Partial<AuthState>;
 }
 
 /**
@@ -45,8 +52,9 @@ interface RenderPageOptions {
  * router (for useParams), an authenticated OWNER auth context (for usePermissions),
  * and a fresh, non-retrying QueryClient (for the TanStack Query hooks).
  */
-export function renderPage(ui: ReactElement, { path, initialEntry, queryClient }: RenderPageOptions) {
+export function renderPage(ui: ReactElement, { path, initialEntry, queryClient, auth }: RenderPageOptions) {
   const client = queryClient ?? createTestQueryClient();
+  const authState: AuthState = { ...FAKE_AUTH_STATE, ...auth };
   return render(
     // Matches the top-level <Suspense> in main.tsx: useTranslation() can
     // suspend while its locale bundle loads (see src/i18n). setup.ts
@@ -54,7 +62,7 @@ export function renderPage(ui: ReactElement, { path, initialEntry, queryClient }
     // normally be hit, but it keeps tests honest with production wiring.
     <Suspense fallback={null}>
       <QueryClientProvider client={client}>
-        <AuthContext.Provider value={FAKE_AUTH_STATE}>
+        <AuthContext.Provider value={authState}>
           <MemoryRouter initialEntries={[initialEntry]}>
             <Routes>
               <Route path={path} element={ui} />

@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
+  SlidersHorizontal,
   Book,
   Code,
   FileCheck,
@@ -24,6 +25,7 @@ import {
 export type SectionId =
   | 'overview'
   | 'getting-started'
+  | 'configuration'
   | 'authentication'
   | 'webhook-security'
   | 'retries'
@@ -46,6 +48,7 @@ export interface SectionMeta {
 export const GUIDE_SECTIONS: SectionMeta[] = [
   { id: 'overview', labelKey: 'docsPage.sections.overview', icon: Book },
   { id: 'getting-started', labelKey: 'docsPage.sections.gettingStarted', icon: Zap },
+  { id: 'configuration', labelKey: 'docsPage.sections.configuration', icon: SlidersHorizontal },
   { id: 'authentication', labelKey: 'docsPage.sections.authentication', icon: Key },
   { id: 'webhook-security', labelKey: 'docsPage.sections.webhookSecurity', icon: Shield },
   { id: 'retries', labelKey: 'docsPage.sections.retries', icon: RefreshCw },
@@ -82,6 +85,21 @@ const LEGACY_ANCHORS: Record<string, { section: SectionId; group?: string }> = {
   api: { section: 'api-reference' },
   reference: { section: 'api-reference' },
 };
+
+/**
+ * Resolves the `/docs/:sectionId` path segment, or undefined when it names no
+ * section — a typo'd or stale URL then falls through to the overview rather
+ * than rendering a blank page.
+ */
+export function resolveSectionId(param: string | undefined): SectionId | undefined {
+  if (param && ALL_IDS.has(param)) return param as SectionId;
+  return undefined;
+}
+
+/** The path a section is addressed by. Overview is the docs root, not `/docs/overview`. */
+export function sectionPath(id: SectionId): string {
+  return id === 'overview' ? '/docs' : `/docs/${id}`;
+}
 
 /** Resolves a URL hash (current or long-obsolete) to a section and, maybe, a group. */
 export function resolveAnchor(hash: string): { section: SectionId; group?: string } {

@@ -5,6 +5,7 @@ import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.HeaderSanitizer;
+import com.webhook.platform.common.security.SecretRotationWindow;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.worker.domain.entity.Delivery;
@@ -287,7 +288,8 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         Delivery delivery = claim.delivery();
         String secret = decryptSecret();
         signatureTimestamp = System.currentTimeMillis();
-        String signature = WebhookSignatureUtils.buildSignatureHeader(secret, signatureTimestamp, body);
+        String signature = WebhookSignatureUtils.buildSignatureHeader(
+                secret, secretInsideGraceWindow(), signatureTimestamp, body);
 
         String sequenceHeader = delivery.getSequenceNumber() != null
                 ? String.valueOf(delivery.getSequenceNumber())
@@ -508,6 +510,38 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         } catch (Exception e) {
             throw new IllegalStateException("Failed to decrypt secret for endpoint " + endpoint.getId()
                     + ". Check WEBHOOK_ENCRYPTION_KEY configuration.", e);
+        }
+    }
+
+    /**
+     * The retired secret, while its grace window is still open — otherwise {@code null}.
+     *
+     * <p>Rotating used to be a breaking change for the receiver: the new secret took effect
+     * on the next delivery, so every webhook failed their verification until they had
+     * deployed it. Signing with both for the window means the two deploys do not have to be
+     * simultaneous.
+     *
+     * <p>A failure to decrypt the <em>previous</em> secret is not fatal the way a failure on
+     * the current one is: the delivery is still correctly signed with the secret the customer
+     * is migrating to. It is logged and the second signature is dropped, rather than taking
+     * down a delivery over a secret that is on its way out.
+     */
+    private String secretInsideGraceWindow() {
+        String encrypted = endpoint.getSecretPreviousEncrypted();
+        Instant rotatedAt = endpoint.getSecretRotatedAt();
+        if (encrypted == null || rotatedAt == null) {
+            return null;
+        }
+        if (!SecretRotationWindow.isOpen(rotatedAt, endpoint.getSecretRotationGracePeriodHours(), Instant.now())) {
+            return null;
+        }
+        try {
+            return encryptionKeyRegistry.decryptWithFallback(
+                    encrypted, endpoint.getSecretPreviousIv(), endpoint.getEncryptionKeyVersion());
+        } catch (Exception e) {
+            log.warn("Endpoint {}: previous secret is inside its rotation grace window but could not be "
+                    + "decrypted; signing with the current secret only", endpoint.getId(), e);
+            return null;
         }
     }
 
