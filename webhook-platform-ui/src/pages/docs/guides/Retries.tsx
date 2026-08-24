@@ -7,6 +7,7 @@ import {
   Note,
   Section,
   SketchBox,
+  SketchChip,
   SketchEdge,
   SketchText,
 } from '../primitives';
@@ -77,10 +78,17 @@ function DeliveryStateMachine() {
       </SketchText>
 
       {/* retryable failure: PROCESSING → PENDING, round the right */}
+      {/* The wait is the whole subject of this page and the state machine could not show it:
+          "retryable failure" sent the reader back to PENDING with no hint that the return
+          trip takes a minute the first time and six hours the fifth. */}
       <SketchEdge d={`M295,163 H400 V47 H${SPINE_X + 82}`} tone="retry" />
-      <SketchText x={394} y={104} anchor="end" tone="retry">
+      <SketchText x={392} y={98} anchor="end" size={12} tone="retry">
         {t('docsPage.retries.edgeRetry')}
       </SketchText>
+      {/* Short on purpose: the gap between PROCESSING and the loop's vertical run is about a
+          hundred units, and the full ladder is spelled out in the list below. What the
+          drawing owes the reader here is that the return trip is not instant. */}
+      <SketchChip x={345} y={120} tone="retry">1m → 24h</SketchChip>
 
       {/* deferral: PROCESSING → PENDING, round the left. Dashed, because
           nothing was sent and no attempt was spent. */}
@@ -93,7 +101,9 @@ function DeliveryStateMachine() {
       <SketchBox x={145} y={PROCESSING_Y} w={150} label="PROCESSING" tone="retry" />
       <SketchBox x={20} y={TERMINAL_Y} w={128} label="SUCCESS" tone="ok" />
       <SketchBox x={156} y={TERMINAL_Y} w={128} label="FAILED" tone="halt" />
-      <SketchBox x={292} y={TERMINAL_Y} w={128} label="DLQ" tone="halt" />
+      {/* Both names, because the API status really is DLQ and the screen really says Failed
+          Messages — a reader meets one of them in a payload and the other in the product. */}
+      <SketchBox x={292} y={TERMINAL_Y} w={128} label="DLQ" sub="Failed Messages" tone="halt" />
     </Diagram>
   );
 }

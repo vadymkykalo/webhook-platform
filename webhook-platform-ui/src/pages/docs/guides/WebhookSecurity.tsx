@@ -10,6 +10,7 @@ import {
   Prose,
   Section,
   SketchBox,
+  SketchChip,
   SketchEdge,
   SketchText,
   SubSection,
@@ -39,17 +40,15 @@ function SigningDiagram() {
       caption={t('docsPage.security.diagCaption')}
     >
       <SketchEdge d="M158,40 H278" />
-      <SketchText x={218} y={30} size={12} mono>
-        POST
-      </SketchText>
+      <SketchChip x={218} y={24}>POST</SketchChip>
 
       <SketchBox x={14} y={18} w={144} h={44} label="Hookflow" />
-      <SketchBox x={282} y={18} w={144} h={44} label={t('docsPage.security.diagReceiver')} />
+      <SketchBox x={282} y={18} w={144} h={44} role={t('docsPage.security.diagReceiver')} sub="api.acme.io" align="start" />
 
       {/* what actually travels */}
       <SketchEdge d="M354,62 V78" />
       <SketchBox x={54} y={82} w={332} h={40} />
-      <SketchText x={220} y={107} size={13} mono>
+      <SketchText x={220} y={107} size={12.5} mono>
         X-Signature: t=&lt;unix-ms&gt;,v1=&lt;hex&gt;
       </SketchText>
       <SketchText x={220} y={140} size={12}>

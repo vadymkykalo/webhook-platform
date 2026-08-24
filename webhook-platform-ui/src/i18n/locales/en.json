@@ -1548,9 +1548,9 @@
       "conceptRule": "Rule",
       "conceptRuleDesc": "An event type pattern, a condition tree and the actions to run when both match.",
       "concepts": "Concepts",
-      "diagAlt": "An event flows into rules. A matching `DROP` action ends it there. Otherwise it flows on to subscription matching, which is where deliveries are created.",
-      "diagCaption": "Rules are evaluated before the subscription lookup, which is why `DROP` is cheap and total: at that point no delivery has been created, so there is nothing to cancel.",
-      "diagFoot": "the event is still stored, and still answers 201",
+      "diagAlt": "An order.created event flows into the rules stage, where ROUTE, TRANSFORM and TAG change it and let it continue. A matching DROP action ends it there instead. What survives reaches subscription matching, which creates one delivery per match.",
+      "diagCaption": "Rules run before the subscription lookup, which is why DROP is cheap and total: at that point no delivery has been created, so there is nothing to cancel and nothing a customer half-received.",
+      "diagFoot": "no delivery exists yet",
       "diagRules": "Rules",
       "diagStop": "stops here",
       "diagSubs": "Subscriptions matched",
@@ -1568,7 +1568,8 @@
       "step4": "Actions run",
       "step4Desc": "Every action of a matching rule runs in its configured order.",
       "subtitle": "Match an event on its content, then route, transform, tag or drop it — before any delivery exists.",
-      "title": "Rules Engine"
+      "title": "Rules Engine",
+      "diagSubsSub": "one delivery per match"
     },
     "schemaRegistry": {
       "compatBackwardDesc": "The new schema can read data written by the old one.",
@@ -1601,7 +1602,10 @@
       "wildcardMultiDesc": "Any number of segments: order.created, order.line.added, order.a.b.c.",
       "wildcardRouting": "Event type patterns",
       "wildcardRoutingDesc": "What a subscription may point at, beyond one exact type:",
-      "wildcardSingleDesc": "One segment: order.created, order.updated. Not order.line.added."
+      "wildcardSingleDesc": "One segment: order.created, order.updated. Not order.line.added.",
+      "lifecycleDraftDoes": "validates nothing",
+      "lifecycleActiveDoes": "what payloads are checked against",
+      "lifecycleDeprecatedDoes": "kept, no longer enforced"
     },
     "sdks": {
       "deliveries": "Deliveries",

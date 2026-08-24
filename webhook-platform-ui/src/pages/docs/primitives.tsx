@@ -610,6 +610,14 @@ export function SketchRail({
 }
 
 /** Diagram text that is not a box label: an edge annotation, a heading, a footnote. */
+/**
+ * Diagram text that is not a box label: an edge annotation, a heading, a footnote.
+ *
+ * Backticks are stripped rather than rendered. Docs prose marks identifiers with them for
+ * `Prose` to turn into chips, and several of those same strings are also used as edge labels
+ * — where there is no chip to make, so the reader saw a literal `` `2xx` `` painted into the
+ * drawing.
+ */
 export function SketchText({
   x,
   y,
@@ -636,7 +644,7 @@ export function SketchText({
       className={mono ? 'font-mono' : undefined}
       fill={tone && tone !== 'rail' ? `hsl(var(--${tone}))` : 'hsl(var(--muted-foreground))'}
     >
-      {children}
+      {children.replace(/`/g, '')}
     </text>
   );
 }
