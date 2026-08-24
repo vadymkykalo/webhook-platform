@@ -2,13 +2,24 @@ import { Link, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
 import { RailRule } from '../pages/landing/primitives';
+import LandingNav from '../pages/landing/LandingNav';
+import { REPO_URL } from '../pages/landing/plans';
 
-const REPO_URL = 'https://github.com/vadymkykalo/webhook-platform';
 const API_REFERENCE_URL = 'https://vadymkykalo.github.io/webhook-platform/';
 
-export default function PublicLayout() {
+/**
+ * The chrome every public page shares.
+ *
+ * `nav` is opt-in because the documentation brings its own: a full-height
+ * sidebar with a sticky bar of its own on small screens, which a second sticky
+ * header would sit on top of. The footer is not opt-in — /docs used to render
+ * outside this layout entirely, so the deepest page in the funnel was the one
+ * page with no link back to pricing, the repository or a signup.
+ */
+export default function PublicLayout({ nav = true }: { nav?: boolean }) {
   return (
     <div className="flex min-h-screen flex-col">
+      {nav && <LandingNav />}
       <div className="flex-1">
         <Outlet />
       </div>
@@ -61,30 +72,21 @@ export function Footer() {
           <div>
             <h2 className="mono-label mb-3">{t('footer.product')}</h2>
             <ul className="space-y-2">
-              <li>
-                <a href="/#how-it-works" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                  {t('landing.nav.directions')}
-                </a>
-              </li>
-              <li>
-                <a href="/#retries" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                  {t('footer.retries')}
-                </a>
-              </li>
-              <li>
-                <a href="/#quickstart" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                  {t('footer.quickstart')}
-                </a>
-              </li>
+              <FooterLink to="/#capabilities">{t('footer.capabilities')}</FooterLink>
+              <FooterLink to="/#how-it-works">{t('footer.directions')}</FooterLink>
+              <FooterLink to="/#security">{t('footer.security')}</FooterLink>
+              <FooterLink to="/pricing">{t('footer.pricing')}</FooterLink>
               <FooterLink to="/docs">{t('footer.documentation')}</FooterLink>
             </ul>
           </div>
           <div>
             <h2 className="mono-label mb-3">{t('footer.access')}</h2>
             <ul className="space-y-2">
-              <FooterLink to="/login">{t('footer.signIn')}</FooterLink>
               <FooterLink to="/register">{t('footer.createAccount')}</FooterLink>
+              <FooterLink to="/login">{t('footer.signIn')}</FooterLink>
               <FooterLink to="/admin/dashboard">{t('footer.dashboard')}</FooterLink>
+              <FooterLink to="/contact">{t('footer.contact')}</FooterLink>
+              <FooterLink to="/#faq">{t('footer.faq')}</FooterLink>
             </ul>
           </div>
           <div>

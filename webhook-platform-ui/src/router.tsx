@@ -15,6 +15,8 @@ const ResetPasswordPage = lazy(() => import('./auth/ResetPasswordPage'));
 const AcceptInvitePage = lazy(() => import('./auth/AcceptInvitePage'));
 const DeviceApprovePage = lazy(() => import('./auth/DeviceApprovePage'));
 const DocumentationPage = lazy(() => import('./pages/DocumentationPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
@@ -73,6 +75,14 @@ export const router = createBrowserRouter([
         path: '/',
         element: <S><LandingPage /></S>,
       },
+      {
+        path: '/pricing',
+        element: <S><PricingPage /></S>,
+      },
+      {
+        path: '/contact',
+        element: <S><ContactPage /></S>,
+      },
     ],
   },
   {
@@ -103,12 +113,21 @@ export const router = createBrowserRouter([
     path: '/device',
     element: <S><DeviceApprovePage /></S>,
   },
+  /* Each guide gets a URL of its own. They used to share `/docs`, addressed by
+     hash — thirteen pages of hand-written explanation behind one indexable
+     address. `/docs/cli` was the one exception, hard-coded; it is now just the
+     `:sectionId` route matching, and every old `/docs#retries` link still lands
+     right because `resolveAnchor` is still consulted when there is no param.
+     The docs bring their own chrome — a fixed full-height sidebar and a mobile
+     bar — so they are not wrapped in PublicLayout: a footer laid out beside a
+     `fixed` aside slides underneath it. DocumentationPage renders the footer
+     itself, inside the content column. */
   {
     path: '/docs',
     element: <S><DocumentationPage /></S>,
   },
   {
-    path: '/docs/cli',
+    path: '/docs/:sectionId',
     element: <S><DocumentationPage /></S>,
   },
   {
