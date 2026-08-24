@@ -19,6 +19,51 @@ export function DocsArticle({ children }: { children: ReactNode }) {
   return <article className="space-y-12 pb-16">{children}</article>;
 }
 
+/**
+ * Prose with the mono rule applied inside it.
+ *
+ * The brief at the top of this file says paths, verbs, field names, status codes
+ * and type names are mono and the prose around them is not. Every heading and
+ * code block obeyed that; the paragraphs did not, because they arrive as flat
+ * i18n strings and a string cannot carry a span. So a sentence like "a delivery
+ * to an endpoint that is neither VERIFIED nor SKIPPED fails terminally" printed
+ * two status names, a header, and a full API path in the same body face as the
+ * words around them, and the reader had to parse the sentence to find the parts
+ * they were looking for.
+ *
+ * Authors mark those up in the locale file with backticks — `X-Signature`,
+ * `POST /api/v1/events`, `VERIFIED` — and this splits on them. Backticks rather
+ * than a richer markup because the translator has to reproduce them by hand in
+ * uk.json, and one character that survives copy-paste is the most that can be
+ * asked of a format nothing validates.
+ *
+ * Deliberately not a markdown renderer: this is the whole grammar, and a real
+ * parser here would invite bold, links and lists into strings that then cannot
+ * be typed or tested.
+ */
+export function Prose({ children, className }: { children: string; className?: string }) {
+  return (
+    <>
+      {children.split(/`([^`]+)`/).map((part, i) =>
+        i % 2 === 1 ? (
+          <code
+            key={i}
+            className={cn(
+              'whitespace-nowrap rounded border border-rail bg-secondary/60 px-1 py-px',
+              'font-mono text-[0.86em] text-foreground',
+              className,
+            )}
+          >
+            {part}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
 export function DocsTitle({ title, lede }: { title: string; lede?: string }) {
   return (
     <header className="space-y-3">
@@ -40,7 +85,11 @@ export function Section({
   return (
     <section className="space-y-4">
       <h2 className="text-title">{title}</h2>
-      {description && <p className="max-w-2xl leading-relaxed text-muted-foreground">{description}</p>}
+      {description && (
+        <p className="max-w-2xl leading-relaxed text-muted-foreground">
+          <Prose>{description}</Prose>
+        </p>
+      )}
       {children}
     </section>
   );
@@ -63,7 +112,9 @@ export function Note({ label, children }: { label: string; children: ReactNode }
   return (
     <div className="rounded-lg border border-rail bg-secondary/50 p-4">
       <div className="mono-label mb-1.5">{label}</div>
-      <div className="text-sm leading-relaxed text-muted-foreground">{children}</div>
+      <div className="text-sm leading-relaxed text-muted-foreground">
+        {typeof children === 'string' ? <Prose>{children}</Prose> : children}
+      </div>
     </div>
   );
 }
@@ -177,7 +228,9 @@ export function DefinitionList({ items }: { items: Array<{ term: string; definit
       {items.map((item) => (
         <div key={item.term} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,14rem)_1fr] sm:gap-4">
           <dt className="font-mono text-[13px] text-foreground">{item.term}</dt>
-          <dd className="text-sm leading-relaxed text-muted-foreground">{item.definition}</dd>
+          <dd className="text-sm leading-relaxed text-muted-foreground">
+            {typeof item.definition === 'string' ? <Prose>{item.definition}</Prose> : item.definition}
+          </dd>
         </div>
       ))}
     </dl>
@@ -217,7 +270,11 @@ export function StepRow({ steps }: { steps: Array<{ label: string; desc?: string
               </span>
               <span className="text-sm font-medium">{step.label}</span>
             </div>
-            {step.desc && <p className="text-xs leading-relaxed text-muted-foreground">{step.desc}</p>}
+            {step.desc && (
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                <Prose>{step.desc}</Prose>
+              </p>
+            )}
           </div>
           {i < steps.length - 1 && (
             <ArrowRight

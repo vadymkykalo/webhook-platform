@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
+  Prose,
   DefinitionList,
   Diagram,
   DocsArticle,
@@ -67,24 +68,34 @@ function DirectionsDiagram() {
 
 /**
  * The thing people get wrong about webhook platforms: an event is not a send.
- * One event becomes one delivery per matching subscription, and from that
- * moment the deliveries have nothing to do with each other — which is why the
- * three below are in three different states at the same time.
+ *
+ * One event becomes one delivery per matching subscription, and from that moment the
+ * deliveries have nothing to do with each other. The three lanes carry their attempt
+ * counters for exactly that reason — the earlier version showed three coloured boxes and
+ * three status words, which asserted the independence without showing it. `1/7`, `3/7` and
+ * `7/7` on the same event is the whole point, and it is also where the retry ladder first
+ * appears to a reader.
+ *
+ * The third lane says "Failed Messages", not "DLQ". CONTEXT.md is explicit that DLQ is
+ * vocabulary you have to already know, and a drawing that labels a state differently from
+ * the screen it describes teaches the reader a word the product will never say back.
  */
 function FanOutDiagram() {
   const { t } = useTranslation();
 
-  const lane = (x: number, sub: string, tone: 'ok' | 'retry' | 'halt', status: string) => (
+  const lane = (
+    x: number,
+    endpoint: string,
+    tone: 'ok' | 'retry' | 'halt',
+    attempts: string,
+    status: string,
+  ) => (
     <>
-      <SketchBox
-        x={x}
-        y={150}
-        w={116}
-        label={t('docsPage.concepts.delivery')}
-        sub={sub}
-        tone={tone}
-      />
-      <SketchText x={x + 58} y={222} size={12} mono tone={tone}>
+      <SketchBox x={x} y={152} w={124} h={50} label={t('docsPage.concepts.delivery')} sub={endpoint} tone={tone} />
+      <SketchText x={x + 62} y={222} size={12} mono tone={tone}>
+        {attempts}
+      </SketchText>
+      <SketchText x={x + 62} y={240} size={12} tone={tone}>
         {status}
       </SketchText>
     </>
@@ -92,26 +103,22 @@ function FanOutDiagram() {
 
   return (
     <Diagram
-      viewBox="0 0 440 260"
+      viewBox="0 0 440 274"
+      maxWidth={560}
       label={t('docsPage.overview.diagFanAlt')}
       caption={t('docsPage.overview.diagFanCaption')}
     >
-      <SketchEdge d="M200,62 C190,100 88,108 78,144" />
-      <SketchEdge d="M220,62 V144" />
-      <SketchEdge d="M240,62 C250,100 352,108 362,144" />
+      <SketchEdge d="M198,66 C186,104 84,110 72,146" />
+      <SketchEdge d="M220,66 V146" />
+      <SketchEdge d="M242,66 C254,104 356,110 368,146" />
 
-      <SketchBox
-        x={145}
-        y={16}
-        w={150}
-        label={t('docsPage.concepts.event')}
-        sub="order.created"
-      />
-      {lane(20, `${t('docsPage.concepts.endpoint')} A`, 'ok', 'SUCCESS')}
-      {lane(162, `${t('docsPage.concepts.endpoint')} B`, 'retry', 'PENDING')}
-      {lane(304, `${t('docsPage.concepts.endpoint')} C`, 'halt', 'DLQ')}
+      <SketchBox x={140} y={18} w={160} h={48} label={t('docsPage.concepts.event')} sub="order.created" />
 
-      <SketchText x={220} y={248} size={13}>
+      {lane(10, 'endpoint A', 'ok', '1/7', t('docsPage.overview.diagFanDelivered'))}
+      {lane(158, 'endpoint B', 'retry', '3/7', t('docsPage.overview.diagFanRetrying'))}
+      {lane(306, 'endpoint C', 'halt', '7/7', t('docsPage.overview.diagFanAbandoned'))}
+
+      <SketchText x={220} y={264} size={12}>
         {t('docsPage.overview.diagFanEach')}
       </SketchText>
     </Diagram>
@@ -126,7 +133,7 @@ export default function Overview() {
       <DocsTitle title={t('docsPage.overview.title')} lede={t('docsPage.overview.subtitle')} />
 
       <Section title={t('docsPage.overview.whatIs')} description={t('docsPage.overview.whatIsDesc1')}>
-        <p className="max-w-2xl leading-relaxed text-muted-foreground">{t('docsPage.overview.whatIsDesc2')}</p>
+        <p className="max-w-2xl leading-relaxed text-muted-foreground"><Prose>{t('docsPage.overview.whatIsDesc2')}</Prose></p>
       </Section>
 
       <Section title={t('docsPage.overview.directions')}>
@@ -134,11 +141,11 @@ export default function Overview() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-rail bg-card p-4">
             <div className="mono-label mb-1.5">{t('docsPage.overview.outgoing')}</div>
-            <p className="text-sm leading-relaxed text-muted-foreground">{t('docsPage.overview.outgoingDesc')}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground"><Prose>{t('docsPage.overview.outgoingDesc')}</Prose></p>
           </div>
           <div className="rounded-lg border border-rail bg-card p-4">
             <div className="mono-label mb-1.5">{t('docsPage.overview.incoming')}</div>
-            <p className="text-sm leading-relaxed text-muted-foreground">{t('docsPage.overview.incomingDesc')}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground"><Prose>{t('docsPage.overview.incomingDesc')}</Prose></p>
           </div>
         </div>
       </Section>
@@ -172,7 +179,7 @@ export default function Overview() {
       </Section>
 
       <p className="text-sm text-muted-foreground">
-        <Link to="/docs#getting-started" className="text-primary hover:underline">
+        <Link to="/docs/getting-started" className="text-primary hover:underline">
           {t('docsPage.overview.next')}
         </Link>
       </p>

@@ -39,6 +39,40 @@ describe('Webhook Signature Verification', () => {
     });
   });
 
+  /**
+   * After a rotation Hookflow signs each delivery with the new secret and the retired one
+   * for the endpoint's grace window, so a receiver that has not deployed the new secret yet
+   * keeps working. The parser used to keep only the last v1 and rejected whichever half of
+   * the pair the receiver was holding.
+   */
+  describe('a header carrying two signatures (secret rotation)', () => {
+    const newSecret = 'whsec_new';
+    const retiredSecret = 'whsec_retired';
+
+    const dualHeader = (body: string, at = Date.now()) => {
+      const retiredV1 = generateSignature(body, retiredSecret, at).split('v1=')[1];
+      return `${generateSignature(body, newSecret, at)},v1=${retiredV1}`;
+    };
+
+    it('verifies with the new secret', () => {
+      expect(verifySignature(payload, dualHeader(payload), newSecret)).toBe(true);
+    });
+
+    it('verifies with the retired secret', () => {
+      expect(verifySignature(payload, dualHeader(payload), retiredSecret)).toBe(true);
+    });
+
+    it('still rejects an unrelated secret', () => {
+      expect(() => verifySignature(payload, dualHeader(payload), 'whsec_someone_else'))
+        .toThrow(HookflowError);
+    });
+
+    it('still rejects a tampered body', () => {
+      expect(() => verifySignature(`${payload} `, dualHeader(payload), newSecret))
+        .toThrow(HookflowError);
+    });
+  });
+
   describe('verifySignature', () => {
     it('should verify valid signature', () => {
       const timestamp = Date.now();

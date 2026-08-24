@@ -20,9 +20,16 @@ def verify_signature(
     """
     Verify webhook signature using HMAC-SHA256.
 
+    The header is ``t=<unix-ms>,v1=<hex>`` and may carry more than one ``v1``.
+    After you rotate an endpoint's secret, Hookflow signs each delivery with both
+    the new secret and the retired one for the endpoint's grace window (24 hours
+    by default), so the new secret can be deployed whenever you like rather than
+    at the instant you press rotate. The delivery is authentic if *any* ``v1``
+    matches.
+
     Args:
         payload: Raw request body as string
-        signature: X-Signature header value (format: t=timestamp,v1=signature)
+        signature: X-Signature header value (format: t=timestamp,v1=signature[,v1=...])
         secret: Endpoint webhook secret
         tolerance_ms: Maximum age of signature in milliseconds
 
@@ -39,17 +46,20 @@ def verify_signature(
 
     # Parse signature
     timestamp: Optional[str] = None
-    sig: Optional[str] = None
+    # Collected, not overwritten: a header sent during a secret rotation carries one
+    # v1 per valid secret, and keeping only the last would reject whichever of the
+    # pair the receiver is currently holding.
+    signatures: list[str] = []
 
     for part in signature.split(","):
         if "=" in part:
             key, value = part.split("=", 1)
             if key == "t":
-                timestamp = value
+                timestamp = value.strip()
             elif key == "v1":
-                sig = value
+                signatures.append(value.strip())
 
-    if not timestamp or not sig:
+    if not timestamp or not signatures:
         raise HookflowError(
             "Invalid signature format. Expected: t=timestamp,v1=signature",
             400,
@@ -75,7 +85,14 @@ def verify_signature(
         hashlib.sha256,
     ).hexdigest()
 
-    if not hmac.compare_digest(sig, expected_signature):
+    # Every candidate is compared, with no early exit, so the time taken does not
+    # depend on which position matched.
+    matched = False
+    for candidate in signatures:
+        if hmac.compare_digest(candidate, expected_signature):
+            matched = True
+
+    if not matched:
         raise HookflowError("Invalid signature", 400, "invalid_signature")
 
     return True

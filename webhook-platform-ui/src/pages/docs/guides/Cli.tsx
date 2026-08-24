@@ -1,5 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import { CodeBlock, DefinitionList, DocsArticle, DocsTitle, Note, Section, SubSection } from '../primitives';
+import {
+  CodeBlock,
+  DefinitionList,
+  DocsArticle,
+  DocsTitle,
+  Note,
+  Prose,
+  Section,
+  SubSection,
+} from '../primitives';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
 import { cliSamples } from '../samples';
 
@@ -34,11 +43,11 @@ export default function Cli() {
 
       <Section title={t('docsPage.cli.installTitle')}>
         <SubSection title={t('docsPage.cli.installOpt1Title')}>
-          <p className="text-sm text-muted-foreground">{t('docsPage.cli.installOpt1Desc')}</p>
+          <p className="text-sm text-muted-foreground"><Prose>{t('docsPage.cli.installOpt1Desc')}</Prose></p>
           <CodeBlock code={cliSamples.install} label="bash" />
         </SubSection>
         <SubSection title={t('docsPage.cli.installOpt3Title')}>
-          <p className="text-sm text-muted-foreground">{t('docsPage.cli.installOpt3Desc')}</p>
+          <p className="text-sm text-muted-foreground"><Prose>{t('docsPage.cli.installOpt3Desc')}</Prose></p>
           <CodeBlock code={cliSamples.docker} label="bash" />
         </SubSection>
         <Note label={t('docsPage.cli.requirementsLabel')}>{t('docsPage.cli.installReq')}</Note>
@@ -62,7 +71,7 @@ export default function Cli() {
 
       <Section title={t('docsPage.cli.configTitle')} description={t('docsPage.cli.configProfilesDesc')}>
         <CodeBlock code={cliSamples.profiles} label="bash" />
-        <p className="max-w-2xl text-sm text-muted-foreground">{t('docsPage.cli.configFileDetails')}</p>
+        <p className="max-w-2xl text-sm text-muted-foreground"><Prose>{t('docsPage.cli.configFileDetails')}</Prose></p>
       </Section>
 
       <Section title={t('docsPage.cli.cmdRefTitle')}>

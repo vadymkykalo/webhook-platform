@@ -7,6 +7,7 @@ import {
   DocsArticle,
   DocsTitle,
   Note,
+  Prose,
   Section,
   SketchBox,
   SketchEdge,
@@ -14,7 +15,7 @@ import {
   SubSection,
 } from '../primitives';
 import type { SampleLanguage } from '../primitives';
-import { challengeSamples, signatureSamples } from '../samples';
+import { challengeSamples, rotationSample, signatureSamples } from '../samples';
 
 /**
  * The header list is every header `OutgoingAttemptStore` sets, in the order it
@@ -102,6 +103,16 @@ export default function WebhookSecurity({
           <CodeSample samples={signatureSamples} language={language} onLanguageChange={onLanguageChange} />
         </SubSection>
 
+        <SubSection title={t('docsPage.security.rotation')}>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.rotationDesc')}</Prose>
+          </p>
+          <CodeBlock code={rotationSample} label="http" />
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.rotationAfter')}</Prose>
+          </p>
+        </SubSection>
+
         <Note label={t('docsPage.security.pitfallsLabel')}>{t('docsPage.security.pitfallsDesc')}</Note>
       </Section>
 
@@ -115,7 +126,7 @@ export default function WebhookSecurity({
         <SubSection title={t('docsPage.security.expectedResponse')}>
           <CodeBlock code={challengeSamples.response} label="http" />
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {t('docsPage.security.expectedResponseDesc')}
+            <Prose>{t('docsPage.security.expectedResponseDesc')}</Prose>
           </p>
         </SubSection>
       </Section>

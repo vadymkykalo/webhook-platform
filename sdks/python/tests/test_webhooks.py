@@ -81,6 +81,49 @@ class TestVerifySignature:
         
         assert verify_signature(payload, signature, secret) is True
 
+    def test_verifies_either_signature_during_a_secret_rotation(self):
+        """A header carrying two v1 values verifies with either secret.
+
+        After a rotation Hookflow signs each delivery with the new secret and the
+        retired one for the grace window, so a receiver that has not deployed the new
+        secret yet keeps working. Before this, the parser kept only the last v1 and
+        rejected whichever half of the pair the receiver was holding.
+        """
+        payload = '{"type": "order.completed"}'
+        new_secret, retired_secret = "whsec_new", "whsec_retired"
+        timestamp = int(time.time() * 1000)
+        header = "{},v1={}".format(
+            generate_signature(payload, new_secret, timestamp),
+            generate_signature(payload, retired_secret, timestamp).split("v1=")[1],
+        )
+
+        assert verify_signature(payload, header, new_secret) is True
+        assert verify_signature(payload, header, retired_secret) is True
+
+    def test_two_signatures_still_reject_an_unrelated_secret(self):
+        """Accepting any v1 must not become accepting anything."""
+        payload = '{"type": "order.completed"}'
+        timestamp = int(time.time() * 1000)
+        header = "{},v1={}".format(
+            generate_signature(payload, "whsec_new", timestamp),
+            generate_signature(payload, "whsec_retired", timestamp).split("v1=")[1],
+        )
+
+        with pytest.raises(HookflowError):
+            verify_signature(payload, header, "whsec_someone_else")
+
+    def test_two_signatures_still_reject_a_tampered_body(self):
+        """Two signatures must not weaken body integrity."""
+        payload = '{"type": "order.completed"}'
+        timestamp = int(time.time() * 1000)
+        header = "{},v1={}".format(
+            generate_signature(payload, "whsec_new", timestamp),
+            generate_signature(payload, "whsec_retired", timestamp).split("v1=")[1],
+        )
+
+        with pytest.raises(HookflowError):
+            verify_signature(payload + " ", header, "whsec_new")
+
     def test_raises_on_missing_signature(self):
         """Should raise on missing signature."""
         with pytest.raises(HookflowError) as exc:
