@@ -68,6 +68,51 @@ class WebhookTest extends TestCase
         $this->assertTrue($result);
     }
 
+    /**
+     * After a rotation Hookflow signs each delivery with the new secret and the retired
+     * one for the endpoint's grace window, so a receiver that has not deployed the new
+     * secret yet keeps working. The parser used to keep only the last v1 and rejected
+     * whichever half of the pair the receiver was holding.
+     */
+    private function dualSignatureHeader(string $payload, string $newSecret, string $retiredSecret): string
+    {
+        $timestamp = (int) (microtime(true) * 1000);
+        $retired = Webhook::generateSignature($payload, $retiredSecret, $timestamp);
+        $retiredV1 = substr($retired, strpos($retired, 'v1=') + 3);
+
+        return Webhook::generateSignature($payload, $newSecret, $timestamp) . ',v1=' . $retiredV1;
+    }
+
+    public function testVerifySignatureAcceptsTheNewSecretDuringRotation(): void
+    {
+        $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');
+
+        $this->assertTrue(Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_new'));
+    }
+
+    public function testVerifySignatureAcceptsTheRetiredSecretDuringRotation(): void
+    {
+        $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');
+
+        $this->assertTrue(Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_retired'));
+    }
+
+    public function testVerifySignatureStillRejectsAnUnrelatedSecretWithTwoSignatures(): void
+    {
+        $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');
+
+        $this->expectException(HookflowException::class);
+        Webhook::verifySignature(self::PAYLOAD, $header, 'whsec_someone_else');
+    }
+
+    public function testVerifySignatureStillRejectsATamperedBodyWithTwoSignatures(): void
+    {
+        $header = $this->dualSignatureHeader(self::PAYLOAD, 'whsec_new', 'whsec_retired');
+
+        $this->expectException(HookflowException::class);
+        Webhook::verifySignature(self::PAYLOAD . ' ', $header, 'whsec_new');
+    }
+
     public function testVerifySignatureThrowsOnMissingSignature(): void
     {
         $this->expectException(HookflowException::class);

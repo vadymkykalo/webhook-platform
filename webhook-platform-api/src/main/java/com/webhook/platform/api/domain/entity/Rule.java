@@ -3,8 +3,10 @@ package com.webhook.platform.api.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -54,6 +56,7 @@ public class Rule {
     private String eventTypePattern;
 
     /** Condition tree as JSONB. NULL = match all events (no conditions). */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String conditions;
 

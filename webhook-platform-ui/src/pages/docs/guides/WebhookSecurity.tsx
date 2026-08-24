@@ -7,14 +7,16 @@ import {
   DocsArticle,
   DocsTitle,
   Note,
+  Prose,
   Section,
   SketchBox,
+  SketchChip,
   SketchEdge,
   SketchText,
   SubSection,
 } from '../primitives';
 import type { SampleLanguage } from '../primitives';
-import { challengeSamples, signatureSamples } from '../samples';
+import { challengeSamples, rotationSample, signatureSamples } from '../samples';
 
 /**
  * The header list is every header `OutgoingAttemptStore` sets, in the order it
@@ -38,17 +40,15 @@ function SigningDiagram() {
       caption={t('docsPage.security.diagCaption')}
     >
       <SketchEdge d="M158,40 H278" />
-      <SketchText x={218} y={30} size={12} mono>
-        POST
-      </SketchText>
+      <SketchChip x={218} y={24}>POST</SketchChip>
 
       <SketchBox x={14} y={18} w={144} h={44} label="Hookflow" />
-      <SketchBox x={282} y={18} w={144} h={44} label={t('docsPage.security.diagReceiver')} />
+      <SketchBox x={282} y={18} w={144} h={44} role={t('docsPage.security.diagReceiver')} sub="api.acme.io" align="start" />
 
       {/* what actually travels */}
       <SketchEdge d="M354,62 V78" />
       <SketchBox x={54} y={82} w={332} h={40} />
-      <SketchText x={220} y={107} size={13} mono>
+      <SketchText x={220} y={107} size={12.5} mono>
         X-Signature: t=&lt;unix-ms&gt;,v1=&lt;hex&gt;
       </SketchText>
       <SketchText x={220} y={140} size={12}>
@@ -102,6 +102,16 @@ export default function WebhookSecurity({
           <CodeSample samples={signatureSamples} language={language} onLanguageChange={onLanguageChange} />
         </SubSection>
 
+        <SubSection title={t('docsPage.security.rotation')}>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.rotationDesc')}</Prose>
+          </p>
+          <CodeBlock code={rotationSample} label="http" />
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.rotationAfter')}</Prose>
+          </p>
+        </SubSection>
+
         <Note label={t('docsPage.security.pitfallsLabel')}>{t('docsPage.security.pitfallsDesc')}</Note>
       </Section>
 
@@ -115,7 +125,7 @@ export default function WebhookSecurity({
         <SubSection title={t('docsPage.security.expectedResponse')}>
           <CodeBlock code={challengeSamples.response} label="http" />
           <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {t('docsPage.security.expectedResponseDesc')}
+            <Prose>{t('docsPage.security.expectedResponseDesc')}</Prose>
           </p>
         </SubSection>
       </Section>

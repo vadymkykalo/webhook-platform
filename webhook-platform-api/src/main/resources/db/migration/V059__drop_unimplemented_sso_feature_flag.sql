@@ -1,0 +1,13 @@
+-- Drop the `sso` feature flag from every plan.
+--
+-- V036 seeded '"sso": true' on enterprise and self_hosted, and nothing in the
+-- tree implements SSO — there is no SAML, no OIDC, no @RequireFeature("sso").
+-- The flag was not inert: BillingController returns `features` verbatim, and the
+-- in-app Billing page renders every key in it, so an Enterprise customer saw SSO
+-- listed as included on the plan they were paying for. The public pricing page
+-- claimed it too, until it stopped.
+--
+-- Removing the key rather than setting it false: a false flag reads as "planned
+-- and switched off", which invites someone to flip it back on before the code
+-- exists. When SSO ships, the migration that ships it seeds the flag.
+UPDATE plans SET features = features - 'sso';

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Check, ExternalLink, Loader2, Minus, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
@@ -125,13 +126,23 @@ function PlanLimits({ plan }: { plan: PlanResponse }) {
   );
 }
 
-const FEATURE_KEYS = ['workflows', 'rules', 'replay', 'mTLS', 'sso'] as const;
+/**
+ * The keys are the plan's `features` jsonb, spelled exactly as the seed and
+ * every `@RequireFeature` spell them — `mTLS`, not `mtls`.
+ *
+ * `sso` used to be here, and V036 seeded it true on enterprise and self_hosted
+ * with no SSO anywhere in the codebase, so this list showed a paying Enterprise
+ * customer a feature that does not exist. V059 drops the flag; the row goes with
+ * it. `tunnels` takes its place — that one is real, gated by
+ * EntitlementService.checkTunnelLimit(), and now on for the free plan too.
+ */
+const FEATURE_KEYS = ['workflows', 'rules', 'replay', 'mTLS', 'tunnels'] as const;
 const FEATURE_LABEL: Record<(typeof FEATURE_KEYS)[number], string> = {
   workflows: 'billing.featureWorkflows',
   rules: 'billing.featureRules',
   replay: 'billing.featureReplay',
   mTLS: 'billing.featureMtls',
-  sso: 'billing.featureSso',
+  tunnels: 'billing.featureTunnels',
 };
 
 export default function BillingPage() {
@@ -359,7 +370,9 @@ export default function BillingPage() {
                         <div className="mt-3">
                           {isCustom ? (
                             <Button asChild size="sm" variant="outline" className="w-full">
-                              <a href="mailto:vadymkykalo@gmail.com">{t('billing.contactSales')}</a>
+                              {/* Was a mailto to the author's personal Gmail, shipped inside
+                                  the product to whoever clicked Enterprise. */}
+                              <Link to="/contact">{t('billing.contactSales')}</Link>
                             </Button>
                           ) : (
                             <Button

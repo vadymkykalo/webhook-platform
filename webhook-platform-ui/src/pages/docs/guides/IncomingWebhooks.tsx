@@ -1,5 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import { CodeBlock, DefinitionList, DocsArticle, DocsTitle, Note, Section } from '../primitives';
+import {
+  CodeBlock,
+  DefinitionList,
+  DocsArticle,
+  DocsTitle,
+  Note,
+  Prose,
+  Section,
+} from '../primitives';
 
 export default function IncomingWebhooks() {
   const { t } = useTranslation();
@@ -40,7 +48,7 @@ export default function IncomingWebhooks() {
             { term: 'PROVIDER', definition: t('docsPage.incomingWebhooks.modeProvider') },
           ]}
         />
-        <p className="text-sm text-muted-foreground">{t('docsPage.incomingWebhooks.providerTypes')}</p>
+        <p className="text-sm text-muted-foreground"><Prose>{t('docsPage.incomingWebhooks.providerTypes')}</Prose></p>
         <Note label={t('docsPage.incomingWebhooks.dedupLabel')}>{t('docsPage.incomingWebhooks.dedupDesc')}</Note>
       </Section>
 

@@ -13,8 +13,15 @@ class Webhook
     /**
      * Verify webhook signature using HMAC-SHA256.
      *
+     * The header is `t=<unix-ms>,v1=<hex>` and may carry more than one `v1`.
+     * After you rotate an endpoint's secret, Hookflow signs each delivery with
+     * both the new secret and the retired one for the endpoint's grace window
+     * (24 hours by default), so the new secret can be deployed whenever you like
+     * rather than at the instant you press rotate. The delivery is authentic if
+     * any `v1` matches.
+     *
      * @param string $payload Raw request body
-     * @param string $signature X-Signature header value (format: t=timestamp,v1=signature)
+     * @param string $signature X-Signature header value (format: t=timestamp,v1=signature[,v1=...])
      * @param string $secret Endpoint webhook secret
      * @param int $toleranceMs Maximum age of signature in milliseconds
      * @return bool True if signature is valid
@@ -31,17 +38,20 @@ class Webhook
         }
 
         $timestamp = null;
-        $sig = null;
+        // Collected, not overwritten: a header sent during a secret rotation carries
+        // one v1 per valid secret, and keeping only the last would reject whichever
+        // of the pair the receiver is currently holding.
+        $signatures = [];
 
         foreach (explode(',', $signature) as $part) {
             if (str_starts_with($part, 't=')) {
-                $timestamp = substr($part, 2);
+                $timestamp = trim(substr($part, 2));
             } elseif (str_starts_with($part, 'v1=')) {
-                $sig = substr($part, 3);
+                $signatures[] = trim(substr($part, 3));
             }
         }
 
-        if ($timestamp === null || $sig === null) {
+        if ($timestamp === null || $signatures === []) {
             throw new HookflowException(
                 'Invalid signature format. Expected: t=timestamp,v1=signature',
                 400,
@@ -63,7 +73,16 @@ class Webhook
         $signedPayload = "{$timestamp}.{$payload}";
         $expectedSignature = hash_hmac('sha256', $signedPayload, $secret);
 
-        if (!hash_equals($expectedSignature, $sig)) {
+        // Every candidate is compared, with no early exit, so the time taken does
+        // not depend on which position matched.
+        $matched = false;
+        foreach ($signatures as $candidate) {
+            if (hash_equals($expectedSignature, $candidate)) {
+                $matched = true;
+            }
+        }
+
+        if (!$matched) {
             throw new HookflowException('Invalid signature', 400, 'invalid_signature');
         }
 

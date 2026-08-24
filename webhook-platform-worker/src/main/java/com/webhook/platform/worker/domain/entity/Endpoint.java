@@ -47,6 +47,27 @@ public class Endpoint {
     @Column(name = "secret_iv", nullable = false, columnDefinition = "TEXT")
     private String secretIv;
 
+    /*
+     * The rotation grace window. EndpointService.rotateSecret copies the outgoing secret
+     * here — re-encrypted under the current key, so one encryption_key_version still
+     * describes both columns — and stamps secretRotatedAt. While now() is inside
+     * secretRotatedAt + secretRotationGracePeriodHours, OutgoingAttemptStore signs with
+     * both and the header carries two v1 values, so a receiver still holding the old
+     * secret keeps verifying. Outside the window the previous secret is simply not read.
+     */
+    @Column(name = "secret_previous_encrypted", columnDefinition = "TEXT")
+    private String secretPreviousEncrypted;
+
+    @Column(name = "secret_previous_iv", columnDefinition = "TEXT")
+    private String secretPreviousIv;
+
+    @Column(name = "secret_rotated_at")
+    private Instant secretRotatedAt;
+
+    @Builder.Default
+    @Column(name = "secret_rotation_grace_period_hours")
+    private Integer secretRotationGracePeriodHours = 24;
+
     @Column(nullable = false)
     private Boolean enabled;
 

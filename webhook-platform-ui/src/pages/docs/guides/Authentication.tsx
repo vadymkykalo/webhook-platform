@@ -1,5 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { CodeBlock, CodeSample, DocsArticle, DocsTitle, Note, Route, Section, SubSection } from '../primitives';
+import {
+  CodeBlock,
+  CodeSample,
+  DocsArticle,
+  DocsTitle,
+  Note,
+  Prose,
+  Route,
+  Section,
+  SubSection,
+} from '../primitives';
 import type { SampleLanguage } from '../primitives';
 import { authSamples } from '../samples';
 
@@ -21,7 +31,7 @@ export default function Authentication({
         <CodeSample samples={authSamples.login} language={language} onLanguageChange={onLanguageChange} />
         <Note label={t('docsPage.auth.refreshLabel')}>{t('docsPage.auth.refreshDesc')}</Note>
         <SubSection title={t('docsPage.auth.usingJwt')}>
-          <p className="text-sm text-muted-foreground">{t('docsPage.auth.usingJwtDesc')}</p>
+          <p className="text-sm text-muted-foreground"><Prose>{t('docsPage.auth.usingJwtDesc')}</Prose></p>
           <CodeBlock code={authSamples.bearer} label="http" />
         </SubSection>
       </Section>

@@ -1,5 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { CodeBlock, CodeSample, DocsArticle, DocsTitle, Note, Route, Section } from '../primitives';
+import {
+  CodeBlock,
+  CodeSample,
+  DefinitionList,
+  DocsArticle,
+  DocsTitle,
+  Note,
+  Route,
+  Section,
+  SubSection,
+} from '../primitives';
 import type { SampleLanguage } from '../primitives';
 import { authSamples, quickstartSamples } from '../samples';
 
@@ -10,11 +20,26 @@ import { authSamples, quickstartSamples } from '../samples';
  * missing step — it is deliberately the pulled-image path rather than the
  * build-from-source one, which is a contributor's concern, not an integrator's.
  */
-const runInstance = `curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+const runInstance = `REPO=https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main
+
+curl -fsSLO $REPO/docker-compose.pull.yml
+curl -fsSL  $REPO/.env.dist -o .env
 
 docker compose -f docker-compose.pull.yml up -d
 curl -f http://localhost:8082/actuator/health/liveness`;
+
+/**
+ * The three ports the compose file binds, and where each one is set.
+ *
+ * The health check above lands on 8082, which is not the API — and the sample gave no way to
+ * know that or to change it. Actuator runs on its own port so a broken auth configuration
+ * cannot take health and metrics down with it, and compose binds it to loopback only.
+ */
+const PORTS = [
+  { port: '8080', envVar: 'API_PORT', key: 'docsPage.gettingStarted.portApi' },
+  { port: '5173', envVar: 'UI_PORT', key: 'docsPage.gettingStarted.portUi' },
+  { port: '8082', envVar: 'MANAGEMENT_PORT', key: 'docsPage.gettingStarted.portActuator' },
+];
 
 function Step({
   number,
@@ -58,7 +83,17 @@ export default function GettingStarted({
       <DocsTitle title={t('docsPage.gettingStarted.title')} lede={t('docsPage.gettingStarted.subtitle')} />
 
       <Section title={t('docsPage.gettingStarted.runTitle')} description={t('docsPage.gettingStarted.runDesc')}>
-        <CodeBlock code={runInstance} label="bash" />
+        <CodeBlock code={runInstance} label="bash" wrap />
+
+        <SubSection title={t('docsPage.gettingStarted.portsTitle')}>
+          <DefinitionList
+            items={PORTS.map((p) => ({
+              term: p.port,
+              definition: `${t(p.key)} \`${p.envVar}\``,
+            }))}
+          />
+        </SubSection>
+
         <Note label={t('docsPage.gettingStarted.runBaseUrlLabel')}>{t('docsPage.gettingStarted.runBaseUrlDesc')}</Note>
         <Note label={t('docsPage.gettingStarted.runSecretsLabel')}>{t('docsPage.gettingStarted.runSecretsDesc')}</Note>
       </Section>

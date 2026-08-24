@@ -6,8 +6,7 @@ import { useAuth } from '../../auth/auth.store';
 import AmbientDelivery from './AmbientDelivery';
 import DeliveryFlight from './DeliveryFlight';
 import { Reveal } from './primitives';
-
-const REPO_URL = 'https://github.com/vadymkykalo/webhook-platform';
+import { FREE_PLAN } from './plans';
 
 /**
  * The headline is the outcome, not the topology.
@@ -18,12 +17,19 @@ const REPO_URL = 'https://github.com/vadymkykalo/webhook-platform';
  * reason to buy. The proof still appears, one rung down: the chips under the
  * fold carry it, and the sections below spell it out once each.
  *
- * The primary button is the account, not the repository. A visitor deciding
- * whether to buy should not have their first click land on GitHub.
+ * Both buttons stay inside the funnel: the account, then the documentation.
+ * The repository is a trust signal, not a step, so it lives as a mark in the
+ * nav — a visitor deciding whether to buy should not be handed a git clone as
+ * one of their two choices.
+ *
+ * The free-plan numbers are interpolated from FREE_PLAN rather than written
+ * into the sentence, because the same figures are rendered again in the pricing
+ * grid and a hand-typed copy of them drifts on the first plan change.
  */
 export default function HeroSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { isAuthenticated } = useAuth();
+  const events = new Intl.NumberFormat(i18n.language).format(FREE_PLAN.events);
 
   return (
     <section className="relative overflow-hidden">
@@ -37,7 +43,10 @@ export default function HeroSection() {
             </h1>
             <p className="mt-5 max-w-xl text-body-lg text-muted-foreground">{t('landing.hero.subtitle')}</p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            {/* flex-wrap, not just sm:flex-row: the Ukrainian labels are half
+                again as long as the English ones and pushed the second button
+                under the panel in the next column. */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               {isAuthenticated ? (
                 <Link to="/admin/dashboard">
                   <Button size="lg" className="w-full sm:w-auto">
@@ -51,15 +60,15 @@ export default function HeroSection() {
                       {t('landing.hero.ctaPrimary')} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </Link>
-                  <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+                  <Link to="/docs">
                     <Button size="lg" variant="outline" className="w-full sm:w-auto">
                       {t('landing.hero.ctaSecondary')}
                     </Button>
-                  </a>
+                  </Link>
                 </>
               )}
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.ctaNote')}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{t('landing.hero.ctaNote', { events })}</p>
 
             <ul className="mt-8 flex flex-col gap-2 border-t border-rail pt-6 font-mono text-[12px] text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-6">
               <li>{t('landing.hero.chip1')}</li>

@@ -22,9 +22,17 @@ export interface VerifyOptions {
 }
 
 /**
- * Verifies the webhook signature using HMAC-SHA256
+ * Verifies the webhook signature using HMAC-SHA256.
+ *
+ * The header is `t=<unix-ms>,v1=<hex>`, and it may carry **more than one** `v1`.
+ * After you rotate an endpoint's secret, Hookflow signs each delivery with both
+ * the new secret and the retired one for the endpoint's grace window (24 hours
+ * by default), so you can deploy the new secret whenever you like instead of at
+ * the instant you press rotate. The delivery is authentic if *any* `v1` matches,
+ * which is what this checks.
+ *
  * @param payload - Raw request body as string
- * @param signature - X-Signature header value (format: t=timestamp,v1=signature)
+ * @param signature - X-Signature header value (format: t=timestamp,v1=signature[,v1=...])
  * @param secret - Endpoint webhook secret
  * @param options - Verification options
  * @returns true if signature is valid
@@ -44,15 +52,18 @@ export function verifySignature(
 
   const parts = signature.split(',');
   let timestamp: string | undefined;
-  let sig: string | undefined;
+  const signatures: string[] = [];
 
   for (const part of parts) {
     const [key, value] = part.split('=');
-    if (key === 't') timestamp = value;
-    if (key === 'v1') sig = value;
+    if (key === 't') timestamp = value?.trim();
+    // Collected, not overwritten: a header sent during a secret rotation carries
+    // one v1 per valid secret, and keeping only the last would reject whichever
+    // of the pair you are currently holding.
+    if (key === 'v1' && value) signatures.push(value.trim());
   }
 
-  if (!timestamp || !sig) {
+  if (!timestamp || signatures.length === 0) {
     throw new HookflowError(
       'Invalid signature format. Expected: t=timestamp,v1=signature',
       400,
@@ -77,10 +88,18 @@ export function verifySignature(
     .update(signedPayload)
     .digest('hex');
 
-  const sigBuffer = Buffer.from(sig);
   const expectedBuffer = Buffer.from(expectedSignature);
+  // Every candidate is compared — no early exit — so the time taken does not
+  // depend on which position matched.
+  let matched = false;
+  for (const candidate of signatures) {
+    const sigBuffer = Buffer.from(candidate);
+    if (sigBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+      matched = true;
+    }
+  }
 
-  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+  if (!matched) {
     throw new HookflowError('Invalid signature', 400, 'invalid_signature');
   }
 

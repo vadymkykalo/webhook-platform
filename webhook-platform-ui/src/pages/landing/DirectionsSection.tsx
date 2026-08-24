@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { ArrowRight, KeyRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { panel, Reveal, Section, SectionHeader } from './primitives';
 import { cn } from '../../lib/utils';
@@ -156,27 +158,128 @@ function DirectionCard({
   body,
   chain,
   ladder,
+  cta,
   diagram,
+  children,
 }: {
   label: string;
   title: string;
   body: string;
   chain: string;
   ladder: string;
+  cta: string;
   diagram: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className={cn('flex flex-col p-6 sm:p-7', panel(true))}>
+    <div className={cn('flex h-full flex-col p-6 sm:p-7', panel(true))}>
       <p className="mono-label">{label}</p>
       <h3 className="mt-3 text-title text-foreground">{title}</h3>
       <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{body}</p>
       {diagram}
+      {children}
+      {/* The incoming card carries a verified-sources list the outgoing one does
+          not, so without a spacer the two cards' footers sit at different
+          heights and the pair reads as a rendering mistake. */}
+      <div className="flex-1" aria-hidden="true" />
       <dl className="mt-6 grid gap-2 border-t border-rail pt-4 font-mono text-[11.5px] text-muted-foreground sm:grid-cols-[auto_minmax(0,1fr)] sm:gap-x-4">
         <dt className="sr-only">chain</dt>
         <dd className="sm:col-span-2">{chain}</dd>
         <dt className="sr-only">ladder</dt>
         <dd className="sm:col-span-2 text-foreground">{ladder}</dd>
       </dl>
+      <Link
+        to="/register"
+        className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+      >
+        {cta} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * The providers with a verifier of their own, sitting inside the incoming card
+ * rather than in a section of their own.
+ *
+ * They used to lead the page as "what it connects to", one screen below the
+ * hero, which spent the second-most-valuable slot on a fact that only matters
+ * once the reader has decided incoming is their problem. Here it answers the
+ * question at the moment it is asked.
+ */
+const VERIFIED = [
+  { name: 'Stripe', detailKey: 'landing.verified.stripeDetail' },
+  { name: 'GitHub', detailKey: 'landing.verified.githubDetail' },
+  { name: 'GitLab', detailKey: 'landing.verified.gitlabDetail' },
+  { name: 'Slack', detailKey: 'landing.verified.slackDetail' },
+  { name: 'Shopify', detailKey: 'landing.verified.shopifyDetail' },
+];
+
+function VerifiedSources() {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-6 border-t border-rail pt-4">
+      <p className="mono-label">{t('landing.verified.verifiedLabel')}</p>
+      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+        {VERIFIED.map((provider) => (
+          <div key={provider.name} className="contents">
+            <dt className="text-[13.5px] text-foreground">{provider.name}</dt>
+            <dd className="truncate font-mono text-[11px] leading-5 text-muted-foreground">
+              {t(provider.detailKey)}
+            </dd>
+          </div>
+        ))}
+        <dt className="flex items-center gap-1.5 text-[13.5px] text-foreground">
+          <KeyRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          {t('landing.verified.genericName')}
+        </dt>
+        <dd className="truncate font-mono text-[11px] leading-5 text-muted-foreground">
+          {t('landing.verified.genericDetail')}
+        </dd>
+      </dl>
+      <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+        {t('landing.verified.note')}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The headers Hookflow puts on a delivery, as the outgoing card's counterpart to the incoming
+ * card's verified-source list.
+ *
+ * Without it the outgoing card was a third empty: one card carried a six-row list and the one
+ * beside it carried nothing, which reads as a rendering fault rather than a pair. And the
+ * mirror is the honest one to draw — what we sign on the way out against what we verify on the
+ * way in. Every name here is a header `OutgoingAttemptStore` actually sets.
+ */
+const SENT_HEADERS = [
+  { name: 'X-Signature', detailKey: 'landing.sentHeaders.signature' },
+  { name: 'X-Event-Id', detailKey: 'landing.sentHeaders.eventId' },
+  { name: 'X-Delivery-Id', detailKey: 'landing.sentHeaders.deliveryId' },
+  { name: 'X-Timestamp', detailKey: 'landing.sentHeaders.timestamp' },
+  { name: 'X-Sequence-Number', detailKey: 'landing.sentHeaders.sequence' },
+  { name: 'Idempotency-Key', detailKey: 'landing.sentHeaders.idempotency' },
+];
+
+function SentHeaders() {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-6 border-t border-rail pt-4">
+      <p className="mono-label">{t('landing.sentHeaders.label')}</p>
+      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+        {SENT_HEADERS.map((header) => (
+          <div key={header.name} className="contents">
+            <dt className="font-mono text-[11.5px] leading-5 text-foreground">{header.name}</dt>
+            <dd className="truncate font-mono text-[11px] leading-5 text-muted-foreground">
+              {t(header.detailKey)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+        {t('landing.sentHeaders.note')}
+      </p>
     </div>
   );
 }
@@ -201,8 +304,11 @@ export default function DirectionsSection() {
           body={t('landing.directions.outBody')}
           chain={t('landing.directions.outChain')}
           ladder={t('landing.directions.outLadder')}
+          cta={t('landing.directions.outCta')}
           diagram={<OutgoingDiagram />}
-        />
+        >
+          <SentHeaders />
+        </DirectionCard>
         </Reveal>
         <Reveal className="h-full" delay={90}>
         <DirectionCard
@@ -211,8 +317,11 @@ export default function DirectionsSection() {
           body={t('landing.directions.inBody')}
           chain={t('landing.directions.inChain')}
           ladder={t('landing.directions.inLadder')}
+          cta={t('landing.directions.inCta')}
           diagram={<IncomingDiagram />}
-        />
+        >
+          <VerifiedSources />
+        </DirectionCard>
         </Reveal>
       </div>
       <p className="mt-6 max-w-3xl text-sm text-muted-foreground">{t('landing.directions.note')}</p>

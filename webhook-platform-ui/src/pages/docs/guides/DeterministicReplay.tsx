@@ -9,6 +9,7 @@ import {
   Route,
   Section,
   SketchBox,
+  SketchChip,
   SketchEdge,
   SketchText,
 } from '../primitives';
@@ -37,23 +38,28 @@ function RetryVersusReplayDiagram() {
       label={t('docsPage.deterministicReplay.diagAlt')}
       caption={t('docsPage.deterministicReplay.diagCaption')}
     >
-      <SketchText x={12} y={22} anchor="start" size={12}>
-        {t('docsPage.deterministicReplay.diagRetryLane')}
+      {/* The page exists because two endpoints have "replay" in the path and do different
+          things. Naming each lane's endpoint on the lane answers "which one do I call?"
+          where the reader is looking, instead of two sections down. */}
+      <SketchText x={12} y={20} anchor="start" size={9.5} mono>
+        {t('docsPage.deterministicReplay.diagRetryLane').toUpperCase()}
       </SketchText>
+      <SketchChip x={258} y={20}>{'POST /deliveries/{id}/replay'}</SketchChip>
       <SketchEdge d="M286,46 C318,28 318,88 292,74" tone="retry" />
       <SketchText x={318} y={62} anchor="start" size={12} tone="retry">
         {t('docsPage.deterministicReplay.diagNextAttempt')}
       </SketchText>
-      <SketchBox x={136} y={34} w={150} label={t('docsPage.concepts.delivery')} sub="d1 · seq 12" tone="retry" />
+      <SketchBox x={136} y={34} w={150} role={t('docsPage.concepts.delivery')} sub="d1 · seq 12" align="start" tone="retry" />
 
-      <SketchText x={12} y={140} anchor="start" size={12}>
-        {t('docsPage.deterministicReplay.diagReplayLane')}
+      <SketchText x={12} y={104} anchor="start" size={9.5} mono>
+        {t('docsPage.deterministicReplay.diagReplayLane').toUpperCase()}
       </SketchText>
+      <SketchChip x={258} y={100}>{'POST /projects/{id}/replay'}</SketchChip>
       <SketchEdge d="M126,172 C150,172 156,142 176,142" />
       <SketchEdge d="M126,178 C150,178 156,214 176,214" tone="ok" />
       <SketchBox x={12} y={152} w={114} label={t('docsPage.concepts.event')} />
-      <SketchBox x={180} y={120} w={140} label={t('docsPage.concepts.delivery')} sub="d1 · seq 12" tone="idle" />
-      <SketchBox x={180} y={192} w={140} label={t('docsPage.concepts.delivery')} sub="d2 · seq 41" tone="ok" />
+      <SketchBox x={180} y={120} w={140} role={t('docsPage.concepts.delivery')} sub="d1 · seq 12" align="start" tone="idle" />
+      <SketchBox x={180} y={192} w={140} role={t('docsPage.concepts.delivery')} sub="d2 · seq 41" align="start" tone="ok" />
       <SketchText x={328} y={147} anchor="start" size={12}>
         {t('docsPage.deterministicReplay.diagUnchanged')}
       </SketchText>
