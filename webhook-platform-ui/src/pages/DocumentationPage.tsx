@@ -86,8 +86,13 @@ export default function DocumentationPage() {
 
   const sampleProps = { language, onLanguageChange: setLanguage };
 
+  /* Each guide has its own URL now, so each needs its own title: thirteen pages sharing
+     "Documentation — Hookflow" is one page as far as a search result is concerned. The
+     section's own sidebar label is the name it is already known by. */
+  const sectionLabel = [...GUIDE_SECTIONS, REFERENCE_SECTION].find((s) => s.id === section)?.labelKey;
   useDocumentMeta({
     titleKey: 'meta.docs.title',
+    titleParams: section === 'overview' || !sectionLabel ? undefined : { section: t(sectionLabel) },
     descriptionKey: 'meta.docs.description',
     path: sectionPath(section),
   });

@@ -74,6 +74,42 @@ function FieldTable({ fields, caption }: { fields: SpecField[]; caption: string 
   );
 }
 
+/**
+ * The fields of a schema, in one place because a request body and a response body are the
+ * same thing pointed in different directions.
+ *
+ * The response side used to print only the schema's name — "200 EventResponse OK" — while the
+ * request side listed every field. So the reference answered what to send and left what comes
+ * back as a name to go and look up somewhere else, which for a generated page is the one
+ * thing it was supposed to save the reader.
+ */
+function FieldList({ fields }: { fields: SpecField[] }) {
+  const { t } = useTranslation();
+  return (
+    <dl className="divide-y divide-rail border-y border-rail">
+      {fields.map((field) => (
+        <div key={field.name} className="grid gap-1 py-2.5 sm:grid-cols-[minmax(0,16rem)_1fr] sm:gap-4">
+          <dt className="min-w-0">
+            <code className="break-all font-mono text-[13px] text-foreground">{field.name}</code>
+            <span className="ml-2 font-mono text-[11px] text-muted-foreground">{field.type}</span>
+            {field.required && (
+              <span className="ml-2 text-[11px] text-muted-foreground">
+                {t('docsPage.paramTable.required').toLowerCase()}
+              </span>
+            )}
+          </dt>
+          <dd className="space-y-1 text-sm text-muted-foreground">
+            {field.description && <SpecText text={field.description} className="leading-relaxed" />}
+            {field.values && (
+              <div className="font-mono text-[11px] text-muted-foreground">{field.values.join(' · ')}</div>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function Operation({ operation, schemas }: { operation: SpecOperation; schemas: ApiIndex['schemas'] }) {
   const { t } = useTranslation();
   const bodyFields = operation.body ? schemas[operation.body.type.replace(/\[\]$/, '')] : undefined;
@@ -118,46 +154,37 @@ function Operation({ operation, schemas }: { operation: SpecOperation; schemas: 
             {t('docsPage.reference.requestBody')} · {operation.body.type} · {operation.body.contentType}
           </div>
           {bodyFields ? (
-            <dl className="divide-y divide-rail border-y border-rail">
-              {bodyFields.map((field) => (
-                <div key={field.name} className="grid gap-1 py-2.5 sm:grid-cols-[minmax(0,16rem)_1fr] sm:gap-4">
-                  <dt className="min-w-0">
-                    <code className="break-all font-mono text-[13px] text-foreground">{field.name}</code>
-                    <span className="ml-2 font-mono text-[11px] text-muted-foreground">{field.type}</span>
-                    {field.required && (
-                      <span className="ml-2 text-[11px] text-muted-foreground">
-                        {t('docsPage.paramTable.required').toLowerCase()}
-                      </span>
-                    )}
-                  </dt>
-                  <dd className="space-y-1 text-sm text-muted-foreground">
-                    {field.description && <SpecText text={field.description} className="leading-relaxed" />}
-                    {field.values && (
-                      <div className="font-mono text-[11px] text-muted-foreground">{field.values.join(' · ')}</div>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            <FieldList fields={bodyFields} />
           ) : (
             <p className="font-mono text-[13px] text-muted-foreground">{operation.body.type}</p>
           )}
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="mono-label">{t('docsPage.reference.responses')}</div>
-        <dl className="divide-y divide-rail border-y border-rail">
-          {operation.responses.map((response) => (
-            <div key={response.status} className="grid gap-1 py-2.5 sm:grid-cols-[minmax(0,16rem)_1fr] sm:gap-4">
-              <dt className="font-mono text-[13px] text-foreground">
-                {response.status}
-                {response.type && <span className="ml-2 text-[11px] text-muted-foreground">{response.type}</span>}
-              </dt>
-              <dd className="text-sm text-muted-foreground">{response.description}</dd>
+        {operation.responses.map((response) => {
+          /* `EventResponse[]` and `EventResponse` are the same shape; a wrapper type the
+             generator could not flatten (`map<string, integer>`, a bare `string`) resolves to
+             nothing and keeps the one-line treatment it always had. */
+          const fields = response.type ? schemas[response.type.replace(/\[\]$/, '')] : undefined;
+          return (
+            <div key={response.status} className="space-y-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-rail pt-2.5">
+                <span className="font-mono text-[13px] text-foreground">{response.status}</span>
+                {response.type && (
+                  <span className="font-mono text-[11.5px] text-muted-foreground">{response.type}</span>
+                )}
+                <span className="text-sm text-muted-foreground">{response.description}</span>
+              </div>
+              {fields && (
+                <div className="sm:pl-4">
+                  <FieldList fields={fields} />
+                </div>
+              )}
             </div>
-          ))}
-        </dl>
+          );
+        })}
       </div>
     </article>
   );

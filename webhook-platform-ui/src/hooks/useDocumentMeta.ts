@@ -40,15 +40,18 @@ function upsertCanonical(href: string) {
 
 export function useDocumentMeta({
   titleKey,
+  titleParams,
   descriptionKey,
   path,
 }: {
   titleKey: string;
+  /** Interpolation for the title, e.g. the documentation section's own name. */
+  titleParams?: Record<string, string>;
   descriptionKey: string;
   path: string;
 }) {
   const { t, i18n } = useTranslation();
-  const title = t(titleKey);
+  const title = titleParams ? t(`${titleKey}Section`, titleParams) : t(titleKey);
   const description = t(descriptionKey);
 
   useEffect(() => {

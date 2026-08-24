@@ -1603,9 +1603,9 @@
       "wildcardRouting": "Шаблони типів подій",
       "wildcardRoutingDesc": "На що може вказувати підписка, окрім одного точного типу:",
       "wildcardSingleDesc": "Один сегмент: order.created, order.updated. Але не order.line.added.",
-      "lifecycleDraftDoes": "нічого не перевіряє",
-      "lifecycleActiveDoes": "з нею звіряються payload'и",
-      "lifecycleDeprecatedDoes": "зберігається, вже не діє"
+      "lifecycleDraftDoes": "не діє",
+      "lifecycleActiveDoes": "payload'и звіряються",
+      "lifecycleDeprecatedDoes": "зберігається, не діє"
     },
     "sdks": {
       "deliveries": "Доставки",
@@ -4170,7 +4170,8 @@
     },
     "docs": {
       "description": "Як надсилати події, приймати вебхуки, перевіряти підписи й читати, що сталося — гайди та повний довідник API.",
-      "title": "Документація — Hookflow"
+      "title": "Документація — Hookflow",
+      "titleSection": "{{section}} — документація Hookflow"
     },
     "landing": {
       "description": "Надсилайте вебхуки на endpoint'и ваших клієнтів і приймайте їх від Stripe, GitHub чи Slack. Підпис HMAC, драбина повторів від 1 хвилини до 24 годин, Failed Messages і повторна відправка. Безкоштовно до 10 000 подій на місяць або self-host за MIT.",

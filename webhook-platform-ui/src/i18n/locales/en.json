@@ -1603,9 +1603,9 @@
       "wildcardRouting": "Event type patterns",
       "wildcardRoutingDesc": "What a subscription may point at, beyond one exact type:",
       "wildcardSingleDesc": "One segment: order.created, order.updated. Not order.line.added.",
-      "lifecycleDraftDoes": "validates nothing",
-      "lifecycleActiveDoes": "what payloads are checked against",
-      "lifecycleDeprecatedDoes": "kept, no longer enforced"
+      "lifecycleDraftDoes": "not enforced",
+      "lifecycleActiveDoes": "payloads checked",
+      "lifecycleDeprecatedDoes": "kept, not enforced"
     },
     "sdks": {
       "deliveries": "Deliveries",
@@ -4170,7 +4170,8 @@
     },
     "docs": {
       "description": "How to send events, receive webhooks, verify signatures, and read what happened — guides and the full API reference.",
-      "title": "Documentation — Hookflow"
+      "title": "Documentation — Hookflow",
+      "titleSection": "{{section}} — Hookflow docs"
     },
     "landing": {
       "description": "Send webhooks to your customers' endpoints and receive them from Stripe, GitHub or Slack. HMAC-signed, retried on a ladder from 1 minute to 24 hours, with Failed Messages and replay. Free for 10,000 events a month, or self-host under MIT.",
