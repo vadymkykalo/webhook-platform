@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
+  SlidersHorizontal,
   Book,
   Code,
   FileCheck,
@@ -24,6 +25,7 @@ import {
 export type SectionId =
   | 'overview'
   | 'getting-started'
+  | 'configuration'
   | 'authentication'
   | 'webhook-security'
   | 'retries'
@@ -46,6 +48,7 @@ export interface SectionMeta {
 export const GUIDE_SECTIONS: SectionMeta[] = [
   { id: 'overview', labelKey: 'docsPage.sections.overview', icon: Book },
   { id: 'getting-started', labelKey: 'docsPage.sections.gettingStarted', icon: Zap },
+  { id: 'configuration', labelKey: 'docsPage.sections.configuration', icon: SlidersHorizontal },
   { id: 'authentication', labelKey: 'docsPage.sections.authentication', icon: Key },
   { id: 'webhook-security', labelKey: 'docsPage.sections.webhookSecurity', icon: Shield },
   { id: 'retries', labelKey: 'docsPage.sections.retries', icon: RefreshCw },

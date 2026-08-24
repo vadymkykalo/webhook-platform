@@ -1489,7 +1489,9 @@
       "searchResults": "Search results · {{n}}",
       "sourceOfTruth": "Source of truth",
       "specLink": "Download openapi.yaml",
-      "title": "API reference"
+      "title": "API reference",
+      "showFields": "Field reference for {{type}}",
+      "hideFields": "Hide field reference"
     },
     "response": "Response",
     "retries": {
@@ -1636,7 +1638,8 @@
       "schemaRegistry": "Schema Registry",
       "sdks": "SDKs",
       "webhookSecurity": "Webhook Security",
-      "workflowAutomation": "Workflows"
+      "workflowAutomation": "Workflows",
+      "configuration": "Configuration"
     },
     "security": {
       "challengeRequest": "What Hookflow sends",
@@ -1708,6 +1711,80 @@
       "triggerSchedule": "Runs on a schedule, with no event behind it.",
       "triggerTypes": "Trigger types",
       "triggerWebhookEvent": "Runs whenever an event of the chosen type is announced in the project."
+    },
+    "configuration": {
+      "title": "Configuration",
+      "subtitle": "The settings a self-hosted instance has to make a decision about, and where each one is set.",
+      "defaultIs": "Default `{{value}}`.",
+      "howTitle": "How settings reach the services",
+      "howDesc": "Everything is an environment variable. `docker compose` reads the `.env` file beside the compose file and passes what each service needs into its container; nothing is configured by editing a file inside an image. Change a value, then `docker compose up -d` — Compose recreates only the containers whose environment changed.",
+      "authorityLabel": "The full list",
+      "authorityDesc": "`.env.dist` is the authority and carries every variable with a comment explaining it — around two hundred, most of them a timeout or a batch size that is right until a load test says otherwise. This page covers the other kind: the ones whose default is a development choice that becomes wrong the moment the instance is reachable from outside your machine.",
+      "requiredTitle": "Change before it is reachable",
+      "requiredDesc": "The shipped values are placeholders. Every one of them is public — they are in `.env.dist` in a public repository — so an instance left on them is an instance anyone can sign tokens for and decrypt the endpoint secrets of.",
+      "required": {
+        "appEnv": "`development`, `staging` or `production`. Production turns on the startup checks below.",
+        "jwtSecret": "Signs every access token. 32 characters or more; rotating it logs everyone out.",
+        "encKey": "Derives the AES-256-GCM key that endpoint secrets, HMAC secrets and mTLS material are encrypted with at rest. Lose it and none of them can be read back.",
+        "encSalt": "The PBKDF2 salt for that derivation. Unique per deployment; changing it has the same effect as changing the key.",
+        "pgPassword": "The embedded Postgres password.",
+        "redisPassword": "The Redis password.",
+        "adminToken": "Presented in `X-Platform-Admin-Token` for the cluster-wide operator endpoints under `/api/v1/admin`, such as rotating the encryption key across every tenant. Deliberately separate from any organization: an org OWNER does not get it. Left empty those endpoints are unreachable, which is the right state until an operator needs them."
+      },
+      "startupLabel": "What production mode refuses to start on",
+      "startupDesc": "With `APP_ENV=production` the services validate their own configuration before accepting traffic and abort on a placeholder secret, a secret shorter than its minimum, or a combination that would leave the instance open. It is a startup failure rather than a warning on purpose: a warning in a log nobody reads is how an instance ends up in production on `dev_jwt_secret_key_32_chars_minimum`.",
+      "addressesTitle": "Ports and addresses",
+      "addressesDesc": "Every port is a variable — nothing is hard-coded. The two that catch people out are the management port, which is not the API, and the base URLs, which end up inside links your users receive.",
+      "addresses": {
+        "apiPort": "The API and everything under `/api/v1`.",
+        "apiBind": "Which host interface the API port is published on. In production keep it on `127.0.0.1` and let the UI's nginx be the only thing facing the internet.",
+        "uiPort": "The dashboard, served by nginx.",
+        "managementPort": "Health and Prometheus metrics only — never the API. It is a separate embedded server that does not pass through the main security chain, which is the point: a broken auth configuration must not take your health checks down with it. Compose keeps it off the public interface; do not point it at one.",
+        "appBaseUrl": "Where your users' browsers reach the dashboard. It is what goes into verification emails, password resets and shared debug links — left on localhost, those links are unusable for everyone but you.",
+        "viteApiUrl": "The API origin the dashboard calls. Baked in at image build time, not read at runtime.",
+        "cors": "Origins allowed to call the API from a browser. Comma-separated.",
+        "ingressBase": "The prefix of the ingress URL shown for each incoming source. It is the URL you paste into Stripe or GitHub, so it has to be the address they can reach, not yours.",
+        "tunnelBase": "The same, for the public URL a CLI tunnel prints."
+      },
+      "publicTitle": "Putting it behind a domain",
+      "publicDesc": "Four values move together: `APP_BASE_URL` and `VITE_API_URL` for the browser, `WEBHOOK_INGRESS_BASE_URL` and `TUNNEL_INGRESS_BASE_URL` for the providers sending to you. Add the API origin to `CORS_ALLOWED_ORIGINS` and to `VITE_CSP_EXTRA_CONNECT` — the dashboard's Content-Security-Policy blocks any origin it does not name, so a working API and a blank dashboard is what a missed one looks like.",
+      "storesTitle": "Postgres, Redis and Kafka",
+      "storesDesc": "Compose runs all three for you. Point them at managed instances when you would rather not operate them: Postgres holds the record, Kafka moves the work, Redis holds the claims, rate limits and the ordering buffer.",
+      "stores": {
+        "dbMode": "`embedded` runs Postgres in Compose; `external` uses the `DB_*` settings below instead.",
+        "dbExternal": "Your managed Postgres, used when `DB_MODE=external`.",
+        "dbSsl": "Set it to `require` for anything not on the same private network.",
+        "redis": "Where Redis lives.",
+        "kafka": "Comma-separated broker list.",
+        "partitions": "Partitions on the delivery topics, which is the ceiling on how many workers can consume in parallel. Raise it before you scale workers past it; it cannot be lowered afterwards.",
+        "concurrency": "Concurrent consumers per worker instance. Total in-flight deliveries is this times the number of workers, capped by the partition count."
+      },
+      "deliveryTitle": "Delivery limits",
+      "deliveryDesc": "The bounds a single project can push the platform to. On a cloud deployment the plan's limits apply on top of these; self-hosted, these are the only ones.",
+      "delivery": {
+        "payloadSize": "Largest event body accepted, in bytes.",
+        "fanout": "Most deliveries one event may create. An event matching more subscriptions than this is rejected rather than half-delivered.",
+        "projectRate": "Events per second one project may send.",
+        "concurrentPerEndpoint": "In-flight attempts against a single endpoint. It is a courtesy to the receiver as much as a limit on you.",
+        "privateIps": "Off by default: an endpoint URL resolving to a loopback, link-local or private address is refused, and so are the cloud metadata endpoints. Turn it on only for an instance that delivers exclusively inside your own network.",
+        "allowedHosts": "An allowlist of hosts endpoints may point at. Empty means any public host.",
+        "verificationRequired": "When on, a new endpoint has to answer a challenge before anything is delivered to it.",
+        "gapTimeout": "How long an ordered delivery waits for the one before it. After this it goes anyway — a predecessor that never arrives delays one delivery rather than stopping the endpoint."
+      },
+      "housekeepingTitle": "Retention, email and the rest",
+      "housekeepingDesc": "What is kept, what gets sent, and what is exposed.",
+      "housekeeping": {
+        "attemptsDays": "How long delivery attempts are kept before the nightly cleanup removes them.",
+        "incomingDays": "The same, for incoming events.",
+        "emailEnabled": "Off by default. With it off, verification, invite and reset links are written to the API log instead of sent — which is what makes a local instance usable without a mail server.",
+        "smtp": "Your mail server, once `EMAIL_ENABLED=true`.",
+        "billingEnabled": "Off means no plans and no quotas — the self-hosted default. On, the seeded plans apply and the limits below stop being consulted.",
+        "entitlementRate": "The requests-per-second an organization gets when billing is off.",
+        "entitlementFanout": "The fan-out ceiling when billing is off.",
+        "logLevel": "`ERROR`, `WARN`, `INFO` or `DEBUG`.",
+        "metrics": "Exposes `/actuator/prometheus` on the management port.",
+        "swagger": "Off by default. It publishes the whole API surface, which is a thing to decide about rather than leave on."
+      }
     }
   },
   "endpoints": {
@@ -2615,6 +2692,16 @@
       "slackDetail": "v0 signature + timestamp",
       "stripeDetail": "timestamp + v1 signature",
       "verifiedLabel": "VERIFIED SOURCES"
+    },
+    "sentHeaders": {
+      "label": "HEADERS WE SEND",
+      "signature": "t=<ms>,v1=<hex>",
+      "eventId": "the event",
+      "deliveryId": "this delivery",
+      "timestamp": "when it was signed",
+      "sequence": "its place in order",
+      "idempotency": "stable across attempts",
+      "note": "Signed with a secret only that endpoint has. Rotate it and the old one keeps verifying for 24 hours, so your customer deploys the new one when it suits them."
     }
   },
   "members": {

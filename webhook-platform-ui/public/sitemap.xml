@@ -26,6 +26,11 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://hookflow.dev/docs/configuration</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://hookflow.dev/docs/authentication</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

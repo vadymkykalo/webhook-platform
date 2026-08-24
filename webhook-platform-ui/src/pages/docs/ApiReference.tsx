@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Skeleton } from '../../components/ui/skeleton';
 import { cn } from '../../lib/utils';
 import SpecText from './SpecText';
+import { CodeBlock } from './primitives';
 import { DocsTitle, Route, Section } from './primitives';
 import {
   CANONICAL_REFERENCE_URL,
@@ -110,7 +111,37 @@ function FieldList({ fields }: { fields: SpecField[] }) {
   );
 }
 
-function Operation({ operation, schemas }: { operation: SpecOperation; schemas: ApiIndex['schemas'] }) {
+/**
+ * A Spring `Page` envelope, and the type it actually carries.
+ *
+ * `PageAlertEventResponse` is eleven fields of framework — totalPages, pageable, sort, first,
+ * last, empty — around one that matters. Tabulating all of them buried the item type behind
+ * `content: AlertEventResponse[]`; the example above shows the envelope in full, so the table
+ * beneath it documents the item.
+ */
+function unwrapPage(
+  type: string | undefined,
+  schemas: ApiIndex['schemas'],
+): { type: string; paged: boolean } | undefined {
+  if (!type) return undefined;
+  const base = type.replace(/\[\]$/, '');
+  const fields = schemas[base];
+  if (!fields) return undefined;
+  const content = fields.find((f) => f.name === 'content');
+  if (!content || !fields.some((f) => f.name === 'totalElements')) return { type: base, paged: false };
+  const inner = content.type.replace(/\[\]$/, '');
+  return schemas[inner] ? { type: inner, paged: true } : { type: base, paged: false };
+}
+
+function Operation({
+  operation,
+  schemas,
+  examples,
+}: {
+  operation: SpecOperation;
+  schemas: ApiIndex['schemas'];
+  examples: ApiIndex['examples'];
+}) {
   const { t } = useTranslation();
   const bodyFields = operation.body ? schemas[operation.body.type.replace(/\[\]$/, '')] : undefined;
 
@@ -167,7 +198,11 @@ function Operation({ operation, schemas }: { operation: SpecOperation; schemas: 
           /* `EventResponse[]` and `EventResponse` are the same shape; a wrapper type the
              generator could not flatten (`map<string, integer>`, a bare `string`) resolves to
              nothing and keeps the one-line treatment it always had. */
-          const fields = response.type ? schemas[response.type.replace(/\[\]$/, '')] : undefined;
+          const base = response.type?.replace(/\[\]$/, '');
+          const example = base ? examples[base] : undefined;
+          const isArray = Boolean(response.type?.endsWith('[]'));
+          const carried = unwrapPage(response.type, schemas);
+          const fields = carried ? schemas[carried.type] : undefined;
           return (
             <div key={response.status} className="space-y-2">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-rail pt-2.5">
@@ -177,10 +212,24 @@ function Operation({ operation, schemas }: { operation: SpecOperation; schemas: 
                 )}
                 <span className="text-sm text-muted-foreground">{response.description}</span>
               </div>
+              {example !== undefined && (
+                <CodeBlock
+                  code={JSON.stringify(isArray ? [example] : example, null, 2)}
+                  label="json"
+                />
+              )}
               {fields && (
-                <div className="sm:pl-4">
+                <details className="group">
+                  <summary className="cursor-pointer list-none py-1 text-[13px] text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    <span className="group-open:hidden">
+                      {t('docsPage.reference.showFields', { type: carried?.type })}
+                    </span>
+                    <span className="hidden group-open:inline">
+                      {t('docsPage.reference.hideFields', { type: carried?.type })}
+                    </span>
+                  </summary>
                   <FieldList fields={fields} />
-                </div>
+                </details>
               )}
             </div>
           );
@@ -327,7 +376,12 @@ export default function ApiReference({
                 )}
               </div>
               {activeGroup.operations.map((op) => (
-                <Operation key={`${op.method}-${op.path}-${op.id}`} operation={op} schemas={index.schemas} />
+                <Operation
+                  key={`${op.method}-${op.path}-${op.id}`}
+                  operation={op}
+                  schemas={index.schemas}
+                  examples={index.examples}
+                />
               ))}
             </section>
           )}

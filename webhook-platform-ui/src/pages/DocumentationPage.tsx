@@ -17,6 +17,7 @@ import { Footer } from '../layout/PublicLayout';
 
 import Authentication from './docs/guides/Authentication';
 import Cli from './docs/guides/Cli';
+import Configuration from './docs/guides/Configuration';
 import DeterministicReplay from './docs/guides/DeterministicReplay';
 import ErrorsAndLimits from './docs/guides/ErrorsAndLimits';
 import GettingStarted from './docs/guides/GettingStarted';
@@ -120,6 +121,7 @@ export default function DocumentationPage() {
           <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
             {section === 'overview' && <Overview />}
             {section === 'getting-started' && <GettingStarted {...sampleProps} />}
+            {section === 'configuration' && <Configuration />}
             {section === 'authentication' && <Authentication {...sampleProps} />}
             {section === 'webhook-security' && <WebhookSecurity {...sampleProps} />}
             {section === 'retries' && <Retries />}
