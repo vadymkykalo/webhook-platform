@@ -492,7 +492,7 @@
     "featureMtls": "mTLS",
     "featureReplay": "Replay",
     "featureRules": "Rules engine",
-    "featureSso": "SSO / SAML",
+    "featureTunnels": "CLI tunnels",
     "featureWorkflows": "Workflows",
     "free": "Free",
     "included": "Included",
@@ -500,6 +500,13 @@
     "invoiceDate": "Date",
     "invoicePlan": "Plan",
     "invoiceStatus": "Status",
+    "invoiceStatuses": {
+      "PAID": "Paid",
+      "OPEN": "Open",
+      "VOID": "Void",
+      "UNCOLLECTIBLE": "Uncollectible",
+      "DRAFT": "Draft"
+    },
     "invoiceView": "View",
     "invoices": "Invoices",
     "invoicesDesc": "Every invoice issued to this organization.",
@@ -519,6 +526,12 @@
     "retention": "Retention",
     "save": "Save",
     "selfHosted": "Self-hosted mode — all features unlocked, no limits",
+    "statuses": {
+      "ACTIVE": "Active",
+      "PAST_DUE": "Past due",
+      "CANCELED": "Canceled",
+      "TRIALING": "Trial"
+    },
     "subtitle": "Manage your plan and usage",
     "switchPlan": "Switch",
     "title": "Billing",
@@ -530,20 +543,7 @@
     "usageSubtitle": "Resource usage for the current billing period",
     "used": "{{percent}}% used",
     "yearly": "Yearly",
-    "yearlySave": "Save ~17%",
-    "statuses": {
-      "ACTIVE": "Active",
-      "PAST_DUE": "Past due",
-      "CANCELED": "Canceled",
-      "TRIALING": "Trial"
-    },
-    "invoiceStatuses": {
-      "PAID": "Paid",
-      "OPEN": "Open",
-      "VOID": "Void",
-      "UNCOLLECTIBLE": "Uncollectible",
-      "DRAFT": "Draft"
-    }
+    "yearlySave": "Save ~17%"
   },
   "breadcrumb": {
     "alerts": "Alerts",

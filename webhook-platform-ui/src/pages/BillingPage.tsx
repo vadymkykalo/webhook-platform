@@ -125,13 +125,23 @@ function PlanLimits({ plan }: { plan: PlanResponse }) {
   );
 }
 
-const FEATURE_KEYS = ['workflows', 'rules', 'replay', 'mTLS', 'sso'] as const;
+/**
+ * The keys are the plan's `features` jsonb, spelled exactly as the seed and
+ * every `@RequireFeature` spell them — `mTLS`, not `mtls`.
+ *
+ * `sso` used to be here, and V036 seeded it true on enterprise and self_hosted
+ * with no SSO anywhere in the codebase, so this list showed a paying Enterprise
+ * customer a feature that does not exist. V059 drops the flag; the row goes with
+ * it. `tunnels` takes its place — that one is real, gated by
+ * EntitlementService.checkTunnelLimit(), and now on for the free plan too.
+ */
+const FEATURE_KEYS = ['workflows', 'rules', 'replay', 'mTLS', 'tunnels'] as const;
 const FEATURE_LABEL: Record<(typeof FEATURE_KEYS)[number], string> = {
   workflows: 'billing.featureWorkflows',
   rules: 'billing.featureRules',
   replay: 'billing.featureReplay',
   mTLS: 'billing.featureMtls',
-  sso: 'billing.featureSso',
+  tunnels: 'billing.featureTunnels',
 };
 
 export default function BillingPage() {

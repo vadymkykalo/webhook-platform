@@ -492,7 +492,7 @@
     "featureMtls": "mTLS",
     "featureReplay": "Реплей",
     "featureRules": "Правила",
-    "featureSso": "SSO / SAML",
+    "featureTunnels": "Тунелі CLI",
     "featureWorkflows": "Автоматизація",
     "free": "Безкоштовно",
     "included": "Включено",
@@ -500,6 +500,13 @@
     "invoiceDate": "Дата",
     "invoicePlan": "План",
     "invoiceStatus": "Статус",
+    "invoiceStatuses": {
+      "PAID": "Оплачено",
+      "OPEN": "Відкрито",
+      "VOID": "Анульовано",
+      "UNCOLLECTIBLE": "Безнадійна",
+      "DRAFT": "Чернетка"
+    },
     "invoiceView": "Переглянути",
     "invoices": "Рахунки",
     "invoicesDesc": "Усі рахунки, виставлені цій організації.",
@@ -519,6 +526,12 @@
     "retention": "Зберігання",
     "save": "Зберегти",
     "selfHosted": "Self-hosted режим — всі функції розблоковані, без лімітів",
+    "statuses": {
+      "ACTIVE": "Активна",
+      "PAST_DUE": "Прострочена",
+      "CANCELED": "Скасована",
+      "TRIALING": "Пробний період"
+    },
     "subtitle": "Керуйте планом та використанням",
     "switchPlan": "Змінити",
     "title": "Білінг",
@@ -530,20 +543,7 @@
     "usageSubtitle": "Використання ресурсів за поточний період",
     "used": "{{percent}}% використано",
     "yearly": "Щорічно",
-    "yearlySave": "Економія ~17%",
-    "statuses": {
-      "ACTIVE": "Активна",
-      "PAST_DUE": "Прострочена",
-      "CANCELED": "Скасована",
-      "TRIALING": "Пробний період"
-    },
-    "invoiceStatuses": {
-      "PAID": "Оплачено",
-      "OPEN": "Відкрито",
-      "VOID": "Анульовано",
-      "UNCOLLECTIBLE": "Безнадійна",
-      "DRAFT": "Чернетка"
-    }
+    "yearlySave": "Економія ~17%"
   },
   "breadcrumb": {
     "alerts": "Алерти",
