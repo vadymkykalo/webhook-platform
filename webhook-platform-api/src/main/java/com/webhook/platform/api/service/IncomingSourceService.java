@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
+import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
@@ -31,17 +32,50 @@ public class IncomingSourceService {
     private final IncomingSourceRepository sourceRepository;
     private final ProjectRepository projectRepository;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
+    private final WebhookVerifierFactory verifierFactory;
     private final String ingressBaseUrl;
 
     public IncomingSourceService(
             IncomingSourceRepository sourceRepository,
             ProjectRepository projectRepository,
             EncryptionKeyRegistry encryptionKeyRegistry,
+            WebhookVerifierFactory verifierFactory,
             @Value("${webhook.ingress-base-url:}") String ingressBaseUrl) {
         this.sourceRepository = sourceRepository;
         this.projectRepository = projectRepository;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
+        this.verifierFactory = verifierFactory;
         this.ingressBaseUrl = ingressBaseUrl;
+    }
+
+    /**
+     * Refuses a source that would fail at ingress rather than at the keyboard.
+     *
+     * <p>Validated against the row as it will be saved, not against the request, because an
+     * update is partial: switching only the mode to {@code PROVIDER} has to be judged
+     * together with the provider type already on the row.
+     *
+     * <p>The failure this prevents is a slow one. A source saved in {@code PROVIDER} mode
+     * with a provider nothing verifies looked configured, and only threw once the provider
+     * was already sending — by which point the webhooks it was rejecting were real.
+     */
+    private void validateVerificationSettings(IncomingSource source) {
+        VerificationMode mode = source.getVerificationMode();
+        if (mode == VerificationMode.PROVIDER
+                && !verifierFactory.supportsProviderVerification(source.getProviderType())) {
+            throw new IllegalArgumentException(
+                    "Provider '" + source.getProviderType() + "' has no built-in verifier. "
+                            + "Use verificationMode HMAC_GENERIC with your own header and prefix, or NONE.");
+        }
+        if (mode == VerificationMode.HMAC_GENERIC && source.getHmacSecretEncrypted() == null) {
+            /* Not a crash, but a source that can never verify anything: every delivery would
+               be stored with verified=false and "Verification error", and the reason would be
+               a field nobody filled in. The header name needs no check — the entity defaults
+               it to X-Signature. */
+            throw new IllegalArgumentException(
+                    "verificationMode HMAC_GENERIC requires hmacSecret — the shared secret the "
+                            + "provider signs with.");
+        }
     }
 
     /**
@@ -107,6 +141,7 @@ public class IncomingSourceService {
         }
         source.setRateLimitPerSecond(request.getRateLimitPerSecond());
 
+        validateVerificationSettings(source);
         source = sourceRepository.saveAndFlush(source);
         log.info("Created incoming source: id={}, projectId={}, slug={}", source.getId(), projectId, slug);
         return mapToResponse(source);
@@ -168,6 +203,7 @@ public class IncomingSourceService {
             source.setRateLimitPerSecond(request.getRateLimitPerSecond());
         }
 
+        validateVerificationSettings(source);
         source = sourceRepository.saveAndFlush(source);
         log.info("Updated incoming source: id={}", id);
         return mapToResponse(source);

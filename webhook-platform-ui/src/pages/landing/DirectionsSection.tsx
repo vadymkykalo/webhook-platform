@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, KeyRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { panel, LogoMark, Reveal, Section, SectionHeader } from './primitives';
+import { panel, Reveal, Section, SectionHeader } from './primitives';
 import { cn } from '../../lib/utils';
 
 /**
@@ -208,9 +208,11 @@ function DirectionCard({
  * question at the moment it is asked.
  */
 const VERIFIED = [
-  { name: 'Stripe', src: '/logos/stripe.svg', detailKey: 'landing.verified.stripeDetail' },
-  { name: 'GitHub', src: '/logos/github.svg', detailKey: 'landing.verified.githubDetail' },
-  { name: 'Slack', src: '/logos/slack.svg', detailKey: 'landing.verified.slackDetail' },
+  { name: 'Stripe', detailKey: 'landing.verified.stripeDetail' },
+  { name: 'GitHub', detailKey: 'landing.verified.githubDetail' },
+  { name: 'GitLab', detailKey: 'landing.verified.gitlabDetail' },
+  { name: 'Slack', detailKey: 'landing.verified.slackDetail' },
+  { name: 'Shopify', detailKey: 'landing.verified.shopifyDetail' },
 ];
 
 function VerifiedSources() {
@@ -218,24 +220,26 @@ function VerifiedSources() {
   return (
     <div className="mt-6 border-t border-rail pt-4">
       <p className="mono-label">{t('landing.verified.verifiedLabel')}</p>
-      <ul className="mt-3 space-y-2">
+      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
         {VERIFIED.map((provider) => (
-          <li key={provider.name} className="flex items-center gap-2.5">
-            <LogoMark src={provider.src} name={provider.name} className="h-4 w-4" />
-            <span className="text-[13.5px] text-foreground">{provider.name}</span>
-            <span className="truncate font-mono text-[11px] text-muted-foreground">
+          <div key={provider.name} className="contents">
+            <dt className="text-[13.5px] text-foreground">{provider.name}</dt>
+            <dd className="truncate font-mono text-[11px] leading-5 text-muted-foreground">
               {t(provider.detailKey)}
-            </span>
-          </li>
+            </dd>
+          </div>
         ))}
-        <li className="flex items-center gap-2.5">
-          <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="text-[13.5px] text-foreground">{t('landing.verified.genericName')}</span>
-          <span className="truncate font-mono text-[11px] text-muted-foreground">
-            {t('landing.verified.genericDetail')}
-          </span>
-        </li>
-      </ul>
+        <dt className="flex items-center gap-1.5 text-[13.5px] text-foreground">
+          <KeyRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          {t('landing.verified.genericName')}
+        </dt>
+        <dd className="truncate font-mono text-[11px] leading-5 text-muted-foreground">
+          {t('landing.verified.genericDetail')}
+        </dd>
+      </dl>
+      <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
+        {t('landing.verified.note')}
+      </p>
     </div>
   );
 }

@@ -1,5 +1,8 @@
 package com.webhook.platform.api.service;
 
+import com.webhook.platform.api.audit.AuditAction;
+import com.webhook.platform.api.audit.Auditable;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
@@ -117,6 +120,7 @@ public class DlqService {
     }
 
     @Transactional
+    @Auditable(action = AuditAction.DLQ_RETRY, resourceType = "Delivery")
     public int retryDeliveries(UUID projectId, List<UUID> deliveryIds) {
         validateProjectOwnership(projectId);
         
@@ -148,6 +152,7 @@ public class DlqService {
     }
 
     @Transactional
+    @Auditable(action = AuditAction.DLQ_PURGE, resourceType = "Delivery")
     public int purgeAllDlq(UUID projectId) {
         validateProjectOwnership(projectId);
         

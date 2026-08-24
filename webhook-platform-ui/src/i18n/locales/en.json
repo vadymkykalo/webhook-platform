@@ -2267,7 +2267,8 @@
       "slugHint": "URL-friendly identifier. Auto-generated from name if empty.",
       "slugPlaceholder": "github-webhooks",
       "title": "Create Incoming Source",
-      "verificationMode": "Verification Mode"
+      "verificationMode": "Verification Mode",
+      "providerVerifiedHint": "Signature verification is built in for these. For any other provider choose HMAC (generic) and name the header it signs in."
     },
     "created": "Created",
     "deleteDialog": {
@@ -2376,9 +2377,9 @@
       "inCta": "Start receiving",
       "inLabel": "INCOMING",
       "inLadder": "5 attempts",
-      "inTitle": "Stop losing webhooks from Stripe and GitHub",
+      "inTitle": "Stop losing the webhooks other services send you",
       "note": "Your own event is worth holding for a day; someone else's webhook is not — so incoming gives up after five attempts and outgoing after seven.",
-      "outBody": "Your system announces an event once. Every endpoint subscribed to it gets its own delivery, signed and numbered so two deliveries to the same endpoint cannot overtake each other.",
+      "outBody": "Your system announces an event once. Every endpoint subscribed to it gets its own delivery, signed and numbered, and a delivery waits for the one before it rather than overtaking it.",
       "outChain": "event → subscription → delivery → attempt",
       "outCta": "Start sending",
       "outLabel": "OUTGOING",
@@ -2394,7 +2395,7 @@
       "a5": "Yes — it is the same code. The self-hosted build is MIT licensed with every feature on and no limits on events, projects, endpoints, members or retention. Two curls and a docker compose up.",
       "a6": "The dashboard shows usage against your plan as you approach it, and you can change plan at any time from Billing. Rate limits are per second, so a burst is smoothed rather than dropped.",
       "a7": "Per endpoint, yes. Each delivery carries a sequence number, and a delivery whose predecessor is still retrying waits its turn instead of overtaking it.",
-      "a8": "Stripe, GitHub and Slack have their own verifier. Everything else — GitLab, Shopify, and any provider that signs its body with a shared secret — uses the generic HMAC verifier, where you name the header and prefix.",
+      "a8": "Any of them. Stripe, GitHub, GitLab, Slack and Shopify verify with no configuration — each has a verifier written for the exact header it sends. For any other provider that signs its body with a shared secret, name the header and the prefix and Hookflow verifies it the same way. A provider that does not sign at all can still deliver; the payload is stored and forwarded, marked unverified.",
       "eyebrow": "QUESTIONS",
       "q1": "What's actually in the free plan?",
       "q2": "What happens when an endpoint is down?",
@@ -2422,7 +2423,7 @@
       "statusFailed": "Attempt {{n}} failed · 500",
       "statusInFlight": "Attempt {{n}} in flight",
       "statusWaiting": "Waiting {{delay}} before attempt {{n}}",
-      "subtitle": "Hookflow is the webhook layer for your product: deliveries out to the endpoints your customers registered, and webhooks in from Stripe, GitHub or Slack. Signed, retried, and every attempt on the record.",
+      "subtitle": "Hookflow is the webhook layer for your product: deliveries out to the endpoints your customers registered, and webhooks in from any provider you receive from. Signed, retried, and every attempt on the record.",
       "title": "Never lose a webhook"
     },
     "nav": {
@@ -2537,7 +2538,7 @@
       "ladderEnd": "after the last rung → Failed Messages",
       "ladderLabel": "OUTGOING LADDER",
       "ladderNote": "Each wait is longer than the last: a blip costs one retry, a real outage still gets a full day of tries.",
-      "orderBody": "A delivery whose predecessor has not finished waits its turn instead of overtaking it.",
+      "orderBody": "A delivery whose predecessor has not finished waits its turn. It waits for a minute — a predecessor that never arrives stalls one delivery, not the endpoint.",
       "orderTitle": "Ordered per endpoint",
       "replayBody": "Pick events you already stored and send them again as fresh deliveries — same content, new attempts, 200 at a time.",
       "replayTitle": "Time Machine",
@@ -2546,7 +2547,7 @@
     "security": {
       "apiKeysDesc": "Project-scoped keys with a read-only mode. Rotate one without touching the others.",
       "apiKeysTitle": "Scoped API keys",
-      "auditDesc": "Who changed which endpoint, rotated which secret, replayed which events — and when.",
+      "auditDesc": "Who changed which endpoint, rotated which secret, replayed which events, purged which Failed Messages — and when.",
       "auditTitle": "Audit log",
       "body": "Webhooks carry order totals, email addresses and card metadata across the open internet. Here is what Hookflow does about that.",
       "encryptionDesc": "Secrets and certificates are AES-256-GCM encrypted, each row tagged with the key that sealed it, so a key can be rotated without re-encrypting the world.",
@@ -2561,7 +2562,7 @@
       "note": "Prefer that none of it leaves your network? The self-hosted build is the same code with every feature on.",
       "rbacDesc": "Owner, Developer and Viewer, scoped per organization. Tenant isolation is enforced in the data layer, not by hand.",
       "rbacTitle": "Roles and organizations",
-      "rotationDesc": "The old signing secret keeps working for 24 hours after you rotate, so nobody has to deploy in lockstep with you.",
+      "rotationDesc": "The retired secret keeps verifying for 24 hours: each delivery is signed with both, so your customers do not have to deploy the new one the moment you rotate.",
       "rotationTitle": "Zero-downtime secret rotation",
       "ssrfDesc": "Endpoint URLs are validated before the first request: private ranges and internal hosts are refused.",
       "ssrfTitle": "SSRF protection",
@@ -2590,8 +2591,11 @@
     },
     "verified": {
       "genericDetail": "your header, your prefix",
-      "genericName": "Any HMAC provider",
-      "githubDetail": "sha256 prefix",
+      "genericName": "Any other provider",
+      "githubDetail": "sha256= prefix",
+      "gitlabDetail": "X-Gitlab-Token",
+      "note": "Five providers verify without configuration. Anything else that signs its body with a shared secret verifies once you name the header — and a provider that does not sign at all still delivers.",
+      "shopifyDetail": "base64 HMAC",
       "slackDetail": "v0 signature + timestamp",
       "stripeDetail": "timestamp + v1 signature",
       "verifiedLabel": "VERIFIED SOURCES"
