@@ -1,18 +1,24 @@
 # ============================================================================
 # Pull-based quick start — no Maven/npm toolchain, no repo clone required.
 # ============================================================================
-# Unlike docker-compose.yml (build: contexts) and docker-compose.prod.yml (an
-# *overlay* that still needs docker-compose.yml present for its base service
-# definitions), this file is fully self-contained: every service resolves to
-# a pre-built image, so it works with nothing but this file plus a .env next
-# to it (copy .env.dist -> .env and fill in the secrets).
+# This is what install.sh downloads and what an installation runs. Unlike
+# docker-compose.yml (build: contexts) and docker-compose.prod.yml (an *overlay*
+# that still needs docker-compose.yml present for its base service definitions),
+# it is fully self-contained: every service resolves to a pre-built image, so it
+# works with nothing but this file and a .env next to it.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
-#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
-#   # edit .env: set WEBHOOK_ENCRYPTION_KEY / WEBHOOK_ENCRYPTION_SALT / JWT_SECRET / *_PASSWORD
-#   docker compose -f docker-compose.pull.yml up -d
-#   curl -f http://localhost:8082/actuator/health/liveness   # actuator: separate port, see MANAGEMENT_PORT below
-#   curl -f http://localhost:5173
+# Get both, with real generated secrets rather than the public ones in
+# .env.dist, by running the installer:
+#
+#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+#
+# ONE PUBLISHED PORT. The ui service's nginx is the only thing bound to the
+# host; it serves the dashboard and proxies every API path to `api`. Nothing
+# else — not the API, not the actuator, not the datastores — is reachable from
+# outside the Docker network. Set HOOKFLOW_PORT to move it off 80.
+#
+#   curl -f http://localhost/actuator/health/liveness
+#   curl -f http://localhost/
 #
 # Images default to the images this project publishes to GHCR on every
 # version tag (see .github/workflows/docker-publish.yml). Override
@@ -33,8 +39,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-webhook_platform}
       POSTGRES_USER: ${POSTGRES_USER:-webhook_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_VOLUME_NAME:-webhook_pgdata}:/var/lib/postgresql/data
     healthcheck:
@@ -60,9 +64,6 @@ services:
   kafka:
     image: ${KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: webhook-kafka
-    ports:
-      - "127.0.0.1:9092:9092"
-      - "127.0.0.1:9093:9093"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -127,8 +128,6 @@ services:
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
     container_name: webhook-redis
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-webhook_redis_pass}
     volumes:
       - redis_data:/data
@@ -155,16 +154,29 @@ services:
   api:
     image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-api:${API_IMAGE_TAG:-latest}
     container_name: webhook-api
-    ports:
-      - "${API_BIND:-127.0.0.1}:${API_PORT:-8080}:8080"
-      # docker-compose.yml never publishes 8082 (actuator is meant to be reachable
-      # only from other containers on webhook-network — see the MANAGEMENT_PORT
-      # comment below). This file loopback-publishes it anyway, same trust
-      # boundary as the postgres/kafka/redis loopback ports above, so
-      # `curl localhost:8082/actuator/health/liveness` works for a bare quick-start trial
-      # without requiring `docker exec` (which docs/OPERATIONS.md's `make health`
-      # uses for the build-from-source path instead).
-      - "127.0.0.1:8082:8082"
+    # Deliberately no host ports. Everything reaches the API through the ui
+    # service's nginx, which proxies /api/, /ws/tunnel, /tunnel/, /hook/,
+    # /ingress/ and the two safe actuator paths. One published port is one URL
+    # to give people, one certificate to obtain and one firewall rule to
+    # write — and in production that port is 443 behind a domain, not a set of
+    # numbers anyone has to remember.
+    #
+    # Nothing else publishes a host port either — not postgres, kafka or redis.
+    # `docker compose exec` reaches all of them (that is what ./hookflow backup
+    # uses), and a database listening on a laptop's loopback is a real exposure
+    # the moment anything else on that machine is compromised.
+    #
+    # If you do want something reachable directly — debugging, psql, a CLI
+    # pointed straight at the API — add a docker-compose.override.yml next to
+    # this file:
+    #
+    #   services:
+    #     api:      { ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"] }
+    #     postgres: { ports: ["127.0.0.1:5432:5432"] }
+    #
+    # Keep them on 127.0.0.1. 8082 is the actuator port, and it deliberately
+    # does not pass through the authenticated security chain (see
+    # MANAGEMENT_PORT below), so it must never leave the host.
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -439,7 +451,11 @@ services:
     image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-ui:${UI_IMAGE_TAG:-latest}
     container_name: webhook-ui
     ports:
-      - "${UI_PORT:-5173}:5173"
+      # The one published port. 80 by default because that is what a browser
+      # assumes. With the `tls` profile on, install.sh moves this to
+      # 127.0.0.1:8080 and Caddy below takes 80/443 instead — nothing else
+      # changes, because Caddy proxies straight to this same nginx.
+      - "${HOOKFLOW_BIND:-0.0.0.0}:${HOOKFLOW_PORT:-80}:5173"
     # No environment block: the UI is a static bundle behind nginx. Vite inlines
     # every VITE_* value at build time, so nothing here could change it — and on
     # a pre-built image there is no build to feed. nginx proxies /api/,
@@ -462,7 +478,55 @@ services:
       - webhook-network
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # TLS. Off unless the `tls` profile is enabled, which install.sh does when you
+  # give it --domain.
+  #
+  # Caddy rather than nginx-with-certbot because getting and renewing the
+  # certificate is the whole job here, and Caddy does it with no cron entry, no
+  # renewal hook and no first-run chicken-and-egg where nginx will not start
+  # until a certificate exists that cannot be obtained until nginx starts.
+  #
+  # It terminates TLS and proxies to the ui service's nginx, which still does
+  # all the routing. One place decides what is public; adding TLS did not move
+  # that decision.
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    container_name: webhook-caddy
+    profiles: [tls]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # `:-` and not `:?`: Compose interpolates the whole file regardless of
+      # which profiles are active, so a required-variable guard here would fail
+      # every install that is not using TLS. An empty value reaches the
+      # Caddyfile, where Caddy refuses to start with a clear message — and only
+      # when this profile is actually on.
+      HOOKFLOW_DOMAIN: ${HOOKFLOW_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means re-issuing on the next
+      # start, which Let's Encrypt rate-limits — back it up with your .env.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - ui
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks:
+      - webhook-network
+
 volumes:
+  caddy_data:
+  caddy_config:
   webhook_pgdata:
     name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}
   kafka_data:
