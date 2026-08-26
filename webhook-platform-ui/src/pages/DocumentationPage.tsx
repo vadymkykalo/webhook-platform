@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, ExternalLink, Menu, X } from 'lucide-react';
 import { HookflowIcon } from '../components/icons/HookflowIcon';
@@ -9,10 +9,15 @@ import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 import { CANONICAL_REFERENCE_URL } from './docs/apiIndex';
 import type { SampleLanguage } from './docs/primitives';
-import { GUIDE_SECTIONS, REFERENCE_SECTION, resolveAnchor, type SectionId } from './docs/sections';
+import {
+  GUIDE_SECTIONS, REFERENCE_SECTION, resolveAnchor, resolveSectionId, sectionPath, type SectionId,
+} from './docs/sections';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { Footer } from '../layout/PublicLayout';
 
 import Authentication from './docs/guides/Authentication';
 import Cli from './docs/guides/Cli';
+import Configuration from './docs/guides/Configuration';
 import DeterministicReplay from './docs/guides/DeterministicReplay';
 import ErrorsAndLimits from './docs/guides/ErrorsAndLimits';
 import GettingStarted from './docs/guides/GettingStarted';
@@ -43,9 +48,13 @@ export default function DocumentationPage() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const params = useParams<{ sectionId?: string }>();
 
-  const isCliRoute = location.pathname === '/docs/cli';
-  const initial = isCliRoute ? { section: 'cli' as SectionId } : resolveAnchor(location.hash);
+  /* A guide is addressed by path now. The hash is still read, because every
+     link written before this — in an EmptyState, a bookmark, an old blog post —
+     is `/docs#retries`. */
+  const routed = resolveSectionId(params.sectionId);
+  const initial = routed ? { section: routed } : resolveAnchor(location.hash);
 
   const [section, setSection] = useState<SectionId>(initial.section);
   const [referenceGroup, setReferenceGroup] = useState<string | undefined>(initial.group);
@@ -53,27 +62,41 @@ export default function DocumentationPage() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    if (isCliRoute) {
-      setSection('cli');
+    if (routed) {
+      setSection(routed);
       return;
     }
-    if (!location.hash) return;
+    if (!location.hash) {
+      setSection('overview');
+      return;
+    }
     const resolved = resolveAnchor(location.hash);
     setSection(resolved.section);
     if (resolved.group) setReferenceGroup(resolved.group);
-  }, [location.hash, isCliRoute]);
+  }, [location.hash, routed]);
 
   const go = useCallback(
     (next: SectionId) => {
       setSection(next);
       setMobileNavOpen(false);
-      navigate(next === 'overview' ? '/docs' : `/docs#${next}`, { replace: false });
+      navigate(sectionPath(next), { replace: false });
       window.scrollTo({ top: 0, behavior: 'auto' });
     },
     [navigate]
   );
 
   const sampleProps = { language, onLanguageChange: setLanguage };
+
+  /* Each guide has its own URL now, so each needs its own title: thirteen pages sharing
+     "Documentation — Hookflow" is one page as far as a search result is concerned. The
+     section's own sidebar label is the name it is already known by. */
+  const sectionLabel = [...GUIDE_SECTIONS, REFERENCE_SECTION].find((s) => s.id === section)?.labelKey;
+  useDocumentMeta({
+    titleKey: 'meta.docs.title',
+    titleParams: section === 'overview' || !sectionLabel ? undefined : { section: t(sectionLabel) },
+    descriptionKey: 'meta.docs.description',
+    path: sectionPath(section),
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,6 +121,7 @@ export default function DocumentationPage() {
           <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
             {section === 'overview' && <Overview />}
             {section === 'getting-started' && <GettingStarted {...sampleProps} />}
+            {section === 'configuration' && <Configuration />}
             {section === 'authentication' && <Authentication {...sampleProps} />}
             {section === 'webhook-security' && <WebhookSecurity {...sampleProps} />}
             {section === 'retries' && <Retries />}
@@ -115,6 +139,12 @@ export default function DocumentationPage() {
               </Suspense>
             )}
           </div>
+
+          {/* Inside the content column, not around the page: the sidebar beside
+              it is `fixed`, so a footer at layout level lays out under it. The
+              docs used to have no footer at all — the deepest page in the funnel
+              was the one with no link back to pricing or a signup. */}
+          <Footer />
         </main>
       </div>
     </div>

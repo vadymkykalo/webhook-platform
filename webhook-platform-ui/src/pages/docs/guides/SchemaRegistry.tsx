@@ -28,24 +28,27 @@ function VersionLifecycle() {
 
   return (
     <Diagram
-      viewBox="0 0 440 130"
+      viewBox="0 0 440 136"
       maxWidth={500}
       label={t('docsPage.schemaRegistry.lifecycleAlt')}
       caption={t('docsPage.schemaRegistry.lifecycleCaption')}
     >
-      <SketchEdge d="M132,56 H156" />
-      <SketchText x={144} y={24} size={12}>
+      <SketchEdge d="M138,56 H154" />
+      <SketchText x={146} y={24} size={11}>
         {t('docsPage.schemaRegistry.lifecyclePromote')}
       </SketchText>
 
-      <SketchEdge d="M284,56 H308" />
-      <SketchText x={296} y={24} size={12}>
+      <SketchEdge d="M284,56 H300" />
+      <SketchText x={292} y={24} size={11}>
         {t('docsPage.schemaRegistry.lifecycleReplaced')}
       </SketchText>
 
-      <SketchBox x={12} y={34} w={120} h={44} label="DRAFT" />
-      <SketchBox x={160} y={34} w={124} h={44} label="ACTIVE" />
-      <SketchBox x={312} y={34} w={124} h={44} label="DEPRECATED" />
+      {/* What each state does to a payload, which is the question a reader arrives with and
+          the one three bare status names did not answer. Short phrases: a mono sub-line wider
+          than its node overruns into the one beside it. */}
+      <SketchBox x={12} y={30} w={126} h={52} label="DRAFT" sub={t('docsPage.schemaRegistry.lifecycleDraftDoes')} />
+      <SketchBox x={158} y={30} w={126} h={52} label="ACTIVE" sub={t('docsPage.schemaRegistry.lifecycleActiveDoes')} tone="ok" />
+      <SketchBox x={304} y={30} w={130} h={52} label="DEPRECATED" sub={t('docsPage.schemaRegistry.lifecycleDeprecatedDoes')} tone="idle" />
 
       <SketchText x={220} y={112} size={13}>
         {t('docsPage.schemaRegistry.lifecycleOnlyOne')}

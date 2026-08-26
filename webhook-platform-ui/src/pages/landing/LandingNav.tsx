@@ -1,19 +1,40 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Github, Menu, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { HookflowIcon } from '../../components/icons/HookflowIcon';
 import { Button } from '../../components/ui/button';
 import ThemeToggle from '../../components/ThemeToggle';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
 import { useAuth } from '../../auth/auth.store';
+import { REPO_URL } from './plans';
 
+/**
+ * Five items, each naming a decision rather than a component of the system.
+ *
+ * The set this replaces was `How it works · Reliability · Dashboard · Features
+ * · Pricing`: "Reliability" and "Dashboard" are attributes of the product, not
+ * questions a buyer arrives with, and "Features" pointed at an anchor called
+ * `#quickstart` in a file called `QuickstartSection`. Reliability and the
+ * dashboard now live inside "How it works" and "Product" respectively, which is
+ * where a reader looks for them.
+ *
+ * Pricing is a route, not an anchor: it is the link people paste into a chat.
+ *
+ * The anchors are `Link`s rather than bare `<a href>`s because this nav is also
+ * mounted on /pricing and /contact, where an href to "/#security" is a full
+ * document navigation. `LandingPage` scrolls to the hash on arrival, so a
+ * client-side navigation lands in the same place at SPA cost.
+ */
 const LINKS = [
-  { href: '#how-it-works', key: 'landing.nav.directions' },
-  { href: '#retries', key: 'landing.nav.reliability' },
-  { href: '#dashboard', key: 'landing.nav.product' },
-  { href: '#quickstart', key: 'landing.nav.quickstart' },
-  { href: '#pricing', key: 'landing.nav.pricing' },
+  { to: '/#capabilities', key: 'landing.nav.product' },
+  { to: '/#how-it-works', key: 'landing.nav.directions' },
+  { to: '/#security', key: 'landing.nav.security' },
+] as const;
+
+const ROUTES = [
+  { to: '/pricing', key: 'landing.nav.pricing' },
+  { to: '/docs', key: 'landing.nav.docs' },
 ] as const;
 
 export default function LandingNav() {
@@ -52,25 +73,41 @@ export default function LandingNav() {
           </Link>
           <ul className="hidden items-center gap-6 lg:flex">
             {LINKS.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
+              <li key={link.to}>
+                <Link
+                  to={link.to}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {t(link.key)}
-                </a>
+                </Link>
               </li>
             ))}
-            <li>
-              <Link to="/docs" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-                {t('landing.nav.docs')}
-              </Link>
-            </li>
+            {ROUTES.map((route) => (
+              <li key={route.to}>
+                <Link
+                  to={route.to}
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {t(route.key)}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
 
         <div className="flex items-center gap-1.5">
           <div className="hidden sm:flex sm:items-center sm:gap-1.5">
+            {/* The repository is a trust signal, not a step in the funnel: it
+                stays reachable, at the weight of an icon rather than a button. */}
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={t('landing.nav.github')}
+              className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Github className="h-4 w-4" aria-hidden="true" />
+            </a>
             <LanguageSwitcher />
             <ThemeToggle className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" />
           </div>
@@ -108,25 +145,27 @@ export default function LandingNav() {
         <div id="landing-mobile-nav" className="border-t border-rail bg-background lg:hidden">
           <ul className="mx-auto flex max-w-6xl flex-col px-5 py-2 sm:px-6">
             {LINKS.map((link) => (
-              <li key={link.href}>
-                <a
-                  href={link.href}
+              <li key={link.to}>
+                <Link
+                  to={link.to}
                   onClick={() => setOpen(false)}
                   className="block border-b border-rail py-3 text-[15px] text-foreground"
                 >
                   {t(link.key)}
-                </a>
+                </Link>
               </li>
             ))}
-            <li>
-              <Link
-                to="/docs"
-                onClick={() => setOpen(false)}
-                className="block border-b border-rail py-3 text-[15px] text-foreground"
-              >
-                {t('landing.nav.docs')}
-              </Link>
-            </li>
+            {ROUTES.map((route) => (
+              <li key={route.to}>
+                <Link
+                  to={route.to}
+                  onClick={() => setOpen(false)}
+                  className="block border-b border-rail py-3 text-[15px] text-foreground"
+                >
+                  {t(route.key)}
+                </Link>
+              </li>
+            ))}
             <li className="flex flex-col gap-2.5 py-4">
               {isAuthenticated ? (
                 <Link to="/admin/dashboard" onClick={() => setOpen(false)}>

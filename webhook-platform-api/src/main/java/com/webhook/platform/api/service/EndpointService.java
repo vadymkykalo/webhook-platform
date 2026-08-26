@@ -189,22 +189,70 @@ public class EndpointService {
         endpointRepository.save(endpoint);
     }
 
+    /**
+     * Rotates the signing secret, keeping the retired one valid for the endpoint's grace
+     * period (24 hours by default).
+     *
+     * <p>Rotation used to replace the secret in place, which made it a breaking change for
+     * the receiver: every delivery from that instant was signed with a key they had not
+     * deployed yet, and each one failed their verification. The retired secret is now kept
+     * alongside, and the worker signs with both while the window is open — the header
+     * carries two {@code v1} values and either verifies.
+     *
+     * <p>The previous secret is <em>re-encrypted</em> rather than copied as ciphertext: the
+     * row carries a single {@code encryption_key_version}, so a straight copy would leave
+     * two ciphertexts described by one version and the older one undecryptable after a key
+     * rotation.
+     */
     @Auditable(action = AuditAction.ROTATE_SECRET, resourceType = "Endpoint")
     @Transactional
     public EndpointResponse rotateSecret(UUID id) {
         Endpoint endpoint = endpointRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Endpoint not found"));
         validateProjectOwnership(endpoint.getProjectId());
-        
+
+        String retiringSecret = decryptSecretOrNull(endpoint);
+
         String newSecret = CryptoUtils.generateSecureToken(32);
         CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(newSecret);
-        
+
+        if (retiringSecret != null) {
+            CryptoUtils.EncryptedData previous = encryptionKeyRegistry.encrypt(retiringSecret);
+            endpoint.setSecretPreviousEncrypted(previous.getCiphertext());
+            endpoint.setSecretPreviousIv(previous.getIv());
+            endpoint.setSecretRotatedAt(Instant.now());
+        } else {
+            /* Nothing decryptable to keep — the receiver could not have been verifying with
+               it either, so there is no window to open. Clearing rather than leaving a stale
+               pair behind, which would otherwise be signed with under the new rotated_at. */
+            endpoint.setSecretPreviousEncrypted(null);
+            endpoint.setSecretPreviousIv(null);
+            endpoint.setSecretRotatedAt(null);
+        }
+
         endpoint.setSecretEncrypted(encrypted.getCiphertext());
         endpoint.setSecretIv(encrypted.getIv());
         endpoint.setEncryptionKeyVersion(encrypted.getKeyVersion());
         endpoint = endpointRepository.saveAndFlush(endpoint);
-        
+
         return mapToResponseWithSecret(endpoint, newSecret);
+    }
+
+    /**
+     * The endpoint's current secret, or {@code null} when it cannot be decrypted.
+     *
+     * <p>An undecryptable secret must not block a rotation — rotating is exactly what an
+     * operator does to recover from one.
+     */
+    private String decryptSecretOrNull(Endpoint endpoint) {
+        try {
+            return encryptionKeyRegistry.decryptWithFallback(
+                    endpoint.getSecretEncrypted(), endpoint.getSecretIv(), endpoint.getEncryptionKeyVersion());
+        } catch (Exception e) {
+            log.warn("Endpoint {}: current secret could not be decrypted, rotating without a grace window",
+                    endpoint.getId(), e);
+            return null;
+        }
     }
 
     public EndpointTestResponse testEndpoint(UUID id) {

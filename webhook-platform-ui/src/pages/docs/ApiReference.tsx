@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Skeleton } from '../../components/ui/skeleton';
 import { cn } from '../../lib/utils';
 import SpecText from './SpecText';
+import { CodeBlock } from './primitives';
 import { DocsTitle, Route, Section } from './primitives';
 import {
   CANONICAL_REFERENCE_URL,
@@ -74,7 +75,73 @@ function FieldTable({ fields, caption }: { fields: SpecField[]; caption: string 
   );
 }
 
-function Operation({ operation, schemas }: { operation: SpecOperation; schemas: ApiIndex['schemas'] }) {
+/**
+ * The fields of a schema, in one place because a request body and a response body are the
+ * same thing pointed in different directions.
+ *
+ * The response side used to print only the schema's name — "200 EventResponse OK" — while the
+ * request side listed every field. So the reference answered what to send and left what comes
+ * back as a name to go and look up somewhere else, which for a generated page is the one
+ * thing it was supposed to save the reader.
+ */
+function FieldList({ fields }: { fields: SpecField[] }) {
+  const { t } = useTranslation();
+  return (
+    <dl className="divide-y divide-rail border-y border-rail">
+      {fields.map((field) => (
+        <div key={field.name} className="grid gap-1 py-2.5 sm:grid-cols-[minmax(0,16rem)_1fr] sm:gap-4">
+          <dt className="min-w-0">
+            <code className="break-all font-mono text-[13px] text-foreground">{field.name}</code>
+            <span className="ml-2 font-mono text-[11px] text-muted-foreground">{field.type}</span>
+            {field.required && (
+              <span className="ml-2 text-[11px] text-muted-foreground">
+                {t('docsPage.paramTable.required').toLowerCase()}
+              </span>
+            )}
+          </dt>
+          <dd className="space-y-1 text-sm text-muted-foreground">
+            {field.description && <SpecText text={field.description} className="leading-relaxed" />}
+            {field.values && (
+              <div className="font-mono text-[11px] text-muted-foreground">{field.values.join(' · ')}</div>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * A Spring `Page` envelope, and the type it actually carries.
+ *
+ * `PageAlertEventResponse` is eleven fields of framework — totalPages, pageable, sort, first,
+ * last, empty — around one that matters. Tabulating all of them buried the item type behind
+ * `content: AlertEventResponse[]`; the example above shows the envelope in full, so the table
+ * beneath it documents the item.
+ */
+function unwrapPage(
+  type: string | undefined,
+  schemas: ApiIndex['schemas'],
+): { type: string; paged: boolean } | undefined {
+  if (!type) return undefined;
+  const base = type.replace(/\[\]$/, '');
+  const fields = schemas[base];
+  if (!fields) return undefined;
+  const content = fields.find((f) => f.name === 'content');
+  if (!content || !fields.some((f) => f.name === 'totalElements')) return { type: base, paged: false };
+  const inner = content.type.replace(/\[\]$/, '');
+  return schemas[inner] ? { type: inner, paged: true } : { type: base, paged: false };
+}
+
+function Operation({
+  operation,
+  schemas,
+  examples,
+}: {
+  operation: SpecOperation;
+  schemas: ApiIndex['schemas'];
+  examples: ApiIndex['examples'];
+}) {
   const { t } = useTranslation();
   const bodyFields = operation.body ? schemas[operation.body.type.replace(/\[\]$/, '')] : undefined;
 
@@ -118,46 +185,55 @@ function Operation({ operation, schemas }: { operation: SpecOperation; schemas: 
             {t('docsPage.reference.requestBody')} · {operation.body.type} · {operation.body.contentType}
           </div>
           {bodyFields ? (
-            <dl className="divide-y divide-rail border-y border-rail">
-              {bodyFields.map((field) => (
-                <div key={field.name} className="grid gap-1 py-2.5 sm:grid-cols-[minmax(0,16rem)_1fr] sm:gap-4">
-                  <dt className="min-w-0">
-                    <code className="break-all font-mono text-[13px] text-foreground">{field.name}</code>
-                    <span className="ml-2 font-mono text-[11px] text-muted-foreground">{field.type}</span>
-                    {field.required && (
-                      <span className="ml-2 text-[11px] text-muted-foreground">
-                        {t('docsPage.paramTable.required').toLowerCase()}
-                      </span>
-                    )}
-                  </dt>
-                  <dd className="space-y-1 text-sm text-muted-foreground">
-                    {field.description && <SpecText text={field.description} className="leading-relaxed" />}
-                    {field.values && (
-                      <div className="font-mono text-[11px] text-muted-foreground">{field.values.join(' · ')}</div>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            <FieldList fields={bodyFields} />
           ) : (
             <p className="font-mono text-[13px] text-muted-foreground">{operation.body.type}</p>
           )}
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="mono-label">{t('docsPage.reference.responses')}</div>
-        <dl className="divide-y divide-rail border-y border-rail">
-          {operation.responses.map((response) => (
-            <div key={response.status} className="grid gap-1 py-2.5 sm:grid-cols-[minmax(0,16rem)_1fr] sm:gap-4">
-              <dt className="font-mono text-[13px] text-foreground">
-                {response.status}
-                {response.type && <span className="ml-2 text-[11px] text-muted-foreground">{response.type}</span>}
-              </dt>
-              <dd className="text-sm text-muted-foreground">{response.description}</dd>
+        {operation.responses.map((response) => {
+          /* `EventResponse[]` and `EventResponse` are the same shape; a wrapper type the
+             generator could not flatten (`map<string, integer>`, a bare `string`) resolves to
+             nothing and keeps the one-line treatment it always had. */
+          const base = response.type?.replace(/\[\]$/, '');
+          const example = base ? examples[base] : undefined;
+          const isArray = Boolean(response.type?.endsWith('[]'));
+          const carried = unwrapPage(response.type, schemas);
+          const fields = carried ? schemas[carried.type] : undefined;
+          return (
+            <div key={response.status} className="space-y-2">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-rail pt-2.5">
+                <span className="font-mono text-[13px] text-foreground">{response.status}</span>
+                {response.type && (
+                  <span className="font-mono text-[11.5px] text-muted-foreground">{response.type}</span>
+                )}
+                <span className="text-sm text-muted-foreground">{response.description}</span>
+              </div>
+              {example !== undefined && (
+                <CodeBlock
+                  code={JSON.stringify(isArray ? [example] : example, null, 2)}
+                  label="json"
+                />
+              )}
+              {fields && (
+                <details className="group">
+                  <summary className="cursor-pointer list-none py-1 text-[13px] text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    <span className="group-open:hidden">
+                      {t('docsPage.reference.showFields', { type: carried?.type })}
+                    </span>
+                    <span className="hidden group-open:inline">
+                      {t('docsPage.reference.hideFields', { type: carried?.type })}
+                    </span>
+                  </summary>
+                  <FieldList fields={fields} />
+                </details>
+              )}
             </div>
-          ))}
-        </dl>
+          );
+        })}
       </div>
     </article>
   );
@@ -300,7 +376,12 @@ export default function ApiReference({
                 )}
               </div>
               {activeGroup.operations.map((op) => (
-                <Operation key={`${op.method}-${op.path}-${op.id}`} operation={op} schemas={index.schemas} />
+                <Operation
+                  key={`${op.method}-${op.path}-${op.id}`}
+                  operation={op}
+                  schemas={index.schemas}
+                  examples={index.examples}
+                />
               ))}
             </section>
           )}

@@ -356,6 +356,13 @@ jobs:
         working-directory: webhook-platform-ui
         run: npm run docs:api-index:check
 
+      # sitemap.xml is derived from the same guide list the docs sidebar renders
+      # and committed, so a guide added without regenerating it would be a page
+      # that exists and is never crawled.
+      - name: Check sitemap.xml matches the public route list
+        working-directory: webhook-platform-ui
+        run: npm run seo:sitemap:check
+
       - name: Run ESLint
         working-directory: webhook-platform-ui
         run: npm run lint

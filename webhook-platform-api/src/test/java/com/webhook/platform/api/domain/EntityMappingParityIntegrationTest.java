@@ -137,17 +137,11 @@ class EntityMappingParityIntegrationTest {
         exempt("endpoints.description", "dashboard-only label; carries no delivery behaviour");
         exempt("endpoints.created_at", "informational; the worker neither reads nor writes it");
 
-        // Secret-rotation grace period. Nothing populates these: EndpointService.rotateSecret
-        // replaces the secret in place and never writes a previous copy, and the only other
-        // reader — EncryptionKeyRotationService — merely re-encrypts them if a row somehow has
-        // them. So the worker signing with the single current secret is correct today.
-        //
-        // IF DUAL-SIGNING DURING A GRACE PERIOD IS EVER IMPLEMENTED, the worker is where it
-        // lands, and these four entries must be deleted rather than re-justified.
-        exempt("endpoints.secret_previous_encrypted", "grace-period dual-signing is not implemented; nothing writes this");
-        exempt("endpoints.secret_previous_iv", "grace-period dual-signing is not implemented; nothing writes this");
-        exempt("endpoints.secret_rotated_at", "grace-period dual-signing is not implemented; nothing writes this");
-        exempt("endpoints.secret_rotation_grace_period_hours", "grace-period dual-signing is not implemented; nothing writes this");
+        // The four secret-rotation columns were exempt here with the note "IF DUAL-SIGNING
+        // DURING A GRACE PERIOD IS EVER IMPLEMENTED, the worker is where it lands, and these
+        // four entries must be deleted rather than re-justified." It was, and they are:
+        // EndpointService.rotateSecret writes the retired secret and stamps rotated_at, and
+        // OutgoingAttemptStore.secretInsideGraceWindow reads all four.
 
         // Endpoint-verification handshake: entirely an api flow. The worker consumes only its
         // outcome, through verification_status, which it does map — OutgoingAttemptStore

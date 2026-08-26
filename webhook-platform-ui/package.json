@@ -12,6 +12,9 @@
     "types:generate": "openapi-typescript ../openapi.yaml -o src/types/api.generated.ts",
     "docs:api-index": "node scripts/generate-docs-api-index.mjs",
     "docs:api-index:check": "node scripts/generate-docs-api-index.mjs --check",
+    "seo:sitemap": "node scripts/generate-sitemap.mjs",
+    "seo:sitemap:check": "node scripts/generate-sitemap.mjs --check",
+    "prerender": "node scripts/prerender.mjs",
     "test": "vitest",
     "test:ci": "vitest run --reporter=verbose",
     "test:coverage": "vitest run --coverage"
@@ -68,6 +71,7 @@
     "jsdom": "^30.0.1",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.5.26",
+    "puppeteer-core": "^24.43.1",
     "tailwindcss": "^3.3.6",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.3.3",

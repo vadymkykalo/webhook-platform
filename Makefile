@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-check version-check version-set
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-check seo-check prerender version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -233,6 +233,12 @@ types-check: ## Fail if the UI's generated API types are stale vs openapi.yaml (
 docs-check: ## Fail if the in-app API reference index is stale vs openapi.yaml (same check CI runs)
 	@cd webhook-platform-ui && npm run docs:api-index:check
 
+seo-check: ## Fail if public/sitemap.xml is stale vs the docs guide list (same check CI runs)
+	@cd webhook-platform-ui && npm run seo:sitemap:check
+
+prerender: ## Render the public pages to static HTML over an existing dist/ (needs a Chromium)
+	@cd webhook-platform-ui && npm run build && npm run prerender
+
 ##@ Scaling
 scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 	@if [ -z "$(N)" ]; then \
@@ -258,8 +264,8 @@ scale-api: ## Scale API instances (usage: make scale-api N=3)
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(GREEN)Scaling api to $(N) instances (each replica gets its own ephemeral host port)...$(NC)"
-	@API_PORT= $(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
+	@echo "$(GREEN)Scaling api to $(N) instances (nginx load-balances across them)...$(NC)"
+	@$(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
 	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' shows each replica's assigned port$(NC)"
 
 ##@ Release

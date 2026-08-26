@@ -11,6 +11,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
 import com.webhook.platform.common.enums.ProviderType;
 import com.webhook.platform.common.enums.VerificationMode;
+import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ class IncomingSourceServiceTest {
         service = new IncomingSourceService(
                 sourceRepository, projectRepository,
                 registry,
+                new WebhookVerifierFactory(),
                 "http://localhost:8080"
         );
         project = Project.builder()
@@ -245,5 +247,101 @@ class IncomingSourceServiceTest {
         Field f = obj.getClass().getDeclaredField(fieldName);
         f.setAccessible(true);
         f.set(obj, value);
+    }
+
+    // ── Refusing a source that would only fail once webhooks arrive ──────────
+
+    @Test
+    void createRejectsProviderModeForAProviderWithNoVerifier() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+        IncomingSourceRequest request = new IncomingSourceRequest();
+        request.setName("Twilio");
+        request.setProviderType(ProviderType.TWILIO);
+        request.setVerificationMode(VerificationMode.PROVIDER);
+
+        /* TWILIO, GENERIC and CUSTOM are ProviderType names no verifier is written for.
+           This used to save happily and throw IllegalStateException at ingress — the source
+           looked configured, and the failure showed up once the provider was already
+           sending. */
+        assertThatThrownBy(() -> service.createSource(projectId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no built-in verifier");
+
+        verify(sourceRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createAcceptsProviderModeForEveryProviderThatHasAVerifier() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.existsByProjectIdAndSlug(any(), any())).thenReturn(false);
+        when(sourceRepository.existsByIngressPathToken(any())).thenReturn(false);
+        when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        for (ProviderType provider : new ProviderType[] {
+                ProviderType.STRIPE, ProviderType.GITHUB, ProviderType.GITLAB,
+                ProviderType.SLACK, ProviderType.SHOPIFY }) {
+            IncomingSourceRequest request = new IncomingSourceRequest();
+            request.setName("Source " + provider);
+            request.setProviderType(provider);
+            request.setVerificationMode(VerificationMode.PROVIDER);
+
+            assertThatCode(() -> service.createSource(projectId, request))
+                    .as("%s ships a verifier and must be accepted", provider)
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
+    void createRejectsGenericHmacWithoutTheSecretItSignsWith() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+        IncomingSourceRequest request = new IncomingSourceRequest();
+        request.setName("Some provider");
+        request.setVerificationMode(VerificationMode.HMAC_GENERIC);
+        request.setHmacHeaderName("X-Provider-Signature");
+
+        /* Not a crash like the PROVIDER case — every delivery would simply be stored with
+           verified=false and "Verification error", and the cause would be a field nobody
+           filled in. Cheaper to refuse at the keyboard. */
+        assertThatThrownBy(() -> service.createSource(projectId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("hmacSecret");
+    }
+
+    @Test
+    void updateIsJudgedOnTheResultingRowNotTheRequest() {
+        IncomingSource existing = buildSource();
+        existing.setProviderType(ProviderType.TWILIO);
+        existing.setVerificationMode(VerificationMode.NONE);
+        when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(existing));
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+        IncomingSourceRequest request = new IncomingSourceRequest();
+        request.setVerificationMode(VerificationMode.PROVIDER);
+
+        /* The request alone looks harmless — it names no provider. It is the combination
+           with the provider already on the row that is unverifiable, which is why the check
+           runs against the merged state. */
+        assertThatThrownBy(() -> service.updateSource(sourceId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no built-in verifier");
+    }
+
+    @Test
+    void noneModeAcceptsAnyProvider() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(sourceRepository.existsByProjectIdAndSlug(any(), any())).thenReturn(false);
+        when(sourceRepository.existsByIngressPathToken(any())).thenReturn(false);
+        when(sourceRepository.saveAndFlush(any(IncomingSource.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        IncomingSourceRequest request = new IncomingSourceRequest();
+        request.setName("A provider that does not sign at all");
+        request.setProviderType(ProviderType.CUSTOM);
+        request.setVerificationMode(VerificationMode.NONE);
+
+        // Receiving from anything that can POST is the point; only PROVIDER mode makes a
+        // promise about the provider.
+        assertThatCode(() -> service.createSource(projectId, request)).doesNotThrowAnyException();
     }
 }

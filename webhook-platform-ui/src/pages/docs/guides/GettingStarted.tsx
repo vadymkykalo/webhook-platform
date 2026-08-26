@@ -1,5 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { CodeBlock, CodeSample, DocsArticle, DocsTitle, Note, Route, Section } from '../primitives';
+import {
+  CodeBlock,
+  CodeSample,
+  DefinitionList,
+  DocsArticle,
+  DocsTitle,
+  Note,
+  Route,
+  Section,
+  SubSection,
+} from '../primitives';
 import type { SampleLanguage } from '../primitives';
 import { authSamples, quickstartSamples } from '../samples';
 
@@ -14,6 +24,19 @@ const runInstance = `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/we
 
 # Everything is served on one port. Health, once it is up:
 curl -f http://localhost/actuator/health/liveness`;
+
+/**
+ * One published port, and the two that are not.
+ *
+ * This used to list three bindings, from when the dashboard, the API and the actuator each
+ * had their own. Only nginx is bound to the host now — it serves the dashboard and proxies
+ * every API path — so the other two are here to say where they went, not how to reach them.
+ */
+const PORTS = [
+  { port: '80', envVar: 'HOOKFLOW_PORT', key: 'docsPage.gettingStarted.portWeb' },
+  { port: '8080', envVar: null, key: 'docsPage.gettingStarted.portApi' },
+  { port: '8082', envVar: null, key: 'docsPage.gettingStarted.portActuator' },
+];
 
 function Step({
   number,
@@ -57,7 +80,17 @@ export default function GettingStarted({
       <DocsTitle title={t('docsPage.gettingStarted.title')} lede={t('docsPage.gettingStarted.subtitle')} />
 
       <Section title={t('docsPage.gettingStarted.runTitle')} description={t('docsPage.gettingStarted.runDesc')}>
-        <CodeBlock code={runInstance} label="bash" />
+        <CodeBlock code={runInstance} label="bash" wrap />
+
+        <SubSection title={t('docsPage.gettingStarted.portsTitle')}>
+          <DefinitionList
+            items={PORTS.map((p) => ({
+              term: p.port,
+              definition: p.envVar ? `${t(p.key)} \`${p.envVar}\`` : t(p.key),
+            }))}
+          />
+        </SubSection>
+
         <Note label={t('docsPage.gettingStarted.runBaseUrlLabel')}>{t('docsPage.gettingStarted.runBaseUrlDesc')}</Note>
         <Note label={t('docsPage.gettingStarted.runSecretsLabel')}>{t('docsPage.gettingStarted.runSecretsDesc')}</Note>
       </Section>

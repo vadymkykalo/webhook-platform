@@ -166,19 +166,11 @@ There is no written procedure for reconciling the three.
 ```bash
 # Docker Compose
 make scale-worker N=5
-make scale-api N=3     # The base compose files bind the API to a fixed
-                        # host port (127.0.0.1:8080) for direct `curl
-                        # localhost:8080` access, which blocks `--scale api=N`
-                        # outright — every replica would fight over the same
-                        # host port. This target runs with API_PORT= (empty),
-                        # which collapses that mapping to an ephemeral
-                        # per-replica host port instead (see the API_PORT
-                        # comment in docker-compose.yml). Traffic still reaches
-                        # every replica because the UI's nginx proxies to
-                        # `api:8080` by Compose DNS, which load-balances across
-                        # replicas on its own. Trade-off: `curl localhost:8080`
-                        # from the host no longer reaches a specific replica —
-                        # use `docker compose exec api ...` or go through the UI.
+make scale-api N=3     # The API publishes no host port, so replicas have
+                       # nothing to fight over and this just works. nginx
+                       # proxies to `api:8080` by Compose DNS, which
+                       # load-balances across them on its own. To reach one
+                       # specific replica: `docker compose exec api ...`.
 
 # Kubernetes (auto-scales with HPA)
 kubectl scale deployment hookflow-worker --replicas=10

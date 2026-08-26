@@ -24,8 +24,16 @@ ARG VITE_CSP_EXTRA_CONNECT=""
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
 
-# Build for production
-RUN npm run build
+# Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
+# puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
+# It lives in the build stage only — the runtime image below is nginx and carries none of it.
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Build, then render the public pages to static HTML. Without the second step nginx serves
+# `<div id="root"></div>` for every URL, and the titles, canonicals and sitemap all point at
+# pages whose body is empty until React mounts.
+RUN npm run build && npm run prerender
 
 # Runtime stage
 # Bumped from the 1.25 stable branch (past EOL) to the current 1.30
