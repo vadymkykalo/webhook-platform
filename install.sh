@@ -280,6 +280,20 @@ check_config() {
         fail=1
     fi
 
+    # The database lives behind a Compose profile so that pointing at a managed
+    # one is a matter of not enabling it. The failure mode if this line goes
+    # missing is a stack that starts and then cannot reach a database it never
+    # launched, which reads like a networking problem and is not one.
+    if grep -q '^COMPOSE_PROFILES=.*embedded-db' "$env_file"; then
+        ok "The embedded database profile is on"
+    elif grep -qE '^DB_HOST=..' "$env_file"; then
+        say "  ${DIM}embedded-db is off and DB_HOST is set — using an external database${N}"
+    else
+        say "  ${RED}x${N} Neither COMPOSE_PROFILES=embedded-db nor DB_HOST is set,"
+        say "      so nothing will run a database and nothing points at one."
+        fail=1
+    fi
+
     # Production hardening, checked only when the operator has said this is
     # production. ProductionSafetyValidator refuses to start on most of these;
     # catching them here means finding out now rather than from a crash loop.
@@ -342,6 +356,23 @@ write_files() {
             || curl -fsSL "${RAW}/${VERSION}/docker-compose.pull.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
             || die "Could not download the Compose file for ${VERSION}."
         ok "docker-compose.yml (pinned to ${VERSION})"
+    fi
+
+    # The scheduled-backup sidecar bind-mounts these two. Fetching them is what
+    # lets an install have nightly dumps rather than only the on-demand
+    # `./hookflow backup`.
+    mkdir -p "${INSTALL_DIR}/deploy/scripts"
+    if curl -fsSL "${RAW}/${VERSION}/deploy/scripts/db-backup.sh" \
+            -o "${INSTALL_DIR}/deploy/scripts/db-backup.sh" 2>/dev/null \
+       && curl -fsSL "${RAW}/${VERSION}/deploy/scripts/db-backup-loop.sh" \
+            -o "${INSTALL_DIR}/deploy/scripts/db-backup-loop.sh" 2>/dev/null; then
+        chmod +x "${INSTALL_DIR}/deploy/scripts/"*.sh
+        BACKUP_PROFILE=",backup"
+        ok "Scheduled backups"
+    else
+        # Not fatal: `./hookflow backup` still works, it is just not automatic.
+        BACKUP_PROFILE=""
+        warn "Could not fetch the backup scripts — scheduled backups are off"
     fi
 
     if [ -n "$DOMAIN" ]; then
@@ -447,7 +478,7 @@ HOOKFLOW_PORT=${PORT}
 # below turns on.
 HOOKFLOW_DOMAIN=${DOMAIN}
 ACME_EMAIL=${ACME_EMAIL}
-COMPOSE_PROFILES=${PROFILES}
+COMPOSE_PROFILES=${PROFILES}${BACKUP_PROFILE}
 
 # The URL people will actually type. Verification, invite and reset links are
 # built from it, so it has to be reachable from their browser — change it to

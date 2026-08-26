@@ -48,7 +48,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-webhook_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
     volumes:
-      - ${POSTGRES_VOLUME_NAME:-webhook_pgdata}:/var/lib/postgresql/data
+      - webhook_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-webhook_user} -d ${POSTGRES_DB:-webhook_platform}"]
       interval: 10s
@@ -72,7 +72,14 @@ services:
   db-backup:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: webhook-db-backup
-    profiles: [embedded-db]
+    # Its own profile, not embedded-db: it bind-mounts two scripts from
+    # deploy/scripts/, which exist in a clone but not in an install
+    # directory — where Docker would helpfully create them as empty
+    # root-owned directories and the container would then fail to run.
+    # install.sh fetches the scripts and turns this profile on;
+    # `make up` gets it from the clone. Ad-hoc backups need none of it:
+    # `./hookflow backup` runs pg_dump through `compose exec`.
+    profiles: [backup]
     entrypoint: ["bash"]
     command: ["/scripts/db-backup-loop.sh"]
     environment:
@@ -628,8 +635,14 @@ volumes:
   caddy_data:
   caddy_config:
   minio_data:
+  # Project-scoped, like kafka_data and redis_data beside it. It used to carry
+  # `name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}`, which pins one global volume
+  # shared by every Compose project on the host: a second install silently
+  # attached to the first one's database and then failed authentication against
+  # credentials it had never been given. There is no conditional `name:` in
+  # Compose, so the knob is gone — to attach a specific existing volume (a
+  # restore, say), declare it external in a docker-compose.override.yml.
   webhook_pgdata:
-    name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}
   kafka_data:
   redis_data:
 

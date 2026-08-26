@@ -37,11 +37,13 @@ init: ## Initialize .env from .env.dist (if not exists)
 up: init ## Start services (embedded DB, dev mode)
 	@echo "$(GREEN)Starting services in embedded DB mode...$(NC)"
 	@$(MAKE) doctor
-	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db up -d --build
+	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db --profile backup up -d --build
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
-	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) health
+	@echo ""
+	@echo "$(GREEN)Ready — http://localhost:$${HOOKFLOW_PORT:-8080}$(NC)"
+	@echo "  Dashboard, API, docs and ingress all go through that one port."
 
 up-external-db: init ## Start services (external DB, dev mode)
 	@echo "$(GREEN)Starting services in external DB mode...$(NC)"

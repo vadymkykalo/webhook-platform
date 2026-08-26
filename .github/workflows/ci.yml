@@ -581,6 +581,10 @@ jobs:
           cd "$HOME/hookflow"
           sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
           echo "DOCKER_REGISTRY=webhook-platform" >> .env
+          # COMPOSE_PROFILES comes from the .env the installer wrote: the
+          # database and the backup sidecar are behind profiles, so a run that
+          # ignored it would come up with no database at all.
+          grep -q '^COMPOSE_PROFILES=.*embedded-db' .env || { echo "::error::installer did not enable embedded-db"; exit 1; }
           docker compose up -d
 
       - name: Wait for the platform
@@ -620,7 +624,7 @@ jobs:
         run: |
           # The single-port promise. Postgres, Kafka, Redis and the API itself
           # must be reachable only from inside the Docker network.
-          for p in 5432 9092 6379 8082; do
+          for p in 5432 9092 6379 8082 5173; do
             if curl -s -o /dev/null --max-time 2 "http://localhost:$p" 2>/dev/null \
                || nc -z localhost "$p" 2>/dev/null; then
               echo "::error::port $p is published to the host; only the web port should be"

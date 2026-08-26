@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`install.sh` — the install is one command.** It checks the machine (Docker,
+  Compose in either spelling, memory, disk, ports), writes a directory holding a
+  Compose file pinned to the latest release and a `.env` with locally generated
+  secrets, verifies that configuration, and starts the stack. The previous
+  instructions were three commands and two `curl`s, one of which fetched
+  `.env.dist` — whose secrets are public, because it lives in a public
+  repository. Anyone who followed the README verbatim deployed with an
+  encryption key and JWT secret published on GitHub.
+- **`--domain` puts it on a domain with HTTPS.** Brings up a TLS terminator that
+  obtains and renews its own certificate, moves the dashboard behind it onto
+  loopback, and switches the platform to `APP_ENV=production`, where
+  `ProductionSafetyValidator` refuses to start on unsafe configuration.
+- **`hookflow doctor`** re-runs the machine and configuration checks against an
+  existing install, catching a hand-edited `.env` before it becomes an outage.
+  It knows the mistakes that actually happen — a shipped default left in a
+  secret, `POSTGRES_PASSWORD` drifting from `DB_PASSWORD`.
+
+### Changed
+- **One published port.** The dashboard's nginx is the only thing bound to the
+  host and proxies every API path to the backend; the API, the actuator,
+  Postgres, Kafka and Redis are reachable only inside the Docker network. This
+  applies to the development stack too, which previously published five ports —
+  so what you learned locally about reaching the API directly stopped working
+  the day you deployed.
+- **Three Compose files became one, plus a 25-line build overlay.** 384 of
+  roughly 470 meaningful lines were duplicated by hand between
+  `docker-compose.yml` and `docker-compose.pull.yml`, and they had drifted:
+  the worker's actuator bind address differed, leaving Prometheus's scrape
+  target unreachable in one deployment path and not the other.
+  `docker-compose.prod.yml` is removed — its job was "use images instead of
+  building", which is now the default.
+- **`MANAGEMENT_ADDRESS` is no longer configurable.** Neither actuator port is
+  published, so its only non-default value did nothing but silently break
+  Prometheus — twice — and, once nginx became the only way in, the health
+  endpoint as well.
+
+### Fixed
+- **Registering no longer leaves the dashboard unusable.** With `EMAIL_ENABLED`
+  off — the default — nothing could deliver a verification token, but accounts
+  were still created `PENDING_VERIFICATION`, and `VerificationGate` disables
+  every write in the dashboard for that status. The only way through was to know
+  to grep the API container's logs. Verification now runs only when there is an
+  email channel to verify over.
+- **Malformed requests answered 500.** A wrong HTTP method, unparseable JSON or
+  an unsupported content type all fell through to the catch-all handler. For a
+  webhook platform that is not a cosmetic wrong number: 5xx means "retry", so a
+  sender posting bad JSON was told to keep posting it against a healthy API.
+  They are 405, 400 and 415 now, and the 405 carries an `Allow` header.
+- **Prometheus could not scrape the API.** The management port exists so metrics
+  can be read without a JWT, and three separate comments said so, but Boot copies
+  the parent context's filters into the management child context — so
+  `/actuator/prometheus` answered 401 on the one port that exists for it to
+  answer on.
+- **`api` and `worker` did not depend on `postgres`**, so Flyway raced a database
+  that had not started accepting connections.
+- **Compose overrode the images' JVM tuning with an empty string**, so every
+  default deployment ran at `MaxRAMPercentage=25` — roughly 192 MB of heap inside
+  a 768 MB limit instead of the intended 576 MB.
+- **`VITE_API_URL` and `VITE_CSP_EXTRA_CONNECT` were dead config**, passed as
+  runtime environment to an nginx container when Vite inlines them at build time.
+- **nginx proxied `/actuator/*` to the wrong port**, so the health path it
+  advertised returned 404. Metrics are no longer proxied at all: nginx is the
+  public face, and they leak endpoint names and tenant cardinality.
+
 ## [2.4.0] - 2026-08-23
 
 ### Changed
