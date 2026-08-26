@@ -6,6 +6,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
+import java.util.Set;
+
+import org.springframework.http.HttpMethod;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
@@ -172,6 +180,82 @@ public class GlobalExceptionHandler {
                 HttpStatus.NOT_FOUND.value()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /**
+     * The rest of the family the NoResourceFoundException handler above belongs
+     * to: requests Spring rejects before any controller sees them. Left to the
+     * catch-all RuntimeException handler they all came back as 500, which tells
+     * the caller the server is broken and — for anything with a retry policy,
+     * including this platform's own ladder — tells it to try again. A malformed
+     * request will be just as malformed the second time.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex, WebRequest request) {
+        log.debug("Method {} not supported for this path", ex.getMethod());
+        ErrorResponse error = new ErrorResponse(
+                "method_not_allowed",
+                "The " + ex.getMethod() + " method is not supported for this endpoint",
+                HttpStatus.METHOD_NOT_ALLOWED.value()
+        );
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        // Saying which methods are allowed is what makes the 405 actionable, and
+        // it is required of a 405 response by RFC 9110.
+        Set<HttpMethod> allowed = ex.getSupportedHttpMethods();
+        if (allowed != null && !allowed.isEmpty()) {
+            response.allow(allowed.toArray(new HttpMethod[0]));
+        }
+        return response.body(error);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(
+            HttpMessageNotReadableException ex, WebRequest request) {
+        // Deliberately not echoing ex.getMessage(): Jackson puts a fragment of
+        // the offending payload in it, and this endpoint family carries
+        // credentials and customer payloads.
+        log.debug("Unreadable request body: {}", ex.getMostSpecificCause().getClass().getSimpleName());
+        ErrorResponse error = new ErrorResponse(
+                "malformed_request",
+                "The request body is missing or is not valid JSON",
+                HttpStatus.BAD_REQUEST.value()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex, WebRequest request) {
+        log.debug("Unsupported content type: {}", ex.getContentType());
+        ErrorResponse error = new ErrorResponse(
+                "unsupported_media_type",
+                "This endpoint accepts application/json",
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE.value()
+        );
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(error);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(
+            MissingServletRequestParameterException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                "missing_parameter",
+                "Required parameter '" + ex.getParameterName() + "' is missing",
+                HttpStatus.BAD_REQUEST.value()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                "invalid_parameter",
+                "Parameter '" + ex.getName() + "' is not in the expected format",
+                HttpStatus.BAD_REQUEST.value()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     @ExceptionHandler(UrlValidator.InvalidUrlException.class)
