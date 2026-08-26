@@ -1,10 +1,10 @@
 name: Docker Publish
 
-# Publishes the images the Helm chart and docker-compose.pull.yml
+# Publishes the images the Helm chart and docker-compose.yml
 # reference by default. Runs only on version tags — every push/PR still goes
 # through ci.yml's `docker-build` job (:test tag, never pushed), which is what
 # catches Dockerfile breakage day to day. This workflow is the one that makes
-# `helm install` and `docker compose -f docker-compose.pull.yml up` actually
+# `helm install` and `docker compose up` actually
 # work against something real.
 
 on:
@@ -51,7 +51,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, worker, ui]
+        include:
+          - service: api
+            dockerfile: webhook-platform-api/Dockerfile
+          - service: worker
+            dockerfile: webhook-platform-worker/Dockerfile
+          - service: ui
+            dockerfile: webhook-platform-ui/Dockerfile
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -87,7 +93,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: webhook-platform-${{ matrix.service }}/Dockerfile
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

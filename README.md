@@ -6,565 +6,242 @@
 
 [![CI](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![Latest Release](https://img.shields.io/github/v/release/vadymkykalo/webhook-platform?label=release)](https://github.com/vadymkykalo/webhook-platform/releases/latest)
-[![Coverage](https://img.shields.io/badge/coverage-52%25_lines-yellow)](https://github.com/vadymkykalo/webhook-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Java 17](https://img.shields.io/badge/Java-17-orange)]()
-[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-green)]()
+[![Java 17](https://img.shields.io/badge/Java-17-orange)](https://openjdk.org/projects/jdk/17/)
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-green)](https://spring.io/projects/spring-boot)
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fvadymkykalo%2Fhookflow-blue?logo=docker&logoColor=white)](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
-docker compose -f docker-compose.pull.yml up -d
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
 ```
 
-No Maven, no npm, no clone — two files and Docker. **Dashboard** → http://localhost:5173 &nbsp;|&nbsp; **API Docs** → http://localhost:8080/swagger-ui.html
+Checks the machine, writes a Compose file pinned to the latest release and a
+`.env` with freshly generated secrets, and starts the stack. No clone, no
+config to write, no secrets to invent.
+
+**Open → http://localhost** &nbsp;·&nbsp; register, and you are in the dashboard.
 
 </div>
 
 <div align="center">
-  <img src="docs/img.png" alt="Every delivery, its attempts and the response each one got" width="100%">
+  <img src="docs/screenshots/deliveries.png" alt="Every delivery, its attempts and the response each one got" width="100%">
   <p><em>Deliveries — every attempt on the record, with the retry ladder each one is on.</em></p>
-</div>
-
-<table>
-<tr>
-<td width="50%"><img src="docs/screenshots/connections.png" alt="Connection map: endpoints, what each is subscribed to, and its verification state"><br><em>Connections — what you receive from, what you forward to, and whether the last deliveries arrived.</em></td>
-<td width="50%"><img src="docs/screenshots/analytics.png" alt="Delivery outcome over time, latency percentiles and per-endpoint health"><br><em>Analytics — outcome over time, p50/p95/p99 latency and per-endpoint health.</em></td>
-</tr>
-</table>
-
-<div align="center">
-
-*Live public demo: not deployed yet — see [`docs/DEMO.md`](docs/DEMO.md) for the scoped plan (seeded, read-only, isolation-verified) and why it's deferred rather than faked.*
-
+  <p><sub><a href="docs/screenshots/">More screenshots</a> · <a href="docs/DEMO.md">a public demo is planned, not deployed</a></sub></p>
 </div>
 
 ---
 
 ## Quick Start
 
-**Prerequisites:** Docker 20.10+, Docker Compose v2+. That's it — the commands below
-pull pre-built [multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
-(amd64 + arm64) images from GHCR, so nothing gets compiled on your machine.
+**Prerequisites:** Docker 20.10+, Compose v2, and about 4 GB of RAM. The images
+are [multi-arch](https://github.com/vadymkykalo?tab=packages&repo_name=webhook-platform)
+(amd64 + arm64), so nothing is compiled on your machine.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
-# Edit .env: set WEBHOOK_ENCRYPTION_KEY / WEBHOOK_ENCRYPTION_SALT / JWT_SECRET
-# (dev defaults work out of the box for a local trial run)
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
 
-docker compose -f docker-compose.pull.yml up -d
-curl -f http://localhost:8082/actuator/health/liveness   # actuator is split onto its own port — see below
-# Open http://localhost:5173, register, create project, get API key
-docker compose -f docker-compose.pull.yml logs api | grep "Verify URL:" | tail -1
+# Somewhere other than ~/hookflow, or on a port other than 80:
+#   ... | bash -s -- --dir /opt/hookflow --port 8080
 ```
 
+The installer refuses to start until Docker, memory, disk and the port all
+check out, and it verifies the configuration it wrote before starting anything.
+Then open **http://localhost**, register, and create a project. Nothing is
+gated behind a verification email you never receive — with no SMTP configured,
+the account is active immediately.
+
 ```bash
-# Send your first event
-curl -X POST http://localhost:8080/api/v1/projects/{projectId}/events \
+# Send your first event, with the API key the dashboard just gave you
+curl -X POST http://localhost/api/v1/projects/{projectId}/events \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"type": "user.signup", "payload": {"userId": "usr_42"}}'
 ```
 
-> Actuator (`/actuator/health`, `/actuator/prometheus`) runs on its own port (8082,
-> loopback-only) rather than the main API port (8080) — it never passes through the
-> JWT/API-key-authenticated security chain, so it stays reachable for health checks
-> and Prometheus even if auth config is broken. The main platform API (events,
-> projects, ingress) is on 8080 as usual.
+**One published port.** nginx serves the dashboard and proxies every API path
+to the backend, so there is a single URL to hand out, a single certificate to
+obtain and a single firewall rule to write. Postgres, Kafka, Redis and the API
+itself are reachable only from inside the Docker network.
 
-### Building from source (contributors)
+### On a domain, with HTTPS
 
-If you're changing code rather than just running the platform, clone the repo and
-build locally instead — this path needs Maven + npm (or just `make`, which shells
-out to both via Docker build contexts):
+Point the A record at the server, then:
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
+```
+
+That brings up a TLS terminator which obtains and renews the certificate itself
+— no cron entry, no renewal hook — moves the dashboard behind it onto loopback,
+and switches the platform to production mode, where it refuses to start on
+unsafe configuration rather than running with it.
+
+### Day two
+
+```bash
+cd ~/hookflow
+./hookflow status | logs | stop | start | backup | doctor
+```
+
+`doctor` re-runs the machine and configuration checks against what is on disk,
+so a hand-edited `.env` gets caught before it becomes a support question. `.env`
+holds your secrets — **back it up**: `WEBHOOK_ENCRYPTION_KEY` is what every
+endpoint secret in the database is encrypted with, and a database backup
+without it restores rows nothing can read.
+
+To remove it: `... install.sh | bash -s -- --uninstall` keeps your data,
+`--purge` deletes it.
+
+### Running it from a clone (contributors)
+
+Different command, same stack: this builds the three services from your
+working tree instead of pulling a release.
 
 ```bash
 git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
-make up                   # Start everything (builds all 3 images from source)
-make verify-link          # Get email verification link from logs
+make up            # build everything and start it
+make health        # is it up
+make logs-api      # or logs-worker, logs-ui
+make down          # stop
 ```
 
-**Coverage.** Backend (JaCoCo, unit + integration merged):
+`make up` copies `.env.dist` to `.env` for you and creates the Kafka topics.
+`make dev-api` / `dev-worker` / `dev-ui` rebuild and restart one service — the
+fast loop once the stack is running. `make help` lists the rest.
 
-```bash
-mvn clean test jacoco:report
-open target/site/jacoco-aggregate/index.html   # or target/site/jacoco-aggregate/jacoco.csv
-```
+**http://localhost:8080** — the same one-port shape as an installed deployment,
+so nothing you learn here stops working when you deploy. There is one Compose
+file, `docker-compose.yml`, which resolves every service to a published image;
+`docker-compose.build.yml` is a 25-line overlay that builds the three services
+this project owns from your working tree instead, and that is the only
+difference between running from a clone and running a release.
 
-Frontend (Vitest + v8):
-
-```bash
-cd webhook-platform-ui && npm run test:coverage
-```
-
-CI publishes both as workflow artifacts (`jacoco-aggregate-report`, `vitest-coverage-report`) on every run — see `.github/workflows/ci.yml`. The Coverage badge above is a static shields.io badge (no Codecov/similar integration wired up), so it only reflects reality if it's updated by hand whenever the coverage numbers move.
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the prerequisites, the test commands
+that match CI, and what each build guard means when it fails.
 
 ---
 
-## Features
+## What it does
 
-### Outgoing Delivery
-- **Transactional outbox → Kafka** — at-least-once, zero event loss
-- **FIFO ordering** per endpoint (Redis ordering buffer + sequence numbers)
-- **6-tier retry** — 1m, 5m, 15m, 1h, 6h, 24h (up to 7 attempts, ~55h expected / ~83h worst-case
-  span with jitter, before the 96h hard-cap escalates an unresponded delivery to DLQ — see P1-24a)
-- **DLQ** with one-click reprocess · **Circuit breaker** per endpoint
-- **HMAC-SHA256** signatures · **mTLS** · **Endpoint verification** (challenge-response)
+**Outgoing** — your system announces an event; Hookflow gets it to every endpoint
+your customers registered. Written to a transactional outbox in the same
+statement as the work itself, so an event cannot be accepted and then lost.
+Signed with HMAC-SHA256, ordered per endpoint, retried on a six-rung ladder
+(1m → 24h), and parked in a DLQ for a human once the ladder runs out. Every
+attempt is on the record with the response it got.
 
-### Incoming Ingress
-- **Public URLs** — `/ingress/{token}` per source, provider-specific signature verification
-- **Built-in providers** — Stripe, GitHub, GitLab, Shopify, Slack + generic HMAC
-- **Multi-destination forwarding** with auth (Bearer / Basic / custom header)
-- **Payload transformation** — JSONPath · **Per-source rate limiting** · **Full audit trail**
+**Incoming** — a provider posts to a URL you own; Hookflow verifies the
+signature and forwards it to the destinations you nominated. Stripe, GitHub,
+GitLab, Shopify and Slack are understood out of the box, plus generic HMAC.
 
-### CLI & Local Tunnel
-- **`hookflow listen 3000`** — receive webhooks on localhost during development, no deploy needed
-- **WebSocket tunnel** — public URL → backend → WS → CLI → `localhost:PORT` → response back
-- **Device code login** — secure auth without typing passwords in terminal (like `gh auth login`)
-- **Event replay** — re-deliver past events for debugging · **Event tail** — follow events in real-time
-- **Tunnel management** — list, close, status · **Auto-reconnect** with exponential backoff
-- **Plan-based tunnel limits** — FREE tier = disabled, paid plans get per-org active tunnel caps
-- **Bandwidth metering** — per-org monthly tunnel traffic tracked in Redis
-- **Config profiles** — switch between staging/production servers without re-login
+Both directions run the same claim → send → classify → finalise loop, so a fix
+to attempt behaviour lands once rather than twice.
 
-### Platform
-- **Schema Registry** — JSON Schema per event type, breaking change detection, WARN/BLOCK policies
-- **Wildcard subscriptions** — `order.*`, `order.**`, `**`
-- **Multi-tenancy** — Organizations → Projects → Endpoints, RBAC (Owner/Developer/Viewer)
-- **AES-256-GCM** encryption for all secrets · **SSRF protection** · **API keys** with scoping
-- **Prometheus metrics** · **Correlation IDs** · **Audit logging**
-- **SDKs** — [Node.js](./sdks/node), [Python](./sdks/python), [PHP](./sdks/php) · **Request Bin** built-in
-
----
+Also: a schema registry with breaking-change detection, wildcard subscriptions,
+JSONPath transforms, replay, a CLI that tunnels webhooks to `localhost` while
+you develop, per-org rate limits, AES-256-GCM at rest, SSRF protection,
+Prometheus metrics and an audit log. Organizations → Projects → Endpoints, with
+Owner/Developer/Viewer roles.
 
 ## Architecture
 
-```mermaid
-graph TB
-    subgraph "Third-Party Providers"
-        Stripe[Stripe]
-        GitHub[GitHub]
-        Shopify[Shopify]
-    end
+Two directions, one attempt lifecycle. **Outgoing** carries a customer's events
+to endpoints their users registered; Hookflow signs what it sends. **Incoming**
+carries third-party webhooks to destinations the customer nominated; Hookflow
+verifies what it receives. Both go through the same claim → admit → send →
+classify → finalise loop, so a fix to attempt behaviour lands once.
 
-    subgraph "Your Infrastructure"
-        App[Your Application]
-        Svc1[Internal Service A]
-        Svc2[Internal Service B]
-    end
-    
-    subgraph "Hookflow"
-        UI[Dashboard<br/>React + Vite]
-        API[API Service<br/>Spring Boot]
-        DB[(PostgreSQL<br/>Events · Deliveries · Outbox<br/>Incoming Events · Forward Attempts)]
-        Redis[(Redis<br/>Rate Limits · Ordering Buffer)]
-        Kafka[Kafka<br/>Delivery Topics · Forward Topics · Retry · DLQ]
-        Worker[Worker Service<br/>Spring Boot]
-    end
-    
-    subgraph "Customer Endpoints"
-        EP1[Endpoint A]
-        EP2[Endpoint B]
-    end
-    
-    App -->|POST /api/v1/events| API
-    UI  -->|REST API| API
-    API -->|Transactional Write| DB
-    API -->|Outbox Publish| Kafka
-    Kafka -->|Consume Deliveries| Worker
-    Worker -->|POST + HMAC| EP1
-    Worker -->|POST + HMAC| EP2
-    
-    Stripe -->|POST /ingress/tok_stripe| API
-    GitHub -->|POST /ingress/tok_github| API
-    Shopify -->|POST /ingress/tok_shopify| API
-    API -->|Verify Signature + Persist| DB
-    Kafka -->|Consume Forwards| Worker
-    Worker -->|Forward + Auth| Svc1
-    Worker -->|Forward + Auth| Svc2
-    
-    API -->|Rate Limit| Redis
-    Worker -->|Read/Update| DB
-    Worker -->|Ordering Buffer| Redis
-    
-    style API fill:#4CAF50
-    style Worker fill:#2196F3
-    style UI fill:#FF9800
-    style DB fill:#9C27B0
-    style Kafka fill:#F44336
-    style Redis fill:#DC382D
+The write path never publishes to Kafka directly: work and its announcement are
+written to a transactional outbox in the same statement, so they cannot
+disagree. The worker consumes, attempts delivery, and reschedules onto one of
+six delay topics that make up the retry ladder.
+
+```
+Outgoing   your app ──▶ api ──▶ outbox (same txn) ──▶ Kafka ──▶ worker ──▶ endpoint
+                                                        ▲                     │
+                                                        └─── retry ladder ◀───┘
+                                                        1m 5m 15m 1h 6h 24h → DLQ
+
+Incoming   provider ──▶ /ingress/{token} ──▶ verify signature ──▶ Kafka ──▶ worker ──▶ destination
 ```
 
-| Service | Port | Role |
-|---------|------|------|
-| **API** | `8080` | Event ingestion, webhook ingress, REST API, outbox publisher |
-| **Worker** | `8081` | Kafka consumer, HTTP delivery, forwarding, retry scheduling |
-| **UI** | `5173` | Admin dashboard (React / Vite / shadcn/ui) |
-| **PostgreSQL** | `5432` | Events, deliveries, incoming events, outbox |
-| **Kafka** | `9092` | Dispatch + 6 retry tiers + forward dispatch/retry + DLQ |
-| **Redis** | `6379` | Rate limiting, FIFO ordering, circuit breaker |
+**[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** has the component diagram and
+the full sequence diagrams for both directions and the CLI tunnel.
+**[`CONTEXT.md`](CONTEXT.md)** is the vocabulary all of it uses.
 
-### Outgoing Delivery Flow
-
-```mermaid
-sequenceDiagram
-    participant App as Your Application
-    participant API as API Service
-    participant DB as PostgreSQL
-    participant Kafka as Kafka
-    participant Worker as Worker
-    participant EP as Customer Endpoint
-    
-    App->>API: POST /events
-    API-->>App: 202 Accepted
-    API->>DB: INSERT event + deliveries + outbox (single TX)
-    
-    Note over API: Outbox publisher polls every 100ms
-    API->>Kafka: Publish DeliveryMessage
-    API->>DB: Mark outbox PUBLISHED
-    
-    Kafka->>Worker: Consume from deliveries.dispatch
-    Worker->>DB: Load delivery + endpoint + secret
-    Worker->>EP: POST payload + HMAC-SHA256 signature
-    
-    alt 2xx Response
-        EP-->>Worker: 200 OK
-        Worker->>DB: Status = SUCCESS
-    else 4xx/5xx / Timeout
-        EP-->>Worker: 503 / timeout
-        Worker->>Kafka: Publish to deliveries.retry.1m
-        Note over Worker: Retry delays: 1m, 5m, 15m, 1h, 6h, 24h
-    else All retries exhausted
-        Worker->>Kafka: Publish to deliveries.dlq
-        Worker->>DB: Status = DLQ
-    end
-```
-
-### Incoming Ingress Flow
-
-```mermaid
-sequenceDiagram
-    participant Provider as Third-Party Provider
-    participant API as API Service
-    participant DB as PostgreSQL
-    participant Kafka as Kafka
-    participant Worker as Worker
-    participant Dest as Your Internal Service
-
-    Provider->>API: POST /ingress/{token}
-    API->>DB: Load IncomingSource by token
-    
-    alt Signature verification enabled
-        API->>API: Verify signature (Stripe/GitHub/Shopify/Slack/HMAC)
-    end
-    
-    API->>DB: INSERT IncomingEvent (headers, body, IP, verified status)
-
-    alt Signature invalid
-        API-->>Provider: 401 Unauthorized
-    else Valid
-        API-->>Provider: 202 Accepted
-        API->>DB: INSERT ForwardAttempts + OutboxMessages (single TX)
-        API->>Kafka: Publish to incoming.forward.dispatch
-        
-        Kafka->>Worker: Consume forward message
-        Worker->>Dest: POST body + auth headers
-        
-        alt 2xx
-            Worker->>DB: Status = SUCCESS
-        else Failure
-            Worker->>DB: Schedule retry
-        end
-    end
-```
-
-### CLI Tunnel Flow
-
-```mermaid
-sequenceDiagram
-    participant Dev as Developer (localhost)
-    participant CLI as Hookflow CLI
-    participant API as API Service
-    participant WS as WebSocket Hub
-    participant Provider as Third-Party Provider
-
-    Dev->>CLI: hookflow listen 3000
-    CLI->>API: POST /api/v1/tunnels (JWT auth)
-    API-->>CLI: 201 {slug, wsUrl}
-    CLI->>WS: Connect WSS /ws/tunnel (slug in handshake)
-    WS-->>CLI: Connected ✓
-
-    Note over CLI,WS: Tunnel active — public URL ready
-
-    Provider->>API: POST /tunnel/{slug} (webhook payload)
-    API->>WS: Forward request via WebSocket
-    WS->>CLI: TunnelRequestMessage (headers, body)
-    CLI->>Dev: POST http://localhost:3000 (forwarded)
-    Dev-->>CLI: 200 OK + response body
-    CLI->>WS: TunnelResponseMessage
-    WS->>API: Response back
-    API-->>Provider: 200 OK
-
-    Note over CLI: Auto-reconnect on disconnect<br/>Exponential backoff up to 2min
-```
-
----
 
 ## API Reference & SDKs
 
-- **In-app docs** — the dashboard's [Documentation page](webhook-platform-ui/src/pages/DocumentationPage.tsx) has prose, concepts and per-language quick-start samples for every endpoint (visit `/docs` after logging in, or run the UI locally).
+- **In-app docs** — the dashboard's [Documentation page](webhook-platform-ui/src/pages/DocumentationPage.tsx) has prose, concepts and per-language quick-start samples for every endpoint (open `/docs` — it needs no account).
 - **OpenAPI spec** — [`openapi.yaml`](./openapi.yaml), committed at the repo root and generated by `springdoc-openapi` from the controllers. `OpenApiDriftIntegrationTest` fails the build if it drifts from what the API actually serves; after an intentional API change, regenerate and commit it with `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`. Browse it rendered at [`docs/api-reference.html`](docs/api-reference.html) (Redoc) — served live at the project's GitHub Pages site once `Settings → Pages → Source = GitHub Actions` is enabled, or open it locally: `python3 -m http.server 8000` from the repo root, then visit `http://localhost:8000/docs/api-reference.html`.
 - **Swagger UI** — `http://localhost:8080/swagger-ui.html` against a running instance (`SWAGGER_ENABLED=true`).
 
-### SDK coverage
+### SDKs
 
-The official SDKs ([`sdks/node`](sdks/node) — `@webhook-platform/node` on npm, [`sdks/python`](sdks/python) — `webhook-platform` on PyPI, [`sdks/php`](sdks/php) — `webhook-platform/php` on Packagist) cover the "send an event / manage endpoints / verify a signature" workflow, not the full dashboard surface. As of this writing that's **7 of the platform's 35 REST controllers**:
-
-| Covered by the SDKs | REST-only (use `openapi.yaml` / the dashboard) |
-|---|---|
-| Events (send) | Auth, Device Authentication |
-| Endpoints (CRUD) | Organizations, Projects, Members, API Keys |
-| Subscriptions | Dashboard, Usage, Billing |
-| Deliveries (status, replay) | Rules, Workflows, Schema Registry |
-| Incoming Sources | Transformations, Transform Preview |
-| Incoming Destinations | Alerts, Incidents, Audit Log |
-| Incoming Events | DLQ, Encryption Admin, PII Masking |
-| Signature verification (client-side helper, not a controller) | Tunnels, Tunnel Ingress, Ingress, Webhook Capture, Debug Links, Test Endpoints, Project Events |
-
-If you need something from the right-hand column, call the REST API directly (each SDK exposes a generic authenticated-request escape hatch for this — see its README) or use the dashboard.
-
-All three SDKs authenticate with `X-API-Key` only. They have no login surface, so registering an organization, creating a project and minting the API key are a one-time step you do with the dashboard, the CLI or plain HTTP — not through the SDK.
-
-Each SDK carries a live-API smoke check that drives its own public methods against a running instance (`make up` first) and fails loudly rather than skipping, unlike the mocked unit suites. These are scripts, not tests, and are never collected by the unit runs:
-
-```bash
-cd sdks/node   && npm run smoke:live
-cd sdks/python && python scripts/live_api_smoke.py
-cd sdks/php    && php scripts/live-api-smoke.php
-```
+Official SDKs for [Node](sdks/node) (`@webhook-platform/node`),
+[Python](sdks/python) (`webhook-platform`) and [PHP](sdks/php)
+(`webhook-platform/php`). They cover the send-an-event / manage-endpoints /
+verify-a-signature workflow — 7 of the platform's 35 REST controllers — and each
+exposes a generic authenticated-request escape hatch for the rest. All three
+authenticate with `X-API-Key` only, so minting that key is a one-time step in
+the dashboard. Each SDK's README has the coverage table and its live-API smoke
+check.
 
 ---
 
-## Deployment
+## Running it in production
 
-### Pull pre-built images (no toolchain)
+[`docs/SELF_HOSTED_GUIDE.md`](docs/SELF_HOSTED_GUIDE.md) is the operator's
+document: sizing, the port table, TLS and mTLS, backup and restore, the upgrade
+path, and what to check when something is wrong. `make help` lists every
+development target. [`docs/OPERATIONS.md`](docs/OPERATIONS.md) covers the
+runbooks.
 
-```bash
-make up-pull          # Pull ghcr.io/vadymkykalo/hookflow-* and start (needs repo clone for `make`)
-# or, with no clone at all:
-docker compose -f docker-compose.pull.yml up -d
-make down-pull         # Stop (data preserved)
-```
+## CLI
 
-### Development (build from source)
-
-```bash
-make up              # Start all (embedded PostgreSQL)
-make up-external-db  # External/managed DB
-make down            # Stop (data preserved)
-make logs            # Follow logs
-make doctor          # Pre-flight checks
-```
-
-### Production
+Receive webhooks on `localhost` while you develop — no deploy, no ngrok.
 
 ```bash
-cp .env.dist .env    # Edit with real secrets
-make up-prod         # Production overrides
-make health          # Verify services
-```
-
-All env vars documented in [`.env.dist`](./.env.dist). Run `make doctor` before production.
-
-### Monitoring
-
-```bash
-make monitoring-up        # Start Prometheus + Grafana
-make monitoring-down      # Stop monitoring
-make monitoring-logs      # Follow monitoring logs
-make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
-```
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| **Grafana** | http://localhost:3001 | `hookflow` / `hookflow_monitor_2024` |
-| **Prometheus** | http://localhost:9090 | — |
-
-4 dashboards auto-provisioned: **Overview**, **Worker & Circuit Breaker**, **JVM / Micrometer**, **Kafka**.
-
-### Key Commands
-
-```bash
-make health               # Check all services
-make backup-db            # Backup database
-make restore-db FILE=...  # Restore from backup
-make shell-db             # Open psql shell
-make dev-api              # Quick rebuild API + tail logs
-make verify-link          # Email verification link (dev)
-make reset-link           # Password reset link (dev)
-make invite-link          # Member invite link (dev)
-make nuke CONFIRM=YES     # Destroy everything (platform + monitoring)
-```
-
-### CLI Commands
-
-```bash
-# Install CLI (verifies a published SHA256 checksum; add --with-java to let it
-# install Java 17 via sudo if you don't already have it — see -h for all flags)
 curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --with-java
 
-# Uninstall
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/webhook-platform-cli/install.sh | bash -s -- --uninstall
-
-# Or build from source (optional)
-# mvn clean package -pl webhook-platform-cli -am -DskipTests
-# alias hookflow='java -jar webhook-platform-cli/target/webhook-platform-cli-2.2.1.jar'
-
-# Auth
-hookflow login                             # Device code flow (browser approve)
-hookflow login --email u@x.com --password  # Direct login
-
-# Local tunnel
-hookflow listen 3000                       # Forward webhooks to localhost:3000
-hookflow listen 3000 --project <id>        # Associate with project
-
-# Tunnel management
-hookflow tunnels list                      # List active tunnels
-hookflow tunnels close <sessionId>         # Close tunnel
-hookflow tunnels status                    # Active tunnels, bandwidth, pending requests
-
-# Events
-hookflow events <projectId>               # Recent events
-hookflow events <projectId> --follow      # Tail in real-time
-hookflow replay <projectId> --dry-run     # Estimate replay
-hookflow replay <projectId>               # Replay last 24h
-
-# Diagnostics
-hookflow status                            # Auth, health, active tunnels
-hookflow config show                       # Current config
-hookflow config set backend-url <url>      # Change backend
-hookflow config profile list               # List all profiles
-hookflow config profile create staging --url https://staging.example.com
-hookflow config profile use staging         # Switch to staging
-hookflow config profile use default         # Switch back
-hookflow config profile delete staging      # Remove profile
+hookflow login              # device-code flow, like `gh auth login`
+hookflow listen 3000        # public URL → your machine, responses flow back
+hookflow events <projectId> --follow
+hookflow replay <projectId> --dry-run
 ```
 
----
+`hookflow -h` lists the rest: tunnel management, config profiles for switching
+between staging and production, and diagnostics.
 
-## Troubleshooting & Configuration
+## Contributing
 
-### Quick Reference
+Contributions are welcome — bug reports, docs fixes and features alike.
 
-| What | How | Default |
-|------|-----|---------|
-| **Swagger UI** | http://localhost:8080/swagger-ui.html | Enabled in dev |
-| **Dashboard** | http://localhost:5173 | — |
-| **Grafana** | http://localhost:3001 | `hookflow` / `hookflow_monitor_2024` |
-| **Prometheus** | http://localhost:9090 | — |
-| **API Health** | `make health`, or http://localhost:8082/actuator/health/liveness with `docker-compose.pull.yml` (not published by `make up`) | — |
-| **Worker Health** | `make health` (internal-only, not published to host) | — |
-| **Metrics** | `/actuator/prometheus` on the same internal port as health above | — |
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to set up, which branch to target
+  (`develop`, never `main`), the test commands CI actually runs, and what each
+  build guard means when it fails.
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — the Contributor Covenant.
+- [`SECURITY.md`](./SECURITY.md) — report vulnerabilities privately, not as an issue.
+- [`CONTEXT.md`](./CONTEXT.md) — the domain vocabulary. Every term carries a list
+  of near-synonyms *not* to use; read it before naming a class, column or UI string.
 
-### Common Issues
+## Is this really MIT? What is the billing code doing here?
 
-<details>
-<summary><b>API won't start — "WEBHOOK_ENCRYPTION_KEY must be at least 32 characters"</b></summary>
+Yes, really MIT — and self-hosting gets **every** feature, with no licence key,
+no locked modules and no paid tier. `BILLING_ENABLED` defaults to `false`, which
+is what makes that true: with billing off, quota and feature checks are
+short-circuited and nothing is gated.
 
-Your `.env` key is too short. Fix:
-```bash
-cp .env.dist .env   # Fresh copy with valid defaults
-make up
-```
-</details>
+The `Plan`/`Subscription` entities, the Stripe and WayForPay providers and the
+seeded price rows in `V036__billing_plans.sql` exist because we also run a
+managed cloud instance of this same code, and that is the only thing we sell.
+Selling hosting rather than features is why none of it needs to be closed —
+so it lives in the open repository like everything else, dormant unless you
+turn it on.
 
-<details>
-<summary><b>Email/password/invite links in dev mode</b></summary>
-
-With `EMAIL_ENABLED=false` (default), all links go to API logs:
-
-```bash
-make verify-link   # Email verification
-make reset-link    # Password reset (expires in 1h)
-make invite-link   # Member invite (expires in 48h)
-```
-</details>
-
-<details>
-<summary><b>Enable Swagger UI</b></summary>
-
-Swagger is disabled by default. To enable, add to `.env`:
-```env
-SWAGGER_ENABLED=true
-```
-Then restart: `make dev-api` or `make up`. Open http://localhost:8080/swagger-ui.html
-</details>
-
-<details>
-<summary><b>Endpoint creation fails with 500</b></summary>
-
-Set `TEST_ENDPOINT_BASE_URL=http://api:8080` in `.env` (must match Docker service name).
-</details>
-
-<details>
-<summary><b>Kafka topics not created</b></summary>
-
-```bash
-make up  # Auto-creates topics
-# or manually:
-docker exec webhook-kafka kafka-topics --create --topic deliveries.dispatch --partitions 12 --bootstrap-server localhost:9092
-```
-</details>
-
-<details>
-<summary><b>Monitoring: Grafana shows "No data"</b></summary>
-
-1. Make sure the main platform is running first: `make up && make wait-healthy`
-2. Then start monitoring: `make monitoring-up`
-3. Wait ~30s for first scrape. Check Prometheus targets: http://localhost:9090/targets
-</details>
-
-### SMTP / Email Setup
-
-```env
-EMAIL_ENABLED=true
-EMAIL_FROM=noreply@yourdomain.com
-SMTP_HOST=smtp.gmail.com        # or your SMTP provider
-SMTP_PORT=587
-SMTP_USERNAME=your@email.com
-SMTP_PASSWORD=app_password
-SMTP_AUTH=true
-SMTP_STARTTLS=true
-```
-
-### Production Checklist
-
-> **Before going live**, override these in your `.env`:
-
-| Variable | Dev Default | Production Value |
-|----------|-------------|------------------|
-| `APP_ENV` | `development` | `production` |
-| `WEBHOOK_ENCRYPTION_KEY` | `dev_encryption_key_...` | **Random 32+ char string** |
-| `WEBHOOK_ENCRYPTION_SALT` | `dev_encryption_salt_...` | **Random 16+ char string** |
-| `JWT_SECRET` | `dev_jwt_secret_...` | **Random 32+ char string** |
-| `POSTGRES_PASSWORD` | `webhook_secret` | **Strong unique password** |
-| `REDIS_PASSWORD` | `redis_secret` | **Strong unique password** |
-| `SWAGGER_ENABLED` | `true` | `false` |
-| `WEBHOOK_ALLOW_PRIVATE_IPS` | `true` | `false` |
-| `EMAIL_ENABLED` | `false` | `true` + SMTP config |
-| `CORS_ALLOWED_ORIGINS` | `*` | `https://yourdomain.com` |
-| `DB_SSL_MODE` | `disable` | `require` or `verify-full` |
-| `LOG_LEVEL` | `INFO` | `WARN` |
-
-```bash
-# Generate secure secrets
-openssl rand -base64 32   # For encryption key
-openssl rand -base64 24   # For JWT secret
-openssl rand -base64 18   # For DB/Redis passwords
-```
+If you would rather not carry the price rows at all, they are inert data in
+five table rows; nothing reads them while billing is off.
 
 ---
 

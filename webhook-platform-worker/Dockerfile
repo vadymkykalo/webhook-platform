@@ -53,4 +53,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
     -Dfile.encoding=UTF-8 \
     -Dreactor.netty.ioWorkerCount=4"
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# JAVA_EXTRA_OPTS appends to the tuning above; setting JAVA_OPTS itself
+# replaces it wholesale. Compose passes the former so an unset knob
+# cannot silently erase MaxRAMPercentage.
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS $JAVA_EXTRA_OPTS -jar app.jar"]

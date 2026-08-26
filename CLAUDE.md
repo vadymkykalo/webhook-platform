@@ -3,14 +3,18 @@
 Guidance for Claude Code working in this repository.
 
 Java 17 + Spring Boot 3.5 (Maven reactor: `common`, `api`, `worker`, `cli`), React + Vite +
-TypeScript in `webhook-platform-ui`. `api` owns all Flyway migrations. README.md has the
-architecture and the sequence diagrams for both delivery pipelines.
+TypeScript in `webhook-platform-ui`. `api` owns all Flyway migrations.
+`docs/ARCHITECTURE.md` has the architecture and the sequence diagrams for both pipelines.
 
 ## Commands
 
 `make help` lists every target. `make up` also creates `.env` from `.env.dist` and the Kafka
-topics — don't do either by hand. `make dev-api` / `dev-worker` / `dev-ui` rebuild one service and
-restart it: the fast inner loop once the stack is up.
+topics — don't do either by hand. There is one `docker-compose.yml` (published images, what
+`install.sh` deploys) plus `docker-compose.build.yml`, a small overlay adding build contexts;
+put a service change in the former, never in both.
+
+`make dev-api` / `dev-worker` / `dev-ui` rebuild one service and restart it:
+the fast inner loop once the stack is up.
 
 ```bash
 mvn clean compile -B                # what CI compiles with

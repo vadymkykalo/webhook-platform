@@ -15,30 +15,27 @@ import { authSamples, quickstartSamples } from '../samples';
 
 /**
  * Step 1 used to be `POST /api/v1/auth/login` against a host the reader did not
- * have: the compose instructions live on neither the landing page nor here any
- * more, so the first step was one nobody could run. `runInstance` is that
- * missing step — it is deliberately the pulled-image path rather than the
- * build-from-source one, which is a contributor's concern, not an integrator's.
+ * have, so the first step was one nobody could run. `runInstance` is that
+ * missing step, and it is the installer rather than a hand-assembled Compose
+ * invocation: an integrator reading this wants an instance to talk to, not a
+ * deployment decision.
  */
-const runInstance = `REPO=https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main
+const runInstance = `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
 
-curl -fsSLO $REPO/docker-compose.pull.yml
-curl -fsSL  $REPO/.env.dist -o .env
-
-docker compose -f docker-compose.pull.yml up -d
-curl -f http://localhost:8082/actuator/health/liveness`;
+# Everything is served on one port. Health, once it is up:
+curl -f http://localhost/actuator/health/liveness`;
 
 /**
- * The three ports the compose file binds, and where each one is set.
+ * One published port, and the two that are not.
  *
- * The health check above lands on 8082, which is not the API — and the sample gave no way to
- * know that or to change it. Actuator runs on its own port so a broken auth configuration
- * cannot take health and metrics down with it, and compose binds it to loopback only.
+ * This used to list three bindings, from when the dashboard, the API and the actuator each
+ * had their own. Only nginx is bound to the host now — it serves the dashboard and proxies
+ * every API path — so the other two are here to say where they went, not how to reach them.
  */
 const PORTS = [
-  { port: '8080', envVar: 'API_PORT', key: 'docsPage.gettingStarted.portApi' },
-  { port: '5173', envVar: 'UI_PORT', key: 'docsPage.gettingStarted.portUi' },
-  { port: '8082', envVar: 'MANAGEMENT_PORT', key: 'docsPage.gettingStarted.portActuator' },
+  { port: '80', envVar: 'HOOKFLOW_PORT', key: 'docsPage.gettingStarted.portWeb' },
+  { port: '8080', envVar: null, key: 'docsPage.gettingStarted.portApi' },
+  { port: '8082', envVar: null, key: 'docsPage.gettingStarted.portActuator' },
 ];
 
 function Step({
@@ -89,7 +86,7 @@ export default function GettingStarted({
           <DefinitionList
             items={PORTS.map((p) => ({
               term: p.port,
-              definition: `${t(p.key)} \`${p.envVar}\``,
+              definition: p.envVar ? `${t(p.key)} \`${p.envVar}\`` : t(p.key),
             }))}
           />
         </SubSection>
