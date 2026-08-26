@@ -111,7 +111,7 @@ Get this wrong in either direction:
   that peer, or spoof its address, can forge `X-Forwarded-For` and get a fresh IP per
   request, defeating rate limiting entirely.
 
-`docker-compose.prod.yml` (traffic goes through the bundled UI-nginx proxy) sets this to
+The bundled UI-nginx proxy is what traffic goes through, so set this to
 `172.16.0.0/12` by default, matching Docker Compose's default bridge network range —
 narrow it to the proxy's actual address if you've pinned a custom subnet.
 
@@ -216,29 +216,24 @@ the actuator port are reachable only from inside the Docker network. One URL,
 one certificate, one firewall rule. If you need one of them directly, add a
 `docker-compose.override.yml` — the header of the Compose file has the snippet.
 
-### 4.2 Docker Compose — pull pre-built images (no toolchain)
+### 4.2 Docker Compose, driven by hand
 
-The same Compose file 4.1 installs, driven by hand. Worth knowing about if you
-are putting it under your own configuration management, and otherwise not the
-path to take: the installer generates real secrets, where copying `.env.dist`
-hands you the public ones from the repository, which you then have to remember
-to replace. No repo clone needed either way — `docker-compose.pull.yml` is
-standalone (see the comment at the top of that file for how it differs from
-`docker-compose.prod.yml`, which is an overlay and still needs the rest of the
-repo present):
+The same file 4.1 installs, run yourself. Worth knowing if you are putting this
+under your own configuration management; otherwise not the path to take,
+because the installer generates real secrets where `.env.dist` hands you the
+public ones from this repository and trusts you to remember to replace them.
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
+curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.yml
 curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
 
-# Edit .env — set required secrets:
-#   WEBHOOK_ENCRYPTION_KEY (32 chars)
-#   WEBHOOK_ENCRYPTION_SALT (32 chars)
-#   JWT_SECRET (64+ chars)
-#   DB_PASSWORD
+# Edit .env — at minimum, replace every one of these with a generated value:
+#   WEBHOOK_ENCRYPTION_KEY, WEBHOOK_ENCRYPTION_SALT, JWT_SECRET
+#   POSTGRES_PASSWORD and DB_PASSWORD (they must match)
 #   REDIS_PASSWORD
+# and set COMPOSE_PROFILES=embedded-db unless you are bringing your own database.
 
-docker compose -f docker-compose.pull.yml up -d
+COMPOSE_PROFILES=embedded-db docker compose up -d
 
 # Verify. Only the web port is published; the actuator is on 8082 inside the
 # network and nginx proxies the health paths from it (see the port table above).
@@ -247,28 +242,30 @@ curl http://localhost/                     # dashboard
 curl -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/projects   # expect 401, not a connection error
 ```
 
-### 4.3 Docker Compose — build from source (if you've cloned the repo anyway)
+### 4.3 Build from source (if you have cloned the repo anyway)
+
+`docker-compose.yml` resolves every service to a published image.
+`docker-compose.build.yml` is a small overlay that builds the three services
+this project owns from the working tree instead:
 
 ```bash
-# Clone repository
 git clone https://github.com/vadymkykalo/webhook-platform.git
 cd webhook-platform
-
-# Copy environment template
-cp .env.dist .env
-# Edit .env as above
-
-# --no-build: docker-compose.yml still has `build:` contexts for the source
-# path (make up/make rebuild); pass this or Compose will build from source
-# instead of pulling, since docker-compose.prod.yml is an overlay and doesn't
-# remove the base file's `build:` key.
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
-
-# Verify — this overlay doesn't publish the actuator port (8082) to the host at
-# all, unlike docker-compose.pull.yml, so check from inside the network instead:
-docker compose exec -T api wget -q -O - http://localhost:8082/actuator/health/liveness
-# or: make health
+make up          # the overlay, the embedded-db profile and the topic creation
+make health
 ```
+
+By hand, if you would rather see it:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+  --profile embedded-db up -d --build
+```
+
+There used to be three Compose files describing the same seven services. They
+drifted — the worker's actuator bind address ended up different in two of them,
+which silently broke metrics scraping in one deployment path and not the other
+— so they are now one file plus a 25-line build overlay.
 
 **Or via Makefile (from a clone):**
 ```bash

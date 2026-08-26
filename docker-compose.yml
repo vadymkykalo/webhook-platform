@@ -1,15 +1,52 @@
+# ============================================================================
+# Hookflow — services, and how they are wired to each other.
+# ============================================================================
+# The one Compose file. It is what install.sh downloads, what an installation
+# runs, and — with docker-compose.build.yml layered on top — what `make up`
+# builds from source. There used to be three files describing the same seven
+# services; they drifted, and the drift was a real bug (the worker's actuator
+# bind address differed between two of them, which silently broke metrics
+# scraping in exactly one deployment path).
+#
+# Every service resolves to a pre-built image, so this file plus a .env beside
+# it is a complete deployment.
+#
+# Get both, with real generated secrets rather than the public ones in
+# .env.dist, by running the installer:
+#
+#   curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+#
+# ONE PUBLISHED PORT. The ui service's nginx is the only thing bound to the
+# host; it serves the dashboard and proxies every API path to `api`. Nothing
+# else — not the API, not the actuator, not the datastores — is reachable from
+# outside the Docker network. Set HOOKFLOW_PORT to move it off 80.
+#
+#   curl -f http://localhost/actuator/health/liveness
+#   curl -f http://localhost/
+#
+# Images default to the images this project publishes to GHCR on every
+# version tag (see .github/workflows/docker-publish.yml). Override
+# DOCKER_REGISTRY / API_IMAGE_TAG / WORKER_IMAGE_TAG / UI_IMAGE_TAG (all
+# documented in .env.dist) to point at a
+# private mirror or a specific version instead of :latest.
+#
+# Kafka topic creation, which `make up` normally does as a separate Makefile
+# step after startup, runs here as the one-shot `kafka-init` service — api and
+# worker wait for it to complete successfully before starting, so there is no
+# "app started before topics existed" race.
+
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: webhook-postgres
-    profiles:
-      - embedded-db
+    # Under a profile so DB_MODE=external can point the platform at a managed
+    # database without this ever starting. install.sh turns the profile on;
+    # `make up` passes --profile embedded-db.
+    profiles: [embedded-db]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-webhook_platform}
       POSTGRES_USER: ${POSTGRES_USER:-webhook_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ${POSTGRES_VOLUME_NAME:-webhook_pgdata}:/var/lib/postgresql/data
     healthcheck:
@@ -32,12 +69,44 @@ services:
       - webhook-network
     restart: unless-stopped
 
+  db-backup:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: webhook-db-backup
+    profiles: [embedded-db]
+    entrypoint: ["bash"]
+    command: ["/scripts/db-backup-loop.sh"]
+    environment:
+      # "direct" mode: this container has its own pg_dump (same postgres:16-alpine
+      # image as the DB itself) and reaches Postgres over webhook-network, so it
+      # never needs docker exec / the docker socket to back up a sibling container.
+      DB_MODE: direct
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-webhook_platform}
+      DB_USER: ${POSTGRES_USER:-webhook_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      DB_BACKUP_INTERVAL_SECONDS: ${DB_BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+      - ./deploy/scripts/db-backup.sh:/scripts/db-backup.sh:ro
+      - ./deploy/scripts/db-backup-loop.sh:/scripts/db-backup-loop.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - webhook-network
+    restart: unless-stopped
+
   kafka:
     image: ${KAFKA_IMAGE:-apache/kafka:3.7.0}
     container_name: webhook-kafka
-    ports:
-      - "127.0.0.1:9092:9092"
-      - "127.0.0.1:9093:9093"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -77,11 +146,32 @@ services:
       - webhook-network
     restart: unless-stopped
 
+  # One-shot: creates every topic in KafkaTopics.java (worker/api do NOT rely on
+  # broker auto-create, since that would silently apply the broker default
+  # partition count instead of KAFKA_NUM_PARTITIONS). api/worker block on this
+  # via `condition: service_completed_successfully` below.
+
+  kafka-init:
+    image: ${KAFKA_IMAGE:-apache/kafka:3.7.0}
+    container_name: webhook-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: >
+      bash -c "
+      set -e;
+      for t in deliveries.dispatch deliveries.retry.1m deliveries.retry.5m deliveries.retry.15m deliveries.retry.1h deliveries.retry.6h deliveries.retry.24h deliveries.dlq incoming.forward.dispatch incoming.forward.retry incoming.forward.dlq; do
+        echo \"Creating topic: $$t\";
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic $$t --partitions ${KAFKA_NUM_PARTITIONS:-12} --replication-factor 1;
+      done;
+      echo 'Kafka topics ready.'"
+    networks:
+      - webhook-network
+    restart: "no"
+
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
     container_name: webhook-redis
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-webhook_redis_pass}
     volumes:
       - redis_data:/data
@@ -101,47 +191,6 @@ services:
           memory: "${REDIS_MEMORY_LIMIT:-512m}"
         reservations:
           memory: "64m"
-    networks:
-      - webhook-network
-    restart: unless-stopped
-
-  # Scheduled backups for the embedded-DB Compose path, mirroring
-  # deploy/helm/hookflow/templates/db-backup-cronjob.yaml (the only prior
-  # scheduled backup, Kubernetes-only). Runs deploy/scripts/db-backup.sh on a
-  # fixed interval instead of a cron daemon — simplest thing that can't silently
-  # stop firing. Retention is handled inside the script (BACKUP_RETENTION_DAYS).
-  db-backup:
-    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
-    container_name: webhook-db-backup
-    profiles:
-      - embedded-db
-    entrypoint: ["bash"]
-    command: ["/scripts/db-backup-loop.sh"]
-    environment:
-      # "direct" mode: this container has its own pg_dump (same postgres:16-alpine
-      # image as the DB itself) and reaches Postgres over webhook-network, so it
-      # never needs docker exec / the docker socket to back up a sibling container.
-      DB_MODE: direct
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: ${POSTGRES_DB:-webhook_platform}
-      DB_USER: ${POSTGRES_USER:-webhook_user}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-webhook_pass}
-      BACKUP_DIR: /backups
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
-      DB_BACKUP_INTERVAL_SECONDS: ${DB_BACKUP_INTERVAL_SECONDS:-86400}
-    volumes:
-      - ${BACKUP_DIR:-./backups}:/backups
-      - ./deploy/scripts/db-backup.sh:/scripts/db-backup.sh:ro
-      - ./deploy/scripts/db-backup-loop.sh:/scripts/db-backup-loop.sh:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - webhook-network
     restart: unless-stopped
@@ -181,25 +230,31 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: ./webhook-platform-api/Dockerfile
-    image: webhook-platform-api:${API_IMAGE_TAG:-latest}
-    # API_PORT uses `${API_PORT-8080}` (single dash — default applies only
-    # when the var is completely UNSET, not when it's set-but-empty) rather than
-    # the usual `${API_PORT:-8080}`. This is what makes `make scale-api N=3`
-    # possible: it runs with API_PORT explicitly set to "", which collapses this
-    # mapping to "<bind>::8080" — Compose's syntax for "publish on an
-    # auto-assigned ephemeral host port per replica" — instead of every replica
-    # fighting over the same fixed 8080. (A Compose multi-file overlay can't do
-    # this: `ports:` lists get concatenated across `-f` files, not replaced, in
-    # the Compose versions this was tested against, so a second file adding an
-    # ephemeral mapping left the fixed one still bound and scaling still failed.)
-    # Traffic doesn't need this fixed port anyway — the UI's nginx proxies to
-    # `api:8080` over the internal Compose network regardless of what's
-    # published to the host; this port exists for host-level `curl`/debugging.
-    ports:
-      - "${API_BIND:-127.0.0.1}:${API_PORT-8080}:8080"
+    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-api:${API_IMAGE_TAG:-latest}
+    container_name: webhook-api
+    # Deliberately no host ports. Everything reaches the API through the ui
+    # service's nginx, which proxies /api/, /ws/tunnel, /tunnel/, /hook/,
+    # /ingress/ and the two safe actuator paths. One published port is one URL
+    # to give people, one certificate to obtain and one firewall rule to
+    # write — and in production that port is 443 behind a domain, not a set of
+    # numbers anyone has to remember.
+    #
+    # Nothing else publishes a host port either — not postgres, kafka or redis.
+    # `docker compose exec` reaches all of them (that is what ./hookflow backup
+    # uses), and a database listening on a laptop's loopback is a real exposure
+    # the moment anything else on that machine is compromised.
+    #
+    # If you do want something reachable directly — debugging, psql, a CLI
+    # pointed straight at the API — add a docker-compose.override.yml next to
+    # this file:
+    #
+    #   services:
+    #     api:      { ports: ["127.0.0.1:8080:8080", "127.0.0.1:8082:8082"] }
+    #     postgres: { ports: ["127.0.0.1:5432:5432"] }
+    #
+    # Keep them on 127.0.0.1. 8082 is the actuator port, and it deliberately
+    # does not pass through the authenticated security chain (see
+    # MANAGEMENT_PORT below), so it must never leave the host.
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -215,12 +270,18 @@ services:
       SERVER_PORT: 8080
       # Actuator (incl. /actuator/prometheus) is split onto its own port so
       # Prometheus can scrape it without going through the JWT/API-key-authenticated
-      # SecurityConfig filter chain on 8080 (see SecurityConfig.java and
-      # monitoring/README.md "Metrics-scrape auth"). Not published to the host —
-      # only reachable from other containers on the webhook-network, same trust
-      # boundary as postgres/kafka/redis.
+      # SecurityConfig filter chain on 8080. Not published to the host — only
+      # reachable from other containers on webhook-network, same trust boundary
+      # as postgres/kafka/redis. (Mirrors docker-compose.yml's api service.)
       MANAGEMENT_PORT: 8082
-      MANAGEMENT_ADDRESS: ${MANAGEMENT_ADDRESS:-0.0.0.0}
+      # Literal, not a variable. Neither management port is published to the
+      # host, so 0.0.0.0 here means "reachable from other containers on this
+      # network" and nothing more — which is exactly what nginx's health proxy
+      # and Prometheus's scrape both need. It was a knob, and setting it to
+      # 127.0.0.1 (which reads as the safer choice) silently broke Prometheus
+      # once already; now it would break the health endpoint too, since nginx
+      # is the only way in. Removing the knob removes the failure.
+      MANAGEMENT_ADDRESS: 0.0.0.0
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       WEBHOOK_ENCRYPTION_KEYS: ${WEBHOOK_ENCRYPTION_KEYS:-}
@@ -254,9 +315,6 @@ services:
       TUNNEL_CLEANUP_INTERVAL_MS: ${TUNNEL_CLEANUP_INTERVAL_MS:-60000}
       TUNNEL_REQUEST_LOG_RETENTION_DAYS: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:-7}
       WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:-524288}
-      # Empty by default: the API port is exposed directly to the host here, so the
-      # socket peer is already the real client. Only set this if you put a reverse
-      # proxy in front (see docker-compose.prod.yml, which does).
       WEBHOOK_TRUSTED_PROXIES: ${WEBHOOK_TRUSTED_PROXIES:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1000}
@@ -281,9 +339,6 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-webhook_redis_pass}
-      # Not otherwise used by the API (MinIO integration is optional/future — see
-      # .env.dist) — forwarded solely so ProductionSafetyValidator can catch a
-      # shipped default left in place in production (P0-14c).
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
       ALERTS_NOTIFICATIONS_ENABLED: ${ALERTS_NOTIFICATIONS_ENABLED:-false}
       RULES_CACHE_REFRESH_MS: ${RULES_CACHE_REFRESH_MS:-30000}
@@ -327,10 +382,9 @@ services:
       WAYFORPAY_PLAN_PRICES: ${WAYFORPAY_PLAN_PRICES:-}
       JAVA_EXTRA_OPTS: ${API_JAVA_OPTS:-}
     depends_on:
-      # required:false so this does not drag the embedded-db profile in when
-      # DB_MODE=external — but when postgres IS in play, wait for it. Without
-      # this, Flyway races a Postgres that has not started accepting
-      # connections yet.
+      # required:false so an external/managed database does not drag the
+      # embedded-db profile in — but when postgres IS in play, wait for it.
+      # Without it, Flyway races a database not yet accepting connections.
       postgres:
         condition: service_healthy
         required: false
@@ -338,7 +392,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     healthcheck:
+      # Actuator lives on MANAGEMENT_PORT (8082), not the main 8080 — see the
+      # comment above. Same as docker-compose.yml's api healthcheck.
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health/liveness"]
       interval: 10s
       timeout: 5s
@@ -361,10 +419,8 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: ./webhook-platform-worker/Dockerfile
-    image: webhook-platform-worker:${WORKER_IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-worker:${WORKER_IMAGE_TAG:-latest}
+    container_name: webhook-worker
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
@@ -373,25 +429,23 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-webhook_pass}
       DB_SSL_MODE: ${DB_SSL_MODE:-disable}
       DB_JDBC_URL: ${DB_JDBC_URL:-}
-      # Deliberately a DIFFERENT host-level env var from the API's DB_POOL_MAX_SIZE/
-      # DB_POOL_MIN_IDLE (see .env.dist). Both used to read the exact same shared
-      # DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE names -- .env.dist sets those once, so `make up`
-      # silently gave the worker the API's smaller pool (20/10) instead of its own tuned
-      # 40/20, no matter what default this fallback below claimed. The two must stay named
-      # distinctly or they will drift back into colliding again.
+      # See docker-compose.yml's worker block -- WORKER_DB_POOL_MAX_SIZE/MIN_IDLE are
+      # deliberately distinct from the API's DB_POOL_MAX_SIZE/DB_POOL_MIN_IDLE (.env.dist), or
+      # a single shared .env value silently overrides both services' independently-tuned pools.
       DB_POOL_MAX_SIZE: ${WORKER_DB_POOL_MAX_SIZE:-40}
       DB_POOL_MIN_IDLE: ${WORKER_DB_POOL_MIN_IDLE:-20}
       DB_POOL_CONNECTION_TIMEOUT: ${DB_POOL_CONNECTION_TIMEOUT:-30000}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       SCHEDULING_POOL_SIZE: ${SCHEDULING_POOL_SIZE:-8}
       MANAGEMENT_PORT: 8081
-      # Was 127.0.0.1 (loopback-inside-container), which made this port
-      # unreachable from any other container — including Prometheus trying to
-      # scrape "worker:8081" and, in the Helm/K8s deployment, kubelet's own
-      # liveness/readiness httpGet probes (which also connect from outside the
-      # container's network namespace). Not published to the host — only
-      # reachable from other containers on webhook-network.
-      MANAGEMENT_ADDRESS: ${MANAGEMENT_ADDRESS:-0.0.0.0}
+      # Literal, not a variable. Neither management port is published to the
+      # host, so 0.0.0.0 here means "reachable from other containers on this
+      # network" and nothing more — which is exactly what nginx's health proxy
+      # and Prometheus's scrape both need. It was a knob, and setting it to
+      # 127.0.0.1 (which reads as the safer choice) silently broke Prometheus
+      # once already; now it would break the health endpoint too, since nginx
+      # is the only way in. Removing the knob removes the failure.
+      MANAGEMENT_ADDRESS: 0.0.0.0
       WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:?WEBHOOK_ENCRYPTION_KEY must be set}
       WEBHOOK_ENCRYPTION_KEYS: ${WEBHOOK_ENCRYPTION_KEYS:-}
       WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION: ${WEBHOOK_ENCRYPTION_KEY_ACTIVE_VERSION:-0}
@@ -459,10 +513,9 @@ services:
       DELIVERY_ESCALATION_INTERVAL_MS: ${DELIVERY_ESCALATION_INTERVAL_MS:-300000}
       JAVA_EXTRA_OPTS: ${WORKER_JAVA_OPTS:-}
     depends_on:
-      # required:false so this does not drag the embedded-db profile in when
-      # DB_MODE=external — but when postgres IS in play, wait for it. Without
-      # this, Flyway races a Postgres that has not started accepting
-      # connections yet.
+      # required:false so an external/managed database does not drag the
+      # embedded-db profile in — but when postgres IS in play, wait for it.
+      # Without it, Flyway races a database not yet accepting connections.
       postgres:
         condition: service_healthy
         required: false
@@ -470,6 +523,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/actuator/health/liveness"]
       interval: 10s
@@ -493,17 +548,19 @@ services:
     restart: unless-stopped
 
   ui:
-    build:
-      context: .
-      dockerfile: ./webhook-platform-ui/Dockerfile
-      # Build args, not environment: Vite inlines these into the bundle at
-      # build time. As runtime env on the nginx stage they were dead config.
-      args:
-        VITE_API_URL: ${VITE_API_URL:-}
-        VITE_CSP_EXTRA_CONNECT: ${VITE_CSP_EXTRA_CONNECT:-}
-    image: webhook-platform-ui:${UI_IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-ui:${UI_IMAGE_TAG:-latest}
+    container_name: webhook-ui
     ports:
-      - "${UI_PORT:-5173}:5173"
+      # The one published port. 80 by default because that is what a browser
+      # assumes. With the `tls` profile on, install.sh moves this to
+      # 127.0.0.1:8080 and Caddy below takes 80/443 instead — nothing else
+      # changes, because Caddy proxies straight to this same nginx.
+      - "${HOOKFLOW_BIND:-0.0.0.0}:${HOOKFLOW_PORT:-80}:5173"
+    # No environment block: the UI is a static bundle behind nginx. Vite inlines
+    # every VITE_* value at build time, so nothing here could change it — and on
+    # a pre-built image there is no build to feed. nginx proxies /api/,
+    # /ws/tunnel, /hook/ and /ingress/ to the api service, so the bundle talks
+    # to its own origin and needs no API URL at all.
     depends_on:
       - api
     logging:
@@ -521,12 +578,60 @@ services:
       - webhook-network
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # TLS. Off unless the `tls` profile is enabled, which install.sh does when you
+  # give it --domain.
+  #
+  # Caddy rather than nginx-with-certbot because getting and renewing the
+  # certificate is the whole job here, and Caddy does it with no cron entry, no
+  # renewal hook and no first-run chicken-and-egg where nginx will not start
+  # until a certificate exists that cannot be obtained until nginx starts.
+  #
+  # It terminates TLS and proxies to the ui service's nginx, which still does
+  # all the routing. One place decides what is public; adding TLS did not move
+  # that decision.
+  # ---------------------------------------------------------------------------
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    container_name: webhook-caddy
+    profiles: [tls]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # `:-` and not `:?`: Compose interpolates the whole file regardless of
+      # which profiles are active, so a required-variable guard here would fail
+      # every install that is not using TLS. An empty value reaches the
+      # Caddyfile, where Caddy refuses to start with a clear message — and only
+      # when this profile is actually on.
+      HOOKFLOW_DOMAIN: ${HOOKFLOW_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means re-issuing on the next
+      # start, which Let's Encrypt rate-limits — back it up with your .env.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - ui
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks:
+      - webhook-network
 volumes:
+  caddy_data:
+  caddy_config:
+  minio_data:
   webhook_pgdata:
     name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}
   kafka_data:
   redis_data:
-  minio_data:
 
 networks:
   webhook-network:

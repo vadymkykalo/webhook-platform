@@ -86,12 +86,14 @@ INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_DIR}"
 
 # With a domain, Caddy owns 80 and 443 and the dashboard's nginx moves to
 # loopback behind it. Without one, nginx is the only thing listening.
+# embedded-db is what runs Postgres in the stack. Leaving it out is how you
+# point the platform at a managed database instead.
 if [ -n "$DOMAIN" ]; then
     BASE_URL="https://${DOMAIN}"
     BIND="127.0.0.1"
     PORT="8080"
     APP_ENV="production"
-    PROFILES="tls"
+    PROFILES="embedded-db,tls"
     CHECK_PORTS="80 443"
 else
     # Port 80 is implicit in a URL, and a URL with ":80" in it looks wrong to
@@ -99,7 +101,7 @@ else
     if [ "$PORT" = "80" ]; then BASE_URL="http://localhost"; else BASE_URL="http://localhost:${PORT}"; fi
     BIND="0.0.0.0"
     APP_ENV="development"
-    PROFILES=""
+    PROFILES="embedded-db"
     CHECK_PORTS="$PORT"
 fi
 
@@ -329,7 +331,15 @@ write_files() {
     else
         # Pinned to the release tag, not to main. An install that silently
         # changes under you between two `docker compose pull`s is not an install.
-        curl -fsSL "${RAW}/${VERSION}/docker-compose.pull.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
+        #
+        # Two names: releases up to 2.5.0 called the deployment file
+        # docker-compose.pull.yml, alongside a build-from-source
+        # docker-compose.yml. Those merged into one canonical docker-compose.yml,
+        # so try that first and fall back — this installer has to be able to
+        # install a release older than the change.
+        curl -fsSL "${RAW}/${VERSION}/docker-compose.yml" -o "${INSTALL_DIR}/docker-compose.yml" 2>/dev/null \
+            && grep -q 'ghcr.io/vadymkykalo/hookflow' "${INSTALL_DIR}/docker-compose.yml" \
+            || curl -fsSL "${RAW}/${VERSION}/docker-compose.pull.yml" -o "${INSTALL_DIR}/docker-compose.yml" \
             || die "Could not download the Compose file for ${VERSION}."
         ok "docker-compose.yml (pinned to ${VERSION})"
     fi
@@ -377,6 +387,24 @@ CADDY
     db_pass=$(password)
     redis_pass=$(password)
     local image_tag="${VERSION#v}"
+
+    # Only when this is going on a domain, i.e. facing the internet.
+    PROD_SETTINGS=""
+    if [ -n "$DOMAIN" ]; then
+        PROD_SETTINGS=$(cat <<'PRODENV'
+
+# Set because this install faces the internet.
+# Require TLS to the database — it is loopback-only here, but the moment you
+# move to a managed one this is the setting people forget.
+DB_SSL_MODE=require
+# INFO on a public endpoint is a lot of disk and a lot of payload metadata.
+LOG_LEVEL=WARN
+# The Docker bridge range, so X-Forwarded-For from the TLS terminator in front
+# is trusted and client IPs in the audit log are real.
+WEBHOOK_TRUSTED_PROXIES=172.16.0.0/12
+PRODENV
+)
+    fi
 
     umask 077
     cat > "${INSTALL_DIR}/.env" <<ENVFILE
@@ -438,6 +466,7 @@ APP_ENV=${APP_ENV}
 # to deliver a verification link. Turn it on and set the SMTP_* variables to
 # send verification, invite and alert mail.
 EMAIL_ENABLED=false
+${PROD_SETTINGS}
 ENVFILE
     ok ".env with newly generated secrets"
 }

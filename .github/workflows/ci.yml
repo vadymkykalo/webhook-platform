@@ -538,11 +538,11 @@ jobs:
           echo "### Docker Build Results" >> $GITHUB_STEP_SUMMARY
           echo "✅ All images built successfully" >> $GITHUB_STEP_SUMMARY
 
-  # Proves docker-compose.pull.yml (the no-Maven/no-npm quick start
+  # Proves docker-compose.yml (the no-Maven/no-npm quick start
   # advertised in the README) actually boots and answers health checks, so it
   # can't silently rot the way the old build-only compose flow did. Rebuilds
   # the three images itself (same pattern as container-scan below) and tags
-  # them to match what docker-compose.pull.yml resolves to when DOCKER_REGISTRY
+  # them to match what docker-compose.yml resolves to when DOCKER_REGISTRY
   # is pointed at the local :test images instead of GHCR — no registry
   # credentials needed to run this.
   install-smoke:
@@ -574,7 +574,7 @@ jobs:
       - name: Install, exactly as the README says
         env:
           # Test the Compose file in this PR, not the one in the last release.
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.pull.yml
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
           ./install.sh --dir "$HOME/hookflow" --version v0.0.0-ci --port 8080 --no-start --yes
           # Point it at the images just built rather than pulling the release.
@@ -645,12 +645,12 @@ jobs:
 
       - name: The installer's own checks pass against what it wrote
         env:
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.pull.yml
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: ./install.sh --check --dir "$HOME/hookflow"
 
       - name: A domain install wires TLS in without publishing the dashboard
         env:
-          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.pull.yml
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.yml
         run: |
           # No certificate can be issued in CI, so this checks the wiring: the
           # terminator is in the service list, the dashboard has moved to

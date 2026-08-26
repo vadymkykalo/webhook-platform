@@ -26,7 +26,7 @@ Empty is the right answer for every compose deployment: the UI's nginx proxies
 browser talks to its own origin and no CORS is involved. If you do point it at a
 separate origin, add that origin to `CORS_ALLOWED_ORIGINS` as well.
 
-On the pre-built images from `docker-compose.pull.yml` neither variable can be
+On the pre-built images neither variable can be
 changed at all — there is no build to feed — so both are gone from that file.
 
 ### `JAVA_OPTS` in `.env` is now `API_JAVA_OPTS` / `WORKER_JAVA_OPTS`, and appends

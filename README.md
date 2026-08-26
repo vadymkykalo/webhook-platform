@@ -95,8 +95,8 @@ To remove it: `... install.sh | bash -s -- --uninstall` keeps your data,
 
 ### Running it from a clone (contributors)
 
-Different command, and deliberately a different shape: this builds all three
-images from your working tree instead of pulling a release.
+Different command, same stack: this builds the three services from your
+working tree instead of pulling a release.
 
 ```bash
 git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
@@ -110,10 +110,12 @@ make down          # stop
 `make dev-api` / `dev-worker` / `dev-ui` rebuild and restart one service — the
 fast loop once the stack is running. `make help` lists the rest.
 
-Here the dashboard is on **http://localhost:5173** and the API on **:8080**,
-separately — unlike an installed deployment, which publishes only nginx. That is
-on purpose: hitting the API directly is worth more than tidiness while you are
-changing it.
+**http://localhost:8080** — the same one-port shape as an installed deployment,
+so nothing you learn here stops working when you deploy. There is one Compose
+file, `docker-compose.yml`, which resolves every service to a published image;
+`docker-compose.build.yml` is a 25-line overlay that builds the three services
+this project owns from your working tree instead, and that is the only
+difference between running from a clone and running a release.
 
 [`CONTRIBUTING.md`](./CONTRIBUTING.md) has the prerequisites, the test commands
 that match CI, and what each build guard means when it fails.
