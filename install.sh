@@ -195,6 +195,8 @@ check_system() {
     # doctor can never pass on a healthy install.
     if [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
         say "  ${DIM}Ports not checked — ${INSTALL_DIR} is an existing installation${N}"
+    elif [ "$START" = "0" ]; then
+        say "  ${DIM}Ports not checked — nothing is being started (--no-start)${N}"
     else
         local p
         for p in $CHECK_PORTS; do
