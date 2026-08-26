@@ -325,8 +325,15 @@ services:
       WAYFORPAY_MERCHANT_DOMAIN: ${WAYFORPAY_MERCHANT_DOMAIN:-}
       WAYFORPAY_SERVICE_URL: ${WAYFORPAY_SERVICE_URL:-}
       WAYFORPAY_PLAN_PRICES: ${WAYFORPAY_PLAN_PRICES:-}
-      JAVA_OPTS: ${API_JAVA_OPTS:-}
+      JAVA_EXTRA_OPTS: ${API_JAVA_OPTS:-}
     depends_on:
+      # required:false so this does not drag the embedded-db profile in when
+      # DB_MODE=external — but when postgres IS in play, wait for it. Without
+      # this, Flyway races a Postgres that has not started accepting
+      # connections yet.
+      postgres:
+        condition: service_healthy
+        required: false
       kafka:
         condition: service_healthy
       redis:
@@ -450,8 +457,15 @@ services:
       FORWARD_ESCALATION_INTERVAL_MS: ${FORWARD_ESCALATION_INTERVAL_MS:-300000}
       DELIVERY_ESCALATION_BATCH_SIZE: ${DELIVERY_ESCALATION_BATCH_SIZE:-100}
       DELIVERY_ESCALATION_INTERVAL_MS: ${DELIVERY_ESCALATION_INTERVAL_MS:-300000}
-      JAVA_OPTS: ${WORKER_JAVA_OPTS:-}
+      JAVA_EXTRA_OPTS: ${WORKER_JAVA_OPTS:-}
     depends_on:
+      # required:false so this does not drag the embedded-db profile in when
+      # DB_MODE=external — but when postgres IS in play, wait for it. Without
+      # this, Flyway races a Postgres that has not started accepting
+      # connections yet.
+      postgres:
+        condition: service_healthy
+        required: false
       kafka:
         condition: service_healthy
       redis:
@@ -482,12 +496,14 @@ services:
     build:
       context: .
       dockerfile: ./webhook-platform-ui/Dockerfile
+      # Build args, not environment: Vite inlines these into the bundle at
+      # build time. As runtime env on the nginx stage they were dead config.
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_CSP_EXTRA_CONNECT: ${VITE_CSP_EXTRA_CONNECT:-}
     image: webhook-platform-ui:${UI_IMAGE_TAG:-latest}
     ports:
       - "${UI_PORT:-5173}:5173"
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-}
-      VITE_CSP_EXTRA_CONNECT: ${VITE_CSP_EXTRA_CONNECT:-}
     depends_on:
       - api
     logging:

@@ -11,7 +11,7 @@ access (a small VPS or a free-tier cloud VM is enough — see "Sizing" below).
 ## Why this is worth doing (and why it was scoped carefully)
 
 A public read-only demo is the highest-leverage marketing surface for a
-UI-heavy product like this — right now `docs/img.png` is a static screenshot
+UI-heavy product like this — right now `docs/screenshots/deliveries.png` is a static screenshot
 doing all the persuasion. But a public demo with live cross-tenant data
 leakage would actively damage trust rather than build it, so this plan does
 not proceed until two preconditions are both true:
@@ -102,7 +102,7 @@ docker-compose.pull.yml up -d` on a small VPS.
 
 1. Deploy the stack above on any reachable host (a $5–10/mo VPS is enough).
 2. Point a subdomain at it (e.g. `demo.hookflow.dev`) and link it from the
-   README next to `docs/img.png`.
+   README next to `docs/screenshots/deliveries.png`.
 3. Run the cross-tenant check from "Isolation model" above against the live
    instance from a second (real, non-demo) account and paste the result here.
 4. Confirm the data-reset job is actually scheduled and running.

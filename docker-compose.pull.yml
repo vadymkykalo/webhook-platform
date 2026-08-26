@@ -283,8 +283,10 @@ services:
       WAYFORPAY_MERCHANT_DOMAIN: ${WAYFORPAY_MERCHANT_DOMAIN:-}
       WAYFORPAY_SERVICE_URL: ${WAYFORPAY_SERVICE_URL:-}
       WAYFORPAY_PLAN_PRICES: ${WAYFORPAY_PLAN_PRICES:-}
-      JAVA_OPTS: ${API_JAVA_OPTS:-}
+      JAVA_EXTRA_OPTS: ${API_JAVA_OPTS:-}
     depends_on:
+      postgres:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       redis:
@@ -401,8 +403,10 @@ services:
       FORWARD_ESCALATION_INTERVAL_MS: ${FORWARD_ESCALATION_INTERVAL_MS:-300000}
       DELIVERY_ESCALATION_BATCH_SIZE: ${DELIVERY_ESCALATION_BATCH_SIZE:-100}
       DELIVERY_ESCALATION_INTERVAL_MS: ${DELIVERY_ESCALATION_INTERVAL_MS:-300000}
-      JAVA_OPTS: ${WORKER_JAVA_OPTS:-}
+      JAVA_EXTRA_OPTS: ${WORKER_JAVA_OPTS:-}
     depends_on:
+      postgres:
+        condition: service_healthy
       kafka:
         condition: service_healthy
       redis:
@@ -437,8 +441,6 @@ services:
     ports:
       - "${UI_PORT:-5173}:5173"
     environment:
-      VITE_API_URL: ${VITE_API_URL:-}
-      VITE_CSP_EXTRA_CONNECT: ${VITE_CSP_EXTRA_CONNECT:-}
     depends_on:
       - api
     logging:

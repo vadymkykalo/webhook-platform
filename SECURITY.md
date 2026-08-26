@@ -4,7 +4,11 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
+| 2.5.x   | :white_check_mark: |
+| < 2.5   | :x:                |
+
+Fixes land on the latest minor line. Older releases are not backported — upgrade
+first, and see [`UPGRADING.md`](./UPGRADING.md) if the jump crosses a major.
 
 ## Reporting a Vulnerability
 
