@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+### `VITE_API_URL` now takes effect — check your `.env` before rebuilding the UI
+
+`VITE_API_URL` and `VITE_CSP_EXTRA_CONNECT` were being passed as runtime
+environment to the UI's nginx container, where they did nothing: Vite inlines
+`import.meta.env.VITE_*` into the bundle at build time. They are build args now,
+so they finally do what they always claimed to.
+
+**This means a stale value starts biting.** Older `.env.dist` shipped
+`VITE_API_URL=http://localhost:8080`. If your `.env` still carries that line and
+you rebuild the UI image (`make up`, `make dev-ui`, `make rebuild-ui`), the
+bundle will hardcode `http://localhost:8080` as the API origin — which breaks
+the moment the dashboard is served from anywhere but your own machine.
+
+Set it empty unless the API genuinely lives on another origin:
+
+```env
+VITE_API_URL=
+```
+
+Empty is the right answer for every compose deployment: the UI's nginx proxies
+`/api/`, `/ws/tunnel`, `/hook/` and `/ingress/` to the api service, so the
+browser talks to its own origin and no CORS is involved. If you do point it at a
+separate origin, add that origin to `CORS_ALLOWED_ORIGINS` as well.
+
+On the pre-built images from `docker-compose.pull.yml` neither variable can be
+changed at all — there is no build to feed — so both are gone from that file.
+
+### `JAVA_OPTS` in `.env` is now `API_JAVA_OPTS` / `WORKER_JAVA_OPTS`, and appends
+
+Compose was setting the containers' `JAVA_OPTS` to the empty string by default,
+which overrode the JVM tuning baked into the images. Every default deployment
+was running at the stock `MaxRAMPercentage=25` — roughly 192 MB of heap inside a
+768 MB limit instead of the intended ~576 MB. If you sized your containers
+around observed memory use, expect the JVMs to now use the headroom you gave
+them.
+
+`API_JAVA_OPTS` / `WORKER_JAVA_OPTS` still work and are unchanged in spelling,
+but they now **append** to the image tuning rather than replace it. An explicit
+`-Xmx` still wins over `MaxRAMPercentage`, so existing values keep their
+meaning. To replace the tuning wholesale, set the container's `JAVA_OPTS`
+directly.
+
 ### `RETRY_LADDER_DEFAULT_*` removed — no action required
 
 `RETRY_LADDER_DEFAULT_DELAYS_SECONDS` and `RETRY_LADDER_DEFAULT_MAX_ATTEMPTS` are

@@ -440,7 +440,11 @@ services:
     container_name: webhook-ui
     ports:
       - "${UI_PORT:-5173}:5173"
-    environment:
+    # No environment block: the UI is a static bundle behind nginx. Vite inlines
+    # every VITE_* value at build time, so nothing here could change it — and on
+    # a pre-built image there is no build to feed. nginx proxies /api/,
+    # /ws/tunnel, /hook/ and /ingress/ to the api service, so the bundle talks
+    # to its own origin and needs no API URL at all.
     depends_on:
       - api
     logging:
