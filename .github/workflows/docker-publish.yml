@@ -51,7 +51,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api, worker, ui]
+        include:
+          - service: api
+            dockerfile: webhook-platform-api/Dockerfile
+          - service: worker
+            dockerfile: webhook-platform-worker/Dockerfile
+          - service: ui
+            dockerfile: webhook-platform-ui/Dockerfile
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -87,7 +93,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: webhook-platform-${{ matrix.service }}/Dockerfile
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

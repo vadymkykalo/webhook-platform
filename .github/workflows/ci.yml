@@ -497,7 +497,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      # The only full builds in the workflow. docker-compose-smoke and
+      # The only full builds in the workflow. install-smoke and
       # container-scan need the same three images and used to rebuild each from
       # scratch — nine full builds per run for three distinct images. They now
       # restore from the layer cache written here (scoped per image so the three
@@ -545,12 +545,15 @@ jobs:
   # them to match what docker-compose.pull.yml resolves to when DOCKER_REGISTRY
   # is pointed at the local :test images instead of GHCR — no registry
   # credentials needed to run this.
-  docker-compose-smoke:
-    name: Docker Compose Pull-Path Smoke Test
+  install-smoke:
+    name: Installer Smoke Test
     runs-on: ubuntu-latest
     needs: docker-build
-    timeout-minutes: 15
+    timeout-minutes: 25
 
+    # This is the install the README tells people to run, driven exactly as they
+    # would drive it. It replaced a test that invoked Compose by hand: that one
+    # could pass while install.sh — the thing anyone actually runs — was broken.
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -558,88 +561,116 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: webhook-platform-api/Dockerfile
-          tags: webhook-platform-api:test
-          load: true
-          cache-from: type=gha,scope=api
-
-      - name: Build Worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: webhook-platform-worker/Dockerfile
-          tags: webhook-platform-worker:test
-          load: true
-          cache-from: type=gha,scope=worker
-
-      - name: Build UI image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: webhook-platform-ui/Dockerfile
-          tags: webhook-platform-ui:test
-          load: true
-          cache-from: type=gha,scope=ui
-
-      - name: Create .env from .env.dist
-        run: cp .env.dist .env
-
-      - name: Start pull-based compose stack (using the images just built)
-        env:
-          DOCKER_REGISTRY: webhook-platform
-          API_IMAGE_TAG: test
-          WORKER_IMAGE_TAG: test
-          UI_IMAGE_TAG: test
-        run: docker compose -f docker-compose.pull.yml --env-file .env up -d
-
-      - name: Wait for API and UI health, then curl both endpoints
+      - name: Build the three images
         run: |
-          # Actuator (health/prometheus) lives on its own port (8082, loopback-only
-          # in docker-compose.pull.yml) rather than the main API port (8080), so it
-          # bypasses the JWT/API-key-authenticated security chain — see the
-          # MANAGEMENT_PORT comment in docker-compose.pull.yml. Using /liveness
-          # rather than the aggregate /actuator/health: the latter folds in the
-          # Spring Boot mail health indicator, which reads DOWN (503) whenever no
-          # SMTP server is reachable — true by default in this stack even with
-          # EMAIL_ENABLED=false — so it's not a reliable up/down signal here.
+          set -e
+          for svc in api worker ui; do
+            docker buildx build --load \
+              -f "webhook-platform-${svc}/Dockerfile" \
+              -t "webhook-platform-${svc}:test" \
+              --cache-from "type=gha,scope=${svc}" .
+          done
+
+      - name: Install, exactly as the README says
+        env:
+          # Test the Compose file in this PR, not the one in the last release.
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.pull.yml
+        run: |
+          ./install.sh --dir "$HOME/hookflow" --version v0.0.0-ci --port 8080 --no-start --yes
+          # Point it at the images just built rather than pulling the release.
+          cd "$HOME/hookflow"
+          sed -i 's|^API_IMAGE_TAG=.*|API_IMAGE_TAG=test|;s|^WORKER_IMAGE_TAG=.*|WORKER_IMAGE_TAG=test|;s|^UI_IMAGE_TAG=.*|UI_IMAGE_TAG=test|' .env
+          echo "DOCKER_REGISTRY=webhook-platform" >> .env
+          docker compose up -d
+
+      - name: Wait for the platform
+        run: |
+          cd "$HOME/hookflow"
           for i in $(seq 1 60); do
-            api_ok=$(curl -sf -o /dev/null http://localhost:8082/actuator/health/liveness && echo 1 || echo 0)
-            ui_ok=$(curl -sf -o /dev/null http://localhost:5173 && echo 1 || echo 0)
-            if [ "$api_ok" = "1" ] && [ "$ui_ok" = "1" ]; then
-              echo "API and UI both healthy after ${i}0s"
-              break
-            fi
+            curl -sf -o /dev/null http://localhost:8080/actuator/health/liveness && { echo "up after ${i}0s"; exit 0; }
             sleep 10
-            if [ "$i" = "60" ]; then
-              echo "::error::Stack did not become healthy in time"
-              docker compose -f docker-compose.pull.yml ps
-              docker compose -f docker-compose.pull.yml logs
+          done
+          echo "::error::the stack did not come up"
+          docker compose ps
+          docker compose logs
+          exit 1
+
+      - name: Everything is on the one port, and only what should be
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080$1")
+            printf '%-30s %s (want %s)\n' "$1" "$code" "$2"
+            [ "$code" = "$2" ] || { echo "::error::$1 returned $code, expected $2"; exit 1; }
+          }
+          check /                          200   # dashboard
+          check /docs                      200   # public docs, no account
+          check /actuator/health/liveness  200   # probes
+          check /api/v1/projects           401   # reachable, and refusing anonymous access
+          # Neither of these may be public: metrics leak tenant cardinality and
+          # traffic volume, and /actuator/env leaks the configuration wholesale.
+          check /actuator/prometheus       404
+          check /actuator/env              404
+          # A wrong method must not read as a server error — 5xx tells every
+          # sender with a retry policy to come back and try again.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ingress/nope)
+          [ "$code" = "405" ] || { echo "::error::GET /ingress/nope returned $code, expected 405"; exit 1; }
+          echo "method handling ok"
+
+      - name: Nothing else is bound to the host
+        run: |
+          # The single-port promise. Postgres, Kafka, Redis and the API itself
+          # must be reachable only from inside the Docker network.
+          for p in 5432 9092 6379 8082; do
+            if curl -s -o /dev/null --max-time 2 "http://localhost:$p" 2>/dev/null \
+               || nc -z localhost "$p" 2>/dev/null; then
+              echo "::error::port $p is published to the host; only the web port should be"
               exit 1
             fi
           done
-          echo "--- curl http://localhost:8082/actuator/health/liveness ---"
-          curl -f http://localhost:8082/actuator/health/liveness
-          echo ""
-          echo "--- curl http://localhost:5173 (status only) ---"
-          curl -f -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:5173
+          echo "only the web port is published"
 
-      - name: Smoke Test Summary
-        if: always()
+      - name: Registering leaves the dashboard usable
         run: |
-          echo "### Docker Compose Pull-Path Smoke Test" >> $GITHUB_STEP_SUMMARY
-          echo "docker-compose.pull.yml booted and both /actuator/health/liveness (API) and / (UI) responded." >> $GITHUB_STEP_SUMMARY
+          # With no SMTP there is no way to deliver a verification token, and a
+          # PENDING_VERIFICATION account meets a dashboard with every write
+          # button disabled.
+          body=$(curl -sf -X POST http://localhost:8080/api/v1/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"smoke@example.com","password":"Smoke1234!","fullName":"Smoke","organizationName":"Smoke Co"}')
+          echo "$body" | grep -q '"emailVerified":true' \
+            || { echo "::error::registration did not complete verified: $body"; exit 1; }
+          token=$(echo "$body" | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+          curl -sf http://localhost:8080/api/v1/auth/me -H "Authorization: Bearer $token" \
+            | grep -q '"status":"ACTIVE"' || { echo "::error::/me did not report ACTIVE"; exit 1; }
+
+      - name: The installer's own checks pass against what it wrote
+        env:
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.pull.yml
+        run: ./install.sh --check --dir "$HOME/hookflow"
+
+      - name: A domain install wires TLS in without publishing the dashboard
+        env:
+          HOOKFLOW_COMPOSE_SRC: ${{ github.workspace }}/docker-compose.pull.yml
+        run: |
+          # No certificate can be issued in CI, so this checks the wiring: the
+          # terminator is in the service list, the dashboard has moved to
+          # loopback behind it, and production mode is on.
+          ./install.sh --dir "$HOME/hookflow-tls" --version v0.0.0-ci \
+            --domain hooks.example.com --email ops@example.com --no-start --yes
+          cd "$HOME/hookflow-tls"
+          docker compose config --services | grep -qx caddy || { echo "::error::no TLS terminator"; exit 1; }
+          docker compose config | grep -q "host_ip: 127.0.0.1" || { echo "::error::dashboard still bound publicly"; exit 1; }
+          grep -qx 'APP_ENV=production' .env || { echo "::error::APP_ENV not production"; exit 1; }
+          grep -q '^CORS_ALLOWED_ORIGINS=https://hooks.example.com$' .env || { echo "::error::CORS not on the domain"; exit 1; }
+          test -f Caddyfile || { echo "::error::no Caddyfile"; exit 1; }
 
       - name: Dump logs on failure
         if: failure()
-        run: docker compose -f docker-compose.pull.yml logs
+        run: cd "$HOME/hookflow" && docker compose logs || true
 
       - name: Tear down
         if: always()
-        run: docker compose -f docker-compose.pull.yml down -v
+        run: cd "$HOME/hookflow" && docker compose down -v || true
 
   container-scan:
     name: Container Security Scan (Trivy)
