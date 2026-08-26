@@ -178,7 +178,7 @@ export const cliSamples = {
   ghcr.io/vadymkykalo/hookflow-cli:latest listen 3000`,
   login: `hookflow login
 
-# ▸ Open: http://localhost:5173/device?code=ABCD-1234
+# ▸ Open: http://localhost/device?code=ABCD-1234
 # ▸ Code: ABCD-1234
 # ✓ Logged in as you@company.com`,
   listen: `hookflow listen 3000

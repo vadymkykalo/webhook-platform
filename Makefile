@@ -288,7 +288,7 @@ logs-worker: ## Follow logs for Worker service
 logs-ui: ## Follow logs for UI service
 	@$(DOCKER_COMPOSE) logs -f ui
 
-verify-link: ## Show last email verification link from API logs
+verify-link: ## Show last verification link from API logs (only needed with EMAIL_ENABLED=true)
 	@$(DOCKER_COMPOSE) logs api 2>&1 | grep "Verify URL:" | tail -1 | sed 's/.*Verify URL: //'
 
 reset-link: ## Show last password reset link from API logs

@@ -53,8 +53,9 @@
 
 | Service | Port | Protocol | Direction | Notes |
 |---------|------|----------|-----------|-------|
-| API (HTTP) | 8080 | TCP | Inbound | REST API + webhook ingestion |
-| API (Actuator) | 8082 | TCP | Internal | `/actuator/health` — separate port, never exposed to the host in docker-compose.yml (bypasses the JWT/API-key auth chain on 8080) |
+| Web | 80 (443 with `--domain`) | TCP | Inbound | **The only port published.** Dashboard, REST API, ingress and tunnels, all through nginx |
+| API (HTTP) | 8080 | TCP | Internal | Reached through nginx; not bound to the host by the installer |
+| API (Actuator) | 8082 | TCP | Internal | Health and metrics on their own port, deliberately outside the JWT/API-key chain so Prometheus can scrape without credentials. Never published — nginx proxies the two health paths and nothing else |
 | Worker (Actuator) | 8081 | TCP | Internal | Health checks + metrics |
 | UI (HTTP) | 80/443 | TCP | Inbound | Web dashboard |
 | PostgreSQL | 5432 | TCP | Internal | Database |
@@ -158,10 +159,71 @@ kubectl describe nodes | grep -A5 "Allocated resources"
 
 ## 4. Installation Methods
 
-### 4.1 Docker Compose — pull pre-built images (Small / Dev, no toolchain)
+Four of them, and they are not equally recommended. **4.1 is the one to use**
+unless you have a specific reason not to; the rest exist for deployments that
+have outgrown it.
 
-No repo clone needed — `docker-compose.pull.yml` is fully standalone (see the
-comment at the top of that file for how it differs from
+### 4.1 The installer (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
+```
+
+It checks the machine first — Docker, Compose (either spelling), memory, disk,
+the port — then writes `~/hookflow` containing a Compose file pinned to the
+latest release, a `.env` with freshly generated secrets, and a small `hookflow`
+helper. It verifies the configuration it wrote before starting anything, and
+tells you the URL when the platform answers.
+
+What it leaves behind is an ordinary Compose deployment. `docker compose` works
+on it exactly as you would expect; nothing about it is bespoke.
+
+**Onto a domain, with HTTPS:**
+
+```bash
+curl -fsSL .../install.sh | bash -s -- --domain hooks.example.com --email ops@example.com
+```
+
+Point the domain's A record at the server first. That flag brings up a TLS
+terminator that obtains and renews the certificate itself — no cron entry, no
+renewal hook — moves the dashboard behind it onto loopback, and sets
+`APP_ENV=production`, which turns on `ProductionSafetyValidator`. From then on
+the platform refuses to start on unsafe configuration rather than running with
+it.
+
+**Other options:** `--dir` to install elsewhere, `--port` when 80 is taken,
+`--no-start` to write the files and stop, `--check` to re-run the machine and
+configuration checks against an existing install, `--uninstall` (keeps data) and
+`--purge` (does not). `--help` lists them.
+
+**Day two**, from the install directory:
+
+```bash
+./hookflow status | logs | stop | start | upgrade | backup | doctor
+```
+
+`doctor` re-runs every check against what is on disk, which is how a
+hand-edited `.env` gets caught before it becomes an outage.
+
+**Back up `.env`.** `WEBHOOK_ENCRYPTION_KEY` in it is what every endpoint secret
+in the database is encrypted with. A database backup without that file restores
+rows nothing can read.
+
+**One published port.** The dashboard's nginx is the only thing bound to the
+host; it serves the dashboard and proxies `/api/`, `/ws/tunnel`, `/tunnel/`,
+`/hook/`, `/ingress/` and the health probes. Postgres, Kafka, Redis, the API and
+the actuator port are reachable only from inside the Docker network. One URL,
+one certificate, one firewall rule. If you need one of them directly, add a
+`docker-compose.override.yml` — the header of the Compose file has the snippet.
+
+### 4.2 Docker Compose — pull pre-built images (no toolchain)
+
+The same Compose file 4.1 installs, driven by hand. Worth knowing about if you
+are putting it under your own configuration management, and otherwise not the
+path to take: the installer generates real secrets, where copying `.env.dist`
+hands you the public ones from the repository, which you then have to remember
+to replace. No repo clone needed either way — `docker-compose.pull.yml` is
+standalone (see the comment at the top of that file for how it differs from
 `docker-compose.prod.yml`, which is an overlay and still needs the rest of the
 repo present):
 
@@ -178,16 +240,14 @@ curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.
 
 docker compose -f docker-compose.pull.yml up -d
 
-# Verify — actuator lives on its own port (8082, loopback-only), not 8080
-# (see the "API (Actuator)" row in the port table above). /liveness rather than
-# the aggregate /actuator/health: the latter also reflects the mail health
-# indicator, which reads DOWN whenever no SMTP server is reachable — true by
-# default here even with EMAIL_ENABLED=false — so it's not a reliable signal.
-curl http://localhost:8082/actuator/health/liveness
-curl http://localhost:8080/                # main API port — expect 401 (auth required), not a connection error
+# Verify. Only the web port is published; the actuator is on 8082 inside the
+# network and nginx proxies the health paths from it (see the port table above).
+curl http://localhost/actuator/health/liveness
+curl http://localhost/                     # dashboard
+curl -o /dev/null -w '%{http_code}\n' http://localhost/api/v1/projects   # expect 401, not a connection error
 ```
 
-### 4.1b Docker Compose — build from source (if you've cloned the repo anyway)
+### 4.3 Docker Compose — build from source (if you've cloned the repo anyway)
 
 ```bash
 # Clone repository
@@ -217,7 +277,7 @@ make up-prod           # Build+run with production overrides, embedded DB
 make up-prod-external  # External managed services (provide connection strings in .env)
 ```
 
-### 4.2 Kubernetes + Helm (Medium / Large / Production)
+### 4.4 Kubernetes + Helm (Medium / Large / Production)
 
 The chart is published as an OCI artifact to GHCR on every release, so
 `helm install` works against a clean cluster with **no repo clone**:

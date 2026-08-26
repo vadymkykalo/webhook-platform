@@ -96,7 +96,7 @@ section — this is a demo, not a production tenant, so the smallest documented
 tier is enough: 2 vCPU / 4 GB RAM is comfortable for Postgres + Redis + Kafka
 (single broker, `KAFKA_NUM_PARTITIONS` turned down since demo throughput is
 trivial) + API + worker + UI, all in one `docker compose -f
-docker-compose.pull.yml up -d` on a small VPS.
+install.sh | bash --domain demo.hookflow.dev` on a small VPS.
 
 ## What would make this "DONE" instead of deferred
 

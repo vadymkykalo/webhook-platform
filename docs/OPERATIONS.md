@@ -1,20 +1,23 @@
 # Hookflow Operations Guide
 
-## Quick Start (Docker Compose)
+## Quick Start
 
 ```bash
-# Pull pre-built images — no clone, no Maven/npm (see docker-compose.pull.yml)
-curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
-docker compose -f docker-compose.pull.yml up -d
+curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
 
-# Check health — actuator is on its own port (8082), not the main API port (8080)
-curl -f http://localhost:8082/actuator/health/liveness
+# Health, on the one published port. The actuator itself is on 8082 inside the
+# network and is not bound to the host; nginx proxies these two paths from it
+# and 404s the rest.
+curl -f http://localhost/actuator/health/liveness
 ```
+
+Day-to-day, from the install directory: `./hookflow status | logs | stop |
+start | upgrade | backup | doctor`. `doctor` re-runs the machine and
+configuration checks against what is on disk.
 
 Building from source instead (`git clone ... && make up`) is documented in the
 [README](../README.md#building-from-source-contributors); `make health`,
-`make logs`, `make logs-api`, `make logs-worker` work against either path.
+`make logs`, `make logs-api`, `make logs-worker` work against that path.
 
 ## Production Deployment (Kubernetes)
 

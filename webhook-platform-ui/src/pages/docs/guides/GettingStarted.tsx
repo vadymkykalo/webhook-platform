@@ -5,16 +5,15 @@ import { authSamples, quickstartSamples } from '../samples';
 
 /**
  * Step 1 used to be `POST /api/v1/auth/login` against a host the reader did not
- * have: the compose instructions live on neither the landing page nor here any
- * more, so the first step was one nobody could run. `runInstance` is that
- * missing step — it is deliberately the pulled-image path rather than the
- * build-from-source one, which is a contributor's concern, not an integrator's.
+ * have, so the first step was one nobody could run. `runInstance` is that
+ * missing step, and it is the installer rather than a hand-assembled Compose
+ * invocation: an integrator reading this wants an instance to talk to, not a
+ * deployment decision.
  */
-const runInstance = `curl -fsSLO https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/docker-compose.pull.yml
-curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/.env.dist -o .env
+const runInstance = `curl -fsSL https://raw.githubusercontent.com/vadymkykalo/webhook-platform/main/install.sh | bash
 
-docker compose -f docker-compose.pull.yml up -d
-curl -f http://localhost:8082/actuator/health/liveness`;
+# Everything is served on one port. Health, once it is up:
+curl -f http://localhost/actuator/health/liveness`;
 
 function Step({
   number,
