@@ -93,16 +93,30 @@ without it restores rows nothing can read.
 To remove it: `... install.sh | bash -s -- --uninstall` keeps your data,
 `--purge` deletes it.
 
-### Building from source (contributors)
+### Running it from a clone (contributors)
+
+Different command, and deliberately a different shape: this builds all three
+images from your working tree instead of pulling a release.
 
 ```bash
 git clone https://github.com/vadymkykalo/webhook-platform.git && cd webhook-platform
-make up          # builds all three images from source and starts everything
+make up            # build everything and start it
+make health        # is it up
+make logs-api      # or logs-worker, logs-ui
+make down          # stop
 ```
 
-Needs Maven and npm — or just `make`, which shells out to both through Docker
-build contexts. [`CONTRIBUTING.md`](./CONTRIBUTING.md) has the prerequisites,
-the test commands and the build guards.
+`make up` copies `.env.dist` to `.env` for you and creates the Kafka topics.
+`make dev-api` / `dev-worker` / `dev-ui` rebuild and restart one service — the
+fast loop once the stack is running. `make help` lists the rest.
+
+Here the dashboard is on **http://localhost:5173** and the API on **:8080**,
+separately — unlike an installed deployment, which publishes only nginx. That is
+on purpose: hitting the API directly is worth more than tidiness while you are
+changing it.
+
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) has the prerequisites, the test commands
+that match CI, and what each build guard means when it fails.
 
 ---
 
