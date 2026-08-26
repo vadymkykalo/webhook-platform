@@ -7,6 +7,7 @@ import com.webhook.platform.api.dto.*;
 import com.webhook.platform.api.security.JwtUtil;
 import com.webhook.platform.api.service.EmailService;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +45,15 @@ public class AuthIntegrationTest extends AbstractIntegrationTest {
     // CryptoUtils.hashApiKey(token), so the raw token can't be read back from the row).
     @MockBean
     private EmailService emailService;
+
+    // This class exercises the email-verification journey, which only exists when
+    // there is an email channel to verify over. The mock would otherwise report
+    // email as disabled and registration would complete already-verified — see
+    // RegistrationWithoutEmailIntegrationTest for that path.
+    @BeforeEach
+    void enableEmail() {
+        when(emailService.isEnabled()).thenReturn(true);
+    }
 
     @Test
     public void testRegisterLoginAndGetCurrentUser() throws Exception {
