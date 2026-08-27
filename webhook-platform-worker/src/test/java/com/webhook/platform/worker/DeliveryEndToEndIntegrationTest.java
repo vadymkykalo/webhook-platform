@@ -112,9 +112,9 @@ class DeliveryEndToEndIntegrationTest {
      *
      * <p>It was 4s, which is only about three seconds of slack, and a loaded CI runner ate it:
      * the response won, the delivery went straight to SUCCESS, and the assertion waiting for the
-     * sweep to hand it back as PENDING timed out against a row that was never recovered because
-     * it had never needed recovering. The number is slack for a stalled runner, nothing more -
-     * no assertion here is about how long a response takes.</p>
+     * sweep to release the row timed out against a row that was never recovered because it had
+     * never needed recovering. The number is slack for a stalled runner, nothing more - no
+     * assertion here is about how long a response takes.</p>
      */
     private static final int ABANDONED_ATTEMPT_HOLD_MS = 20_000;
 
@@ -479,9 +479,25 @@ class DeliveryEndToEndIntegrationTest {
         assertEquals(1, updated, "must have backdated exactly the delivery under test");
 
         // StuckDeliveryRecoveryService (real scheduled bean, check-interval-ms=500 above) must
-        // reclaim it back to PENDING - the recovery half of the claim/recover cycle.
-        await().atMost(Duration.ofSeconds(15)).pollInterval(Duration.ofMillis(150))
-                .untilAsserted(() -> assertEquals(Delivery.DeliveryStatus.PENDING, reload(deliveryId).getStatus()));
+        // reclaim the row - the recovery half of the claim/recover cycle.
+        //
+        // Asserted through attempt_count, not by polling for status=PENDING. The sweep releases
+        // the row with next_retry_at = now() (see resetStuckDeliveries), which makes it
+        // immediately eligible for the retry ladder polling at 500ms - so PENDING is a window,
+        // not a state, and one narrower than any poll interval this test could use. Polling for
+        // it timed out on CI against a row that had already been correctly recovered and
+        // reclaimed ("expected PENDING but was PROCESSING"), which is a lost race, not a defect.
+        //
+        // attempt_count >= 3 is the same fact stated where it stays put: only a claim the sweep
+        // handed back can start a third attempt. The abandoned second attempt cannot produce it
+        // - it is still parked inside its held WireMock response, and when that lands it is
+        // fenced out of the row (attemptStarting increments the count before a request goes out,
+        // so no in-flight attempt bumps it later either). Break the sweep and this row stays at
+        // 2 until the held response finalizes it, and the wait below fails as it should.
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(150))
+                .untilAsserted(() -> assertTrue(reload(deliveryId).getAttemptCount() >= 3,
+                        "the stuck sweep must hand the abandoned claim back to the retry ladder, "
+                                + "which then starts a third attempt"));
 
         // ... and the normal retry ladder must pick the recovered row back up and complete it
         // (via a third, independent claim+attempt - the abandoned second attempt is still
