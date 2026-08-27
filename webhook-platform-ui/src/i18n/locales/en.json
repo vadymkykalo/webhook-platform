@@ -1375,7 +1375,7 @@
       "nextLabel": "Next",
       "runBaseUrlDesc": "Every sample below points at https://your-api.com — replace it with wherever you put the instance. The health and Prometheus endpoints deliberately sit outside the authenticated chain, on their own port, so a broken auth configuration cannot take your health checks down with it.",
       "runBaseUrlLabel": "The base URL",
-      "runDesc": "Everything below runs against an instance you host. It needs Docker 20.10+ with Compose v2 and two files; the images are pre-built, so nothing is compiled locally.",
+      "runDesc": "Everything below runs against an instance you host. One command installs it: the installer checks the machine, generates your secrets and starts the stack, and everything is served on a single port.",
       "runSecretsDesc": "The .env you downloaded ships development secrets. Set JWT_SECRET, WEBHOOK_ENCRYPTION_KEY and WEBHOOK_ENCRYPTION_SALT to your own values: with APP_ENV=production, startup refuses to complete while any of them is still the shipped default.",
       "runSecretsLabel": "Before it is public",
       "runTitle": "Run an instance",
@@ -1395,10 +1395,10 @@
       "title": "Getting Started",
       "verifyDesc": "A delivery to an endpoint that is neither `VERIFIED` nor `SKIPPED` fails terminally, without a single retry. `POST /api/v1/projects/{projectId}/endpoints/{id}/verify` sends the challenge; Webhook Security has the format of it.",
       "verifyLabel": "It receives nothing until it is verified",
-      "portsTitle": "Ports it binds",
-      "portApi": "The API and everything under `/api/v1`. Bound to loopback by default; change the host it listens on with `API_BIND` and the port with",
-      "portUi": "The dashboard. Change it with",
-      "portActuator": "Health and Prometheus metrics only — never the API. It runs on its own port so a broken auth configuration cannot take health checks down with it, and compose binds it to loopback. Change it with"
+      "portsTitle": "The port it binds, and the two it does not",
+      "portWeb": "Everything: the dashboard, the API, the docs, the ingress endpoints. The only port bound to the host — nginx serves the dashboard and proxies the rest. Change it with",
+      "portApi": "The API, inside the Docker network only. Reached through the port above; not published, so nothing outside the network can talk to it directly.",
+      "portActuator": "Health and Prometheus metrics, inside the network only. It sits on its own port so a broken auth configuration cannot take health checks down with it; nginx proxies the health paths from it and refuses the rest."
     },
     "incomingWebhooks": {
       "dedupDesc": "Providers resend. When the request carries an id Hookflow recognises — `X-Webhook-Id`, Stripe-Webhook-Id, `X-GitHub-Delivery`, `X-Shopify-Webhook-Id`, `X-Twilio-Webhook-Id`, or Slack's event_id — a second arrival of the same id returns the stored event instead of forwarding it again. A provider that sends none of these is not deduplicated.",
@@ -1736,10 +1736,9 @@
       "addressesTitle": "Ports and addresses",
       "addressesDesc": "Every port is a variable — nothing is hard-coded. The two that catch people out are the management port, which is not the API, and the base URLs, which end up inside links your users receive.",
       "addresses": {
-        "apiPort": "The API and everything under `/api/v1`.",
-        "apiBind": "Which host interface the API port is published on. In production keep it on `127.0.0.1` and let the UI's nginx be the only thing facing the internet.",
-        "uiPort": "The dashboard, served by nginx.",
-        "managementPort": "Health and Prometheus metrics only — never the API. It is a separate embedded server that does not pass through the main security chain, which is the point: a broken auth configuration must not take your health checks down with it. Compose keeps it off the public interface; do not point it at one.",
+        "hookflowPort": "The one port published to the host. nginx serves the dashboard on it and proxies every API path, so it is the single URL to hand out and the single thing to put a certificate on.",
+        "hookflowBind": "Which host interface that port is published on. Installing with a domain moves it to `127.0.0.1` and puts the TLS terminator in front.",
+        "hookflowDomain": "The domain the built-in TLS terminator obtains a certificate for. It only runs under the `tls` Compose profile, which `install.sh --domain` turns on.",
         "appBaseUrl": "Where your users' browsers reach the dashboard. It is what goes into verification emails, password resets and shared debug links — left on localhost, those links are unusable for everyone but you.",
         "viteApiUrl": "The API origin the dashboard calls. Baked in at image build time, not read at runtime.",
         "cors": "Origins allowed to call the API from a browser. Comma-separated.",
@@ -2485,7 +2484,7 @@
       "a2": "Hookflow retries on a ladder — 1m, 5m, 15m, 1h, 6h, 24h for outgoing, one rung shorter for incoming. When the rungs run out, the delivery moves to Failed Messages with every attempt and response kept, and waits there for a person to retry it or let it go.",
       "a3": "Every delivery carries an HMAC-SHA256 signature over the timestamp and the raw body, with a secret unique to that endpoint. The Node, Python and PHP SDKs ship a verification helper; anything else is a few lines with a standard HMAC library.",
       "a4": "Outgoing: your system announces an event and Hookflow delivers it to the endpoints your customers registered — Hookflow is the sender and signs. Incoming: a provider posts to a URL Hookflow owns, the signature is verified, and the payload is forwarded to the destinations you nominated — Hookflow is the receiver. Both share one attempt log and one set of screens.",
-      "a5": "Yes — it is the same code. The self-hosted build is MIT licensed with every feature on and no limits on events, projects, endpoints, members or retention. Two curls and a docker compose up.",
+      "a5": "Yes — it is the same code. The self-hosted build is MIT licensed with every feature on and no limits on events, projects, endpoints, members or retention. One command installs it, and pointing it at a domain gets it a TLS certificate of its own.",
       "a6": "The dashboard shows usage against your plan as you approach it, and you can change plan at any time from Billing. Rate limits are per second, so a burst is smoothed rather than dropped.",
       "a7": "Per endpoint, yes. Each delivery carries a sequence number, and a delivery whose predecessor is still retrying waits its turn instead of overtaking it.",
       "a8": "Any of them. Stripe, GitHub, GitLab, Slack and Shopify verify with no configuration — each has a verifier written for the exact header it sends. For any other provider that signs its body with a shared secret, name the header and the prefix and Hookflow verifies it the same way. A provider that does not sign at all can still deliver; the payload is stored and forwarded, marked unverified.",
@@ -2680,7 +2679,7 @@
       "item3": "Node · Python · PHP SDKs",
       "item4": "OpenAPI spec, drift-tested in CI",
       "item5": "Prometheus and Grafana dashboards",
-      "item6": "Docker Compose in two commands"
+      "item6": "Installs with one command"
     },
     "verified": {
       "genericDetail": "your header, your prefix",

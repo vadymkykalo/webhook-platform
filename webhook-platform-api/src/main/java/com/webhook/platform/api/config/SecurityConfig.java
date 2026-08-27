@@ -7,6 +7,7 @@ import com.webhook.platform.api.security.PlatformAdminAuthenticationToken;
 import com.webhook.platform.api.tenancy.TenantContextFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,18 +29,21 @@ public class SecurityConfig {
         private final TenantContextFilter tenantContextFilter = new TenantContextFilter();
         private final CorsConfigurationSource corsConfigurationSource;
         private final boolean swaggerEnabled;
+        private final Environment environment;
 
         public SecurityConfig(
                         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
                         JwtAuthenticationFilter jwtAuthenticationFilter,
                         PlatformAdminAuthenticationFilter platformAdminAuthenticationFilter,
                         @Qualifier("corsConfigurationSource") CorsConfigurationSource corsConfigurationSource,
-                        @Value("${swagger.enabled:false}") boolean swaggerEnabled) {
+                        @Value("${swagger.enabled:false}") boolean swaggerEnabled,
+                        Environment environment) {
                 this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
                 this.jwtAuthenticationFilter = jwtAuthenticationFilter;
                 this.platformAdminAuthenticationFilter = platformAdminAuthenticationFilter;
                 this.corsConfigurationSource = corsConfigurationSource;
                 this.swaggerEnabled = swaggerEnabled;
+                this.environment = environment;
         }
 
         @Bean
@@ -70,6 +74,22 @@ public class SecurityConfig {
                                                         // Kubernetes/Helm deployment that wants the same needs its
                                                         // own port split (chart currently scrapes /actuator/prometheus
                                                         // on the main authenticated port — see docs/OPERATIONS.md).
+                                                        // Everything arriving on the actuator's own port, when
+                                                        // one is configured. That port is never published to the
+                                                        // host — the Compose deployment exposes only nginx, and
+                                                        // nginx proxies health from it and nothing else — so it
+                                                        // is reachable exactly by things already inside the
+                                                        // network, which is what "Prometheus scrapes without a
+                                                        // JWT" requires. See ManagementPortRequestMatcher for why
+                                                        // this is not automatic: Boot copies this filter chain
+                                                        // into the management child context, so without it
+                                                        // /actuator/prometheus answers 401 on the one port that
+                                                        // exists for it to answer on.
+                                                        .requestMatchers(new ManagementPortRequestMatcher(environment))
+                                                        .permitAll()
+                                                        // On the main port — the published one — only the probes
+                                                        // are anonymous. Metrics are not: they leak endpoint
+                                                        // names, tenant cardinality and traffic volume.
                                                         .requestMatchers("/actuator/health", "/actuator/health/**",
                                                                         "/actuator/info")
                                                         .permitAll()

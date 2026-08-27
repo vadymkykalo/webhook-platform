@@ -1,4 +1,4 @@
-.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-check seo-check prerender version-check version-set
+.PHONY: help up up-external-db up-prod up-prod-external up-pull down down-pull stop clean build rebuild logs logs-api logs-worker logs-ui shell-db backup-db restore-db doctor nuke create-topics health wait-healthy rebuild-api rebuild-worker rebuild-ui restart-api restart-worker restart-ui dev-api dev-worker dev-ui init rebuild-external-db verify-link reset-link invite-link scale-worker scale-api test-ui monitoring-up monitoring-down monitoring-logs ratchets types-check docs-check seo-check prerender version-check version-set
 
 # Default target
 .DEFAULT_GOAL := help
@@ -37,11 +37,13 @@ init: ## Initialize .env from .env.dist (if not exists)
 up: init ## Start services (embedded DB, dev mode)
 	@echo "$(GREEN)Starting services in embedded DB mode...$(NC)"
 	@$(MAKE) doctor
-	@$(DOCKER_COMPOSE) --profile embedded-db up -d --build
+	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db --profile backup up -d --build
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
-	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) health
+	@echo ""
+	@echo "$(GREEN)Ready — http://localhost:$${HOOKFLOW_PORT:-8080}$(NC)"
+	@echo "  Dashboard, API, docs and ingress all go through that one port."
 
 up-external-db: init ## Start services (external DB, dev mode)
 	@echo "$(GREEN)Starting services in external DB mode...$(NC)"
@@ -50,13 +52,15 @@ up-external-db: init ## Start services (external DB, dev mode)
 		echo "$(RED)ERROR: DB_HOST must be set for external DB mode$(NC)"; \
 		exit 1; \
 	fi
-	@$(DOCKER_COMPOSE) up -d --build
+	@$(DOCKER_COMPOSE_BUILD) up -d --build
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Services started successfully$(NC)"
 	@$(MAKE) health
 
-DOCKER_COMPOSE_PROD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml
+# Production is not a different Compose file any more — it is APP_ENV=production
+# plus the settings install.sh writes with --domain. The stack is the same stack.
+DOCKER_COMPOSE_PROD := $(DOCKER_COMPOSE)
 
 up-prod: init ## Start services (embedded DB, production mode)
 	@echo "$(GREEN)Starting services in PRODUCTION mode (embedded DB)...$(NC)"
@@ -81,31 +85,39 @@ up-prod-external: init ## Start services (external DB, production mode)
 	@$(MAKE) health
 
 # Pulls this project's own published images (ghcr.io/vadymkykalo/hookflow-*)
-# instead of building from source — no Maven/npm toolchain required. Uses
-# docker-compose.pull.yml, which is fully standalone (unlike docker-compose.prod.yml,
-# it doesn't need docker-compose.yml present) — see the comment at the top of
-# that file for why there are two.
-DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE) -f docker-compose.pull.yml
+# instead of building from source — no Maven/npm toolchain required. That is
+# just docker-compose.yml on its own: it resolves every service to a published
+# image, and docker-compose.build.yml is the overlay that builds the three we
+# own from the working tree instead.
+DOCKER_COMPOSE_PULL := $(DOCKER_COMPOSE)
+DOCKER_COMPOSE_BUILD := $(DOCKER_COMPOSE) -f docker-compose.yml -f docker-compose.build.yml
 
-up-pull: ## Start services from pre-built GHCR images (no build toolchain required)
+# NOTE: to actually install Hookflow somewhere, use ./install.sh — it generates
+# real secrets, where the .env.dist this target falls back to contains the
+# public ones from this repository. This target exists for testing the pull
+# images from a clone.
+up-pull: ## Start pre-built GHCR images from this clone (to install, use ./install.sh)
 	@if [ ! -f .env ]; then \
 		echo "$(GREEN)Creating .env from .env.dist...$(NC)"; \
 		cp .env.dist .env; \
-		echo "$(YELLOW)  Using development defaults. CHANGE SECRETS FOR PRODUCTION!$(NC)"; \
+		echo "$(YELLOW)  Development defaults — the secrets in .env.dist are public.$(NC)"; \
+		echo "$(YELLOW)  For a real deployment run ./install.sh instead.$(NC)"; \
 	fi
 	@echo "$(GREEN)Pulling pre-built images...$(NC)"
 	@$(DOCKER_COMPOSE_PULL) pull
 	@echo "$(GREEN)Starting services (pull-based, embedded DB/Kafka/Redis)...$(NC)"
 	@$(DOCKER_COMPOSE_PULL) up -d
-	@echo "$(GREEN)Waiting for API and UI to answer health checks...$(NC)"
-	@elapsed=0; \
-	while [ $$elapsed -lt 150 ]; do \
-		api_ok=$$(curl -sf -o /dev/null http://localhost:8082/actuator/health/liveness 2>/dev/null && echo 1 || echo 0); \
-		ui_ok=$$(curl -sf -o /dev/null http://localhost:$${UI_PORT:-5173} 2>/dev/null && echo 1 || echo 0); \
-		if [ "$$api_ok" = "1" ] && [ "$$ui_ok" = "1" ]; then break; fi; \
+	@echo "$(GREEN)Waiting for the platform to answer...$(NC)"
+	@port=$${HOOKFLOW_PORT:-80}; elapsed=0; \
+	while [ $$elapsed -lt 300 ]; do \
+		if curl -sf -o /dev/null http://localhost:$$port/actuator/health/liveness 2>/dev/null \
+		   && curl -sf -o /dev/null http://localhost:$$port/ 2>/dev/null; then break; fi; \
 		sleep 5; elapsed=$$((elapsed + 5)); \
-	done
-	@echo "$(GREEN)Services started — dashboard: http://localhost:$${UI_PORT:-5173}$(NC)"
+	done; \
+	if [ $$elapsed -ge 300 ]; then \
+		echo "$(RED)Did not come up in time — $(DOCKER_COMPOSE_PULL) logs$(NC)"; exit 1; \
+	fi; \
+	echo "$(GREEN)Started — http://localhost:$$port$(NC)"
 
 down-pull: ## Stop pull-based services (keeps data)
 	@echo "$(YELLOW)Stopping pull-based services...$(NC)"
@@ -128,12 +140,12 @@ clean: ## Stop services and remove containers (keeps volumes)
 ##@ Build
 build: ## Build all Docker images
 	@echo "$(GREEN)Building Docker images...$(NC)"
-	@$(DOCKER_COMPOSE) build --no-cache
+	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 
 rebuild: ## Rebuild and restart services (embedded DB)
 	@echo "$(GREEN)Rebuilding services...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down
-	@$(DOCKER_COMPOSE) build --no-cache
+	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 	@$(DOCKER_COMPOSE) --profile embedded-db up -d
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
@@ -142,7 +154,7 @@ rebuild: ## Rebuild and restart services (embedded DB)
 rebuild-external-db: ## Rebuild and restart services (external DB)
 	@echo "$(GREEN)Rebuilding services (external DB mode)...$(NC)"
 	@$(DOCKER_COMPOSE) down
-	@$(DOCKER_COMPOSE) build --no-cache
+	@$(DOCKER_COMPOSE_BUILD) build --no-cache
 	@$(DOCKER_COMPOSE) up -d
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
@@ -151,19 +163,19 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 ##@ Development (Fast Rebuilds)
 rebuild-api: ## Rebuild only API service (fast)
 	@echo "$(GREEN)Rebuilding API...$(NC)"
-	@$(DOCKER_COMPOSE) build --no-cache api
+	@$(DOCKER_COMPOSE_BUILD) build --no-cache api
 	@$(DOCKER_COMPOSE) up -d api
 	@echo "$(GREEN) API rebuilt and restarted$(NC)"
 
 rebuild-worker: ## Rebuild only Worker service (fast)
 	@echo "$(GREEN)Rebuilding Worker...$(NC)"
-	@$(DOCKER_COMPOSE) build --no-cache worker
+	@$(DOCKER_COMPOSE_BUILD) build --no-cache worker
 	@$(DOCKER_COMPOSE) up -d worker
 	@echo "$(GREEN) Worker rebuilt and restarted$(NC)"
 
 rebuild-ui: ## Rebuild only UI service (fast)
 	@echo "$(GREEN)Rebuilding UI...$(NC)"
-	@$(DOCKER_COMPOSE) build --no-cache ui
+	@$(DOCKER_COMPOSE_BUILD) build --no-cache ui
 	@$(DOCKER_COMPOSE) up -d ui
 	@echo "$(GREEN) UI rebuilt and restarted$(NC)"
 
@@ -184,21 +196,21 @@ restart-ui: ## Restart UI service (no rebuild)
 
 dev-api: ## Quick dev: rebuild API with cache + restart
 	@echo "$(GREEN)Quick rebuild API (with cache)...$(NC)"
-	@$(DOCKER_COMPOSE) build api
+	@$(DOCKER_COMPOSE_BUILD) build api
 	@$(DOCKER_COMPOSE) up -d api
 	@echo "$(GREEN) API ready$(NC)"
 	@$(MAKE) logs-api
 
 dev-worker: ## Quick dev: rebuild Worker with cache + restart
 	@echo "$(GREEN)Quick rebuild Worker (with cache)...$(NC)"
-	@$(DOCKER_COMPOSE) build worker
+	@$(DOCKER_COMPOSE_BUILD) build worker
 	@$(DOCKER_COMPOSE) up -d worker
 	@echo "$(GREEN) Worker ready$(NC)"
 	@$(MAKE) logs-worker
 
 dev-ui: ## Quick dev: rebuild UI with cache + restart
 	@echo "$(GREEN)Quick rebuild UI (with cache)...$(NC)"
-	@$(DOCKER_COMPOSE) build ui
+	@$(DOCKER_COMPOSE_BUILD) build ui
 	@$(DOCKER_COMPOSE) up -d ui
 	@echo "$(GREEN) UI ready$(NC)"
 	@$(MAKE) logs-ui
@@ -252,8 +264,8 @@ scale-api: ## Scale API instances (usage: make scale-api N=3)
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$(GREEN)Scaling api to $(N) instances (each replica gets its own ephemeral host port)...$(NC)"
-	@API_PORT= $(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
+	@echo "$(GREEN)Scaling api to $(N) instances (nginx load-balances across them)...$(NC)"
+	@$(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
 	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' shows each replica's assigned port$(NC)"
 
 ##@ Release
@@ -294,7 +306,7 @@ logs-worker: ## Follow logs for Worker service
 logs-ui: ## Follow logs for UI service
 	@$(DOCKER_COMPOSE) logs -f ui
 
-verify-link: ## Show last email verification link from API logs
+verify-link: ## Show last verification link from API logs (only needed with EMAIL_ENABLED=true)
 	@$(DOCKER_COMPOSE) logs api 2>&1 | grep "Verify URL:" | tail -1 | sed 's/.*Verify URL: //'
 
 reset-link: ## Show last password reset link from API logs
@@ -330,7 +342,7 @@ health: ## Check health of all services
 	@echo "Redis:    $$(docker exec webhook-redis redis-cli -a $${REDIS_PASSWORD:-webhook_redis_pass} ping 2>/dev/null | grep -q PONG && echo 'UP' || echo 'DOWN')"
 	@echo "API:      $$($(DOCKER_COMPOSE) exec -T api wget -q -O - http://localhost:8082/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
 	@echo "Worker:   $$($(DOCKER_COMPOSE) exec -T worker wget -q -O - http://localhost:8081/actuator/health/liveness 2>/dev/null | jq -r .status 2>/dev/null || echo 'DOWN')"
-	@echo "UI:       $$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:5173 2>/dev/null || echo 'DOWN')"
+	@echo "Web:      $$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:$${HOOKFLOW_PORT:-8080}/ 2>/dev/null || echo 'DOWN') (dashboard + API, http://localhost:$${HOOKFLOW_PORT:-8080})"
 
 ##@ Database
 POSTGRES_USER         ?= webhook_user

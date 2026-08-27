@@ -76,18 +76,27 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
 
+        // With email disabled there is no channel that can carry a verification
+        // token to this address, so requiring verification is a gate with no key:
+        // VerificationGate disables every write in the dashboard, and the only way
+        // through is to read the API container's logs. Skip it — an unsent email
+        // proves nothing about an address, so nothing is being given up here.
+        boolean verificationIsDeliverable = emailService.isEnabled();
+
         // Only the hash is persisted — the plaintext token exists solely
         // to be emailed to the user and is never written to the database or logs.
-        String verificationToken = generateVerificationToken();
+        String verificationToken = verificationIsDeliverable ? generateVerificationToken() : null;
 
         User user = User.builder()
                 .email(request.getEmail())
                 .fullName(request.getFullName())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .status(UserStatus.PENDING_VERIFICATION)
-                .emailVerified(false)
-                .verificationToken(CryptoUtils.hashApiKey(verificationToken))
-                .verificationTokenExpiresAt(Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS))
+                .status(verificationIsDeliverable ? UserStatus.PENDING_VERIFICATION : UserStatus.ACTIVE)
+                .emailVerified(!verificationIsDeliverable)
+                .verificationToken(verificationIsDeliverable ? CryptoUtils.hashApiKey(verificationToken) : null)
+                .verificationTokenExpiresAt(verificationIsDeliverable
+                        ? Instant.now().plus(TOKEN_EXPIRY_HOURS, ChronoUnit.HOURS)
+                        : null)
                 .build();
         user = userRepository.save(user);
 
@@ -109,7 +118,9 @@ public class AuthService {
                 .build();
         membershipRepository.save(membership);
 
-        emailService.sendVerificationEmail(user.getEmail(), verificationToken);
+        if (verificationIsDeliverable) {
+            emailService.sendVerificationEmail(user.getEmail(), verificationToken);
+        }
 
         String accessToken = jwtUtil.generateAccessToken(user.getId(), organization.getId(), MembershipRole.OWNER);
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
@@ -117,7 +128,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .emailVerified(false)
+                .emailVerified(!verificationIsDeliverable)
                 .build();
     }
 

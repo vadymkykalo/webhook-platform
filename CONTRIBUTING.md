@@ -79,21 +79,88 @@ Create a Pull Request to `develop` branch on GitHub.
   develop→main PR was squash-merged, and the next release's merge reported 19
   conflicts, 12 of them between byte-identical files.
 
-## Running Tests Locally
+## Getting set up
+
+**You need:** Java 17, Maven 3.9+, Node 22+, Docker with Compose v2.
 
 ```bash
-# Unit tests
-mvn test -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest'
+git clone https://github.com/vadymkykalo/webhook-platform.git
+cd webhook-platform
+make up          # builds all three images and starts everything
+make help        # every other target
+```
 
-# Integration tests (requires Docker)
-mvn test -Dtest='*IntegrationTest,*IT,*RepositoryTest'
+`make dev-api` / `dev-worker` / `dev-ui` rebuild and restart one service — the
+fast loop once the stack is up.
+
+## Running tests
+
+The **class-name suffix decides which CI job a test lands in**, and there are no
+tags or profiles doing it — `*IntegrationTest`, `*IT`, `*RepositoryTest`,
+`*ConcurrencyTest`, `*RbacTest` and `*IsolationTest` go to the Docker job, and
+everything else to the no-Docker one. Name a Docker-needing test wrong and it
+passes on your machine and fails in CI; `scripts/check-test-routing.sh` fails
+the build to stop that.
+
+```bash
+# Backend, no Docker needed — the same exclusion list CI uses
+mvn test -Dtest='!*IntegrationTest,!*IT,!*RepositoryTest,!*ConcurrencyTest,!*RbacTest,!*IsolationTest'
+
+# Backend, needs Docker (Testcontainers)
+mvn test -Dtest='*IntegrationTest,*IT,*RepositoryTest,*ConcurrencyTest,*RbacTest,*IsolationTest' \
+  -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
+
+# One class, or one method. Always scope with -pl: the reactor is multi-module.
+mvn test -pl webhook-platform-api -am -Dtest=TunnelServiceTest
 
 # Frontend
-cd webhook-platform-ui
-npm run lint
-npm run typecheck
-npm run build
+make test-ui
+cd webhook-platform-ui && npm run lint && npm run typecheck
 ```
+
+Use `mvn test`, not `mvn verify`, for ordinary work: the per-module JaCoCo
+thresholds bind to `verify` and will fail against a partial test selection.
+
+New behaviour is written **test-first** — a failing test stating the expected
+result, then the implementation. Refactors, `docs:` and `chore:` are exempt.
+
+## The checks that fail CI for reasons that are not in your diff
+
+Most of these are *ratchets*: they require the known exception list to stop
+growing, not that the codebase be perfect. Every one names its own remedy when
+it fails. Adding to a documented-exemption list is a review decision with a
+stated reason, never a way to get green.
+
+```bash
+make ratchets        # the build guards — run these before pushing
+make version-check   # the version lives in seven files; only `make version-set` moves it
+make types-check     # src/types/api.generated.ts is generated from openapi.yaml
+make docs-check      # the in-app API reference is generated from openapi.yaml
+```
+
+Two whose remedy nobody guesses:
+
+- **Changed a DTO?** `openapi.yaml` is committed and semantically diffed against
+  what springdoc serves. Regenerate rather than hand-edit:
+  `mvn test -pl webhook-platform-api -Dtest=OpenApiDriftIntegrationTest -Dopenapi.regenerate=true`.
+  Then `cd webhook-platform-ui && npm run types:generate`, and fix whatever
+  `src/types/api.contract.ts` reports.
+- **Changed the API surface?** `npm run docs:api-index` regenerates the in-app
+  reference. Never hand-write an endpoint table — that is what the 4,000-line
+  page this replaced was, and nothing kept it in sync.
+
+**A schema change touches three places**: the JPA entity in `api`, its copy in
+`worker`, and a Flyway migration. A column left unmapped on either side fails
+the build.
+
+**Never hand-roll an organization check.** `@TenantId` scopes every Hibernate
+query to the caller's organization, `findById` included. A service method taking
+an `organizationId` fails the build.
+
+**Read `CONTEXT.md` before naming anything.** It is the domain vocabulary, and
+every term carries a list of near-synonyms deliberately not used. Where the code
+and `CONTEXT.md` disagree, one of them is a bug — it is not licence to pick
+either word.
 
 ## Code Style
 
@@ -107,26 +174,9 @@ npm run build
 - Functional components with hooks
 - Type everything explicitly
 
-## Release Process
+## Releasing
 
-1. Create release branch: `git checkout -b release/1.x.0 develop`
-2. Update version numbers everywhere in one step: `make version-set VERSION=1.x.0`
-   (wraps `scripts/set-version.sh`, which sets the reactor poms, `Chart.yaml`,
-   `webhook-platform-ui/package.json` and the three SDK manifests together —
-   don't hand-edit them individually, that's how these drifted apart in the
-   first place). Verify with `make version-check`.
-3. Update `CHANGELOG.md`: move `[Unreleased]` content under the new version
-   heading, and write `UPGRADING.md` notes if the release breaks anything.
-4. Create PR to `main`. **Merge it with "Create a merge commit"** — not
-   "Squash and merge", which is GitHub's default here and breaks step 6 (see
-   Code Review above).
-5. After merge, tag release: `git tag v1.x.0`
-6. Merge back to `develop` and bump the reactor to the next `-SNAPSHOT`
-   (`make version-set VERSION=1.x+1.0-SNAPSHOT`). With a merge commit in step 4
-   this is conflict-free; after a squash it is a manual reconciliation.
-
-CI's `version-check` job (`.github/workflows/ci.yml`) fails the build if the
-pom, Chart, UI and SDK versions ever disagree again.
+Maintainers only — see [`docs/RELEASING.md`](docs/RELEASING.md).
 
 ## Questions?
 

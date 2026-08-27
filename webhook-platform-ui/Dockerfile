@@ -14,6 +14,16 @@ RUN npm ci
 # Copy UI source files
 COPY webhook-platform-ui/ .
 
+# Vite inlines import.meta.env.VITE_* at build time, so these have to arrive
+# here as build args — passing them as runtime env to the nginx stage does
+# nothing. Empty is the normal case: nginx.conf proxies /api/, /ws/tunnel,
+# /hook/ and /ingress/ to the api service, so the bundle talks to its own
+# origin and needs no absolute API URL.
+ARG VITE_API_URL=""
+ARG VITE_CSP_EXTRA_CONNECT=""
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_CSP_EXTRA_CONNECT=$VITE_CSP_EXTRA_CONNECT
+
 # Chromium for the prerender step. Alpine's package rather than a Puppeteer download:
 # puppeteer-core ships no browser, and the musl builds Puppeteer fetches do not run here.
 # It lives in the build stage only — the runtime image below is nginx and carries none of it.

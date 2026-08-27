@@ -12,10 +12,9 @@ Maven or npm dependency trees is AGPL/GPL/SSPL/BSL). Three things keep it from
 being a problem for the MIT-branded default distribution:
 
 1. **It is not started by default.** `minio` sits behind its own Compose
-   profile (`profiles: [minio]`, `docker-compose.yml:153`), which neither
-   `make up` (`--profile embedded-db`) nor `docker-compose.pull.yml` (the
-   quick-start path in the README) activates. A fresh `docker compose -f
-   docker-compose.pull.yml up -d` never pulls the MinIO image.
+   profile (`profiles: [minio]` in `docker-compose.yml`), which neither
+   `make up` (`--profile embedded-db`) nor `install.sh` activates. A fresh
+   install never pulls the MinIO image.
 2. **Nothing in the application calls it yet.** `.env.dist` labels it
    `# MINIO (OPTIONAL - for future file storage)`
    (`.env.dist:616`) — grepping `webhook-platform-api/src` and

@@ -26,6 +26,17 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
+    /**
+     * Whether anything sent through this service can actually reach a person.
+     * When false every send below degrades to a log line, so callers that
+     * depend on the recipient receiving something — email verification, most
+     * of all — must take a different path rather than wait for a reply that
+     * is never coming.
+     */
+    public boolean isEnabled() {
+        return emailEnabled;
+    }
+
     public void sendVerificationEmail(String to, String token) {
         String verifyUrl = baseUrl + "/verify-email?token=" + token;
 

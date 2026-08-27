@@ -40,16 +40,18 @@ const REQUIRED: Setting[] = [
   { name: 'PLATFORM_ADMIN_TOKEN', fallback: 'empty', key: 'adminToken' },
 ];
 
+// One published port, so one entry. API_PORT, UI_PORT and MANAGEMENT_PORT used
+// to be here; they are gone because the API and the actuator are no longer
+// bound to the host at all — nginx reaches them over the Docker network.
 const ADDRESSES: Setting[] = [
-  { name: 'API_PORT', fallback: '8080', key: 'apiPort' },
-  { name: 'API_BIND', fallback: '0.0.0.0', key: 'apiBind' },
-  { name: 'UI_PORT', fallback: '5173', key: 'uiPort' },
-  { name: 'MANAGEMENT_PORT', fallback: '8082 (api) · 8081 (worker)', key: 'managementPort' },
-  { name: 'APP_BASE_URL', fallback: 'http://localhost:5173', key: 'appBaseUrl' },
-  { name: 'VITE_API_URL', fallback: 'http://localhost:8080', key: 'viteApiUrl' },
-  { name: 'CORS_ALLOWED_ORIGINS', fallback: 'http://localhost:5173,…', key: 'cors' },
-  { name: 'WEBHOOK_INGRESS_BASE_URL', fallback: 'http://localhost:8080', key: 'ingressBase' },
-  { name: 'TUNNEL_INGRESS_BASE_URL', fallback: 'http://localhost:8080', key: 'tunnelBase' },
+  { name: 'HOOKFLOW_PORT', fallback: '80', key: 'hookflowPort' },
+  { name: 'HOOKFLOW_BIND', fallback: '0.0.0.0', key: 'hookflowBind' },
+  { name: 'HOOKFLOW_DOMAIN', fallback: 'empty', key: 'hookflowDomain' },
+  { name: 'APP_BASE_URL', fallback: 'http://localhost', key: 'appBaseUrl' },
+  { name: 'VITE_API_URL', fallback: 'empty', key: 'viteApiUrl' },
+  { name: 'CORS_ALLOWED_ORIGINS', fallback: 'http://localhost', key: 'cors' },
+  { name: 'WEBHOOK_INGRESS_BASE_URL', fallback: 'http://localhost', key: 'ingressBase' },
+  { name: 'TUNNEL_INGRESS_BASE_URL', fallback: 'http://localhost', key: 'tunnelBase' },
 ];
 
 const STORES: Setting[] = [
