@@ -261,10 +261,18 @@ jobs:
       - name: Start embedded Postgres
         run: docker compose --profile embedded-db up -d postgres
 
+      # Over the unix socket, pg_isready says "ready" during the image's own init
+      # phase: the entrypoint starts a temporary server with listen_addresses=''
+      # to apply the initdb scripts, then stops it and starts the real one. This
+      # wait used to return inside that window, and the seed step below hit the
+      # stop with "FATAL: the database system is shutting down". TCP is the
+      # discriminator - the temporary server is not listening on it - and the
+      # query proves the server that answered will still be there for the seed.
       - name: Wait for Postgres to be ready
         run: |
-          for i in $(seq 1 30); do
-            if docker exec webhook-postgres pg_isready -U webhook_user -d webhook_platform; then
+          for i in $(seq 1 45); do
+            if docker exec webhook-postgres pg_isready -h 127.0.0.1 -U webhook_user -d webhook_platform \
+               && docker exec webhook-postgres psql -U webhook_user -d webhook_platform -c 'SELECT 1' >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2

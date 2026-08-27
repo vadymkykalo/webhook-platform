@@ -50,7 +50,11 @@ services:
     volumes:
       - webhook_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-webhook_user} -d ${POSTGRES_DB:-webhook_platform}"]
+      # Over TCP, not the unix socket: the image's entrypoint runs a temporary
+      # server with listen_addresses='' while it applies the initdb scripts, and
+      # a socket probe reports that one as healthy - so a dependant starts, and
+      # the temporary server is then stopped out from under it.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-webhook_user} -d ${POSTGRES_DB:-webhook_platform}"]
       interval: 10s
       timeout: 5s
       retries: 5
