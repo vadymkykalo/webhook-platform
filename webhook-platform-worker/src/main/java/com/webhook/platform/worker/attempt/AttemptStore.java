@@ -101,4 +101,21 @@ public interface AttemptStore<C> {
      * must not be able to undo the committed success.
      */
     void onSucceeded(C claim);
+
+    /**
+     * Called once, after a {@link Finalization.TerminallyFailed} that applied.
+     *
+     * <p>Terminal is as final as Succeeded and Abandoned — this obligation will never be
+     * attempted again — so whatever those two release has to be released here too. It was
+     * not, and a terminal outcome is not the rare case: a non-retryable 4xx, an endpoint that
+     * has been disabled or deleted, a URL the SSRF validator refuses, a Ladder that will not
+     * parse. On an ordering-enabled endpoint the cursor stayed at N-1 for good, so every
+     * later Delivery failed {@code canDeliver}, {@code getReadyDeliveries} could never let
+     * anything out, and the fallback scan widened without bound. FIFO degraded to nothing
+     * being delivered at all, silently.
+     *
+     * <p>Default no-op: a direction with nothing to release says so by not overriding.
+     */
+    default void onTerminallyFailed(C claim) {
+    }
 }

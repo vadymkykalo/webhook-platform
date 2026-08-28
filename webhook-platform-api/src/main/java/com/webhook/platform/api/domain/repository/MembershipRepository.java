@@ -15,6 +15,18 @@ import java.util.UUID;
 public interface MembershipRepository extends JpaRepository<Membership, UUID> {
     List<Membership> findByUserId(UUID userId);
 
+    /**
+     * A user's memberships, oldest first.
+     *
+     * <p>Login and refresh pick the first of these as the organization to mint the token for.
+     * With the unordered {@link #findByUserId} that choice came down to whatever order the
+     * database happened to return, so a user belonging to two organizations could land in a
+     * different one on each login — and since {@code TenantContextFilter} derives the
+     * Hibernate tenant from that claim, in a different set of data. Oldest-first at least
+     * makes it the same organization every time, until there is a way to choose.</p>
+     */
+    List<Membership> findByUserIdOrderByCreatedAtAsc(UUID userId);
+
     List<Membership> findByOrganizationId(UUID organizationId);
 
     Optional<Membership> findByUserIdAndOrganizationId(UUID userId, UUID organizationId);

@@ -13,6 +13,7 @@ import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.service.EmailService;
 import com.webhook.platform.api.service.MembershipService;
+import com.webhook.platform.api.service.TokenBlacklistService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -148,8 +149,8 @@ class InviteTokenLeakTest {
         MembershipRepository membershipRepository = mock(MembershipRepository.class);
         EmailService emailService = mock(EmailService.class);
 
-        MembershipService membershipService =
-                new MembershipService(userRepository, membershipRepository, emailService);
+        MembershipService membershipService = new MembershipService(
+                userRepository, membershipRepository, emailService, mock(TokenBlacklistService.class));
 
         UUID orgId = UUID.randomUUID();
         String email = "new-invitee@example.com";
@@ -192,8 +193,8 @@ class InviteTokenLeakTest {
         MembershipRepository membershipRepository = mock(MembershipRepository.class);
         EmailService emailService = mock(EmailService.class);
 
-        MembershipService membershipService =
-                new MembershipService(userRepository, membershipRepository, emailService);
+        MembershipService membershipService = new MembershipService(
+                userRepository, membershipRepository, emailService, mock(TokenBlacklistService.class));
 
         UUID orgId = UUID.randomUUID();
         String email = "existing-user@example.com";

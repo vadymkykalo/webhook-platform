@@ -36,6 +36,9 @@ class StaleDeliveryEscalationServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
+    @Mock
+    private OrderingBufferService orderingBufferService;
+
     private StaleDeliveryEscalationService service;
 
     @BeforeEach
@@ -49,6 +52,7 @@ class StaleDeliveryEscalationServiceTest {
                 deliveryRepository,
                 kafkaTemplate,
                 transactionTemplate,
+                orderingBufferService,
                 new SimpleMeterRegistry(),
                 96,   // hardCapHours — raised from 48h to fit the retry ladder's ~83h worst case
                 100   // escalationBatchSize
@@ -107,6 +111,72 @@ class StaleDeliveryEscalationServiceTest {
 
         // Verify DLQ notification sent to Kafka
         verify(kafkaTemplate).send(anyString(), eq(endpointId.toString()), any(DeliveryMessage.class));
+    }
+
+    @Test
+    void runEscalation_orderedDelivery_releasesTheEndpointCursor() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID endpointId = UUID.randomUUID();
+
+        Delivery staleDelivery = Delivery.builder()
+                .id(deliveryId)
+                .eventId(UUID.randomUUID())
+                .endpointId(endpointId)
+                .subscriptionId(UUID.randomUUID())
+                .status(Delivery.DeliveryStatus.PENDING)
+                .attemptCount(5)
+                .maxAttempts(7)
+                .orderingEnabled(true)
+                .sequenceNumber(42L)
+                .createdAt(Instant.now().minus(120, ChronoUnit.HOURS))
+                .updatedAt(Instant.now().minus(96, ChronoUnit.HOURS))
+                .build();
+
+        when(deliveryRepository.findOldestPendingCreatedAtGlobal())
+                .thenReturn(staleDelivery.getCreatedAt());
+        when(deliveryRepository.findStaleDeliveryIds(any(Instant.class), anyInt()))
+                .thenReturn(List.of(deliveryId));
+        when(deliveryRepository.findAllById(List.of(deliveryId)))
+                .thenReturn(List.of(staleDelivery));
+
+        service.runEscalation();
+
+        // This path never goes through AttemptRunner, so it owes the release itself. It used
+        // to publish the DLQ notification and stop there — leaving the cursor parked at
+        // sequence 42 for good, so nothing after it on this endpoint was ever delivered
+        // again. An escalated Delivery is as over as an abandoned one.
+        verify(orderingBufferService).removeFromBuffer(endpointId, deliveryId);
+        verify(orderingBufferService).markDelivered(endpointId, 42L);
+    }
+
+    @Test
+    void runEscalation_unorderedDelivery_touchesNoBuffer() {
+        UUID deliveryId = UUID.randomUUID();
+        UUID endpointId = UUID.randomUUID();
+
+        Delivery staleDelivery = Delivery.builder()
+                .id(deliveryId)
+                .eventId(UUID.randomUUID())
+                .endpointId(endpointId)
+                .subscriptionId(UUID.randomUUID())
+                .status(Delivery.DeliveryStatus.PENDING)
+                .attemptCount(5)
+                .maxAttempts(7)
+                .orderingEnabled(false)
+                .createdAt(Instant.now().minus(120, ChronoUnit.HOURS))
+                .updatedAt(Instant.now().minus(96, ChronoUnit.HOURS))
+                .build();
+
+        when(deliveryRepository.findOldestPendingCreatedAtGlobal())
+                .thenReturn(staleDelivery.getCreatedAt());
+        when(deliveryRepository.findStaleDeliveryIds(any(Instant.class), anyInt()))
+                .thenReturn(List.of(deliveryId));
+        when(deliveryRepository.findAllById(List.of(deliveryId)))
+                .thenReturn(List.of(staleDelivery));
+
+        service.runEscalation();
+
+        verifyNoInteractions(orderingBufferService);
     }
 
     @Test

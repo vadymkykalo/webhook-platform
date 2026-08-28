@@ -146,7 +146,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        Membership membership = membershipRepository.findByUserId(user.getId()).stream()
+        // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
+        // two organizations got whichever the database felt like returning, and with it a
+        // different tenant scope on each login. Oldest membership wins until there is an
+        // endpoint to switch organizations deliberately.
+        Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
 
@@ -194,7 +198,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        Membership membership = membershipRepository.findByUserId(user.getId()).stream()
+        // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
+        // two organizations got whichever the database felt like returning, and with it a
+        // different tenant scope on each login. Oldest membership wins until there is an
+        // endpoint to switch organizations deliberately.
+        Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
 
@@ -284,7 +292,11 @@ public class AuthService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-        log.info("Password changed for user {}", userId);
+        // Access tokens are self-contained and nothing re-checks the database per request, so
+        // without this every session opened with the old password stays valid until its TTL
+        // runs out. Changing a password has to mean the old one no longer gets you anywhere.
+        tokenBlacklistService.revokeAllUserTokens(userId);
+        log.info("Password changed for user {}, all sessions revoked", userId);
     }
 
     @SystemTenant("acts on a User by email address, with no authenticated caller")
@@ -326,7 +338,12 @@ public class AuthService {
         user.setPasswordResetToken(null);
         user.setPasswordResetTokenExpiresAt(null);
         userRepository.save(user);
-        log.info("Password reset completed for user {}", user.getEmail());
+        // The reset path is the one that matters most: it is how somebody recovers an account
+        // that has been taken over. Leaving the attacker's already-issued access token valid
+        // for the rest of its TTL hands them the account back for another quarter of an hour,
+        // while the owner believes they have just locked them out.
+        tokenBlacklistService.revokeAllUserTokens(user.getId());
+        log.info("Password reset completed for user {}, all sessions revoked", user.getEmail());
     }
 
     @Transactional

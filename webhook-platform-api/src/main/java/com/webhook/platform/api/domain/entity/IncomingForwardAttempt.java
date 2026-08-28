@@ -49,6 +49,17 @@ public class IncomingForwardAttempt {
     @Column(name = "started_at")
     private Instant startedAt;
 
+    /**
+     * Fencing token for whichever claim moved this row to PROCESSING (V060).
+     *
+     * <p>{@code finalise} writes only while this still matches the token its own attempt was
+     * claimed under, so an attempt a stuck sweep has already taken away cannot finalize a row
+     * that has since been reclaimed. Null when unclaimed. The outgoing counterpart is
+     * {@code deliveries.claim_token} (V055).</p>
+     */
+    @Column(name = "claim_token")
+    private UUID claimToken;
+
     @Column(name = "finished_at")
     private Instant finishedAt;
 

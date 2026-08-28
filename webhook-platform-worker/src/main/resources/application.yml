@@ -71,7 +71,14 @@ management:
         enabled: true
   endpoint:
     health:
-      show-details: always
+      # when-authorized, not always. The aggregate /actuator/health is reachable anonymously
+      # (SecurityConfig permits it) and the UI's nginx proxies it straight through to the
+      # public port, so `always` published component names, the database product and version,
+      # and Redis/Kafka reachability to anyone who asked. Everything that actually consumes
+      # health here — the Compose healthchecks, the Helm probes, `make health`, install.sh's
+      # wait loop — reads the liveness/readiness probe groups, which still return their status
+      # either way.
+      show-details: when-authorized
       probes:
         enabled: true
   health:

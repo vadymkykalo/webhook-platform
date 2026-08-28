@@ -3,6 +3,7 @@ package com.webhook.platform.worker.service;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.redisson.api.RPermitExpirableSemaphore;
@@ -14,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -57,6 +59,34 @@ class RedisConcurrencyControlServiceTest {
         // expires a permit. Verifying the 3-arg overload was invoked with the configured
         // lease fails against that code (0 invocations) and passes against the fix.
         verify(semaphore).tryAcquire(anyLong(), eq((long) leaseSeconds), eq(TimeUnit.SECONDS));
+    }
+
+    @Test
+    void tryAcquire_doesNotBlockWhenTheSemaphoreIsSaturated() throws InterruptedException {
+        int leaseSeconds = 90;
+        when(redissonClient.getPermitExpirableSemaphore(anyString())).thenReturn(semaphore);
+        // A saturated semaphore: Redisson hands back no permit id.
+        when(semaphore.tryAcquire(anyLong(), anyLong(), eq(TimeUnit.SECONDS))).thenReturn(null);
+
+        RedisConcurrencyControlService service = new RedisConcurrencyControlService(
+                redissonClient, new SimpleMeterRegistry(), 5, leaseSeconds);
+
+        assertFalse(service.tryAcquire(UUID.randomUUID()));
+
+        ArgumentCaptor<Long> waitTime = ArgumentCaptor.forClass(Long.class);
+        verify(semaphore).tryAcquire(waitTime.capture(), eq((long) leaseSeconds), eq(TimeUnit.SECONDS));
+
+        // Redisson's signature is tryAcquire(waitTime, leaseTime, unit) — ONE TimeUnit for
+        // both. The call used to pass 100 there, meaning 100 *seconds* of waiting, not the
+        // 100 milliseconds it reads as. AttemptRunner.admit() treats concurrency the way it
+        // treats the two rate limiters and the circuit breaker: check, and defer on refusal.
+        // Blocking instead pins a BoundedAsyncExecutor thread for up to 100s per attempt, so
+        // one saturated endpoint drains the whole outgoing pool, BoundedAsyncExecutor pauses
+        // every Kafka container, and the worker stops delivering for every tenant. The wait
+        // also exceeded the 90s lease, so a permit expired while still in use and the cap it
+        // exists to enforce did not hold.
+        assertEquals(0L, waitTime.getValue(),
+                "acquiring a permit must not block: admit() defers on refusal");
     }
 
     @Test

@@ -49,7 +49,12 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
      * read by {@link AttemptRunner} — the Runner is generic over this type and has no way to
      * reach inside it.
      */
-    public record Claim(UUID eventId, UUID destinationId, int attemptNumber, Instant fence) {
+    /**
+     * @param fence the claim_token this attempt was claimed under (V060). Null only for a
+     *              retry message published before the token existed, where {@code finalise}
+     *              falls back to the status guard it used to rely on alone.
+     */
+    public record Claim(UUID eventId, UUID destinationId, int attemptNumber, UUID fence) {
     }
 
     private final IncomingForwardAttemptRepository attemptRepository;
@@ -113,6 +118,10 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
         int attemptNumber = isRetry ? message.getAttemptCount() : 1;
 
+        // Generated here, not in SQL, so the attempt that wins the claim knows the value it
+        // must still match when it finalises.
+        UUID claimToken = UUID.randomUUID();
+
         if (isRetry && !isReplay) {
             Instant expected = message.getStartedAt();
             if (expected == null) {
@@ -124,24 +133,27 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return claimed(attemptNumber, null);
             }
             Integer applied = transactionTemplate.execute(tx -> attemptRepository.claimRetryForProcessing(
-                    event.getId(), destination.getId(), attemptNumber, expected));
+                    event.getId(), destination.getId(), attemptNumber, expected, claimToken));
             if (applied == null || applied == 0) {
                 return new ClaimResult.NotClaimed<>(
                         "retry attempt already claimed by a prior delivery of this Kafka message");
             }
-            return claimed(attemptNumber, expected);
+            // The token this CAS just stamped, not the started_at it was matched on. The old
+            // code carried `expected` here, which the CAS itself had already superseded — a
+            // fence that could never match the row was the same as no fence at all.
+            return claimed(attemptNumber, claimToken);
         }
 
         final int number = attemptNumber;
         Integer applied = transactionTemplate.execute(tx ->
-                attemptRepository.claimForProcessing(event.getId(), destination.getId(), number));
+                attemptRepository.claimForProcessing(event.getId(), destination.getId(), number, claimToken));
         if (applied == null || applied == 0) {
             return new ClaimResult.NotClaimed<>("forward attempt already claimed or not PENDING");
         }
-        return claimed(number, null);
+        return claimed(number, claimToken);
     }
 
-    private ClaimResult<Claim> claimed(int attemptNumber, Instant fence) {
+    private ClaimResult<Claim> claimed(int attemptNumber, UUID fence) {
         RetryLadder ladder;
         try {
             ladder = RetryLadder.parse(destination.getRetryDelays(), destination.getMaxAttempts());
@@ -276,8 +288,14 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                         && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                     return false;
                 }
+                if (!stillHoldsClaim(claim, attempt)) {
+                    return false;
+                }
                 attempt.setStatus(ForwardAttemptStatus.PENDING);
                 attempt.setStartedAt(null);
+                // Handing the row back ends this claim, so the token goes with it: "token set"
+                // means "currently claimed".
+                attempt.setClaimToken(null);
                 attempt.setNextRetryAt(deferred.until());
                 attemptRepository.save(attempt);
                 return true;
@@ -286,6 +304,13 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             if (attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                 log.warn("Attempt {} for eventId={}, destId={} is already {} — refusing to overwrite",
                         claim.attemptNumber(), claim.eventId(), claim.destinationId(), attempt.getStatus());
+                return false;
+            }
+
+            if (!stillHoldsClaim(claim, attempt)) {
+                log.warn("Attempt {} for eventId={}, destId={} was reclaimed while this attempt was in "
+                                + "flight — refusing to finalise a row another attempt now owns",
+                        claim.attemptNumber(), claim.eventId(), claim.destinationId());
                 return false;
             }
 
@@ -312,6 +337,34 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             return true;
         });
         return Boolean.TRUE.equals(applied);
+    }
+
+    /**
+     * Does this Claim still own the row it is about to write?
+     *
+     * <p>The status guard alone cannot answer that. It tells a late writer apart from a
+     * terminal row, but not "the claim I am finishing" from "somebody else's newer claim on
+     * the same row" — and PROCESSING is exactly what the row looks like in the second case:</p>
+     *
+     * <pre>
+     *   t0  the scheduler claims the row -&gt; PROCESSING, the POST starts and is slow
+     *   t1  StuckForwardRecoveryService decides the claim was abandoned -&gt; PENDING
+     *   t2  the scheduler claims it again; a second worker POSTs the same webhook
+     *   t3  the t0 attempt finally gets a 500. The status guard passes, so it writes FAILED
+     *       and queues attempt n+1
+     *   t4  the t2 attempt succeeds — and now finds FAILED, so its success is discarded,
+     *       while the successor queued at t3 sends a third copy
+     * </pre>
+     *
+     * <p>The outgoing side has fenced on a token since V055 and its {@code finalise} has
+     * checked it all along; this is the incoming half of the same contract (see
+     * {@link AttemptStore#finalise}).</p>
+     *
+     * <p>A null fence means the retry message predates the token (rolling deploy), so there is
+     * nothing to compare and the status guard stands on its own, as it used to.</p>
+     */
+    private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt) {
+        return claim.fence() == null || claim.fence().equals(attempt.getClaimToken());
     }
 
     /**
