@@ -13,7 +13,7 @@ use Hookflow\Api\IncomingEvents;
 
 class Hookflow
 {
-    private const SDK_VERSION = '2.7.0';
+    private const SDK_VERSION = '2.8.0';
 
     private string $apiKey;
     private string $baseUrl;
