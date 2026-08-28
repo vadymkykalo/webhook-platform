@@ -4,6 +4,17 @@ on:
   push:
     tags:
       - 'v*'
+  # A release that fails cannot otherwise be retried without deleting and re-pushing its
+  # tag, which is a history rewrite to work around a transient failure — an expired token,
+  # a registry outage, or the permissions mistake that made this workflow fail to start at
+  # all on v2.6.1. Every step here is idempotent: the SDK jobs skip when the registry
+  # already has the version, and the release upload replaces its assets.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to (re)run the release for, e.g. v2.6.1'
+        required: true
+        type: string
 
 jobs:
   release-cli:
@@ -15,6 +26,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # On a dispatch github.ref is the branch, so without this the jar would be built
+          # from whatever that branch happens to hold rather than from the tag being released.
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -27,8 +42,11 @@ jobs:
         run: mvn clean package -pl webhook-platform-cli -am -DskipTests -B
 
       - name: Prepare release assets
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
           cp webhook-platform-cli/target/webhook-platform-cli-*.jar hookflow-cli.jar
           # install.sh refuses to run a JAR that doesn't match this file (see
           # verify_checksum() in webhook-platform-cli/install.sh) — table
@@ -39,7 +57,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          name: "Hookflow ${{ github.ref_name }}"
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: "Hookflow ${{ inputs.tag || github.ref_name }}"
           body: |
             ## Hookflow CLI ${{ env.VERSION }}
 
@@ -77,8 +96,16 @@ jobs:
     name: Publish SDKs
     needs: release-cli
     uses: ./.github/workflows/publish-sdks.yml
+    # A called workflow's jobs cannot hold permissions the calling job does not, and
+    # publish-sdks needs id-token: write for npm's OIDC publish. Without this line GitHub
+    # rejects the whole run before any job starts — a startup_failure with no logs and no
+    # annotation, which is exactly what v2.6.1 hit.
+    permissions:
+      contents: read
+      id-token: write
     with:
       sdk: all
+      ref: ${{ inputs.tag || github.ref }}
     secrets: inherit
 
   # The v2.6.0 post-mortem in one job.
@@ -101,7 +128,11 @@ jobs:
       contents: read
     steps:
       - name: Resolve version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        # On a tag push GITHUB_REF_NAME is the tag; on a manual dispatch it is the branch,
+        # so the tag has to come from the input instead.
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
 
       # docker-publish.yml is a separate workflow on the same tag, so this one
       # cannot `needs:` it. Poll instead — a full multi-arch build of the three
