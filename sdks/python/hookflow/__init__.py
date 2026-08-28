@@ -41,7 +41,7 @@ from .types import (
     ReplayEventResponse,
 )
 
-__version__ = "2.6.1"
+__version__ = "2.7.0"
 
 # Backward-compatible aliases
 WebhookPlatform = Hookflow
