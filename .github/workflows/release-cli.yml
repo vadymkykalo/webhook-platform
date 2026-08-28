@@ -25,14 +25,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # On a dispatch github.ref is the branch, so without this the jar would be built
           # from whatever that branch happens to hold rather than from the tag being released.
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: 'temurin'

@@ -39,10 +39,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -66,7 +66,7 @@ jobs:
       # job red.
       - name: Restore OWASP Dependency-Check NVD data
         id: dc-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
@@ -124,14 +124,14 @@ jobs:
 
       - name: Save OWASP Dependency-Check NVD data
         if: always() && steps.dc-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
           key: dependency-check-data-${{ steps.dc-cache-week.outputs.week }}
 
       - name: Upload Dependency-Check report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-check-report
           path: target/dependency-check-report.html

@@ -66,12 +66,12 @@ jobs:
       run:
         working-directory: sdks/node
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # 22, not 20: `npm@latest` (needed for Trusted Publishing) requires
           # ^20.17 || >=22.9, and which 20.x the runner image carries is not
@@ -137,12 +137,12 @@ jobs:
       run:
         working-directory: sdks/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -189,7 +189,7 @@ jobs:
       run:
         working-directory: sdks/php
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || github.ref }}
 
