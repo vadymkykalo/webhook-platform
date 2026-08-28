@@ -46,6 +46,20 @@ const PORT = Number(process.env.PRERENDER_PORT || 4178);
  */
 const PRERENDER_LOCALE = process.env.PRERENDER_LOCALE || 'en';
 
+/**
+ * How long one route gets to load and to mount React.
+ *
+ * Generous on purpose. This runs inside `docker build`, where the machine is
+ * shared with whatever else the build is doing and Chromium is competing for
+ * it. The Dockerfile pins the build stage to $BUILDPLATFORM so this no longer
+ * runs under QEMU — the emulated arm64 leg is what blew the old 30s budget and
+ * cost the v2.6.0 release its UI image — but a slow CI runner alone can come
+ * close, and a timeout here fails the whole image build. Overridable so a
+ * constrained builder can raise them without a code change.
+ */
+const NAV_TIMEOUT_MS = Number(process.env.PRERENDER_NAV_TIMEOUT_MS || 60_000);
+const RENDER_TIMEOUT_MS = Number(process.env.PRERENDER_RENDER_TIMEOUT_MS || 30_000);
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
@@ -133,10 +147,10 @@ async function main() {
 
     for (const route of routes) {
       failures.length = 0;
-      await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle0', timeout: 30_000 });
+      await page.goto(`http://localhost:${PORT}${route}`, { waitUntil: 'networkidle0', timeout: NAV_TIMEOUT_MS });
       // The locale bundle is a dynamic import; without it the capture is a tree of raw keys.
       await page.waitForFunction(() => document.querySelector('#root')?.childElementCount > 0, {
-        timeout: 15_000,
+        timeout: RENDER_TIMEOUT_MS,
       });
 
       if (failures.length) {

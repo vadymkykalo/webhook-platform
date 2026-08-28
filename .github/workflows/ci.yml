@@ -30,6 +30,89 @@ jobs:
       - name: Check pom / Chart / UI / SDK versions agree
         run: scripts/check-version-drift.sh
 
+  # `helm lint` used to live only in docker-publish.yml, which runs
+  # `on: push: tags` — so the chart was first checked *after* it had been
+  # tagged and released. That is how the 2.6.0 chart shipped declaring
+  # containerPort 80 for an image whose nginx listens on 5173: readiness could
+  # never pass, and `helm install` produced a UI that never came up. The chart
+  # is a documented installation path, so it gets checked on the way in.
+  helm-lint:
+    name: Helm Chart Lint & Render
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: helm lint
+        run: helm lint deploy/helm/hookflow
+
+      # Both values files, because values-production.yaml overrides enough
+      # (external database, replica counts, resources) to render templates the
+      # default values never reach.
+      - name: helm template
+        run: |
+          set -euo pipefail
+          mkdir -p rendered
+          helm template hookflow deploy/helm/hookflow \
+            > rendered/default.yaml
+          helm template hookflow deploy/helm/hookflow \
+            -f deploy/helm/hookflow/values-production.yaml \
+            > rendered/production.yaml
+          wc -l rendered/*.yaml
+
+      - name: Validate rendered manifests against the Kubernetes schema
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar xz kubeconform
+          # -strict rejects unknown fields, which is what catches a typo'd key
+          # that Helm renders happily and Kubernetes silently ignores.
+          # ServiceMonitor/PrometheusRule are CRDs, hence the extra schema
+          # source; -ignore-missing-schemas would hide real errors instead.
+          ./kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered/default.yaml rendered/production.yaml
+
+      # The port the UI container listens on lives in three files that nothing
+      # otherwise ties together: nginx.conf, the Deployment and the probes.
+      # This asserts they still agree, so the 2.6.0 bug cannot come back
+      # quietly.
+      - name: UI container port matches nginx.conf
+        run: |
+          set -euo pipefail
+          NGINX_PORT=$(sed -n 's/^[[:space:]]*listen[[:space:]]\+\([0-9]\+\);.*/\1/p' \
+            webhook-platform-ui/nginx.conf | head -1)
+          echo "nginx.conf listens on ${NGINX_PORT}"
+
+          python3 - "$NGINX_PORT" <<'EOF'
+          import sys, yaml
+          expected = int(sys.argv[1])
+          failures = []
+          for doc in yaml.safe_load_all(open('rendered/default.yaml')):
+              if not doc or doc.get('kind') != 'Deployment':
+                  continue
+              if not doc['metadata']['name'].endswith('-ui'):
+                  continue
+              for c in doc['spec']['template']['spec']['containers']:
+                  for port in c.get('ports', []):
+                      if port['containerPort'] != expected:
+                          failures.append(f"containerPort {port['containerPort']}")
+                  for probe in ('livenessProbe', 'readinessProbe', 'startupProbe'):
+                      http = (c.get(probe) or {}).get('httpGet')
+                      if http and http.get('port') != expected:
+                          failures.append(f"{probe} port {http.get('port')}")
+          if failures:
+              sys.exit(f"::error::UI chart disagrees with nginx.conf ({expected}): " + ", ".join(failures))
+          print(f"UI Deployment and probes all target {expected}.")
+          EOF
+
   backend-build:
     name: Backend Build & Compile
     runs-on: ubuntu-latest

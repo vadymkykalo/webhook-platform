@@ -28,7 +28,7 @@ spec:
         - name: worker
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.global.imageRegistry }}{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           ports:
             - name: http

@@ -1,7 +1,16 @@
 # Build stage
 # Node:18-alpine went EOL April 2025. 22-alpine is the current
 # Maintenance LTS line (actively rebuilt/patched as of 2026-08).
-FROM node:22-alpine AS build
+#
+# --platform=$BUILDPLATFORM pins this stage to the builder's own architecture.
+# What it produces — `dist` — is static HTML, CSS and JS, identical whatever CPU
+# built it, and it is copied into the per-arch runtime stage below, so the image
+# stays multi-arch. Without the pin, `docker buildx --platform linux/arm64` runs
+# this stage under QEMU emulation, and the prerender step launches Chromium
+# there: on the v2.6.0 tag that timed out after 16 minutes
+# ("Timed out after waiting 30000ms") and the UI image for that release was
+# never published, which broke `install.sh` for every new user.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /app
 

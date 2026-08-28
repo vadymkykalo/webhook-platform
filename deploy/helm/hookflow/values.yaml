@@ -11,8 +11,14 @@ api:
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).
+    #
+    # Empty means "the chart's appVersion", so `helm install` of chart 2.6.1
+    # runs the 2.6.1 images and `helm rollback` rolls the image back with it.
+    # A literal `latest` decoupled the two: the chart claimed a version and
+    # installed whatever GHCR last tagged, and IfNotPresent then kept serving a
+    # stale image on nodes that already had one.
     repository: ghcr.io/vadymkykalo/hookflow-api
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
   
   service:
@@ -69,8 +75,14 @@ worker:
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).
+    #
+    # Empty means "the chart's appVersion", so `helm install` of chart 2.6.1
+    # runs the 2.6.1 images and `helm rollback` rolls the image back with it.
+    # A literal `latest` decoupled the two: the chart claimed a version and
+    # installed whatever GHCR last tagged, and IfNotPresent then kept serving a
+    # stale image on nodes that already had one.
     repository: ghcr.io/vadymkykalo/hookflow-worker
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
   
   resources:
@@ -122,14 +134,29 @@ ui:
   image:
     # Published by .github/workflows/docker-publish.yml on every version tag
     # (multi-arch: linux/amd64, linux/arm64).
+    #
+    # Empty means "the chart's appVersion", so `helm install` of chart 2.6.1
+    # runs the 2.6.1 images and `helm rollback` rolls the image back with it.
+    # A literal `latest` decoupled the two: the chart claimed a version and
+    # installed whatever GHCR last tagged, and IfNotPresent then kept serving a
+    # stale image on nodes that already had one.
     repository: ghcr.io/vadymkykalo/hookflow-ui
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
   
   service:
     type: ClusterIP
     port: 80
-  
+
+  # The UI image's nginx.conf proxies to the literal hostname `api`, and nginx
+  # refuses to start when a literal upstream does not resolve. This creates a
+  # Service by that name alongside the release-prefixed one, so the image works
+  # unchanged under both Compose and Helm. See the template for the full
+  # reasoning and for why the name is namespace-scoped.
+  apiUpstreamAlias:
+    enabled: true
+    name: api
+
   resources:
     requests:
       cpu: 50m
@@ -138,19 +165,40 @@ ui:
       cpu: 200m
       memory: 128Mi
   
+  # The image is nginx with `listen 5173` (webhook-platform-ui/nginx.conf), not
+  # 80. Probing 80 meant readiness could never pass.
   livenessProbe:
     httpGet:
       path: /
-      port: 80
+      port: 5173
     initialDelaySeconds: 10
     periodSeconds: 10
   
   readinessProbe:
     httpGet:
       path: /
-      port: 80
+      port: 5173
     initialDelaySeconds: 5
     periodSeconds: 5
+
+  # The chart-wide podSecurityContext / securityContext below are written for
+  # the Spring Boot images, whose Dockerfiles declare `USER appuser`. The UI is
+  # stock nginx, which starts its master as root and drops privileges itself.
+  # Handed runAsUser: 1001 and cap_drop ALL it cannot write /var/cache/nginx or
+  # /var/run/nginx.pid and CrashLoops, so it gets its own pair — still
+  # unprivileged, with the writable paths supplied as emptyDir in the
+  # Deployment. Set either to null to fall back to the chart-wide values.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101      # the `nginx` user in nginx:alpine
+    runAsGroup: 101
+    fsGroup: 101
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: false
   
   ingress:
     enabled: true
