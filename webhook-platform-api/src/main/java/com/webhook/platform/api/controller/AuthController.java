@@ -41,16 +41,23 @@ public class AuthController {
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final boolean isProduction;
+    private final int refreshCookieMaxAgeSeconds;
 
     public AuthController(
             AuthService authService,
             AuthRateLimiterService authRateLimiterService,
             TrustedProxyResolver trustedProxyResolver,
-            @Value("${app.env:development}") String appEnv) {
+            @Value("${app.env:development}") String appEnv,
+            @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.authService = authService;
         this.authRateLimiterService = authRateLimiterService;
         this.trustedProxyResolver = trustedProxyResolver;
         this.isProduction = "production".equalsIgnoreCase(appEnv);
+        // Derived from the token's own lifetime rather than hardcoded. The cookie used to be
+        // pinned at seven days while the token it carries expires in one, so for six of those
+        // days the browser kept presenting a token the server had already rejected — every
+        // refresh a guaranteed 401, and a cookie surviving long past anything it can authorise.
+        this.refreshCookieMaxAgeSeconds = (int) (refreshTokenExpirationMs / 1000);
     }
 
     @Operation(summary = "Register new user", description = "Creates a new user account and organization")
@@ -269,7 +276,7 @@ public class AuthController {
         cookie.setHttpOnly(true);
         cookie.setSecure(isProduction); // HTTPS only in production, allow HTTP for localhost dev
         cookie.setPath("/api/v1/auth");
-        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
+        cookie.setMaxAge(refreshCookieMaxAgeSeconds);
         cookie.setAttribute("SameSite", isProduction ? "Strict" : "Lax"); // Lax for dev cross-origin
         response.addCookie(cookie);
     }
