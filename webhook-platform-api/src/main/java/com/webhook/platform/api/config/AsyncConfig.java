@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
@@ -68,8 +69,23 @@ public class AsyncConfig {
         executor.setRejectedExecutionHandler((runnable, pool) -> {
             Counter.builder("workflow_tasks_rejected_total").register(meterRegistry).increment();
             log.warn("Workflow task rejected (pool overloaded): active={}, queue={}/{}. " +
-                            "Workflow will NOT execute — increase pool size or reduce load.",
+                            "Deferring the outbox row — increase pool size or reduce load.",
                     pool.getActiveCount(), pool.getQueue().size(), queueCapacity);
+            // Throw, don't just log. A handler that returns normally is what
+            // ThreadPoolExecutor treats as "handled", so execute() returned normally and the
+            // caller could not tell the task had been dropped: WorkflowTriggerOutboxService's
+            // `catch (TaskRejectedException)` was unreachable, its outbox row stayed
+            // PROCESSING forever (claimBatch only selects PENDING), and the per-project
+            // in-flight counter — decremented in the discarded task's finally — leaked one
+            // per rejection until that project was throttled for good.
+            //
+            // Spring wraps this in TaskRejectedException, which the caller returns to PENDING
+            // for the next poll. Discarding is still the policy; the caller now gets to act
+            // on it. Blocking the caller (CallerRunsPolicy) stays off the table for the
+            // reason above: it often holds a DB transaction.
+            throw new RejectedExecutionException(
+                    "workflowTaskExecutor is saturated: active=" + pool.getActiveCount()
+                            + ", queue=" + pool.getQueue().size() + "/" + queueCapacity);
         });
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(awaitSeconds);

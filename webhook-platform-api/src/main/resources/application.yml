@@ -224,6 +224,8 @@ workflow:
     max-attempts: ${WORKFLOW_TRIGGER_OUTBOX_MAX_ATTEMPTS:3}
     max-per-project: ${WORKFLOW_TRIGGER_OUTBOX_MAX_PER_PROJECT:5}
     max-concurrent-per-project: ${WORKFLOW_TRIGGER_OUTBOX_MAX_CONCURRENT_PER_PROJECT:3}
+    stalled-after-minutes: ${WORKFLOW_TRIGGER_OUTBOX_STALLED_AFTER_MINUTES:15}
+    stalled-sweep-ms: ${WORKFLOW_TRIGGER_OUTBOX_STALLED_SWEEP_MS:300000}
 
 rules:
   cache-refresh-ms: ${RULES_CACHE_REFRESH_MS:30000}
