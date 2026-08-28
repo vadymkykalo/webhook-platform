@@ -43,6 +43,7 @@ public class StaleDeliveryEscalationService {
     private final DeliveryRepository deliveryRepository;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final OrderingBufferService orderingBufferService;
     private final Duration hardCapAge;
     private final int escalationBatchSize;
     private final AtomicLong oldestPendingAgeSeconds = new AtomicLong(0);
@@ -52,12 +53,14 @@ public class StaleDeliveryEscalationService {
             DeliveryRepository deliveryRepository,
             KafkaTemplate<String, DeliveryMessage> kafkaTemplate,
             TransactionTemplate transactionTemplate,
+            OrderingBufferService orderingBufferService,
             MeterRegistry meterRegistry,
             @Value("${delivery.escalation.hard-cap-hours:96}") long hardCapHours,
             @Value("${delivery.escalation.batch-size:100}") int escalationBatchSize) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
+        this.orderingBufferService = orderingBufferService;
         this.hardCapAge = Duration.ofHours(hardCapHours);
         this.escalationBatchSize = escalationBatchSize;
 
@@ -124,6 +127,12 @@ public class StaleDeliveryEscalationService {
 
             // Best-effort DLQ notifications
             for (Delivery d : escalated) {
+                // An escalated Delivery is never attempted again, so the endpoint's ordering
+                // cursor has to move past it — exactly as it does when the Runner abandons
+                // one. This path bypasses the Runner entirely, and used to release nothing:
+                // one hard-capped Delivery froze an ordering-enabled endpoint at its sequence
+                // and nothing behind it was ever delivered.
+                releaseOrdering(d);
                 try {
                     DeliveryMessage msg = DeliveryMessage.builder()
                             .deliveryId(d.getId())
@@ -144,6 +153,20 @@ public class StaleDeliveryEscalationService {
 
         } catch (Exception e) {
             log.error("Stale delivery escalation failed: {}", e.getMessage(), e);
+        }
+    }
+
+    /** Mirrors OutgoingAttemptStore#onAbandoned: this obligation is over, let the next one through. */
+    private void releaseOrdering(Delivery delivery) {
+        if (!Boolean.TRUE.equals(delivery.getOrderingEnabled()) || delivery.getSequenceNumber() == null) {
+            return;
+        }
+        try {
+            orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
+            orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
+        } catch (Exception e) {
+            log.error("Failed to release ordering buffer for escalated delivery {}: {}",
+                    delivery.getId(), e.getMessage(), e);
         }
     }
 }

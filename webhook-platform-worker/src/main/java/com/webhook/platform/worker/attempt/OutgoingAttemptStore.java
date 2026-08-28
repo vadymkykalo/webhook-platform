@@ -213,7 +213,12 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     /** Fails the Delivery under its fencing token and reports that there is nothing to attempt. */
     private ClaimResult<Claim> terminal(Claim claim, String reason) {
         log.warn("Delivery {} will not be attempted: {}", claim.deliveryId(), reason);
-        finalise(claim, new Finalization.TerminallyFailed(reason));
+        // This path never reaches AttemptRunner — it rejects the Delivery during the claim,
+        // before there is an Attempt at all — so it owes the release itself. Same condition as
+        // everywhere else: only the writer whose finalisation applied may let go of the cursor.
+        if (finalise(claim, new Finalization.TerminallyFailed(reason))) {
+            onTerminallyFailed(claim);
+        }
         return new ClaimResult.NotClaimed<>(reason);
     }
 
@@ -458,6 +463,19 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     @Override
     public void onSucceeded(Claim claim) {
         releaseOrdering(claim.delivery(), false);
+    }
+
+    /**
+     * A Delivery that terminally failed is as done as one that succeeded or was abandoned, and
+     * the endpoint's cursor has to move past it. It did not, so a single non-retryable 4xx —
+     * or a disabled endpoint, or an SSRF rejection — parked an ordering-enabled endpoint at
+     * that sequence permanently: nothing after it ever satisfied {@code canDeliver} again.
+     * Removed from the buffer as well as marked delivered, as with abandonment, because a
+     * terminal Delivery has no successor coming to clean up after it.
+     */
+    @Override
+    public void onTerminallyFailed(Claim claim) {
+        releaseOrdering(claim.delivery(), true);
     }
 
     private void releaseOrdering(Delivery delivery, boolean removeFromBuffer) {

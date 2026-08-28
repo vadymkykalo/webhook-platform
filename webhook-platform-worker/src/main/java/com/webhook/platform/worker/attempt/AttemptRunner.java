@@ -119,7 +119,7 @@ public class AttemptRunner {
             String reason = "SSRF_PROTECTION: " + e.getMessage();
             log.error("{}: {}", ctx.description(), reason);
             store.recordAttempt(claim, errorRecord(null, null, reason, elapsed(startedAt)));
-            store.finalise(claim, new Finalization.TerminallyFailed(reason));
+            terminallyFail(store, claim, reason);
             return;
         }
 
@@ -196,6 +196,24 @@ public class AttemptRunner {
         return true;
     }
 
+    /**
+     * Ends the obligation for good, and lets go of what it was holding.
+     *
+     * <p>Terminal is as final as Succeeded and Abandoned — nothing will attempt this again —
+     * so it owes the same release, and under the same condition. Both call sites used to
+     * finalise and return, ignoring the answer: the ordering cursor was never released, and
+     * had it been, it would have been released even for a row a stuck sweep had already
+     * handed to somebody else. Invariant 2 applies here exactly as it does to a successor.</p>
+     */
+    private <C> void terminallyFail(AttemptStore<C> store, C claim, String reason) {
+        if (store.finalise(claim, new Finalization.TerminallyFailed(reason))) {
+            store.onTerminallyFailed(claim);
+        } else {
+            log.warn("terminal finalisation did not apply — the obligation is owned by another "
+                    + "attempt now, so nothing was released: {}", reason);
+        }
+    }
+
     private <C> boolean defer(AttemptStore<C> store, C claim, AttemptContext ctx,
             long baseSeconds, long maxSeconds, String reason) {
         long delay = RetryPolicy.backoffWithJitter(ctx.attemptNumber(), baseSeconds, maxSeconds);
@@ -251,7 +269,7 @@ public class AttemptRunner {
             retryOrAbandon(store, claim, ctx, "Retryable HTTP " + status);
         } else {
             circuitBreaker.recordFailure(ctx.targetKey(), new RuntimeException("Non-retryable HTTP " + status));
-            store.finalise(claim, new Finalization.TerminallyFailed("Non-retryable HTTP " + status));
+            terminallyFail(store, claim, "Non-retryable HTTP " + status);
         }
     }
 
