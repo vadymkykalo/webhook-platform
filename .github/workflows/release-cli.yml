@@ -77,6 +77,13 @@ jobs:
     name: Publish SDKs
     needs: release-cli
     uses: ./.github/workflows/publish-sdks.yml
+    # A called workflow's jobs cannot hold permissions the calling job does not, and
+    # publish-sdks needs id-token: write for npm's OIDC publish. Without this line GitHub
+    # rejects the whole run before any job starts — a startup_failure with no logs and no
+    # annotation, which is exactly what v2.6.1 hit.
+    permissions:
+      contents: read
+      id-token: write
     with:
       sdk: all
     secrets: inherit
