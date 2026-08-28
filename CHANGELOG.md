@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-08-28
+
+Hookflow now speaks [Standard Webhooks](https://www.standardwebhooks.com) as well as
+its own signature scheme, so a receiver can verify with a library they already
+have instead of reading our documentation.
+
+### Added
+
+- **Standard Webhooks signatures.** Endpoints receive `webhook-id`,
+  `webhook-timestamp` and `webhook-signature` alongside the existing
+  `X-Signature`, controlled by `Endpoint.signatureScheme` — `BOTH` by default.
+  Unknown headers cost a receiver nothing, so every existing endpoint keeps
+  working untouched while a new one can reach for one of the convention's nine
+  language libraries from day one. `LEGACY` and `STANDARD` are there for anyone
+  who wants exactly one.
+
+  Three details that are easy to get subtly wrong, and were not: the signed id is
+  the *delivery* id, stable across every attempt and so usable for deduplication,
+  where the event id would collide across a fan-out; the signing primitive takes
+  key **bytes**, because the reference libraries HMAC with base64-decoded material
+  and round-tripping those through a String mangles every byte above `0x7F`; and
+  `EndpointResponse` now carries `standardWebhooksSecret`, the `whsec_`-prefixed
+  form, because stored secrets are URL-safe base64 without padding — a different
+  alphabet from the one those libraries decode, which would otherwise reject every
+  delivery with no clue why.
+
+- **`verifyStandardWebhook` in all three SDKs** (Node, Python, PHP), each with the
+  same cases: a reference signature, case-insensitive headers, either secret
+  verifying through a rotation window, a replay rejected despite a still-valid
+  signature, a signature lifted from another message, a tampered body, missing
+  headers, and an unknown signature version.
+
+- **`ROADMAP.md`**, naming what the project lacks — SSO, OpenTelemetry, RBAC
+  granularity, per-subscription filtering and the rest — rather than leaving an
+  evaluator to discover it.
+
+### Fixed
+
+- **The refresh cookie outlived its token**, pinned at seven days while the token
+  expires in one; for six of those days the browser presented a token the server
+  had already rejected. Its max-age now derives from the token's lifetime.
+- **The outbox age gauge queried the database on every metrics scrape**, from every
+  replica, on the management port that deliberately sits outside the auth chain.
+  It is sampled on the publisher poll instead, and the gauge is a memory read.
+- **Retrying out of the DLQ reset `attemptCount` to 0**, so the attempt it recorded
+  collided in number with one already on the record and "the latest attempt"
+  stopped being well defined. The count carries forward; `maxAttempts` is raised.
+- **`purgeAllDlq` was one unbounded DELETE**, which with the foreign key restored in
+  2.6.1 cascades into every attempt row and held locks across all of them for a
+  single transaction. Batched.
+- **A dead `ApiKeyAuthCacheService`** that would have thrown or filtered to the wrong
+  organization had anything injected it. Removed; the correct implementation
+  already lives in `ApiKeyAuthenticationFilter`.
+- **The release workflow could not be re-run without rewriting its tag**, and failed
+  to start at all when a called workflow asked for a permission its caller had not
+  granted. Both fixed, the first with a `workflow_dispatch` that reads the tag
+  everywhere rather than the branch it was started from.
+
+### Changed
+
+- The generic raw-hex HMAC verifier documents what it cannot promise: that shape
+  signs the body alone, so a captured request stays verifiable for as long as the
+  secret lives, and no verifier can supply a property the provider's scheme lacks.
+  The replay window that does bound it is now configurable.
+
 ## [2.6.1] - 2026-08-28
 
 A repair release. 2.6.0 shipped without its UI image, which broke the one-line
@@ -594,7 +659,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...v2.7.0
 [2.6.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.4.0...v2.5.0
