@@ -88,7 +88,17 @@ public class RedisConcurrencyControlService {
             // the caller's finally) never comes back until the whole semaphore key's 24h TTL
             // lapses, and that TTL only refreshes on a successful acquire — so an exhausted
             // semaphore self-heals here even if the caller-side release is ever skipped again.
-            String permitId = semaphore.tryAcquire(100, permitLeaseSeconds, TimeUnit.SECONDS);
+            // waitTime 0: check and return, never block. Redisson's signature is
+            // tryAcquire(waitTime, leaseTime, unit) — one TimeUnit governs both — so the 100
+            // that used to sit here meant 100 *seconds* of waiting, not the 100 milliseconds
+            // it reads as. AttemptRunner.admit() treats this the way it treats the rate
+            // limiters and the breaker: a refusal is a Deferral, not something to wait out.
+            // Waiting instead pinned a BoundedAsyncExecutor thread per attempt, so a single
+            // saturated endpoint drained the outgoing pool, BoundedAsyncExecutor paused every
+            // Kafka container, and the worker stopped delivering for every tenant. The wait
+            // also outlasted the lease below, so a permit expired while still in use and the
+            // cap this class exists to enforce quietly stopped holding.
+            String permitId = semaphore.tryAcquire(0, permitLeaseSeconds, TimeUnit.SECONDS);
             if (permitId != null) {
                 acquiredPermits.put(threadKey, permitId);
                 semaphore.expire(KEY_TTL);
