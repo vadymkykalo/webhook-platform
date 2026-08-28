@@ -134,9 +134,39 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
     List<Object[]> countByEndpointIdsGroupByEndpointAndStatus(
  @Param("organizationId") UUID organizationId,@Param("endpointIds") List<UUID> endpointIds, @Param("since") Instant since);
 
+    /**
+     * Deletes at most {@code batchSize} DLQ deliveries, so a purge runs in bounded chunks.
+     *
+     * <p>The unbounded {@code DELETE} this replaces held row locks across every matching
+     * delivery for one transaction — and, with the foreign key restored in V061, cascades into
+     * {@code delivery_attempts} for each, which is where the volume actually is. A project with
+     * a large DLQ could hold those locks for a long time.</p>
+     *
+     * <p>Native, because JPQL has no {@code LIMIT} on a bulk delete; the subquery is what lets
+     * the limit apply to the rows chosen rather than to the delete itself. Being native, it
+     * carries {@code organization_id} explicitly: Hibernate's {@code @TenantId} discriminator
+     * does not reach native SQL, so the JPQL form this replaced was scoped for free and this
+     * one would delete across organizations without the predicate (ADR-0006). The service
+     * validates project ownership before calling, so this is the second lock on the door —
+     * which is the point of it.</p>
+     *
+     * @return how many rows this call removed, so the caller stops when a batch comes back short
+     */
     @Modifying
-    @Query("DELETE FROM Delivery d WHERE d.status = 'DLQ' AND d.event.projectId = :projectId")
-    void deleteDlqByProjectId(@Param("projectId") UUID projectId);
+    @Query(value = """
+            DELETE FROM deliveries
+             WHERE id IN (
+                   SELECT d.id FROM deliveries d
+                     JOIN events e ON e.id = d.event_id
+                    WHERE d.organization_id = :organizationId
+                      AND d.status = 'DLQ' AND e.project_id = :projectId
+                    LIMIT :batchSize
+             )
+            """, nativeQuery = true)
+    int deleteDlqBatchByProjectId(
+            @Param("organizationId") UUID organizationId,
+            @Param("projectId") UUID projectId,
+            @Param("batchSize") int batchSize);
 
     /**
      * Highest sequence number ever generated (and persisted) for an endpoint. Used by

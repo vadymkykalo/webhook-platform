@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
@@ -43,6 +44,19 @@ public class OutboxPublisherService {
     private final long sendingRecoverySeconds;
     private final long batchSendTimeoutSeconds;
     private final int maxPerProject;
+
+    /**
+     * Sampled by the publisher poll, read by the gauge.
+     *
+     * <p>The gauge used to run {@code findOldestPendingCreatedAt()} inside its own lambda, so
+     * every Prometheus scrape — from every replica, and on the management port, which is
+     * deliberately outside the auth chain — issued a query. Scrape frequency is a monitoring
+     * decision made elsewhere; it should not be able to set database load. The poll already
+     * runs every second, which is finer than any scrape interval, so sampling there costs
+     * nothing extra and the gauge becomes a memory read. Same shape as
+     * StaleDeliveryEscalationService.</p>
+     */
+    private final AtomicLong oldestPendingAgeSeconds = new AtomicLong(0);
     private final Timer publishLatency;
     private final TransactionTemplate txTemplate;
 
@@ -100,18 +114,28 @@ public class OutboxPublisherService {
                 .tag("status", "dead")
                 .register(meterRegistry);
 
-        Gauge.builder("outbox_oldest_pending_age_seconds", outboxMessageRepository, repo -> {
-                    Instant oldest = repo.findOldestPendingCreatedAt();
-                    return oldest != null ? java.time.Duration.between(oldest, Instant.now()).getSeconds() : 0;
-                })
+        Gauge.builder("outbox_oldest_pending_age_seconds", oldestPendingAgeSeconds, AtomicLong::doubleValue)
                 .description("Age in seconds of the oldest PENDING outbox message")
                 .register(meterRegistry);
+    }
+
+    /** Best-effort: a stale gauge reading is better than a poll that fails over a metric. */
+    private void sampleOldestPendingAge() {
+        try {
+            Instant oldest = outboxMessageRepository.findOldestPendingCreatedAt();
+            oldestPendingAgeSeconds.set(
+                    oldest != null ? Duration.between(oldest, Instant.now()).getSeconds() : 0);
+        } catch (Exception e) {
+            log.debug("Could not sample oldest pending outbox age: {}", e.getMessage());
+        }
     }
 
     @SystemTenant
     @Scheduled(fixedDelayString = "${outbox.publisher.poll-interval-ms:1000}")
     @SchedulerLock(name = "outbox-publisher", lockAtLeastFor = "PT1S", lockAtMostFor = "PT30S")
     public void publishPendingMessages() {
+        sampleOldestPendingAge();
+
         // Phase 1: fast claim — SELECT FOR UPDATE + mark SENDING, commit immediately
         List<OutboxMessage> claimed = txTemplate.execute(status -> {
             List<OutboxMessage> batch = outboxMessageRepository

@@ -187,6 +187,8 @@ webhook:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
   ingress-base-url: ${WEBHOOK_INGRESS_BASE_URL:http://localhost:8080}
+  ingress:
+    replay-window-minutes: ${WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES:5}
   incoming:
     max-payload-size-bytes: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:524288}
   # Trusted reverse-proxy peers, comma-separated IPs and/or CIDR ranges. X-Forwarded-For /

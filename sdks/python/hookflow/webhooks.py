@@ -1,5 +1,6 @@
 """Webhook signature verification utilities."""
 
+import base64
 import hashlib
 import hmac
 import time
@@ -9,6 +10,9 @@ from .types import WebhookEvent
 from .errors import HookflowError
 
 DEFAULT_TOLERANCE_MS = 300000  # 5 minutes
+
+# The Standard Webhooks headers carry seconds, not milliseconds.
+DEFAULT_STANDARD_TOLERANCE_SECONDS = 300
 
 
 def verify_signature(
@@ -90,6 +94,86 @@ def verify_signature(
     matched = False
     for candidate in signatures:
         if hmac.compare_digest(candidate, expected_signature):
+            matched = True
+
+    if not matched:
+        raise HookflowError("Invalid signature", 400, "invalid_signature")
+
+    return True
+
+
+def verify_standard_webhook(
+    payload: str,
+    headers: Dict[str, Any],
+    secret: str,
+    tolerance_seconds: int = DEFAULT_STANDARD_TOLERANCE_SECONDS,
+) -> bool:
+    """Verify the `Standard Webhooks <https://www.standardwebhooks.com>`_ headers.
+
+    Endpoints receive both header sets by default (``signatureScheme: "BOTH"``), so use
+    whichever suits you — this one if you would rather verify the same way as other
+    providers you integrate with, :func:`verify_signature` if you already verify
+    ``X-Signature``.
+
+    Two things differ from Hookflow's own scheme beyond the header names: the message id is
+    part of what is signed, and the digest is base64 rather than hex. Rotation behaves the
+    same — through the grace window the header carries a space-separated signature per valid
+    secret, and any one matching is enough.
+
+    Args:
+        payload: the raw request body.
+        headers: the request headers, including the three ``webhook-*`` ones.
+        secret: the endpoint's ``standardWebhooksSecret`` (``whsec_…``). A raw secret is
+            accepted too and used as-is.
+        tolerance_seconds: how far the timestamp may be from now, either way.
+
+    Returns:
+        True if the signature is valid.
+
+    Raises:
+        HookflowError: if it is not.
+    """
+    lowered = {str(k).lower(): v for k, v in headers.items()}
+    message_id = lowered.get("webhook-id")
+    timestamp = lowered.get("webhook-timestamp")
+    signature = lowered.get("webhook-signature")
+
+    if not message_id or not timestamp or not signature:
+        raise HookflowError(
+            "Missing webhook-id, webhook-timestamp or webhook-signature header",
+            400,
+            "invalid_signature",
+        )
+
+    try:
+        timestamp_seconds = int(str(timestamp).strip())
+    except ValueError:
+        raise HookflowError("Invalid webhook-timestamp header", 400, "invalid_signature")
+
+    if abs(int(time.time()) - timestamp_seconds) > tolerance_seconds:
+        raise HookflowError(
+            "Webhook timestamp is outside tolerance window", 400, "timestamp_expired"
+        )
+
+    # ``whsec_<base64>`` is the conventional form, and is what the endpoint's
+    # standardWebhooksSecret gives you: the base64 body decodes to the key bytes. Anything
+    # else is taken literally, so a raw secret still works.
+    if secret.startswith("whsec_"):
+        key = base64.b64decode(secret[len("whsec_") :])
+    else:
+        key = secret.encode("utf-8")
+
+    signed_content = f"{message_id}.{timestamp_seconds}.{payload}".encode("utf-8")
+    expected = base64.b64encode(hmac.new(key, signed_content, hashlib.sha256).digest()).decode()
+
+    # Space-separated, one per valid secret during a rotation window. Every candidate is
+    # compared with no early exit, so the time taken does not reveal which one matched.
+    matched = False
+    for part in str(signature).strip().split():
+        version, _, candidate = part.partition(",")
+        if version != "v1" or not candidate:
+            continue
+        if hmac.compare_digest(candidate, expected):
             matched = True
 
     if not matched:

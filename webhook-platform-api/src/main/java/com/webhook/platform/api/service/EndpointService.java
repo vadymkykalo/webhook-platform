@@ -13,6 +13,7 @@ import com.webhook.platform.api.dto.EndpointTestResponse;
 import com.webhook.platform.common.security.UrlValidator;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
+import com.webhook.platform.common.util.StandardWebhookSignature;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -108,7 +109,11 @@ public class EndpointService {
                 .rateLimitPerSecond(request.getRateLimitPerSecond())
                 .allowedSourceIps(request.getAllowedSourceIps())
                 .build();
-        
+
+        if (request.getSignatureScheme() != null) {
+            endpoint.setSignatureScheme(request.getSignatureScheme());
+        }
+
         if (request.getEnabled() != null) {
             endpoint.setEnabled(request.getEnabled());
         }
@@ -172,7 +177,14 @@ public class EndpointService {
         if (request.getAllowedSourceIps() != null) {
             endpoint.setAllowedSourceIps(request.getAllowedSourceIps());
         }
-        
+
+        // Null means "not specified", not "reset to default": an update that leaves the field
+        // out must not silently switch an endpoint back to BOTH and start sending headers its
+        // receiver has never seen.
+        if (request.getSignatureScheme() != null) {
+            endpoint.setSignatureScheme(request.getSignatureScheme());
+        }
+
         endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponse(endpoint);
@@ -345,6 +357,12 @@ public class EndpointService {
     }
 
     private EndpointResponse mapToResponseWithSecret(Endpoint endpoint, String secret) {
+        // Only alongside the plaintext secret, which is itself only returned at creation and
+        // rotation: deriving it is trivial, but emitting it on every read would put a second
+        // copy of the secret in every list response.
+        String standardWebhooksSecret = secret != null
+                ? StandardWebhookSignature.asSharedSecret(secret)
+                : null;
         return EndpointResponse.builder()
                 .id(endpoint.getId())
                 .projectId(endpoint.getProjectId())
@@ -361,6 +379,8 @@ public class EndpointService {
                 .createdAt(endpoint.getCreatedAt())
                 .updatedAt(endpoint.getUpdatedAt())
                 .secret(secret)
+                .signatureScheme(endpoint.getSignatureScheme())
+                .standardWebhooksSecret(standardWebhooksSecret)
                 .build();
     }
 

@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.webhook.platform</groupId>
         <artifactId>webhook-platform</artifactId>
-        <version>2.6.1</version>
+        <version>2.7.0</version>
     </parent>
 
     <artifactId>webhook-platform-common</artifactId>

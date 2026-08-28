@@ -7153,6 +7153,12 @@ components:
           minimum: 1
         allowedSourceIps:
           type: string
+        signatureScheme:
+          type: string
+          enum:
+          - LEGACY
+          - STANDARD
+          - BOTH
       required:
       - url
     EndpointResponse:
@@ -7194,6 +7200,14 @@ components:
           type: string
           format: date-time
         secret:
+          type: string
+        signatureScheme:
+          type: string
+          enum:
+          - LEGACY
+          - STANDARD
+          - BOTH
+        standardWebhooksSecret:
           type: string
     AlertRuleRequest:
       type: object

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.domain.entity;
 
+import com.webhook.platform.common.enums.SignatureScheme;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -65,6 +66,18 @@ public class Endpoint {
 
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
+
+    /**
+     * Which signature headers this endpoint receives (V062).
+     *
+     * <p>{@code BOTH} by default: an existing receiver goes on verifying {@code X-Signature}
+     * while a new one can verify with an off-the-shelf Standard Webhooks library, and neither
+     * has to know the other exists.</p>
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "signature_scheme", nullable = false, length = 20)
+    @Builder.Default
+    private SignatureScheme signatureScheme = SignatureScheme.BOTH;
 
     @Column(name = "allowed_source_ips", columnDefinition = "TEXT")
     private String allowedSourceIps;

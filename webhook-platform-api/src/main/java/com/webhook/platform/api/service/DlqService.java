@@ -45,6 +45,19 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DlqService {
 
+    /**
+     * How many more attempts a delivery retried out of the DLQ gets.
+     *
+     * <p>Added to the count it already has rather than replacing it: the attempt history stays
+     * a single ascending sequence, which is what {@code delivery_attempts}' uniqueness on
+     * {@code (delivery_id, attempt_number)} assumes and what makes "the latest attempt" a
+     * well-defined thing.</p>
+     */
+    private static final int DLQ_RETRY_ATTEMPTS = 3;
+
+    /** Deliberately not "all of them in one statement" — see deleteDlqBatchByProjectId. */
+    private static final int PURGE_BATCH_SIZE = 500;
+
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final EventRepository eventRepository;
@@ -134,9 +147,18 @@ public class DlqService {
                 continue;
             }
             
-            // Reset delivery for retry
+            // attemptCount is deliberately NOT reset to 0. The retry ladder reads it to decide
+            // the next delay, and delivery_attempts is keyed on (delivery_id, attempt_number):
+            // restarting the count makes the attempt this retry records collide in number with
+            // one already on the record, so the attempt history of a retried delivery reads as
+            // two attempt 1s and findTopByDeliveryIdOrderByAttemptNumberDesc becomes ambiguous
+            // about which is the latest. Continuing the count keeps the history a sequence.
+            //
+            // maxAttempts is raised instead, which is what a human pressing "retry" is asking
+            // for: give this delivery another go at the ladder, without pretending the
+            // attempts it already made never happened.
             delivery.setStatus(DeliveryStatus.PENDING);
-            delivery.setAttemptCount(0);
+            delivery.setMaxAttempts(delivery.getAttemptCount() + DLQ_RETRY_ATTEMPTS);
             delivery.setNextRetryAt(null);
             delivery.setFailedAt(null);
             deliveryRepository.save(delivery);
@@ -156,11 +178,20 @@ public class DlqService {
     public int purgeAllDlq(UUID projectId) {
         validateProjectOwnership(projectId);
         
-        long count = deliveryRepository.countDlqByProjectId(projectId);
-        deliveryRepository.deleteDlqByProjectId(projectId);
-        
-        log.info("Purged {} DLQ items for project: {}", count, projectId);
-        return (int) count;
+        // Batched, because this used to be one unbounded DELETE. A project with a large DLQ
+        // meant a single long transaction holding row locks across every matching delivery —
+        // and, now that the foreign key is back (V061), cascading into delivery_attempts for
+        // each one, which is where the real volume is.
+        long total = 0;
+        int deleted;
+        do {
+            deleted = deliveryRepository.deleteDlqBatchByProjectId(
+                    TenantContext.require(), projectId, PURGE_BATCH_SIZE);
+            total += deleted;
+        } while (deleted == PURGE_BATCH_SIZE);
+
+        log.info("Purged {} DLQ items for project: {}", total, projectId);
+        return (int) total;
     }
 
     private DlqItemResponse mapToResponse(Delivery delivery, DeliveryAttempt lastAttempt) {
