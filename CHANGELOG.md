@@ -5,7 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6.1] - 2026-08-28
+
+A repair release. 2.6.0 shipped without its UI image, which broke the one-line
+install for every new user, and the audit that found it turned up seven runtime
+bugs that lose work silently.
+
+### Fixed
+
+- **The UI image for 2.6.0 was never published, so `install.sh` was broken.** Its
+  build died under QEMU: buildx runs the build stage once per target platform, so
+  the `linux/arm64` leg ran Chromium for the prerender under emulation, blew a 30s
+  budget and killed the job after sixteen minutes. The build stage is now pinned to
+  `$BUILDPLATFORM` and runs natively once; only the nginx runtime stage stays
+  per-arch. Takes roughly sixteen minutes off every release as a side effect.
+- **npm and Packagist had been publishing nothing since v2.3.0 and February
+  respectively**, the first because a token expired, the second because the step
+  posted an update call naming a repository Packagist has never heard of and
+  checked neither the exit code nor the response. npm moves to Trusted Publishing;
+  the PHP SDK is now pushed to its split repository as part of the release.
+- **A new `verify-release` job** asks GHCR, npm, PyPI and Packagist what is
+  actually published and fails when any of them disagrees with the tag. The
+  existing version guard compares files in the repository to each other, so none
+  of the above was visible to it.
+- **The Helm chart could never have brought up its UI**: the container port and
+  both probes said 80 for an nginx that listens on 5173, the chart-wide security
+  context handed stock nginx a uid with no writable cache or pid path, and the
+  image proxies to a hostname the chart did not create. `helm lint` now runs on
+  every pull request rather than only on a tag, which is how all of that reached a
+  release; on its first run it found a fifth fault, a duplicate map key in a
+  ConfigMap that `kubectl` rejects. Chart image tags now default to the chart's
+  appVersion instead of `latest`.
+- **A saturated endpoint stopped delivery for every tenant.** The per-endpoint
+  concurrency permit was acquired with a 100-*second* wait where 100 milliseconds
+  was meant, so one slow endpoint drained the outgoing pool and the worker paused
+  every Kafka listener.
+- **Workflow triggers were dropped silently and then locked the project out.** The
+  executor's rejection handler did not throw, so the caller could not tell the task
+  had been discarded: the outbox row stayed `PROCESSING` with nothing to reclaim it,
+  and the per-project in-flight counter leaked one per rejection until every future
+  trigger for that project deferred forever.
+- **Two paths delivered the same webhook twice.** The outgoing retry read its
+  fencing token out of the row rather than carrying it, so every redelivery of a
+  Kafka message agreed it owned the row; the incoming side had no fence at all in
+  `finalise`, letting a stuck-swept attempt overwrite a live claim, queue a
+  successor, and discard a concurrent success.
+- **FIFO ordering degraded to nothing being delivered.** A terminal failure — a
+  non-retryable 4xx, a disabled endpoint, an SSRF rejection — never released the
+  ordering cursor, so it stuck permanently and every later delivery for that
+  endpoint was held behind it.
+- **Password reset did not revoke live sessions**, leaving an attacker's access
+  token valid for its full lifetime while the owner believed they had locked them
+  out. Member removal and role change had the same gap.
+- **A share token could be read across projects.** Listing an event's debug links
+  validated the project in the path but loaded links by event id alone, defeating
+  the API-key project confinement that exists for exactly this case.
+- **`/actuator/health` published component detail anonymously**, including the
+  database product and version, through the one public port.
+- **A foreign key dropped by accident in V052** left delivery attempts orphaned,
+  request and response bodies included, when a DLQ purge removed their deliveries.
+
+### Changed
+
+- The revocation epoch in Redis now expires instead of accumulating one key per
+  user forever, and login picks a user's oldest organization rather than whichever
+  the database happened to return first.
+
+## [2.6.0] - 2026-08-27
+
+No changelog entry was written at the time; this and the 2.5.0 entry below were
+reconstructed from the release history afterwards, which is what the CHANGELOG
+check added in 2.6.1 exists to prevent happening again.
 
 ### Added
 - **`install.sh` — the install is one command.** It checks the machine (Docker,
@@ -71,6 +141,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **nginx proxied `/actuator/*` to the wrong port**, so the health path it
   advertised returned 404. Metrics are no longer proxied at all: nginx is the
   public face, and they leak endpoint names and tenant cardinality.
+
+## [2.5.0] - 2026-08-23
+
+Also written after the fact. The release rebuilt the dashboard's design system and
+information architecture, generated the API reference from `openapi.yaml` rather
+than maintaining it by hand, added Connection to the domain model, gave every
+admin screen a loading, empty and error state, and fixed all three SDKs against
+the real API.
 
 ## [2.4.0] - 2026-08-23
 
@@ -516,7 +594,10 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.0...v2.6.1
+[2.6.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.1...v2.3.0
 [2.2.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.2.0...v2.2.1
