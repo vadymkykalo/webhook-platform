@@ -7722,6 +7722,16 @@
         "name": "allowedSourceIps",
         "type": "string",
         "required": false
+      },
+      {
+        "name": "signatureScheme",
+        "type": "string",
+        "required": false,
+        "values": [
+          "LEGACY",
+          "STANDARD",
+          "BOTH"
+        ]
       }
     ],
     "EndpointResponse": [
@@ -7797,6 +7807,21 @@
       },
       {
         "name": "secret",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "signatureScheme",
+        "type": "string",
+        "required": false,
+        "values": [
+          "LEGACY",
+          "STANDARD",
+          "BOTH"
+        ]
+      },
+      {
+        "name": "standardWebhooksSecret",
         "type": "string",
         "required": false
       }
@@ -12624,7 +12649,8 @@
       "secret": "string",
       "enabled": true,
       "rateLimitPerSecond": 0,
-      "allowedSourceIps": "string"
+      "allowedSourceIps": "string",
+      "signatureScheme": "LEGACY"
     },
     "EndpointResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -12641,7 +12667,9 @@
       "verificationSkipReason": "string",
       "createdAt": "2026-01-01T12:00:00Z",
       "updatedAt": "2026-01-01T12:00:00Z",
-      "secret": "string"
+      "secret": "string",
+      "signatureScheme": "LEGACY",
+      "standardWebhooksSecret": "string"
     },
     "EndpointTestResponse": {
       "success": true,
@@ -13322,7 +13350,9 @@
           "verificationSkipReason": "string",
           "createdAt": "2026-01-01T12:00:00Z",
           "updatedAt": "2026-01-01T12:00:00Z",
-          "secret": "string"
+          "secret": "string",
+          "signatureScheme": "LEGACY",
+          "standardWebhooksSecret": "string"
         }
       ],
       "number": 0,

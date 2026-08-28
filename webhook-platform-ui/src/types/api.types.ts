@@ -66,6 +66,15 @@ export interface ProjectResponse {
   updatedAt: string;
 }
 
+/**
+ * Which signature headers an endpoint receives.
+ *
+ * `BOTH` is the default: extra headers cost a receiver nothing, so an existing integration
+ * keeps verifying `X-Signature` while a new one can use an off-the-shelf Standard Webhooks
+ * library.
+ */
+export type SignatureScheme = 'LEGACY' | 'STANDARD' | 'BOTH';
+
 export interface EndpointRequest {
   url: string;
   description?: string;
@@ -73,6 +82,7 @@ export interface EndpointRequest {
   enabled?: boolean;
   rateLimitPerSecond?: number;
   allowedSourceIps?: string;
+  signatureScheme?: SignatureScheme;
 }
 
 export interface EndpointResponse {
@@ -91,6 +101,12 @@ export interface EndpointResponse {
   createdAt: string;
   updatedAt: string;
   secret?: string;
+  signatureScheme?: SignatureScheme;
+  /**
+   * The same secret in the form a Standard Webhooks library expects (`whsec_` + base64).
+   * Present only where `secret` is — at creation and rotation.
+   */
+  standardWebhooksSecret?: string;
 }
 
 export interface DeliveryResponse {

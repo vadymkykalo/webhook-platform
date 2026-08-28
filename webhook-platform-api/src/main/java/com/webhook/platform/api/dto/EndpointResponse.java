@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.enums.SignatureScheme;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,17 @@ public class EndpointResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private String secret;
+
+    private SignatureScheme signatureScheme;
+
+    /**
+     * The same secret in the form a Standard Webhooks verification library expects —
+     * {@code whsec_} followed by base64 — populated only where {@link #secret} is.
+     *
+     * <p>Stored secrets are URL-safe base64 without padding, a different alphabet from the
+     * one those libraries decode. Handing the stored value over would either fail to decode
+     * or, worse, decode to different bytes and reject every delivery with no clue why. This
+     * is the value to paste into their constructor.</p>
+     */
+    private String standardWebhooksSecret;
 }

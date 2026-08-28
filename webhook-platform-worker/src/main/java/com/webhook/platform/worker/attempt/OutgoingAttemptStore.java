@@ -6,6 +6,8 @@ import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.common.security.SecretRotationWindow;
+import com.webhook.platform.common.enums.SignatureScheme;
+import com.webhook.platform.common.util.StandardWebhookSignature;
 import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.worker.domain.entity.Delivery;
@@ -318,9 +320,24 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     public RequestSpec buildRequest(Claim claim, String body) {
         Delivery delivery = claim.delivery();
         String secret = decryptSecret();
+        String previousSecret = secretInsideGraceWindow();
         signatureTimestamp = System.currentTimeMillis();
-        String signature = WebhookSignatureUtils.buildSignatureHeader(
-                secret, secretInsideGraceWindow(), signatureTimestamp, body);
+
+        SignatureScheme scheme = endpoint.getSignatureScheme() != null
+                ? endpoint.getSignatureScheme()
+                : SignatureScheme.BOTH;
+
+        String signature = scheme == SignatureScheme.STANDARD ? null
+                : WebhookSignatureUtils.buildSignatureHeader(
+                        secret, previousSecret, signatureTimestamp, body);
+
+        // The delivery id, not the event id: it is one obligation to one endpoint, stable
+        // across every attempt, which is exactly what a receiver needs to deduplicate on.
+        // The event id would collide across a fan-out.
+        String standardSignature = scheme == SignatureScheme.LEGACY ? null
+                : StandardWebhookSignature.buildSignatureHeader(
+                        secret, previousSecret, delivery.getId().toString(),
+                        signatureTimestamp / 1000, body);
 
         String sequenceHeader = delivery.getSequenceNumber() != null
                 ? String.valueOf(delivery.getSequenceNumber())
@@ -337,15 +354,26 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 client,
                 request -> {
                     request.contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                            .header("X-Signature", signature)
                             .header("X-Event-Id", event.getId().toString())
                             .header("X-Delivery-Id", delivery.getId().toString())
-                            .header("X-Timestamp", String.valueOf(signatureTimestamp))
                             .header("X-Sequence-Number", sequenceHeader)
                             .header("Idempotency-Key", idempotencyKey);
+                    if (signature != null) {
+                        request.header("X-Signature", signature)
+                                .header("X-Timestamp", String.valueOf(signatureTimestamp));
+                    }
+                    if (standardSignature != null) {
+                        // Lower-case names because the convention spells them that way. HTTP
+                        // header names are case-insensitive, so this is cosmetic on the wire
+                        // — but a receiver copying them out of the specification and finding
+                        // them spelled identically has one less thing to wonder about.
+                        request.header("webhook-id", delivery.getId().toString())
+                                .header("webhook-timestamp", String.valueOf(signatureTimestamp / 1000))
+                                .header("webhook-signature", standardSignature);
+                    }
                     addCustomHeaders(request, delivery.getCustomHeaders());
                 },
-                recordedRequestHeaders(signature, delivery));
+                recordedRequestHeaders(signature, standardSignature, delivery));
     }
 
     /**
@@ -590,11 +618,25 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     }
 
     /** The signature is masked: this string is shown in the dashboard. */
-    private String recordedRequestHeaders(String signature, Delivery delivery) {
-        return String.format(
-                "{\"Content-Type\":\"application/json\",\"X-Signature\":\"%s\",\"X-Event-Id\":\"%s\","
-                        + "\"X-Delivery-Id\":\"%s\",\"X-Timestamp\":\"%s\",\"User-Agent\":\"WebhookPlatform/1.0\"}",
-                HeaderSanitizer.maskSignature(signature), event.getId(), delivery.getId(), signatureTimestamp);
+    private String recordedRequestHeaders(String signature, String standardSignature, Delivery delivery) {
+        StringBuilder json = new StringBuilder("{\"Content-Type\":\"application/json\"");
+        if (signature != null) {
+            json.append(",\"X-Signature\":\"").append(HeaderSanitizer.maskSignature(signature)).append('"')
+                    .append(",\"X-Timestamp\":\"").append(signatureTimestamp).append('"');
+        }
+        json.append(",\"X-Event-Id\":\"").append(event.getId()).append('"')
+                .append(",\"X-Delivery-Id\":\"").append(delivery.getId()).append('"');
+        if (standardSignature != null) {
+            // Masked like the other one. This string is shown verbatim in the dashboard, and
+            // a signature is a shared secret's output: printing it lets anyone who can read a
+            // delivery replay it against the endpoint.
+            json.append(",\"webhook-id\":\"").append(delivery.getId()).append('"')
+                    .append(",\"webhook-timestamp\":\"").append(signatureTimestamp / 1000).append('"')
+                    .append(",\"webhook-signature\":\"")
+                    .append(HeaderSanitizer.maskSignature(standardSignature)).append('"');
+        }
+        json.append(",\"User-Agent\":\"WebhookPlatform/1.0\"}");
+        return json.toString();
     }
 
     @SuppressWarnings("unchecked")

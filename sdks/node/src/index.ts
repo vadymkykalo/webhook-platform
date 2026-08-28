@@ -4,6 +4,6 @@ export { HookflowError, RateLimitError, AuthenticationError, ValidationError, No
 // Backward-compatible aliases
 export { Hookflow as WebhookPlatform } from './client';
 export { HookflowError as WebhookPlatformError } from './errors';
-export { verifySignature, constructEvent, generateSignature } from './webhooks';
+export { verifySignature, verifyStandardWebhook, constructEvent, generateSignature } from './webhooks';
 export type { WebhookHeaders, VerifyOptions } from './webhooks';
 export * from './types';

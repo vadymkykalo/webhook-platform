@@ -8,7 +8,12 @@ from .errors import (
     ValidationError,
     NotFoundError,
 )
-from .webhooks import verify_signature, construct_event, generate_signature
+from .webhooks import (
+    verify_signature,
+    verify_standard_webhook,
+    construct_event,
+    generate_signature,
+)
 from .types import (
     Event,
     EventResponse,
@@ -52,6 +57,7 @@ __all__ = [
     "ValidationError",
     "NotFoundError",
     "verify_signature",
+    "verify_standard_webhook",
     "construct_event",
     "generate_signature",
     "Event",
