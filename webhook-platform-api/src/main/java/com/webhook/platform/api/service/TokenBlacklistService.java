@@ -3,6 +3,7 @@ package com.webhook.platform.api.service;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -17,9 +18,17 @@ public class TokenBlacklistService {
     private static final String EPOCH_PREFIX = "jwt:epoch:";
 
     private final RedissonClient redissonClient;
+    private final Duration epochTtl;
 
-    public TokenBlacklistService(RedissonClient redissonClient) {
+    public TokenBlacklistService(
+            RedissonClient redissonClient,
+            @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.redissonClient = redissonClient;
+        // An epoch marker only has to outlive the longest-lived token it can invalidate:
+        // once every token issued before the revocation has expired on its own, the marker
+        // says nothing. Doubling the refresh-token lifetime leaves generous headroom for
+        // clock skew and for the setting being raised without this being revisited.
+        this.epochTtl = Duration.ofMillis(refreshTokenExpirationMs * 2);
     }
 
     public void blacklist(String jti, Date expiration) {
@@ -43,7 +52,10 @@ public class TokenBlacklistService {
 
     public void revokeAllUserTokens(UUID userId) {
         RBucket<Long> bucket = redissonClient.getBucket(EPOCH_PREFIX + userId);
-        bucket.set(System.currentTimeMillis());
+        // With a TTL, not without one. These keys used to live forever, so Redis grew by one
+        // key per user who ever changed a password or had a session revoked, and none of them
+        // could ever be reclaimed.
+        bucket.set(System.currentTimeMillis(), epochTtl);
         log.info("Revoked all tokens for user {}", userId);
     }
 

@@ -42,6 +42,7 @@ public class WorkflowTriggerOutboxService {
     private final int maxAttempts;
     private final int maxPerProject;
     private final int maxConcurrentPerProject;
+    private final int stalledAfterMinutes;
 
     /** Per-project in-flight workflow counter. Prevents one project from consuming all executor threads. */
     private final ConcurrentHashMap<UUID, AtomicInteger> projectInFlight = new ConcurrentHashMap<>();
@@ -54,7 +55,8 @@ public class WorkflowTriggerOutboxService {
             @Value("${workflow.trigger-outbox.batch-size:50}") int batchSize,
             @Value("${workflow.trigger-outbox.max-attempts:3}") int maxAttempts,
             @Value("${workflow.trigger-outbox.max-per-project:5}") int maxPerProject,
-            @Value("${workflow.trigger-outbox.max-concurrent-per-project:3}") int maxConcurrentPerProject) {
+            @Value("${workflow.trigger-outbox.max-concurrent-per-project:3}") int maxConcurrentPerProject,
+            @Value("${workflow.trigger-outbox.stalled-after-minutes:15}") int stalledAfterMinutes) {
         this.outboxRepository = outboxRepository;
         this.triggerService = triggerService;
         this.workflowTaskExecutor = workflowTaskExecutor;
@@ -63,6 +65,7 @@ public class WorkflowTriggerOutboxService {
         this.maxAttempts = maxAttempts;
         this.maxPerProject = maxPerProject;
         this.maxConcurrentPerProject = maxConcurrentPerProject;
+        this.stalledAfterMinutes = stalledAfterMinutes;
     }
 
     @SystemTenant
@@ -82,8 +85,7 @@ public class WorkflowTriggerOutboxService {
                 // Project already at max concurrent workflows — defer to next poll
                 log.debug("Project {} at max concurrent workflows ({}), deferring outbox row: id={}",
                         projectId, maxConcurrentPerProject, row.getId());
-                row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
-                outboxRepository.save(row);
+                deferToNextPoll(row);
                 continue;
             }
 
@@ -102,10 +104,26 @@ public class WorkflowTriggerOutboxService {
                         v.decrementAndGet() <= 0 ? null : v);
                 log.warn("Workflow executor full, deferring outbox row: id={}, eventId={}",
                         row.getId(), row.getEventId());
-                row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
-                outboxRepository.save(row);
+                deferToNextPoll(row);
             }
         }
+    }
+
+    /**
+     * Returns a row nobody has attempted yet to the queue.
+     *
+     * <p>Both callers are backpressure: the workflow pool would not take the task, or the
+     * project is already running as many workflows as it may. Neither is the workflow
+     * failing, so neither may spend its retry budget — {@code claimBatch} charges
+     * {@code attempts = attempts + 1} on every claim, and without giving that back a busy
+     * project burnt all {@code maxAttempts} on deferrals alone. The first genuine exception
+     * then found {@code attempts >= maxAttempts} and marked the row FAILED having never once
+     * run the workflow.</p>
+     */
+    private void deferToNextPoll(WorkflowTriggerOutbox row) {
+        row.setStatus(WorkflowTriggerOutboxStatus.PENDING);
+        row.setAttempts(Math.max(0, row.getAttempts() - 1));
+        outboxRepository.save(row);
     }
 
     private void processRow(WorkflowTriggerOutbox row) {
@@ -143,6 +161,34 @@ public class WorkflowTriggerOutboxService {
             Counter.builder("workflow_trigger_outbox_processed_total")
                     .tag("result", "error")
                     .register(meterRegistry).increment();
+        }
+    }
+
+    /**
+     * Recovers rows that were claimed and then abandoned.
+     *
+     * <p>A row goes PROCESSING the moment {@code claimBatch} hands it out, and returns to
+     * PENDING or DONE only if the poller that took it lived long enough to say so. A pod that
+     * dies mid-workflow — or, before the executor learnt to throw, a task the pool dropped
+     * without telling anyone — leaves the row PROCESSING with nothing in the system able to
+     * pick it up again: claimBatch reads PENDING, cleanup deletes DONE. The workflow is
+     * simply lost, and quietly.</p>
+     *
+     * <p>The threshold has to exceed the longest legitimate workflow run. Fifteen minutes is
+     * well past that and still short enough that a lost trigger recovers the same hour.</p>
+     */
+    @SystemTenant
+    @Scheduled(fixedDelayString = "${workflow.trigger-outbox.stalled-sweep-ms:300000}")
+    @SchedulerLock(name = "workflowTriggerOutboxStalledSweep", lockAtMostFor = "PT2M")
+    @Transactional
+    public void reclaimStalledRows() {
+        Instant cutoff = Instant.now().minus(stalledAfterMinutes, ChronoUnit.MINUTES);
+        int reclaimed = outboxRepository.reclaimStalledRows(cutoff);
+        if (reclaimed > 0) {
+            log.warn("Reclaimed {} workflow trigger outbox rows stuck in PROCESSING for over {}m",
+                    reclaimed, stalledAfterMinutes);
+            Counter.builder("workflow_trigger_outbox_reclaimed_total")
+                    .register(meterRegistry).increment(reclaimed);
         }
     }
 

@@ -42,15 +42,18 @@ public class MembershipService {
     private final UserRepository userRepository;
     private final MembershipRepository membershipRepository;
     private final EmailService emailService;
+    private final TokenBlacklistService tokenBlacklistService;
     private final BCryptPasswordEncoder passwordEncoder;
 
     public MembershipService(
             UserRepository userRepository,
             MembershipRepository membershipRepository,
-            EmailService emailService) {
+            EmailService emailService,
+            TokenBlacklistService tokenBlacklistService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.emailService = emailService;
+        this.tokenBlacklistService = tokenBlacklistService;
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
@@ -227,6 +230,10 @@ public class MembershipService {
 
         membership.setRole(newRole);
         membershipRepository.save(membership);
+        // JwtAuthenticationFilter reads the role out of the access token and never re-checks
+        // it against the database, so a demoted OWNER keeps OWNER authority until that token
+        // expires. Revoking makes the demotion take effect on the next request instead.
+        tokenBlacklistService.revokeAllUserTokens(userId);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
@@ -259,5 +266,10 @@ public class MembershipService {
         }
 
         membershipRepository.delete(membership);
+        // Same reasoning as the demotion above: organizationId comes from the token, so a
+        // removed member goes on reaching this organization's data until it expires.
+        // Refreshing is already blocked — that path 404s on the missing membership — which is
+        // precisely why the live access token is the gap left to close.
+        tokenBlacklistService.revokeAllUserTokens(userId);
     }
 }

@@ -142,6 +142,57 @@ class AttemptRunnerTest {
         }
     }
 
+    @Nested
+    @DisplayName("a terminal failure releases what it was holding")
+    class TerminalRelease {
+
+        @Test
+        @DisplayName("a non-retryable status runs the terminal side effect")
+        void nonRetryableStatusReleases() {
+            respond(422, "unprocessable");
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
+            // Succeeded and Abandoned both released the ordering buffer; TerminallyFailed
+            // released nothing. It is the outcome for a non-retryable 4xx — much the commonest
+            // terminal case — for a disabled or deleted endpoint, and for an SSRF rejection.
+            // On an ordering-enabled endpoint the cursor then stuck at N-1 permanently:
+            // canDeliver stayed false for every later delivery, getReadyDeliveries could never
+            // release anything, and orderingHold fell through to a BETWEEN scan whose upper
+            // bound grew without limit. FIFO quietly degraded to no delivery at all.
+            assertEquals(1, store.terminallyFailedCalls,
+                    "nothing else ever releases the ordering cursor for this delivery");
+        }
+
+        @Test
+        @DisplayName("an SSRF rejection runs the terminal side effect")
+        void ssrfRejectionReleases() {
+            // A private address the URL validator refuses before admission.
+            FakeStore store = new FakeStore("http://169.254.169.254/latest/meta-data");
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
+            assertEquals(1, store.terminallyFailedCalls);
+        }
+
+        @Test
+        @DisplayName("a terminal failure whose finalisation did not apply releases nothing")
+        void refusedTerminalReleasesNothing() {
+            respond(422, "unprocessable");
+            FakeStore store = new FakeStore(baseUrl);
+            store.finaliseApplies = false; // reclaimed by a stuck sweep while we were sending
+
+            runner.run(store, metrics);
+
+            assertEquals(0, store.terminallyFailedCalls,
+                    "releasing the cursor for a row another attempt now owns would let a "
+                            + "successor through early — the same invariant as success and abandonment");
+        }
+    }
+
     // ── classification ─────────────────────────────────────────────────────────────
 
     @Nested
@@ -335,6 +386,7 @@ class AttemptRunnerTest {
         int attemptStartingCalls;
         int abandonedCalls;
         int succeededCalls;
+        int terminallyFailedCalls;
 
         FakeStore(String url) {
             this.url = url;
@@ -388,6 +440,11 @@ class AttemptRunnerTest {
         @Override
         public void onSucceeded(String claim) {
             succeededCalls++;
+        }
+
+        @Override
+        public void onTerminallyFailed(String claim) {
+            terminallyFailedCalls++;
         }
     }
 

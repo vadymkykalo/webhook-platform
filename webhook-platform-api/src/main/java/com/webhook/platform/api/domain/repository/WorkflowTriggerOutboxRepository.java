@@ -36,6 +36,28 @@ public interface WorkflowTriggerOutboxRepository extends JpaRepository<WorkflowT
         """, nativeQuery = true)
     List<WorkflowTriggerOutbox> claimBatch(@Param("batchSize") int batchSize, @Param("maxPerProject") int maxPerProject);
 
+    /**
+     * Returns rows abandoned mid-flight to the queue.
+     *
+     * <p>{@link #claimBatch} flips a row to PROCESSING and hands it to an executor. If that
+     * hand-off never completes — the pod dies, or the task is dropped without the caller
+     * being told, which is what happened before the workflow executor learnt to throw — the
+     * row keeps that status forever: claimBatch selects PENDING only, and the cleanup delete
+     * touches processed rows only. Nothing else in the system reclaims it, so the workflow
+     * silently never runs and the table grows without bound.</p>
+     *
+     * <p>Attempts is deliberately not incremented: being abandoned is not an attempt, and
+     * charging for it would retire a row that has never actually run.</p>
+     */
+    @Modifying
+    @Query("""
+        UPDATE WorkflowTriggerOutbox w
+           SET w.status = com.webhook.platform.api.domain.enums.WorkflowTriggerOutboxStatus.PENDING
+         WHERE w.status = com.webhook.platform.api.domain.enums.WorkflowTriggerOutboxStatus.PROCESSING
+           AND w.createdAt < :before
+        """)
+    int reclaimStalledRows(@Param("before") Instant before);
+
     @Modifying
     @Query("DELETE FROM WorkflowTriggerOutbox w WHERE w.status = :status AND w.processedAt < :before")
     int deleteByStatusAndProcessedAtBefore(

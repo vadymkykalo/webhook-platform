@@ -77,6 +77,36 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
             "RETURNING *", nativeQuery = true)
     Delivery claimForProcessingAndReturn(@Param("id") UUID id, @Param("claimToken") UUID claimToken);
 
+    /**
+     * CAS claim for the retry path.
+     *
+     * <p>RetrySchedulerService has already moved the row PENDING -&gt; PROCESSING under a
+     * fencing token and published that token with the Kafka message. This swaps it for a
+     * fresh one, but only if the row still carries the token the message was published with.
+     * Two things lose that race and correctly claim nothing:</p>
+     *
+     * <ul>
+     *   <li>a second delivery of the same Kafka message — at-least-once means a rebalance
+     *       that loses an offset commit replays it, and both copies used to read PROCESSING
+     *       and double-POST;</li>
+     *   <li>a message whose send the scheduler gave up waiting on. On "Send confirmation
+     *       timeout" it hands the row back as PENDING with a null token, the next poll
+     *       re-claims it under a new token and publishes again — and the original send often
+     *       lands anyway. That late message carries the old token, so it now stops here
+     *       instead of dispatching alongside the fresh one.</li>
+     * </ul>
+     *
+     * <p>The Delivery is returned so the winner has the row it just claimed without a second
+     * read, and so a claim that applied to nothing is distinguishable from a missing row.</p>
+     */
+    @Query(value = "UPDATE deliveries SET claim_token = :newClaimToken, " +
+            "updated_at = now(), version = version + 1 " +
+            "WHERE id = :id AND status = 'PROCESSING' AND claim_token = :expectedClaimToken " +
+            "RETURNING *", nativeQuery = true)
+    Delivery claimRetryForProcessing(@Param("id") UUID id,
+            @Param("expectedClaimToken") UUID expectedClaimToken,
+            @Param("newClaimToken") UUID newClaimToken);
+
     @Modifying
     @Query(value = "UPDATE deliveries SET attempt_count = attempt_count + 1, " +
             "updated_at = now(), version = version + 1 " +

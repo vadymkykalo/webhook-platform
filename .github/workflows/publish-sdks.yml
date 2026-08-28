@@ -39,10 +39,18 @@ on:
           - python
           - php
 
+# Least privilege by default. `id-token: write` is granted per-job below, only
+# where a registry's OIDC (Trusted Publishing) flow needs it.
+permissions:
+  contents: read
+
 jobs:
   publish-node:
     name: Publish Node.js SDK to npm (@webhook-platform/node)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm Trusted Publishing + --provenance
     if: >
       inputs.sdk == 'all' ||
       inputs.sdk == 'node'
@@ -55,7 +63,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20: `npm@latest` (needed for Trusted Publishing) requires
+          # ^20.17 || >=22.9, and which 20.x the runner image carries is not
+          # something to depend on.
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Check version drift
@@ -82,9 +93,27 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: npm run build
 
+      # npm >= 11.5.1 is what understands Trusted Publishing; setup-node pins an
+      # older npm with Node 20.
+      - name: Upgrade npm for Trusted Publishing
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm install -g npm@latest
+
+      # v2.5.0 and v2.6.0 both failed here with
+      #   npm error 404 Not Found - PUT .../@webhook-platform%2fnode
+      # which is what npm returns for an unauthenticated scoped publish: the
+      # long-lived NPM_TOKEN had expired, and npm was left two releases behind
+      # at 2.2.1. OIDC removes the standing secret so that cannot recur, and
+      # --provenance attaches the sigstore attestation the container images
+      # already carry.
+      #
+      # One-time setup on npmjs.com, which no workflow can do for you: package
+      # settings -> Trusted Publisher -> this repository, workflow
+      # `publish-sdks.yml`. NPM_TOKEN stays here as the fallback npm uses when
+      # no trusted publisher is configured; once OIDC works it can be deleted.
       - name: Publish to npm
         if: steps.check.outputs.should_publish == 'true'
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -180,16 +209,107 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: vendor/bin/phpunit --no-coverage
 
-      # Packagist auto-updates from GitHub via webhook; this just nudges it.
+      # Packagist cannot serve a package whose composer.json lives in a subdirectory, so
+      # `webhook-platform/php` there is registered against a separate repository,
+      # vadymkykalo/webhook-platform-php. That repository was kept in step by hand, and the
+      # hand stopped: its last commit is the v2.2.1 release, and every release since has
+      # shipped a PHP SDK that nothing published. Meanwhile this job reported success every
+      # time, because it posted an update-package call naming *this* monorepo — a URL
+      # Packagist does not know — and checked neither the exit code nor the response body,
+      # inside an `if [ -n "$TOKEN" ]` that made a missing secret a silent no-op too.
+      #
+      # Authenticated with a deploy key rather than a personal access token: a deploy key
+      # grants write to exactly one repository and nothing else, which is all this needs.
+      # The public half is registered on vadymkykalo/webhook-platform-php ("hookflow-release
+      # (SDK split push)"); revoking it there is enough to cut this off. GITHUB_TOKEN cannot
+      # be used — it is scoped to the repository running the workflow.
+      - name: Publish sdks/php to the split repository
+        if: steps.check.outputs.should_publish == 'true'
+        working-directory: .
+        env:
+          SDK_SPLIT_SSH_KEY: ${{ secrets.SDK_SPLIT_SSH_KEY }}
+          SPLIT_REPO: vadymkykalo/webhook-platform-php
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SDK_SPLIT_SSH_KEY:-}" ]; then
+            echo "::error::SDK_SPLIT_SSH_KEY is not set, so the PHP SDK cannot be published. See the comment above this step."
+            exit 1
+          fi
+
+          VERSION=$(php -r "echo json_decode(file_get_contents('sdks/php/composer.json'), true)['version'] ?? '';")
+          [ -n "$VERSION" ] || { echo "::error::no version in sdks/php/composer.json"; exit 1; }
+
+          # Written to disk rather than passed through ssh-agent: the agent would outlive
+          # this step, and the runner is discarded either way.
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SDK_SPLIT_SSH_KEY" > ~/.ssh/sdk_split
+          chmod 600 ~/.ssh/sdk_split
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/sdk_split -o IdentitiesOnly=yes"
+
+          git clone --depth 1 "git@github.com:${SPLIT_REPO}.git" split
+          cd split
+
+          if git ls-remote --tags origin "refs/tags/${VERSION}" | grep -q .; then
+            echo "Tag ${VERSION} already exists in ${SPLIT_REPO}; nothing to push."
+            exit 0
+          fi
+
+          # Everything the package needs and nothing else: vendor/ is a build artefact, and
+          # the contract-test harness only means anything against a running platform.
+          # .gitignore is the split repository's own and survives the sweep — it is not
+          # something this monorepo has an opinion about.
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitignore -exec rm -rf {} +
+          cp -r ../sdks/php/src ../sdks/php/tests ../sdks/php/README.md \
+                ../sdks/php/composer.json ../sdks/php/composer.lock ../sdks/php/phpunit.xml .
+
+          # Packagist derives the version from the git tag and advises against a hardcoded
+          # one. The monorepo copy keeps the field because scripts/check-version-drift.sh
+          # reads it as one of the seven places the version has to agree; the published copy
+          # drops it, which is what the split repository has done by hand since 1.1.0.
+          php -r '
+            $f = "composer.json";
+            $c = json_decode(file_get_contents($f), true);
+            unset($c["version"]);
+            file_put_contents($f, json_encode($c, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+          '
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No content change; tagging the existing HEAD as ${VERSION}."
+          else
+            git commit -m "Release ${VERSION}"
+          fi
+          git tag "${VERSION}"
+          git push origin HEAD:main --tags
+
+      # Packagist re-crawls from the split repository's own webhook when one is configured
+      # there. This nudge makes the publish deterministic — and unlike the call it replaces,
+      # it fails when the nudge does not land.
       - name: Trigger Packagist update
         if: steps.check.outputs.should_publish == 'true'
         env:
           PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
           PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
         run: |
-          if [ -n "$PACKAGIST_TOKEN" ]; then
-            curl -X POST \
-              -H "Content-Type: application/json" \
-              "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}&autoUpdated=1" \
-              -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}'
+          set -euo pipefail
+
+          if [ -z "${PACKAGIST_TOKEN:-}" ] || [ -z "${PACKAGIST_USERNAME:-}" ]; then
+            echo "::error::PACKAGIST_USERNAME / PACKAGIST_TOKEN are not set, so Packagist will not re-crawl."
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}&autoUpdated=1" \
+            -d '{"repository":{"url":"https://github.com/vadymkykalo/webhook-platform-php"}}')
+
+          echo "Packagist responded: $RESPONSE"
+
+          if ! echo "$RESPONSE" | grep -q '"status" *: *"success"'; then
+            echo "::error::Packagist did not accept the update. Check that webhook-platform/php is registered against vadymkykalo/webhook-platform-php."
+            exit 1
           fi

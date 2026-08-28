@@ -132,11 +132,37 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         UUID fence;
 
         if (isRetry) {
-            delivery = deliveryRepository.findById(message.getDeliveryId()).orElse(null);
-            if (delivery == null || delivery.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
-                return new ClaimResult.NotClaimed<>("retry delivery not found or not PROCESSING");
+            UUID expected = message.getClaimToken();
+            if (expected == null) {
+                // Published by a worker from before the token travelled with the message
+                // (rolling deploy skew). Fall back to trusting the status rather than
+                // stranding every retry already in flight — the same accommodation
+                // IncomingAttemptStore makes for its own fencing token.
+                delivery = deliveryRepository.findById(message.getDeliveryId()).orElse(null);
+                if (delivery == null || delivery.getStatus() != Delivery.DeliveryStatus.PROCESSING) {
+                    return new ClaimResult.NotClaimed<>("retry delivery not found or not PROCESSING");
+                }
+                log.debug("Retry message for delivery {} carries no fencing token (older producer?), "
+                        + "proceeding without CAS", message.getDeliveryId());
+                fence = delivery.getClaimToken();
+            } else {
+                // CAS on the token the scheduler published with, rather than trusting the
+                // status. Reading the fence out of the row meant every copy of a redelivered
+                // Kafka message matched, and both dispatched: only the first finalisation
+                // applied, so the second webhook went out with nothing recording it. The same
+                // held for a message the scheduler had already given up on — it hands the row
+                // back as PENDING with a null token, the next poll re-claims it under a new
+                // token, and the late send then picked up that new token and dispatched
+                // alongside the fresh one.
+                UUID token = UUID.randomUUID();
+                delivery = transactionTemplate.execute(tx ->
+                        deliveryRepository.claimRetryForProcessing(message.getDeliveryId(), expected, token));
+                if (delivery == null) {
+                    return new ClaimResult.NotClaimed<>(
+                            "retry delivery already claimed by a prior delivery of this Kafka message");
+                }
+                fence = token;
             }
-            fence = delivery.getClaimToken();
         } else {
             UUID token = UUID.randomUUID();
             delivery = transactionTemplate.execute(tx ->
@@ -213,7 +239,12 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     /** Fails the Delivery under its fencing token and reports that there is nothing to attempt. */
     private ClaimResult<Claim> terminal(Claim claim, String reason) {
         log.warn("Delivery {} will not be attempted: {}", claim.deliveryId(), reason);
-        finalise(claim, new Finalization.TerminallyFailed(reason));
+        // This path never reaches AttemptRunner — it rejects the Delivery during the claim,
+        // before there is an Attempt at all — so it owes the release itself. Same condition as
+        // everywhere else: only the writer whose finalisation applied may let go of the cursor.
+        if (finalise(claim, new Finalization.TerminallyFailed(reason))) {
+            onTerminallyFailed(claim);
+        }
         return new ClaimResult.NotClaimed<>(reason);
     }
 
@@ -458,6 +489,19 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     @Override
     public void onSucceeded(Claim claim) {
         releaseOrdering(claim.delivery(), false);
+    }
+
+    /**
+     * A Delivery that terminally failed is as done as one that succeeded or was abandoned, and
+     * the endpoint's cursor has to move past it. It did not, so a single non-retryable 4xx —
+     * or a disabled endpoint, or an SSRF rejection — parked an ordering-enabled endpoint at
+     * that sequence permanently: nothing after it ever satisfied {@code canDeliver} again.
+     * Removed from the buffer as well as marked delivered, as with abandonment, because a
+     * terminal Delivery has no successor coming to clean up after it.
+     */
+    @Override
+    public void onTerminallyFailed(Claim claim) {
+        releaseOrdering(claim.delivery(), true);
     }
 
     private void releaseOrdering(Delivery delivery, boolean removeFromBuffer) {
