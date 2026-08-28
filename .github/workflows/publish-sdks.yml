@@ -26,6 +26,14 @@ on:
         required: false
         default: 'all'
         type: string
+      ref:
+        description: >-
+          Git ref to publish from. Defaults to whatever triggered the caller, which on a tag
+          push is the tag. A manual re-run of a release starts from a branch, and without
+          this the SDK versions read would be that branch's rather than the tag's.
+        required: false
+        default: ''
+        type: string
   workflow_dispatch:
     inputs:
       sdk:
@@ -59,6 +67,8 @@ jobs:
         working-directory: sdks/node
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -128,6 +138,8 @@ jobs:
         working-directory: sdks/python
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -178,6 +190,8 @@ jobs:
         working-directory: sdks/php
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
