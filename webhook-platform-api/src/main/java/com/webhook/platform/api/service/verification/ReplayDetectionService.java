@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service.verification;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -18,11 +19,24 @@ import java.util.HexFormat;
 public class ReplayDetectionService {
 
     private static final String REDIS_KEY_PREFIX = "webhook:replay:";
-    private static final Duration REPLAY_CACHE_TTL = Duration.ofMinutes(5);
+    /**
+     * How long a signature is remembered as already-seen.
+     *
+     * <p>For a provider whose scheme carries a timestamp this is a duplicate-suppression
+     * window and five minutes is generous. For the raw-hex generic HMAC it is the <em>only</em>
+     * bound on replay — that shape signs the body alone, so a captured request stays
+     * verifiable for as long as the secret lives and nothing but this cache stops it being
+     * sent again. Raise it for a source like that, at the cost of Redis holding one key per
+     * signature for the window.</p>
+     */
+    private final Duration replayCacheTtl;
 
     private final StringRedisTemplate redisTemplate;
 
-    public ReplayDetectionService(StringRedisTemplate redisTemplate) {
+    public ReplayDetectionService(
+            StringRedisTemplate redisTemplate,
+            @Value("${webhook.ingress.replay-window-minutes:5}") int replayWindowMinutes) {
+        this.replayCacheTtl = Duration.ofMinutes(replayWindowMinutes);
         this.redisTemplate = redisTemplate;
     }
 
@@ -39,7 +53,7 @@ public class ReplayDetectionService {
         String redisKey = REDIS_KEY_PREFIX + sourceId + ":" + signatureHash;
 
         Boolean wasSet = redisTemplate.opsForValue()
-                .setIfAbsent(redisKey, "1", REPLAY_CACHE_TTL);
+                .setIfAbsent(redisKey, "1", replayCacheTtl);
 
         if (Boolean.FALSE.equals(wasSet)) {
             log.warn("Replay attack detected: sourceId={}, signatureHash={}", sourceId, signatureHash);

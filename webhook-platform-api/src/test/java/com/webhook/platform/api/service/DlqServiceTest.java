@@ -248,7 +248,13 @@ class DlqServiceTest {
         verify(deliveryRepository).save(savedCaptor.capture());
         Delivery saved = savedCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
-        assertThat(saved.getAttemptCount()).isZero();
+        // attemptCount is carried forward, not reset. delivery_attempts is unique on
+        // (delivery_id, attempt_number), so restarting the count makes the attempt this retry
+        // records collide with one already on the record — the history reads as two attempt 1s
+        // and "the latest attempt" stops being well defined. Headroom comes from maxAttempts
+        // instead, which is what pressing retry is actually asking for.
+        assertThat(saved.getAttemptCount()).isEqualTo(7);
+        assertThat(saved.getMaxAttempts()).isEqualTo(10);
         assertThat(saved.getNextRetryAt()).isNull();
         assertThat(saved.getFailedAt()).isNull();
 
@@ -311,12 +317,29 @@ class DlqServiceTest {
     @Test
     void purgeAllDlq_deletesAndReturnsCount() {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
-        when(deliveryRepository.countDlqByProjectId(projectId)).thenReturn(5L);
+        when(deliveryRepository.deleteDlqBatchByProjectId(any(), eq(projectId), anyInt())).thenReturn(5);
 
         int purged = dlqService.purgeAllDlq(projectId);
 
+        // One short batch means the DLQ is drained, so exactly one round-trip.
         assertThat(purged).isEqualTo(5);
-        verify(deliveryRepository).deleteDlqByProjectId(projectId);
+        verify(deliveryRepository).deleteDlqBatchByProjectId(any(), eq(projectId), anyInt());
+    }
+
+    @Test
+    void purgeAllDlq_keepsDeletingUntilABatchComesBackShort() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(projectOwnedBy(orgId)));
+        // A full batch means there may be more; the loop stops on the first short one.
+        when(deliveryRepository.deleteDlqBatchByProjectId(any(), eq(projectId), anyInt()))
+                .thenReturn(500, 500, 12);
+
+        int purged = dlqService.purgeAllDlq(projectId);
+
+        // Batched rather than one unbounded DELETE: with the V061 foreign key back, each
+        // delivery cascades into its attempt rows, so an unbounded purge held locks across all
+        // of them for the length of a single transaction.
+        assertThat(purged).isEqualTo(1012);
+        verify(deliveryRepository, times(3)).deleteDlqBatchByProjectId(any(), eq(projectId), anyInt());
     }
 
     @Test
@@ -327,6 +350,6 @@ class DlqServiceTest {
 
         assertThatThrownBy(() -> dlqService.purgeAllDlq(projectId))
                 .isInstanceOf(NotFoundException.class);
-        verify(deliveryRepository, never()).deleteDlqByProjectId(any());
+        verify(deliveryRepository, never()).deleteDlqBatchByProjectId(any(), any(), anyInt());
     }
 }
