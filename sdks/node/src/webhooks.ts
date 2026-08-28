@@ -106,6 +106,98 @@ export function verifySignature(
   return true;
 }
 
+const STANDARD_ID_HEADER = 'webhook-id';
+const STANDARD_TIMESTAMP_HEADER = 'webhook-timestamp';
+const STANDARD_SIGNATURE_HEADER = 'webhook-signature';
+
+/** Tolerance for the Standard Webhooks headers, whose timestamp is in **seconds**. */
+const DEFAULT_STANDARD_TOLERANCE_SECONDS = 300;
+
+/**
+ * Verifies the [Standard Webhooks](https://www.standardwebhooks.com) headers.
+ *
+ * Endpoints receive both header sets by default (`signatureScheme: 'BOTH'`), so use
+ * whichever you prefer — this one if you would rather your verification match what other
+ * providers send, `verifySignature` if you are already verifying `X-Signature`.
+ *
+ * Two things differ from Hookflow's own scheme beyond the header names: the message id is
+ * part of what is signed, and the digest is base64 rather than hex. Rotation works the same
+ * way — during the grace window the header carries a space-separated signature per valid
+ * secret, and any one matching is enough.
+ *
+ * @param payload - Raw request body as string
+ * @param headers - Request headers, including the three `webhook-*` ones
+ * @param secret - The endpoint's `standardWebhooksSecret` (`whsec_…`), not the raw secret.
+ *                 A plain secret is accepted too and used as-is.
+ * @returns true if the signature is valid
+ * @throws HookflowError if it is not
+ */
+export function verifyStandardWebhook(
+  payload: string,
+  headers: WebhookHeaders,
+  secret: string,
+  options: { toleranceSeconds?: number } = {}
+): boolean {
+  const tolerance = options.toleranceSeconds ?? DEFAULT_STANDARD_TOLERANCE_SECONDS;
+
+  const id = headers[STANDARD_ID_HEADER] || headers['Webhook-Id'];
+  const timestamp = headers[STANDARD_TIMESTAMP_HEADER] || headers['Webhook-Timestamp'];
+  const signature = headers[STANDARD_SIGNATURE_HEADER] || headers['Webhook-Signature'];
+
+  if (!id || !timestamp || !signature) {
+    throw new HookflowError(
+      'Missing webhook-id, webhook-timestamp or webhook-signature header',
+      400,
+      'invalid_signature'
+    );
+  }
+
+  const timestampSeconds = parseInt(timestamp, 10);
+  if (Number.isNaN(timestampSeconds)) {
+    throw new HookflowError('Invalid webhook-timestamp header', 400, 'invalid_signature');
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - timestampSeconds) > tolerance) {
+    throw new HookflowError(
+      'Webhook timestamp is outside tolerance window',
+      400,
+      'timestamp_expired'
+    );
+  }
+
+  // `whsec_<base64>` is the conventional form and is what the endpoint's
+  // standardWebhooksSecret gives you; the base64 body decodes to the key bytes. Anything
+  // else is taken literally, so a raw secret still works.
+  const key = secret.startsWith('whsec_')
+    ? Buffer.from(secret.slice('whsec_'.length), 'base64')
+    : Buffer.from(secret, 'utf8');
+
+  const expected = crypto
+    .createHmac('sha256', key)
+    .update(`${id}.${timestampSeconds}.${payload}`)
+    .digest('base64');
+  const expectedBuffer = Buffer.from(expected);
+
+  // Space-separated, one per valid secret during a rotation window. Every candidate is
+  // compared with no early exit, so the time taken does not reveal which one matched.
+  let matched = false;
+  for (const part of signature.trim().split(/\s+/)) {
+    const comma = part.indexOf(',');
+    if (comma < 1 || part.slice(0, comma) !== 'v1') continue;
+    const candidate = Buffer.from(part.slice(comma + 1));
+    if (candidate.length === expectedBuffer.length && crypto.timingSafeEqual(candidate, expectedBuffer)) {
+      matched = true;
+    }
+  }
+
+  if (!matched) {
+    throw new HookflowError('Invalid signature', 400, 'invalid_signature');
+  }
+
+  return true;
+}
+
 /**
  * Constructs a webhook event from the request.
  *

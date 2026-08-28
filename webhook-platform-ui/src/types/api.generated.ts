@@ -3214,6 +3214,8 @@ export interface components {
             /** Format: int32 */
             rateLimitPerSecond?: number;
             allowedSourceIps?: string;
+            /** @enum {string} */
+            signatureScheme?: "LEGACY" | "STANDARD" | "BOTH";
         };
         EndpointResponse: {
             /** Format: uuid */
@@ -3238,6 +3240,9 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             secret?: string;
+            /** @enum {string} */
+            signatureScheme?: "LEGACY" | "STANDARD" | "BOTH";
+            standardWebhooksSecret?: string;
         };
         AlertRuleRequest: {
             name: string;

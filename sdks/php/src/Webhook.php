@@ -10,6 +10,9 @@ class Webhook
 {
     private const DEFAULT_TOLERANCE_MS = 300000; // 5 minutes
 
+    /** The Standard Webhooks headers carry seconds, not milliseconds. */
+    private const DEFAULT_STANDARD_TOLERANCE_SECONDS = 300;
+
     /**
      * Verify webhook signature using HMAC-SHA256.
      *
@@ -78,6 +81,96 @@ class Webhook
         $matched = false;
         foreach ($signatures as $candidate) {
             if (hash_equals($expectedSignature, $candidate)) {
+                $matched = true;
+            }
+        }
+
+        if (!$matched) {
+            throw new HookflowException('Invalid signature', 400, 'invalid_signature');
+        }
+
+        return true;
+    }
+
+    /**
+     * Verify the {@link https://www.standardwebhooks.com Standard Webhooks} headers.
+     *
+     * Endpoints receive both header sets by default (`signatureScheme: BOTH`), so use
+     * whichever suits you — this one if you would rather verify the same way as the other
+     * providers you integrate with, `verifySignature` if you already verify `X-Signature`.
+     *
+     * Two things differ from Hookflow's own scheme beyond the header names: the message id
+     * is part of what is signed, and the digest is base64 rather than hex. Rotation behaves
+     * the same — through the grace window the header carries a space-separated signature per
+     * valid secret, and any one matching is enough.
+     *
+     * @param string $payload Raw request body
+     * @param array $headers Request headers (case-insensitive)
+     * @param string $secret The endpoint's `standardWebhooksSecret` (`whsec_…`). A raw
+     *                       secret is accepted too and used as-is.
+     * @param int $toleranceSeconds How far the timestamp may be from now, either way
+     * @return bool True if the signature is valid
+     * @throws HookflowException If it is not
+     */
+    public static function verifyStandardWebhook(
+        string $payload,
+        array $headers,
+        string $secret,
+        int $toleranceSeconds = self::DEFAULT_STANDARD_TOLERANCE_SECONDS
+    ): bool {
+        $normalized = [];
+        foreach ($headers as $key => $value) {
+            $normalized[strtolower((string) $key)] = $value;
+        }
+
+        $messageId = $normalized['webhook-id'] ?? null;
+        $timestamp = $normalized['webhook-timestamp'] ?? null;
+        $signature = $normalized['webhook-signature'] ?? null;
+
+        if (!$messageId || !$timestamp || !$signature) {
+            throw new HookflowException(
+                'Missing webhook-id, webhook-timestamp or webhook-signature header',
+                400,
+                'invalid_signature'
+            );
+        }
+
+        if (!is_numeric(trim((string) $timestamp))) {
+            throw new HookflowException('Invalid webhook-timestamp header', 400, 'invalid_signature');
+        }
+        $timestampSeconds = (int) trim((string) $timestamp);
+
+        if (abs(time() - $timestampSeconds) > $toleranceSeconds) {
+            throw new HookflowException(
+                'Webhook timestamp is outside tolerance window',
+                400,
+                'timestamp_expired'
+            );
+        }
+
+        // `whsec_<base64>` is the conventional form and is what the endpoint's
+        // standardWebhooksSecret gives you: the base64 body decodes to the key bytes.
+        // Anything else is taken literally, so a raw secret still works.
+        $key = str_starts_with($secret, 'whsec_')
+            ? base64_decode(substr($secret, strlen('whsec_')), true)
+            : $secret;
+        if ($key === false) {
+            throw new HookflowException('Malformed whsec_ secret', 400, 'invalid_signature');
+        }
+
+        $expected = base64_encode(
+            hash_hmac('sha256', $messageId . '.' . $timestampSeconds . '.' . $payload, $key, true)
+        );
+
+        // Space-separated, one per valid secret during a rotation window. Every candidate is
+        // compared with no early exit, so the time taken does not reveal which one matched.
+        $matched = false;
+        foreach (preg_split('/\s+/', trim((string) $signature)) as $part) {
+            $comma = strpos($part, ',');
+            if ($comma === false || substr($part, 0, $comma) !== 'v1') {
+                continue;
+            }
+            if (hash_equals($expected, substr($part, $comma + 1))) {
                 $matched = true;
             }
         }

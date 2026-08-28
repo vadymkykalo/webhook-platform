@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.common.enums.SignatureScheme;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -31,4 +32,10 @@ public class EndpointRequest {
     private Integer rateLimitPerSecond;
 
     private String allowedSourceIps;
+
+    /**
+     * Which signature headers this endpoint should receive. Null means leave it alone —
+     * BOTH for a new endpoint, unchanged for an existing one.
+     */
+    private SignatureScheme signatureScheme;
 }
