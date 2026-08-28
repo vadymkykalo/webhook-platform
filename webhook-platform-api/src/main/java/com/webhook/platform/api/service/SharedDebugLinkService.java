@@ -85,7 +85,15 @@ public class SharedDebugLinkService {
                 .filter(p -> p.getOrganizationId().equals(organizationId))
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
+        // Filtered by projectId, not just by eventId. The response carries the raw share
+        // token and its URL, and ScopeEnforcementInterceptor.enforceProjectScope confines an
+        // API key to the {projectId} in the path while saying nothing about {eventId} — so
+        // without this a key scoped to one project could name any event of a sibling project,
+        // take the token, and read that event through the unauthenticated
+        // /public/debug/{token} endpoint. createLink already checks the event belongs to the
+        // project; this is the same check on the way back out.
         return linkRepository.findByEventId(eventId).stream()
+                .filter(link -> projectId.equals(link.getProjectId()))
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
