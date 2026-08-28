@@ -209,6 +209,11 @@ public class RetrySchedulerService {
                         .subscriptionId(delivery.getSubscriptionId())
                         .status(delivery.getStatus().name())
                         .attemptCount(delivery.getAttemptCount())
+                        // The token Phase 1 claimed this row with, so the consumer can CAS on
+                        // it instead of trusting the status. Without it, a redelivered Kafka
+                        // message and a send this method has already timed out on both read
+                        // PROCESSING from the row and both dispatched.
+                        .claimToken(delivery.getClaimToken())
                         .build();
 
                 CompletableFuture<SendResult<String, DeliveryMessage>> future = kafkaTemplate.send(topic,
