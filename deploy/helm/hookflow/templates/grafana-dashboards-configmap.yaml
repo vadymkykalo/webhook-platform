@@ -5,10 +5,17 @@ metadata:
   name: {{ include "hookflow.fullname" . }}-grafana-dashboards
   labels:
     {{- include "hookflow.labels" . | nindent 4 }}
-    grafana_dashboard: "1"
-    {{- with .Values.monitoring.grafanaDashboards.labels }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- /*
+      Merged rather than appended. `grafana_dashboard: "1"` is the label the
+      Grafana sidecar looks for, so it is the default — but it is also the
+      label an operator is most likely to set explicitly, and
+      values-production.yaml does exactly that. Emitting both lines produced a
+      ConfigMap with a duplicate map key, which is not valid YAML: Helm
+      rendered it happily and `kubectl apply` rejected the release.
+      merge with the user's dict first means their value wins.
+    */}}
+    {{- $labels := merge (dict) (.Values.monitoring.grafanaDashboards.labels | default dict) (dict "grafana_dashboard" "1") }}
+    {{- toYaml $labels | nindent 4 }}
   annotations:
     grafana-folder: Hookflow
 data:

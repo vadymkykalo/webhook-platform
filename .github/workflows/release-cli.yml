@@ -80,3 +80,108 @@ jobs:
     with:
       sdk: all
     secrets: inherit
+
+  # The v2.6.0 post-mortem in one job.
+  #
+  # That release published api and worker to GHCR, skipped the UI image (its
+  # build died under QEMU), left npm on 2.2.1 (an expired token), and left
+  # Packagist on 2.2.1 (a step that could not fail). The GitHub release was
+  # created and stayed up through all of it, and `install.sh` — which resolves
+  # the latest release and pins every image tag to it — was broken for every
+  # new user from that moment.
+  #
+  # `make version-check` could not have caught any of it: it compares files in
+  # the repository to each other and never asks a registry what is actually
+  # published. This does ask.
+  verify-release:
+    name: Verify everything published
+    needs: publish-sdks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Resolve version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      # docker-publish.yml is a separate workflow on the same tag, so this one
+      # cannot `needs:` it. Poll instead — a full multi-arch build of the three
+      # images takes ~17 minutes, so a bounded wait is the honest shape here
+      # rather than an immediate check that would just race.
+      - name: Wait for the container images
+        run: |
+          set -uo pipefail
+          DEADLINE=$(( $(date +%s) + 30 * 60 ))
+          MISSING=""
+
+          tag_exists() {
+            local image="$1"
+            local token
+            token=$(curl -fsS "https://ghcr.io/token?scope=repository:${GITHUB_REPOSITORY_OWNER}/${image}:pull&service=ghcr.io" \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])') || return 1
+            curl -fsS -H "Authorization: Bearer ${token}" \
+              "https://ghcr.io/v2/${GITHUB_REPOSITORY_OWNER}/${image}/manifests/${VERSION}" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json' \
+              -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
+              -o /dev/null
+          }
+
+          while :; do
+            MISSING=""
+            for image in hookflow-api hookflow-ui hookflow-worker; do
+              tag_exists "$image" || MISSING="${MISSING} ${image}"
+            done
+            [ -z "$MISSING" ] && break
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "::error::No ${VERSION} tag in GHCR for:${MISSING}. Check the Docker Publish run for this tag — an image that never published means install.sh cannot pull it."
+              exit 1
+            fi
+            echo "still waiting for:${MISSING}"
+            sleep 60
+          done
+          echo "All three images carry the ${VERSION} tag."
+
+      # Each of the three is checked, and each reports independently, so one
+      # broken registry does not hide the state of the other two.
+      - name: Verify the SDK registries
+        run: |
+          set -uo pipefail
+
+          npm_version() { npm view @webhook-platform/node version 2>/dev/null || echo ''; }
+          pypi_version() {
+            curl -fsS https://pypi.org/pypi/webhook-platform/json 2>/dev/null \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["info"]["version"])' 2>/dev/null || echo ''
+          }
+          packagist_version() {
+            curl -fsS https://repo.packagist.org/p2/webhook-platform/php.json 2>/dev/null \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["packages"]["webhook-platform/php"][0]["version"].lstrip("v"))' 2>/dev/null || echo ''
+          }
+
+          # Packagist crawls asynchronously after update-package returns, and
+          # npm's read replicas lag its own publish by a few seconds, so a
+          # single immediate read would report a false failure. Ten minutes is
+          # well past both and still far short of a hung job.
+          DEADLINE=$(( $(date +%s) + 10 * 60 ))
+          while :; do
+            NPM=$(npm_version); PYPI=$(pypi_version); PACKAGIST=$(packagist_version)
+            [ "$NPM" = "$VERSION" ] && [ "$PYPI" = "$VERSION" ] && [ "$PACKAGIST" = "$VERSION" ] && break
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then break; fi
+            echo "waiting — npm=${NPM:-<nothing>} pypi=${PYPI:-<nothing>} packagist=${PACKAGIST:-<nothing>}"
+            sleep 30
+          done
+
+          # Report all three even when one has already failed: a half-published
+          # release is exactly the case where you want the whole picture.
+          FAILED=0
+          check() {
+            if [ "$2" = "$VERSION" ]; then
+              echo "ok   $1: $2"
+            else
+              echo "::error::$1 is on '${2:-<nothing>}', expected ${VERSION}."
+              FAILED=1
+            fi
+          }
+          check "npm @webhook-platform/node" "$NPM"
+          check "PyPI webhook-platform" "$PYPI"
+          check "Packagist webhook-platform/php" "$PACKAGIST"
+
+          exit $FAILED

@@ -23,16 +23,20 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "hookflow.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml (.Values.ui.podSecurityContext | default .Values.podSecurityContext) | nindent 8 }}
       containers:
         - name: ui
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.global.imageRegistry }}{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+            {{- toYaml (.Values.ui.securityContext | default .Values.securityContext) | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
           ports:
+            # 5173, not 80: the image is nginx serving `listen 5173`
+            # (webhook-platform-ui/nginx.conf) and EXPOSE 5173. While this said
+            # 80 the readiness probe could never pass and the Service pointed at
+            # a closed port, so `helm install` produced a UI that never came up.
             - name: http
-              containerPort: 80
+              containerPort: 5173
               protocol: TCP
           livenessProbe:
             {{- toYaml .Values.ui.livenessProbe | nindent 12 }}
@@ -40,6 +44,23 @@ spec:
             {{- toYaml .Values.ui.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
+          # nginx writes its temp dirs and its pid file at startup. As a
+          # non-root user those paths are not writable in the image, so without
+          # these the container exits before it ever serves anything.
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

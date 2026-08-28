@@ -39,10 +39,18 @@ on:
           - python
           - php
 
+# Least privilege by default. `id-token: write` is granted per-job below, only
+# where a registry's OIDC (Trusted Publishing) flow needs it.
+permissions:
+  contents: read
+
 jobs:
   publish-node:
     name: Publish Node.js SDK to npm (@webhook-platform/node)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm Trusted Publishing + --provenance
     if: >
       inputs.sdk == 'all' ||
       inputs.sdk == 'node'
@@ -55,7 +63,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 22, not 20: `npm@latest` (needed for Trusted Publishing) requires
+          # ^20.17 || >=22.9, and which 20.x the runner image carries is not
+          # something to depend on.
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Check version drift
@@ -82,9 +93,27 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: npm run build
 
+      # npm >= 11.5.1 is what understands Trusted Publishing; setup-node pins an
+      # older npm with Node 20.
+      - name: Upgrade npm for Trusted Publishing
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm install -g npm@latest
+
+      # v2.5.0 and v2.6.0 both failed here with
+      #   npm error 404 Not Found - PUT .../@webhook-platform%2fnode
+      # which is what npm returns for an unauthenticated scoped publish: the
+      # long-lived NPM_TOKEN had expired, and npm was left two releases behind
+      # at 2.2.1. OIDC removes the standing secret so that cannot recur, and
+      # --provenance attaches the sigstore attestation the container images
+      # already carry.
+      #
+      # One-time setup on npmjs.com, which no workflow can do for you: package
+      # settings -> Trusted Publisher -> this repository, workflow
+      # `publish-sdks.yml`. NPM_TOKEN stays here as the fallback npm uses when
+      # no trusted publisher is configured; once OIDC works it can be deleted.
       - name: Publish to npm
         if: steps.check.outputs.should_publish == 'true'
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -180,16 +209,40 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: vendor/bin/phpunit --no-coverage
 
-      # Packagist auto-updates from GitHub via webhook; this just nudges it.
+      # This step used to `curl ... || true` inside an `if [ -n "$PACKAGIST_TOKEN" ]`
+      # and report success either way. It reported success for every release from
+      # v2.3.0 on while Packagist stayed on 2.2.1, because the package there is
+      # registered against a *different* repository (vadymkykalo/webhook-platform-php)
+      # and an update-package call naming this monorepo matches nothing. A publish
+      # step that cannot fail is not a publish step, so this one now checks both
+      # the secret and the API's answer.
+      #
+      # One-time setup on packagist.org, which no workflow can do for you: point
+      # the `webhook-platform/php` package at this repository (or split sdks/php
+      # out to a repository of its own and tag it). Until that is done this step
+      # fails loudly, which is the intended behaviour — silence is what let the
+      # SDK sit six months behind.
       - name: Trigger Packagist update
         if: steps.check.outputs.should_publish == 'true'
         env:
           PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
           PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
         run: |
-          if [ -n "$PACKAGIST_TOKEN" ]; then
-            curl -X POST \
-              -H "Content-Type: application/json" \
-              "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}&autoUpdated=1" \
-              -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}'
+          set -euo pipefail
+
+          if [ -z "${PACKAGIST_TOKEN:-}" ] || [ -z "${PACKAGIST_USERNAME:-}" ]; then
+            echo "::error::PACKAGIST_USERNAME / PACKAGIST_TOKEN are not set, so the PHP SDK cannot be published."
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}&autoUpdated=1" \
+            -d '{"repository":{"url":"https://github.com/${{ github.repository }}"}}')
+
+          echo "Packagist responded: $RESPONSE"
+
+          if ! echo "$RESPONSE" | grep -q '"status" *: *"success"'; then
+            echo "::error::Packagist did not accept the update. The package is most likely registered against a different repository — see the comment above this step."
+            exit 1
           fi
