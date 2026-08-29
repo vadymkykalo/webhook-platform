@@ -157,7 +157,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 attemptNumber,
                 ladder,
                 destination.getUrl(),
-                Math.max(1, Math.min(60, destination.getTimeoutSeconds())));
+                AttemptSupport.clampTimeout(destination.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
     }
 
@@ -175,7 +175,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                             .header("X-Forward-Attempt", String.valueOf(claim.attemptNumber()))
                             .header("Idempotency-Key", idempotencyKey);
                     addAuthHeaders(request);
-                    addCustomHeaders(request, destination.getCustomHeadersJson());
+                    AttemptSupport.addCustomHeaders(request, destination.getCustomHeadersJson(), objectMapper);
                 },
                 null); // Incoming has never recorded its request headers on the attempt row
     }
@@ -302,20 +302,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return Boolean.TRUE.equals(applied);
     }
 
-    /**
-     * Does this Claim still own the row it is about to write?
-     *
-     * <p>The status cannot answer it: a claim swept as abandoned and re-claimed by a second
-     * worker leaves the row PROCESSING again, so the first attempt's late 500 passes the status
-     * guard, writes FAILED and queues a successor — while the second attempt's success is
-     * discarded and the successor sends a third copy.
-     *
-     * <p>An unfenced Claim — a retry message published before the token existed — matches only
-     * a row that carries no token either. A row that carries one belongs to whoever stamped it.</p>
-     */
     private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt) {
-        UUID current = attempt.getClaimToken();
-        return current == null ? claim.fence() == null : current.equals(claim.fence());
+        return AttemptSupport.fenceMatches(attempt.getClaimToken(), claim.fence());
     }
 
     /**
@@ -354,7 +342,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
         attempt.setResponseCode(pendingRecord.statusCode());
         attempt.setResponseHeadersJson(pendingRecord.responseHeaders());
-        attempt.setResponseBodySnippet(truncate(pendingRecord.responseBody(), 10240));
+        attempt.setResponseBodySnippet(AttemptSupport.truncate(pendingRecord.responseBody(), 10240));
         attempt.setErrorMessage(pendingRecord.errorMessage());
     }
 
@@ -430,31 +418,4 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void addCustomHeaders(WebClient.RequestBodySpec request, String customHeadersJson) {
-        if (customHeadersJson == null || customHeadersJson.isBlank()) {
-            return;
-        }
-        try {
-            Map<String, String> headers = objectMapper.readValue(customHeadersJson, Map.class);
-            headers.forEach((key, value) -> {
-                if (key != null && value != null && !key.isBlank()) {
-                    String lower = key.toLowerCase();
-                    if (!lower.equals("host") && !lower.equals("content-length")
-                            && !lower.equals("transfer-encoding")) {
-                        request.header(key, value);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            log.warn("Failed to parse custom headers: {}", e.getMessage());
-        }
-    }
-
-    private String truncate(String value, int maxLength) {
-        if (value == null || value.length() <= maxLength) {
-            return value;
-        }
-        return value.substring(0, maxLength) + "\n...[truncated]";
-    }
 }

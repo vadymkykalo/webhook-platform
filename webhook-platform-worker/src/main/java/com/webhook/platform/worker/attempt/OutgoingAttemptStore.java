@@ -32,7 +32,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -216,7 +215,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 delivery.getAttemptCount() + 1,
                 ladder,
                 endpoint.getUrl(),
-                clampTimeout(delivery.getTimeoutSeconds()));
+                AttemptSupport.clampTimeout(delivery.getTimeoutSeconds()));
         return new ClaimResult.Claimed<>(claim, context);
     }
 
@@ -342,7 +341,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                                 .header("webhook-timestamp", String.valueOf(signatureTimestamp / 1000))
                                 .header("webhook-signature", standardSignature);
                     }
-                    addCustomHeaders(request, delivery.getCustomHeaders());
+                    AttemptSupport.addCustomHeaders(request, delivery.getCustomHeaders(), objectMapper);
                 },
                 recordedRequestHeaders(signature, standardSignature, delivery));
     }
@@ -387,10 +386,10 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 .organizationId(claim.delivery().getOrganizationId())
                 .attemptNumber(claim.delivery().getAttemptCount())
                 .requestHeaders(record.requestHeaders())
-                .requestBody(truncate(record.requestBody(), 10240))
+                .requestBody(AttemptSupport.truncate(record.requestBody(), 10240))
                 .httpStatusCode(record.statusCode())
                 .responseHeaders(record.responseHeaders())
-                .responseBody(truncate(record.responseBody(), success ? 2048 : 10240))
+                .responseBody(AttemptSupport.truncate(record.responseBody(), success ? 2048 : 10240))
                 .errorMessage(record.errorMessage())
                 .durationMs(record.durationMs())
                 .build());
@@ -525,8 +524,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     }
 
     private boolean stillHoldsClaim(Delivery fresh, Claim claim) {
-        UUID current = fresh.getClaimToken();
-        return current == null ? claim.fence() == null : current.equals(claim.fence());
+        return AttemptSupport.fenceMatches(fresh.getClaimToken(), claim.fence());
     }
 
     private String decryptSecret() {
@@ -583,38 +581,4 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return json.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private void addCustomHeaders(WebClient.RequestBodySpec request, String customHeadersJson) {
-        if (customHeadersJson == null || customHeadersJson.isBlank()) {
-            return;
-        }
-        try {
-            Map<String, String> headers = objectMapper.readValue(customHeadersJson, Map.class);
-            headers.forEach((key, value) -> {
-                if (key != null && value != null && !key.isBlank()) {
-                    String lower = key.toLowerCase();
-                    if (!lower.equals("host") && !lower.equals("content-length")
-                            && !lower.equals("transfer-encoding")) {
-                        request.header(key, value);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            log.warn("Failed to parse custom headers: {}", e.getMessage());
-        }
-    }
-
-    private int clampTimeout(Integer timeoutSeconds) {
-        if (timeoutSeconds == null) {
-            return 30;
-        }
-        return Math.max(1, Math.min(60, timeoutSeconds));
-    }
-
-    private String truncate(String value, int maxLength) {
-        if (value == null || value.length() <= maxLength) {
-            return value;
-        }
-        return value.substring(0, maxLength) + "\n...[truncated]";
-    }
 }
