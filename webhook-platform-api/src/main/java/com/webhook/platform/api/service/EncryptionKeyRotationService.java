@@ -21,6 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
@@ -142,44 +144,33 @@ public class EncryptionKeyRotationService {
     private void rotateEndpoint(Endpoint endpoint, int targetVersion) {
         int currentVersion = endpoint.getEncryptionKeyVersion() != null ? endpoint.getEncryptionKeyVersion() : 1;
 
-        // Re-encrypt main secret
-        if (endpoint.getSecretEncrypted() != null && endpoint.getSecretIv() != null) {
-            String plaintext = encryptionKeyRegistry.decryptWithFallback(
-                    endpoint.getSecretEncrypted(), endpoint.getSecretIv(), currentVersion);
-            CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
-            endpoint.setSecretEncrypted(reEncrypted.getCiphertext());
-            endpoint.setSecretIv(reEncrypted.getIv());
-        }
-
-        // Re-encrypt client cert
-        if (endpoint.getClientCertEncrypted() != null && endpoint.getClientCertIv() != null) {
-            String plaintext = encryptionKeyRegistry.decryptWithFallback(
-                    endpoint.getClientCertEncrypted(), endpoint.getClientCertIv(), currentVersion);
-            CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
-            endpoint.setClientCertEncrypted(reEncrypted.getCiphertext());
-            endpoint.setClientCertIv(reEncrypted.getIv());
-        }
-
-        // Re-encrypt client key
-        if (endpoint.getClientKeyEncrypted() != null && endpoint.getClientKeyIv() != null) {
-            String plaintext = encryptionKeyRegistry.decryptWithFallback(
-                    endpoint.getClientKeyEncrypted(), endpoint.getClientKeyIv(), currentVersion);
-            CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
-            endpoint.setClientKeyEncrypted(reEncrypted.getCiphertext());
-            endpoint.setClientKeyIv(reEncrypted.getIv());
-        }
-
-        // Re-encrypt previous secret if present
-        if (endpoint.getSecretPreviousEncrypted() != null && endpoint.getSecretPreviousIv() != null) {
-            String plaintext = encryptionKeyRegistry.decryptWithFallback(
-                    endpoint.getSecretPreviousEncrypted(), endpoint.getSecretPreviousIv(), currentVersion);
-            CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
-            endpoint.setSecretPreviousEncrypted(reEncrypted.getCiphertext());
-            endpoint.setSecretPreviousIv(reEncrypted.getIv());
-        }
+        reEncrypt(currentVersion, endpoint::getSecretEncrypted, endpoint::getSecretIv,
+                endpoint::setSecretEncrypted, endpoint::setSecretIv);
+        reEncrypt(currentVersion, endpoint::getClientCertEncrypted, endpoint::getClientCertIv,
+                endpoint::setClientCertEncrypted, endpoint::setClientCertIv);
+        reEncrypt(currentVersion, endpoint::getClientKeyEncrypted, endpoint::getClientKeyIv,
+                endpoint::setClientKeyEncrypted, endpoint::setClientKeyIv);
+        reEncrypt(currentVersion, endpoint::getSecretPreviousEncrypted, endpoint::getSecretPreviousIv,
+                endpoint::setSecretPreviousEncrypted, endpoint::setSecretPreviousIv);
 
         endpoint.setEncryptionKeyVersion(targetVersion);
         endpointRepository.save(endpoint);
+    }
+
+    /**
+     * Decrypts one field under the key it was written with and writes it back under the current
+     * one. A field that is not set stays that way — an endpoint without mTLS has no certificate
+     * to rotate.
+     */
+    private void reEncrypt(int currentVersion, Supplier<String> ciphertext, Supplier<String> iv,
+            Consumer<String> setCiphertext, Consumer<String> setIv) {
+        if (ciphertext.get() == null || iv.get() == null) {
+            return;
+        }
+        String plaintext = encryptionKeyRegistry.decryptWithFallback(ciphertext.get(), iv.get(), currentVersion);
+        CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
+        setCiphertext.accept(reEncrypted.getCiphertext());
+        setIv.accept(reEncrypted.getIv());
     }
 
     private void rotateIncomingSources(int targetVersion, AtomicInteger rotated, AtomicInteger errors) {
@@ -213,11 +204,8 @@ public class EncryptionKeyRotationService {
     private void rotateIncomingSource(IncomingSource source, int targetVersion) {
         int currentVersion = source.getEncryptionKeyVersion() != null ? source.getEncryptionKeyVersion() : 1;
 
-        String plaintext = encryptionKeyRegistry.decryptWithFallback(
-                source.getHmacSecretEncrypted(), source.getHmacSecretIv(), currentVersion);
-        CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
-        source.setHmacSecretEncrypted(reEncrypted.getCiphertext());
-        source.setHmacSecretIv(reEncrypted.getIv());
+        reEncrypt(currentVersion, source::getHmacSecretEncrypted, source::getHmacSecretIv,
+                source::setHmacSecretEncrypted, source::setHmacSecretIv);
         source.setEncryptionKeyVersion(targetVersion);
         incomingSourceRepository.save(source);
     }
@@ -253,11 +241,8 @@ public class EncryptionKeyRotationService {
     private void rotateIncomingDestination(IncomingDestination dest, int targetVersion) {
         int currentVersion = dest.getEncryptionKeyVersion() != null ? dest.getEncryptionKeyVersion() : 1;
 
-        String plaintext = encryptionKeyRegistry.decryptWithFallback(
-                dest.getAuthConfigEncrypted(), dest.getAuthConfigIv(), currentVersion);
-        CryptoUtils.EncryptedData reEncrypted = encryptionKeyRegistry.encrypt(plaintext);
-        dest.setAuthConfigEncrypted(reEncrypted.getCiphertext());
-        dest.setAuthConfigIv(reEncrypted.getIv());
+        reEncrypt(currentVersion, dest::getAuthConfigEncrypted, dest::getAuthConfigIv,
+                dest::setAuthConfigEncrypted, dest::setAuthConfigIv);
         dest.setEncryptionKeyVersion(targetVersion);
         incomingDestinationRepository.save(dest);
     }
