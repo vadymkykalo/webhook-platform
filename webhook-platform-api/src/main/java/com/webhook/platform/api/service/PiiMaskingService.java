@@ -31,7 +31,7 @@ public class PiiMaskingService {
     public List<PiiMaskingRuleResponse> listRules(UUID projectId) {
         validateProjectAccess(projectId);
         return ruleRepository.findByProjectId(projectId).stream()
-                .map(this::toResponse)
+                .map(PiiMaskingRuleResponse::of)
                 .collect(Collectors.toList());
     }
 
@@ -52,7 +52,7 @@ public class PiiMaskingService {
 
         rule = ruleRepository.save(rule);
         log.info("Created PII masking rule '{}' for project {}", rule.getPatternName(), projectId);
-        return toResponse(rule);
+        return PiiMaskingRuleResponse.of(rule);
     }
 
     @Transactional
@@ -75,7 +75,7 @@ public class PiiMaskingService {
 
         rule = ruleRepository.save(rule);
         log.info("Updated PII masking rule '{}' for project {}", rule.getPatternName(), projectId);
-        return toResponse(rule);
+        return PiiMaskingRuleResponse.of(rule);
     }
 
     @Transactional
@@ -154,17 +154,4 @@ public class PiiMaskingService {
                 .orElseThrow(() -> new NotFoundException("Project not found"));
     }
 
-    private PiiMaskingRuleResponse toResponse(PiiMaskingRule rule) {
-        return PiiMaskingRuleResponse.builder()
-                .id(rule.getId())
-                .projectId(rule.getProjectId())
-                .ruleType(rule.getRuleType())
-                .patternName(rule.getPatternName())
-                .jsonPath(rule.getJsonPath())
-                .maskStyle(rule.getMaskStyle())
-                .enabled(rule.getEnabled())
-                .createdAt(rule.getCreatedAt())
-                .updatedAt(rule.getUpdatedAt())
-                .build();
-    }
 }

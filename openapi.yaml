@@ -22,8 +22,12 @@ info:
     url: https://opensource.org/licenses/MIT
   version: 1.0.0
 servers:
-- url: http://localhost:8080
-  description: Local Development
+- url: "{baseUrl}"
+  description: Your Hookflow installation — the same origin the dashboard runs on
+  variables:
+    baseUrl:
+      description: "Scheme and host of your installation, without a trailing slash"
+      default: http://localhost:8080
 security:
 - bearerAuth: []
 tags:
@@ -413,11 +417,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -441,11 +440,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -475,11 +469,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Project deleted
@@ -491,6 +480,8 @@ paths:
       tags:
       - Workflows
       summary: Get workflow
+      description: "Returns the definition, the trigger, and how its executions have\
+        \ gone."
       operationId: getWorkflow
       parameters:
       - name: projectId
@@ -505,11 +496,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -524,6 +510,8 @@ paths:
       tags:
       - Workflows
       summary: Update workflow
+      description: Replaces the definition and trigger. Executions already running
+        are unaffected; the next one uses the new version.
       operationId: updateWorkflow
       parameters:
       - name: projectId
@@ -538,11 +526,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -563,6 +546,7 @@ paths:
       tags:
       - Workflows
       summary: Delete workflow
+      description: Removes the workflow and its execution history.
       operationId: deleteWorkflow
       parameters:
       - name: projectId
@@ -577,11 +561,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Workflow deleted
@@ -608,11 +587,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -642,11 +616,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -683,11 +652,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Transformation deleted
@@ -708,11 +672,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -736,11 +695,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -770,11 +724,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Subscription deleted
@@ -794,11 +743,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -835,11 +779,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -869,11 +808,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -909,11 +843,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Event type deleted
@@ -940,11 +869,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -974,11 +898,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1014,11 +933,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Rule deleted
@@ -1045,11 +959,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1085,11 +994,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Rule deleted
@@ -1110,11 +1014,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Destination retrieved
@@ -1144,11 +1043,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1184,11 +1078,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Destination deleted
@@ -1209,11 +1098,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Source retrieved
@@ -1243,11 +1127,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1283,11 +1162,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Source disabled
@@ -1299,6 +1173,8 @@ paths:
       tags:
       - Incidents
       summary: Get incident with timeline
+      description: "The incident and every entry recorded against it, in the order\
+        \ they happened."
       operationId: getIncident
       parameters:
       - name: projectId
@@ -1313,11 +1189,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1332,6 +1203,8 @@ paths:
       tags:
       - Incidents
       summary: "Update incident (status, RCA notes, severity)"
+      description: "A change of status is itself recorded on the timeline, so the\
+        \ history stays readable after the fact."
       operationId: updateIncident
       parameters:
       - name: projectId
@@ -1346,11 +1219,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1381,11 +1249,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1409,11 +1272,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1443,11 +1301,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Endpoint deleted
@@ -1459,6 +1312,8 @@ paths:
       tags:
       - Alerts
       summary: Update alert rule
+      description: "Changes the threshold, the channels or the enabled state. Alerts\
+        \ already fired are left as they are."
       operationId: updateAlertRule
       parameters:
       - name: projectId
@@ -1473,11 +1328,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1498,6 +1348,7 @@ paths:
       tags:
       - Alerts
       summary: Delete alert rule
+      description: Removes the rule. The alerts it has already fired stay in the history.
       operationId: deleteAlertRule
       parameters:
       - name: projectId
@@ -1512,11 +1363,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Rule deleted
@@ -1537,11 +1383,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1565,11 +1406,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1600,11 +1436,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Organization deleted
@@ -1618,12 +1449,6 @@ paths:
       summary: Get organization billing info
       description: "Returns current plan, billing status, and usage snapshot"
       operationId: getOrganizationBilling
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1639,12 +1464,6 @@ paths:
       summary: Update organization billing info
       description: Updates billing email for the organization (owner only)
       operationId: updateBillingInfo
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1668,12 +1487,6 @@ paths:
       description: "Directly assigns a plan to the organization (owner only). For\
         \ paid plans, use checkout instead."
       operationId: changePlan
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1696,12 +1509,6 @@ paths:
       summary: Update profile
       description: Updates the authenticated user's profile information
       operationId: updateProfile
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1794,11 +1601,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1835,11 +1637,6 @@ paths:
         required: false
         schema:
           type: string
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1856,12 +1653,6 @@ paths:
       summary: List projects
       description: Returns all projects in the organization
       operationId: listProjects
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1880,12 +1671,6 @@ paths:
       summary: Create project
       description: Creates a new project in the organization
       operationId: createProject
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1907,6 +1692,8 @@ paths:
       tags:
       - Workflows
       summary: List workflows
+      description: "Every workflow in the project, newest first, each with its execution\
+        \ counts."
       operationId: listWorkflows
       parameters:
       - name: projectId
@@ -1915,11 +1702,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -1936,6 +1718,8 @@ paths:
       tags:
       - Workflows
       summary: Create workflow
+      description: "Defines a workflow: the nodes it runs, the edges between them,\
+        \ and what triggers it. Created disabled until toggled on."
       operationId: createWorkflow
       parameters:
       - name: projectId
@@ -1944,11 +1728,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -1970,6 +1749,8 @@ paths:
       tags:
       - Workflows
       summary: Manually trigger workflow with test payload
+      description: "Runs the workflow now against a payload you supply, without waiting\
+        \ for its trigger. The run is recorded like any other."
       operationId: trigger
       parameters:
       - name: projectId
@@ -1984,11 +1765,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2019,11 +1795,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2049,11 +1820,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2084,11 +1850,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2120,11 +1881,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2155,11 +1911,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2185,11 +1936,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2219,11 +1965,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2249,11 +1990,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2284,11 +2020,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2314,11 +2045,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2355,11 +2081,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2391,11 +2112,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2439,11 +2155,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2480,11 +2191,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2509,11 +2215,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2539,11 +2240,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2588,11 +2284,6 @@ paths:
           type: integer
           format: int32
           default: 20
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2616,11 +2307,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2657,11 +2343,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2687,11 +2368,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2722,11 +2398,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2752,11 +2423,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2787,11 +2453,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Default rules seeded
@@ -2818,11 +2479,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2858,11 +2514,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2886,11 +2537,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2926,11 +2572,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -2954,11 +2595,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -2989,11 +2625,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Event replayed
@@ -3025,11 +2656,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3057,6 +2683,8 @@ paths:
       tags:
       - Incidents
       summary: List incidents
+      description: "Incidents in the project, newest first, filterable by status and\
+        \ severity."
       operationId: listIncidents
       parameters:
       - name: projectId
@@ -3085,11 +2713,6 @@ paths:
           type: integer
           format: int32
           default: 20
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3104,6 +2727,7 @@ paths:
       tags:
       - Incidents
       summary: Create incident
+      description: Opens an incident and records its first timeline entry.
       operationId: createIncident
       parameters:
       - name: projectId
@@ -3112,11 +2736,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3138,6 +2757,7 @@ paths:
       tags:
       - Incidents
       summary: Add timeline entry to incident
+      description: "Appends a note, an action taken, or an observation."
       operationId: addTimeline
       parameters:
       - name: projectId
@@ -3152,11 +2772,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3193,11 +2808,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3229,11 +2839,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3264,11 +2869,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3304,11 +2904,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3332,11 +2927,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3373,11 +2963,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3408,11 +2993,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3443,11 +3023,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3477,11 +3052,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3512,11 +3082,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3552,11 +3117,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3587,11 +3147,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Delivery queued for retry
@@ -3616,11 +3171,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3656,11 +3206,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3685,11 +3230,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3711,6 +3251,7 @@ paths:
       tags:
       - Alerts
       summary: List alert rules
+      description: "The conditions this project alerts on, and the channels each notifies."
       operationId: listAlertRules
       parameters:
       - name: projectId
@@ -3719,11 +3260,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3740,6 +3276,8 @@ paths:
       tags:
       - Alerts
       summary: Create alert rule
+      description: "Defines what to watch, the threshold that fires it, and where\
+        \ to send it."
       operationId: createAlertRule
       parameters:
       - name: projectId
@@ -3748,11 +3286,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3774,6 +3307,7 @@ paths:
       tags:
       - Alerts
       summary: Resolve a single alert event
+      description: Marks one fired alert as dealt with. The rule keeps watching.
       operationId: resolveEvent
       parameters:
       - name: projectId
@@ -3788,11 +3322,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3804,6 +3333,8 @@ paths:
       tags:
       - Alerts
       summary: Resolve all unresolved alert events
+      description: "Clears the whole backlog at once, for when a known outage fired\
+        \ many."
       operationId: resolveAll
       parameters:
       - name: projectId
@@ -3812,11 +3343,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3844,11 +3370,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -3874,11 +3395,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -3914,11 +3430,6 @@ paths:
         required: true
         schema:
           type: string
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Invite accepted
@@ -3998,11 +3509,6 @@ paths:
         schema:
           type: integer
           format: int32
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "202":
           description: Replay initiated
@@ -4020,12 +3526,6 @@ paths:
       summary: Bulk replay deliveries
       description: Re-sends multiple failed deliveries at once
       operationId: bulkReplayDeliveries
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4080,11 +3580,6 @@ paths:
         required: true
         schema:
           type: string
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4103,12 +3598,6 @@ paths:
       summary: Create checkout session
       description: Creates a billing provider checkout session for plan upgrade
       operationId: createCheckout
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4133,12 +3622,6 @@ paths:
       summary: Cancel subscription
       description: Cancels the current subscription and downgrades to free plan
       operationId: cancelSubscription
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4390,12 +3873,6 @@ paths:
       description: Called by the authenticated user in the browser to approve a device
         login request
       operationId: approveDeviceCode
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4418,12 +3895,6 @@ paths:
       summary: Change password
       description: Changes the authenticated user's password
       operationId: changePassword
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4481,6 +3952,7 @@ paths:
       tags:
       - Workflows
       summary: Toggle workflow enabled/disabled
+      description: A disabled workflow keeps its definition and stops being triggered.
       operationId: toggleWorkflow
       parameters:
       - name: projectId
@@ -4495,11 +3967,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4523,6 +3990,7 @@ paths:
       tags:
       - Rules
       summary: Toggle rule enabled/disabled
+      description: A disabled rule keeps its conditions and stops being evaluated.
       operationId: toggleRule
       parameters:
       - name: projectId
@@ -4537,11 +4005,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4580,11 +4043,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Member removed
@@ -4610,11 +4068,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       requestBody:
         content:
           application/json:
@@ -4659,11 +4112,6 @@ paths:
           type: integer
           format: int32
           default: 50
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4680,12 +4128,6 @@ paths:
       summary: Tunnel status
       description: Returns current tunnel registry stats and user's active tunnels
       operationId: status
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4722,6 +4164,8 @@ paths:
       tags:
       - Workflows
       summary: List workflow executions
+      description: "Runs of this workflow, newest first, with the status each finished\
+        \ in."
       operationId: listExecutions
       parameters:
       - name: projectId
@@ -4750,11 +4194,6 @@ paths:
           type: integer
           format: int32
           default: 20
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4770,6 +4209,8 @@ paths:
       tags:
       - Workflows
       summary: Get execution details with step results
+      description: "One run, node by node: what each step was given, what it returned,\
+        \ and where the run stopped if it did."
       operationId: getExecution
       parameters:
       - name: projectId
@@ -4790,11 +4231,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4826,11 +4262,6 @@ paths:
           type: integer
           format: int32
           default: 30
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4861,11 +4292,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4895,11 +4321,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4931,11 +4352,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -4965,11 +4381,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5002,11 +4413,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5037,11 +4443,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5068,11 +4469,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5105,11 +4501,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5146,11 +4537,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Events retrieved
@@ -5175,11 +4561,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Event retrieved
@@ -5215,11 +4596,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Attempts retrieved
@@ -5241,6 +4617,7 @@ paths:
       tags:
       - Incidents
       summary: Count open incidents
+      description: "How many incidents are not yet resolved — for a badge, not a report."
       operationId: countOpen
       parameters:
       - name: projectId
@@ -5249,11 +4626,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5291,11 +4663,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5326,11 +4693,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5361,11 +4723,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5408,11 +4765,6 @@ paths:
         schema:
           type: boolean
           default: true
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5457,11 +4809,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5485,11 +4832,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: DLQ purged
@@ -5520,11 +4862,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5549,11 +4886,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5569,6 +4901,8 @@ paths:
       tags:
       - Alerts
       summary: List alert events (fired alerts)
+      description: "Times a rule actually fired, newest first, resolved and unresolved\
+        \ alike."
       operationId: listAlertEvents
       parameters:
       - name: projectId
@@ -5591,11 +4925,6 @@ paths:
           type: integer
           format: int32
           default: 20
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5611,6 +4940,8 @@ paths:
       tags:
       - Alerts
       summary: Count unresolved alerts
+      description: "How many fired alerts nobody has resolved — for a badge, not a\
+        \ report."
       operationId: countUnresolved
       parameters:
       - name: projectId
@@ -5619,11 +4950,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5644,12 +4970,6 @@ paths:
       summary: List user organizations
       description: Returns all organizations the user belongs to
       operationId: getUserOrganizations
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5679,11 +4999,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: Data export as JSON
@@ -5719,11 +5034,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5748,11 +5058,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5777,11 +5082,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5853,11 +5153,6 @@ paths:
         required: true
         schema:
           $ref: "#/components/schemas/Pageable"
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5882,11 +5177,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5911,11 +5201,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5947,11 +5232,6 @@ paths:
         schema:
           type: string
           default: 24h
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -5969,12 +5249,6 @@ paths:
       summary: Get detailed usage
       description: Returns current resource usage vs plan limits for all quota types
       operationId: getBillingUsage
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -6010,12 +5284,6 @@ paths:
       description: Returns invoice history from the billing provider. Empty when billing
         is disabled (self-hosted).
       operationId: listInvoices
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -6034,12 +5302,6 @@ paths:
       summary: Get current user
       description: Returns information about the authenticated user
       operationId: getCurrentUser
-      parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: User info returned
@@ -6064,11 +5326,6 @@ paths:
         \ by action and actor"
       operationId: listAuditLog
       parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       - name: page
         in: query
         required: false
@@ -6119,13 +5376,12 @@ paths:
     get:
       tags:
       - audit-log-controller
-      operationId: exportCsv
+      summary: Export the audit log as CSV
+      description: "The same entries the listing returns, under the same filters,\
+        \ streamed as CSV rather than paged. A from= or to= that is not a yyyy-MM-dd\
+        \ date is rejected rather than ignored."
+      operationId: exportAuditLog
       parameters:
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       - name: action
         in: query
         required: false
@@ -6191,11 +5447,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "200":
           description: OK
@@ -6221,11 +5472,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: Link deleted
@@ -6252,11 +5498,6 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: auth
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/AuthContext"
       responses:
         "204":
           description: API key revoked
@@ -6299,32 +5540,6 @@ components:
           type: string
       required:
       - name
-    AuthContext:
-      type: object
-      properties:
-        userId:
-          type: string
-          format: uuid
-        organizationId:
-          type: string
-          format: uuid
-        role:
-          type: string
-          enum:
-          - OWNER
-          - DEVELOPER
-          - VIEWER
-          - API_KEY
-        apiKeyProjectId:
-          type: string
-          format: uuid
-        apiKeyScope:
-          type: string
-          enum:
-          - READ_WRITE
-          - READ_ONLY
-        apiKey:
-          type: boolean
     ProjectResponse:
       type: object
       properties:

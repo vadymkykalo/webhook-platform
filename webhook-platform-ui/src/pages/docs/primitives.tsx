@@ -1,8 +1,9 @@
-import { createContext, useContext, useId, useState, type ReactNode } from 'react';
+import { createContext, useContext, useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Check, Copy } from 'lucide-react';
 import SyntaxHighlight, { normalizeLanguage } from '../../components/SyntaxHighlight';
 import { cn } from '../../lib/utils';
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard';
 
 /**
  * The docs voice, in one place.
@@ -121,14 +122,8 @@ export function Note({ label, children }: { label: string; children: ReactNode }
 
 export function CodeBlock({ code, label, wrap = false }: { code: string; label?: string; wrap?: boolean }) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const caption = label ?? 'shell';
-
-  const copy = () => {
-    navigator.clipboard?.writeText(code);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  };
 
   /* Ink, not paper. A dark field is where machine output lives in this design —
      the landing's CodeBlock and the auth panel both use it, and `.surface-ink`
@@ -146,7 +141,7 @@ export function CodeBlock({ code, label, wrap = false }: { code: string; label?:
         <span className="mono-label truncate">{caption}</span>
         <button
           type="button"
-          onClick={copy}
+          onClick={() => copy(code)}
           aria-label={copied ? t('common.copied') : t('common.copy')}
           className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >

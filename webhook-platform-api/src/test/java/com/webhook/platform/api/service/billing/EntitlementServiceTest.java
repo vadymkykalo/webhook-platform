@@ -77,7 +77,7 @@ class EntitlementServiceTest {
 
     /**
      * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * of taking it as a parameter. A unit test has no request to establish one, so it
      * enters the scope itself; without this the first call fails with TenantNotResolvedException.
      */
     @BeforeEach
@@ -310,7 +310,8 @@ class EntitlementServiceTest {
     private EntitlementService createService(boolean billingEnabled) {
         return new EntitlementService(
                 billingEnabled, 100, 100,
-                organizationRepository, projectRepository,
+                new PlanLookup(organizationRepository, projectRepository, 5),
+                projectRepository,
                 endpointRepository, eventRepository, membershipRepository,
                 tunnelSessionRepository, quotaCounterService);
     }

@@ -23,7 +23,7 @@
                  production log line even though correlationId made it through. With
                  no include/exclude configured, the encoder emits the entire MDC
                  context map, which is what Loki needs to pivot on
-                 correlationId/organizationId per docs/runbooks/trace-webhook-logs.md. -->
+                 correlationId and organizationId. -->
             <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
         </appender>
         <root level="INFO">

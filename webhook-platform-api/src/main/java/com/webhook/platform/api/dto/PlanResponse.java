@@ -1,6 +1,7 @@
 package com.webhook.platform.api.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.webhook.platform.api.domain.entity.Plan;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,4 +27,22 @@ public class PlanResponse {
     private JsonNode features;
     private int priceMonthlyCents;
     private int priceYearlyCents;
+
+    public static PlanResponse of(Plan plan) {
+        return PlanResponse.builder()
+                .id(plan.getId())
+                .name(plan.getName())
+                .displayName(plan.getDisplayName())
+                .maxEventsPerMonth(plan.getMaxEventsPerMonth())
+                .maxEndpointsPerProject(plan.getMaxEndpointsPerProject())
+                .maxProjects(plan.getMaxProjects())
+                .maxMembers(plan.getMaxMembers())
+                .maxActiveTunnels(plan.getMaxActiveTunnels())
+                .rateLimitPerSecond(plan.getRateLimitPerSecond())
+                .maxRetentionDays(plan.getMaxRetentionDays())
+                .features(plan.getFeatures())
+                .priceMonthlyCents(plan.getPriceMonthlyCents())
+                .priceYearlyCents(plan.getPriceYearlyCents())
+                .build();
+    }
 }

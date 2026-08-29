@@ -34,6 +34,7 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import type { TransformationResponse, TransformationRequest } from '../types/api.types';
+import { formatJson, isValidJson } from '../lib/json';
 
 const SAMPLE_INPUT = {
   id: 'evt_abc123',
@@ -69,8 +70,6 @@ export default function TransformationsPage() {
   const [formEnabled, setFormEnabled] = useState(true);
   const [formTouched, setFormTouched] = useState(false);
 
-  const isValidJson = (s: string) => { try { JSON.parse(s); return true; } catch { return false; } };
-  const formatJson = (s: string) => { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } };
   const templateHasContent = formTemplate.trim().length > 0;
   const templateIsJson = templateHasContent && isValidJson(formTemplate);
   const exprCount = (formTemplate.match(/\$\{[^}]*\}/g) || []).length;

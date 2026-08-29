@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.webhook.platform.api.service.rules.RuleEngineService;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -49,7 +50,7 @@ class EventIngestServiceTest {
     @Mock
     private SequenceGeneratorService sequenceGeneratorService;
     @Mock
-    private SchemaRegistryService schemaRegistryService;
+    private PayloadSchemaValidator payloadSchemaValidator;
     @Mock
     private ProjectRepository projectRepository;
     @Mock
@@ -82,8 +83,8 @@ class EventIngestServiceTest {
                 eventRepository, subscriptionMatchingCache,
                 deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
-                objectMapper, meterRegistry,
-                sequenceGeneratorService, schemaRegistryService, projectRepository,
+                objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
+                sequenceGeneratorService, new SchemaValidationGate(payloadSchemaValidator, objectMapper), projectRepository,
                 ruleEngineService, quotaCounterService, entitlementService,
                 transactionManager, 262144L, 1024
         );

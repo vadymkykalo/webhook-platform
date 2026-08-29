@@ -2,29 +2,6 @@ import { useAuth } from './auth.store';
 
 export type Role = 'OWNER' | 'DEVELOPER' | 'VIEWER';
 
-/**
- * Permission matrix:
- *
- * | Action                    | OWNER | DEVELOPER | VIEWER |
- * |---------------------------|-------|-----------|--------|
- * | Create project            |  ✓    |     ✓     |   ✗    |
- * | Delete project            |  ✓    |     ✗     |   ✗    |
- * | Create/edit endpoints     |  ✓    |     ✓     |   ✗    |
- * | Delete endpoints          |  ✓    |     ✓     |   ✗    |
- * | Rotate secrets            |  ✓    |     ✓     |   ✗    |
- * | Send events               |  ✓    |     ✓     |   ✗    |
- * | Replay deliveries         |  ✓    |     ✓     |   ✗    |
- * | Manage subscriptions      |  ✓    |     ✓     |   ✗    |
- * | Manage API keys           |  ✓    |     ✓     |   ✗    |
- * | DLQ retry/purge           |  ✓    |     ✓     |   ✗    |
- * | Manage test endpoints     |  ✓    |     ✓     |   ✗    |
- * | Add/remove members        |  ✓    |     ✗     |   ✗    |
- * | Change member roles       |  ✓    |     ✗     |   ✗    |
- * | Org settings (name etc.)  |  ✓    |     ✗     |   ✗    |
- * | Change own password       |  ✓    |     ✓     |   ✓    |
- * | View everything           |  ✓    |     ✓     |   ✓    |
- */
-
 function hasMinRole(current: Role, required: Role): boolean {
     const order: Record<Role, number> = { VIEWER: 0, DEVELOPER: 1, OWNER: 2 };
     return order[current] >= order[required];

@@ -27,43 +27,17 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 /**
- * Monitors the dead-letter path for <strong>both</strong> directions, from two genuinely
- * different angles each.
+ * Two gauges per direction, and only one of them is alertable.
  *
- * <p>Per direction there is an actionable, DB-backed gauge and an informational, Kafka-side
- * one:
+ * <p>{@code webhook_dlq_depth} and {@code incoming_forward_dlq_depth} count rows still in DLQ
+ * status in Postgres. They are read from the same column retry and purge mutate, so they return
+ * to zero once the backlog is worked through. These are the ones that should page someone.
  *
- * <ul>
- *   <li>{@code webhook_dlq_depth} / {@code incoming_forward_dlq_depth} -- the ACTIONABLE
- *       backlog: how many Deliveries currently sit in {@code DeliveryStatus.DLQ}, and how many
- *       Forwards in {@code ForwardAttemptStatus.DLQ}, in Postgres -- i.e. have not yet been
- *       retried or purged (see {@code DlqService#retryDeliveries} / {@code #purgeAllDlq} on
- *       the API side). These are the numbers that should page someone, and they genuinely
- *       return to 0 once the backlog is worked through, because they are read from the same
- *       status column those operations mutate.
- *   <li>{@code webhook_dlq_topic_retained_total} / {@code
- *       incoming_forward_dlq_topic_retained_total} -- purely informational, Kafka-side
- *       signals: how many records physically remain in the {@code deliveries.dlq} and {@code
- *       incoming.forward.dlq} topics (latest minus earliest offset). Nothing consumes these
- *       topics, so the numbers reflect retention only, never remediation -- a record stays
- *       counted for the full retention window even after the underlying obligation has been
- *       retried or purged. They must never drive an alert.
- * </ul>
- *
- * <p>Previously there was only one gauge, {@code webhook_dlq_depth}, and it was computed
- * as the Kafka latest-earliest offset difference above. That number is structurally incapable
- * of representing "needs manual intervention" -- it counts every record retained in the topic,
- * remediated or not, so it never returned to 0 and the "manual intervention may be required"
- * warning fired every cycle indefinitely (an alert that never clears is one everyone learns to
- * ignore). The two concerns are now split, and only the DB-backed one is the actionable gauge.
- *
- * <p>The Incoming pair was added later still. Until then a Forward that exhausted its Retry
- * Ladder wrote {@code status = DLQ} on its {@code incoming_forward_attempts} row and nothing
- * else: no gauge, and so no alert could exist. Every abandoned Forward was invisible to
- * operators, however many of them piled up. Note that {@code incoming.forward.dlq} currently
- * carries only the listener container's poison records -- nothing produces a business DLQ
- * notification to it -- which is exactly why the retained-depth gauge on it is informational
- * and the row count is the one that matters.
+ * <p>{@code webhook_dlq_topic_retained_total} and {@code incoming_forward_dlq_topic_retained_total}
+ * count records still held by the Kafka topics. Nothing consumes those topics, so a record stays
+ * counted for the whole retention window however thoroughly the obligation was remediated. They
+ * must never drive an alert — as the single Kafka-derived gauge that preceded this split did,
+ * firing every cycle forever.
  */
 @Service
 @Slf4j

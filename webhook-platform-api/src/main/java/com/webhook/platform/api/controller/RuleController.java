@@ -98,7 +98,8 @@ public class RuleController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(operationId = "toggleRule", summary = "Toggle rule enabled/disabled")
+    @Operation(operationId = "toggleRule", summary = "Toggle rule enabled/disabled",
+            description = "A disabled rule keeps its conditions and stops being evaluated.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PatchMapping("/{id}/toggle")

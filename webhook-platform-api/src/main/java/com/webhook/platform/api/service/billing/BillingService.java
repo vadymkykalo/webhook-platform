@@ -71,7 +71,7 @@ public class BillingService {
      * <p>Startup work has no request and therefore no tenant, and the resolver is asked on every
      * session Hibernate opens — not only for {@code @TenantId} entities. Without this the listener
      * races {@code TenancyConfig.endStartupTenantGrace} for the same event and, whenever it loses,
-     * fails the whole startup with {@code TenantNotResolvedException} (ADR-0006).
+     * fails the whole startup with {@code TenantNotResolvedException}.
      */
     @SystemTenant("startup work that reassigns plans across every organization, before any request exists")
     @EventListener(ApplicationReadyEvent.class)

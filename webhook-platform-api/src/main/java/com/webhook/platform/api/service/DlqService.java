@@ -8,20 +8,15 @@ import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.dto.DlqStatsResponse;
 import com.webhook.platform.api.tenancy.TenantContext;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,7 +24,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import java.time.Instant;
@@ -62,20 +56,13 @@ public class DlqService {
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
+    private final DeliveryDispatch deliveryDispatch;
 
     /**
-     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
-     *
-     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
-     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
-     * turning "no such project here" into a {@link NotFoundException} rather than letting the
-     * caller get an empty list back.
-     *
-     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
-     * the intended consequence: the old answer told a caller that a project id it had no access to
-     * existed.
+     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
+     * lookup only sees projects inside the caller's organization: a foreign project id is
+     * indistinguishable from a missing one, which is intended.
      */
     public void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
@@ -164,7 +151,7 @@ public class DlqService {
             deliveryRepository.save(delivery);
             
             // Create outbox message for redelivery
-            createOutboxMessage(delivery, projectId);
+            deliveryDispatch.announce(delivery, projectId, DeliveryDispatch.Reason.RETRY);
             
             log.info("Retrying DLQ delivery: {}", delivery.getId());
             retried++;
@@ -222,34 +209,4 @@ public class DlqService {
                 .build();
     }
 
-    private void createOutboxMessage(Delivery delivery, UUID projectId) {
-        try {
-            DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                    .deliveryId(delivery.getId())
-                    .eventId(delivery.getEventId())
-                    .endpointId(delivery.getEndpointId())
-                    .subscriptionId(delivery.getSubscriptionId())
-                    .status(delivery.getStatus().name())
-                    .attemptCount(delivery.getAttemptCount())
-                    .sequenceNumber(delivery.getSequenceNumber())
-                    .orderingEnabled(delivery.getOrderingEnabled())
-                    .build();
-            
-            String payload = objectMapper.writeValueAsString(deliveryMessage);
-            OutboxMessage outboxMessage = OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryRetry")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(projectId)
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-            outboxMessageRepository.save(outboxMessage);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create outbox message for retry", e);
-        }
-    }
 }

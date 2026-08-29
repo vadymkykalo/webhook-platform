@@ -99,7 +99,7 @@ class IncomingDestinationServiceTest {
 
     /**
      * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * of taking it as a parameter. A unit test has no request to establish one, so it
      * enters the scope itself; without this the first call fails with TenantNotResolvedException.
      */
     @BeforeEach
@@ -382,7 +382,7 @@ class IncomingDestinationServiceTest {
 
     @Test
     void incomingDefaultLadder_deliberatelyShorterThanOutgoing() {
-        // Guards the decision recorded in RetryLadderDefaults and ADR-0011: the two directions
+        // Guards the decision recorded in RetryLadderDefaults: the two directions
         // differ on purpose. A future "tidy-up" that aligns them should fail here first and go
         // read why.
         assertThat(RetryLadderDefaults.INCOMING_DELAYS).isNotEqualTo(RetryLadderDefaults.OUTGOING_DELAYS);

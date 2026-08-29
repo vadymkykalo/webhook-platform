@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from './ui/button';
 import { cn } from '../lib/utils';
 import { showSuccess } from '../lib/toast';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import {
   Dialog,
   DialogContent,
@@ -61,7 +62,7 @@ const STEPS: WizardStep[] = [
 const API_ORIGIN = import.meta.env.VITE_API_URL || window.location.origin;
 
 function CurlSnippet({ t }: { t: (key: string) => string }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const curlCmd = `curl -X POST ${API_ORIGIN}/api/v1/events \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: YOUR_API_KEY" \\
@@ -71,10 +72,9 @@ function CurlSnippet({ t }: { t: (key: string) => string }) {
   }'`;
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(curlCmd);
-    setCopied(true);
-    showSuccess(t('wizard.send.curlCopied'));
-    setTimeout(() => setCopied(false), 2000);
+    if (await copy(curlCmd)) {
+      showSuccess(t('wizard.send.curlCopied'));
+    }
   };
 
   return (

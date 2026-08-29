@@ -4,17 +4,14 @@ import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.tenancy.TenantContext;
 import java.time.Instant;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.specification.DeliverySpecification;
 import com.webhook.platform.api.dto.BulkReplayResponse;
@@ -22,22 +19,17 @@ import com.webhook.platform.api.dto.DeliveryAttemptResponse;
 import com.webhook.platform.api.dto.DeliveryResponse;
 import com.webhook.platform.api.dto.DryRunReplayResponse;
 import org.springframework.data.jpa.domain.Specification;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -50,26 +42,26 @@ public class DeliveryService {
     private final DeliveryRepository deliveryRepository;
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final EndpointRepository endpointRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
+    private final DeliveryDispatch deliveryDispatch;
 
     public DeliveryService(
             DeliveryRepository deliveryRepository,
             DeliveryAttemptRepository deliveryAttemptRepository,
             EndpointRepository endpointRepository,
-            OutboxMessageRepository outboxMessageRepository,
             EventRepository eventRepository,
             ProjectRepository projectRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            DeliveryDispatch deliveryDispatch) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.endpointRepository = endpointRepository;
-        this.outboxMessageRepository = outboxMessageRepository;
         this.eventRepository = eventRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
+        this.deliveryDispatch = deliveryDispatch;
     }
 
     private void validateDeliveryAccess(Delivery delivery, AuthContext auth) {
@@ -77,9 +69,6 @@ public class DeliveryService {
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         Project project = projectRepository.findById(event.getProjectId())
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(auth.organizationId())) {
-            throw new ForbiddenException("Access denied");
-        }
         auth.validateProjectAccess(project.getId());
     }
 
@@ -92,7 +81,7 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-        return mapToResponse(delivery);
+        return DeliveryResponse.of(delivery);
     }
 
     public Page<DeliveryResponse> listDeliveries(UUID eventId, AuthContext auth, Pageable pageable) {
@@ -102,15 +91,12 @@ public class DeliveryService {
                     .orElseThrow(() -> new NotFoundException("Event not found"));
             Project project = projectRepository.findById(event.getProjectId())
                     .orElseThrow(() -> new NotFoundException("Project not found"));
-            if (!project.getOrganizationId().equals(auth.organizationId())) {
-                throw new ForbiddenException("Access denied");
-            }
             auth.validateProjectAccess(project.getId());
             deliveries = deliveryRepository.findByEventId(eventId, pageable);
         } else {
             throw new IllegalArgumentException("eventId parameter is required");
         }
-        return deliveries.map(this::mapToResponse);
+        return deliveries.map(DeliveryResponse::of);
     }
 
     public Page<DeliveryResponse> listDeliveriesByProject(
@@ -127,10 +113,6 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
-
         Specification<Delivery> spec;
         if (eventId != null) {
             spec = Specification.where(DeliverySpecification.hasEventIds(List.of(eventId)));
@@ -145,7 +127,7 @@ public class DeliveryService {
 
         Page<Delivery> deliveries = deliveryRepository.findAll(spec, pageable);
 
-        return deliveries.map(this::mapToResponse);
+        return deliveries.map(DeliveryResponse::of);
     }
 
     @Transactional
@@ -165,34 +147,8 @@ public class DeliveryService {
         delivery.setFailedAt(null);
         deliveryRepository.save(delivery);
         
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .build();
-        
-        try {
-            String payload = objectMapper.writeValueAsString(message);
-            OutboxMessage outboxMessage = OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryReplayed")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(resolveProjectId(delivery))
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-            
-            outboxMessageRepository.save(outboxMessage);
-            log.info("Replayed delivery: {}", deliveryId);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create replay outbox message", e);
-        }
+        deliveryDispatch.announce(delivery, resolveProjectId(delivery), DeliveryDispatch.Reason.REPLAYED);
+        log.info("Replayed delivery: {}", deliveryId);
     }
 
     public List<DeliveryAttemptResponse> getDeliveryAttempts(UUID deliveryId, AuthContext auth) {
@@ -271,9 +227,6 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectIdFilter)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(auth.organizationId())) {
-            throw new ForbiddenException("Access denied");
-        }
         auth.validateProjectAccess(project.getId());
 
         Specification<Delivery> spec = Specification
@@ -318,30 +271,8 @@ public class DeliveryService {
         delivery.setFailedAt(null);
         deliveryRepository.save(delivery);
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .build();
-
         try {
-            String payload = objectMapper.writeValueAsString(message);
-            OutboxMessage outboxMessage = OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryBulkReplayed")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(projectId)
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-
-            outboxMessageRepository.save(outboxMessage);
+            deliveryDispatch.announce(delivery, projectId, DeliveryDispatch.Reason.BULK_REPLAYED);
             return true;
         } catch (Exception e) {
             log.error("Failed to create bulk replay outbox message for delivery {}", delivery.getId(), e);
@@ -444,50 +375,9 @@ public class DeliveryService {
         delivery.setFailedAt(null);
         deliveryRepository.save(delivery);
 
-        DeliveryMessage message = DeliveryMessage.builder()
-                .deliveryId(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .build();
-
-        try {
-            String payload = objectMapper.writeValueAsString(message);
-            OutboxMessage outboxMessage = OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryReplayedFromStep")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(resolveProjectId(delivery))
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-
-            outboxMessageRepository.save(outboxMessage);
-            log.info("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create replay outbox message", e);
-        }
+        deliveryDispatch.announce(delivery, resolveProjectId(delivery),
+                DeliveryDispatch.Reason.REPLAYED_FROM_STEP);
+        log.info("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
     }
 
-    private DeliveryResponse mapToResponse(Delivery delivery) {
-        return DeliveryResponse.builder()
-                .id(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .maxAttempts(delivery.getMaxAttempts())
-                .nextRetryAt(delivery.getNextRetryAt())
-                .lastAttemptAt(delivery.getLastAttemptAt())
-                .succeededAt(delivery.getSucceededAt())
-                .failedAt(delivery.getFailedAt())
-                .createdAt(delivery.getCreatedAt())
-                .build();
-    }
 }

@@ -41,7 +41,7 @@ class DeliveryRepositoryTest {
     /**
      * Fixture tenant for persisted rows.
      *
-     * <p>{@code organization_id} is NOT NULL since ADR-0006, and the worker's entities map it
+     * <p>{@code organization_id} is NOT NULL, and the worker's entities map it
      * without filtering on it: in production the worker copies the value off the parent row it is
      * processing. A fixture that persists directly has to supply one.
      */

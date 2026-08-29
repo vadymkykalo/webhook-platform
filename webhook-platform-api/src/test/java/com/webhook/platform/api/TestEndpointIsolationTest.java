@@ -137,7 +137,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
@@ -147,7 +147,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints")
                         .header("Authorization", "Bearer " + orgBJwt))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
@@ -157,7 +157,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
                         .header("Authorization", "Bearer " + orgBJwt))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
@@ -167,7 +167,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId)
                         .header("Authorization", "Bearer " + orgBJwt))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
@@ -177,7 +177,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
                         .header("Authorization", "Bearer " + orgBJwt))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
     }
@@ -187,7 +187,7 @@ public class TestEndpointIsolationTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/v1/projects/" + projectAId + "/test-endpoints/" + testEndpointAId + "/requests")
                         .header("Authorization", "Bearer " + orgBJwt))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
     }

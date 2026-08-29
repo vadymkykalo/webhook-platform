@@ -11,7 +11,6 @@ import com.webhook.platform.api.domain.repository.SubscriptionRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.TransformationRequest;
 import com.webhook.platform.api.dto.TransformationResponse;
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,16 +39,9 @@ public class TransformationService {
     private static final Pattern EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^}]*)\\}");
 
     /**
-     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
-     *
-     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
-     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
-     * turning "no such project here" into a {@link NotFoundException} rather than letting the
-     * caller get an empty list back.
-     *
-     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
-     * the intended consequence: the old answer told a caller that a project id it had no access to
-     * existed.
+     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
+     * lookup only sees projects inside the caller's organization: a foreign project id is
+     * indistinguishable from a missing one, which is intended.
      */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)
@@ -109,9 +103,21 @@ public class TransformationService {
 
     public List<TransformationResponse> list(UUID projectId) {
         validateProjectOwnership(projectId);
-        return transformationRepository.findByProjectIdOrderByNameAsc(projectId).stream()
-                .map(this::mapToResponse)
+        List<Transformation> transformations = transformationRepository.findByProjectIdOrderByNameAsc(projectId);
+        Set<UUID> ids = transformations.stream().map(Transformation::getId).collect(Collectors.toSet());
+
+        Map<UUID, Long> subscriptionCounts = countsBy(subscriptionRepository.countByTransformationIds(ids));
+        Map<UUID, Long> destinationCounts = countsBy(incomingDestinationRepository.countByTransformationIds(ids));
+
+        return transformations.stream()
+                .map(t -> mapToResponse(t,
+                        subscriptionCounts.getOrDefault(t.getId(), 0L),
+                        destinationCounts.getOrDefault(t.getId(), 0L)))
                 .collect(Collectors.toList());
+    }
+
+    private static Map<UUID, Long> countsBy(List<Object[]> rows) {
+        return rows.stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Transformation")
@@ -166,6 +172,13 @@ public class TransformationService {
     }
 
     private TransformationResponse mapToResponse(Transformation transformation) {
+        return mapToResponse(transformation,
+                subscriptionRepository.countByTransformationId(transformation.getId()),
+                incomingDestinationRepository.countByTransformationId(transformation.getId()));
+    }
+
+    private TransformationResponse mapToResponse(Transformation transformation,
+            long subscriptionCount, long destinationCount) {
         return TransformationResponse.builder()
                 .id(transformation.getId())
                 .projectId(transformation.getProjectId())
@@ -174,8 +187,8 @@ public class TransformationService {
                 .template(transformation.getTemplate())
                 .version(transformation.getVersion())
                 .enabled(transformation.getEnabled())
-                .subscriptionCount(subscriptionRepository.countByTransformationId(transformation.getId()))
-                .destinationCount(incomingDestinationRepository.countByTransformationId(transformation.getId()))
+                .subscriptionCount(subscriptionCount)
+                .destinationCount(destinationCount)
                 .createdAt(transformation.getCreatedAt())
                 .updatedAt(transformation.getUpdatedAt())
                 .build();

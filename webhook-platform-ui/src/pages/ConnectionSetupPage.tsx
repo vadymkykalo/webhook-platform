@@ -20,6 +20,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { cn } from '../lib/utils';
 import { usePermissions } from '../auth/usePermissions';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 /**
  * Creating a connection.
@@ -76,15 +77,12 @@ export function ladderTicks(retryDelays: string, maxAttempts: number): RailAttem
 export function SecretField({ secret, label }: { secret: string; label?: string }) {
   const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy: copyToClipboard } = useCopyToClipboard();
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(secret);
-      setCopied(true);
+    if (await copyToClipboard(secret)) {
       showSuccess(t('endpoints.toast.secretCopied'));
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       showApiError(new Error('clipboard'), 'connectionSetup.secret.copyFailed');
     }
   };

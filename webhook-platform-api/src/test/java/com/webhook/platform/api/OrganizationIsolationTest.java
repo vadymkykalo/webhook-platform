@@ -82,7 +82,7 @@ public class OrganizationIsolationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/projects/" + project.getId())
                         .header("Authorization", "Bearer " + user2Auth.getAccessToken()))
                 // A resource in another organization is not found rather than forbidden: the tenant
-        // filter (ADR-0006) means this caller's queries never see it, and answering 403 would
+        // filter means this caller's queries never see it, and answering 403 would
         // confirm the id exists.
                 .andExpect(status().isNotFound());
 

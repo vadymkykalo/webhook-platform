@@ -2,7 +2,6 @@ package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -22,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -44,8 +41,7 @@ public class RetrySchedulerService {
     private final long rescheduleDelaySeconds;
     private final long defaultPollIntervalMs;
     private final RetryGovernor governor;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-            r -> { Thread t = new Thread(r, "retry-scheduler"); t.setDaemon(true); return t; });
+    private final AdaptivePollLoop pollLoop;
 
     public RetrySchedulerService(
             DeliveryRepository deliveryRepository,
@@ -59,9 +55,7 @@ public class RetrySchedulerService {
             @Value("${retry.scheduler.send-timeout-seconds:30}") long sendTimeoutSeconds,
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
             @Value("${retry.scheduler.high-watermark:5000}") long highWatermark,
-            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs,
-            @Value("${delivery.escalation.hard-cap-hours:96}") long escalationHardCapHours,
-            @Value("${forward.escalation.hard-cap-hours:24}") long forwardEscalationHardCapHours) {
+            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
@@ -74,74 +68,27 @@ public class RetrySchedulerService {
         this.governor = new RetryGovernor(
                 "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
-
-        // Fail fast at startup rather than silently DLQ-ing the last retry tiers — see
-        // RetryLadder.requireFitsWithin for the full explanation.
-        //
-        // Validated against the ladders this platform actually hands out
-        // (RetryLadderDefaults), not against a config value. The pair of environment
-        // variables that used to feed this check — RETRY_LADDER_DEFAULT_DELAYS_SECONDS and
-        // RETRY_LADDER_DEFAULT_MAX_ATTEMPTS — read as though they set the default ladder.
-        // They never did: the real defaults are the Flyway column defaults and the api
-        // services that create the rows. All those variables could do was change what this
-        // check compared against, so lowering one made the check pass while live rows still
-        // carried the long ladder. They are gone; see UPGRADING.md.
-        //
-        // Each direction against its OWN cap. They are different services with different
-        // promises: StaleDeliveryEscalationService hard-caps a Delivery at 96h to clear the
-        // outgoing ladder's ~83h worst case, while StaleForwardEscalationService caps a
-        // Forward at 24h against the incoming ladder's ~11h. Checking the incoming ladder
-        // against the outgoing cap, as this briefly did, passes trivially and tells nobody
-        // anything.
-        RetryLadderDefaults.outgoing().requireFitsWithin(
-                escalationHardCapHours * 3600L, "outgoing default", "delivery.escalation.hard-cap-hours");
-        RetryLadderDefaults.incoming().requireFitsWithin(
-                forwardEscalationHardCapHours * 3600L, "incoming default", "forward.escalation.hard-cap-hours");
+        this.pollLoop = new AdaptivePollLoop("retry-scheduler", governor,
+                defaultPollIntervalMs, this::countPendingRetries, this::scheduleRetries);
     }
 
     @PostConstruct
     void startScheduler() {
-        // Anti-thundering-herd: random jitter 0-5s on startup so pods don't poll simultaneously
-        long startupJitter = ThreadLocalRandom.current().nextLong(0, 5000);
-        log.info("Retry scheduler starting with {}ms jitter, default poll interval {}ms",
-                startupJitter, defaultPollIntervalMs);
-        scheduler.schedule(this::pollAndReschedule, startupJitter, TimeUnit.MILLISECONDS);
+        pollLoop.start();
     }
 
     @PreDestroy
     void stopScheduler() {
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void pollAndReschedule() {
-        long nextDelay = defaultPollIntervalMs;
-        try {
-            long pendingCount = countPendingRetries();
-            scheduleRetries(pendingCount);
-            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount, defaultPollIntervalMs);
-        } catch (Exception e) {
-            log.error("Retry scheduler poll failed: {}", e.getMessage(), e);
-        } finally {
-            scheduler.schedule(this::pollAndReschedule, nextDelay, TimeUnit.MILLISECONDS);
-        }
+        pollLoop.stop();
     }
 
     void scheduleRetries(long pendingCount) {
-        // ── Governor: adaptive batch sizing ──
         int effectiveBatch = governor.computeEffectiveBatch(pendingCount);
         if (effectiveBatch <= 0) {
             return; // Governor cooldown — skip this poll
         }
 
-        // ── Phase 1: Short transaction — claim candidates ──
+        // Phase 1: short transaction, claim candidates.
         List<Delivery> claimed = transactionTemplate.execute(tx -> {
             Instant now = Instant.now();
 
@@ -151,26 +98,17 @@ public class RetrySchedulerService {
                 return List.<Delivery>of();
             }
 
-            // FOR UPDATE SKIP LOCKED — only lock rows not already held
             List<Delivery> locked = deliveryRepository.lockByIds(candidateIds);
             if (locked.isEmpty()) {
                 return List.<Delivery>of();
             }
 
-            // Mark PROCESSING (matches IncomingForwardRetryScheduler) so a crash between
-            // this commit and the Phase 3 save leaves the row recoverable by
-            // StuckDeliveryRecoveryService instead of a PENDING + null next_retry_at row
-            // invisible to both findPendingRetryIds and resetStuckDeliveries.
+            // PROCESSING so a crash before Phase 3 leaves a row the stuck sweep can recover,
+            // rather than a PENDING row with no next_retry_at that nothing can see.
             for (Delivery d : locked) {
-                d.setStatus(Delivery.DeliveryStatus.PROCESSING);
-                d.setNextRetryAt(null);
-                d.setLastAttemptAt(Instant.now());
-                // Fresh fencing token per claim: the attempt this claim hands to the
-                // consumer finalizes the row only while the token still matches, so an
-                // earlier attempt that was swept away as abandoned cannot come back and
-                // write over the claim made here. See V055__delivery_claim_token.sql.
-                d.setClaimToken(UUID.randomUUID());
-                d.setUpdatedAt(Instant.now());
+                // Fresh token per claim, so an earlier attempt swept away as abandoned
+                // cannot come back and write over this one.
+                d.claim(UUID.randomUUID());
             }
             deliveryRepository.saveAll(locked);
 
@@ -183,13 +121,12 @@ public class RetrySchedulerService {
 
         log.info("Claimed {} deliveries for retry dispatch", claimed.size());
 
-        // ── Phase 2: Outside transaction — Kafka I/O ──
+        // Phase 2: outside the transaction, Kafka I/O.
         Map<UUID, CompletableFuture<SendResult<String, DeliveryMessage>>> futures = new HashMap<>();
         Map<UUID, String> deliveryTopics = new HashMap<>();
         List<Delivery> circuitBreakerSkipped = new ArrayList<>();
 
         for (Delivery delivery : claimed) {
-            // Skip if circuit breaker is OPEN for this endpoint
             if (!circuitBreakerService.isCallPermitted(delivery.getEndpointId())) {
                 rescheduleDelivery(delivery, "Circuit breaker OPEN");
                 circuitBreakerSkipped.add(delivery);
@@ -209,10 +146,8 @@ public class RetrySchedulerService {
                         .subscriptionId(delivery.getSubscriptionId())
                         .status(delivery.getStatus().name())
                         .attemptCount(delivery.getAttemptCount())
-                        // The token Phase 1 claimed this row with, so the consumer can CAS on
-                        // it instead of trusting the status. Without it, a redelivered Kafka
-                        // message and a send this method has already timed out on both read
-                        // PROCESSING from the row and both dispatched.
+                        // The consumer CASes on this rather than trusting the status: a
+                        // redelivered message and a timed-out send both see PROCESSING.
                         .claimToken(delivery.getClaimToken())
                         .build();
 
@@ -225,12 +160,10 @@ public class RetrySchedulerService {
         }
 
         if (futures.isEmpty()) {
-            // All sends failed to initiate, reschedule everything
             rescheduleAll(claimed, "Send not initiated");
             return;
         }
 
-        // Wait for all futures with timeout (batch confirmation)
         try {
             CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]))
                     .get(sendTimeoutSeconds, TimeUnit.SECONDS);
@@ -238,9 +171,8 @@ public class RetrySchedulerService {
             log.warn("Batch send timeout or error, will check individual results: {}", e.getMessage());
         }
 
-        // ── Phase 3: Short transaction — update results ──
-        // Only rows this method still owns are written here: a successful send hands
-        // ownership of the row to the consumer (see below), so it is counted, not saved.
+        // Phase 3: short transaction, update results. Only rows this method still owns are
+        // written — a successful send hands the row to the consumer, so it is counted, not saved.
         int sentDeliveries = 0;
         List<Delivery> failedDeliveries = new ArrayList<>();
 
@@ -260,18 +192,10 @@ public class RetrySchedulerService {
                 }
                 SendResult<String, DeliveryMessage> result = future.get();
                 RecordMetadata metadata = result.getRecordMetadata();
-                // Status stays PROCESSING (set and committed in Phase 1) — the consumer
-                // finalizes it (success/failure/reschedule) once it picks up the retry
-                // message. Deliberately NOT collected for saving: there is nothing to
-                // write, and writing it back is actively harmful. The consumer often
-                // picks the message up within milliseconds of the send, so by the time
-                // Phase 3 runs it may already have advanced the row (to PENDING with a
-                // new next_retry_at when the ordering buffer parks it, or to a terminal
-                // state). Re-saving the Phase 1 snapshot then raced that update: whoever
-                // lost threw ObjectOptimisticLockingFailureException, and when the loser
-                // was the consumer, BoundedAsyncExecutor did not ack — stalling the
-                // retry partition until a restart or rebalance. Observed as a real
-                // interleaving in DeliveryEndToEndIntegrationTest's ordering scenario.
+                // Deliberately NOT collected for saving. The consumer often picks the message
+                // up within milliseconds and has already advanced the row; re-saving the Phase 1
+                // snapshot raced it, and when the consumer lost, the retry partition stalled
+                // until a restart.
                 sentDeliveries++;
 
                 log.info("Scheduled retry for delivery {} to topic {} partition {} offset {}",
@@ -291,7 +215,6 @@ public class RetrySchedulerService {
             }
         }
 
-        // Batch save in a short transaction
         transactionTemplate.executeWithoutResult(tx -> {
             if (!failedDeliveries.isEmpty()) {
                 deliveryRepository.saveAll(failedDeliveries);
@@ -301,7 +224,6 @@ public class RetrySchedulerService {
             }
         });
 
-        // ── Governor feedback ──
         governor.recordResult(sentDeliveries, failedDeliveries.size());
 
         log.info("Retry scheduling complete: {} successful, {} failed/rescheduled, {} circuit-breaker-skipped (governor batch={}, pendingCount={})",
@@ -319,14 +241,9 @@ public class RetrySchedulerService {
     private void rescheduleDelivery(Delivery delivery, String reason) {
         long jitter = ThreadLocalRandom.current().nextLong(0, Math.max(1, rescheduleDelaySeconds / 2) + 1);
         Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds + jitter);
-        // Revert the Phase 1 PROCESSING claim so the delivery is picked up again by
-        // findPendingRetryIds instead of waiting out a stuck-delivery sweep.
-        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-        // Handing the row back also ends the claim made in Phase 1, so drop its fencing
-        // token — "token set" is meant to mean "currently claimed" (V055).
-        delivery.setClaimToken(null);
-        delivery.setNextRetryAt(rescheduleTime);
-        delivery.setUpdatedAt(Instant.now());
+        // Revert the Phase 1 claim so the delivery is picked up again rather than waiting
+        // out a stuck sweep.
+        delivery.handBackTo(rescheduleTime);
 
         log.warn("Rescheduling delivery {} to {} due to: {}",
                 delivery.getId(), rescheduleTime, reason);

@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Entity
@@ -22,17 +23,12 @@ public class IncomingForwardAttempt {
     private UUID id;
 
     /**
-     * Tenant discriminator, mapped but not enforced here.
-     *
-     * <p>The api filters on this column via {@code @TenantId} (ADR-0006). The worker deliberately
-     * does not: it has no {@code AuthContext}, every consumer is a system path by construction,
-     * and a discriminator it could never populate from a request would only break it.
-     *
-     * <p>It is mapped rather than ignored for two reasons. The attempt stores insert rows into
-     * {@code delivery_attempts} and {@code incoming_forward_attempts} and have to carry the
-     * tenant across from the parent row, or the api would not see what the worker wrote. And
-     * {@code EntityMappingParityIntegrationTest} requires every column of a shared table to be
-     * mapped by both modules — ADR-0002's cost, paid here rather than exempted.
+     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
+     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
+     * every consumer is a system path. It is mapped rather than ignored because the attempt
+     * stores have to carry the tenant across from the parent row, and because
+     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
+     * shared table.
      */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
@@ -86,4 +82,42 @@ public class IncomingForwardAttempt {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /**
+     * Takes the row for one retry Attempt. {@code started_at} is truncated to microseconds because
+     * Postgres stores it that way, and a full-nanosecond Instant would not match on the CAS that
+     * claims the row back.
+     */
+    public void claimForRetry() {
+        this.status = ForwardAttemptStatus.PROCESSING;
+        this.startedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        this.nextRetryAt = null;
+    }
+
+    /**
+     * Ends the Claim and returns the Forward to the retry ladder. {@code next_retry_at} must be
+     * set: the scheduler ignores rows without one, so a hand-back that skips it strands the
+     * Forward.
+     */
+    public void handBackTo(Instant retryAt) {
+        this.status = ForwardAttemptStatus.PENDING;
+        this.startedAt = null;
+        this.claimToken = null;
+        this.nextRetryAt = retryAt;
+    }
+
+    /** The Retry Ladder is exhausted: kept for a human to decide about. */
+    public void abandon(String reason) {
+        this.status = ForwardAttemptStatus.DLQ;
+        this.finishedAt = Instant.now();
+        this.errorMessage = reason;
+        this.nextRetryAt = null;
+    }
+
+    public void failWith(String reason) {
+        this.status = ForwardAttemptStatus.FAILED;
+        this.finishedAt = Instant.now();
+        this.errorMessage = reason;
+        this.nextRetryAt = null;
+    }
 }

@@ -17,6 +17,7 @@ import com.webhook.platform.api.dto.ReplaySessionResponse;
 import com.webhook.platform.api.exception.ConflictException;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +70,7 @@ class ReplayServiceTest {
 
         replayService = new ReplayService(replaySessionRepository, eventRepository, subscriptionRepository,
                 deliveryRepository, outboxMessageRepository, projectRepository, new ObjectMapper(),
+                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()),
                 sequenceGeneratorService, transactionManager, new SimpleMeterRegistry());
 
         // @Value fields aren't populated outside a Spring context.
@@ -93,7 +95,7 @@ class ReplayServiceTest {
 
     /**
      * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * of taking it as a parameter. A unit test has no request to establish one, so it
      * enters the scope itself; without this the first call fails with TenantNotResolvedException.
      */
     @BeforeEach

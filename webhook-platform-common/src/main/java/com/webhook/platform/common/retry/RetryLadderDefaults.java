@@ -3,23 +3,13 @@ package com.webhook.platform.common.retry;
 /**
  * The retry ladder each direction gets when the customer does not choose one.
  *
- * <p><b>These are the single declaration.</b> Before this class the same two ladders were
- * written out as string literals in thirteen places across the api and worker modules, plus
- * two Flyway column defaults, plus a pair of environment variables — and they had already
- * drifted: the worker's outgoing fallback carried six tiers while its incoming fallback
- * carried five, so the two directions disagreed with each other about a value neither of
- * them was supposed to be deciding.
+ * <p>The single declaration: these ladders were once literals in thirteen places, and had
+ * already drifted apart.
  *
- * <h2>Why the two directions differ, deliberately</h2>
- *
- * <p>They are not a drift and must not be "fixed" into agreement. Outgoing carries the
- * customer's own event to an endpoint they registered, and holding it for a day is a
- * reasonable thing to promise. Incoming relays somebody else's webhook onward, where a
- * shorter, more decisive give-up is the better promise. The split is stated identically in
- * the Flyway column defaults, in the api services that create the rows, and here.
- *
- * <p>{@code SchemaRetryLadderDefaultsTest} asserts the Flyway defaults still agree with the
- * constants below, so the two cannot drift apart again in silence.
+ * <p>The two directions differ deliberately and must not be "fixed" into agreement. Outgoing
+ * carries the customer's own event to an endpoint they registered, where holding it for a day is
+ * a reasonable promise; Incoming relays somebody else's webhook onward, where a shorter give-up
+ * is the better one. {@code SchemaRetryLadderDefaultsTest} pins these against the Flyway defaults.
  */
 public final class RetryLadderDefaults {
 

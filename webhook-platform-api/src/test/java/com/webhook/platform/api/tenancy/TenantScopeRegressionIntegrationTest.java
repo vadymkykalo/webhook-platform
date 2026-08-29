@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Pins the three ADR-0006 failures that produced no error anybody would see.
+ * Pins the three tenancy failures that produced no error anybody would see.
  *
  * <p>{@code CrossTenantIsolationTest} proves the filter confines rows. These are the other
  * direction: work that is <em>supposed</em> to reach rows, and stopped. Each one failed silently —
@@ -217,7 +217,7 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
             // chosen in the aspect rather than left to Hibernate's @TenantId generator, but the
             // value is the same one it used to fill in: the nil UUID, which matches no
             // organization, so a tenant-scoped reader sees this row no more than it saw the
-            // pre-ADR-0006 SQL NULL. Pinned because it is a real difference from that NULL.
+            // the older SQL NULL. Pinned because it is a real difference from that NULL.
             assertThat(written.get(0).getOrganizationId()).isEqualTo(TenantContext.SYSTEM);
         });
     }
@@ -237,7 +237,7 @@ class TenantScopeRegressionIntegrationTest extends AbstractIntegrationTest {
                 transaction.executeWithoutResult(status ->
                         TenantContext.runAs(orgA, () -> projectRepository.count()))))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ADR-0006");
+                .hasMessageContaining("outside the transaction");
     }
 
     @Test

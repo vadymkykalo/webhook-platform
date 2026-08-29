@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Collection;
 import java.util.UUID;
 
 @Repository
@@ -19,6 +20,11 @@ public interface WorkflowExecutionRepository extends JpaRepository<WorkflowExecu
     Page<WorkflowExecution> findByWorkflowIdOrderByStartedAtDesc(UUID workflowId, Pageable pageable);
 
     long countByWorkflowIdAndStatus(UUID workflowId, WorkflowExecution.ExecutionStatus status);
+
+    /** Counts for a whole page at once, so listing does not run one query per workflow per status. */
+    @Query("SELECT e.workflowId, e.status, COUNT(e) FROM WorkflowExecution e "
+            + "WHERE e.workflowId IN :workflowIds GROUP BY e.workflowId, e.status")
+    List<Object[]> countByWorkflowIdsGroupedByStatus(@Param("workflowIds") Collection<UUID> workflowIds);
 
     boolean existsByWorkflowIdAndTriggerEventId(UUID workflowId, UUID triggerEventId);
 

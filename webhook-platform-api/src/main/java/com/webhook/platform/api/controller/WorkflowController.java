@@ -35,7 +35,9 @@ public class WorkflowController {
 
     private final WorkflowService workflowService;
 
-    @Operation(operationId = "createWorkflow", summary = "Create workflow")
+    @Operation(operationId = "createWorkflow", summary = "Create workflow",
+            description = "Defines a workflow: the nodes it runs, the edges between them, and what "
+                    + "triggers it. Created disabled until toggled on.")
     @ApiResponse(responseCode = "201", description = "Workflow created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
@@ -51,7 +53,8 @@ public class WorkflowController {
                 .body(workflowService.create(projectId, request));
     }
 
-    @Operation(operationId = "getWorkflow", summary = "Get workflow")
+    @Operation(operationId = "getWorkflow", summary = "Get workflow",
+            description = "Returns the definition, the trigger, and how its executions have gone.")
     @GetMapping("/{id}")
     public ResponseEntity<WorkflowResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -61,7 +64,8 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.get(id));
     }
 
-    @Operation(operationId = "listWorkflows", summary = "List workflows")
+    @Operation(operationId = "listWorkflows", summary = "List workflows",
+            description = "Every workflow in the project, newest first, each with its execution counts.")
     @GetMapping
     public ResponseEntity<List<WorkflowResponse>> list(
             @PathVariable("projectId") UUID projectId,
@@ -70,7 +74,9 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.list(projectId));
     }
 
-    @Operation(operationId = "updateWorkflow", summary = "Update workflow")
+    @Operation(operationId = "updateWorkflow", summary = "Update workflow",
+            description = "Replaces the definition and trigger. Executions already running are "
+                    + "unaffected; the next one uses the new version.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
     @RequireAccess(AccessLevel.WRITE)
@@ -85,7 +91,8 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.update(id, request));
     }
 
-    @Operation(operationId = "deleteWorkflow", summary = "Delete workflow")
+    @Operation(operationId = "deleteWorkflow", summary = "Delete workflow",
+            description = "Removes the workflow and its execution history.")
     @ApiResponse(responseCode = "204", description = "Workflow deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
@@ -100,7 +107,8 @@ public class WorkflowController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(operationId = "toggleWorkflow", summary = "Toggle workflow enabled/disabled")
+    @Operation(operationId = "toggleWorkflow", summary = "Toggle workflow enabled/disabled",
+            description = "A disabled workflow keeps its definition and stops being triggered.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PatchMapping("/{id}/toggle")
@@ -115,7 +123,9 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.toggleEnabled(id, enabled));
     }
 
-    @Operation(summary = "Manually trigger workflow with test payload")
+    @Operation(summary = "Manually trigger workflow with test payload",
+            description = "Runs the workflow now against a payload you supply, without waiting for "
+                    + "its trigger. The run is recorded like any other.")
     @ApiResponse(responseCode = "200", description = "Workflow executed")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireFeature("workflows")
@@ -133,7 +143,8 @@ public class WorkflowController {
 
     // ── Executions ──────────────────────────────────────────────────────
 
-    @Operation(summary = "List workflow executions")
+    @Operation(summary = "List workflow executions",
+            description = "Runs of this workflow, newest first, with the status each finished in.")
     @GetMapping("/{id}/executions")
     public ResponseEntity<Page<WorkflowExecutionResponse>> listExecutions(
             @PathVariable("projectId") UUID projectId,
@@ -145,7 +156,9 @@ public class WorkflowController {
         return ResponseEntity.ok(workflowService.listExecutions(id, page, size));
     }
 
-    @Operation(summary = "Get execution details with step results")
+    @Operation(summary = "Get execution details with step results",
+            description = "One run, node by node: what each step was given, what it returned, and "
+                    + "where the run stopped if it did.")
     @GetMapping("/{id}/executions/{executionId}")
     public ResponseEntity<WorkflowExecutionResponse> getExecution(
             @PathVariable("projectId") UUID projectId,

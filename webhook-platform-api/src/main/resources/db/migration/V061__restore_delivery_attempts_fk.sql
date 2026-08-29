@@ -19,7 +19,7 @@
 --     ("cannot add NOT VALID foreign key on partitioned table ... not yet supported"),
 --     so the constraint is added validating: brief ACCESS EXCLUSIVE on the parent plus a
 --     scan of every partition. On a large installation, do this in a maintenance window --
---     the same advice docs/runbooks/partition-high-volume-tables.md gives for V052 itself.
+--     as V052 itself advises.
 --   * ADD CONSTRAINT fails outright if any orphan exists, so they are deleted first. Every
 --     row this removes is already unreachable: its delivery is gone, and delivery_id is the
 --     only way in.

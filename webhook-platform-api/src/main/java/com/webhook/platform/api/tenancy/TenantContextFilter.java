@@ -18,41 +18,23 @@ import java.io.IOException;
  *
  * <p>Runs after the three authentication filters and before anything that touches the database,
  * so a handler, a service and a repository all see the same organization without any of them
- * being handed one. This is the request half of what ADR-0006 calls making org ownership a
+ * being handed one. This is the request half of making org ownership a
  * property of data access; {@link TenantContext#runAsSystem} is the other half.
  *
- * <h2>What each kind of caller maps to</h2>
- *
- * <ul>
- *   <li><b>JWT</b> — the organization in the token.</li>
- *   <li><b>API key</b> — the organization owning the key's project, resolved during
- *       authentication.</li>
- *   <li><b>Platform admin</b> — {@link TenantContext#SYSTEM}. A platform admin is not a member of
- *       any organization; {@code /api/v1/admin/**} is gated on the PLATFORM_ADMIN authority in
- *       {@code SecurityConfig} and is meant to see across tenants. Giving it a tenant would
- *       break it, and giving it none would fail every query.</li>
- *   <li><b>Unauthenticated</b> — nothing is set. The whitelisted public paths
- *       ({@code /ingress/**}, {@code /tunnel/**}, {@code /hook/**}) have a tenant but no caller
- *       identity, so they discover their own organization from the token or slug in the URL and
- *       enter it with {@link TenantContext#runAs}. Leaving the scope unset here is what forces
- *       them to: the first unscoped query throws {@link TenantNotResolvedException}.</li>
- * </ul>
+ * <p>A JWT maps to the organization in the token, an API key to the one owning its project, and
+ * a platform admin to {@link TenantContext#SYSTEM} — not being a member of any organization, and
+ * meant to see across them. An unauthenticated request gets nothing: the public paths have a
+ * tenant but no caller identity, so leaving the scope unset is what forces them to discover their
+ * own organization and enter it with {@link TenantContext#runAs}.
  *
  * <p>The previous scope is restored in a {@code finally}, which on a real request means clearing
- * it: Tomcat threads are pooled, and a leaked {@code ThreadLocal} would hand one request's tenant
- * to the next request on that thread — the one failure mode of this design that would be worse
- * than the problem it solves. Restoring rather than clearing outright matters where a request is
- * dispatched on a thread that already had a scope: MockMvc runs the whole chain on the calling
- * thread, so an unconditional clear would wipe the scope of the test that made the call.
+ * it: a leaked {@code ThreadLocal} would hand one request's tenant to the next request on that
+ * pooled thread. Restoring rather than clearing matters under MockMvc, which runs the chain on
+ * the calling thread.
  *
- * <h2>Why this is not a {@code @Component}</h2>
- *
- * <p>Any {@code Filter} bean is also registered directly with the servlet container, where it
- * runs <em>before</em> the security filter chain. For the authentication filters that is
- * harmless. For this one it would be fatal: it would run while the {@code SecurityContext} is
- * still empty, set no tenant, and — being a {@code OncePerRequestFilter} — decline to run again
- * in the position where the identity actually exists. It is constructed by {@code SecurityConfig}
- * instead, so the chain is the only place it appears.
+ * <p>Not a {@code @Component}: a {@code Filter} bean is also registered with the servlet container,
+ * where it would run before the security chain with an empty {@code SecurityContext} and then,
+ * being a {@code OncePerRequestFilter}, decline to run where the identity exists.
  */
 public class TenantContextFilter extends OncePerRequestFilter {
 

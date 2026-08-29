@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.domain.entity.Delivery;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,4 +26,21 @@ public class DeliveryResponse {
     private Instant succeededAt;
     private Instant failedAt;
     private Instant createdAt;
+
+    public static DeliveryResponse of(Delivery delivery) {
+        return DeliveryResponse.builder()
+                .id(delivery.getId())
+                .eventId(delivery.getEventId())
+                .endpointId(delivery.getEndpointId())
+                .subscriptionId(delivery.getSubscriptionId())
+                .status(delivery.getStatus().name())
+                .attemptCount(delivery.getAttemptCount())
+                .maxAttempts(delivery.getMaxAttempts())
+                .nextRetryAt(delivery.getNextRetryAt())
+                .lastAttemptAt(delivery.getLastAttemptAt())
+                .succeededAt(delivery.getSucceededAt())
+                .failedAt(delivery.getFailedAt())
+                .createdAt(delivery.getCreatedAt())
+                .build();
+    }
 }

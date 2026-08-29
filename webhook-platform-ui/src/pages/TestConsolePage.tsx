@@ -31,6 +31,7 @@ import { Badge } from '../components/ui/badge';
 import { Select } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 import { cn } from '../lib/utils';
+import { formatJson } from '../lib/json';
 
 type ConsoleMode = 'event' | 'ping' | 'verify';
 
@@ -925,10 +926,3 @@ function CodeBlock({
   );
 }
 
-function formatJson(str: string): string {
-  try {
-    return JSON.stringify(JSON.parse(str), null, 2);
-  } catch {
-    return str;
-  }
-}

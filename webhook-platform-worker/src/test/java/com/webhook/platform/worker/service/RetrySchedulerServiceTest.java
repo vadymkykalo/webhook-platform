@@ -75,10 +75,10 @@ class RetrySchedulerServiceTest {
                 // Circuit breaker should allow all calls by default in tests
                 lenient().when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
 
-                retrySchedulerService = newRetrySchedulerService(96L);
+                retrySchedulerService = newRetrySchedulerService();
         }
 
-        private RetrySchedulerService newRetrySchedulerService(long escalationHardCapHours) {
+        private RetrySchedulerService newRetrySchedulerService() {
                 return new RetrySchedulerService(
                                 deliveryRepository,
                                 kafkaTemplate,
@@ -91,9 +91,7 @@ class RetrySchedulerServiceTest {
                                 sendTimeoutSeconds,
                                 rescheduleDelaySeconds,
                                 5000L,   // highWatermark
-                                10000L,  // defaultPollIntervalMs
-                                escalationHardCapHours,
-                                24L);    // forwardEscalationHardCapHours
+                                10000L); // defaultPollIntervalMs
         }
 
         @Test
@@ -426,25 +424,6 @@ class RetrySchedulerServiceTest {
                 assertTrue(worstCaseSeconds <= hardCapSeconds,
                                 "ladder worst-case span (" + worstCaseSeconds + "s) must fit inside the " +
                                                 "escalation hard cap (" + hardCapSeconds + "s)");
-        }
-
-        @Test
-        void constructor_ladderWorstCaseExceedsHardCap_throwsAtStartup() {
-                // Regression test: the original defaults (retry ladder worst-case
-                // ~83h) against the original 48h escalation hard-cap must fail fast at startup
-                // instead of silently letting StaleDeliveryEscalationService DLQ deliveries
-                // before the last retry tiers (6h, 24h) ever get a chance to fire.
-                IllegalStateException ex = assertThrows(IllegalStateException.class,
-                                () -> newRetrySchedulerService(48L));
-                assertTrue(ex.getMessage().contains("hard-cap-hours"),
-                                "expected the failure to name the mismatched config, was: " + ex.getMessage());
-        }
-
-        @Test
-        void constructor_ladderFitsInsideHardCap_doesNotThrow() {
-                // The current, agreed-upon default pairing (raise the cap to
-                // 96h rather than shorten the advertised 6-tier ladder) must not throw.
-                assertDoesNotThrow(() -> newRetrySchedulerService(96L));
         }
 
         private Delivery createDelivery(UUID id, int attemptCount, Instant nextRetryAt) {

@@ -4,7 +4,6 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.Delivery;
-import com.webhook.platform.api.domain.entity.DeliveryAttempt;
 import com.webhook.platform.api.domain.entity.Endpoint;
 import com.webhook.platform.api.domain.entity.Event;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
@@ -23,6 +22,7 @@ import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,7 +67,8 @@ class DeliveryServiceTest {
     @BeforeEach
     void setUp() {
         deliveryService = new DeliveryService(deliveryRepository, deliveryAttemptRepository, endpointRepository,
-                outboxMessageRepository, eventRepository, projectRepository, new ObjectMapper());
+                eventRepository, projectRepository, new ObjectMapper(),
+                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()));
     }
 
     private Event eventInProject() {
@@ -88,7 +89,7 @@ class DeliveryServiceTest {
 
     /**
      * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * of taking it as a parameter. A unit test has no request to establish one, so it
      * enters the scope itself; without this the first call fails with TenantNotResolvedException.
      */
     @BeforeEach
@@ -110,17 +111,20 @@ class DeliveryServiceTest {
                 .isInstanceOf(NotFoundException.class);
     }
 
+    /**
+     * {@code Project} carries {@code @TenantId}, so another organization's project comes back
+     * empty rather than with a foreign organization id on it.
+     */
     @Test
-    void getDelivery_wrongOrg_throwsForbidden() {
+    void getDelivery_projectOfAnotherOrg_isNotFound() {
         UUID deliveryId = UUID.randomUUID();
         Delivery delivery = Delivery.builder().id(deliveryId).eventId(eventId).status(DeliveryStatus.PENDING).build();
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(eventInProject()));
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> deliveryService.getDelivery(deliveryId, auth))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -173,13 +177,12 @@ class DeliveryServiceTest {
     // ─── listDeliveriesByProject ─────────────────────────────────────────
 
     @Test
-    void listDeliveriesByProject_wrongOrg_throwsForbidden() {
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
+    void listDeliveriesByProject_projectOfAnotherOrg_isNotFound() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> deliveryService.listDeliveriesByProject(
                 projectId, null, null, null, null, null, null, PageRequest.of(0, 20)))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -429,13 +432,12 @@ class DeliveryServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void bulkReplay_byProject_wrongOrg_throwsForbidden() {
-        when(projectRepository.findById(projectId))
-                .thenReturn(Optional.of(Project.builder().id(projectId).organizationId(UUID.randomUUID()).build()));
+    void bulkReplay_byProject_projectOfAnotherOrg_isNotFound() {
+        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> deliveryService.bulkReplayDeliveries(
                 null, null, null, projectId, null, auth))
-                .isInstanceOf(ForbiddenException.class);
+                .isInstanceOf(NotFoundException.class);
         verify(deliveryRepository, never()).count(any(Specification.class));
     }
 

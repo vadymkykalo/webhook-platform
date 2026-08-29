@@ -314,7 +314,7 @@ class WorkflowTriggerServiceTest {
         // The only caller is the outbox poller, which runs as the system tenant. Under root,
         // Hibernate stamps nothing: whatever scope is live when executionRecord is saved is what
         // decides the row's organization_id, and NOT NULL makes "no scope" a rollback, not a
-        // warning. Assert on the ambient scope rather than on the entity, because after ADR-0006
+        // warning. Assert on the ambient scope rather than on the entity, because
         // the entity deliberately does not carry the value.
         WorkflowTriggerService service = newService(3);
         Workflow workflow = enabledWorkflow(null);

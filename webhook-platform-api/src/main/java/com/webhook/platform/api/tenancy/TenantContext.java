@@ -9,40 +9,25 @@ import java.util.function.Supplier;
 /**
  * The organization whose rows the current thread is allowed to see.
  *
- * <p>ADR-0006 moved three of the four authorization questions from an opt-in call to something
+ * <p>Three of the four authorization questions moved from an opt-in call to something
  * a handler cannot omit. This type is how the fourth one — "is this row inside the caller's
  * organization?" — stops being a parameter threaded through ~186 service signatures and becomes
  * a property of data access: {@link OrganizationTenantResolver} reads this on every session and
  * Hibernate adds the {@code organization_id} predicate itself.
  *
- * <h2>Three states, and why none of them is a default</h2>
+ * <p>Three states, none of them a default: a tenant, set from the request or by {@link #runAs};
+ * {@link #SYSTEM}, entered explicitly, which the resolver reports as Hibernate's root tenant so
+ * no predicate is added; and unset, which throws rather than guess — a sentinel would silently
+ * return zero rows to a background job, and no filter would reopen the hole this closes.
  *
- * <ul>
- *   <li><b>A tenant</b> — set by {@code TenantContextFilter} from the authenticated request, or
- *       by {@link #runAs} on a public path that discovered its tenant from a token or slug.</li>
- *   <li><b>{@link #SYSTEM}</b> — entered explicitly by {@link #runAsSystem} / {@link #callAsSystem}.
- *       The resolver reports it as Hibernate's <em>root</em> tenant, for which no predicate is
- *       added at all, so a system path really does see every organization.</li>
- *   <li><b>Unset</b> — a hard failure. {@link OrganizationTenantResolver} throws rather than
- *       guessing, because the two plausible guesses are both wrong: filtering on a sentinel would
- *       silently return zero rows to a background job, and filtering on nothing would silently
- *       reopen the hole this exists to close.</li>
- * </ul>
- *
- * <p>Scopes nest and restore, so entering system scope inside a request and leaving it puts the
- * request's own tenant back. That nesting is what lets authentication itself work: resolving an
- * API key reads {@code api_keys} and {@code projects}, both tenant-scoped tables, before any
- * tenant is known.
+ * <p>Scopes nest and restore. That is what lets authentication work at all: resolving an API key
+ * reads two tenant-scoped tables before any tenant is known.
  */
 public final class TenantContext {
 
     /**
-     * Hibernate's <em>root</em> tenant: sessions opened under it get no tenant predicate.
-     *
-     * <p>The value is arbitrary and never compared against a real {@code organization_id} — the
-     * resolver's {@code isRoot} intercepts it before Hibernate builds a predicate from it. It is
-     * the nil UUID so that a value which somehow reached a query would match nothing rather than
-     * matching some real organization.
+     * Hibernate's root tenant: sessions opened under it get no predicate. The nil UUID, so a value
+     * that somehow reached a query would match nothing rather than some real organization.
      */
     public static final UUID SYSTEM = new UUID(0L, 0L);
 
@@ -58,11 +43,8 @@ public final class TenantContext {
     }
 
     /**
-     * The current tenant, or a failure if none has been entered.
-     *
-     * <p>For the handful of places that need the organization as a <em>value</em> rather than as
-     * an ambient filter — chiefly native queries, which Hibernate's discriminator does not reach.
-     * Prefer letting the filter do the work; reach for this only where it cannot.
+     * The current tenant, or a failure if none has been entered. For the places that need the
+     * organization as a value rather than a filter — chiefly native queries.
      */
     public static UUID require() {
         UUID tenant = CURRENT.get();
@@ -137,45 +119,25 @@ public final class TenantContext {
     /**
      * Rejects a tenant scope entered after the transaction has already opened.
      *
-     * <p>"Enter the scope outside the transaction" is the most-repeated footgun in ADR-0006, and
-     * until this guard existed it was kept by a comment. Hibernate resolves the tenant once, when
-     * it opens the session, so a scope entered inside an active transaction arrives too late: the
-     * session stays bound to whatever scope was in effect when the transaction began, and every
-     * row written under the new scope is stamped with the old organization. Nothing reports that
-     * — no exception, no constraint violation, just a row in the wrong tenant — which is why this
-     * throws rather than warns. There is no legitimate case for changing tenant mid-transaction,
-     * so there is nothing to carve out.
+     * <p>Hibernate resolves the tenant once, when it opens the session, so a scope entered inside
+     * an open transaction arrives too late: every row written under it is stamped with the old
+     * organization, and nothing reports that. Hence a throw rather than a warning.
      *
-     * <p>The declarative half of the problem was already solved structurally:
-     * {@link SystemTenantAspect} runs at {@code HIGHEST_PRECEDENCE}, so {@code @SystemTenant}
-     * always wraps {@code @Transactional} rather than the other way round. This is the imperative
-     * half.
-     *
-     * <p>{@link #runAsSystem} and {@link #callAsSystem} are deliberately <em>not</em> guarded.
-     * They enter Hibernate's root tenant, for which no predicate is added and no discriminator is
-     * stamped, so entering one inside a transaction cannot put the wrong organization on a row —
-     * and authentication genuinely needs to widen to root from inside whatever scope it is in.
-     *
-     * <p>The fix at a call site is always the same shape: open the scope first and start the
-     * transaction inside it, as {@code IngressService} and {@code TestEndpointService} do on the
-     * two public paths.
+     * <p>{@link #runAsSystem} and {@link #callAsSystem} are deliberately not guarded: root stamps
+     * no discriminator, and authentication needs to widen to it from inside whatever scope it is
+     * in. The fix at a call site is always to open the scope first and start the transaction
+     * inside it.
      */
     private static void requireNoOpenTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException(
                     "Tenant scope entered inside an open transaction; Hibernate read the tenant when it "
                             + "opened the session, so this row would be stamped with the wrong organization. "
-                            + "Enter the scope outside the transaction (ADR-0006).");
+                            + "Enter the scope outside the transaction.");
         }
     }
 
-    /**
-     * Runs {@code body} across every organization.
-     *
-     * <p>Every call site is a deliberate statement that this work has no tenant: a scheduler, a
-     * Kafka consumer, or the authentication lookup that has to read {@code api_keys} before it
-     * knows whose key it is. Reach for it only when that sentence is true.
-     */
+    /** Runs {@code body} across every organization. Only where that is genuinely true. */
     public static void runAsSystem(Runnable body) {
         callAsSystem(() -> {
             body.run();

@@ -24,6 +24,7 @@ import com.webhook.platform.api.service.ingress.SourceDisabledException;
 import com.webhook.platform.api.service.ingress.SourceNotFoundException;
 import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
+import com.webhook.platform.api.service.ForwardDispatch;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -101,7 +102,7 @@ class IngressServiceTest {
         service = new IngressService(
                 sourceRepository, eventRepository, destinationRepository,
                 forwardAttemptRepository, outboxMessageRepository,
-                objectMapper, meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
+                objectMapper, new ForwardDispatch(objectMapper), meterRegistry, verifierFactory, replayDetectionService, rateLimiterService,
                 clientIpResolver, transactionManager,
                 encryptionKeyRegistry, 524288
         );
@@ -128,7 +129,7 @@ class IngressServiceTest {
     private IncomingSource buildActiveSource() {
         return IncomingSource.builder()
                 // The Source names its organization: ingress is unauthenticated, so the tenant
-                // scope the rest of the request runs in comes off this row (ADR-0006).
+                // scope the rest of the request runs in comes off this row.
                 .id(sourceId).projectId(UUID.randomUUID()).organizationId(orgId)
                 .name("Test").slug("test").providerType(ProviderType.GENERIC)
                 .status(IncomingSourceStatus.ACTIVE)

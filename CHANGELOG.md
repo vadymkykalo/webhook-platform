@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-08-29
+
+Three defects that were already in production, five listings that queried once per
+row, and the structural work that stops each of them recurring. No API change.
+
+### Fixed
+
+- **A Forward could be finalised by an attempt that no longer owned it.** The two
+  directions claimed to implement the same fencing contract and did not: Outgoing
+  rejects an unfenced Claim against a row carrying a token, Incoming accepted one
+  unconditionally. A retry message published before the token existed could
+  therefore write over a row a newer attempt had taken — the duplicate forward the
+  fence exists to prevent. Both directions now read the predicate from one place.
+- **An open circuit breaker left no trace on the incoming direction.** The Runner
+  records the refusal deliberately, so an operator looking at why a destination
+  went quiet sees the breaker rather than an unexplained gap. Incoming buffered
+  that record and applied it during finalisation, where the deferral branch
+  returned before reaching it. Outgoing had always written it.
+- **Only one of eleven outbox writes carried a correlation id.** Replay, DLQ
+  retry, bulk replay, workflow deliveries and the whole incoming direction reached
+  the worker with a freshly invented one, so none of them could be traced across
+  the two services. Two of those paths also dropped the sequence number and the
+  ordering flag from the message.
+- **Two dashboard lists did not refresh after the action that changed them.** The
+  workflow node panel read endpoints, api keys and subscriptions under keys of its
+  own, which no invalidation matched; the event detail page read its deliveries
+  under a key `useReplayDelivery` does not touch, so replaying from that page left
+  it stale.
+- A malformed `from=` or `to=` on the audit log export was silently dropped, so a
+  typo returned the unfiltered log and looked like it had worked. It is now a 400.
+- **The published API reference described an endpoint nobody could call.** Every
+  one of the 187 operations carried a required `auth` query parameter of type
+  `AuthContext` — an internal object resolved from the bearer token or the API
+  key, never sent by a caller. springdoc read it off the controller signatures and
+  published it; it is now hidden, and 834 lines of it left the spec.
+- **The reference told readers to call `http://localhost:8080`.** Hookflow is
+  self-hosted, so no address is right for everyone: the server is now a
+  `{baseUrl}` variable a reader fills in, defaulting to the local one the
+  quickstart already has them open.
+- Twenty-five operations — workflows, incidents, alerts, the audit log export —
+  had a name and no description at all. Every operation now has both.
+
+### Changed
+
+- **Listing is no longer one query per row.** Workflows issued five COUNT
+  statements per workflow — two of them asking the same question twice — rules
+  three queries each, and transformations, subscriptions and incoming destinations
+  one apiece. Fifty rows meant a hundred and one round trips; each listing now
+  resolves what the page needs before mapping it.
+- Sixteen ownership guards that answered 403 were removed. They were unreachable:
+  the entity carries a tenant discriminator, so another organization's row is a
+  404 before the comparison runs. Behaviour is unchanged; three unit tests that
+  pinned the dead branch now assert what actually happens.
+- The attempt pipeline is split along the seams it already had names for —
+  ordering, signing, destination authentication, store construction, the polling
+  loop, the cluster-wide sweep lock — and the row transitions live on the row.
+  Nothing about how a Delivery or a Forward behaves changed; 1381 tests and every
+  ratchet pass unchanged.
+- The 137 references to ADRs and runbooks deleted in `79758b3` are gone from the
+  code, along with the javadoc that had grown to 80% of `AttemptStore` and two
+  blocks copied verbatim into 31 and 11 files.
+
+### Added
+
+- A `Clock` bean in both services, so the billing month boundary and the secret
+  rotation grace window are tested rather than waited for.
+- Direct tests for both Attempt Stores, which had only ever been reached through
+  the services that build them.
+
 ## [2.8.0] - 2026-08-28
 
 Release-pipeline repairs and dependency updates. No product change.
@@ -683,7 +752,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...v2.7.0
 [2.6.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.0...v2.6.1

@@ -16,7 +16,7 @@ import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
  * <p>A decorator rather than {@code @SystemTenant} on the handler's methods: Spring AOP proxies
  * only public methods, and {@code handleTextMessage} — where the tunnel does most of its work —
  * is protected. An annotation there would have looked like a declaration and enforced nothing,
- * which is the failure mode ADR-0006 is about.
+ * which is exactly the failure mode this avoids.
  *
  * <p>The hub reads and writes {@code tunnel_sessions} across organizations by design: which
  * organization a session belongs to is a property of the row, discovered from the token the CLI

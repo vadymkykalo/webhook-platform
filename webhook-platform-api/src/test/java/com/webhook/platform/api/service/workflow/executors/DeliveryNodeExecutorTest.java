@@ -11,6 +11,7 @@ import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
 import com.webhook.platform.api.service.workflow.StepResult;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import com.webhook.platform.common.constants.KafkaTopics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,8 @@ class DeliveryNodeExecutorTest {
 
     @BeforeEach
     void setUp() {
-        executor = new DeliveryNodeExecutor(endpointRepository, deliveryRepository, outboxMessageRepository, mapper);
+        executor = new DeliveryNodeExecutor(endpointRepository, deliveryRepository, mapper,
+                new DeliveryDispatch(outboxMessageRepository, mapper));
     }
 
     private JsonNode json(String raw) throws Exception {

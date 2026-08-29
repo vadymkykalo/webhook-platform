@@ -19,13 +19,9 @@ import java.time.Duration;
  * once in api and once in worker. It was byte-identical in both apart from the package line,
  * so an SSRF fix had to be applied twice and nothing said so.
  *
- * <p>Reactor Netty is a {@code provided} dependency of this module on purpose. Both modules
- * that use this class already have it through {@code spring-boot-starter-webflux}, and the CLI
- * — which also depends on common and is shipped as a standalone binary — has no netty at all.
- * Making it {@code compile} would put netty in that binary for a class the CLI never calls.
- * The trade-off is the usual one for {@code provided}: a future consumer of common that uses
- * this class without webflux gets a NoClassDefFoundError at runtime rather than a compile
- * error.
+ * <p>Reactor Netty is {@code provided} on purpose: both modules that use this already have it
+ * through webflux, and making it {@code compile} would put netty into the CLI binary for a class
+ * the CLI never calls. A consumer without webflux gets a NoClassDefFoundError at runtime.
  */
 @Slf4j
 public final class SsrfProtectionCustomizer {
