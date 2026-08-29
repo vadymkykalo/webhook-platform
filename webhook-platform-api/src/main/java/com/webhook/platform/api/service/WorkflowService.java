@@ -13,7 +13,6 @@ import com.webhook.platform.api.dto.WorkflowExecutionResponse.StepExecutionRespo
 import com.webhook.platform.api.dto.WorkflowRequest;
 import com.webhook.platform.api.dto.WorkflowResponse;
 import com.webhook.platform.api.exception.ConflictException;
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.service.workflow.WorkflowEngine;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;

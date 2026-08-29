@@ -66,9 +66,6 @@ public class IncomingDestinationService {
                 .orElseThrow(() -> new NotFoundException("Incoming source not found"));
         Project project = projectRepository.findById(source.getProjectId())
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
     }
 
     private UUID resolveProjectIdForSource(UUID sourceId) {

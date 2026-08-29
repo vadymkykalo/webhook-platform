@@ -17,7 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import java.security.SecureRandom;
@@ -48,10 +47,6 @@ public class ApiKeyService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Project does not belong to your organization");
-        }
-
         String plainKey = generateApiKey();
         String keyHash = CryptoUtils.hashApiKey(plainKey);
         String keyPrefix = plainKey.substring(0, Math.min(8, plainKey.length()));
@@ -77,10 +72,6 @@ public class ApiKeyService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Project does not belong to your organization");
-        }
-
         List<ApiKey> apiKeys = apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId);
         return apiKeys.stream()
                 .map(key -> mapToResponse(key, null))
@@ -93,10 +84,6 @@ public class ApiKeyService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Project does not belong to your organization");
-        }
-
         return apiKeyRepository.findByProjectIdAndRevokedAtIsNull(projectId, pageable)
                 .map(key -> mapToResponse(key, null));
     }
@@ -107,10 +94,6 @@ public class ApiKeyService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Project does not belong to your organization");
-        }
 
         ApiKey apiKey = apiKeyRepository.findByIdAndProjectId(apiKeyId, projectId)
                 .orElseThrow(() -> new NotFoundException("API key not found"));

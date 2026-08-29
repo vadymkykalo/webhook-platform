@@ -27,7 +27,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 
@@ -70,9 +69,6 @@ public class DeliveryService {
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         Project project = projectRepository.findById(event.getProjectId())
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(auth.organizationId())) {
-            throw new ForbiddenException("Access denied");
-        }
         auth.validateProjectAccess(project.getId());
     }
 
@@ -95,9 +91,6 @@ public class DeliveryService {
                     .orElseThrow(() -> new NotFoundException("Event not found"));
             Project project = projectRepository.findById(event.getProjectId())
                     .orElseThrow(() -> new NotFoundException("Project not found"));
-            if (!project.getOrganizationId().equals(auth.organizationId())) {
-                throw new ForbiddenException("Access denied");
-            }
             auth.validateProjectAccess(project.getId());
             deliveries = deliveryRepository.findByEventId(eventId, pageable);
         } else {
@@ -119,10 +112,6 @@ public class DeliveryService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
 
         Specification<Delivery> spec;
         if (eventId != null) {
@@ -238,9 +227,6 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectIdFilter)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(auth.organizationId())) {
-            throw new ForbiddenException("Access denied");
-        }
         auth.validateProjectAccess(project.getId());
 
         Specification<Delivery> spec = Specification

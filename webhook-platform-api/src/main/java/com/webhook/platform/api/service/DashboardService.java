@@ -10,7 +10,6 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import java.time.Instant;
@@ -57,9 +56,6 @@ public class DashboardService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
         return OnboardingStatusResponse.builder()
                 .hasEndpoints(endpointRepository.existsByProjectIdAndDeletedAtIsNull(projectId))
                 .hasSubscriptions(subscriptionRepository.existsByProjectId(projectId))
@@ -76,9 +72,6 @@ public class DashboardService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
         
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
         
         Instant since = Instant.now().minus(30, ChronoUnit.DAYS);
         

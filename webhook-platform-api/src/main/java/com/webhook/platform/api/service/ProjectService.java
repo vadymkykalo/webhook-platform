@@ -12,7 +12,6 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import java.time.Instant;
@@ -48,10 +47,6 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
-
         return mapToResponse(project);
     }
 
@@ -68,10 +63,6 @@ public class ProjectService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
 
         project.setName(request.getName());
         project.setDescription(request.getDescription());
@@ -103,10 +94,6 @@ public class ProjectService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
 
         project.setDeletedAt(Instant.now());
         projectRepository.save(project);
