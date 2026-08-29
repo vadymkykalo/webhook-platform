@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 /**
  * The organization whose rows the current thread is allowed to see.
  *
- * <p>ADR-0006 moved three of the four authorization questions from an opt-in call to something
+ * <p>Three of the four authorization questions moved from an opt-in call to something
  * a handler cannot omit. This type is how the fourth one — "is this row inside the caller's
  * organization?" — stops being a parameter threaded through ~186 service signatures and becomes
  * a property of data access: {@link OrganizationTenantResolver} reads this on every session and
@@ -137,7 +137,7 @@ public final class TenantContext {
     /**
      * Rejects a tenant scope entered after the transaction has already opened.
      *
-     * <p>"Enter the scope outside the transaction" is the most-repeated footgun in ADR-0006, and
+     * <p>"Enter the scope outside the transaction" is the most-repeated footgun in this codebase, and
      * until this guard existed it was kept by a comment. Hibernate resolves the tenant once, when
      * it opens the session, so a scope entered inside an active transaction arrives too late: the
      * session stays bound to whatever scope was in effect when the transaction began, and every
@@ -165,7 +165,7 @@ public final class TenantContext {
             throw new IllegalStateException(
                     "Tenant scope entered inside an open transaction; Hibernate read the tenant when it "
                             + "opened the session, so this row would be stamped with the wrong organization. "
-                            + "Enter the scope outside the transaction (ADR-0006).");
+                            + "Enter the scope outside the transaction.");
         }
     }
 

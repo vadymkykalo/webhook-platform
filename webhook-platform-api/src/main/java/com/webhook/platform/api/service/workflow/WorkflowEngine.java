@@ -44,7 +44,7 @@ public class WorkflowEngine implements DisposableBean {
      * Bounded thread pool for per-node timeout enforcement, wrapped so a node runs in the tenant
      * of the workflow that scheduled it — node executors read endpoints and write deliveries, all
      * {@code @TenantId} entities, and this pool is built here rather than in {@code AsyncConfig},
-     * so nothing else would give it a scope (ADR-0006).
+     * so nothing else would give it a scope.
      */
     private final ExecutorService nodeTimeoutExecutor;
 

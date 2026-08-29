@@ -70,7 +70,7 @@ _Avoid_: relay, proxy, passthrough
 
 ### The attempt lifecycle
 
-Shared by both directions. See ADR-0011.
+Shared by both directions.
 
 **Attempt**:
 One try at getting a Delivery or a Forward to its target: one HTTP request and whatever it

@@ -690,7 +690,7 @@ class IncomingForwardServiceTest {
     void ladderExhausted_publishesDlqNotification() {
         // Before this, a DLQ'd Forward wrote its row status and nothing else: incoming.forward.dlq
         // existed and was created by the Makefile, but nothing ever produced a business
-        // notification to it. See ADR-0011.
+        // notification to it.
         IncomingDestination destination = buildDestination();
         destination.setMaxAttempts(1); // exhausted by the first failure
 

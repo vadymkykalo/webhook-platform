@@ -37,10 +37,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Parity ratchet over the entity duplication ADR-0002 keeps.
+ * Parity ratchet over the entity duplication the two modules keep.
  *
- * <p>ADR-0002 says {@code api} and {@code worker} each keep their own {@code @Entity} copy of
- * every shared table, and that the decision stands. Its cost is that a schema change is a
+ * <p>{@code api} and {@code worker} each keep their own {@code @Entity} copy of
+ * every shared table, deliberately. The cost is that a schema change is a
  * three-file change — migration, api entity, worker entity — and that nothing in the build
  * noticed when only two of the three happened. Hibernate's {@code ddl-auto: validate} catches a
  * mapping that names a column the schema does not have; it cannot catch a column the schema has
@@ -69,8 +69,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       renaming the original aside and re-creating it, partly through dynamic SQL inside
  *       {@code DO $$} blocks. A hand-written DDL interpreter would be one more thing that can be
  *       silently wrong — which is the exact failure mode this test exists to remove. This is
- *       also what ADR-0002 asked for in as many words: "a test comparing each shared table's
- *       {@code information_schema} columns against both {@code @Entity} mappings".</li>
+ *       what this test does instead: compares each shared table's
+ *       {@code information_schema} columns against both {@code @Entity} mappings.</li>
  *   <li><b>Which tables are shared</b> — derived from the filesystem, by intersecting the two
  *       entity package directories. A tenth shared entity is covered the day it is added; it is
  *       never a list anyone has to remember to update.</li>
@@ -119,7 +119,7 @@ class EntityMappingParityIntegrationTest {
      * column. If you cannot say why a column is missing, it is drift, not an exemption.
      *
      * <p>Every entry below is a column the <em>worker</em> does not map; the api maps all of
-     * them, which is the asymmetry ADR-0002 describes. Two reasons recur and are worth stating
+     * them. Two reasons recur and are worth stating
      * once: a column can be safely unmapped either because only the api ever writes it, or
      * because the worker consumes its <em>outcome</em> through a different column it does map.
      * Neither reason survives the column being read on the delivery or forward path — which is
@@ -268,7 +268,7 @@ class EntityMappingParityIntegrationTest {
                 "Columns of a table both modules map are missing from an @Entity. Hibernate's "
                         + "schema validation cannot see this — a missing mapping is silent, which "
                         + "is how events.payload_compressed and endpoints.deleted_at each shipped "
-                        + "a production bug (ADR-0002).\n\n"
+                        + "a production bug.\n\n"
                         + "Map the column in the entity below, or — if the omission is deliberate "
                         + "— add it to DELIBERATELY_UNMAPPED with a reason someone else can check.\n\n"
                         + String.join("\n", gaps) + "\n");
@@ -333,13 +333,13 @@ class EntityMappingParityIntegrationTest {
     @Test
     @DisplayName("the shared-entity set is discovered from the filesystem and is not empty")
     void sharedEntitySetIsDiscovered() {
-        // Eight, not the nine ADR-0002 originally recorded: the worker's IncomingSource entity
+        // Eight, not the nine originally recorded: the worker's IncomingSource entity
         // and repository were dead code and were deleted, so incoming_sources stopped being a
         // shared table. Lower this number only for a deletion you can name — the guard exists so
         // a broken directory scan cannot quietly make the whole test vacuous.
         assertTrue(sharedEntities.size() >= 8,
-                "Only " + sharedEntities.size() + " entities were found in both modules. ADR-0002 "
-                        + "records eight. Fewer means the directory scan is broken and this whole "
+                "Only " + sharedEntities.size() + " entities were found in both modules. This test "
+                        + "expects eight. Fewer means the directory scan is broken and this whole "
                         + "test is vacuous. Found: " + sharedEntities.keySet());
 
         for (Map.Entry<String, Map<String, EntitySource>> entry : sharedEntities.entrySet()) {

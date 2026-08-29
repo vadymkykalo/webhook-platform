@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ratchet over the one hole in ADR-0006's structural tenancy.
+ * Ratchet over the one hole in the structural tenancy.
  *
  * <p>Everything else in this package is confined for free: the entities carry {@code @TenantId},
  * so Hibernate adds {@code organization_id = <current tenant>} when it builds the SQL, and a new
@@ -80,7 +80,7 @@ class NativeQueryTenantPredicateTest {
             "DeliveryAttemptRepository.estimatedRowCount",
             "IncomingEventRepository.estimatedRowCount",
 
-            // The outbox is the one place that is deliberately cross-tenant by design (ADR-0001):
+            // The outbox is the one place that is deliberately cross-tenant by design:
             // OutboxPublisherService polls, claims and settles every organization's messages in
             // one batch under @SystemTenant, with a per-project fairness cap inside the SQL.
             "OutboxMessageRepository.findOldestPendingCreatedAt",
@@ -133,7 +133,7 @@ class NativeQueryTenantPredicateTest {
         assertEquals(Set.of(), unexpected,
                 "These native queries mention no organization_id. Hibernate's @TenantId "
                         + "discriminator does not reach native SQL, so a read returns every "
-                        + "organization's rows and a write stamps none (ADR-0006). Add the predicate "
+                        + "organization's rows and a write stamps none. Add the predicate "
                         + "or the column, or — if the method genuinely runs only under the system "
                         + "tenant — add it to SYSTEM_PATHS with the reason.");
     }

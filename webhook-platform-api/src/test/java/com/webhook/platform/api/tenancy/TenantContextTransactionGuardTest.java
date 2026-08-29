@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Guard over the most-repeated footgun in ADR-0006: entering a tenant scope after the
+ * Guard over the most-repeated tenancy footgun: entering a tenant scope after the
  * transaction has already opened.
  *
  * <p>Hibernate reads the tenant when it opens the session, so a scope entered inside an active
@@ -41,7 +41,7 @@ class TenantContextTransactionGuardTest {
 
         assertThatThrownBy(() -> TenantContext.callAs(ORG, () -> "never runs"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ADR-0006");
+                .hasMessageContaining("outside the transaction");
     }
 
     @Test

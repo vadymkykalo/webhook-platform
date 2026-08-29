@@ -89,7 +89,7 @@ public class StaleForwardEscalationService {
     /**
      * Unlocked deliberately: {@code findStaleForwardAttemptIds} claims with
      * {@code FOR UPDATE … SKIP LOCKED}, so replicas are handed disjoint rows by Postgres and
-     * cannot emit duplicate notifications for the same Forward. See ADR-0005, category 2.
+     * cannot emit duplicate notifications for the same Forward.
      */
     @Scheduled(fixedDelayString = "${forward.escalation.interval-ms:300000}")
     public void runEscalation() {

@@ -122,8 +122,7 @@ public class DataRetentionIntegrationTest {
     /**
      * These two build their own {@code @SpringBootTest} rather than extending
      * {@code AbstractIntegrationTest}, so they enter the system tenant scope themselves. They read
-     * and delete rows across organizations directly, which is exactly what that scope means
-     * (ADR-0006).
+     * and delete rows across organizations directly, which is exactly what that scope means.
      */
     @BeforeEach
     void enterSystemTenantScope() {

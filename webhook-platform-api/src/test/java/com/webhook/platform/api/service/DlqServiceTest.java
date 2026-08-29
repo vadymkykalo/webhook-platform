@@ -68,7 +68,7 @@ class DlqServiceTest {
 
     /**
      * DlqService reads its organization from the ambient tenant scope now, not from a parameter
-     * (ADR-0006); a unit test has no request to establish one, so it enters the scope itself.
+     * rather than from a parameter; a unit test has no request to establish one, so it enters it.
      */
     @BeforeEach
     void enterTenantScope() {

@@ -96,7 +96,7 @@ class HandBuiltExecutorTenantPropagationTest {
                         + "TenantPropagatingTaskDecorator.wrap(...). A task on such a pool starts with "
                         + "whatever scope the previous task left behind — no scope at all on a fresh "
                         + "thread — so it either fails on its first query or stamps the wrong "
-                        + "organization on a row (ADR-0006). Wrap the pool, or add it to "
+                        + "organization on a row. Wrap the pool, or add it to "
                         + "DOCUMENTED_EXEMPTIONS with a reason.");
     }
 

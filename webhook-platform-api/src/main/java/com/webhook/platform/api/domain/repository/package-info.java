@@ -5,7 +5,7 @@
  *
  * <p>Most methods here need no tenant handling at all. The entities they return carry
  * {@code @TenantId}, so Hibernate adds {@code organization_id = <current tenant>} to every derived
- * query, every JPQL {@code @Query} and every {@code findById} — see ADR-0006. A new method
+ * query, every JPQL {@code @Query} and every {@code findById}. A new method
  * inherits that; it cannot forget it.
  *
  * <p><b>Native queries are outside that guarantee.</b> Hibernate's discriminator is applied when
@@ -23,7 +23,7 @@
  * </ul>
  *
  * <p>Adding a native query means deciding which it is. Getting that wrong in the first direction
- * is a cross-tenant read, which is what ADR-0006 exists to prevent — and
+ * is a cross-tenant read — and
  * {@code NativeQueryTenantPredicateTest} is what makes the decision explicit: a native query
  * either names {@code organization_id} in its SQL, or is listed there as a system path with the
  * reason it crosses tenants.

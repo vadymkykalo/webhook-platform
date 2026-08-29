@@ -38,16 +38,9 @@ public class TransformationService {
     private static final Pattern EXPRESSION_PATTERN = Pattern.compile("\\$\\{([^}]*)\\}");
 
     /**
-     * Defence in depth over the tenant filter, and the reason a bad project id is a 404.
-     *
-     * <p>It no longer compares organizations: {@code Project} carries {@code @TenantId}, so this
-     * lookup only ever sees projects inside the caller's organization (ADR-0006). What is left is
-     * turning "no such project here" into a {@link NotFoundException} rather than letting the
-     * caller get an empty list back.
-     *
-     * <p>Another organization's project is now a 404 rather than the 403 it used to be. That is
-     * the intended consequence: the old answer told a caller that a project id it had no access to
-     * existed.
+     * Turns "no such project here" into a 404. {@code Project} carries {@code @TenantId}, so this
+     * lookup only sees projects inside the caller's organization: a foreign project id is
+     * indistinguishable from a missing one, which is intended.
      */
     private void validateProjectOwnership(UUID projectId) {
         projectRepository.findById(projectId)

@@ -128,7 +128,7 @@ class IngressServiceTest {
     private IncomingSource buildActiveSource() {
         return IncomingSource.builder()
                 // The Source names its organization: ingress is unauthenticated, so the tenant
-                // scope the rest of the request runs in comes off this row (ADR-0006).
+                // scope the rest of the request runs in comes off this row.
                 .id(sourceId).projectId(UUID.randomUUID()).organizationId(orgId)
                 .name("Test").slug("test").providerType(ProviderType.GENERIC)
                 .status(IncomingSourceStatus.ACTIVE)

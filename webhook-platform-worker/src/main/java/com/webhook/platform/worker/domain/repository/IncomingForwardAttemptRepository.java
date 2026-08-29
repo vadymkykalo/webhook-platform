@@ -104,7 +104,7 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
          *
          * <p>{@code FOR UPDATE OF a SKIP LOCKED} because the caller publishes a DLQ
          * notification per row: without it two worker replicas would select the same rows and
-         * each emit a duplicate notification for the same Forward. See ADR-0005.
+         * each emit a duplicate notification for the same Forward.
          */
         @Query(value = """
                         SELECT a.id FROM incoming_forward_attempts a

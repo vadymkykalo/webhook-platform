@@ -20,9 +20,8 @@
 --      partition as a safety net so inserts never fail outright if the partition
 --      maintenance job (PartitionMaintenanceService) falls behind.
 --
--- See docs/runbooks/partition-high-volume-tables.md for the full populated-database
--- procedure: pre-validating the attach constraint ahead of the deploy window so the
--- ATTACH itself is instant, lock levels at each step, and rollback.
+-- On a populated database, pre-validate the attach constraint ahead of the deploy
+-- window so the ATTACH itself is instant.
 --
 -- WHY THE PRIMARY KEY WIDENS: Postgres requires every unique/primary-key index on a
 -- partitioned table to include the partition key column. `id` remains globally unique
@@ -71,7 +70,7 @@ CREATE TABLE delivery_attempts (
     PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
-COMMENT ON TABLE delivery_attempts IS 'Stores webhook delivery attempt details with request/response data. Partitioned monthly by created_at (see docs/runbooks/partition-high-volume-tables.md); retention drops whole partitions (PartitionMaintenanceService) instead of DELETEing rows. Successful (2xx) attempts are additionally pruned earlier via row-level DELETE at 14d (data-retention.successful-attempts-retention-days), which is finer-grained than a monthly partition boundary.';
+COMMENT ON TABLE delivery_attempts IS 'Stores webhook delivery attempt details with request/response data. Partitioned monthly by created_at; retention drops whole partitions (PartitionMaintenanceService) instead of DELETEing rows. Successful (2xx) attempts are additionally pruned earlier via row-level DELETE at 14d (data-retention.successful-attempts-retention-days), which is finer-grained than a monthly partition boundary.';
 
 -- Indexes on the parent auto-propagate to every current AND future partition (PG 11+).
 CREATE INDEX idx_delivery_attempts_delivery_id ON delivery_attempts (delivery_id);
@@ -107,7 +106,7 @@ BEGIN
     -- for a composite one first. On a large production table, pre-build this as
     -- `CREATE UNIQUE INDEX CONCURRENTLY ... ON delivery_attempts_legacy (id, created_at)`
     -- ahead of the deploy window and attach it with `ADD CONSTRAINT ... PRIMARY KEY
-    -- USING INDEX ...` instead — see docs/runbooks/partition-high-volume-tables.md —
+    -- USING INDEX ...` instead,
     -- since the plain form below takes ACCESS EXCLUSIVE for the whole index build.
     EXECUTE 'ALTER TABLE delivery_attempts_legacy DROP CONSTRAINT delivery_attempts_legacy_pkey';
     EXECUTE 'ALTER TABLE delivery_attempts_legacy ADD CONSTRAINT delivery_attempts_legacy_pkey PRIMARY KEY (id, created_at)';

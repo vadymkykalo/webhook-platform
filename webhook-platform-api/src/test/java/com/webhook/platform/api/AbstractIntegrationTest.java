@@ -66,7 +66,7 @@ public abstract class AbstractIntegrationTest {
 
     /**
      * Integration tests reach for repositories directly — seeding fixtures, asserting on rows,
-     * often for several organizations in one test. That is system work, and ADR-0006 made system
+     * often for several organizations in one test. That is system work, and system
      * work say so: without a scope the first repository call fails with
      * TenantNotResolvedException.
      *

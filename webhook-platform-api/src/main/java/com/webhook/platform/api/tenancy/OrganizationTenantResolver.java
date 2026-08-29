@@ -24,7 +24,7 @@ import java.util.UUID;
  * <h2>Why an unset tenant throws</h2>
  *
  * <p>Returning null is not an option Hibernate offers, and neither available fallback is safe: a
- * sentinel breaks system work, and "no filter" is precisely the opt-in default ADR-0006 exists
+ * sentinel breaks system work, and "no filter" is precisely the opt-in default this resolver exists
  * to remove. Failing loudly means an uncovered path shows up as a 500 in a test run rather than
  * as a cross-tenant read in production.
  */

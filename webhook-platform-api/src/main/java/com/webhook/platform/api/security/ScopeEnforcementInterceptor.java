@@ -74,7 +74,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
      * covered was platform-admin tokens aimed at <em>tenant</em> handlers, which were already
      * refused a step later by {@code AuthContextArgumentResolver} — but only because all 79
      * annotated handlers happen to take an {@code AuthContext}. A handler that did not would have
-     * been open. ADR-0015 has the reasoning.
+     * been open.
      */
     private void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
         RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);

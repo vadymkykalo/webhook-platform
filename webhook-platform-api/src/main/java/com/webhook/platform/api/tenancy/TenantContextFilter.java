@@ -18,7 +18,7 @@ import java.io.IOException;
  *
  * <p>Runs after the three authentication filters and before anything that touches the database,
  * so a handler, a service and a repository all see the same organization without any of them
- * being handed one. This is the request half of what ADR-0006 calls making org ownership a
+ * being handed one. This is the request half of making org ownership a
  * property of data access; {@link TenantContext#runAsSystem} is the other half.
  *
  * <h2>What each kind of caller maps to</h2>

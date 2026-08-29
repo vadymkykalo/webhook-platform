@@ -14,13 +14,13 @@ import java.lang.annotation.Target;
  * shipped reachable by a {@code VIEWER} JWT and a {@code READ_ONLY} API key — one returned a
  * real HMAC signature computed with an Endpoint's signing secret, another fired a signed
  * outbound request from the platform — because the guard was an imperative call somebody had
- * not written, and nothing anywhere said it was missing. See ADR-0006.
+ * not written, and nothing anywhere said it was missing.
  *
  * <p>Method-level wins over class-level.
  *
  * <h2>And the {@code auth.requireWriteAccess()} call in the handler?</h2>
  *
- * <p>It stays, and ADR-0015 is why — but not for the reason the earlier wording here gave. It is
+ * <p>It stays, but not for the reason the earlier wording here gave. It is
  * not a second opinion: {@link ScopeEnforcementInterceptor} calls the same {@link RbacUtil} the
  * handler does, so the two cannot disagree about what WRITE means. They can only disagree about
  * whether they run, and the interceptor is now the more reliable of the two — it cannot be
