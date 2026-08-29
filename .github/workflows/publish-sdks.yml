@@ -16,24 +16,27 @@ name: Publish SDKs
 # GITHUB_TOKEN — and GitHub does not start a workflow from an event raised by
 # that token, to stop workflows triggering themselves. So the release event
 # never arrived and the SDKs sat at 2.2.1 through two releases with nothing
-# failing anywhere. release-cli.yml now calls this workflow directly instead:
-# an explicit call cannot be silently dropped the way an event can.
+# failing anywhere. This workflow was called directly from release-cli.yml for a
+# while instead; it now listens for the tag push itself, for the npm reason set
+# out below the `on:` key. A tag push is a real push event, so it does not go
+# missing the way the release event did.
 on:
-  workflow_call:
-    inputs:
-      sdk:
-        description: 'SDK to publish (node, python, php, all)'
-        required: false
-        default: 'all'
-        type: string
-      ref:
-        description: >-
-          Git ref to publish from. Defaults to whatever triggered the caller, which on a tag
-          push is the tag. A manual re-run of a release starts from a branch, and without
-          this the SDK versions read would be that branch's rather than the tag's.
-        required: false
-        default: ''
-        type: string
+  # Triggered by the tag directly, not called from release-cli.yml, and that distinction is
+  # load-bearing rather than stylistic. npm's Trusted Publisher validates the OIDC token
+  # against the workflow that *entered* the run. Called as a reusable workflow the entry is
+  # release-cli.yml, so a publisher trusting this file was rejected with a bare 404 — while
+  # the identical job started directly from here succeeded. Owning its own trigger keeps the
+  # entry workflow and the trusted publisher the same file, which is the only arrangement npm
+  # accepts without naming the caller instead.
+  #
+  # A tag push is a real push event, so unlike `release: published` it is not dropped for
+  # being raised by GITHUB_TOKEN — the trap documented in NOTE 2 above.
+  push:
+    tags:
+      - 'v*.*.*'
+  # Deliberately not `workflow_call`. Being called makes the caller the entry workflow, and
+  # npm's Trusted Publisher checks the entry workflow — which is how a correctly configured
+  # publisher came back as a bare 404 for six months' worth of releases. Do not add it back.
   workflow_dispatch:
     inputs:
       sdk:
@@ -46,6 +49,11 @@ on:
           - node
           - python
           - php
+      ref:
+        description: 'Tag to publish from, e.g. v2.7.0 (defaults to this branch)'
+        required: false
+        default: ''
+        type: string
 
 # Least privilege by default. `id-token: write` is granted per-job below, only
 # where a registry's OIDC (Trusted Publishing) flow needs it.
@@ -60,6 +68,7 @@ jobs:
       contents: read
       id-token: write   # npm Trusted Publishing + --provenance
     if: >
+      github.event_name == 'push' ||
       inputs.sdk == 'all' ||
       inputs.sdk == 'node'
     defaults:
@@ -131,6 +140,7 @@ jobs:
     name: Publish Python SDK to PyPI (webhook-platform)
     runs-on: ubuntu-latest
     if: >
+      github.event_name == 'push' ||
       inputs.sdk == 'all' ||
       inputs.sdk == 'python'
     defaults:
@@ -183,6 +193,7 @@ jobs:
     name: Publish PHP SDK to Packagist (webhook-platform/php)
     runs-on: ubuntu-latest
     if: >
+      github.event_name == 'push' ||
       inputs.sdk == 'all' ||
       inputs.sdk == 'php'
     defaults:
