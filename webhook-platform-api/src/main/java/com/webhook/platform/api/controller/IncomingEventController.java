@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -47,7 +48,7 @@ public class IncomingEventController {
     public ResponseEntity<Page<IncomingEventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
             @Parameter(description = "Filter by incoming source ID") @RequestParam(value = "sourceId", required = false) UUID sourceId,
-            @PageableDefault(size = 20, sort = "receivedAt") Pageable pageable,
+            @PageableDefault(size = 20, sort = "receivedAt") @ParameterObject Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         Page<IncomingEventResponse> response = eventService.listEvents(
@@ -76,7 +77,7 @@ public class IncomingEventController {
     @GetMapping("/{id}/attempts")
     public ResponseEntity<Page<IncomingForwardAttemptResponse>> getEventAttempts(
             @PathVariable("id") UUID id,
-            @PageableDefault(size = 20) Pageable pageable,
+            @PageableDefault(size = 20) @ParameterObject Pageable pageable,
             AuthContext auth) {
         Page<IncomingForwardAttemptResponse> response = eventService.getEventAttempts(
                 id, auth, pageable);

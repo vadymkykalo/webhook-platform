@@ -298,19 +298,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -1558,19 +1561,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -1697,19 +1703,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -2004,19 +2013,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -2537,19 +2549,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -3044,19 +3059,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -3212,19 +3230,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -3299,19 +3320,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -3465,19 +3489,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
@@ -5159,19 +5186,22 @@
               "name": "page",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "Zero-based page index (0..N)"
             },
             {
               "name": "size",
               "in": "query",
               "required": false,
-              "type": "integer (int32)"
+              "type": "integer",
+              "description": "The size of the page to be returned"
             },
             {
               "name": "sort",
               "in": "query",
               "required": false,
-              "type": "string[]"
+              "type": "string[]",
+              "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported."
             }
           ],
           "responses": [
