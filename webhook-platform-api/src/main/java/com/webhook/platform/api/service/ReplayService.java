@@ -8,17 +8,13 @@ import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.enums.ReplaySessionStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.ReplayEstimateResponse;
 import com.webhook.platform.api.dto.ReplayRequest;
 import com.webhook.platform.api.dto.ReplaySessionResponse;
 import com.webhook.platform.api.exception.ConflictException;
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.util.EventTypeMatcher;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -52,6 +48,7 @@ public class ReplayService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
+    private final DeliveryDispatch deliveryDispatch;
     private final SequenceGeneratorService sequenceGeneratorService;
     private final TransactionTemplate txTemplate;
 
@@ -77,6 +74,7 @@ public class ReplayService {
             OutboxMessageRepository outboxMessageRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
+            DeliveryDispatch deliveryDispatch,
             SequenceGeneratorService sequenceGeneratorService,
             PlatformTransactionManager transactionManager,
             MeterRegistry meterRegistry) {
@@ -87,6 +85,7 @@ public class ReplayService {
         this.outboxMessageRepository = outboxMessageRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
+        this.deliveryDispatch = deliveryDispatch;
         this.sequenceGeneratorService = sequenceGeneratorService;
         this.txTemplate = new TransactionTemplate(transactionManager);
 
@@ -399,7 +398,7 @@ public class ReplayService {
         List<OutboxMessage> outboxMessages = new ArrayList<>();
         for (Delivery delivery : savedDeliveries) {
             try {
-                outboxMessages.add(createOutboxMessage(delivery, projectId));
+                outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
             } catch (Exception e) {
                 errors++;
                 log.warn("Failed to create outbox message for delivery {}: {}",
@@ -438,36 +437,6 @@ public class ReplayService {
             return subscriptionRepository.findByProjectIdAndEventTypeAndEnabledTrue(projectId, request.getEventType());
         }
         return subscriptionRepository.findByProjectIdAndEnabledTrue(projectId);
-    }
-
-    private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
-        try {
-            DeliveryMessage msg = DeliveryMessage.builder()
-                    .deliveryId(delivery.getId())
-                    .eventId(delivery.getEventId())
-                    .endpointId(delivery.getEndpointId())
-                    .subscriptionId(delivery.getSubscriptionId())
-                    .status(delivery.getStatus().name())
-                    .attemptCount(delivery.getAttemptCount())
-                    .sequenceNumber(delivery.getSequenceNumber())
-                    .orderingEnabled(delivery.getOrderingEnabled())
-                    .build();
-
-            String payload = objectMapper.writeValueAsString(msg);
-            return OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryCreated")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(projectId)
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create outbox message for replay delivery", e);
-        }
     }
 
     private void updateProgress(UUID sessionId, int processed, int deliveries, int errors, UUID lastEventId) {

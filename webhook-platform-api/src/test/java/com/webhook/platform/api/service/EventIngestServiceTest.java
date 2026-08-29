@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.webhook.platform.api.service.rules.RuleEngineService;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -82,7 +83,7 @@ class EventIngestServiceTest {
                 eventRepository, subscriptionMatchingCache,
                 deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
-                objectMapper, meterRegistry,
+                objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
                 sequenceGeneratorService, schemaRegistryService, projectRepository,
                 ruleEngineService, quotaCounterService, entitlementService,
                 transactionManager, 262144L, 1024

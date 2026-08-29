@@ -23,6 +23,7 @@ import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,7 +68,8 @@ class DeliveryServiceTest {
     @BeforeEach
     void setUp() {
         deliveryService = new DeliveryService(deliveryRepository, deliveryAttemptRepository, endpointRepository,
-                outboxMessageRepository, eventRepository, projectRepository, new ObjectMapper());
+                eventRepository, projectRepository, new ObjectMapper(),
+                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()));
     }
 
     private Event eventInProject() {

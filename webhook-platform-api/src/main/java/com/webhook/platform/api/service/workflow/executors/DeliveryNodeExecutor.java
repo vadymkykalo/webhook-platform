@@ -6,16 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.webhook.platform.api.domain.entity.Delivery;
 import com.webhook.platform.api.domain.entity.Endpoint;
-import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.DeliveryRepository;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
-import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import com.webhook.platform.api.service.workflow.NodeExecutor;
 import com.webhook.platform.api.service.workflow.StepResult;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,8 +30,8 @@ public class DeliveryNodeExecutor implements NodeExecutor {
 
     private final EndpointRepository endpointRepository;
     private final DeliveryRepository deliveryRepository;
-    private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
+    private final DeliveryDispatch deliveryDispatch;
 
     @Override
     public String getType() {
@@ -87,28 +83,8 @@ public class DeliveryNodeExecutor implements NodeExecutor {
 
             delivery = deliveryRepository.save(delivery);
 
-            // Create outbox message to dispatch via Kafka
-            DeliveryMessage msg = DeliveryMessage.builder()
-                    .deliveryId(delivery.getId())
-                    .eventId(delivery.getEventId())
-                    .endpointId(delivery.getEndpointId())
-                    .status(delivery.getStatus().name())
-                    .attemptCount(delivery.getAttemptCount())
-                    .orderingEnabled(false)
-                    .build();
-
-            String payload = objectMapper.writeValueAsString(msg);
-            outboxMessageRepository.save(OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("WorkflowDeliveryCreated")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(endpointId.toString())
-                    .projectId(endpoint.getProjectId())
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build());
+            deliveryDispatch.announce(delivery, endpoint.getProjectId(),
+                    DeliveryDispatch.Reason.WORKFLOW_CREATED);
 
             log.info("Workflow delivery created: {} → endpoint {}", delivery.getId(), endpointId);
 
