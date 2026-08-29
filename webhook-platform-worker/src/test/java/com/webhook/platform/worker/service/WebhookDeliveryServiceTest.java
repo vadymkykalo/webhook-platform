@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.worker.attempt.AttemptRunner;
+import java.time.Clock;
 import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
 import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
@@ -135,7 +136,8 @@ class WebhookDeliveryServiceTest {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
-                new ObjectMapper(), webClient, registry, ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
+                new ObjectMapper(), webClient, registry, Clock.systemUTC(),
+                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
         return new WebhookDeliveryService(runner, storeFactory, new DeliveryAttemptMetrics(registry),
                 deliveryRepository, transactionTemplate);
     }

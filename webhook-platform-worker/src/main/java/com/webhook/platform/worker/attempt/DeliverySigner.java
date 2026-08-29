@@ -9,6 +9,7 @@ import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.webhook.platform.worker.domain.entity.Endpoint;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,10 +25,12 @@ class DeliverySigner {
 
     private final Endpoint endpoint;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
+    private final Clock clock;
 
-    DeliverySigner(Endpoint endpoint, EncryptionKeyRegistry encryptionKeyRegistry) {
+    DeliverySigner(Endpoint endpoint, EncryptionKeyRegistry encryptionKeyRegistry, Clock clock) {
         this.endpoint = endpoint;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
+        this.clock = clock;
     }
 
     /**
@@ -53,7 +56,7 @@ class DeliverySigner {
     Signatures sign(UUID deliveryId, String body) {
         String secret = currentSecret();
         String previousSecret = retiredSecretInsideGraceWindow();
-        long timestamp = System.currentTimeMillis();
+        long timestamp = clock.millis();
 
         SignatureScheme scheme = endpoint.getSignatureScheme() != null
                 ? endpoint.getSignatureScheme()
@@ -91,7 +94,7 @@ class DeliverySigner {
         if (encrypted == null || rotatedAt == null) {
             return null;
         }
-        if (!SecretRotationWindow.isOpen(rotatedAt, endpoint.getSecretRotationGracePeriodHours(), Instant.now())) {
+        if (!SecretRotationWindow.isOpen(rotatedAt, endpoint.getSecretRotationGracePeriodHours(), Instant.now(clock))) {
             return null;
         }
         try {
