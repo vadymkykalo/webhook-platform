@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,4 +29,9 @@ public interface IncomingDestinationRepository extends JpaRepository<IncomingDes
     boolean existsByProjectId(@Param("projectId") UUID projectId);
 
     long countByTransformationId(UUID transformationId);
+
+    /** Counts for a whole page at once, so listing does not run one query per row. */
+    @Query("SELECT d.transformationId, COUNT(d) FROM IncomingDestination d "
+            + "WHERE d.transformationId IN :transformationIds GROUP BY d.transformationId")
+    List<Object[]> countByTransformationIds(@Param("transformationIds") Collection<UUID> transformationIds);
 }

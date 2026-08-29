@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -101,9 +103,21 @@ public class TransformationService {
 
     public List<TransformationResponse> list(UUID projectId) {
         validateProjectOwnership(projectId);
-        return transformationRepository.findByProjectIdOrderByNameAsc(projectId).stream()
-                .map(this::mapToResponse)
+        List<Transformation> transformations = transformationRepository.findByProjectIdOrderByNameAsc(projectId);
+        Set<UUID> ids = transformations.stream().map(Transformation::getId).collect(Collectors.toSet());
+
+        Map<UUID, Long> subscriptionCounts = countsBy(subscriptionRepository.countByTransformationIds(ids));
+        Map<UUID, Long> destinationCounts = countsBy(incomingDestinationRepository.countByTransformationIds(ids));
+
+        return transformations.stream()
+                .map(t -> mapToResponse(t,
+                        subscriptionCounts.getOrDefault(t.getId(), 0L),
+                        destinationCounts.getOrDefault(t.getId(), 0L)))
                 .collect(Collectors.toList());
+    }
+
+    private static Map<UUID, Long> countsBy(List<Object[]> rows) {
+        return rows.stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Transformation")
@@ -158,6 +172,13 @@ public class TransformationService {
     }
 
     private TransformationResponse mapToResponse(Transformation transformation) {
+        return mapToResponse(transformation,
+                subscriptionRepository.countByTransformationId(transformation.getId()),
+                incomingDestinationRepository.countByTransformationId(transformation.getId()));
+    }
+
+    private TransformationResponse mapToResponse(Transformation transformation,
+            long subscriptionCount, long destinationCount) {
         return TransformationResponse.builder()
                 .id(transformation.getId())
                 .projectId(transformation.getProjectId())
@@ -166,8 +187,8 @@ public class TransformationService {
                 .template(transformation.getTemplate())
                 .version(transformation.getVersion())
                 .enabled(transformation.getEnabled())
-                .subscriptionCount(subscriptionRepository.countByTransformationId(transformation.getId()))
-                .destinationCount(incomingDestinationRepository.countByTransformationId(transformation.getId()))
+                .subscriptionCount(subscriptionCount)
+                .destinationCount(destinationCount)
                 .createdAt(transformation.getCreatedAt())
                 .updatedAt(transformation.getUpdatedAt())
                 .build();
