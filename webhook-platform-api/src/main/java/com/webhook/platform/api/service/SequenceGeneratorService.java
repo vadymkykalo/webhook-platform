@@ -13,15 +13,10 @@ import java.util.UUID;
  * Generates monotonically increasing sequence numbers per endpoint.
  * Used for FIFO ordering guarantees in webhook delivery.
  *
- * <p>The counter itself lives in Redis (a bare {@code INCR} is cheap and fast on the ingest
- * hot path), but Redis is not durable: a flush, an eviction under {@code allkeys-lru}, or a
- * restore from an empty replica all silently reset it. Without a durable backing, that reset
- * makes new events get sequence 1, 2, 3... while {@code ordering_cursors} (Postgres, written
- * by the worker) already holds a much higher "last delivered" value — at which point
- * {@code canDeliver} never matches again and ordering is dead for that endpoint until an
- * operator manually intervenes. {@link #nextSequence} guards against that by
- * reseeding from the durable high-water mark — {@code MAX(sequence_number)} already persisted
- * in {@code deliveries} — the moment it notices the Redis key is gone.
+ * <p>The counter lives in Redis, which is not durable: a flush or an eviction silently resets it,
+ * and new events then start again at 1 while the worker's cursor already holds a much higher
+ * value — at which point ordering is dead for that endpoint. {@link #nextSequence} reseeds from
+ * the durable high-water mark the moment it notices the key is gone.
  */
 @Service
 @Slf4j
@@ -43,18 +38,9 @@ public class SequenceGeneratorService {
     }
 
     /**
-     * Atomically increments and returns the next sequence number for an endpoint.
-     * Thread-safe across multiple API instances.
-     *
-     * <p>Callers should generate this <strong>after</strong> the delivery it will be stamped
-     * onto has been durably committed (see {@code EventIngestService
-     * #assignSequenceNumbersPostCommit}) — never from inside the ingest transaction. Generating
-     * it inside that transaction meant a rollback (including the {@code
-     * DataIntegrityViolationException} idempotency-race path) silently burned a sequence
-     * number that no delivery would ever carry.
-     *
-     * @param endpointId the endpoint ID
-     * @return the next sequence number (starts from 1)
+     * The next sequence number, from 1. Generate it after the delivery it will be stamped onto has
+     * committed, never inside the ingest transaction: a rollback there burned a number no delivery
+     * would ever carry.
      */
     public long nextSequence(UUID endpointId) {
         String key = SEQUENCE_KEY_PREFIX + endpointId;
@@ -66,13 +52,9 @@ public class SequenceGeneratorService {
     }
 
     /**
-     * Reseeds the Redis counter from the durable high-water mark if (and only if) the key is
-     * currently absent — i.e. this is a cache miss, not the hot path. Redisson (like Redis's
-     * own {@code INCR}) treats a missing key as value {@code 0}, so {@code compareAndSet(0,
-     * seed)} is the atomic "set only if still absent/zero" primitive here: it only takes
-     * effect if the key is still at its just-created default by the time it runs, so a
-     * concurrent caller racing the same reseed can't stomp on a value another instance (or a
-     * real request that got here first) already established.
+     * Reseeds from the durable high-water mark only while the key is still absent. A missing key
+     * reads as 0, so {@code compareAndSet(0, seed)} is the "only if still absent" primitive and a
+     * concurrent reseed cannot stomp on a value somebody else already established.
      */
     private void reseedFromDurableHighWaterMarkIfMissing(RAtomicLong counter, UUID endpointId) {
         if (counter.isExists()) {
@@ -95,12 +77,6 @@ public class SequenceGeneratorService {
         return max == null ? 0L : max;
     }
 
-    /**
-     * Returns the current sequence number for an endpoint without incrementing.
-     *
-     * @param endpointId the endpoint ID
-     * @return the current sequence number (0 if no events yet)
-     */
     public long currentSequence(UUID endpointId) {
         String key = SEQUENCE_KEY_PREFIX + endpointId;
         RAtomicLong counter = redissonClient.getAtomicLong(key);
@@ -108,13 +84,8 @@ public class SequenceGeneratorService {
     }
 
     /**
-     * Bumps the counter up to at least {@code minimum} if it is currently behind, via an
-     * optimistic compare-and-set loop. Used by the periodic reconciliation job ({@code
-     * SequenceReconciliationService}) to self-heal a desync it detects between the Redis
-     * counter and the durable high-water mark, without ever moving the counter backwards.
-     *
-     * @param endpointId the endpoint ID
-     * @param minimum the value the counter must be at least
+     * Bumps the counter to at least {@code minimum} if it is behind, never backwards. The
+     * reconciliation job uses this to heal a desync it detects against the high-water mark.
      */
     public void reseedIfBehind(UUID endpointId, long minimum) {
         String key = SEQUENCE_KEY_PREFIX + endpointId;
