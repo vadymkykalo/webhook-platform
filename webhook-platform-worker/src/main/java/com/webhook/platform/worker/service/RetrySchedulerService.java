@@ -143,13 +143,9 @@ public class RetrySchedulerService {
             // PROCESSING so a crash before Phase 3 leaves a row the stuck sweep can recover,
             // rather than a PENDING row with no next_retry_at that nothing can see.
             for (Delivery d : locked) {
-                d.setStatus(Delivery.DeliveryStatus.PROCESSING);
-                d.setNextRetryAt(null);
-                d.setLastAttemptAt(Instant.now());
                 // Fresh token per claim, so an earlier attempt swept away as abandoned
                 // cannot come back and write over this one.
-                d.setClaimToken(UUID.randomUUID());
-                d.setUpdatedAt(Instant.now());
+                d.claim(UUID.randomUUID());
             }
             deliveryRepository.saveAll(locked);
 
@@ -284,11 +280,7 @@ public class RetrySchedulerService {
         Instant rescheduleTime = Instant.now().plusSeconds(rescheduleDelaySeconds + jitter);
         // Revert the Phase 1 claim so the delivery is picked up again rather than waiting
         // out a stuck sweep.
-        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-        // Handing the row back ends the claim, so the token goes with it.
-        delivery.setClaimToken(null);
-        delivery.setNextRetryAt(rescheduleTime);
-        delivery.setUpdatedAt(Instant.now());
+        delivery.handBackTo(rescheduleTime);
 
         log.warn("Rescheduling delivery {} to {} due to: {}",
                 delivery.getId(), rescheduleTime, reason);

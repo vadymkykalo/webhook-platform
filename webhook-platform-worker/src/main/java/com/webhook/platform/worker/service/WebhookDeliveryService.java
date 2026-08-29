@@ -95,10 +95,7 @@ public class WebhookDeliveryService {
                 return;
             }
             long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
-            delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-            delivery.setClaimToken(null);
-            delivery.setNextRetryAt(Instant.now().plusSeconds(delaySec));
-            delivery.setUpdatedAt(Instant.now());
+            delivery.handBackTo(Instant.now().plusSeconds(delaySec));
             deliveryRepository.save(delivery);
             log.warn("Executor pool full, rescheduled delivery {} via retry ladder in {}s instead of leaving it unacked",
                     deliveryId, delaySec);

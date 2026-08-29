@@ -126,6 +126,50 @@ public class Delivery {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    /**
+     * Takes the row for one Attempt. The token is what a later writer must still match to
+     * finalise: "token set" means "currently claimed", which is why handing the row back clears it.
+     */
+    public void claim(UUID token) {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.PROCESSING;
+        this.nextRetryAt = null;
+        this.lastAttemptAt = now;
+        this.claimToken = token;
+        this.updatedAt = now;
+    }
+
+    /** Ends the Claim and returns the obligation to the retry ladder, to be picked up at {@code retryAt}. */
+    public void handBackTo(Instant retryAt) {
+        this.status = DeliveryStatus.PENDING;
+        this.claimToken = null;
+        this.nextRetryAt = retryAt;
+        this.updatedAt = Instant.now();
+    }
+
+    public void succeed() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.SUCCESS;
+        this.succeededAt = now;
+        this.updatedAt = now;
+    }
+
+    /** The Retry Ladder is exhausted: kept for a human to decide about. */
+    public void abandon() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.DLQ;
+        this.failedAt = now;
+        this.updatedAt = now;
+    }
+
+    /** No number of retries would help — a refused URL, a deleted endpoint, an unusable ladder. */
+    public void failTerminally() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.FAILED;
+        this.failedAt = now;
+        this.updatedAt = now;
+    }
+
     public enum DeliveryStatus {
         PENDING, PROCESSING, SUCCESS, FAILED, DLQ
     }

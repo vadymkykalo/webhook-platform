@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Entity
@@ -81,4 +82,42 @@ public class IncomingForwardAttempt {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /**
+     * Takes the row for one retry Attempt. {@code started_at} is truncated to microseconds because
+     * Postgres stores it that way, and a full-nanosecond Instant would not match on the CAS that
+     * claims the row back.
+     */
+    public void claimForRetry() {
+        this.status = ForwardAttemptStatus.PROCESSING;
+        this.startedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        this.nextRetryAt = null;
+    }
+
+    /**
+     * Ends the Claim and returns the Forward to the retry ladder. {@code next_retry_at} must be
+     * set: the scheduler ignores rows without one, so a hand-back that skips it strands the
+     * Forward.
+     */
+    public void handBackTo(Instant retryAt) {
+        this.status = ForwardAttemptStatus.PENDING;
+        this.startedAt = null;
+        this.claimToken = null;
+        this.nextRetryAt = retryAt;
+    }
+
+    /** The Retry Ladder is exhausted: kept for a human to decide about. */
+    public void abandon(String reason) {
+        this.status = ForwardAttemptStatus.DLQ;
+        this.finishedAt = Instant.now();
+        this.errorMessage = reason;
+        this.nextRetryAt = null;
+    }
+
+    public void failWith(String reason) {
+        this.status = ForwardAttemptStatus.FAILED;
+        this.finishedAt = Instant.now();
+        this.errorMessage = reason;
+        this.nextRetryAt = null;
+    }
 }

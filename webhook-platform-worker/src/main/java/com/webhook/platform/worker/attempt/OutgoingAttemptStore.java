@@ -332,27 +332,18 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                 return false;
             }
 
-            Instant now = Instant.now();
             if (outcome instanceof Finalization.Succeeded) {
-                fresh.setStatus(Delivery.DeliveryStatus.SUCCESS);
-                fresh.setSucceededAt(now);
+                fresh.succeed();
             } else if (outcome instanceof Finalization.Deferred deferred) {
-                fresh.setStatus(Delivery.DeliveryStatus.PENDING);
-                fresh.setClaimToken(null);
-                fresh.setNextRetryAt(deferred.until());
+                fresh.handBackTo(deferred.until());
             } else if (outcome instanceof Finalization.Retry retry) {
-                fresh.setStatus(Delivery.DeliveryStatus.PENDING);
-                fresh.setClaimToken(null);
-                fresh.setNextRetryAt(retry.at());
+                fresh.handBackTo(retry.at());
             } else if (outcome instanceof Finalization.Abandoned) {
-                fresh.setStatus(Delivery.DeliveryStatus.DLQ);
-                fresh.setFailedAt(now);
+                fresh.abandon();
             } else if (outcome instanceof Finalization.TerminallyFailed failed) {
-                fresh.setStatus(Delivery.DeliveryStatus.FAILED);
-                fresh.setFailedAt(now);
+                fresh.failTerminally();
                 log.error("Delivery {} failed: {}", fresh.getId(), failed.reason());
             }
-            fresh.setUpdatedAt(now);
             deliveryRepository.save(fresh);
             return true;
         });

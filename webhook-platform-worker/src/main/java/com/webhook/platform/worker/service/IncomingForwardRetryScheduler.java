@@ -130,9 +130,7 @@ public class IncomingForwardRetryScheduler {
                 // and comparing a full-nanosecond Instant against the DB-truncated value on
                 // claim would spuriously fail to match.
                 for (IncomingForwardAttempt attempt : pendingRetries) {
-                    attempt.setStatus(ForwardAttemptStatus.PROCESSING);
-                    attempt.setStartedAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
-                    attempt.setNextRetryAt(null);
+                    attempt.claimForRetry();
                 }
                 attemptRepository.saveAll(pendingRetries);
 
@@ -187,9 +185,7 @@ public class IncomingForwardRetryScheduler {
                 CompletableFuture<SendResult<String, IncomingForwardMessage>> future = futures.get(attempt.getId());
                 if (future == null) {
                     // Send was not initiated, revert to PENDING
-                    attempt.setStatus(ForwardAttemptStatus.PENDING);
-                    attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
-                    attempt.setStartedAt(null);
+                    attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     failed.add(attempt);
                     continue;
                 }
@@ -197,9 +193,7 @@ public class IncomingForwardRetryScheduler {
                 try {
                     if (!future.isDone()) {
                         // Timed out, revert to PENDING
-                        attempt.setStatus(ForwardAttemptStatus.PENDING);
-                        attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
-                        attempt.setStartedAt(null);
+                        attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                         failed.add(attempt);
                         continue;
                     }
@@ -225,9 +219,7 @@ public class IncomingForwardRetryScheduler {
                 } catch (Exception e) {
                     log.error("Failed to schedule incoming forward retry: attemptId={}: {}",
                             attempt.getId(), e.getMessage());
-                    attempt.setStatus(ForwardAttemptStatus.PENDING);
-                    attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
-                    attempt.setStartedAt(null);
+                    attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     failed.add(attempt);
                 }
             }

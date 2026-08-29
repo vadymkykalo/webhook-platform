@@ -89,10 +89,7 @@ class OrderingGate {
         orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
 
         Instant until = Instant.now().plusSeconds(rescheduleDelaySeconds);
-        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-        delivery.setNextRetryAt(until);
-        delivery.setClaimToken(null);
-        delivery.setUpdatedAt(Instant.now());
+        delivery.handBackTo(until);
         try {
             deliveryRepository.save(delivery);
         } catch (OptimisticLockingFailureException e) {

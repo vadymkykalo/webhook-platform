@@ -108,9 +108,7 @@ public class StaleDeliveryEscalationService {
 
                 List<Delivery> stale = deliveryRepository.findAllById(staleIds);
                 for (Delivery d : stale) {
-                    d.setStatus(Delivery.DeliveryStatus.DLQ);
-                    d.setFailedAt(Instant.now());
-                    d.setUpdatedAt(Instant.now());
+                    d.abandon();
                 }
                 deliveryRepository.saveAll(stale);
 

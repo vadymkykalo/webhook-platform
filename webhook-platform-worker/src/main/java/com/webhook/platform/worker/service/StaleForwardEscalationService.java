@@ -2,7 +2,6 @@ package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
-import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import io.micrometer.core.instrument.Counter;
@@ -119,12 +118,8 @@ public class StaleForwardEscalationService {
                 }
 
                 List<IncomingForwardAttempt> stale = attemptRepository.findAllById(staleIds);
-                Instant now = Instant.now();
                 for (IncomingForwardAttempt attempt : stale) {
-                    attempt.setStatus(ForwardAttemptStatus.DLQ);
-                    attempt.setFinishedAt(now);
-                    attempt.setNextRetryAt(null);
-                    attempt.setErrorMessage("Hard-cap escalation: outstanding longer than "
+                    attempt.abandon("Hard-cap escalation: outstanding longer than "
                             + hardCapAge.toHours() + "h");
                 }
                 attemptRepository.saveAll(stale);

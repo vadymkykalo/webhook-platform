@@ -114,9 +114,7 @@ public class IncomingForwardService {
                 return;
             }
             long delaySec = ThreadLocalRandom.current().nextLong(5, 16);
-            attempt.setStatus(ForwardAttemptStatus.PENDING);
-            attempt.setStartedAt(null);
-            attempt.setNextRetryAt(Instant.now().plusSeconds(delaySec));
+            attempt.handBackTo(Instant.now().plusSeconds(delaySec));
             attemptRepository.save(attempt);
             log.warn("Executor pool full, rescheduled forward eventId={}, destId={} via retry ladder in {}s "
                     + "instead of leaving it unacked", eventId, destinationId, delaySec);
@@ -149,10 +147,7 @@ public class IncomingForwardService {
                 return;
             }
 
-            attempt.setStatus(ForwardAttemptStatus.FAILED);
-            attempt.setFinishedAt(Instant.now());
-            attempt.setErrorMessage(reason);
-            attempt.setNextRetryAt(null);
+            attempt.failWith(reason);
             attemptRepository.save(attempt);
         });
     }

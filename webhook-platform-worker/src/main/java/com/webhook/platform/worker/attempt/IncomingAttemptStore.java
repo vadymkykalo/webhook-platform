@@ -254,11 +254,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 if (!stillHoldsClaim(claim, attempt)) {
                     return false;
                 }
-                attempt.setStatus(ForwardAttemptStatus.PENDING);
-                attempt.setStartedAt(null);
-                // Handing the row back ends the claim, so the token goes with it.
-                attempt.setClaimToken(null);
-                attempt.setNextRetryAt(deferred.until());
+                attempt.handBackTo(deferred.until());
                 applyRecord(attempt);
                 attemptRepository.save(attempt);
                 return true;
