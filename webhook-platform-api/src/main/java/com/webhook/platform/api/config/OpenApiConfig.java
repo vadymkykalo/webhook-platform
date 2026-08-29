@@ -8,8 +8,11 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.servers.ServerVariable;
+import io.swagger.v3.oas.models.servers.ServerVariables;
 import io.swagger.v3.oas.models.tags.Tag;
-import org.springframework.beans.factory.annotation.Value;
+import com.webhook.platform.api.security.AuthContext;
+import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,8 +23,16 @@ import java.util.List;
 @ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", havingValue = "true", matchIfMissing = true)
 public class OpenApiConfig {
 
-    @Value("${server.port:8080}")
-    private int serverPort;
+    /** What docker-compose publishes, and what the quickstart tells a reader to open. */
+    private static final String DEFAULT_BASE_URL = "http://localhost:8080";
+
+    static {
+        // AuthContext is resolved from the bearer token or the API key by
+        // AuthContextArgumentResolver — it is never sent by a caller. Left to itself, springdoc
+        // reads it as a method parameter and publishes it as a required `auth` query object,
+        // which describes an API that does not exist.
+        SpringDocUtils.getConfig().addRequestWrapperToIgnore(AuthContext.class);
+    }
 
     @Bean
     public OpenAPI webhookPlatformOpenAPI() {
@@ -49,8 +60,7 @@ public class OpenApiConfig {
                         .license(new License()
                                 .name("MIT")
                                 .url("https://opensource.org/licenses/MIT")))
-                .servers(List.of(
-                        new Server().url("http://localhost:" + serverPort).description("Local Development")))
+                .servers(List.of(installationServer()))
                 .tags(List.of(
                         new Tag().name("Authentication").description("User registration, login, and session management"),
                         new Tag().name("Organizations").description("Organization and member management"),
@@ -78,5 +88,21 @@ public class OpenApiConfig {
                                 .description("Cluster-operator credential (PLATFORM_ADMIN_TOKEN env var), independent "
                                         + "of tenant org membership — required for cross-tenant admin endpoints")))
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+    }
+
+    /**
+     * One server, whose host the reader fills in: Hookflow is self-hosted, so there is no address
+     * this document could name that would be right for anybody but its author. The default is the
+     * local one, which is where a reader following the quickstart already is: the port is the
+     * one docker-compose publishes, not whatever this process happens to be bound to — a spec
+     * regenerated from a test on a random port would otherwise document that port.
+     */
+    private Server installationServer() {
+        return new Server()
+                .url("{baseUrl}")
+                .description("Your Hookflow installation — the same origin the dashboard runs on")
+                .variables(new ServerVariables().addServerVariable("baseUrl", new ServerVariable()
+                        ._default(DEFAULT_BASE_URL)
+                        .description("Scheme and host of your installation, without a trailing slash")));
     }
 }

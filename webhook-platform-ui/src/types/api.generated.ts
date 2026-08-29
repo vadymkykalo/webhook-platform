@@ -119,12 +119,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get workflow */
+        /**
+         * Get workflow
+         * @description Returns the definition, the trigger, and how its executions have gone.
+         */
         get: operations["getWorkflow"];
-        /** Update workflow */
+        /**
+         * Update workflow
+         * @description Replaces the definition and trigger. Executions already running are unaffected; the next one uses the new version.
+         */
         put: operations["updateWorkflow"];
         post?: never;
-        /** Delete workflow */
+        /**
+         * Delete workflow
+         * @description Removes the workflow and its execution history.
+         */
         delete: operations["deleteWorkflow"];
         options?: never;
         head?: never;
@@ -334,9 +343,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get incident with timeline */
+        /**
+         * Get incident with timeline
+         * @description The incident and every entry recorded against it, in the order they happened.
+         */
         get: operations["getIncident"];
-        /** Update incident (status, RCA notes, severity) */
+        /**
+         * Update incident (status, RCA notes, severity)
+         * @description A change of status is itself recorded on the timeline, so the history stays readable after the fact.
+         */
         put: operations["updateIncident"];
         post?: never;
         delete?: never;
@@ -381,10 +396,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update alert rule */
+        /**
+         * Update alert rule
+         * @description Changes the threshold, the channels or the enabled state. Alerts already fired are left as they are.
+         */
         put: operations["updateAlertRule"];
         post?: never;
-        /** Delete alert rule */
+        /**
+         * Delete alert rule
+         * @description Removes the rule. The alerts it has already fired stay in the history.
+         */
         delete: operations["deleteAlertRule"];
         options?: never;
         head?: never;
@@ -558,10 +579,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflows */
+        /**
+         * List workflows
+         * @description Every workflow in the project, newest first, each with its execution counts.
+         */
         get: operations["listWorkflows"];
         put?: never;
-        /** Create workflow */
+        /**
+         * Create workflow
+         * @description Defines a workflow: the nodes it runs, the edges between them, and what triggers it. Created disabled until toggled on.
+         */
         post: operations["createWorkflow"];
         delete?: never;
         options?: never;
@@ -578,7 +605,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Manually trigger workflow with test payload */
+        /**
+         * Manually trigger workflow with test payload
+         * @description Runs the workflow now against a payload you supply, without waiting for its trigger. The run is recorded like any other.
+         */
         post: operations["trigger"];
         delete?: never;
         options?: never;
@@ -1033,10 +1063,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List incidents */
+        /**
+         * List incidents
+         * @description Incidents in the project, newest first, filterable by status and severity.
+         */
         get: operations["listIncidents"];
         put?: never;
-        /** Create incident */
+        /**
+         * Create incident
+         * @description Opens an incident and records its first timeline entry.
+         */
         post: operations["createIncident"];
         delete?: never;
         options?: never;
@@ -1053,7 +1089,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add timeline entry to incident */
+        /**
+         * Add timeline entry to incident
+         * @description Appends a note, an action taken, or an observation.
+         */
         post: operations["addTimeline"];
         delete?: never;
         options?: never;
@@ -1304,10 +1343,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List alert rules */
+        /**
+         * List alert rules
+         * @description The conditions this project alerts on, and the channels each notifies.
+         */
         get: operations["listAlertRules"];
         put?: never;
-        /** Create alert rule */
+        /**
+         * Create alert rule
+         * @description Defines what to watch, the threshold that fires it, and where to send it.
+         */
         post: operations["createAlertRule"];
         delete?: never;
         options?: never;
@@ -1324,7 +1369,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Resolve a single alert event */
+        /**
+         * Resolve a single alert event
+         * @description Marks one fired alert as dealt with. The rule keeps watching.
+         */
         post: operations["resolveEvent"];
         delete?: never;
         options?: never;
@@ -1341,7 +1389,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Resolve all unresolved alert events */
+        /**
+         * Resolve all unresolved alert events
+         * @description Clears the whole backlog at once, for when a known outage fired many.
+         */
         post: operations["resolveAll"];
         delete?: never;
         options?: never;
@@ -1806,7 +1857,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Toggle workflow enabled/disabled */
+        /**
+         * Toggle workflow enabled/disabled
+         * @description A disabled workflow keeps its definition and stops being triggered.
+         */
         patch: operations["toggleWorkflow"];
         trace?: never;
     };
@@ -1823,7 +1877,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Toggle rule enabled/disabled */
+        /**
+         * Toggle rule enabled/disabled
+         * @description A disabled rule keeps its conditions and stops being evaluated.
+         */
         patch: operations["toggleRule"];
         trace?: never;
     };
@@ -1918,7 +1975,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List workflow executions */
+        /**
+         * List workflow executions
+         * @description Runs of this workflow, newest first, with the status each finished in.
+         */
         get: operations["listExecutions"];
         put?: never;
         post?: never;
@@ -1935,7 +1995,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get execution details with step results */
+        /**
+         * Get execution details with step results
+         * @description One run, node by node: what each step was given, what it returned, and where the run stopped if it did.
+         */
         get: operations["getExecution"];
         put?: never;
         post?: never;
@@ -2160,7 +2223,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Count open incidents */
+        /**
+         * Count open incidents
+         * @description How many incidents are not yet resolved — for a badge, not a report.
+         */
         get: operations["countOpen"];
         put?: never;
         post?: never;
@@ -2321,7 +2387,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List alert events (fired alerts) */
+        /**
+         * List alert events (fired alerts)
+         * @description Times a rule actually fired, newest first, resolved and unresolved alike.
+         */
         get: operations["listAlertEvents"];
         put?: never;
         post?: never;
@@ -2338,7 +2407,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Count unresolved alerts */
+        /**
+         * Count unresolved alerts
+         * @description How many fired alerts nobody has resolved — for a badge, not a report.
+         */
         get: operations["countUnresolved"];
         put?: never;
         post?: never;
@@ -2635,7 +2707,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["exportCsv"];
+        /**
+         * Export the audit log as CSV
+         * @description The same entries the listing returns, under the same filters, streamed as CSV rather than paged. A from= or to= that is not a yyyy-MM-dd date is rejected rather than ignored.
+         */
+        get: operations["exportAuditLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2742,19 +2818,6 @@ export interface components {
             schemaValidationEnabled?: boolean;
             schemaValidationPolicy?: string;
             idempotencyPolicy?: string;
-        };
-        AuthContext: {
-            /** Format: uuid */
-            userId?: string;
-            /** Format: uuid */
-            organizationId?: string;
-            /** @enum {string} */
-            role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
-            /** Format: uuid */
-            apiKeyProjectId?: string;
-            /** @enum {string} */
-            apiKeyScope?: "READ_WRITE" | "READ_ONLY";
-            apiKey?: boolean;
         };
         ProjectResponse: {
             /** Format: uuid */
@@ -5176,9 +5239,7 @@ export interface operations {
     };
     getProject: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5200,9 +5261,7 @@ export interface operations {
     };
     updateProject: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5228,9 +5287,7 @@ export interface operations {
     };
     deleteProject: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5250,9 +5307,7 @@ export interface operations {
     };
     getWorkflow: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5275,9 +5330,7 @@ export interface operations {
     };
     updateWorkflow: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5304,9 +5357,7 @@ export interface operations {
     };
     deleteWorkflow: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5327,9 +5378,7 @@ export interface operations {
     };
     getTransformation: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5352,9 +5401,7 @@ export interface operations {
     };
     updateTransformation: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5381,9 +5428,7 @@ export interface operations {
     };
     deleteTransformation: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5404,9 +5449,7 @@ export interface operations {
     };
     getSubscription: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5428,9 +5471,7 @@ export interface operations {
     };
     updateSubscription: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5456,9 +5497,7 @@ export interface operations {
     };
     deleteSubscription: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5478,9 +5517,7 @@ export interface operations {
     };
     patchSubscription: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5506,9 +5543,7 @@ export interface operations {
     };
     getEventType: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5531,9 +5566,7 @@ export interface operations {
     };
     updateEventType: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5560,9 +5593,7 @@ export interface operations {
     };
     deleteEventType: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5583,9 +5614,7 @@ export interface operations {
     };
     getRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5608,9 +5637,7 @@ export interface operations {
     };
     updateRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5637,9 +5664,7 @@ export interface operations {
     };
     deleteRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5660,9 +5685,7 @@ export interface operations {
     };
     updatePiiRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5689,9 +5712,7 @@ export interface operations {
     };
     deletePiiRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5712,9 +5733,7 @@ export interface operations {
     };
     getDestination: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5745,9 +5764,7 @@ export interface operations {
     };
     updateDestination: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5782,9 +5799,7 @@ export interface operations {
     };
     deleteDestination: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5804,9 +5819,7 @@ export interface operations {
     };
     getSource: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5837,9 +5850,7 @@ export interface operations {
     };
     updateSource: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5874,9 +5885,7 @@ export interface operations {
     };
     deleteSource: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5896,9 +5905,7 @@ export interface operations {
     };
     getIncident: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5921,9 +5928,7 @@ export interface operations {
     };
     updateIncident: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -5950,9 +5955,7 @@ export interface operations {
     };
     getEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -5974,9 +5977,7 @@ export interface operations {
     };
     updateEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -6002,9 +6003,7 @@ export interface operations {
     };
     deleteEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -6024,9 +6023,7 @@ export interface operations {
     };
     updateAlertRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6053,9 +6050,7 @@ export interface operations {
     };
     deleteAlertRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6076,9 +6071,7 @@ export interface operations {
     };
     getOrganization: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -6100,9 +6093,7 @@ export interface operations {
     };
     updateOrganization: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -6128,9 +6119,7 @@ export interface operations {
     };
     deleteOrganization: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -6150,9 +6139,7 @@ export interface operations {
     };
     getOrganizationBilling: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -6172,9 +6159,7 @@ export interface operations {
     };
     updateBillingInfo: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -6198,9 +6183,7 @@ export interface operations {
     };
     changePlan: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -6224,9 +6207,7 @@ export interface operations {
     };
     updateProfile: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -6330,9 +6311,8 @@ export interface operations {
     };
     listTunnels: {
         parameters: {
-            query: {
+            query?: {
                 projectId?: string;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path?: never;
@@ -6357,7 +6337,6 @@ export interface operations {
                 localPort: number;
                 projectId?: string;
                 clientInfo?: string;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path?: never;
@@ -6378,9 +6357,7 @@ export interface operations {
     };
     listProjects: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -6400,9 +6377,7 @@ export interface operations {
     };
     createProject: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -6426,9 +6401,7 @@ export interface operations {
     };
     listWorkflows: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6450,9 +6423,7 @@ export interface operations {
     };
     createWorkflow: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6478,9 +6449,7 @@ export interface operations {
     };
     trigger: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6509,9 +6478,7 @@ export interface operations {
     };
     listTransformations: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6533,9 +6500,7 @@ export interface operations {
     };
     createTransformation: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6561,9 +6526,7 @@ export interface operations {
     };
     preview: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6589,9 +6552,7 @@ export interface operations {
     };
     deliveryDryRun: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6617,9 +6578,7 @@ export interface operations {
     };
     listTestEndpoints: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6641,9 +6600,7 @@ export interface operations {
     };
     createTestEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6669,9 +6626,7 @@ export interface operations {
     };
     listSubscriptions: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6693,9 +6648,7 @@ export interface operations {
     };
     createSubscription: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6721,9 +6674,7 @@ export interface operations {
     };
     listEventTypes: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6745,9 +6696,7 @@ export interface operations {
     };
     createEventType: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6773,9 +6722,7 @@ export interface operations {
     };
     listVersions: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6798,9 +6745,7 @@ export interface operations {
     };
     createVersion: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6827,9 +6772,7 @@ export interface operations {
     };
     promoteVersion: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6853,9 +6796,7 @@ export interface operations {
     };
     deprecateVersion: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6879,9 +6820,7 @@ export interface operations {
     };
     listRules: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6903,9 +6842,7 @@ export interface operations {
     };
     createRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6931,10 +6868,9 @@ export interface operations {
     };
     listReplaySessions: {
         parameters: {
-            query: {
+            query?: {
                 page?: number;
                 size?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -6957,9 +6893,7 @@ export interface operations {
     };
     createReplaySession: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -6985,9 +6919,7 @@ export interface operations {
     };
     cancel: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7010,9 +6942,7 @@ export interface operations {
     };
     estimate: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7038,9 +6968,7 @@ export interface operations {
     };
     listPiiRules: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7062,9 +6990,7 @@ export interface operations {
     };
     createPiiRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7090,9 +7016,7 @@ export interface operations {
     };
     seedDefaults: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7114,9 +7038,7 @@ export interface operations {
     };
     previewSanitization: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7144,7 +7066,6 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -7167,9 +7088,7 @@ export interface operations {
     };
     createSource: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7197,7 +7116,6 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -7220,9 +7138,7 @@ export interface operations {
     };
     createDestination: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 sourceId: string;
@@ -7248,9 +7164,7 @@ export interface operations {
     };
     replayEvent: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -7281,9 +7195,7 @@ export interface operations {
     };
     bulkReplay: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7318,11 +7230,10 @@ export interface operations {
     };
     listIncidents: {
         parameters: {
-            query: {
+            query?: {
                 openOnly?: boolean;
                 page?: number;
                 size?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -7345,9 +7256,7 @@ export interface operations {
     };
     createIncident: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7373,9 +7282,7 @@ export interface operations {
     };
     addTimeline: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7402,9 +7309,7 @@ export interface operations {
     };
     listLinksForEvent: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7427,9 +7332,7 @@ export interface operations {
     };
     createLink: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7456,9 +7359,7 @@ export interface operations {
     };
     sendTestEvent: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7486,7 +7387,6 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -7509,9 +7409,7 @@ export interface operations {
     };
     createEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7537,9 +7435,7 @@ export interface operations {
     };
     verifyEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7562,9 +7458,7 @@ export interface operations {
     };
     testEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7587,9 +7481,7 @@ export interface operations {
     };
     skipVerification: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7616,9 +7508,7 @@ export interface operations {
     };
     rotateSecret: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -7640,9 +7530,7 @@ export interface operations {
     };
     configureMtls: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7669,9 +7557,7 @@ export interface operations {
     };
     disableMtls: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7694,9 +7580,7 @@ export interface operations {
     };
     retrySingle: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7719,9 +7603,7 @@ export interface operations {
     };
     retryBulk: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7749,7 +7631,6 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -7772,9 +7653,7 @@ export interface operations {
     };
     createApiKey: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7800,9 +7679,7 @@ export interface operations {
     };
     listAlertRules: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7824,9 +7701,7 @@ export interface operations {
     };
     createAlertRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7852,9 +7727,7 @@ export interface operations {
     };
     resolveEvent: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7875,9 +7748,7 @@ export interface operations {
     };
     resolveAll: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -7901,9 +7772,7 @@ export interface operations {
     };
     getMembers: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -7925,9 +7794,7 @@ export interface operations {
     };
     addMember: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -7955,7 +7822,6 @@ export interface operations {
         parameters: {
             query: {
                 token: string;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -8023,10 +7889,9 @@ export interface operations {
     };
     replayDelivery: {
         parameters: {
-            query: {
+            query?: {
                 dryRun?: boolean;
                 fromAttempt?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -8049,9 +7914,7 @@ export interface operations {
     };
     bulkReplayDeliveries: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -8101,7 +7964,6 @@ export interface operations {
         parameters: {
             query: {
                 returnUrl: string;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path?: never;
@@ -8124,9 +7986,7 @@ export interface operations {
     };
     createCheckout: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -8152,9 +8012,7 @@ export interface operations {
     };
     cancelSubscription: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -8501,9 +8359,7 @@ export interface operations {
     };
     approveDeviceCode: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -8539,9 +8395,7 @@ export interface operations {
     };
     changePassword: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -8624,9 +8478,7 @@ export interface operations {
     };
     toggleWorkflow: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -8655,9 +8507,7 @@ export interface operations {
     };
     toggleRule: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -8686,9 +8536,7 @@ export interface operations {
     };
     removeMember: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -8709,9 +8557,7 @@ export interface operations {
     };
     changeMemberRole: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -8738,10 +8584,9 @@ export interface operations {
     };
     requestLog: {
         parameters: {
-            query: {
+            query?: {
                 page?: number;
                 size?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -8764,9 +8609,7 @@ export interface operations {
     };
     status: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -8810,10 +8653,9 @@ export interface operations {
     };
     listExecutions: {
         parameters: {
-            query: {
+            query?: {
                 page?: number;
                 size?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -8837,9 +8679,7 @@ export interface operations {
     };
     getExecution: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -8863,9 +8703,8 @@ export interface operations {
     };
     getProjectUsage: {
         parameters: {
-            query: {
+            query?: {
                 days?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -8888,9 +8727,7 @@ export interface operations {
     };
     getTestEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -8913,9 +8750,7 @@ export interface operations {
     };
     deleteTestEndpoint: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -8938,7 +8773,6 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -8962,9 +8796,7 @@ export interface operations {
     };
     clearRequests: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -8985,9 +8817,7 @@ export interface operations {
     };
     getVersion: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9011,9 +8841,7 @@ export interface operations {
     };
     listChanges: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9036,9 +8864,7 @@ export interface operations {
     };
     listProjectChanges: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9060,9 +8886,7 @@ export interface operations {
     };
     getReplaySession: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9089,7 +8913,6 @@ export interface operations {
                 /** @description Filter by incoming source ID */
                 sourceId?: string;
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9112,9 +8935,7 @@ export interface operations {
     };
     getIncomingEvent: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -9147,7 +8968,6 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9179,9 +8999,7 @@ export interface operations {
     };
     countOpen: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9208,7 +9026,6 @@ export interface operations {
             query: {
                 eventType?: string;
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9231,9 +9048,7 @@ export interface operations {
     };
     getEvent: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9256,9 +9071,7 @@ export interface operations {
     };
     getEventSanitized: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9285,7 +9098,6 @@ export interface operations {
                 left: string;
                 right: string;
                 sanitize?: boolean;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9308,11 +9120,10 @@ export interface operations {
     };
     listDlqItems: {
         parameters: {
-            query: {
+            query?: {
                 page?: number;
                 size?: number;
                 endpointId?: string;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9335,9 +9146,7 @@ export interface operations {
     };
     purgeAll: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9359,9 +9168,7 @@ export interface operations {
     };
     getDlqItem: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9384,9 +9191,7 @@ export interface operations {
     };
     getDlqStats: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9408,10 +9213,9 @@ export interface operations {
     };
     listAlertEvents: {
         parameters: {
-            query: {
+            query?: {
                 page?: number;
                 size?: number;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9434,9 +9238,7 @@ export interface operations {
     };
     countUnresolved: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9460,9 +9262,7 @@ export interface operations {
     };
     getUserOrganizations: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -9482,9 +9282,7 @@ export interface operations {
     };
     exportOrganizationData: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 orgId: string;
@@ -9518,7 +9316,6 @@ export interface operations {
             query: {
                 eventId?: string;
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path?: never;
@@ -9539,9 +9336,7 @@ export interface operations {
     };
     getDelivery: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -9563,9 +9358,7 @@ export interface operations {
     };
     getDeliveryAttempts: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
@@ -9595,7 +9388,6 @@ export interface operations {
                 fromDate?: string;
                 toDate?: string;
                 pageable: components["schemas"]["Pageable"];
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9618,9 +9410,7 @@ export interface operations {
     };
     getProjectDashboard: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9642,9 +9432,7 @@ export interface operations {
     };
     getOnboardingStatus: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9666,10 +9454,9 @@ export interface operations {
     };
     getProjectAnalytics: {
         parameters: {
-            query: {
+            query?: {
                 /** @description Time period: 24h, 7d, 30d */
                 period?: string;
-                auth: components["schemas"]["AuthContext"];
             };
             header?: never;
             path: {
@@ -9692,9 +9479,7 @@ export interface operations {
     };
     getBillingUsage: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -9734,9 +9519,7 @@ export interface operations {
     };
     listInvoices: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -9756,9 +9539,7 @@ export interface operations {
     };
     getCurrentUser: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -9787,8 +9568,7 @@ export interface operations {
     };
     listAuditLog: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
+            query?: {
                 page?: number;
                 size?: number;
                 action?: string;
@@ -9814,10 +9594,9 @@ export interface operations {
             };
         };
     };
-    exportCsv: {
+    exportAuditLog: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
+            query?: {
                 action?: string;
                 status?: string;
                 resourceType?: string;
@@ -9870,9 +9649,7 @@ export interface operations {
     };
     close: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 sessionId: string;
@@ -9892,9 +9669,7 @@ export interface operations {
     };
     deleteLink: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;
@@ -9915,9 +9690,7 @@ export interface operations {
     };
     revokeApiKey: {
         parameters: {
-            query: {
-                auth: components["schemas"]["AuthContext"];
-            };
+            query?: never;
             header?: never;
             path: {
                 projectId: string;

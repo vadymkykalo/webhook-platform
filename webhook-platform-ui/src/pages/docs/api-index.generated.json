@@ -55,6 +55,7 @@
               "type": "AlertRuleResponse"
             }
           ],
+          "description": "Changes the threshold, the channels or the enabled state. Alerts already fired are left as they are.",
           "body": {
             "contentType": "application/json",
             "type": "AlertRuleRequest",
@@ -89,7 +90,8 @@
               "status": "204",
               "description": "Rule deleted"
             }
-          ]
+          ],
+          "description": "Removes the rule. The alerts it has already fired stay in the history."
         },
         {
           "id": "listAlertRules",
@@ -114,7 +116,8 @@
               "description": "OK",
               "type": "AlertRuleResponse[]"
             }
-          ]
+          ],
+          "description": "The conditions this project alerts on, and the channels each notifies."
         },
         {
           "id": "createAlertRule",
@@ -140,6 +143,7 @@
               "type": "AlertRuleResponse"
             }
           ],
+          "description": "Defines what to watch, the threshold that fires it, and where to send it.",
           "body": {
             "contentType": "application/json",
             "type": "AlertRuleRequest",
@@ -174,7 +178,8 @@
               "status": "200",
               "description": "OK"
             }
-          ]
+          ],
+          "description": "Marks one fired alert as dealt with. The rule keeps watching."
         },
         {
           "id": "resolveAll",
@@ -199,7 +204,8 @@
               "description": "OK",
               "type": "map<string, integer (int32)>"
             }
-          ]
+          ],
+          "description": "Clears the whole backlog at once, for when a known outage fired many."
         },
         {
           "id": "listAlertEvents",
@@ -236,7 +242,8 @@
               "description": "OK",
               "type": "PageAlertEventResponse"
             }
-          ]
+          ],
+          "description": "Times a rule actually fired, newest first, resolved and unresolved alike."
         },
         {
           "id": "countUnresolved",
@@ -261,7 +268,8 @@
               "description": "OK",
               "type": "map<string, integer (int64)>"
             }
-          ]
+          ],
+          "description": "How many fired alerts nobody has resolved — for a badge, not a report."
         }
       ]
     },
@@ -445,10 +453,10 @@
           "description": "Returns the organization's audit log, newest first, filterable by action and actor"
         },
         {
-          "id": "exportCsv",
+          "id": "exportAuditLog",
           "method": "GET",
           "path": "/api/v1/audit-log/export",
-          "summary": "",
+          "summary": "Export the audit log as CSV",
           "auth": [
             "bearerAuth"
           ],
@@ -489,7 +497,8 @@
               "status": "200",
               "description": "OK"
             }
-          ]
+          ],
+          "description": "The same entries the listing returns, under the same filters, streamed as CSV rather than paged. A from= or to= that is not a yyyy-MM-dd date is rejected rather than ignored."
         }
       ]
     },
@@ -2696,7 +2705,8 @@
               "description": "OK",
               "type": "IncidentResponse"
             }
-          ]
+          ],
+          "description": "The incident and every entry recorded against it, in the order they happened."
         },
         {
           "id": "updateIncident",
@@ -2728,6 +2738,7 @@
               "type": "IncidentResponse"
             }
           ],
+          "description": "A change of status is itself recorded on the timeline, so the history stays readable after the fact.",
           "body": {
             "contentType": "application/json",
             "type": "IncidentRequest",
@@ -2775,7 +2786,8 @@
               "description": "OK",
               "type": "PageIncidentResponse"
             }
-          ]
+          ],
+          "description": "Incidents in the project, newest first, filterable by status and severity."
         },
         {
           "id": "createIncident",
@@ -2801,6 +2813,7 @@
               "type": "IncidentResponse"
             }
           ],
+          "description": "Opens an incident and records its first timeline entry.",
           "body": {
             "contentType": "application/json",
             "type": "IncidentRequest",
@@ -2837,6 +2850,7 @@
               "type": "IncidentResponse"
             }
           ],
+          "description": "Appends a note, an action taken, or an observation.",
           "body": {
             "contentType": "application/json",
             "type": "TimelineEntryRequest",
@@ -2866,7 +2880,8 @@
               "description": "OK",
               "type": "map<string, integer (int64)>"
             }
-          ]
+          ],
+          "description": "How many incidents are not yet resolved — for a badge, not a report."
         }
       ]
     },
@@ -4378,6 +4393,7 @@
               "type": "RuleResponse"
             }
           ],
+          "description": "A disabled rule keeps its conditions and stops being evaluated.",
           "body": {
             "contentType": "application/json",
             "type": "map<string, boolean>",
@@ -6028,7 +6044,8 @@
               "description": "OK",
               "type": "WorkflowResponse"
             }
-          ]
+          ],
+          "description": "Returns the definition, the trigger, and how its executions have gone."
         },
         {
           "id": "updateWorkflow",
@@ -6060,6 +6077,7 @@
               "type": "WorkflowResponse"
             }
           ],
+          "description": "Replaces the definition and trigger. Executions already running are unaffected; the next one uses the new version.",
           "body": {
             "contentType": "application/json",
             "type": "WorkflowRequest",
@@ -6094,7 +6112,8 @@
               "status": "204",
               "description": "Workflow deleted"
             }
-          ]
+          ],
+          "description": "Removes the workflow and its execution history."
         },
         {
           "id": "listWorkflows",
@@ -6119,7 +6138,8 @@
               "description": "OK",
               "type": "WorkflowResponse[]"
             }
-          ]
+          ],
+          "description": "Every workflow in the project, newest first, each with its execution counts."
         },
         {
           "id": "createWorkflow",
@@ -6145,6 +6165,7 @@
               "type": "WorkflowResponse"
             }
           ],
+          "description": "Defines a workflow: the nodes it runs, the edges between them, and what triggers it. Created disabled until toggled on.",
           "body": {
             "contentType": "application/json",
             "type": "WorkflowRequest",
@@ -6181,6 +6202,7 @@
               "type": "WorkflowExecutionResponse"
             }
           ],
+          "description": "Runs the workflow now against a payload you supply, without waiting for its trigger. The run is recorded like any other.",
           "body": {
             "contentType": "application/json",
             "type": "map<string, object>",
@@ -6217,6 +6239,7 @@
               "type": "WorkflowResponse"
             }
           ],
+          "description": "A disabled workflow keeps its definition and stops being triggered.",
           "body": {
             "contentType": "application/json",
             "type": "map<string, boolean>",
@@ -6264,7 +6287,8 @@
               "description": "OK",
               "type": "PageWorkflowExecutionResponse"
             }
-          ]
+          ],
+          "description": "Runs of this workflow, newest first, with the status each finished in."
         },
         {
           "id": "getExecution",
@@ -6301,7 +6325,8 @@
               "description": "OK",
               "type": "WorkflowExecutionResponse"
             }
-          ]
+          ],
+          "description": "One run, node by node: what each step was given, what it returned, and where the run stopped if it did."
         }
       ]
     }

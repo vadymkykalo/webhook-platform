@@ -36,7 +36,8 @@ public class AlertController {
 
     // ─── Rules ──────────────────────────────────────────────────────────
 
-    @Operation(operationId = "listAlertRules", summary = "List alert rules")
+    @Operation(operationId = "listAlertRules", summary = "List alert rules",
+            description = "The conditions this project alerts on, and the channels each notifies.")
     @GetMapping("/rules")
     public ResponseEntity<List<AlertRuleResponse>> listRules(
             @PathVariable("projectId") UUID projectId,
@@ -45,7 +46,8 @@ public class AlertController {
         return ResponseEntity.ok(alertService.listRules(projectId));
     }
 
-    @Operation(operationId = "createAlertRule", summary = "Create alert rule")
+    @Operation(operationId = "createAlertRule", summary = "Create alert rule",
+            description = "Defines what to watch, the threshold that fires it, and where to send it.")
     @ApiResponse(responseCode = "201", description = "Rule created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
@@ -60,7 +62,9 @@ public class AlertController {
                 .body(alertService.createRule(projectId, request));
     }
 
-    @Operation(operationId = "updateAlertRule", summary = "Update alert rule")
+    @Operation(operationId = "updateAlertRule", summary = "Update alert rule",
+            description = "Changes the threshold, the channels or the enabled state. Alerts already "
+                    + "fired are left as they are.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PutMapping("/rules/{ruleId}")
@@ -74,7 +78,8 @@ public class AlertController {
         return ResponseEntity.ok(alertService.updateRule(projectId, ruleId, request));
     }
 
-    @Operation(operationId = "deleteAlertRule", summary = "Delete alert rule")
+    @Operation(operationId = "deleteAlertRule", summary = "Delete alert rule",
+            description = "Removes the rule. The alerts it has already fired stay in the history.")
     @ApiResponse(responseCode = "204", description = "Rule deleted")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
@@ -91,7 +96,8 @@ public class AlertController {
 
     // ─── Events ─────────────────────────────────────────────────────────
 
-    @Operation(operationId = "listAlertEvents", summary = "List alert events (fired alerts)")
+    @Operation(operationId = "listAlertEvents", summary = "List alert events (fired alerts)",
+            description = "Times a rule actually fired, newest first, resolved and unresolved alike.")
     @GetMapping("/events")
     public ResponseEntity<Page<AlertEventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
@@ -102,7 +108,8 @@ public class AlertController {
         return ResponseEntity.ok(alertService.listEvents(projectId, page, size));
     }
 
-    @Operation(summary = "Count unresolved alerts")
+    @Operation(summary = "Count unresolved alerts",
+            description = "How many fired alerts nobody has resolved — for a badge, not a report.")
     @GetMapping("/events/unresolved-count")
     public ResponseEntity<Map<String, Long>> countUnresolved(
             @PathVariable("projectId") UUID projectId,
@@ -112,7 +119,8 @@ public class AlertController {
         return ResponseEntity.ok(Map.of("count", count));
     }
 
-    @Operation(summary = "Resolve a single alert event")
+    @Operation(summary = "Resolve a single alert event",
+            description = "Marks one fired alert as dealt with. The rule keeps watching.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PostMapping("/events/{eventId}/resolve")
@@ -126,7 +134,8 @@ public class AlertController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Resolve all unresolved alert events")
+    @Operation(summary = "Resolve all unresolved alert events",
+            description = "Clears the whole backlog at once, for when a known outage fired many.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PostMapping("/events/resolve-all")

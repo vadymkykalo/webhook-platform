@@ -41,6 +41,10 @@ public class AuditLogController {
                 PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE))));
     }
 
+    @Operation(operationId = "exportAuditLog", summary = "Export the audit log as CSV",
+            description = "The same entries the listing returns, under the same filters, streamed "
+                    + "as CSV rather than paged. A from= or to= that is not a yyyy-MM-dd date is "
+                    + "rejected rather than ignored.")
     @GetMapping("/export")
     public void exportCsv(
             AuthContext auth,

@@ -33,7 +33,8 @@ public class IncidentController {
 
     private final IncidentService incidentService;
 
-    @Operation(operationId = "listIncidents", summary = "List incidents")
+    @Operation(operationId = "listIncidents", summary = "List incidents",
+            description = "Incidents in the project, newest first, filterable by status and severity.")
     @GetMapping
     public ResponseEntity<Page<IncidentResponse>> list(
             @PathVariable("projectId") UUID projectId,
@@ -45,7 +46,8 @@ public class IncidentController {
         return ResponseEntity.ok(incidentService.listIncidents(projectId, openOnly, page, size));
     }
 
-    @Operation(operationId = "getIncident", summary = "Get incident with timeline")
+    @Operation(operationId = "getIncident", summary = "Get incident with timeline",
+            description = "The incident and every entry recorded against it, in the order they happened.")
     @GetMapping("/{incidentId}")
     public ResponseEntity<IncidentResponse> get(
             @PathVariable("projectId") UUID projectId,
@@ -55,7 +57,8 @@ public class IncidentController {
         return ResponseEntity.ok(incidentService.getIncident(projectId, incidentId));
     }
 
-    @Operation(operationId = "createIncident", summary = "Create incident")
+    @Operation(operationId = "createIncident", summary = "Create incident",
+            description = "Opens an incident and records its first timeline entry.")
     @ApiResponse(responseCode = "201", description = "Incident created")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
@@ -70,7 +73,9 @@ public class IncidentController {
                 .body(incidentService.createIncident(projectId, request));
     }
 
-    @Operation(operationId = "updateIncident", summary = "Update incident (status, RCA notes, severity)")
+    @Operation(operationId = "updateIncident", summary = "Update incident (status, RCA notes, severity)",
+            description = "A change of status is itself recorded on the timeline, so the history "
+                    + "stays readable after the fact.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PutMapping("/{incidentId}")
@@ -84,7 +89,8 @@ public class IncidentController {
         return ResponseEntity.ok(incidentService.updateIncident(projectId, incidentId, request));
     }
 
-    @Operation(summary = "Add timeline entry to incident")
+    @Operation(summary = "Add timeline entry to incident",
+            description = "Appends a note, an action taken, or an observation.")
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireAccess(AccessLevel.WRITE)
 @PostMapping("/{incidentId}/timeline")
@@ -98,7 +104,8 @@ public class IncidentController {
         return ResponseEntity.ok(incidentService.addTimelineEntry(projectId, incidentId, request));
     }
 
-    @Operation(summary = "Count open incidents")
+    @Operation(summary = "Count open incidents",
+            description = "How many incidents are not yet resolved — for a badge, not a report.")
     @GetMapping("/open-count")
     public ResponseEntity<Map<String, Long>> countOpen(
             @PathVariable("projectId") UUID projectId,
