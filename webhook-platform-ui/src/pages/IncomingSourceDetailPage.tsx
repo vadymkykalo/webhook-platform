@@ -32,16 +32,13 @@ import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '../components/ui/alert-dialog';
 import { Select } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { formatJson, isValidJson } from '../lib/json';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 /**
  * One incoming source and the destinations its events are forwarded to.
@@ -726,25 +723,14 @@ export default function IncomingSourceDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteDestId} onOpenChange={(open) => !open && setDeleteDestId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('incomingDestinations.deleteDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('incomingDestinations.deleteDialog.description')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteDest.isPending}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteDest}
-              disabled={deleteDest.isPending}
-              className="bg-halt text-primary-foreground hover:bg-halt/90"
-            >
-              {deleteDest.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {deleteDest.isPending ? t('common.deleting') : t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteDestId}
+        onOpenChange={(open) => !open && setDeleteDestId(null)}
+        title={t('incomingDestinations.deleteDialog.title')}
+        description={t('incomingDestinations.deleteDialog.description')}
+        onConfirm={handleDeleteDest}
+        loading={deleteDest.isPending}
+      />
     </div>
   );
 }

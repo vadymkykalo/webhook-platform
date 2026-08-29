@@ -24,16 +24,13 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '../components/ui/alert-dialog';
-import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
 import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 /**
  * The flat list of Subscriptions — the other half of a connection. One row is
@@ -434,25 +431,14 @@ export default function SubscriptionsPage() {
         onSuccess={() => qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId!) })}
       />
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('subscriptions.deleteDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('subscriptions.deleteDialog.description')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className="bg-halt text-primary-foreground hover:bg-halt/90"
-            >
-              {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title={t('subscriptions.deleteDialog.title')}
+        description={t('subscriptions.deleteDialog.description')}
+        onConfirm={handleDelete}
+        loading={deleteMutation.isPending}
+      />
 
       <Dialog
         open={showMoveDialog}
