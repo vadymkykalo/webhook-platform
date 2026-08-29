@@ -33,6 +33,17 @@ updates:
         update-types:
           - "patch"
           - "minor"
+    # netty is pinned to a line, not to a version. The root pom overrides what
+    # spring-boot-dependencies manages purely to pick up CVE fixes *within* 4.1 — Spring Boot
+    # 3.5 manages that line and reactor-netty is matched to it. A grouped minor bump took the
+    # override to 4.2.17 and broke the build outright ("package io.netty.channel does not
+    # exist"), because the group admits minors and nothing said netty was different.
+    # Patch updates still come through, which is the entire reason the override exists.
+    ignore:
+      - dependency-name: "io.netty:*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     labels:
       - "dependencies"
       - "maven"
