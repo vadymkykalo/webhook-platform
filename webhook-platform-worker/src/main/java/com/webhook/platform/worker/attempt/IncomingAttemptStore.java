@@ -5,7 +5,6 @@ import com.jayway.jsonpath.JsonPath;
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
-import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
@@ -21,9 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -174,7 +171,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                             .header("X-Incoming-Request-Id", event.getRequestId())
                             .header("X-Forward-Attempt", String.valueOf(claim.attemptNumber()))
                             .header("Idempotency-Key", idempotencyKey);
-                    addAuthHeaders(request);
+                    new DestinationAuthenticator(destination, encryptionKeyRegistry, objectMapper)
+                            .authenticate(request);
                     AttemptSupport.addCustomHeaders(request, destination.getCustomHeadersJson(), objectMapper);
                 },
                 null); // Incoming has never recorded its request headers on the attempt row
@@ -376,46 +374,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             return failed.reason();
         }
         return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void addAuthHeaders(WebClient.RequestBodySpec request) {
-        if (destination.getAuthType() == IncomingAuthType.NONE || destination.getAuthConfigEncrypted() == null) {
-            return;
-        }
-        try {
-            String authConfig = encryptionKeyRegistry.decryptWithFallback(
-                    destination.getAuthConfigEncrypted(),
-                    destination.getAuthConfigIv(),
-                    destination.getEncryptionKeyVersion());
-            Map<String, String> config = objectMapper.readValue(authConfig, Map.class);
-
-            switch (destination.getAuthType()) {
-                case BEARER -> {
-                    String token = config.get("token");
-                    if (token != null) {
-                        request.header("Authorization", "Bearer " + token);
-                    }
-                }
-                case BASIC -> {
-                    String username = config.getOrDefault("username", "");
-                    String password = config.getOrDefault("password", "");
-                    request.header("Authorization", "Basic " + Base64.getEncoder()
-                            .encodeToString((username + ":" + password).getBytes()));
-                }
-                case CUSTOM_HEADER -> {
-                    String name = config.get("headerName");
-                    String value = config.get("headerValue");
-                    if (name != null && value != null) {
-                        request.header(name, value);
-                    }
-                }
-                default -> {
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to apply auth headers for destination {}: {}", destination.getId(), e.getMessage());
-        }
     }
 
 }

@@ -4,11 +4,6 @@ import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.HeaderSanitizer;
-import com.webhook.platform.common.security.SecretRotationWindow;
-import com.webhook.platform.common.enums.SignatureScheme;
-import com.webhook.platform.common.util.StandardWebhookSignature;
-import com.webhook.platform.common.util.WebhookSignatureUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.entity.DeliveryAttempt;
@@ -25,13 +20,11 @@ import com.webhook.platform.worker.service.PayloadTransformService;
 import com.webhook.platform.worker.service.TransformationCacheService;
 import io.micrometer.core.instrument.Counter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -56,16 +49,14 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
     private final TransactionTemplate transactionTemplate;
-    private final OrderingBufferService orderingBufferService;
     private final KafkaTemplate<String, DeliveryMessage> kafkaTemplate;
+    private final OrderingGate orderingGate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
     private final MtlsWebClientFactory mtlsWebClientFactory;
     private final TransformationCacheService transformationCacheService;
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
     private final WebClient defaultWebClient;
-    private final Counter orderingGapTimeoutCounter;
-    private final int orderingRescheduleDelaySeconds;
 
     private final DeliveryMessage message;
     private final boolean isRetry;
@@ -73,8 +64,6 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     // Resolved inside claim(), after the ordering gate — see the note there.
     private Endpoint endpoint;
     private Event event;
-
-    private long signatureTimestamp;
 
     public OutgoingAttemptStore(
             DeliveryRepository deliveryRepository,
@@ -99,16 +88,15 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.transactionTemplate = transactionTemplate;
-        this.orderingBufferService = orderingBufferService;
         this.kafkaTemplate = kafkaTemplate;
+        this.orderingGate = new OrderingGate(orderingBufferService, deliveryRepository, kafkaTemplate,
+                orderingGapTimeoutCounter, orderingRescheduleDelaySeconds);
         this.encryptionKeyRegistry = encryptionKeyRegistry;
         this.mtlsWebClientFactory = mtlsWebClientFactory;
         this.transformationCacheService = transformationCacheService;
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
         this.defaultWebClient = defaultWebClient;
-        this.orderingGapTimeoutCounter = orderingGapTimeoutCounter;
-        this.orderingRescheduleDelaySeconds = orderingRescheduleDelaySeconds;
         this.message = message;
         this.isRetry = isRetry;
     }
@@ -165,7 +153,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         // Before the Endpoint and Event are read: a parked Delivery is re-polled every few
         // seconds, and loading both rows each time put two reads per poll on the hot path.
         if (Boolean.TRUE.equals(delivery.getOrderingEnabled()) && delivery.getSequenceNumber() != null) {
-            Instant until = orderingHold(delivery);
+            Instant until = orderingGate.holdUntil(delivery);
             if (until != null) {
                 return new ClaimResult.Deferred<>(until, "waiting for an earlier sequence");
             }
@@ -230,87 +218,11 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         return new ClaimResult.NotClaimed<>(reason);
     }
 
-    /**
-     * @return when to come back, or null if this Delivery may proceed now. Parking hands the
-     *         row back to the retry ladder, so the Claim is over — the token is cleared rather
-     *         than left stale for a later writer to match.
-     */
-    private Instant orderingHold(Delivery delivery) {
-        UUID endpointId = delivery.getEndpointId();
-        long sequenceNumber = delivery.getSequenceNumber();
-
-        if (orderingBufferService.canDeliver(endpointId, sequenceNumber)) {
-            return null;
-        }
-
-        // The whole missing range: checking only sequenceNumber - 1 let a Delivery several
-        // ahead sail through whenever the immediately preceding one was already terminal.
-        Long lastDelivered = orderingBufferService.getLastDeliveredSequence(endpointId);
-        long rangeStart = (lastDelivered == null ? 0 : lastDelivered) + 1;
-        long rangeEnd = sequenceNumber - 1;
-
-        Instant oldestPendingInRange = rangeStart <= rangeEnd
-                ? deliveryRepository.findOldestPendingCreatedAt(endpointId, rangeStart, rangeEnd)
-                : null;
-
-        if (oldestPendingInRange == null) {
-            log.info("No outstanding deliveries in gap [{}, {}] for endpoint {}, proceeding with seq={}",
-                    rangeStart, rangeEnd, endpointId, sequenceNumber);
-            return null;
-        }
-
-        // From when this Delivery was first buffered: the blocking row's ingest timestamp made
-        // the timeout trivially true for any backlog older than it.
-        if (orderingBufferService.isGapTimedOut(delivery.getOrderingFirstBufferedAt())) {
-            log.warn("Gap timeout for endpoint {}, proceeding with seq={} despite outstanding range [{}, {}]",
-                    endpointId, sequenceNumber, rangeStart, rangeEnd);
-            orderingGapTimeoutCounter.increment();
-            return null;
-        }
-
-        if (delivery.getOrderingFirstBufferedAt() == null) {
-            delivery.setOrderingFirstBufferedAt(Instant.now());
-        }
-        log.info("Buffering delivery {} (seq={}) waiting for range [{}, {}]",
-                delivery.getId(), sequenceNumber, rangeStart, rangeEnd);
-        orderingBufferService.bufferDelivery(endpointId, delivery.getId(), sequenceNumber);
-
-        Instant until = Instant.now().plusSeconds(orderingRescheduleDelaySeconds);
-        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
-        delivery.setNextRetryAt(until);
-        delivery.setClaimToken(null);
-        delivery.setUpdatedAt(Instant.now());
-        try {
-            deliveryRepository.save(delivery);
-        } catch (OptimisticLockingFailureException e) {
-            // Someone advanced the row while we were parking it; the buffer entry is already
-            // in place, so nothing is lost. Swallowed because propagating stalls the partition.
-            log.warn("Delivery {} (seq={}) was updated concurrently while being buffered; "
-                    + "leaving the other writer's state in place", delivery.getId(), sequenceNumber);
-        }
-        return until;
-    }
-
     @Override
     public RequestSpec buildRequest(Claim claim, String body) {
         Delivery delivery = claim.delivery();
-        String secret = decryptSecret();
-        String previousSecret = secretInsideGraceWindow();
-        signatureTimestamp = System.currentTimeMillis();
-
-        SignatureScheme scheme = endpoint.getSignatureScheme() != null
-                ? endpoint.getSignatureScheme()
-                : SignatureScheme.BOTH;
-
-        String signature = scheme == SignatureScheme.STANDARD ? null
-                : WebhookSignatureUtils.buildSignatureHeader(
-                        secret, previousSecret, signatureTimestamp, body);
-
-        // The delivery id, not the event id, which would collide across a fan-out.
-        String standardSignature = scheme == SignatureScheme.LEGACY ? null
-                : StandardWebhookSignature.buildSignatureHeader(
-                        secret, previousSecret, delivery.getId().toString(),
-                        signatureTimestamp / 1000, body);
+        DeliverySigner.Signatures signatures =
+                new DeliverySigner(endpoint, encryptionKeyRegistry).sign(delivery.getId(), body);
 
         String sequenceHeader = delivery.getSequenceNumber() != null
                 ? String.valueOf(delivery.getSequenceNumber())
@@ -331,19 +243,19 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
                             .header("X-Delivery-Id", delivery.getId().toString())
                             .header("X-Sequence-Number", sequenceHeader)
                             .header("Idempotency-Key", idempotencyKey);
-                    if (signature != null) {
-                        request.header("X-Signature", signature)
-                                .header("X-Timestamp", String.valueOf(signatureTimestamp));
+                    if (signatures.legacy() != null) {
+                        request.header("X-Signature", signatures.legacy())
+                                .header("X-Timestamp", String.valueOf(signatures.timestampMillis()));
                     }
-                    if (standardSignature != null) {
+                    if (signatures.standard() != null) {
                         // Lower-case as the convention spells them; cosmetic on the wire.
                         request.header("webhook-id", delivery.getId().toString())
-                                .header("webhook-timestamp", String.valueOf(signatureTimestamp / 1000))
-                                .header("webhook-signature", standardSignature);
+                                .header("webhook-timestamp", String.valueOf(signatures.timestampSeconds()))
+                                .header("webhook-signature", signatures.standard());
                     }
                     AttemptSupport.addCustomHeaders(request, delivery.getCustomHeaders(), objectMapper);
                 },
-                recordedRequestHeaders(signature, standardSignature, delivery));
+                recordedRequestHeaders(signatures, delivery));
     }
 
     /**
@@ -451,7 +363,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     @Override
     public void onAbandoned(Claim claim) {
         Delivery delivery = claim.delivery();
-        releaseOrdering(delivery, true);
+        orderingGate.release(delivery, true);
         try {
             kafkaTemplate.send(KafkaTopics.DELIVERIES_DLQ, delivery.getEndpointId().toString(),
                     DeliveryMessage.builder()
@@ -472,7 +384,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
 
     @Override
     public void onSucceeded(Claim claim) {
-        releaseOrdering(claim.delivery(), false);
+        orderingGate.release(claim.delivery(), false);
     }
 
     /**
@@ -482,100 +394,26 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
      */
     @Override
     public void onTerminallyFailed(Claim claim) {
-        releaseOrdering(claim.delivery(), true);
-    }
-
-    private void releaseOrdering(Delivery delivery, boolean removeFromBuffer) {
-        if (!Boolean.TRUE.equals(delivery.getOrderingEnabled()) || delivery.getSequenceNumber() == null) {
-            return;
-        }
-        try {
-            if (removeFromBuffer) {
-                orderingBufferService.removeFromBuffer(delivery.getEndpointId(), delivery.getId());
-            }
-            orderingBufferService.markDelivered(delivery.getEndpointId(), delivery.getSequenceNumber());
-            triggerBufferedDeliveries(delivery.getEndpointId());
-        } catch (Exception e) {
-            log.error("Failed to release ordering buffer for delivery {}: {}", delivery.getId(), e.getMessage(), e);
-        }
-    }
-
-    /** Republishes the Deliveries that this sequence was blocking. */
-    private void triggerBufferedDeliveries(UUID endpointId) {
-        List<UUID> ready = orderingBufferService.getReadyDeliveries(endpointId);
-        if (ready.isEmpty()) {
-            return;
-        }
-        for (Delivery buffered : deliveryRepository.findAllById(ready)) {
-            kafkaTemplate.send(KafkaTopics.DELIVERIES_DISPATCH, endpointId.toString(),
-                    DeliveryMessage.builder()
-                            .deliveryId(buffered.getId())
-                            .eventId(buffered.getEventId())
-                            .endpointId(buffered.getEndpointId())
-                            .subscriptionId(buffered.getSubscriptionId())
-                            .status(buffered.getStatus().name())
-                            .attemptCount(buffered.getAttemptCount())
-                            .sequenceNumber(buffered.getSequenceNumber())
-                            .orderingEnabled(buffered.getOrderingEnabled())
-                            .build());
-            log.info("Triggered buffered delivery {} (seq={}) for endpoint {}",
-                    buffered.getId(), buffered.getSequenceNumber(), endpointId);
-        }
+        orderingGate.release(claim.delivery(), true);
     }
 
     private boolean stillHoldsClaim(Delivery fresh, Claim claim) {
         return AttemptSupport.fenceMatches(fresh.getClaimToken(), claim.fence());
     }
 
-    private String decryptSecret() {
-        try {
-            return encryptionKeyRegistry.decryptWithFallback(
-                    endpoint.getSecretEncrypted(), endpoint.getSecretIv(), endpoint.getEncryptionKeyVersion());
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to decrypt secret for endpoint " + endpoint.getId()
-                    + ". Check WEBHOOK_ENCRYPTION_KEY configuration.", e);
-        }
-    }
-
-    /**
-     * The retired secret while its grace window is open, otherwise null. Signing with both means
-     * the receiver's deploy and ours need not be simultaneous. A failure to decrypt this one is
-     * logged and dropped: the delivery is still correctly signed with the current secret.
-     */
-    private String secretInsideGraceWindow() {
-        String encrypted = endpoint.getSecretPreviousEncrypted();
-        Instant rotatedAt = endpoint.getSecretRotatedAt();
-        if (encrypted == null || rotatedAt == null) {
-            return null;
-        }
-        if (!SecretRotationWindow.isOpen(rotatedAt, endpoint.getSecretRotationGracePeriodHours(), Instant.now())) {
-            return null;
-        }
-        try {
-            return encryptionKeyRegistry.decryptWithFallback(
-                    encrypted, endpoint.getSecretPreviousIv(), endpoint.getEncryptionKeyVersion());
-        } catch (Exception e) {
-            log.warn("Endpoint {}: previous secret is inside its rotation grace window but could not be "
-                    + "decrypted; signing with the current secret only", endpoint.getId(), e);
-            return null;
-        }
-    }
-
-    /** The signature is masked: this string is shown in the dashboard. */
-    private String recordedRequestHeaders(String signature, String standardSignature, Delivery delivery) {
+    /** What the dashboard shows for this request. */
+    private String recordedRequestHeaders(DeliverySigner.Signatures signatures, Delivery delivery) {
         StringBuilder json = new StringBuilder("{\"Content-Type\":\"application/json\"");
-        if (signature != null) {
-            json.append(",\"X-Signature\":\"").append(HeaderSanitizer.maskSignature(signature)).append('"')
-                    .append(",\"X-Timestamp\":\"").append(signatureTimestamp).append('"');
+        if (signatures.legacy() != null) {
+            json.append(",\"X-Signature\":\"").append(signatures.maskedLegacy()).append('"')
+                    .append(",\"X-Timestamp\":\"").append(signatures.timestampMillis()).append('"');
         }
         json.append(",\"X-Event-Id\":\"").append(event.getId()).append('"')
                 .append(",\"X-Delivery-Id\":\"").append(delivery.getId()).append('"');
-        if (standardSignature != null) {
-            // Masked: shown verbatim in the dashboard, and a signature can be replayed.
+        if (signatures.standard() != null) {
             json.append(",\"webhook-id\":\"").append(delivery.getId()).append('"')
-                    .append(",\"webhook-timestamp\":\"").append(signatureTimestamp / 1000).append('"')
-                    .append(",\"webhook-signature\":\"")
-                    .append(HeaderSanitizer.maskSignature(standardSignature)).append('"');
+                    .append(",\"webhook-timestamp\":\"").append(signatures.timestampSeconds()).append('"')
+                    .append(",\"webhook-signature\":\"").append(signatures.maskedStandard()).append('"');
         }
         json.append(",\"User-Agent\":\"WebhookPlatform/1.0\"}");
         return json.toString();
