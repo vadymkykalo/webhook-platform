@@ -46,7 +46,7 @@ public class IncidentService {
             incidents = incidentRepository.findByProjectIdOrderByCreatedAtDesc(
                     projectId, PageRequest.of(page, Math.min(size, 100)));
         }
-        return incidents.map(this::toResponse);
+        return incidents.map(IncidentResponse::of);
     }
 
     @Transactional(readOnly = true)
@@ -54,7 +54,7 @@ public class IncidentService {
         validateProjectAccess(projectId);
         Incident incident = incidentRepository.findByIdAndProjectId(incidentId, projectId)
                 .orElseThrow(() -> new NotFoundException("Incident not found"));
-        IncidentResponse response = toResponse(incident);
+        IncidentResponse response = IncidentResponse.of(incident);
         List<IncidentTimeline> timeline = timelineRepository.findByIncidentIdOrderByCreatedAtAsc(incidentId);
         response.setTimeline(timeline.stream().map(this::toTimelineEntry).toList());
         return response;
@@ -149,20 +149,6 @@ public class IncidentService {
     public long countOpen(UUID projectId) {
         validateProjectAccess(projectId);
         return incidentRepository.countByProjectIdAndStatusNot(projectId, IncidentStatus.RESOLVED);
-    }
-
-    private IncidentResponse toResponse(Incident incident) {
-        return IncidentResponse.builder()
-                .id(incident.getId())
-                .projectId(incident.getProjectId())
-                .title(incident.getTitle())
-                .status(incident.getStatus())
-                .severity(incident.getSeverity())
-                .rcaNotes(incident.getRcaNotes())
-                .resolvedAt(incident.getResolvedAt())
-                .createdAt(incident.getCreatedAt())
-                .updatedAt(incident.getUpdatedAt())
-                .build();
     }
 
     private IncidentResponse.TimelineEntry toTimelineEntry(IncidentTimeline tl) {

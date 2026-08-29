@@ -39,7 +39,7 @@ public class ProjectService {
                 .build();
 
         project = projectRepository.saveAndFlush(project);
-        return mapToResponse(project);
+        return ProjectResponse.of(project);
     }
 
     public ProjectResponse getProject(UUID id) {
@@ -47,13 +47,13 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        return mapToResponse(project);
+        return ProjectResponse.of(project);
     }
 
     public List<ProjectResponse> listProjects() {
         UUID organizationId = TenantContext.require();
         return projectRepository.findByOrganizationIdAndDeletedAtIsNull(organizationId).stream()
-                .map(this::mapToResponse)
+                .map(ProjectResponse::of)
                 .collect(Collectors.toList());
     }
 
@@ -85,7 +85,7 @@ public class ProjectService {
         }
         project = projectRepository.save(project);
 
-        return mapToResponse(project);
+        return ProjectResponse.of(project);
     }
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Project")
@@ -99,16 +99,4 @@ public class ProjectService {
         projectRepository.save(project);
     }
 
-    private ProjectResponse mapToResponse(Project project) {
-        return ProjectResponse.builder()
-                .id(project.getId())
-                .name(project.getName())
-                .description(project.getDescription())
-                .schemaValidationEnabled(project.getSchemaValidationEnabled())
-                .schemaValidationPolicy(project.getSchemaValidationPolicy().name())
-                .idempotencyPolicy(project.getIdempotencyPolicy().name())
-                .createdAt(project.getCreatedAt())
-                .updatedAt(project.getUpdatedAt())
-                .build();
-    }
 }

@@ -81,7 +81,7 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-        return mapToResponse(delivery);
+        return DeliveryResponse.of(delivery);
     }
 
     public Page<DeliveryResponse> listDeliveries(UUID eventId, AuthContext auth, Pageable pageable) {
@@ -96,7 +96,7 @@ public class DeliveryService {
         } else {
             throw new IllegalArgumentException("eventId parameter is required");
         }
-        return deliveries.map(this::mapToResponse);
+        return deliveries.map(DeliveryResponse::of);
     }
 
     public Page<DeliveryResponse> listDeliveriesByProject(
@@ -127,7 +127,7 @@ public class DeliveryService {
 
         Page<Delivery> deliveries = deliveryRepository.findAll(spec, pageable);
 
-        return deliveries.map(this::mapToResponse);
+        return deliveries.map(DeliveryResponse::of);
     }
 
     @Transactional
@@ -380,20 +380,4 @@ public class DeliveryService {
         log.info("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
     }
 
-    private DeliveryResponse mapToResponse(Delivery delivery) {
-        return DeliveryResponse.builder()
-                .id(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .maxAttempts(delivery.getMaxAttempts())
-                .nextRetryAt(delivery.getNextRetryAt())
-                .lastAttemptAt(delivery.getLastAttemptAt())
-                .succeededAt(delivery.getSucceededAt())
-                .failedAt(delivery.getFailedAt())
-                .createdAt(delivery.getCreatedAt())
-                .build();
-    }
 }
