@@ -33,6 +33,7 @@ import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
 import { useDebounced } from '../hooks/useDebounced';
+import Callout from '../components/Callout';
 
 const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
@@ -429,10 +430,7 @@ export default function DeliveriesPage() {
               {t('deliveries.bulkReplayDialog.description', { status: t(`deliveries.status.${statusFilter}`), count: totalElements })}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="mx-1 flex items-start gap-2 rounded-lg border border-retry/30 bg-retry-soft p-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
-            <p className="text-sm text-retry">{t('deliveries.bulkReplayDialog.warning')}</p>
-          </div>
+          <Callout className="mx-1">{t('deliveries.bulkReplayDialog.warning')}</Callout>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={bulkReplaying}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => { handleReplayMatching(); setShowBulkReplayDialog(false); }} disabled={bulkReplaying}>
