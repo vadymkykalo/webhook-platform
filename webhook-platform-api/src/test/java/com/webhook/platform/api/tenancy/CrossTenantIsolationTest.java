@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Proves that the tenant filter ADR-0006 introduced actually confines rows.
+ * Proves that the tenant filter actually confines rows.
  *
  * <p>{@code ServiceTenantParameterTest} is the ratchet that keeps {@code organizationId} out of
  * service signatures; it says nothing about whether anything is enforced. This is the other half:

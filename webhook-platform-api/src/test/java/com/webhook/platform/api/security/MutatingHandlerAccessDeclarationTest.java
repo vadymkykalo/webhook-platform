@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Ratchet over {@link RequireAccess} declarations on state-changing handlers.
  *
  * <p>The sibling of {@code MutatingHandlerScopeDeclarationTest}, aimed at the other half of
- * ADR-0006's outstanding work. That one covers what an API key's <em>scope</em> permits; this
+ * the structural-tenancy work. That one covers what an API key's <em>scope</em> permits; this
  * one covers what the caller's <em>role</em> must be — the check that was only ever an
  * imperative {@code auth.requireWriteAccess()} in a handler body, defaulting to allow when
  * somebody did not write it. Three handlers shipped reachable by a VIEWER JWT and a READ_ONLY

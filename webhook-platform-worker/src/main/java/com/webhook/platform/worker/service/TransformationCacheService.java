@@ -28,10 +28,7 @@ public class TransformationCacheService {
                 .build();
     }
 
-    /**
-     * Finds a transformation by ID, using a local cache with 30s TTL.
-     * Returns Optional.empty() if not found.
-     */
+    /** Local cache, 30s TTL. */
     public Optional<Transformation> findById(UUID id) {
         return cache.get(id, key -> {
             log.debug("Cache miss for transformation {}, loading from DB", key);
@@ -39,10 +36,7 @@ public class TransformationCacheService {
         });
     }
 
-    /**
-     * Finds an enabled transformation's template by ID.
-     * Returns null if not found or disabled.
-     */
+    /** Null when the transformation is missing or disabled. */
     public String findEnabledTemplate(UUID id) {
         return findById(id)
                 .filter(Transformation::getEnabled)
@@ -50,16 +44,10 @@ public class TransformationCacheService {
                 .orElse(null);
     }
 
-    /**
-     * Evict a specific entry (e.g. after receiving an update notification).
-     */
     public void evict(UUID id) {
         cache.invalidate(id);
     }
 
-    /**
-     * Evict all cached entries.
-     */
     public void evictAll() {
         cache.invalidateAll();
     }

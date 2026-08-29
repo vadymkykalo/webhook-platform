@@ -78,7 +78,7 @@ public class OrganizationController {
     // covers state-changing handlers only, and most reads legitimately require nothing. This one
     // returns every member, project, endpoint and audit row in the organization, and until this
     // annotation its OWNER requirement lived only in the call below, while its sibling
-    // deleteOrganization declared it. ADR-0015.
+    // deleteOrganization declared it.
     @RequireAccess(AccessLevel.OWNER)
     @GetMapping("/{orgId}/export")
     public ResponseEntity<GdprExportDto> exportOrganizationData(

@@ -1,6 +1,8 @@
 package com.webhook.platform.worker.service;
 
 import com.webhook.platform.worker.attempt.AttemptRunner;
+import com.webhook.platform.worker.attempt.DeliveryAttemptMetrics;
+import com.webhook.platform.worker.attempt.OutgoingAttemptStoreFactory;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -31,7 +33,6 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.netty.resources.ConnectionProvider;
 
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -87,8 +88,6 @@ class WebhookDeliveryServiceTest {
     @Mock
     private DeliveryAttemptRepository deliveryAttemptRepository;
     @Mock
-    private WebClient.Builder webClientBuilder;
-    @Mock
     private MtlsWebClientFactory mtlsWebClientFactory;
     @Mock
     private EncryptionKeyRegistry encryptionKeyRegistry;
@@ -127,21 +126,18 @@ class WebhookDeliveryServiceTest {
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
 
-        WebClient mockWebClient = WebClient.builder().build();
-        when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
-        when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
-
         meterRegistry = new SimpleMeterRegistry();
-        service = new WebhookDeliveryService(
-                deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
-                webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, meterRegistry, new ObjectMapper(),
-                orderingBufferService, kafkaTemplate, payloadTransformService,
-                transactionTemplate, transformationCacheService,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(),
-                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
+        service = newService(WebClient.builder().build(), meterRegistry, newAttemptRunner());
+    }
+
+    private WebhookDeliveryService newService(WebClient webClient, MeterRegistry registry, AttemptRunner runner) {
+        OutgoingAttemptStoreFactory storeFactory = new OutgoingAttemptStoreFactory(
+                deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
+                transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
+                mtlsWebClientFactory, transformationCacheService, payloadTransformService,
+                new ObjectMapper(), webClient, registry, ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
+        return new WebhookDeliveryService(runner, storeFactory, new DeliveryAttemptMetrics(registry),
+                deliveryRepository, transactionTemplate);
     }
 
     private Delivery pendingDelivery(UUID id) {
@@ -244,25 +240,13 @@ class WebhookDeliveryServiceTest {
         RedisConcurrencyControlService realConcurrencyControl = new RedisConcurrencyControlService(
                 redissonClient, new SimpleMeterRegistry(), maxConcurrent, 90);
 
-        WebClient mockWebClient = WebClient.builder().build();
-        when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
-        when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
-
         // A real concurrency control, so the permit accounting this test is about is real.
         AttemptRunner runnerWithRealPermits = new AttemptRunner(
                 projectRateLimiterService, rateLimiterService, realConcurrencyControl,
                 circuitBreakerService, new ObjectMapper(), true, List.of());
 
-        WebhookDeliveryService localService = new WebhookDeliveryService(
-                deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
-                webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, new SimpleMeterRegistry(), new ObjectMapper(),
-                orderingBufferService, kafkaTemplate, payloadTransformService,
-                transactionTemplate, transformationCacheService,
-                ConnectionProvider.newConnection(),
-                runnerWithRealPermits,
-                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
+        WebhookDeliveryService localService = newService(
+                WebClient.builder().build(), new SimpleMeterRegistry(), runnerWithRealPermits);
 
         UUID endpointId = UUID.randomUUID();
         UUID eventId = UUID.randomUUID();
@@ -382,18 +366,7 @@ class WebhookDeliveryServiceTest {
     }
 
     private WebhookDeliveryService serviceWithMockWebClient(WebClient mockWebClient, MeterRegistry meterRegistry) {
-        when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
-        when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
-        return new WebhookDeliveryService(
-                deliveryRepository, endpointRepository, eventRepository, deliveryAttemptRepository,
-                webClientBuilder, mtlsWebClientFactory, encryptionKeyRegistry,
-                true, meterRegistry, new ObjectMapper(),
-                orderingBufferService, kafkaTemplate, payloadTransformService,
-                transactionTemplate, transformationCacheService,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(),
-                ORDERING_BUFFER_RESCHEDULE_DELAY_SECONDS);
+        return newService(mockWebClient, meterRegistry, newAttemptRunner());
     }
 
     /**

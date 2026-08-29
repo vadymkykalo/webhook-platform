@@ -43,7 +43,7 @@ class StuckForwardRecoveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StuckForwardRecoveryService(attemptRepository, redissonClient);
+        service = new StuckForwardRecoveryService(attemptRepository, new ExclusiveSweep(redissonClient));
         ReflectionTestUtils.setField(service, "thresholdMinutes", THRESHOLD_MINUTES);
         when(redissonClient.getLock("lock:stuck-forward-recovery")).thenReturn(lock);
     }

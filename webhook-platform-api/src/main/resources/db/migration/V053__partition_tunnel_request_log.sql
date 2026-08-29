@@ -5,8 +5,8 @@
 -- the monthly grain used for delivery_attempts.
 --
 -- Same attach-legacy-as-one-partition technique as V052 (see the extensive comment there
--- for why this is safe on a live, populated table, and docs/runbooks/partition-high-volume-tables.md
--- for the full procedure). No inbound foreign keys reference tunnel_request_log, and nothing
+-- for why this is safe on a live, populated table). No inbound foreign keys reference
+-- tunnel_request_log, and nothing
 -- else in the schema references its id, so widening the PK to (id, created_at) has zero
 -- ripple into other tables.
 
@@ -38,7 +38,7 @@ CREATE TABLE tunnel_request_log (
     PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
-COMMENT ON TABLE tunnel_request_log IS 'Tunnel request log for debugging and observability. Partitioned weekly by created_at (see docs/runbooks/partition-high-volume-tables.md); retention drops whole partitions (PartitionMaintenanceService) instead of DELETEing rows.';
+COMMENT ON TABLE tunnel_request_log IS 'Tunnel request log for debugging and observability. Partitioned weekly by created_at; retention drops whole partitions (PartitionMaintenanceService) instead of DELETEing rows.';
 
 CREATE INDEX idx_tunnel_req_log_session ON tunnel_request_log (tunnel_session_id);
 CREATE INDEX idx_tunnel_req_log_org     ON tunnel_request_log (organization_id);
@@ -59,8 +59,8 @@ BEGIN
     );
     EXECUTE 'ALTER TABLE tunnel_request_log_legacy VALIDATE CONSTRAINT tunnel_request_log_legacy_created_at_check';
 
-    -- Same PK-widening as V052 (see its comment for the full rationale and the
-    -- production-safe CONCURRENTLY alternative in docs/runbooks/partition-high-volume-tables.md).
+    -- Same PK-widening as V052 (see its comment for the rationale and the production-safe
+    -- CONCURRENTLY alternative).
     EXECUTE 'ALTER TABLE tunnel_request_log_legacy DROP CONSTRAINT tunnel_request_log_legacy_pkey';
     EXECUTE 'ALTER TABLE tunnel_request_log_legacy ADD CONSTRAINT tunnel_request_log_legacy_pkey PRIMARY KEY (id, created_at)';
 

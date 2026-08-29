@@ -9,14 +9,11 @@ import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.OutboxMessageRepository;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.ingress.HeaderSanitizer;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
@@ -30,7 +27,6 @@ import com.webhook.platform.api.service.verification.WebhookVerificationStrategy
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
 import com.webhook.platform.common.enums.VerificationMode;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
-import com.webhook.platform.common.util.CryptoUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +54,7 @@ public class IngressService {
     private final IncomingForwardAttemptRepository forwardAttemptRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
+    private final ForwardDispatch forwardDispatch;
     private final MeterRegistry meterRegistry;
     private final WebhookVerifierFactory verifierFactory;
     private final ReplayDetectionService replayDetectionService;
@@ -74,6 +71,7 @@ public class IngressService {
             IncomingForwardAttemptRepository forwardAttemptRepository,
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
+            ForwardDispatch forwardDispatch,
             MeterRegistry meterRegistry,
             WebhookVerifierFactory verifierFactory,
             ReplayDetectionService replayDetectionService,
@@ -88,6 +86,7 @@ public class IngressService {
         this.forwardAttemptRepository = forwardAttemptRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
+        this.forwardDispatch = forwardDispatch;
         this.meterRegistry = meterRegistry;
         this.verifierFactory = verifierFactory;
         this.replayDetectionService = replayDetectionService;
@@ -329,23 +328,6 @@ public class IngressService {
             List<OutboxMessage> outboxMessages = new ArrayList<>(destinations.size());
 
             for (IncomingDestination destination : destinations) {
-                IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
-                        .incomingEventId(event.getId())
-                        .destinationId(destination.getId())
-                        .incomingSourceId(source.getId())
-                        .attemptCount(0)
-                        .replay(false)
-                        .build();
-
-                String payload;
-                try {
-                    payload = objectMapper.writeValueAsString(forwardMessage);
-                } catch (Exception e) {
-                    throw new RuntimeException(
-                            "Failed to serialize outbox message for incoming forward: eventId="
-                                    + event.getId() + ", destId=" + destination.getId(), e);
-                }
-
                 attempts.add(IncomingForwardAttempt.builder()
                         .incomingEventId(event.getId())
                         .destinationId(destination.getId())
@@ -353,17 +335,8 @@ public class IngressService {
                         .status(ForwardAttemptStatus.PENDING)
                         .build());
 
-                outboxMessages.add(OutboxMessage.builder()
-                        .aggregateType("IncomingForward")
-                        .aggregateId(event.getId())
-                        .eventType("IncomingForwardCreated")
-                        .payload(payload)
-                        .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
-                        .kafkaKey(destination.getId().toString())
-                        .projectId(source.getProjectId())
-                        .status(OutboxStatus.PENDING)
-                        .retryCount(0)
-                        .build());
+                outboxMessages.add(forwardDispatch.outboxFor(event.getId(), source.getId(),
+                        destination.getId(), source.getProjectId(), 0, ForwardDispatch.Reason.CREATED));
             }
 
             forwardAttemptRepository.saveAll(attempts);

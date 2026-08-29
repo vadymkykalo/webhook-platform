@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Ratchet over the last of ADR-0006's four authorization questions.
+ * Ratchet over the last of the four authorization questions.
  *
  * <p>"Is this row inside the caller's organization?" used to be answered by an
  * {@code organizationId} parameter threaded through ~186 service method signatures, with a
@@ -56,7 +56,7 @@ class ServiceTenantParameterTest {
      * That is the case for system-scoped work, which walks many organizations and has no ambient
      * one, and for a cache keyed by organization. Anything reachable from a request should read
      * {@link TenantContext} instead — adding an entry here for one puts the check back in the
-     * caller's hands, which is what ADR-0006 exists to stop.
+     * caller's hands, which is what structural tenancy exists to stop.
      */
     private static final Set<String> DOCUMENTED_EXEMPTIONS = new TreeSet<>(Set.of(
             // Plan lookup and its cache. getRateLimitForProject / getMaxFanoutForProject resolve a
@@ -110,7 +110,7 @@ class ServiceTenantParameterTest {
                 "Expected to scan at least 300 public service methods, found " + methodsScanned);
 
         assertEquals(Set.of(), offenders,
-                "These service methods take an organization as a parameter. ADR-0006 made org "
+                "These service methods take an organization as a parameter. Org "
                         + "ownership a property of data access: read TenantContext, or enter a scope "
                         + "with TenantContext.runAs / @SystemTenant. If the organization genuinely "
                         + "comes off a row rather than off the caller, add the method to "

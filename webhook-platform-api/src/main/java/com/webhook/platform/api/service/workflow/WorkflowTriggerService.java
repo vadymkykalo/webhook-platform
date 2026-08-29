@@ -122,7 +122,7 @@ public class WorkflowTriggerService {
                 // Hibernate adds no predicate and, more importantly, stamps nothing on insert.
                 // Everything below belongs to the workflow's organization — the execution row,
                 // and the endpoints and deliveries its nodes go on to touch — so enter that
-                // organization's scope here, outside any transaction (ADR-0006).
+                // organization's scope here, outside any transaction.
                 TenantContext.runAs(workflow.getOrganizationId(),
                         () -> triggerOne(workflow, eventId, eventType, eventPayload, eventJson, depth));
             } catch (Exception e) {

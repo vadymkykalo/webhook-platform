@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
  * Which organization an audit row is stamped with, per caller type.
  *
  * <p>This exists because the API-key branch resolved the organization by reflecting over method
- * parameter names looking for one called {@code organizationId} — and ADR-0006 removed that
+ * parameter names looking for one called {@code organizationId} — and structural tenancy removed that
  * parameter from every service method, enforced by {@code ServiceTenantParameterTest}. The lookup
  * therefore returned null for every audited action but one, and those rows were written under the
  * SYSTEM sentinel instead of the key's organization. Nothing failed: the row was still written,

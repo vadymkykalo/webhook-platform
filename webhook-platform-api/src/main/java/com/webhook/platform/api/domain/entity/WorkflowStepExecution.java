@@ -23,10 +23,6 @@ public class WorkflowStepExecution {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    /**
-     * Tenant discriminator (ADR-0006): Hibernate adds {@code organization_id = <current tenant>}
-     * to every query against this entity and populates it on insert from the current scope.
-     */
     @TenantId
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;

@@ -214,7 +214,7 @@ writing rows without it.
 ### Open Session In View is off
 
 `spring.jpa.open-in-view: false` since the same release, because OSIV opens a database session
-before a request has established which organization it belongs to (ADR-0006). A handler that
+before a request has established which organization it belongs to. A handler that
 returns an entity with a lazy association now has to fetch it inside the transaction; the symptom
 if one is missed is `LazyInitializationException: could not initialize proxy — no session` in the
 API log, surfacing as a 500.

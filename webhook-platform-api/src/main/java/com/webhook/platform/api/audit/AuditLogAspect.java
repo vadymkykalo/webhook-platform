@@ -43,7 +43,7 @@ public class AuditLogAspect {
      * JVM alive at shutdown. Wrapped so the writer thread inherits the submitting request's tenant
      * — a hand-built pool gets no {@code TaskDecorator} from {@code AsyncConfig}, and
      * {@code AuditLog} carries {@code @TenantId}, so an unscoped writer thread would fail on its
-     * first session (ADR-0006).
+     * first session.
      */
     private final ExecutorService executor = TenantPropagatingTaskDecorator.wrap(
             Executors.newSingleThreadExecutor(r -> {

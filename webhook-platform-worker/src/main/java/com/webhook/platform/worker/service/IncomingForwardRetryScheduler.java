@@ -23,8 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -41,8 +39,7 @@ public class IncomingForwardRetryScheduler {
     private final Counter retryScheduledCounter;
     private final long defaultPollIntervalMs;
     private final RetryGovernor governor;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-            r -> { Thread t = new Thread(r, "incoming-forward-retry-scheduler"); t.setDaemon(true); return t; });
+    private final AdaptivePollLoop pollLoop;
 
     public IncomingForwardRetryScheduler(
             IncomingForwardAttemptRepository attemptRepository,
@@ -63,40 +60,18 @@ public class IncomingForwardRetryScheduler {
         this.governor = new RetryGovernor(
                 "incoming-forward", batchSize, /* minBatch */ 3, /* increment */ 5,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
+        this.pollLoop = new AdaptivePollLoop("incoming-forward-retry-scheduler", governor,
+                defaultPollIntervalMs, this::countPendingRetries, this::pollPendingRetries);
     }
 
     @PostConstruct
     void startScheduler() {
-        long startupJitter = ThreadLocalRandom.current().nextLong(0, 5000);
-        log.info("Incoming forward retry scheduler starting with {}ms jitter, default poll interval {}ms",
-                startupJitter, defaultPollIntervalMs);
-        scheduler.schedule(this::pollAndReschedule, startupJitter, TimeUnit.MILLISECONDS);
+        pollLoop.start();
     }
 
     @PreDestroy
     void stopScheduler() {
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void pollAndReschedule() {
-        long nextDelay = defaultPollIntervalMs;
-        try {
-            long pendingCount = countPendingRetries();
-            pollPendingRetries(pendingCount);
-            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount, defaultPollIntervalMs);
-        } catch (Exception e) {
-            log.error("Incoming forward retry scheduler poll failed: {}", e.getMessage(), e);
-        } finally {
-            scheduler.schedule(this::pollAndReschedule, nextDelay, TimeUnit.MILLISECONDS);
-        }
+        pollLoop.stop();
     }
 
     void pollPendingRetries(long pendingCount) {
@@ -130,9 +105,7 @@ public class IncomingForwardRetryScheduler {
                 // and comparing a full-nanosecond Instant against the DB-truncated value on
                 // claim would spuriously fail to match.
                 for (IncomingForwardAttempt attempt : pendingRetries) {
-                    attempt.setStatus(ForwardAttemptStatus.PROCESSING);
-                    attempt.setStartedAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
-                    attempt.setNextRetryAt(null);
+                    attempt.claimForRetry();
                 }
                 attemptRepository.saveAll(pendingRetries);
 
@@ -187,9 +160,7 @@ public class IncomingForwardRetryScheduler {
                 CompletableFuture<SendResult<String, IncomingForwardMessage>> future = futures.get(attempt.getId());
                 if (future == null) {
                     // Send was not initiated, revert to PENDING
-                    attempt.setStatus(ForwardAttemptStatus.PENDING);
-                    attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
-                    attempt.setStartedAt(null);
+                    attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     failed.add(attempt);
                     continue;
                 }
@@ -197,9 +168,7 @@ public class IncomingForwardRetryScheduler {
                 try {
                     if (!future.isDone()) {
                         // Timed out, revert to PENDING
-                        attempt.setStatus(ForwardAttemptStatus.PENDING);
-                        attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
-                        attempt.setStartedAt(null);
+                        attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                         failed.add(attempt);
                         continue;
                     }
@@ -225,9 +194,7 @@ public class IncomingForwardRetryScheduler {
                 } catch (Exception e) {
                     log.error("Failed to schedule incoming forward retry: attemptId={}: {}",
                             attempt.getId(), e.getMessage());
-                    attempt.setStatus(ForwardAttemptStatus.PENDING);
-                    attempt.setNextRetryAt(Instant.now().plusSeconds(rescheduleWithJitter(30)));
-                    attempt.setStartedAt(null);
+                    attempt.handBackTo(Instant.now().plusSeconds(rescheduleWithJitter(30)));
                     failed.add(attempt);
                 }
             }

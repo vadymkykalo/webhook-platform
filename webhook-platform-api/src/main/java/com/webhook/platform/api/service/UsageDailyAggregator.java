@@ -49,7 +49,7 @@ public class UsageDailyAggregator {
             try {
                 // The scheduler walks every organization, so it has no ambient one — enter each
                 // project's before touching its rows, and outside the transaction below, since
-                // Hibernate reads the tenant when it opens the session (ADR-0006).
+                // Hibernate reads the tenant when it opens the session.
                 TenantContext.runAs(project.getOrganizationId(),
                         () -> aggregateForProject(project.getId(), yesterday));
                 count++;

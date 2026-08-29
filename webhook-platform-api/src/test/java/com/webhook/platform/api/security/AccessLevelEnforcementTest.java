@@ -152,7 +152,7 @@ class AccessLevelEnforcementTest {
         @Test
         @DisplayName("a platform-admin token is refused by a level it cannot satisfy")
         void platformAdminCannotSatisfyAMembershipLevel() {
-            // Reversed deliberately; ADR-0015 has the reasoning. This used to pass through, on
+            // Reversed deliberately. This used to pass through, on
             // the grounds that running RbacUtil against a platform admin would reject the one
             // caller /api/v1/admin/** is for. That reason does not reach here: no admin handler
             // carries @RequireAccess (EncryptionAdminController is gated on the PLATFORM_ADMIN

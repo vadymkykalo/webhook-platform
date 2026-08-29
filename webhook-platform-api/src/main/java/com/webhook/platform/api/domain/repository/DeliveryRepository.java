@@ -146,7 +146,7 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID>, JpaSp
      * the limit apply to the rows chosen rather than to the delete itself. Being native, it
      * carries {@code organization_id} explicitly: Hibernate's {@code @TenantId} discriminator
      * does not reach native SQL, so the JPQL form this replaced was scoped for free and this
-     * one would delete across organizations without the predicate (ADR-0006). The service
+     * one would delete across organizations without the predicate. The service
      * validates project ownership before calling, so this is the second lock on the door —
      * which is the point of it.</p>
      *

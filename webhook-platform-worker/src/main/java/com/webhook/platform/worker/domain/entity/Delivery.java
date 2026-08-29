@@ -20,17 +20,12 @@ public class Delivery {
     private UUID id;
 
     /**
-     * Tenant discriminator, mapped but not enforced here.
-     *
-     * <p>The api filters on this column via {@code @TenantId} (ADR-0006). The worker deliberately
-     * does not: it has no {@code AuthContext}, every consumer is a system path by construction,
-     * and a discriminator it could never populate from a request would only break it.
-     *
-     * <p>It is mapped rather than ignored for two reasons. The attempt stores insert rows into
-     * {@code delivery_attempts} and {@code incoming_forward_attempts} and have to carry the
-     * tenant across from the parent row, or the api would not see what the worker wrote. And
-     * {@code EntityMappingParityIntegrationTest} requires every column of a shared table to be
-     * mapped by both modules — ADR-0002's cost, paid here rather than exempted.
+     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
+     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
+     * every consumer is a system path. It is mapped rather than ignored because the attempt
+     * stores have to carry the tenant across from the parent row, and because
+     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
+     * shared table.
      */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
@@ -130,6 +125,50 @@ public class Delivery {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    /**
+     * Takes the row for one Attempt. The token is what a later writer must still match to
+     * finalise: "token set" means "currently claimed", which is why handing the row back clears it.
+     */
+    public void claim(UUID token) {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.PROCESSING;
+        this.nextRetryAt = null;
+        this.lastAttemptAt = now;
+        this.claimToken = token;
+        this.updatedAt = now;
+    }
+
+    /** Ends the Claim and returns the obligation to the retry ladder, to be picked up at {@code retryAt}. */
+    public void handBackTo(Instant retryAt) {
+        this.status = DeliveryStatus.PENDING;
+        this.claimToken = null;
+        this.nextRetryAt = retryAt;
+        this.updatedAt = Instant.now();
+    }
+
+    public void succeed() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.SUCCESS;
+        this.succeededAt = now;
+        this.updatedAt = now;
+    }
+
+    /** The Retry Ladder is exhausted: kept for a human to decide about. */
+    public void abandon() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.DLQ;
+        this.failedAt = now;
+        this.updatedAt = now;
+    }
+
+    /** No number of retries would help — a refused URL, a deleted endpoint, an unusable ladder. */
+    public void failTerminally() {
+        Instant now = Instant.now();
+        this.status = DeliveryStatus.FAILED;
+        this.failedAt = now;
+        this.updatedAt = now;
+    }
 
     public enum DeliveryStatus {
         PENDING, PROCESSING, SUCCESS, FAILED, DLQ

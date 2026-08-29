@@ -4,14 +4,10 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
-import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventResponse;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
 import lombok.extern.slf4j.Slf4j;
@@ -38,9 +34,10 @@ public class EventService {
     private final DeliveryRepository deliveryRepository;
     private final OutboxMessageRepository outboxMessageRepository;
     private final ObjectMapper objectMapper;
+    private final DeliveryDispatch deliveryDispatch;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
-    private final SchemaRegistryService schemaRegistryService;
+    private final SchemaValidationGate schemaValidationGate;
 
     public EventService(
             EventRepository eventRepository,
@@ -49,18 +46,20 @@ public class EventService {
             DeliveryRepository deliveryRepository,
             OutboxMessageRepository outboxMessageRepository,
             ObjectMapper objectMapper,
+            DeliveryDispatch deliveryDispatch,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
-            SchemaRegistryService schemaRegistryService) {
+            SchemaValidationGate schemaValidationGate) {
         this.eventRepository = eventRepository;
         this.projectRepository = projectRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
         this.outboxMessageRepository = outboxMessageRepository;
         this.objectMapper = objectMapper;
+        this.deliveryDispatch = deliveryDispatch;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
-        this.schemaRegistryService = schemaRegistryService;
+        this.schemaValidationGate = schemaValidationGate;
     }
 
     public Page<EventResponse> listEvents(UUID projectId, Pageable pageable) {
@@ -125,28 +124,7 @@ public class EventService {
             throw new ForbiddenException("Access denied");
         }
 
-        // Schema validation (same logic as EventIngestService)
-        if (Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
-            String payloadJson;
-            try {
-                payloadJson = objectMapper.writeValueAsString(request.getData());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize event payload", e);
-            }
-
-            schemaRegistryService.autoDiscover(projectId, request.getType(), payloadJson);
-
-            List<String> validationErrors = schemaRegistryService.validatePayload(
-                    projectId, request.getType(), payloadJson);
-            if (!validationErrors.isEmpty()) {
-                log.warn("Schema validation failed for test event (type '{}'): {}",
-                        request.getType(), validationErrors);
-                if (project.getSchemaValidationPolicy() == SchemaValidationPolicy.BLOCK) {
-                    throw new IllegalArgumentException(
-                            "Schema validation failed: " + String.join("; ", validationErrors));
-                }
-            }
-        }
+        schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 
         Event event = createEvent(projectId, request);
         event = eventRepository.saveAndFlush(event);
@@ -171,7 +149,7 @@ public class EventService {
 
         List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
         for (Delivery delivery : savedDeliveries) {
-            outboxMessages.add(createOutboxMessage(delivery, projectId));
+            outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
         }
         outboxMessageRepository.saveAll(outboxMessages);
 
@@ -210,36 +188,6 @@ public class EventService {
                 .customHeaders(subscription.getCustomHeaders())
                 .transformationId(subscription.getTransformationId())
                 .build();
-    }
-
-    private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
-        try {
-            DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                    .deliveryId(delivery.getId())
-                    .eventId(delivery.getEventId())
-                    .endpointId(delivery.getEndpointId())
-                    .subscriptionId(delivery.getSubscriptionId())
-                    .status(delivery.getStatus().name())
-                    .attemptCount(delivery.getAttemptCount())
-                    .sequenceNumber(delivery.getSequenceNumber())
-                    .orderingEnabled(delivery.getOrderingEnabled())
-                    .build();
-            
-            String payload = objectMapper.writeValueAsString(deliveryMessage);
-            return OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryCreated")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(projectId)
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create outbox message", e);
-        }
     }
 
     private EventResponse mapToResponse(Event event) {

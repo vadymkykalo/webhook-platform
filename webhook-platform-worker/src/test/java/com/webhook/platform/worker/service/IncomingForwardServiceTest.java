@@ -3,6 +3,8 @@ package com.webhook.platform.worker.service;
 import com.webhook.platform.common.constants.KafkaTopics;
 import org.springframework.kafka.core.KafkaTemplate;
 import com.webhook.platform.worker.attempt.AttemptRunner;
+import com.webhook.platform.worker.attempt.ForwardAttemptMetrics;
+import com.webhook.platform.worker.attempt.IncomingAttemptStoreFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
@@ -27,7 +29,6 @@ import org.mockito.quality.Strictness;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.netty.resources.ConnectionProvider;
 
 import java.time.Instant;
 import java.util.List;
@@ -94,8 +95,6 @@ class IncomingForwardServiceTest {
     @Mock
     private PayloadTransformService payloadTransformService;
     @Mock
-    private WebClient.Builder webClientBuilder;
-    @Mock
     private EncryptionKeyRegistry encryptionKeyRegistry;
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -137,26 +136,21 @@ class IncomingForwardServiceTest {
     void setUp() {
         stubTransactionTemplate();
 
-        WebClient mockWebClient = WebClient.builder().build();
-        when(webClientBuilder.clientConnector(any())).thenReturn(webClientBuilder);
-        when(webClientBuilder.defaultHeader(anyString(), anyString())).thenReturn(webClientBuilder);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
-
         // Tenant isolation guards — permissive by default
         when(projectRateLimiterService.tryAcquire(any(UUID.class))).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
         when(concurrencyControlService.tryAcquire(any(UUID.class))).thenReturn(true);
 
-        MeterRegistry meterRegistry = new SimpleMeterRegistry();
-        service = new IncomingForwardService(
-                eventRepository, destinationRepository, attemptRepository,
-                transformationCacheService, payloadTransformService,
-                webClientBuilder, new ObjectMapper(),
-                encryptionKeyRegistry,
-                true, List.of(),
-                meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(true), kafkaTemplate);
+        service = newService(WebClient.builder().build(), new SimpleMeterRegistry(), newAttemptRunner(true));
+    }
+
+    private IncomingForwardService newService(WebClient webClient, MeterRegistry registry, AttemptRunner runner) {
+        IncomingAttemptStoreFactory storeFactory = new IncomingAttemptStoreFactory(
+                attemptRepository, transactionTemplate, transformationCacheService,
+                payloadTransformService, encryptionKeyRegistry, new ObjectMapper(),
+                webClient, kafkaTemplate);
+        return new IncomingForwardService(eventRepository, destinationRepository, attemptRepository,
+                transactionTemplate, runner, storeFactory, new ForwardAttemptMetrics(registry));
     }
 
 
@@ -327,16 +321,8 @@ class IncomingForwardServiceTest {
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         // Re-create service with allowPrivateIps=false for SSRF to trigger
-        MeterRegistry meterRegistry = new SimpleMeterRegistry();
-        IncomingForwardService ssrfService = new IncomingForwardService(
-                eventRepository, destinationRepository, attemptRepository,
-                transformationCacheService, payloadTransformService,
-                webClientBuilder, new ObjectMapper(),
-                encryptionKeyRegistry,
-                false, List.of(),
-                meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(false), kafkaTemplate);
+        IncomingForwardService ssrfService = newService(
+                WebClient.builder().build(), new SimpleMeterRegistry(), newAttemptRunner(false));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -412,17 +398,9 @@ class IncomingForwardServiceTest {
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         WebClient mockWebClient = mock(WebClient.class);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
         MeterRegistry meterRegistry = new SimpleMeterRegistry();
-        IncomingForwardService localService = new IncomingForwardService(
-                eventRepository, destinationRepository, attemptRepository,
-                transformationCacheService, payloadTransformService,
-                webClientBuilder, new ObjectMapper(),
-                encryptionKeyRegistry,
-                true, List.of(),
-                meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(true), kafkaTemplate);
+        IncomingForwardService localService = newService(
+                mockWebClient, meterRegistry, newAttemptRunner(true));
 
         // Retry dispatch: scheduler already claimed the row, no re-claim needed.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -474,17 +452,8 @@ class IncomingForwardServiceTest {
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         WebClient mockWebClient = mock(WebClient.class);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
-        MeterRegistry meterRegistry = new SimpleMeterRegistry();
-        IncomingForwardService localService = new IncomingForwardService(
-                eventRepository, destinationRepository, attemptRepository,
-                transformationCacheService, payloadTransformService,
-                webClientBuilder, new ObjectMapper(),
-                encryptionKeyRegistry,
-                true, List.of(),
-                meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(true), kafkaTemplate);
+        IncomingForwardService localService = newService(
+                mockWebClient, new SimpleMeterRegistry(), newAttemptRunner(true));
 
         // attemptCount == maxAttempts -- this is the last attempt.
         IncomingForwardMessage message = IncomingForwardMessage.builder()
@@ -520,19 +489,10 @@ class IncomingForwardServiceTest {
                 .thenAnswer(inv -> asClaimed(existingAttempt));
 
         WebClient mockWebClient = mock(WebClient.class);
-        when(webClientBuilder.build()).thenReturn(mockWebClient);
         when(attemptRepository.claimForProcessing(eq(eventId), eq(destinationId), eq(1), any(UUID.class)))
                 .thenAnswer(inv -> { claimedToken.set(inv.getArgument(3)); return 1; });
-        MeterRegistry meterRegistry = new SimpleMeterRegistry();
-        IncomingForwardService localService = new IncomingForwardService(
-                eventRepository, destinationRepository, attemptRepository,
-                transformationCacheService, payloadTransformService,
-                webClientBuilder, new ObjectMapper(),
-                encryptionKeyRegistry,
-                true, List.of(),
-                meterRegistry, transactionTemplate,
-                ConnectionProvider.newConnection(),
-                newAttemptRunner(true), kafkaTemplate);
+        IncomingForwardService localService = newService(
+                mockWebClient, new SimpleMeterRegistry(), newAttemptRunner(true));
 
         IncomingForwardMessage message = IncomingForwardMessage.builder()
                 .incomingEventId(eventId).destinationId(destinationId)
@@ -690,7 +650,7 @@ class IncomingForwardServiceTest {
     void ladderExhausted_publishesDlqNotification() {
         // Before this, a DLQ'd Forward wrote its row status and nothing else: incoming.forward.dlq
         // existed and was created by the Makefile, but nothing ever produced a business
-        // notification to it. See ADR-0011.
+        // notification to it.
         IncomingDestination destination = buildDestination();
         destination.setMaxAttempts(1); // exhausted by the first failure
 

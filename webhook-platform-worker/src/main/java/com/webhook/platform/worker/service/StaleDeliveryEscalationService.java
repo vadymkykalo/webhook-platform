@@ -31,8 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>Periodically computes the age of the oldest pending delivery and exports it as a Prometheus gauge
  *       ({@code delivery_oldest_pending_age_seconds}) for alerting.</li>
  *   <li>Finds deliveries in PENDING state whose {@code created_at} is older than the hard-cap threshold
- *       (default 96h — chosen to comfortably exceed the default retry ladder's ~83h worst-case span,
- *       see {@code RetryPolicy#validateLadderFitsCap}) and escalates them to DLQ status.</li>
+ *       (default 96h, comfortably past the default retry ladder's ~83h worst case) and
+ *       escalates them to DLQ status.</li>
  *   <li>Publishes a DLQ notification to Kafka for each escalated delivery (best-effort).</li>
  * </ol>
  */
@@ -108,9 +108,7 @@ public class StaleDeliveryEscalationService {
 
                 List<Delivery> stale = deliveryRepository.findAllById(staleIds);
                 for (Delivery d : stale) {
-                    d.setStatus(Delivery.DeliveryStatus.DLQ);
-                    d.setFailedAt(Instant.now());
-                    d.setUpdatedAt(Instant.now());
+                    d.abandon();
                 }
                 deliveryRepository.saveAll(stale);
 

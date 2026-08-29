@@ -20,17 +20,12 @@ public class Endpoint {
     private UUID id;
 
     /**
-     * Tenant discriminator, mapped but not enforced here.
-     *
-     * <p>The api filters on this column via {@code @TenantId} (ADR-0006). The worker deliberately
-     * does not: it has no {@code AuthContext}, every consumer is a system path by construction,
-     * and a discriminator it could never populate from a request would only break it.
-     *
-     * <p>It is mapped rather than ignored for two reasons. The attempt stores insert rows into
-     * {@code delivery_attempts} and {@code incoming_forward_attempts} and have to carry the
-     * tenant across from the parent row, or the api would not see what the worker wrote. And
-     * {@code EntityMappingParityIntegrationTest} requires every column of a shared table to be
-     * mapped by both modules — ADR-0002's cost, paid here rather than exempted.
+     * Tenant discriminator, mapped but not enforced here: the api filters on this column via
+     * {@code @TenantId}, the worker deliberately does not — it has no {@code AuthContext} and
+     * every consumer is a system path. It is mapped rather than ignored because the attempt
+     * stores have to carry the tenant across from the parent row, and because
+     * {@code EntityMappingParityIntegrationTest} requires both modules to map every column of a
+     * shared table.
      */
     @Column(name = "organization_id", nullable = false)
     private UUID organizationId;
@@ -49,12 +44,8 @@ public class Endpoint {
     private String secretIv;
 
     /*
-     * The rotation grace window. EndpointService.rotateSecret copies the outgoing secret
-     * here — re-encrypted under the current key, so one encryption_key_version still
-     * describes both columns — and stamps secretRotatedAt. While now() is inside
-     * secretRotatedAt + secretRotationGracePeriodHours, OutgoingAttemptStore signs with
-     * both and the header carries two v1 values, so a receiver still holding the old
-     * secret keeps verifying. Outside the window the previous secret is simply not read.
+     * The rotation grace window. While now() is inside secretRotatedAt plus the grace period,
+     * the store signs with both secrets so a receiver still holding the old one keeps verifying.
      */
     @Column(name = "secret_previous_encrypted", columnDefinition = "TEXT")
     private String secretPreviousEncrypted;
@@ -75,13 +66,7 @@ public class Endpoint {
     @Column(name = "rate_limit_per_second")
     private Integer rateLimitPerSecond;
 
-    /**
-     * Which signature headers this endpoint receives (V062).
-     *
-     * <p>{@code BOTH} by default: an existing receiver goes on verifying {@code X-Signature}
-     * while a new one can verify with an off-the-shelf Standard Webhooks library, and neither
-     * has to know the other exists.</p>
-     */
+    /** {@code BOTH} by default, so neither an old nor a new receiver has to know about the other. */
     @Enumerated(EnumType.STRING)
     @Column(name = "signature_scheme", nullable = false, length = 20)
     @Builder.Default
@@ -117,11 +102,8 @@ public class Endpoint {
     private Instant updatedAt;
 
     /**
-     * Soft-delete marker. {@code EndpointService.deleteEndpoint} only stamps this column —
-     * it does not clear {@code enabled} — and every api-side query filters on
-     * {@code deleted_at IS NULL}. Unmapped here, the worker could not see a deletion at all
-     * and kept delivering already-queued events to a deleted endpoint for as long as the
-     * retry ladder ran.
+     * Soft-delete marker; {@code enabled} is left alone. Unmapped here, the worker went on
+     * delivering queued events to a deleted endpoint for the whole retry ladder.
      */
     @Column(name = "deleted_at")
     private Instant deletedAt;

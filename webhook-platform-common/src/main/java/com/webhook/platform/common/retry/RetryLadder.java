@@ -11,30 +11,15 @@ import java.util.concurrent.ThreadLocalRandom;
  * there are before the obligation is abandoned. Applies to both directions: an outgoing
  * Delivery reads it off its own row, an incoming Forward off its Destination.
  *
- * <h2>No defaults live here, on purpose</h2>
- *
- * <p>Every ladder is data carried by the row it governs, and both tables declare a column
- * default ({@code subscriptions.retry_delays}, {@code incoming_destinations.retry_delays}).
- * A row therefore always carries a ladder, and this type has no fallback to substitute when
- * one looks malformed.
- *
- * <p>That is a deliberate reversal. Both pipelines used to answer a malformed ladder by
- * logging a warning and silently substituting a hardcoded array of their own — and the two
- * arrays did not agree, so a customer who mistyped {@code retry_delays} got a retry policy
- * that was neither theirs nor documented anywhere, with no error at write time and no
- * signal at delivery time. {@link #parse} throws instead, and
- * {@link #validate(String, String)} exists so the API can reject the mistake at the point
- * it is made rather than at the point it would silently take effect.
- *
- * <p>The per-direction defaults are declared once, in {@link RetryLadderDefaults}.
+ * <p>No defaults live here, on purpose. Every row carries its own ladder via a column default,
+ * so there is nothing to substitute when one looks malformed — and substituting was the old
+ * behaviour, which handed a customer who mistyped {@code retry_delays} a policy that was neither
+ * theirs nor documented. {@link #parse} throws, and {@link #validate(String, String)} lets the API
+ * reject the mistake where it is made. The per-direction defaults live in {@link RetryLadderDefaults}.
  */
 public final class RetryLadder {
 
-    /**
-     * Longest a single tier may specify. A tier beyond this is far likelier to be a
-     * mistyped value than an intent, and it also keeps {@link #worstCaseSpanSeconds} and
-     * {@code Instant.plusSeconds} well clear of overflow.
-     */
+    /** Longer than this is likelier a typo than an intent, and keeps the arithmetic clear of overflow. */
     public static final long MAX_TIER_SECONDS = 30L * 24 * 60 * 60;
 
     /** Upper bound on tiers, so a pasted-in wall of numbers is rejected rather than stored. */
@@ -51,14 +36,7 @@ public final class RetryLadder {
         this.maxAttempts = maxAttempts;
     }
 
-    /**
-     * Parses a ladder, rejecting anything malformed.
-     *
-     * @param delaysCsv   comma-separated delays in seconds, as stored in {@code retry_delays}
-     * @param maxAttempts attempts allowed before the obligation is abandoned
-     * @throws IllegalArgumentException with a message written to be shown to the caller who
-     *                                  supplied the value
-     */
+    /** @throws IllegalArgumentException with a message meant to be shown to whoever supplied the value */
     public static RetryLadder parse(String delaysCsv, int maxAttempts) {
         List<Long> delays = parseDelays(delaysCsv, "retryDelays");
         requireAttemptsInRange(maxAttempts, "maxAttempts");
@@ -66,11 +44,8 @@ public final class RetryLadder {
     }
 
     /**
-     * Validates a ladder without building one, for use at the point a caller supplies it.
-     *
-     * @param delaysField name of the field to quote in the error message, so the message
-     *                    matches whatever the caller actually sent
-     * @throws IllegalArgumentException if the value could not be stored and later used
+     * Validates without building one, at the point a caller supplies it. {@code delaysField} is
+     * quoted in the error, so the message names whatever the caller actually sent.
      */
     public static void validate(String delaysCsv, String delaysField) {
         parseDelays(delaysCsv, delaysField);

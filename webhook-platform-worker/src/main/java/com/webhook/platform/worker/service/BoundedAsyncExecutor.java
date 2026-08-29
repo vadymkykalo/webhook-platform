@@ -15,32 +15,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Non-blocking bounded async executor with Kafka container pause/resume backpressure.
+ * Bounded async executor that applies backpressure by pausing the Kafka listener containers
+ * rather than blocking the consumer thread, so {@code max.poll.interval.ms} is never breached.
  *
- * <p>Unlike the old blocking semaphore approach, this executor uses
- * {@link Semaphore#tryAcquire()} (non-blocking). When permits are exhausted,
- * the executor <b>pauses</b> the associated Kafka listener containers, stopping
- * further polling. When a task completes and releases a permit, the containers
- * are <b>resumed</b> automatically.</p>
+ * <p>Pause/resume CASes on an {@link AtomicBoolean} and re-checks, to close the race where a
+ * permit is released between a failed {@code trySubmit()} and the {@code pause()} that follows.
  *
- * <h3>Why this is better than blocking acquire()</h3>
- * <ul>
- *   <li>Consumer threads never block — no risk of {@code max.poll.interval.ms} breach</li>
- *   <li>No rebalance storms from slow consumers</li>
- *   <li>No CallerRunsPolicy risk (consumer thread running HTTP calls)</li>
- *   <li>Clean backpressure: Kafka simply stops polling until capacity is available</li>
- * </ul>
- *
- * <h3>Thread safety</h3>
- * Pause/resume uses {@link AtomicBoolean} CAS with double-check to prevent
- * the TOCTOU race where a permit is released between {@code trySubmit()} failure
- * and {@code pause()} call.
- *
- * <h3>Ack safety</h3>
- * {@code Acknowledgment.acknowledge()} is called only after successful processing.
- * On failure, the message is NOT acked — Kafka redelivers after rebalance.
- * On pool-full rejection, the message is also NOT acked — it will be re-polled
- * when containers resume.
+ * <p>A message is acked only after successful processing. A failure or a pool-full rejection
+ * leaves it unacked, to be redelivered or re-polled.
  */
 @Slf4j
 public class BoundedAsyncExecutor {
@@ -76,8 +58,7 @@ public class BoundedAsyncExecutor {
                     t.setDaemon(true);
                     return t;
                 },
-                // AbortPolicy: if queue is also full, reject. This should never happen
-                // because semaphore limits submissions to poolSize, and queue is poolSize*2.
+                // Unreachable: the semaphore limits submissions to poolSize.
                 new ThreadPoolExecutor.AbortPolicy()
         );
 
@@ -96,23 +77,13 @@ public class BoundedAsyncExecutor {
                 name, poolSize, shutdownTimeoutSeconds);
     }
 
-    /**
-     * Register a Kafka listener container for pause/resume management.
-     * Call this after application startup when containers are available.
-     */
+    /** Call after startup, once the containers exist. */
     public void registerContainer(MessageListenerContainer container) {
         managedContainers.add(container);
         log.info("{} executor registered Kafka container: {}", name, container);
     }
 
-    /**
-     * Try to submit a task for async processing. Non-blocking.
-     *
-     * @param task the processing logic
-     * @param ack  Kafka acknowledgment — called on success, skipped on failure
-     * @param id   identifier for logging
-     * @return {@code true} if accepted, {@code false} if executor is full (caller must NOT ack)
-     */
+    /** @return false when the executor is full, in which case the caller must NOT ack. */
     public boolean trySubmit(Runnable task, Acknowledgment ack, String id) {
         if (!semaphore.tryAcquire()) {
             pauseContainers();
@@ -131,25 +102,14 @@ public class BoundedAsyncExecutor {
                     task.run();
                     ack.acknowledge();
                 } catch (ShutdownRejectedException e) {
-                    // Callers (DeliveryConsumer) are expected to check shutdown state
-                    // themselves before submitting, on the Kafka consumer thread, where
-                    // a throw actually reaches the container's error handler. If one
-                    // still reaches here, this task was already queued/running when
-                    // shutdown began — treat it like any other task failure: log and
-                    // don't ack. Rethrowing would only escape onto this pool thread's
-                    // uncaught-exception handler, which no Kafka container ever sees.
+                    // Callers check shutdown on the consumer thread, where a throw reaches
+                    // the container's error handler. Rethrowing here would only escape onto a
+                    // pool thread no container ever sees, so log and do not ack.
                     log.warn("{}: shutdown rejected, not acking: id={}", name, id);
                 } catch (Exception e) {
-                    // Don't ack. This is a defensive catch-all for a task that escapes its
-                    // own error handling entirely (WebhookDeliveryService.processDelivery
-                    // already catches everything it can and always acks); it should be
-                    // unreachable in practice. KafkaConsumerConfig enables
-                    // asyncAcks, so a permanently-unacked record now blocks this
-                    // partition's offset commits until a rebalance/restart, rather than
-                    // silently losing it — a stall is a visible, recoverable failure mode,
-                    // data loss is not. This executor is generic (also backs the incoming
-                    // pipeline) and has no domain-specific retry ladder to reschedule into,
-                    // unlike DeliveryConsumer's executor-full path.
+                    // Do not ack. With asyncAcks on, an unacked record stalls this partition
+                    // until a rebalance rather than losing the work: a visible, recoverable
+                    // failure beats silent data loss.
                     log.error("{}: async task failed, not acking (partition will stall until restart/rebalance): id={}, error={}",
                             name, id, e.getMessage(), e);
                 } finally {
@@ -160,7 +120,6 @@ public class BoundedAsyncExecutor {
                 }
             });
         } catch (RejectedExecutionException e) {
-            // Should not happen (semaphore guards submissions), but handle gracefully
             inFlight.decrementAndGet();
             semaphore.release();
             log.error("{}: executor rejected task (unexpected): id={}", name, id, e);
@@ -171,10 +130,6 @@ public class BoundedAsyncExecutor {
         return true;
     }
 
-    /**
-     * Pause all managed Kafka containers to stop polling.
-     * Uses CAS + double-check to prevent TOCTOU race.
-     */
     private void pauseContainers() {
         if (containersPaused.compareAndSet(false, true)) {
             for (MessageListenerContainer c : managedContainers) {
@@ -185,8 +140,7 @@ public class BoundedAsyncExecutor {
             log.info("{}: paused {} Kafka containers (executor full, {} in-flight)",
                     name, managedContainers.size(), inFlight.get());
 
-            // Double-check: a permit might have been released between tryAcquire() and pause().
-            // If permits are available now, resume immediately to prevent deadlock.
+            // A permit may have been released between tryAcquire() and pause().
             if (semaphore.availablePermits() > 0) {
                 if (containersPaused.compareAndSet(true, false)) {
                     for (MessageListenerContainer c : managedContainers) {
@@ -200,10 +154,6 @@ public class BoundedAsyncExecutor {
         }
     }
 
-    /**
-     * Resume containers after a permit is released.
-     * Only resumes if containers are currently paused.
-     */
     private void resumeContainersIfNeeded() {
         if (containersPaused.get() && semaphore.availablePermits() > 0) {
             if (containersPaused.compareAndSet(true, false)) {
@@ -218,17 +168,14 @@ public class BoundedAsyncExecutor {
         }
     }
 
-    /** Current number of in-flight tasks (for testing/monitoring). */
     public int getInFlightCount() {
         return inFlight.get();
     }
 
-    /** Available permits in the semaphore (for testing). */
     public int getAvailablePermits() {
         return semaphore.availablePermits();
     }
 
-    /** Whether containers are currently paused (for testing/monitoring). */
     public boolean isContainersPaused() {
         return containersPaused.get();
     }

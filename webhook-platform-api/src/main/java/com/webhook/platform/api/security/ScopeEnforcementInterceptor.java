@@ -21,32 +21,14 @@ import java.util.UUID;
  * {@link RequireScope} annotation for API-key requests, and the structural
  * {@code {projectId}} tenancy guard described below.
  *
- * <h2>API-key read/write scope ({@link RequireScope})</h2>
- * <p>Resolution order:
- * <ol>
- *   <li>Method-level {@code @RequireScope} (most specific)</li>
- *   <li>Class-level {@code @RequireScope}</li>
- *   <li>If neither exists — API key requests are <b>allowed</b> (backward-compat default;
- *       existing RBAC via {@code auth.requireWriteAccess()} still applies)</li>
- * </ol>
- * <p>For non-API-key authentication (JWT), this half of the check is a no-op.</p>
+ * <p>{@link RequireScope} resolves method-level first, then class-level; neither means an API-key
+ * request is allowed, and a JWT skips this half entirely.
  *
- * <h2>API-key project confinement</h2>
- * <p>{@code AuthContext.organizationId} is derived from an API key's project, so a
- * service-layer check that only compares organization IDs passes for <b>any</b>
- * project in that org. The only thing that ever confined a key to its own project
- * was {@code AuthContext.validateProjectAccess(projectId)} — an opt-in call that a
- * handler could simply forget, and about a third of {@code {projectId}} routes did.
- *
- * <p>This interceptor now enforces that confinement <b>structurally</b>: for any
- * route whose resolved URI template contains a {@code {projectId}} path variable,
- * the value actually present in the request path is compared against the API key's
- * own project, regardless of whether the handler method binds that path variable or
- * calls {@code validateProjectAccess} itself. A route opts out only via the explicit
- * {@link ProjectScopeExempt} annotation — see its Javadoc for when that's legitimate.
- *
- * <p>Existing per-handler {@code validateProjectAccess(...)} calls are left in place
- * as harmless defence-in-depth rather than removed.
+ * <p>Project confinement is structural. {@code AuthContext.organizationId} comes off the key's
+ * project, so an organization-only check passes for any project in that org — and the call that
+ * did confine a key was opt-in, which a third of {@code {projectId}} routes forgot. Every route
+ * whose URI template carries {@code {projectId}} is now compared against the key's own project
+ * regardless of what the handler does, unless it declares {@link ProjectScopeExempt}.
  */
 @Slf4j
 @Component
@@ -57,24 +39,13 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
     /**
      * Enforces {@link RequireAccess}, for both JWT and API-key callers.
      *
-     * <p>Runs before the scope check below, not after: scope is an API-key concept and that
-     * check returns early for a JWT, so a role requirement placed after it would silently not
-     * apply to dashboard callers — which are exactly the ones a VIEWER is.
+     * <p>Before the scope check, not after: scope returns early for a JWT, so a role requirement
+     * placed after it would not apply to dashboard callers — exactly the ones a VIEWER is.
      *
-     * <p>The role is read straight off the authentication token. Unlike
-     * {@code AuthContextArgumentResolver}, which resolves an API key's Project to find its
-     * Organization, nothing here needs a database lookup.
-     *
-     * <p>An authentication this cannot map to a membership role — a platform-admin token, or no
-     * authentication at all on a permitAll path — is <b>refused</b> when a level above READ is
-     * declared. It used to pass through, on the grounds that a platform admin is not a tenant
-     * identity and {@code /api/v1/admin/**} is gated on the PLATFORM_ADMIN authority in
-     * {@code SecurityConfig} instead. That is still true, and it is why refusing here costs the
-     * admin endpoints nothing: none of them declares a level. What the pass-through actually
-     * covered was platform-admin tokens aimed at <em>tenant</em> handlers, which were already
-     * refused a step later by {@code AuthContextArgumentResolver} — but only because all 79
-     * annotated handlers happen to take an {@code AuthContext}. A handler that did not would have
-     * been open. ADR-0015 has the reasoning.
+     * <p>An authentication that maps to no membership role is refused when a level above READ is
+     * declared. That costs the admin endpoints nothing, since none of them declares one; what the
+     * old pass-through covered was platform-admin tokens aimed at tenant handlers, safe only
+     * because every annotated handler happens to take an {@code AuthContext}.
      */
     private void enforceAccessLevel(HandlerMethod handlerMethod, Authentication authentication) {
         RequireAccess required = handlerMethod.getMethodAnnotation(RequireAccess.class);

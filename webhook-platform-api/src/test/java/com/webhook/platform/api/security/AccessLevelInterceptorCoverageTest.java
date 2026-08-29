@@ -83,7 +83,7 @@ class AccessLevelInterceptorCoverageTest {
                         + "ScopeEnforcementInterceptor on \"" + INTERCEPTED_PREFIX + "**\" only, and they are "
                         + "mapped outside it. Either map them under /api, or widen the registration in "
                         + "WebConfig and update INTERCEPTED_PREFIX here — do not leave the annotation as "
-                        + "decoration (ADR-0015).");
+                        + "decoration.");
     }
 
     /**

@@ -16,23 +16,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class EventTypeMatcher {
 
-    /**
-     * Cache of pre-split pattern segments. Avoids repeated String.split() + array allocation
-     * on every matches() call in the hot path (event ingestion × wildcard subscriptions).
-     * Bounded by ConcurrentHashMap — patterns are finite (created by users), so unbounded growth is unlikely.
-     */
+    /** Pre-split segments, to keep String.split() off the ingest hot path. */
     private static final ConcurrentHashMap<String, String[]> PATTERN_CACHE = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, String[]> EVENT_CACHE = new ConcurrentHashMap<>();
 
     private EventTypeMatcher() {
     }
 
-    /**
-     * Returns {@code true} if the concrete {@code eventType} matches the given {@code pattern}.
-     *
-     * @param pattern   subscription pattern (may contain {@code *} or {@code **})
-     * @param eventType concrete event type being ingested (no wildcards)
-     */
     public static boolean matches(String pattern, String eventType) {
         if (pattern == null || eventType == null) {
             return false;
@@ -54,11 +44,9 @@ public final class EventTypeMatcher {
         while (pi < pattern.length && ei < event.length) {
             String seg = pattern[pi];
             if ("**".equals(seg)) {
-                // ** at the end matches everything remaining
                 if (pi == pattern.length - 1) {
                     return true;
                 }
-                // try matching ** against 0..N remaining event segments
                 for (int skip = ei; skip <= event.length; skip++) {
                     if (matchParts(pattern, pi + 1, event, skip)) {
                         return true;

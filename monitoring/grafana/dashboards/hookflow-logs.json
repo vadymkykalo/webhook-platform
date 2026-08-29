@@ -16,7 +16,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "hookflow-loki" },
-      "description": "Leave both variables blank to see everything from api+worker. Fill in a correlation ID (see docs/runbooks/trace-webhook-logs.md for how to look one up from a delivery ID) to trace one request/delivery end to end across both services, or an organization ID to see everything for one tenant.",
+      "description": "Leave both variables blank to see everything from api+worker. Fill in a correlation ID to trace one request/delivery end to end across both services, or an organization ID to see everything for one tenant.",
       "gridPos": { "h": 14, "w": 24, "x": 0, "y": 1 },
       "id": 1,
       "options": {

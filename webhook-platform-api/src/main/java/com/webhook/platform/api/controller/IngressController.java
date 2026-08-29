@@ -54,44 +54,47 @@ public class IngressController {
             @PathVariable("token") String token,
             @RequestBody(required = false) String body,
             HttpServletRequest request) {
-        try {
-            IncomingEvent event = ingressService.receiveWebhook(token, body, request);
-            return ResponseEntity.status(HttpStatus.ACCEPTED)
-                    .body(IngressResponse.builder()
-                            .status("accepted")
-                            .requestId(event.getRequestId())
-                            .build());
-        } catch (SourceNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(IngressResponse.builder()
-                            .error("not_found")
-                            .message("Invalid ingress endpoint")
-                            .build());
-        } catch (SourceDisabledException e) {
-            return ResponseEntity.status(HttpStatus.GONE)
-                    .body(IngressResponse.builder()
-                            .error("disabled")
-                            .message("This ingress endpoint is disabled")
-                            .build());
-        } catch (PayloadTooLargeException e) {
-            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
-                    .body(IngressResponse.builder()
-                            .error("payload_too_large")
-                            .message(e.getMessage())
-                            .build());
-        } catch (RateLimitExceededException e) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .header("Retry-After", "1")
-                    .body(IngressResponse.builder()
-                            .error("rate_limit_exceeded")
-                            .message("Too many requests. Please retry later.")
-                            .build());
-        } catch (SignatureVerificationFailedException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(IngressResponse.builder()
-                            .error("signature_verification_failed")
-                            .message("Webhook signature verification failed")
-                            .build());
-        }
+        IncomingEvent event = ingressService.receiveWebhook(token, body, request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(IngressResponse.builder()
+                        .status("accepted")
+                        .requestId(event.getRequestId())
+                        .build());
+    }
+
+    @ExceptionHandler(SourceNotFoundException.class)
+    ResponseEntity<IngressResponse> sourceNotFound(SourceNotFoundException e) {
+        return problem(HttpStatus.NOT_FOUND, "not_found", "Invalid ingress endpoint");
+    }
+
+    @ExceptionHandler(SourceDisabledException.class)
+    ResponseEntity<IngressResponse> sourceDisabled(SourceDisabledException e) {
+        return problem(HttpStatus.GONE, "disabled", "This ingress endpoint is disabled");
+    }
+
+    @ExceptionHandler(PayloadTooLargeException.class)
+    ResponseEntity<IngressResponse> payloadTooLarge(PayloadTooLargeException e) {
+        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "payload_too_large", e.getMessage());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<IngressResponse> rateLimited(RateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", "1")
+                .body(IngressResponse.builder()
+                        .error("rate_limit_exceeded")
+                        .message("Too many requests. Please retry later.")
+                        .build());
+    }
+
+    @ExceptionHandler(SignatureVerificationFailedException.class)
+    ResponseEntity<IngressResponse> signatureFailed(SignatureVerificationFailedException e) {
+        return problem(HttpStatus.UNAUTHORIZED, "signature_verification_failed",
+                "Webhook signature verification failed");
+    }
+
+    private ResponseEntity<IngressResponse> problem(HttpStatus status, String error, String message) {
+        return ResponseEntity.status(status)
+                .body(IngressResponse.builder().error(error).message(message).build());
     }
 }

@@ -6,24 +6,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
-import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
 import com.webhook.platform.api.service.billing.EntitlementService;
 import com.webhook.platform.api.service.billing.QuotaCounterService;
-import com.webhook.platform.api.service.rules.CompiledRule;
 import com.webhook.platform.api.service.rules.RuleEngineService;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
-import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.util.PayloadCompressionUtil;
-import com.webhook.platform.common.dto.DeliveryMessage;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,9 +41,10 @@ public class EventIngestService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository;
     private final ObjectMapper objectMapper;
+    private final DeliveryDispatch deliveryDispatch;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
-    private final SchemaRegistryService schemaRegistryService;
+    private final SchemaValidationGate schemaValidationGate;
     private final ProjectRepository projectRepository;
     private final RuleEngineService ruleEngineService;
     private final QuotaCounterService quotaCounterService;
@@ -65,9 +60,10 @@ public class EventIngestService {
             OutboxMessageRepository outboxMessageRepository,
             WorkflowTriggerOutboxRepository workflowTriggerOutboxRepository,
             ObjectMapper objectMapper,
+            DeliveryDispatch deliveryDispatch,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
-            SchemaRegistryService schemaRegistryService,
+            SchemaValidationGate schemaValidationGate,
             ProjectRepository projectRepository,
             RuleEngineService ruleEngineService,
             QuotaCounterService quotaCounterService,
@@ -81,9 +77,10 @@ public class EventIngestService {
         this.outboxMessageRepository = outboxMessageRepository;
         this.workflowTriggerOutboxRepository = workflowTriggerOutboxRepository;
         this.objectMapper = objectMapper;
+        this.deliveryDispatch = deliveryDispatch;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
-        this.schemaRegistryService = schemaRegistryService;
+        this.schemaValidationGate = schemaValidationGate;
         this.projectRepository = projectRepository;
         this.ruleEngineService = ruleEngineService;
         this.quotaCounterService = quotaCounterService;
@@ -199,28 +196,7 @@ public class EventIngestService {
             }
         }
 
-        // Schema validation BEFORE saving event
-        if (project != null && Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
-            String payloadJson;
-            try {
-                payloadJson = objectMapper.writeValueAsString(request.getData());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize event payload", e);
-            }
-
-            schemaRegistryService.autoDiscover(projectId, request.getType(), payloadJson);
-
-            List<String> validationErrors = schemaRegistryService.validatePayload(
-                    projectId, request.getType(), payloadJson);
-            if (!validationErrors.isEmpty()) {
-                log.warn("Schema validation failed for event type '{}': {}",
-                        request.getType(), validationErrors);
-                if (project.getSchemaValidationPolicy() == SchemaValidationPolicy.BLOCK) {
-                    throw new IllegalArgumentException(
-                            "Schema validation failed: " + String.join("; ", validationErrors));
-                }
-            }
-        }
+        schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);
@@ -287,7 +263,7 @@ public class EventIngestService {
 
         List<OutboxMessage> outboxMessages = new ArrayList<>(savedDeliveries.size());
         for (Delivery delivery : savedDeliveries) {
-            outboxMessages.add(createOutboxMessage(delivery, projectId));
+            outboxMessages.add(deliveryDispatch.outboxFor(delivery, projectId, DeliveryDispatch.Reason.CREATED));
         }
         outboxMessageRepository.saveAll(outboxMessages);
 
@@ -389,39 +365,6 @@ public class EventIngestService {
         }
 
         return builder.build();
-    }
-
-    private OutboxMessage createOutboxMessage(Delivery delivery, UUID projectId) {
-        try {
-            DeliveryMessage deliveryMessage = DeliveryMessage.builder()
-                    .deliveryId(delivery.getId())
-                    .eventId(delivery.getEventId())
-                    .endpointId(delivery.getEndpointId())
-                    .subscriptionId(delivery.getSubscriptionId())
-                    .status(delivery.getStatus().name())
-                    .attemptCount(delivery.getAttemptCount())
-                    .sequenceNumber(delivery.getSequenceNumber())
-                    .orderingEnabled(delivery.getOrderingEnabled())
-                    .build();
-            
-            String payload = objectMapper.writeValueAsString(deliveryMessage);
-            String correlationId = org.slf4j.MDC.get("correlationId");
-            
-            return OutboxMessage.builder()
-                    .aggregateType("Delivery")
-                    .aggregateId(delivery.getId())
-                    .eventType("DeliveryCreated")
-                    .payload(payload)
-                    .kafkaTopic(KafkaTopics.DELIVERIES_DISPATCH)
-                    .kafkaKey(delivery.getEndpointId().toString())
-                    .projectId(projectId)
-                    .correlationId(correlationId)
-                    .status(OutboxStatus.PENDING)
-                    .retryCount(0)
-                    .build();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create outbox message", e);
-        }
     }
 
     private EventIngestResponse buildResponse(Event event, int deliveriesCreated) {

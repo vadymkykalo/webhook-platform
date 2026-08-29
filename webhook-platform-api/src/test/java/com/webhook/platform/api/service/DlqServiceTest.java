@@ -18,6 +18,7 @@ import com.webhook.platform.api.dto.DlqItemResponse;
 import com.webhook.platform.api.dto.DlqStatsResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,7 +57,8 @@ class DlqServiceTest {
     @BeforeEach
     void setUp() {
         dlqService = new DlqService(deliveryRepository, deliveryAttemptRepository, eventRepository,
-                projectRepository, outboxMessageRepository, new ObjectMapper());
+                projectRepository, new ObjectMapper(),
+                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()));
     }
 
     private Project projectOwnedBy(UUID orgId) {
@@ -68,7 +70,7 @@ class DlqServiceTest {
 
     /**
      * DlqService reads its organization from the ambient tenant scope now, not from a parameter
-     * (ADR-0006); a unit test has no request to establish one, so it enters the scope itself.
+     * rather than from a parameter; a unit test has no request to establish one, so it enters it.
      */
     @BeforeEach
     void enterTenantScope() {

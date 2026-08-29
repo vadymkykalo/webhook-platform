@@ -2,7 +2,6 @@ package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.IncomingForwardMessage;
-import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
 import com.webhook.platform.worker.domain.repository.IncomingForwardAttemptRepository;
 import io.micrometer.core.instrument.Counter;
@@ -89,7 +88,7 @@ public class StaleForwardEscalationService {
     /**
      * Unlocked deliberately: {@code findStaleForwardAttemptIds} claims with
      * {@code FOR UPDATE … SKIP LOCKED}, so replicas are handed disjoint rows by Postgres and
-     * cannot emit duplicate notifications for the same Forward. See ADR-0005, category 2.
+     * cannot emit duplicate notifications for the same Forward.
      */
     @Scheduled(fixedDelayString = "${forward.escalation.interval-ms:300000}")
     public void runEscalation() {
@@ -119,12 +118,8 @@ public class StaleForwardEscalationService {
                 }
 
                 List<IncomingForwardAttempt> stale = attemptRepository.findAllById(staleIds);
-                Instant now = Instant.now();
                 for (IncomingForwardAttempt attempt : stale) {
-                    attempt.setStatus(ForwardAttemptStatus.DLQ);
-                    attempt.setFinishedAt(now);
-                    attempt.setNextRetryAt(null);
-                    attempt.setErrorMessage("Hard-cap escalation: outstanding longer than "
+                    attempt.abandon("Hard-cap escalation: outstanding longer than "
                             + hardCapAge.toHours() + "h");
                 }
                 attemptRepository.saveAll(stale);

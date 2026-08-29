@@ -23,6 +23,7 @@ import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.service.DeliveryDispatch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,7 +68,8 @@ class DeliveryServiceTest {
     @BeforeEach
     void setUp() {
         deliveryService = new DeliveryService(deliveryRepository, deliveryAttemptRepository, endpointRepository,
-                outboxMessageRepository, eventRepository, projectRepository, new ObjectMapper());
+                eventRepository, projectRepository, new ObjectMapper(),
+                new DeliveryDispatch(outboxMessageRepository, new ObjectMapper()));
     }
 
     private Event eventInProject() {
@@ -88,7 +90,7 @@ class DeliveryServiceTest {
 
     /**
      * Every service under test now reads its organization from the ambient tenant scope instead
-     * of taking it as a parameter (ADR-0006). A unit test has no request to establish one, so it
+     * of taking it as a parameter. A unit test has no request to establish one, so it
      * enters the scope itself; without this the first call fails with TenantNotResolvedException.
      */
     @BeforeEach
