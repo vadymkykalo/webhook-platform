@@ -32,6 +32,7 @@ import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
+import { useDebounced } from '../hooks/useDebounced';
 
 const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
@@ -92,7 +93,6 @@ export default function DeliveriesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [endpointFilter, setEndpointFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dateRange, setDateRange] = useState('24h');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -103,10 +103,9 @@ export default function DeliveriesPage() {
   const [showBulkReplayDialog, setShowBulkReplayDialog] = useState(false);
   const { canReplayDeliveries } = usePermissions();
 
-  useEffect(() => {
-    const timer = setTimeout(() => { setDebouncedSearch(searchQuery); setPage(0); }, 400);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  const debouncedSearch = useDebounced(searchQuery);
+
+  useEffect(() => setPage(0), [debouncedSearch]);
 
   // Advances once a minute so the trailing date-range window keeps including
   // newly-created deliveries without recomputing (and re-fetching) every render.
