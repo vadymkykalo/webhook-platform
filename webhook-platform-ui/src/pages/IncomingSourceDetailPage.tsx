@@ -41,6 +41,7 @@ import { Switch } from '../components/ui/switch';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
+import { formatJson, isValidJson } from '../lib/json';
 
 /**
  * One incoming source and the destinations its events are forwarded to.
@@ -60,23 +61,6 @@ const RETRY_PRESETS: { key: string; delays: string; attempts: string }[] = [
   { key: 'patient', delays: '300,900,3600,21600,86400', attempts: '6' },
   { key: 'none', delays: '', attempts: '1' },
 ];
-
-function isValidJson(value: string): boolean {
-  try {
-    JSON.parse(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function formatJson(value: string): string {
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2);
-  } catch {
-    return value;
-  }
-}
 
 export default function IncomingSourceDetailPage() {
   const { t } = useTranslation();
