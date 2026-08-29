@@ -8,7 +8,6 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.OutboxMessage;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
-import com.webhook.platform.api.domain.enums.OutboxStatus;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.IncomingForwardAttemptRepository;
@@ -22,8 +21,6 @@ import com.webhook.platform.api.dto.IncomingForwardAttemptResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
-import com.webhook.platform.common.constants.KafkaTopics;
-import com.webhook.platform.common.dto.IncomingForwardMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,6 +49,7 @@ public class IncomingEventService {
     private final OutboxMessageRepository outboxMessageRepository;
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
+    private final ForwardDispatch forwardDispatch;
     private final TransactionTemplate txTemplate;
 
     public IncomingEventService(
@@ -62,6 +60,7 @@ public class IncomingEventService {
             OutboxMessageRepository outboxMessageRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
+            ForwardDispatch forwardDispatch,
             PlatformTransactionManager txManager) {
         this.eventRepository = eventRepository;
         this.sourceRepository = sourceRepository;
@@ -70,6 +69,7 @@ public class IncomingEventService {
         this.outboxMessageRepository = outboxMessageRepository;
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
+        this.forwardDispatch = forwardDispatch;
         this.txTemplate = new TransactionTemplate(txManager);
     }
 
@@ -169,27 +169,9 @@ public class IncomingEventService {
             forwardAttemptRepository.save(attempt);
 
             try {
-                IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
-                        .incomingEventId(eventId)
-                        .destinationId(destination.getId())
-                        .incomingSourceId(event.getIncomingSourceId())
-                        .attemptCount(nextAttempt)
-                        .replay(true)
-                        .build();
-
-                String payload = objectMapper.writeValueAsString(forwardMessage);
-                OutboxMessage outboxMessage = OutboxMessage.builder()
-                        .aggregateType("IncomingForward")
-                        .aggregateId(eventId)
-                        .eventType("IncomingForwardReplay")
-                        .payload(payload)
-                        .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
-                        .kafkaKey(destination.getId().toString())
-                        .projectId(projectId)
-                        .status(OutboxStatus.PENDING)
-                        .retryCount(0)
-                        .build();
-                outboxMessageRepository.save(outboxMessage);
+                outboxMessageRepository.save(forwardDispatch.outboxFor(eventId,
+                        event.getIncomingSourceId(), destination.getId(), projectId,
+                        nextAttempt, ForwardDispatch.Reason.REPLAY));
                 replayed++;
             } catch (Exception e) {
                 log.error("Failed to create replay outbox message: eventId={}, destId={}",
@@ -284,25 +266,9 @@ public class IncomingEventService {
                             .build());
 
                     try {
-                        IncomingForwardMessage forwardMessage = IncomingForwardMessage.builder()
-                                .incomingEventId(event.getId())
-                                .destinationId(destination.getId())
-                                .incomingSourceId(sourceId)
-                                .attemptCount(nextAttempt)
-                                .replay(true)
-                                .build();
-
-                        outboxToSave.add(OutboxMessage.builder()
-                                .aggregateType("IncomingForward")
-                                .aggregateId(event.getId())
-                                .eventType("IncomingForwardBulkReplay")
-                                .payload(objectMapper.writeValueAsString(forwardMessage))
-                                .kafkaTopic(KafkaTopics.INCOMING_FORWARD_DISPATCH)
-                                .kafkaKey(destination.getId().toString())
-                                .projectId(projectId)
-                                .status(OutboxStatus.PENDING)
-                                .retryCount(0)
-                                .build());
+                        outboxToSave.add(forwardDispatch.outboxFor(event.getId(), sourceId,
+                                destination.getId(), projectId, nextAttempt,
+                                ForwardDispatch.Reason.BULK_REPLAY));
                     } catch (Exception e) {
                         log.error("Failed to create bulk replay outbox: eventId={}, destId={}",
                                 event.getId(), destination.getId(), e);

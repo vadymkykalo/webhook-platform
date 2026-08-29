@@ -19,6 +19,7 @@ import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.service.ForwardDispatch;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.enums.IncomingSourceStatus;
@@ -85,7 +86,7 @@ class IncomingEventServiceTest {
         service = new IncomingEventService(
                 eventRepository, sourceRepository, forwardAttemptRepository,
                 destinationRepository, outboxMessageRepository, projectRepository,
-                objectMapper, txManager
+                objectMapper, new ForwardDispatch(objectMapper), txManager
         );
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         source = IncomingSource.builder()
