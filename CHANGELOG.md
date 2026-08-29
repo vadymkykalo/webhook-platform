@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1] - 2026-08-29
+
+The other half of the API-reference fix that shipped in 2.9.0.
+
+### Fixed
+
+- **`pageable` was published as a required query object on ten list endpoints.**
+  The same defect as the `auth` parameter 2.9.0 removed, from the same cause:
+  springdoc read Spring's `Pageable` off the controller signature and published
+  the object rather than the three query parameters it actually is. A reader had
+  no way to learn that paging is `?page=0&size=20&sort=createdAt,desc`, and the
+  document told them a parameter was required that the server never reads.
+  Every one of the ten now lists `page`, `size` and `sort`, none of them required.
+
 ## [2.9.0] - 2026-08-29
 
 Three defects that were already in production, five listings that queried once per
@@ -752,7 +766,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...v2.7.0
