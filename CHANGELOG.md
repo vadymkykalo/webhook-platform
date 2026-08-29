@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-08-28
+
+Release-pipeline repairs and dependency updates. No product change.
+
+### Fixed
+
+- **The Node SDK publish now works from the release itself.** npm's Trusted
+  Publisher validates the OIDC token against the workflow that *entered* the
+  run, not the file containing the job — so called as a reusable workflow from
+  `release-cli.yml`, a publisher trusting `publish-sdks.yml` matched nothing and
+  every release got a bare `404 Not Found - PUT`. Both 2.6.1 and 2.7.0 had to be
+  published by hand. `publish-sdks.yml` now owns its tag trigger, which makes the
+  entry workflow the one npm trusts, and `workflow_call` is gone so it cannot be
+  wired back the old way.
+- **Dependabot no longer offers netty across its minor line.** The root pom
+  overrides what Spring Boot manages purely to take CVE fixes within 4.1, and a
+  grouped bump to 4.2.17 stopped the build compiling outright. The config now
+  records what the comment above the property already said.
+
+### Changed
+
+- GitHub Actions across all workflows, `@types/node`, `@testing-library/jest-dom`
+  and the PHP SDK's phpstan constraint updated.
+
 ## [2.7.0] - 2026-08-28
 
 Hookflow now speaks [Standard Webhooks](https://www.standardwebhooks.com) as well as
@@ -659,7 +683,8 @@ releases actually happened, not strict numeric order.*
 - Cache: Redis 7
 - Message Broker: Apache Kafka
 
-[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/vadymkykalo/webhook-platform/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.1...v2.7.0
 [2.6.1]: https://github.com/vadymkykalo/webhook-platform/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/vadymkykalo/webhook-platform/compare/v2.5.0...v2.6.0

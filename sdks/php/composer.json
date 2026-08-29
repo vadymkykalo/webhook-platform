@@ -3,7 +3,7 @@
   "description": "Official PHP SDK for Hookflow — reliable webhook infrastructure",
   "type": "library",
   "license": "MIT",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "keywords": [
     "webhook",
     "webhooks",
@@ -24,7 +24,7 @@
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",
-    "phpstan/phpstan": "^1.10"
+    "phpstan/phpstan": "^1.10 || ^2.0"
   },
   "autoload": {
     "psr-4": {
