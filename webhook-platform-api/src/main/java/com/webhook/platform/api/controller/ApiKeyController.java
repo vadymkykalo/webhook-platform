@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -57,7 +58,7 @@ public class ApiKeyController {
     @GetMapping
     public ResponseEntity<Page<ApiKeyResponse>> listApiKeys(
             @PathVariable("projectId") UUID projectId,
-            @PageableDefault(size = 20) Pageable pageable,
+            @PageableDefault(size = 20) @ParameterObject Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, pageable);

@@ -2509,11 +2509,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -2567,11 +2587,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -2899,11 +2939,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -3201,11 +3261,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -4347,11 +4427,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -4532,11 +4632,33 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          default:
+          - "receivedAt,ASC"
+          items:
+            type: string
       responses:
         "200":
           description: Events retrieved
@@ -4591,11 +4713,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: Attempts retrieved
@@ -4658,11 +4800,31 @@ paths:
         required: false
         schema:
           type: string
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -5029,11 +5191,31 @@ paths:
         schema:
           type: string
           format: uuid
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -5148,11 +5330,31 @@ paths:
         schema:
           type: string
           format: date-time
-      - name: pageable
+      - name: page
         in: query
-        required: true
+        description: Zero-based page index (0..N)
+        required: false
         schema:
-          $ref: "#/components/schemas/Pageable"
+          type: integer
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        description: The size of the page to be returned
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - name: sort
+        in: query
+        description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
       responses:
         "200":
           description: OK
@@ -7884,21 +8086,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DailyUsage"
-    Pageable:
-      type: object
-      properties:
-        page:
-          type: integer
-          format: int32
-          minimum: 0
-        size:
-          type: integer
-          format: int32
-          minimum: 1
-        sort:
-          type: array
-          items:
-            type: string
     CapturedRequestResponse:
       type: object
       properties:

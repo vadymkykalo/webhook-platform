@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -56,7 +57,7 @@ public class DeliveryController {
     @GetMapping
     public ResponseEntity<Page<DeliveryResponse>> listDeliveries(
             @RequestParam(value = "eventId", required = false) UUID eventId,
-            Pageable pageable,
+            @ParameterObject Pageable pageable,
             AuthContext auth) {
         Page<DeliveryResponse> response = deliveryService.listDeliveries(eventId, auth, pageable);
         return ResponseEntity.ok(response);
@@ -72,7 +73,7 @@ public class DeliveryController {
             @RequestParam(value = "eventType", required = false) String eventType,
             @RequestParam(value = "fromDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant fromDate,
             @RequestParam(value = "toDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant toDate,
-            Pageable pageable,
+            @ParameterObject Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         log.info("Deliveries request - projectId: {}, status: {}, endpointId: {}, eventId: {}, eventType: {}, fromDate: {}, toDate: {}", 

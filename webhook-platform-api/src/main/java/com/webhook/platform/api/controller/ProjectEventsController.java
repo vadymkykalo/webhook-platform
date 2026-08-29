@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -48,7 +49,7 @@ public class ProjectEventsController {
     public ResponseEntity<Page<EventResponse>> listEvents(
             @PathVariable("projectId") UUID projectId,
             @RequestParam(value = "eventType", required = false) String eventType,
-            Pageable pageable,
+            @ParameterObject Pageable pageable,
             AuthContext auth) {
         auth.validateProjectAccess(projectId);
         Page<EventResponse> response = eventService.listEvents(projectId, eventType, pageable);
