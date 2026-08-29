@@ -2,7 +2,6 @@ package com.webhook.platform.worker.service;
 
 import com.webhook.platform.common.constants.KafkaTopics;
 import com.webhook.platform.common.dto.DeliveryMessage;
-import com.webhook.platform.common.retry.RetryLadderDefaults;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -22,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -44,8 +41,7 @@ public class RetrySchedulerService {
     private final long rescheduleDelaySeconds;
     private final long defaultPollIntervalMs;
     private final RetryGovernor governor;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
-            r -> { Thread t = new Thread(r, "retry-scheduler"); t.setDaemon(true); return t; });
+    private final AdaptivePollLoop pollLoop;
 
     public RetrySchedulerService(
             DeliveryRepository deliveryRepository,
@@ -59,9 +55,7 @@ public class RetrySchedulerService {
             @Value("${retry.scheduler.send-timeout-seconds:30}") long sendTimeoutSeconds,
             @Value("${retry.scheduler.reschedule-delay-seconds:60}") long rescheduleDelaySeconds,
             @Value("${retry.scheduler.high-watermark:5000}") long highWatermark,
-            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs,
-            @Value("${delivery.escalation.hard-cap-hours:96}") long escalationHardCapHours,
-            @Value("${forward.escalation.hard-cap-hours:24}") long forwardEscalationHardCapHours) {
+            @Value("${retry.scheduler.poll-interval-ms:10000}") long defaultPollIntervalMs) {
         this.deliveryRepository = deliveryRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.transactionTemplate = transactionTemplate;
@@ -74,49 +68,18 @@ public class RetrySchedulerService {
         this.governor = new RetryGovernor(
                 "outgoing", batchSize, /* minBatch */ 5, /* increment */ 10,
                 highWatermark, /* maxCooldownPolls */ 6, meterRegistry);
-
-        // Fail fast rather than silently DLQ the last retry tiers. Validated against the
-        // ladders actually handed out, and each direction against its OWN cap: the two
-        // escalation services make different promises, so crossing them passes trivially.
-        RetryLadderDefaults.outgoing().requireFitsWithin(
-                escalationHardCapHours * 3600L, "outgoing default", "delivery.escalation.hard-cap-hours");
-        RetryLadderDefaults.incoming().requireFitsWithin(
-                forwardEscalationHardCapHours * 3600L, "incoming default", "forward.escalation.hard-cap-hours");
+        this.pollLoop = new AdaptivePollLoop("retry-scheduler", governor,
+                defaultPollIntervalMs, this::countPendingRetries, this::scheduleRetries);
     }
 
     @PostConstruct
     void startScheduler() {
-        // Jitter so pods do not poll simultaneously.
-        long startupJitter = ThreadLocalRandom.current().nextLong(0, 5000);
-        log.info("Retry scheduler starting with {}ms jitter, default poll interval {}ms",
-                startupJitter, defaultPollIntervalMs);
-        scheduler.schedule(this::pollAndReschedule, startupJitter, TimeUnit.MILLISECONDS);
+        pollLoop.start();
     }
 
     @PreDestroy
     void stopScheduler() {
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void pollAndReschedule() {
-        long nextDelay = defaultPollIntervalMs;
-        try {
-            long pendingCount = countPendingRetries();
-            scheduleRetries(pendingCount);
-            nextDelay = governor.getRecommendedPollIntervalMs(pendingCount, defaultPollIntervalMs);
-        } catch (Exception e) {
-            log.error("Retry scheduler poll failed: {}", e.getMessage(), e);
-        } finally {
-            scheduler.schedule(this::pollAndReschedule, nextDelay, TimeUnit.MILLISECONDS);
-        }
+        pollLoop.stop();
     }
 
     void scheduleRetries(long pendingCount) {

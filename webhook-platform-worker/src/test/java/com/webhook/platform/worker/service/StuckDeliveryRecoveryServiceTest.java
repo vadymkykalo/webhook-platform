@@ -46,7 +46,7 @@ class StuckDeliveryRecoveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StuckDeliveryRecoveryService(deliveryRepository, redissonClient);
+        service = new StuckDeliveryRecoveryService(deliveryRepository, new ExclusiveSweep(redissonClient));
         ReflectionTestUtils.setField(service, "thresholdMinutes", THRESHOLD_MINUTES);
         ReflectionTestUtils.setField(service, "strandedPendingThresholdMinutes", STRANDED_THRESHOLD_MINUTES);
         when(redissonClient.getLock("lock:stuck-delivery-recovery")).thenReturn(lock);

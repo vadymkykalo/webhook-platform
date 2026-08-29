@@ -70,19 +70,19 @@ public class AttemptRunner {
      * the obligation was already claimed by somebody else, or was deferred.
      */
     public <C> void run(AttemptStore<C> store, AttemptMetrics metrics) {
-        ClaimResult<C> claimed = store.claim();
+        ClaimResult<C> result = store.claim();
 
-        if (claimed instanceof ClaimResult.NotClaimed<C> notClaimed) {
+        if (result instanceof ClaimResult.NotClaimed<C> notClaimed) {
             log.debug("Nothing to attempt: {}", notClaimed.reason());
-            return;
-        }
-        if (claimed instanceof ClaimResult.Deferred<C> deferred) {
+        } else if (result instanceof ClaimResult.Deferred<C> deferred) {
             log.debug("Deferred until {}: {}", deferred.until(), deferred.reason());
-            return;
+        } else if (result instanceof ClaimResult.Claimed<C> held) {
+            attempt(store, metrics, held.claim(), held.context());
+        } else {
+            // ClaimResult is sealed, so this is unreachable until a fourth outcome is added —
+            // which used to compile into an unchecked cast and fail at runtime instead.
+            throw new IllegalStateException("Unhandled claim result: " + result);
         }
-
-        ClaimResult.Claimed<C> held = (ClaimResult.Claimed<C>) claimed;
-        attempt(store, metrics, held.claim(), held.context());
     }
 
     private <C> void attempt(AttemptStore<C> store, AttemptMetrics metrics, C claim, AttemptContext ctx) {
