@@ -297,6 +297,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 // means "currently claimed".
                 attempt.setClaimToken(null);
                 attempt.setNextRetryAt(deferred.until());
+                // A deferral can still have something to record — an open breaker is refused
+                // before the network, and dropping that leaves the operator an unexplained gap.
+                applyRecord(attempt);
                 attemptRepository.save(attempt);
                 return true;
             }
@@ -316,9 +319,11 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
             attempt.setStatus(statusFor(outcome));
             attempt.setFinishedAt(Instant.now());
-            attempt.setErrorMessage(reasonFor(outcome));
             attempt.setNextRetryAt(null);
             applyRecord(attempt);
+            // The outcome decides the message here, so it comes after the record rather than
+            // before it. Only a deferral, which has no outcome reason, keeps the record's own.
+            attempt.setErrorMessage(reasonFor(outcome));
             attemptRepository.save(attempt);
 
             // Only the Attempt that actually finalised may queue a successor.
@@ -411,6 +416,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         attempt.setResponseCode(pendingRecord.statusCode());
         attempt.setResponseHeadersJson(pendingRecord.responseHeaders());
         attempt.setResponseBodySnippet(truncate(pendingRecord.responseBody(), 10240));
+        attempt.setErrorMessage(pendingRecord.errorMessage());
     }
 
     private IncomingForwardAttempt findAttempt(Claim claim) {
