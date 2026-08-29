@@ -29,6 +29,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -135,8 +139,17 @@ public class IncomingDestinationService {
 
     public Page<IncomingDestinationResponse> listDestinations(UUID sourceId, Pageable pageable) {
         validateSourceOwnership(sourceId);
-        return destinationRepository.findByIncomingSourceId(sourceId, pageable)
-                .map(this::mapToResponse);
+        Page<IncomingDestination> page = destinationRepository.findByIncomingSourceId(sourceId, pageable);
+
+        Set<UUID> transformationIds = page.getContent().stream()
+                .map(IncomingDestination::getTransformationId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, String> transformationNames = transformationRepository.findAllById(transformationIds).stream()
+                .collect(Collectors.toMap(Transformation::getId, Transformation::getName));
+
+        return page.map(destination ->
+                mapToResponse(destination, transformationNames.get(destination.getTransformationId())));
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "IncomingDestination")
@@ -202,12 +215,14 @@ public class IncomingDestinationService {
     }
 
     private IncomingDestinationResponse mapToResponse(IncomingDestination destination) {
-        String transformationName = null;
-        if (destination.getTransformationId() != null) {
-            transformationName = transformationRepository.findById(destination.getTransformationId())
-                    .map(Transformation::getName)
-                    .orElse(null);
-        }
+        String transformationName = destination.getTransformationId() == null ? null
+                : transformationRepository.findById(destination.getTransformationId())
+                        .map(Transformation::getName)
+                        .orElse(null);
+        return mapToResponse(destination, transformationName);
+    }
+
+    private IncomingDestinationResponse mapToResponse(IncomingDestination destination, String transformationName) {
         return IncomingDestinationResponse.builder()
                 .id(destination.getId())
                 .incomingSourceId(destination.getIncomingSourceId())

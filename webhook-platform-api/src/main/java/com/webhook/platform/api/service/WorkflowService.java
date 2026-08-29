@@ -17,6 +17,9 @@ import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.service.workflow.WorkflowEngine;
 import com.webhook.platform.api.service.workflow.WorkflowTriggerService;
 import java.util.List;
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -80,9 +83,40 @@ public class WorkflowService {
 
     public List<WorkflowResponse> list(UUID projectId) {
         validateProjectOwnership(projectId);
-        return workflowRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
-                .map(this::mapToResponse)
+        List<Workflow> workflows = workflowRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
+        Map<UUID, ExecutionCounts> counts = executionCountsFor(
+                workflows.stream().map(Workflow::getId).collect(Collectors.toSet()));
+
+        return workflows.stream()
+                .map(w -> mapToResponse(w, counts.getOrDefault(w.getId(), ExecutionCounts.NONE)))
                 .collect(Collectors.toList());
+    }
+
+    /** What a workflow's execution history amounts to: the three states a listing shows. */
+    private record ExecutionCounts(long succeeded, long failed, long running) {
+
+        static final ExecutionCounts NONE = new ExecutionCounts(0, 0, 0);
+
+        long total() {
+            return succeeded + failed + running;
+        }
+    }
+
+    private Map<UUID, ExecutionCounts> executionCountsFor(Set<UUID> workflowIds) {
+        Map<UUID, ExecutionCounts> counts = new HashMap<>();
+        for (Object[] row : executionRepository.countByWorkflowIdsGroupedByStatus(workflowIds)) {
+            UUID workflowId = (UUID) row[0];
+            ExecutionStatus status = (ExecutionStatus) row[1];
+            long count = (Long) row[2];
+            ExecutionCounts current = counts.getOrDefault(workflowId, ExecutionCounts.NONE);
+            counts.put(workflowId, switch (status) {
+                case COMPLETED -> new ExecutionCounts(count, current.failed(), current.running());
+                case FAILED -> new ExecutionCounts(current.succeeded(), count, current.running());
+                case RUNNING -> new ExecutionCounts(current.succeeded(), current.failed(), count);
+                default -> current;
+            });
+        }
+        return counts;
     }
 
     @Transactional
@@ -206,12 +240,13 @@ public class WorkflowService {
     // ── Mapping ─────────────────────────────────────────────────────────
 
     private WorkflowResponse mapToResponse(Workflow w) {
-        long total = executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.COMPLETED)
-                + executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.FAILED)
-                + executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.RUNNING);
-        long success = executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.COMPLETED);
-        long failed = executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.FAILED);
+        return mapToResponse(w, new ExecutionCounts(
+                executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.COMPLETED),
+                executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.FAILED),
+                executionRepository.countByWorkflowIdAndStatus(w.getId(), ExecutionStatus.RUNNING)));
+    }
 
+    private WorkflowResponse mapToResponse(Workflow w, ExecutionCounts counts) {
         return WorkflowResponse.builder()
                 .id(w.getId())
                 .projectId(w.getProjectId())
@@ -224,9 +259,9 @@ public class WorkflowService {
                 .version(w.getVersion())
                 .createdAt(w.getCreatedAt())
                 .updatedAt(w.getUpdatedAt())
-                .totalExecutions(total)
-                .successfulExecutions(success)
-                .failedExecutions(failed)
+                .totalExecutions(counts.total())
+                .successfulExecutions(counts.succeeded())
+                .failedExecutions(counts.failed())
                 .build();
     }
 
