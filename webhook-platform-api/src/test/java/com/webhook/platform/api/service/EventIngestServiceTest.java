@@ -50,7 +50,7 @@ class EventIngestServiceTest {
     @Mock
     private SequenceGeneratorService sequenceGeneratorService;
     @Mock
-    private SchemaRegistryService schemaRegistryService;
+    private PayloadSchemaValidator payloadSchemaValidator;
     @Mock
     private ProjectRepository projectRepository;
     @Mock
@@ -84,7 +84,7 @@ class EventIngestServiceTest {
                 deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
                 objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
-                sequenceGeneratorService, new SchemaValidationGate(schemaRegistryService, objectMapper), projectRepository,
+                sequenceGeneratorService, new SchemaValidationGate(payloadSchemaValidator, objectMapper), projectRepository,
                 ruleEngineService, quotaCounterService, entitlementService,
                 transactionManager, 262144L, 1024
         );

@@ -22,7 +22,7 @@ import java.util.UUID;
 @Slf4j
 public class SchemaValidationGate {
 
-    private final SchemaRegistryService schemaRegistryService;
+    private final PayloadSchemaValidator payloadSchemaValidator;
     private final ObjectMapper objectMapper;
 
     public void check(Project project, UUID projectId, String eventType, Object payload) {
@@ -37,9 +37,9 @@ public class SchemaValidationGate {
             throw new IllegalArgumentException("Failed to serialize event payload", e);
         }
 
-        schemaRegistryService.autoDiscover(projectId, eventType, payloadJson);
+        payloadSchemaValidator.autoDiscover(projectId, eventType, payloadJson);
 
-        List<String> errors = schemaRegistryService.validatePayload(projectId, eventType, payloadJson);
+        List<String> errors = payloadSchemaValidator.validate(projectId, eventType, payloadJson);
         if (errors.isEmpty()) {
             return;
         }

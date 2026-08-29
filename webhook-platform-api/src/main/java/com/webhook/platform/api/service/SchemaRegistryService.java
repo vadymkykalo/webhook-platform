@@ -9,7 +9,6 @@ import com.webhook.platform.api.domain.enums.CompatibilityMode;
 import com.webhook.platform.api.domain.enums.SchemaStatus;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.*;
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.common.util.JsonSchemaUtils;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -255,81 +254,6 @@ public class SchemaRegistryService {
         return changeRepository.findByProjectIdWithDetails(projectId).stream()
                 .map(this::mapChangeResponse)
                 .collect(Collectors.toList());
-    }
-
-    // ── Auto-discovery ──
-
-    /**
-     * Auto-discovers event type and infers a DRAFT schema from a payload.
-     * Called during event ingestion when schema_validation_enabled = true.
-     * If the event type doesn't exist yet, creates it. If schema doesn't exist, infers one.
-     */
-    @Transactional
-    public void autoDiscover(UUID projectId, String eventTypeName, String payloadJson) {
-        try {
-            EventTypeCatalog eventType = catalogRepository
-                    .findByProjectIdAndName(projectId, eventTypeName)
-                    .orElseGet(() -> {
-                        EventTypeCatalog newType = EventTypeCatalog.builder()
-                                .projectId(projectId)
-                                .name(eventTypeName)
-                                .description("Auto-discovered from ingested event")
-                                .build();
-                        return catalogRepository.saveAndFlush(newType);
-                    });
-
-            // Only auto-infer if no versions exist
-            int maxVersion = versionRepository.findMaxVersionByEventTypeId(eventType.getId());
-            if (maxVersion == 0) {
-                String inferredSchema = objectMapper.writeValueAsString(JsonSchemaUtils.inferSchema(payloadJson));
-                String fp = JsonSchemaUtils.fingerprint(inferredSchema);
-
-                EventSchemaVersion version = EventSchemaVersion.builder()
-                        .eventTypeId(eventType.getId())
-                        .version(1)
-                        .schemaJson(inferredSchema)
-                        .fingerprint(fp)
-                        .status(SchemaStatus.DRAFT)
-                        .compatibilityMode(CompatibilityMode.NONE)
-                        .description("Auto-inferred from first event payload")
-                        .build();
-                versionRepository.saveAndFlush(version);
-
-                log.info("Auto-discovered event type '{}' with inferred DRAFT schema", eventTypeName);
-                meterRegistry.counter("schema_auto_discovered_total",
-                        "event_type", eventTypeName).increment();
-            }
-        } catch (Exception e) {
-            // Auto-discovery should never block event ingestion
-            log.warn("Schema auto-discovery failed for event type '{}': {}", eventTypeName, e.getMessage());
-        }
-    }
-
-    // ── Payload Validation ──
-
-    /**
-     * Validates a payload against the active schema for the given event type.
-     * Returns empty list if no active schema exists (validation passes).
-     */
-    public List<String> validatePayload(UUID projectId, String eventTypeName, String payloadJson) {
-        Optional<EventTypeCatalog> eventTypeOpt = catalogRepository.findByProjectIdAndName(projectId, eventTypeName);
-        if (eventTypeOpt.isEmpty()) {
-            return List.of();
-        }
-
-        Optional<EventSchemaVersion> activeSchema = versionRepository.findActiveByEventTypeId(eventTypeOpt.get().getId());
-        if (activeSchema.isEmpty()) {
-            return List.of();
-        }
-
-        List<String> errors = JsonSchemaUtils.validate(payloadJson, activeSchema.get().getSchemaJson());
-
-        if (!errors.isEmpty()) {
-            meterRegistry.counter("schema_validation_failures_total",
-                    "event_type", eventTypeName).increment();
-        }
-
-        return errors;
     }
 
     // ── Private helpers ──
