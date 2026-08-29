@@ -45,14 +45,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     /**
      * Ownership of one forward attempt row.
      *
-     * <p>{@code fence} is the {@code started_at} value this Attempt CASes on. It is never
-     * read by {@link AttemptRunner} — the Runner is generic over this type and has no way to
-     * reach inside it.
-     */
-    /**
-     * @param fence the claim_token this attempt was claimed under (V060). Null only for a
-     *              retry message published before the token existed, where {@code finalise}
-     *              falls back to the status guard it used to rely on alone.
+     * @param fence the claim_token this attempt was claimed under, null only for a retry
+     *              message published before the token existed
      */
     public record Claim(UUID eventId, UUID destinationId, int attemptNumber, UUID fence) {
     }
@@ -297,8 +291,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 // means "currently claimed".
                 attempt.setClaimToken(null);
                 attempt.setNextRetryAt(deferred.until());
-                // A deferral can still have something to record — an open breaker is refused
-                // before the network, and dropping that leaves the operator an unexplained gap.
                 applyRecord(attempt);
                 attemptRepository.save(attempt);
                 return true;
@@ -321,8 +313,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             attempt.setFinishedAt(Instant.now());
             attempt.setNextRetryAt(null);
             applyRecord(attempt);
-            // The outcome decides the message here, so it comes after the record rather than
-            // before it. Only a deferral, which has no outcome reason, keeps the record's own.
             attempt.setErrorMessage(reasonFor(outcome));
             attemptRepository.save(attempt);
 
@@ -361,15 +351,12 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
      *       while the successor queued at t3 sends a third copy
      * </pre>
      *
-     * <p>The outgoing side has fenced on a token since V055 and its {@code finalise} has
-     * checked it all along; this is the incoming half of the same contract (see
-     * {@link AttemptStore#finalise}).</p>
-     *
-     * <p>A null fence means the retry message predates the token (rolling deploy), so there is
-     * nothing to compare and the status guard stands on its own, as it used to.</p>
+     * <p>An unfenced Claim — a retry message published before the token existed — matches only
+     * a row that carries no token either. A row that carries one belongs to whoever stamped it.</p>
      */
     private boolean stillHoldsClaim(Claim claim, IncomingForwardAttempt attempt) {
-        return claim.fence() == null || claim.fence().equals(attempt.getClaimToken());
+        UUID current = attempt.getClaimToken();
+        return current == null ? claim.fence() == null : current.equals(claim.fence());
     }
 
     /**
