@@ -14,31 +14,21 @@ import java.util.List;
  * Signatures in the shape the <a href="https://github.com/standard-webhooks/standard-webhooks">
  * Standard Webhooks</a> convention describes.
  *
- * <p>This exists alongside {@link WebhookSignatureUtils}, which produces the Stripe-shaped
- * {@code X-Signature: t=…,v1=…} header this platform has always sent, and does not replace
- * it. The point is interoperability: a receiver following the convention can verify with an
- * off-the-shelf library rather than by reading our documentation, and the convention has been
- * adopted widely enough — OpenAI, Anthropic, Twilio, PagerDuty, Supabase — that "which
- * library verifies this?" is a question worth having a good answer to.</p>
+ * <p>Alongside {@link WebhookSignatureUtils}, not replacing it: a receiver following the
+ * convention can verify with an off-the-shelf library instead of by reading our documentation.
  *
- * <h2>The three headers</h2>
  * <pre>
  *   webhook-id:        the delivery id — stable across retries, so a receiver can dedupe on it
  *   webhook-timestamp: unix seconds
  *   webhook-signature: v1,&lt;base64&gt; [v1,&lt;base64&gt; …]
  * </pre>
- * signed over {@code {id}.{timestamp}.{body}} with HMAC-SHA256. Note what differs from our
- * own scheme beyond the header names: the id participates in the signed content, the digest
- * is base64 rather than hex, and multiple signatures are separated by spaces rather than
- * commas.
+ * signed over {@code {id}.{timestamp}.{body}} with HMAC-SHA256. Beyond the header names: the id
+ * is part of the signed content, the digest is base64 rather than hex, and several signatures are
+ * space-separated.
  *
- * <h2>What the key is</h2>
- * <p>The secret's raw UTF-8 bytes. The reference libraries take a base64 secret, conventionally
- * written {@code whsec_<base64>}, and decode it to the key bytes — so a receiver using one of
- * them passes {@link #asSharedSecret(String)} of our secret and gets back exactly these bytes.
- * Signing with the raw bytes rather than trying to base64-decode whatever is stored keeps this
- * working for a customer-supplied secret, which is arbitrary text and need not be base64 at
- * all.</p>
+ * <p>The key is the secret's raw UTF-8 bytes. Signing those, rather than base64-decoding whatever
+ * is stored, keeps this working for a customer-supplied secret, which need not be base64 at all;
+ * {@link #asSharedSecret(String)} is what a receiver's library wants instead.
  */
 public final class StandardWebhookSignature {
 
@@ -58,31 +48,22 @@ public final class StandardWebhookSignature {
      * The secret in the form the reference libraries expect: {@code whsec_} followed by the
      * standard-base64 of the same bytes this class signs with.
      *
-     * <p>Ours are URL-safe base64 without padding, which is a different alphabet — handing one
-     * straight to a library that base64-decodes it would either fail or, worse, decode to
-     * different bytes. This is the value to show a receiver, not the stored secret.</p>
+     * <p>Ours are URL-safe base64 without padding, a different alphabet: handing one straight to
+     * a library that decodes it would fail, or worse decode to different bytes. This is the value
+     * to show a receiver, not the stored secret.
      */
     public static String asSharedSecret(String secret) {
         return SECRET_PREFIX + Base64.getEncoder()
                 .encodeToString(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    /**
-     * @param messageId the delivery id, which stays the same across every attempt of one
-     *                  delivery — that is what makes it usable for deduplication
-     */
     public static String sign(String secret, String messageId, long timestampSeconds, String body) {
         return sign(secret.getBytes(StandardCharsets.UTF_8), messageId, timestampSeconds, body);
     }
 
     /**
-     * The signing primitive, over key bytes rather than text.
-     *
-     * <p>A key is bytes, and the String overload above is a convenience that happens to fit
-     * how this platform stores its secrets. Anything derived from base64 — which is what the
-     * reference libraries hand their HMAC — is not text at all: round-tripping such bytes
-     * through a String mangles every one above 0x7F, and the resulting signature is wrong in
-     * a way no round-trip test against ourselves would ever notice.</p>
+     * The signing primitive, over key bytes rather than text: round-tripping base64-derived bytes
+     * through a String mangles everything above 0x7F, wrongly and undetectably against ourselves.
      */
     public static String sign(byte[] key, String messageId, long timestampSeconds, String body) {
         try {
@@ -100,12 +81,10 @@ public final class StandardWebhookSignature {
      * Builds the {@code webhook-signature} value, carrying a second signature for
      * {@code previousSecret} during a rotation grace window.
      *
-     * <p>The convention allows several space-separated signatures precisely so that rotation
-     * does not require the receiver to change anything: it accepts if any one matches. Our own
-     * header solves the same problem with two {@code v1=} values, so rotation behaves
-     * identically under both schemes.</p>
+     * <p>The convention allows several space-separated signatures so a rotation needs nothing
+     * from the receiver: it accepts if any one matches.
      *
-     * @param previousSecret the secret being retired, or {@code null} outside a grace window
+     * @param previousSecret the secret being retired, or null outside a grace window
      */
     public static String buildSignatureHeader(String secret, String previousSecret,
             String messageId, long timestampSeconds, String body) {
@@ -126,9 +105,8 @@ public final class StandardWebhookSignature {
     /**
      * Verifies a received webhook, rejecting one whose timestamp is outside the tolerance.
      *
-     * <p>The timestamp check is not decoration: without it a captured request stays replayable
-     * for as long as the secret lives, because the signature over a fixed body never stops
-     * being valid.</p>
+     * <p>Without the timestamp check a captured request stays replayable for as long as the
+     * secret lives.
      */
     public static boolean verify(String secret, String messageId, String timestampHeader,
             String signatureHeader, String body, long toleranceSeconds) {
@@ -150,8 +128,7 @@ public final class StandardWebhookSignature {
 
         String expected = sign(secret, messageId, timestamp, body);
 
-        // Every signature in the header is checked, not just the first: during a rotation
-        // grace window the sender emits two, and the receiver holds only one of the pair.
+        // Every signature, not just the first: a rotation emits two and we hold one of them.
         List<String> provided = new ArrayList<>(2);
         for (String part : signatureHeader.trim().split("\\s+")) {
             int comma = part.indexOf(',');
