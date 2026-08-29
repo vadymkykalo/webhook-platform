@@ -21,41 +21,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Owns what happens during one Attempt, and in what order.
+ * Owns what happens during one Attempt, and in what order. Both directions run this; what
+ * differs is behind {@link AttemptStore}.
  *
- * <p>Both directions run this. What differs — how the obligation is claimed and recorded,
- * how the request is signed or authenticated — is behind {@link AttemptStore}, of which
- * there are two.
- *
- * <h2>Why this exists</h2>
- *
- * <p>The Incoming forward pipeline was created by copying the Outgoing delivery pipeline.
- * Commit {@code 2070d30} then hand-ported four fixes from one to the other, and they landed
- * in four separate places, because the duplication was of the whole lifecycle rather than of
- * one method. Every one of the invariants below was, at some point, correct on one side and
- * wrong on the other.
- *
- * <h2>The invariants this class exists to hold</h2>
+ * <p>Five invariants, each of which was once correct on one direction and wrong on the other:
  *
  * <ol>
- *   <li><b>No DB, Redis or Kafka work inside the reactive chain.</b> The mono produces the
- *       raw HTTP outcome and nothing else; everything downstream runs on this thread after
- *       {@code block()} returns. When a write ran inside {@code .map}, a slow attempt-row
- *       write after a 2xx could trip the {@code .timeout} guarding the HTTP call, and the
- *       resulting TimeoutException drove the failure path into overwriting the SUCCESS that
- *       had already been written — a duplicate delivery of a webhook that had succeeded.</li>
- *   <li><b>No successor unless the finalisation applied.</b> {@link AttemptStore#finalise}
- *       reports whether it wrote. A late writer whose row has been reclaimed gets false and
- *       stops, instead of queueing a second Attempt for an obligation somebody else owns.</li>
- *   <li><b>Every path that takes a concurrency permit releases it.</b> Including the ones
- *       that throw before the request is built — a decryption failure on a rotated key, a bad
- *       client certificate. One misconfigured target used to burn a permit per Attempt until
- *       it was throttled to zero for the whole key TTL.</li>
- *   <li><b>A failed transformation never lets the raw payload out.</b> It fails the Attempt
- *       as retryable and eventually DLQs, rather than falling through to the untransformed
- *       body.</li>
- *   <li><b>A Deferral is not an Attempt.</b> Being turned away by a rate limit does not
- *       consume an attempt or advance the Ladder.</li>
+ *   <li>No DB, Redis or Kafka work inside the reactive chain — a write there can trip the
+ *       HTTP timeout and drive the failure path over a SUCCESS already written.</li>
+ *   <li>No successor Attempt unless {@link AttemptStore#finalise} reports it wrote.</li>
+ *   <li>Every path that takes a concurrency permit releases it, including those that throw
+ *       before the request is built.</li>
+ *   <li>A failed transformation never lets the raw payload out.</li>
+ *   <li>A Deferral is not an Attempt: it consumes nothing and advances no Ladder.</li>
  * </ol>
  */
 @Component
@@ -110,9 +88,7 @@ public class AttemptRunner {
     private <C> void attempt(AttemptStore<C> store, AttemptMetrics metrics, C claim, AttemptContext ctx) {
         long startedAt = System.currentTimeMillis();
 
-        // Before admission, so a target that can never be reached does not spend a permit or a
-        // rate-limit token on being rejected. Terminal: no number of retries resolves an
-        // address the platform is not allowed to talk to.
+        // Before admission: no number of retries resolves an address we may not talk to.
         try {
             UrlValidator.validateWebhookUrl(ctx.url(), allowPrivateIps, allowedHosts);
         } catch (UrlValidator.InvalidUrlException e) {
@@ -131,8 +107,7 @@ public class AttemptRunner {
         String requestHeaders = null;
         String body = null;
         try {
-            // Body first: Outgoing signs exactly these bytes, so the request cannot be
-            // built until the transformation has produced them.
+            // Outgoing signs exactly these bytes, so the body comes before the request.
             body = store.buildBody(claim);
 
             RequestSpec spec = store.buildRequest(claim, body);
@@ -143,8 +118,7 @@ public class AttemptRunner {
             Response response = send(spec, ctx, body);
 
             if (response == null) {
-                // block() returned nothing at all: treat as an error rather than silently
-                // leaving the obligation claimed until the stuck sweep picks it up.
+                // Otherwise the obligation stays claimed until the stuck sweep picks it up.
                 fail(store, metrics, claim, ctx, "Empty response from " + ctx.url(),
                         requestHeaders, body, elapsed(startedAt));
                 return;
@@ -153,9 +127,7 @@ public class AttemptRunner {
             classify(store, metrics, claim, ctx, response, requestHeaders, body, elapsed(startedAt));
 
         } catch (PayloadTransformException e) {
-            // A configured transformation that fails to apply must never result in the raw
-            // payload leaving the platform. Retryable, so a template fixed in time still gets
-            // the webhook out, and DLQ'd if it stays broken.
+            // Retryable, so a template fixed in time still gets the webhook out.
             metrics.transformFailed();
             String reason = "TRANSFORM_FAILED: " + e.getMessage();
             log.error("{}: refusing to send the raw payload: {}", ctx.description(), reason);
@@ -178,8 +150,7 @@ public class AttemptRunner {
         }
 
         if (!circuitBreaker.isCallPermitted(ctx.targetKey())) {
-            // Recorded as an attempt even though nothing was sent: an operator looking at why
-            // a target went quiet needs to see the breaker, not an unexplained gap.
+            // Recorded though nothing was sent: a quiet target should show the breaker.
             store.recordAttempt(claim, errorRecord(null, null, "CIRCUIT_BREAKER_OPEN", 0));
             return defer(store, claim, ctx, "circuit breaker open", Instant.now().plusSeconds(30));
         }
@@ -196,15 +167,7 @@ public class AttemptRunner {
         return true;
     }
 
-    /**
-     * Ends the obligation for good, and lets go of what it was holding.
-     *
-     * <p>Terminal is as final as Succeeded and Abandoned — nothing will attempt this again —
-     * so it owes the same release, and under the same condition. Both call sites used to
-     * finalise and return, ignoring the answer: the ordering cursor was never released, and
-     * had it been, it would have been released even for a row a stuck sweep had already
-     * handed to somebody else. Invariant 2 applies here exactly as it does to a successor.</p>
-     */
+    /** Ends the obligation for good, releasing what it held — under invariant 2, as a successor is. */
     private <C> void terminallyFail(AttemptStore<C> store, C claim, String reason) {
         if (store.finalise(claim, new Finalization.TerminallyFailed(reason))) {
             store.onTerminallyFailed(claim);
@@ -231,8 +194,7 @@ public class AttemptRunner {
         WebClient.RequestBodySpec request = spec.client().post().uri(ctx.url());
         spec.headers().accept(request);
 
-        // The mono produces the raw HTTP outcome and nothing else — see invariant 1 on the
-        // class. Every write below happens after block() returns, on this thread.
+        // Invariant 1: the mono produces the raw HTTP outcome and nothing else.
         return request.bodyValue(body != null ? body : "")
                 .exchangeToMono(response -> {
                     int status = response.statusCode().value();

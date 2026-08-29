@@ -74,18 +74,14 @@ public class RetryGovernor {
     }
 
     /**
-     * Computes the number of items to claim in the next poll.
-     *
-     * @param pendingCount current number of pending retries (from DB or cache).
-     *                     Pass -1 if unknown (skips queue depth governor).
-     * @return effective batch size; 0 means "skip this poll" (cooldown).
+     * @param pendingCount pending retries, or -1 when unknown, which skips the depth governor
+     * @return batch size; 0 means skip this poll
      */
     public int computeEffectiveBatch(long pendingCount) {
         if (pendingCount >= 0) {
             lastPendingCount.set(pendingCount);
         }
 
-        // Cooldown: skip poll entirely if in exponential backoff after sustained failures
         int cd = cooldownRemaining.get();
         if (cd > 0) {
             cooldownRemaining.decrementAndGet();
@@ -95,9 +91,8 @@ public class RetryGovernor {
 
         int batch = effectiveBatch.get();
 
-        // Queue depth governor: if backlog is huge, cap batch to prevent burst drain
         if (pendingCount > highWatermark && highWatermark > 0) {
-            // Allow at most highWatermark/10 per poll to drain over ~100 polls
+            // At most highWatermark/10 per poll, draining over ~100 polls.
             int depthCap = Math.max(minBatch, (int) (highWatermark / 10));
             if (batch > depthCap) {
                 log.info("[{}] Queue depth governor: pending={} > highWatermark={}, capping batch {} → {}",
@@ -118,7 +113,6 @@ public class RetryGovernor {
     public void recordResult(int dispatched, int failed) {
         int total = dispatched + failed;
         if (total == 0) {
-            // Empty poll (no pending retries) — reset to max, no failure
             effectiveBatch.set(maxBatch);
             consecutiveFailures.set(0);
             return;
@@ -127,7 +121,6 @@ public class RetryGovernor {
         double failureRate = (double) failed / total;
 
         if (failureRate > 0.5) {
-            // Multiplicative decrease — halve the batch
             int current = effectiveBatch.get();
             int newBatch = Math.max(minBatch, current / 2);
             effectiveBatch.set(newBatch);
@@ -136,7 +129,6 @@ public class RetryGovernor {
             log.warn("[{}] AIMD decrease: failureRate={:.1f}%, batch {} → {}, consecutiveFailures={}",
                     name, failureRate * 100, current, newBatch, cf);
 
-            // Enter cooldown after sustained failures (exponential: 1, 2, 4, ... capped)
             if (cf >= 3) {
                 int cooldown = Math.min(maxCooldownPolls, 1 << (cf - 3));
                 cooldownRemaining.set(cooldown);
@@ -144,7 +136,6 @@ public class RetryGovernor {
                         name, cooldown, cf);
             }
         } else {
-            // Additive increase
             int current = effectiveBatch.get();
             int newBatch = Math.min(maxBatch, current + increment);
             effectiveBatch.set(newBatch);
@@ -156,36 +147,24 @@ public class RetryGovernor {
         }
     }
 
-    /** Current effective batch (for testing/monitoring). */
     public int getEffectiveBatch() {
         return effectiveBatch.get();
     }
 
-    /** Current consecutive failure count (for testing). */
     public int getConsecutiveFailures() {
         return consecutiveFailures.get();
     }
 
-    /** Current cooldown remaining (for testing). */
     public int getCooldownRemaining() {
         return cooldownRemaining.get();
     }
 
     /**
-     * Recommends poll interval in milliseconds based on pending queue depth.
-     * Allows aggressive polling when backlog is high, backs off when queue is empty.
+     * Poll interval for the next cycle: aggressive under backlog, backing off when empty.
      *
-     * <p>Expressed as a multiple of the caller's configured poll interval rather than as
-     * absolute constants. It used to return hardcoded 30s/10s/5s/2s, which silently
-     * overrode {@code retry.scheduler.poll-interval-ms} on the very first poll — the
-     * setting only ever applied to the startup poll and to the error path, so tuning it
-     * (or lowering it in a test) did nothing. The multipliers below reproduce the old
-     * numbers exactly at the production default of 10s, so this changes what the setting
-     * does, not how a default deployment behaves.
-     *
-     * @param pendingCount        current pending retries count
-     * @param basePollIntervalMs  the caller's configured poll interval, the 1x reference
-     * @return recommended poll interval in milliseconds
+     * <p>A multiple of the caller's configured interval, not an absolute constant. Hardcoded
+     * values here used to override {@code retry.scheduler.poll-interval-ms} from the first poll
+     * onward, so tuning the setting did nothing.
      */
     public long getRecommendedPollIntervalMs(long pendingCount, long basePollIntervalMs) {
         long base = Math.max(1, basePollIntervalMs);

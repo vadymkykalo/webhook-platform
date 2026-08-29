@@ -8,8 +8,7 @@ public final class KafkaTopics {
     // to all six and processes whatever it receives immediately. The actual retry delay is
     // enforced entirely by next_retry_at on the `deliveries` row: RetrySchedulerService only
     // claims (findPendingRetryIds) deliveries whose next_retry_at has passed, and it picks
-    // *which* of these topics to publish to purely by attemptCount, as a routing/observability
-    // label (see RetrySchedulerService#getRetryTopic and RetryPolicy#calculateNextRetry). Do
+    // *which* of these topics to publish to purely by attemptCount, as a routing label. Do
     // not "fix" the scheduler to add a matching delay here — that would double the wait.
     public static final String DELIVERIES_RETRY_1M = "deliveries.retry.1m";
     public static final String DELIVERIES_RETRY_5M = "deliveries.retry.5m";

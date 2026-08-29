@@ -31,13 +31,11 @@ import java.util.UUID;
  * {@code incoming_forward_attempts} row per Attempt, with the successor inserted when the
  * current one is finalised as retryable.
  *
- * <p>Contrast with {@link OutgoingAttemptStore}, which mutates a single {@code deliveries}
- * row in place. Neither model can move to the other's: both are public through API DTOs,
- * controllers, dashboard pages and usage aggregation. That difference is the whole reason
- * this seam has two adapters rather than one.
+ * <p>{@link OutgoingAttemptStore} mutates a single row in place instead. Neither model can
+ * move to the other's — both are public through DTOs, dashboard pages and usage aggregation —
+ * which is why this seam has two adapters.
  *
- * <p>One instance per Attempt. It holds the loaded Event and Destination, so it is confined
- * to the thread running that Attempt and shares no mutable state with any other.
+ * <p>One instance per Attempt; thread-confined.
  */
 @Slf4j
 public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.Claim> {
@@ -90,18 +88,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Three entry paths, each claiming a row that already exists:
-     *
-     * <ul>
-     *   <li><b>First dispatch</b> ({@code attemptCount == 0}): IngressService created a
-     *       PENDING row at attempt 1; claim it with an atomic UPDATE.</li>
-     *   <li><b>Replay</b>: the api created a PENDING row at the given number; same claim.</li>
-     *   <li><b>Retry</b>: IncomingForwardRetryScheduler already moved the row to PROCESSING
-     *       and stamped {@code started_at} as a fencing token before publishing. CAS on that
-     *       token rather than trusting the status — Kafka is at-least-once, so the same retry
-     *       message can be redelivered after a rebalance loses the offset commit, and both
-     *       copies would otherwise see PROCESSING and double-POST.</li>
-     * </ul>
+     * Three entry paths, each claiming a row that already exists: first dispatch and replay
+     * claim a PENDING row outright; retry CASes on the token the scheduler stamped, because a
+     * redelivered Kafka message would otherwise see PROCESSING and double-POST.
      *
      * <p>Never returns {@link ClaimResult.Deferred}: FIFO ordering is an Outgoing concern.
      */
@@ -112,16 +101,14 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
 
         int attemptNumber = isRetry ? message.getAttemptCount() : 1;
 
-        // Generated here, not in SQL, so the attempt that wins the claim knows the value it
-        // must still match when it finalises.
+        // Generated here, not in SQL, so the winner knows what it must still match.
         UUID claimToken = UUID.randomUUID();
 
         if (isRetry && !isReplay) {
             Instant expected = message.getStartedAt();
             if (expected == null) {
-                // An older producer published this before the fencing token existed (rolling
-                // deploy skew). Falling back to the pre-existing behaviour beats dropping every
-                // in-flight retry.
+                // Published before the fencing token existed; dropping every in-flight retry
+                // would be worse.
                 log.debug("Retry message has no fencing token (older producer?), proceeding without CAS: "
                         + "eventId={}, destId={}, attempt={}", event.getId(), destination.getId(), attemptNumber);
                 return claimed(attemptNumber, null);
@@ -132,9 +119,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return new ClaimResult.NotClaimed<>(
                         "retry attempt already claimed by a prior delivery of this Kafka message");
             }
-            // The token this CAS just stamped, not the started_at it was matched on. The old
-            // code carried `expected` here, which the CAS itself had already superseded — a
-            // fence that could never match the row was the same as no fence at all.
+            // The token this CAS just stamped, not the started_at it matched on: the latter
+            // had already been superseded, making it no fence at all.
             return claimed(attemptNumber, claimToken);
         }
 
@@ -152,10 +138,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         try {
             ladder = RetryLadder.parse(destination.getRetryDelays(), destination.getMaxAttempts());
         } catch (IllegalArgumentException e) {
-            // Retrying cannot fix a ladder that does not parse, and letting it throw further
-            // down would leave the row PROCESSING for StuckForwardRecovery to hand back,
-            // failing the same way forever. The api rejects a malformed ladder on write, so
-            // reaching this means the column was written outside the api.
+            // Retrying cannot fix a ladder that does not parse. The api rejects a malformed
+            // one on write, so reaching this means the column was written outside the api.
             String reason = "INVALID_RETRY_LADDER: " + e.getMessage();
             log.error("Destination {} carries an unusable retry ladder: {}", destination.getId(), e.getMessage());
             Claim claim = new Claim(event.getId(), destination.getId(), attemptNumber, fence);
@@ -197,13 +181,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     /**
-     * Priority: a reusable Transformation by id, then an inline JSONPath expression, then the
-     * body unchanged.
-     *
-     * <p>"No transformation configured" is fine and forwards as-is. But once either is
-     * configured, failing to apply it must fail the Attempt: transformations are how customers
-     * strip PII before an Incoming payload is relayed onward, so silently forwarding the raw
-     * body is the one outcome that must never happen.
+     * A reusable Transformation by id, then an inline JSONPath expression, then the body
+     * unchanged. Nothing configured forwards as-is; something configured that fails to apply
+     * fails the Attempt, because transformations are how PII is stripped before relaying.
      */
     @Override
     public String buildBody(Claim claim) {
@@ -243,12 +223,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     public void attemptStarting(Claim claim) {
     }
 
-    /**
-     * Incoming records an Attempt by writing onto the row itself, so there is nothing to
-     * append here — {@link #finalise} carries the response fields. Kept as a no-op rather
-     * than removed from the interface, because Outgoing genuinely appends a separate row and
-     * the Runner must call the same thing for both.
-     */
+    /** Held until {@link #finalise}, which writes the response fields onto the row itself. */
     @Override
     public void recordAttempt(Claim claim, AttemptRecord record) {
         this.pendingRecord = record;
@@ -257,12 +232,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     private AttemptRecord pendingRecord;
 
     /**
-     * Writes the outcome onto the PROCESSING row, and only while it is still PROCESSING.
-     *
-     * <p>Without that guard a late writer — a timed-out call whose 2xx already landed, or a
-     * duplicate Kafka redelivery — silently overwrote a terminal row and, through the
-     * retryable branch, queued a duplicate forward. Terminal states are final: whoever got
-     * here first won.
+     * Writes the outcome onto the PROCESSING row, and only while it is still PROCESSING: a late
+     * writer used to overwrite a terminal row and queue a duplicate forward. Whoever got here
+     * first won.
      */
     @Override
     public boolean finalise(Claim claim, Finalization outcome) {
@@ -275,9 +247,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
             }
 
             if (outcome instanceof Finalization.Deferred deferred) {
-                // Nothing was sent: hand the row back to the ladder without consuming an
-                // attempt. next_retry_at must be set — the scheduler's claim query ignores
-                // rows where it is null, so clearing it would strand the forward.
+                // Nothing was sent, so no attempt is consumed. next_retry_at must be set: the
+                // scheduler ignores rows without one.
                 if (attempt.getStatus() != ForwardAttemptStatus.PENDING
                         && attempt.getStatus() != ForwardAttemptStatus.PROCESSING) {
                     return false;
@@ -287,8 +258,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 }
                 attempt.setStatus(ForwardAttemptStatus.PENDING);
                 attempt.setStartedAt(null);
-                // Handing the row back ends this claim, so the token goes with it: "token set"
-                // means "currently claimed".
+                // Handing the row back ends the claim, so the token goes with it.
                 attempt.setClaimToken(null);
                 attempt.setNextRetryAt(deferred.until());
                 applyRecord(attempt);
@@ -321,8 +291,6 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 attemptRepository.save(IncomingForwardAttempt.builder()
                         .incomingEventId(claim.eventId())
                         .destinationId(claim.destinationId())
-                        // Inherited from the Attempt this one succeeds, which is the same
-                        // organization by construction.
                         .organizationId(attempt.getOrganizationId())
                         .attemptNumber(claim.attemptNumber() + 1)
                         .status(ForwardAttemptStatus.PENDING)
@@ -337,19 +305,10 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     /**
      * Does this Claim still own the row it is about to write?
      *
-     * <p>The status guard alone cannot answer that. It tells a late writer apart from a
-     * terminal row, but not "the claim I am finishing" from "somebody else's newer claim on
-     * the same row" — and PROCESSING is exactly what the row looks like in the second case:</p>
-     *
-     * <pre>
-     *   t0  the scheduler claims the row -&gt; PROCESSING, the POST starts and is slow
-     *   t1  StuckForwardRecoveryService decides the claim was abandoned -&gt; PENDING
-     *   t2  the scheduler claims it again; a second worker POSTs the same webhook
-     *   t3  the t0 attempt finally gets a 500. The status guard passes, so it writes FAILED
-     *       and queues attempt n+1
-     *   t4  the t2 attempt succeeds — and now finds FAILED, so its success is discarded,
-     *       while the successor queued at t3 sends a third copy
-     * </pre>
+     * <p>The status cannot answer it: a claim swept as abandoned and re-claimed by a second
+     * worker leaves the row PROCESSING again, so the first attempt's late 500 passes the status
+     * guard, writes FAILED and queues a successor — while the second attempt's success is
+     * discarded and the successor sends a third copy.
      *
      * <p>An unfenced Claim — a retry message published before the token existed — matches only
      * a row that carries no token either. A row that carries one belongs to whoever stamped it.</p>
@@ -362,16 +321,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     /**
      * Publishes the DLQ notification for a Forward whose Retry Ladder is exhausted.
      *
-     * <p>Called only after an {@link Finalization.Abandoned} that actually applied, and
-     * deliberately outside that transaction: a Kafka failure here must not roll back the DLQ
-     * write that already committed. The database is the source of truth; this is a
-     * notification.
-     *
-     * <p>{@code incoming.forward.dlq} is also the listener container's poison-record topic, so
-     * it carries a mix of records the container routed there and business notifications like
-     * this one. That mirrors {@code deliveries.dlq}, which has always worked the same way.
-     * Anything consuming either topic has to tolerate both shapes; the actionable count is the
-     * DB-backed {@code incoming_forward_dlq_depth} gauge rather than the topic's depth.
+     * <p>Outside the finalising transaction: the DLQ write is committed and this is only a
+     * notification. The topic also carries the container's poison records, so anything consuming
+     * it must tolerate both shapes; the actionable count is the DB-backed gauge.
      */
     @Override
     public void onAbandoned(Claim claim) {
