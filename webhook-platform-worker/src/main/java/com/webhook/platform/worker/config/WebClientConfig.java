@@ -4,6 +4,9 @@ import com.webhook.platform.common.http.SsrfProtectionCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
 @Configuration
@@ -16,5 +19,32 @@ public class WebClientConfig {
             @Value("${webhook.connection-pool.max-idle-time-seconds:60}") int maxIdleTimeSeconds) {
         return SsrfProtectionCustomizer.createConnectionProvider(
                 maxConnections, pendingAcquireTimeoutSeconds, maxIdleTimeSeconds);
+    }
+
+    /**
+     * The client an Outgoing Delivery goes out on. SSRF validation happens after the TCP connect,
+     * against the address actually resolved, so a DNS answer that changes between validation and
+     * request cannot get through.
+     */
+    @Bean
+    public WebClient outgoingWebClient(WebClient.Builder builder, ConnectionProvider webhookConnectionProvider,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
+        return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps)
+                .defaultHeader("User-Agent", "WebhookPlatform/1.0")
+                .build();
+    }
+
+    /** The same client for the Incoming direction, which sends no User-Agent of its own. */
+    @Bean
+    public WebClient incomingForwardWebClient(WebClient.Builder builder,
+            ConnectionProvider webhookConnectionProvider,
+            @Value("${webhook.url-validation.allow-private-ips:false}") boolean allowPrivateIps) {
+        return ssrfSafe(builder, webhookConnectionProvider, allowPrivateIps).build();
+    }
+
+    private WebClient.Builder ssrfSafe(WebClient.Builder builder, ConnectionProvider connectionProvider,
+            boolean allowPrivateIps) {
+        HttpClient httpClient = SsrfProtectionCustomizer.createHttpClient(connectionProvider, allowPrivateIps);
+        return builder.clientConnector(new ReactorClientHttpConnector(httpClient));
     }
 }
