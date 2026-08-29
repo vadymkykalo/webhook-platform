@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.entity.*;
 import com.webhook.platform.api.domain.enums.DeliveryOrigin;
 import com.webhook.platform.api.domain.enums.DeliveryStatus;
 import com.webhook.platform.api.domain.enums.IdempotencyPolicy;
-import com.webhook.platform.api.domain.enums.SchemaValidationPolicy;
 import com.webhook.platform.api.domain.repository.*;
 import com.webhook.platform.api.dto.EventIngestRequest;
 import com.webhook.platform.api.dto.EventIngestResponse;
@@ -45,7 +44,7 @@ public class EventIngestService {
     private final DeliveryDispatch deliveryDispatch;
     private final MeterRegistry meterRegistry;
     private final SequenceGeneratorService sequenceGeneratorService;
-    private final SchemaRegistryService schemaRegistryService;
+    private final SchemaValidationGate schemaValidationGate;
     private final ProjectRepository projectRepository;
     private final RuleEngineService ruleEngineService;
     private final QuotaCounterService quotaCounterService;
@@ -64,7 +63,7 @@ public class EventIngestService {
             DeliveryDispatch deliveryDispatch,
             MeterRegistry meterRegistry,
             SequenceGeneratorService sequenceGeneratorService,
-            SchemaRegistryService schemaRegistryService,
+            SchemaValidationGate schemaValidationGate,
             ProjectRepository projectRepository,
             RuleEngineService ruleEngineService,
             QuotaCounterService quotaCounterService,
@@ -81,7 +80,7 @@ public class EventIngestService {
         this.deliveryDispatch = deliveryDispatch;
         this.meterRegistry = meterRegistry;
         this.sequenceGeneratorService = sequenceGeneratorService;
-        this.schemaRegistryService = schemaRegistryService;
+        this.schemaValidationGate = schemaValidationGate;
         this.projectRepository = projectRepository;
         this.ruleEngineService = ruleEngineService;
         this.quotaCounterService = quotaCounterService;
@@ -197,28 +196,7 @@ public class EventIngestService {
             }
         }
 
-        // Schema validation BEFORE saving event
-        if (project != null && Boolean.TRUE.equals(project.getSchemaValidationEnabled())) {
-            String payloadJson;
-            try {
-                payloadJson = objectMapper.writeValueAsString(request.getData());
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize event payload", e);
-            }
-
-            schemaRegistryService.autoDiscover(projectId, request.getType(), payloadJson);
-
-            List<String> validationErrors = schemaRegistryService.validatePayload(
-                    projectId, request.getType(), payloadJson);
-            if (!validationErrors.isEmpty()) {
-                log.warn("Schema validation failed for event type '{}': {}",
-                        request.getType(), validationErrors);
-                if (project.getSchemaValidationPolicy() == SchemaValidationPolicy.BLOCK) {
-                    throw new IllegalArgumentException(
-                            "Schema validation failed: " + String.join("; ", validationErrors));
-                }
-            }
-        }
+        schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);

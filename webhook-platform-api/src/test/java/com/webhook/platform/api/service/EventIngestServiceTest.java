@@ -84,7 +84,7 @@ class EventIngestServiceTest {
                 deliveryRepository,
                 outboxMessageRepository, workflowTriggerOutboxRepository,
                 objectMapper, new DeliveryDispatch(outboxMessageRepository, objectMapper), meterRegistry,
-                sequenceGeneratorService, schemaRegistryService, projectRepository,
+                sequenceGeneratorService, new SchemaValidationGate(schemaRegistryService, objectMapper), projectRepository,
                 ruleEngineService, quotaCounterService, entitlementService,
                 transactionManager, 262144L, 1024
         );
