@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.domain.entity.Incident;
 import com.webhook.platform.api.domain.enums.AlertSeverity;
 import com.webhook.platform.api.domain.enums.IncidentStatus;
 import lombok.*;
@@ -38,5 +39,19 @@ public class IncidentResponse {
         private UUID deliveryId;
         private UUID endpointId;
         private Instant createdAt;
+    }
+
+    public static IncidentResponse of(Incident incident) {
+        return IncidentResponse.builder()
+                .id(incident.getId())
+                .projectId(incident.getProjectId())
+                .title(incident.getTitle())
+                .status(incident.getStatus())
+                .severity(incident.getSeverity())
+                .rcaNotes(incident.getRcaNotes())
+                .resolvedAt(incident.getResolvedAt())
+                .createdAt(incident.getCreatedAt())
+                .updatedAt(incident.getUpdatedAt())
+                .build();
     }
 }

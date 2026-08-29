@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowDownToLine, Loader2, RotateCcw, AlertTriangle, Clock } from 'lucide-react';
+import { ArrowDownToLine, Loader2, RotateCcw, Clock } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
@@ -28,6 +28,7 @@ import {
 import { usePermissions } from '../auth/usePermissions';
 import { railFromForwardAttempts } from './attemptRailData';
 import { CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
+import Callout from '../components/Callout';
 
 
 /** Verification is the incoming direction's status: did this really come from the source. */
@@ -465,10 +466,7 @@ export default function IncomingEventsPage() {
             <AlertDialogTitle>{t('incomingEvents.replay.title')}</AlertDialogTitle>
             <AlertDialogDescription>{t('incomingEvents.replay.description')}</AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="mx-1 flex items-start gap-2 rounded-lg border border-retry/30 bg-retry-soft p-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
-            <p className="text-sm text-retry">{t('incomingEvents.replay.idempotencyWarning')}</p>
-          </div>
+          <Callout className="mx-1">{t('incomingEvents.replay.idempotencyWarning')}</Callout>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={replaying}>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleReplay} disabled={replaying}>

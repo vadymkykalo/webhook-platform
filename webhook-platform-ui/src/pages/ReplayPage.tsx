@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { History, Play, Square, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { History, Play, Square, Loader2, RefreshCw } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
@@ -24,6 +24,7 @@ import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
 import { FilterBar, FilterField, TimeCell } from './tableParts';
+import Callout from '../components/Callout';
 
 const QUICK_RANGES = ['1h', '6h', '24h', '7d', 'custom'] as const;
 
@@ -299,10 +300,7 @@ export default function ReplayPage() {
           )}
 
           {estimate?.warning && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-retry/30 bg-retry-soft p-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-retry" aria-hidden />
-              <p className="text-sm text-retry">{estimate.warning}</p>
-            </div>
+            <Callout className="mt-3">{estimate.warning}</Callout>
           )}
 
           <div className="mt-4 flex flex-wrap justify-end gap-2">

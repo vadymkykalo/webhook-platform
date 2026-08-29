@@ -70,9 +70,6 @@ public class EventService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
         
         Page<Event> events = (eventType != null && !eventType.isBlank())
                 ? eventRepository.findByProjectIdAndEventTypeContainingIgnoreCase(projectId, eventType.trim(), pageable)
@@ -99,9 +96,6 @@ public class EventService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
         
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
@@ -120,10 +114,6 @@ public class EventService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
-
         schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 
         Event event = createEvent(projectId, request);

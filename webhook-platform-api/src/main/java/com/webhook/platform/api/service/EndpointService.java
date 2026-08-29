@@ -26,7 +26,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import reactor.netty.http.client.HttpClient;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 
 import java.time.Duration;

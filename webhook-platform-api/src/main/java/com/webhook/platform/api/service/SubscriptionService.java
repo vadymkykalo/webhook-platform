@@ -23,6 +23,9 @@ import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.retry.RetryLadderDefaults;
 
 import java.util.List;
+import java.util.Set;
+import java.util.Objects;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -130,8 +133,17 @@ public class SubscriptionService {
 
     public List<SubscriptionResponse> listSubscriptions(UUID projectId) {
         validateProjectOwnership(projectId);
-        return subscriptionRepository.findByProjectId(projectId).stream()
-                .map(this::mapToResponse)
+        List<Subscription> subscriptions = subscriptionRepository.findByProjectId(projectId);
+
+        Set<UUID> transformationIds = subscriptions.stream()
+                .map(Subscription::getTransformationId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, String> transformationNames = transformationRepository.findAllById(transformationIds).stream()
+                .collect(Collectors.toMap(Transformation::getId, Transformation::getName));
+
+        return subscriptions.stream()
+                .map(s -> mapToResponse(s, transformationNames.get(s.getTransformationId())))
                 .collect(Collectors.toList());
     }
 
@@ -207,12 +219,14 @@ public class SubscriptionService {
     }
 
     private SubscriptionResponse mapToResponse(Subscription subscription) {
-        String transformationName = null;
-        if (subscription.getTransformationId() != null) {
-            transformationName = transformationRepository.findById(subscription.getTransformationId())
-                    .map(Transformation::getName)
-                    .orElse(null);
-        }
+        String transformationName = subscription.getTransformationId() == null ? null
+                : transformationRepository.findById(subscription.getTransformationId())
+                        .map(Transformation::getName)
+                        .orElse(null);
+        return mapToResponse(subscription, transformationName);
+    }
+
+    private SubscriptionResponse mapToResponse(Subscription subscription, String transformationName) {
         return SubscriptionResponse.builder()
                 .id(subscription.getId())
                 .projectId(subscription.getProjectId())

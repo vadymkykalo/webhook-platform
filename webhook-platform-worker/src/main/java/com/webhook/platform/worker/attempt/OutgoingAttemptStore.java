@@ -24,6 +24,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -57,6 +58,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     private final PayloadTransformService payloadTransformService;
     private final ObjectMapper objectMapper;
     private final WebClient defaultWebClient;
+    private final Clock clock;
 
     private final DeliveryMessage message;
     private final boolean isRetry;
@@ -80,6 +82,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
             ObjectMapper objectMapper,
             WebClient defaultWebClient,
             Counter orderingGapTimeoutCounter,
+            Clock clock,
             int orderingRescheduleDelaySeconds,
             DeliveryMessage message,
             boolean isRetry) {
@@ -97,6 +100,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
         this.payloadTransformService = payloadTransformService;
         this.objectMapper = objectMapper;
         this.defaultWebClient = defaultWebClient;
+        this.clock = clock;
         this.message = message;
         this.isRetry = isRetry;
     }
@@ -222,7 +226,7 @@ public class OutgoingAttemptStore implements AttemptStore<OutgoingAttemptStore.C
     public RequestSpec buildRequest(Claim claim, String body) {
         Delivery delivery = claim.delivery();
         DeliverySigner.Signatures signatures =
-                new DeliverySigner(endpoint, encryptionKeyRegistry).sign(delivery.getId(), body);
+                new DeliverySigner(endpoint, encryptionKeyRegistry, clock).sign(delivery.getId(), body);
 
         String sequenceHeader = delivery.getSequenceNumber() != null
                 ? String.valueOf(delivery.getSequenceNumber())

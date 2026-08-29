@@ -27,14 +27,11 @@ import { TablePagination } from '../components/ui/table-pagination';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '../components/ui/alert-dialog';
 import { Select } from '../components/ui/select';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 /**
  * Incoming sources — the same shape as Connections, one direction over.
@@ -435,25 +432,14 @@ export default function IncomingSourcesPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('incomingSources.deleteDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('incomingSources.deleteDialog.description')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteSource.isPending}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleteSource.isPending}
-              className="bg-halt text-primary-foreground hover:bg-halt/90"
-            >
-              {deleteSource.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {deleteSource.isPending ? t('common.deleting') : t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title={t('incomingSources.deleteDialog.title')}
+        description={t('incomingSources.deleteDialog.description')}
+        onConfirm={handleDelete}
+        loading={deleteSource.isPending}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.attempt;
 
 import com.webhook.platform.common.dto.DeliveryMessage;
+import java.time.Clock;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ class OutgoingAttemptStoreTest {
 
         store = new OutgoingAttemptStore(
                 deliveryRepository, null, null, null, transactionTemplate,
-                null, null, null, null, null, null, null, null, null, 5,
+                null, null, null, null, null, null, null, null, null, Clock.systemUTC(), 5,
                 DeliveryMessage.builder().deliveryId(DELIVERY_ID).build(), false);
     }
 

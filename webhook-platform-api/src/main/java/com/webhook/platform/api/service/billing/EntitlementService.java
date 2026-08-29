@@ -1,15 +1,10 @@
 package com.webhook.platform.api.service.billing;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.enums.TunnelStatus;
 import com.webhook.platform.api.domain.repository.EndpointRepository;
 import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
-import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TunnelSessionRepository;
 import com.webhook.platform.api.exception.QuotaExceededException;
@@ -18,10 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.UUID;
 
 /**
@@ -33,7 +24,7 @@ import java.util.UUID;
 public class EntitlementService {
 
     private final boolean billingEnabled;
-    private final OrganizationRepository organizationRepository;
+    private final PlanLookup planLookup;
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
     private final EventRepository eventRepository;
@@ -44,14 +35,11 @@ public class EntitlementService {
     private final int defaultRateLimitPerSecond;
     private final int defaultMaxFanoutPerEvent;
 
-    /** Plan cache: orgId → Plan. Avoids DB hit on every request. */
-    private final Cache<UUID, Plan> planCache;
-
     public EntitlementService(
             @Value("${billing.enabled:false}") boolean billingEnabled,
             @Value("${entitlement.defaults.rate-limit-per-second:100}") int defaultRateLimitPerSecond,
             @Value("${entitlement.defaults.max-fanout-per-event:100}") int defaultMaxFanoutPerEvent,
-            OrganizationRepository organizationRepository,
+            PlanLookup planLookup,
             ProjectRepository projectRepository,
             EndpointRepository endpointRepository,
             EventRepository eventRepository,
@@ -61,17 +49,13 @@ public class EntitlementService {
         this.billingEnabled = billingEnabled;
         this.defaultRateLimitPerSecond = defaultRateLimitPerSecond;
         this.defaultMaxFanoutPerEvent = defaultMaxFanoutPerEvent;
-        this.organizationRepository = organizationRepository;
+        this.planLookup = planLookup;
         this.projectRepository = projectRepository;
         this.endpointRepository = endpointRepository;
         this.eventRepository = eventRepository;
         this.membershipRepository = membershipRepository;
         this.tunnelSessionRepository = tunnelSessionRepository;
         this.quotaCounterService = quotaCounterService;
-        this.planCache = Caffeine.newBuilder()
-                .maximumSize(5_000)
-                .expireAfterWrite(Duration.ofMinutes(5))
-                .build();
     }
 
     // ── Quota checks ──────────────────────────────────────────────
@@ -171,18 +155,18 @@ public class EntitlementService {
      */
     public int getRateLimitForProject(UUID projectId) {
         if (!billingEnabled) return defaultRateLimitPerSecond;
-        Project project = projectRepository.findById(projectId).orElse(null);
-        if (project == null) return defaultRateLimitPerSecond;
-        return getRateLimit(project.getOrganizationId());
+        return planLookup.forProject(projectId)
+                .map(Plan::getRateLimitPerSecond)
+                .orElse(defaultRateLimitPerSecond);
     }
 
     // ── Fanout limit ────────────────────────────────────────────
 
     public int getMaxFanoutForProject(UUID projectId) {
         if (!billingEnabled) return defaultMaxFanoutPerEvent;
-        Project project = projectRepository.findById(projectId).orElse(null);
-        if (project == null) return defaultMaxFanoutPerEvent;
-        return getPlan(project.getOrganizationId()).getMaxFanoutPerEvent();
+        return planLookup.forProject(projectId)
+                .map(Plan::getMaxFanoutPerEvent)
+                .orElse(defaultMaxFanoutPerEvent);
     }
 
     // ── Retention ─────────────────────────────────────────────────
@@ -195,38 +179,16 @@ public class EntitlementService {
     // ── Plan access ───────────────────────────────────────────────
 
     public Plan getPlan() {
-        return getPlan(TenantContext.require());
+        return planLookup.forCurrentTenant();
     }
 
-    /**
-     * Explicit-organization form.
-     *
-     * <p>Kept alongside the no-argument one because two callers legitimately have an organization
-     * without being scoped to it: {@code getRateLimitForProject} and {@code getMaxFanoutForProject}
-     * resolve a Project first and read the organization off it, on paths that may be running as
-     * the system tenant.
-     */
     public Plan getPlan(UUID organizationId) {
-        return planCache.get(organizationId, this::loadPlan);
+        return planLookup.forOrganization(organizationId);
     }
 
-    /**
-     * Takes the organization explicitly: the billing schedulers evict the cache for an
-     * organization they are processing under the system tenant, not for one they are "in".
-     */
     public void evictPlanCache(UUID organizationId) {
-        planCache.invalidate(organizationId);
+        planLookup.evict(organizationId);
     }
-
-    // ── Internals ─────────────────────────────────────────────────
-
-    /** Cache loader, so it is handed the key rather than reading an ambient scope. */
-    private Plan loadPlan(UUID organizationId) {
-        Organization org = organizationRepository.findByIdWithPlan(organizationId)
-                .orElseThrow(() -> new IllegalStateException("Organization not found: " + organizationId));
-        return org.getPlan();
-    }
-
 
     public boolean isBillingEnabled() {
         return billingEnabled;

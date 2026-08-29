@@ -1,6 +1,7 @@
 package com.webhook.platform.worker.attempt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import com.webhook.platform.common.dto.DeliveryMessage;
 import com.webhook.platform.worker.domain.entity.Delivery;
 import com.webhook.platform.worker.domain.repository.DeliveryAttemptRepository;
@@ -86,7 +87,7 @@ class OutgoingRetryClaimTest {
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
                 new ObjectMapper(), WebClient.builder().build(),
                 Counter.builder("test").register(new SimpleMeterRegistry()),
-                5, message, true);
+                Clock.systemUTC(), 5, message, true);
     }
 
     private DeliveryMessage retryMessage(UUID claimToken) {

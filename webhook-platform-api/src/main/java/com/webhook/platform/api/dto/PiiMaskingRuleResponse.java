@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.domain.entity.PiiMaskingRule;
 import com.webhook.platform.api.domain.enums.MaskStyle;
 import com.webhook.platform.api.domain.enums.RuleType;
 import lombok.AllArgsConstructor;
@@ -24,4 +25,18 @@ public class PiiMaskingRuleResponse {
     private Boolean enabled;
     private Instant createdAt;
     private Instant updatedAt;
+
+    public static PiiMaskingRuleResponse of(PiiMaskingRule rule) {
+        return PiiMaskingRuleResponse.builder()
+                .id(rule.getId())
+                .projectId(rule.getProjectId())
+                .ruleType(rule.getRuleType())
+                .patternName(rule.getPatternName())
+                .jsonPath(rule.getJsonPath())
+                .maskStyle(rule.getMaskStyle())
+                .enabled(rule.getEnabled())
+                .createdAt(rule.getCreatedAt())
+                .updatedAt(rule.getUpdatedAt())
+                .build();
+    }
 }

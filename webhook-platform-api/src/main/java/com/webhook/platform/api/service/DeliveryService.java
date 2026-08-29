@@ -27,7 +27,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AuthContext;
 
@@ -70,9 +69,6 @@ public class DeliveryService {
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         Project project = projectRepository.findById(event.getProjectId())
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        if (!project.getOrganizationId().equals(auth.organizationId())) {
-            throw new ForbiddenException("Access denied");
-        }
         auth.validateProjectAccess(project.getId());
     }
 
@@ -85,7 +81,7 @@ public class DeliveryService {
         Delivery delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Delivery not found"));
         validateDeliveryAccess(delivery, auth);
-        return mapToResponse(delivery);
+        return DeliveryResponse.of(delivery);
     }
 
     public Page<DeliveryResponse> listDeliveries(UUID eventId, AuthContext auth, Pageable pageable) {
@@ -95,15 +91,12 @@ public class DeliveryService {
                     .orElseThrow(() -> new NotFoundException("Event not found"));
             Project project = projectRepository.findById(event.getProjectId())
                     .orElseThrow(() -> new NotFoundException("Project not found"));
-            if (!project.getOrganizationId().equals(auth.organizationId())) {
-                throw new ForbiddenException("Access denied");
-            }
             auth.validateProjectAccess(project.getId());
             deliveries = deliveryRepository.findByEventId(eventId, pageable);
         } else {
             throw new IllegalArgumentException("eventId parameter is required");
         }
-        return deliveries.map(this::mapToResponse);
+        return deliveries.map(DeliveryResponse::of);
     }
 
     public Page<DeliveryResponse> listDeliveriesByProject(
@@ -120,10 +113,6 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(organizationId)) {
-            throw new ForbiddenException("Access denied");
-        }
-
         Specification<Delivery> spec;
         if (eventId != null) {
             spec = Specification.where(DeliverySpecification.hasEventIds(List.of(eventId)));
@@ -138,7 +127,7 @@ public class DeliveryService {
 
         Page<Delivery> deliveries = deliveryRepository.findAll(spec, pageable);
 
-        return deliveries.map(this::mapToResponse);
+        return deliveries.map(DeliveryResponse::of);
     }
 
     @Transactional
@@ -238,9 +227,6 @@ public class DeliveryService {
         Project project = projectRepository.findById(projectIdFilter)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
 
-        if (!project.getOrganizationId().equals(auth.organizationId())) {
-            throw new ForbiddenException("Access denied");
-        }
         auth.validateProjectAccess(project.getId());
 
         Specification<Delivery> spec = Specification
@@ -394,20 +380,4 @@ public class DeliveryService {
         log.info("Replayed delivery {} from attempt {}", deliveryId, fromAttempt);
     }
 
-    private DeliveryResponse mapToResponse(Delivery delivery) {
-        return DeliveryResponse.builder()
-                .id(delivery.getId())
-                .eventId(delivery.getEventId())
-                .endpointId(delivery.getEndpointId())
-                .subscriptionId(delivery.getSubscriptionId())
-                .status(delivery.getStatus().name())
-                .attemptCount(delivery.getAttemptCount())
-                .maxAttempts(delivery.getMaxAttempts())
-                .nextRetryAt(delivery.getNextRetryAt())
-                .lastAttemptAt(delivery.getLastAttemptAt())
-                .succeededAt(delivery.getSucceededAt())
-                .failedAt(delivery.getFailedAt())
-                .createdAt(delivery.getCreatedAt())
-                .build();
-    }
 }

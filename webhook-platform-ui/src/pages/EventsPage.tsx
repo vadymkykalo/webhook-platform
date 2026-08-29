@@ -22,6 +22,7 @@ import VerificationGate from '../components/VerificationGate';
 import { debugLinksApi } from '../api/debugLinks.api';
 import { CopyId, FilterBar, FilterField, SearchField, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
 import type { DeliveryResponse } from '../types/api.types';
+import { useDebounced } from '../hooks/useDebounced';
 
 
 /**
@@ -87,13 +88,10 @@ export default function EventsPage() {
   const [sharingEventId, setSharingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const debouncedSearch = useDebounced(search.trim());
 
-  useEffect(() => {
-    const timer = setTimeout(() => { setDebouncedSearch(search.trim()); setPage(0); }, 400);
-    return () => clearTimeout(timer);
-  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
 
   const { data: project, isError: projectIsError, error: projectError, refetch: refetchProject } = useProject(projectId);
 

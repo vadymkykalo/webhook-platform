@@ -25,6 +25,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
 import { cn } from '../../lib/utils';
+import { formatJson } from '../../lib/json';
 
 /**
  * One event type's history: every version it has had, and every diff between
@@ -488,10 +489,3 @@ export function RecentSchemaChanges({ projectId }: { projectId: string }) {
   );
 }
 
-function formatJson(json: string): string {
-  try {
-    return JSON.stringify(JSON.parse(json), null, 2);
-  } catch {
-    return json;
-  }
-}

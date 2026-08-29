@@ -59,11 +59,13 @@ class ServiceTenantParameterTest {
      * caller's hands, which is what structural tenancy exists to stop.
      */
     private static final Set<String> DOCUMENTED_EXEMPTIONS = new TreeSet<>(Set.of(
-            // Plan lookup and its cache. getRateLimitForProject / getMaxFanoutForProject resolve a
-            // Project and read the organization off it, on paths that may be running as the system
-            // tenant; the billing schedulers evict the cache for an organization they are
-            // processing, not one they are "in". The no-argument overloads are the request-facing
-            // ones and read the tenant scope.
+            // Plan lookup and its cache. forProject resolves a Project and reads the organization
+            // off it, on paths that may be running as the system tenant; the billing schedulers
+            // evict the cache for an organization they are processing, not one they are "in".
+            // forCurrentTenant and the no-argument overloads are the request-facing ones and read
+            // the tenant scope.
+            "PlanLookup.forOrganization",
+            "PlanLookup.evict",
             "EntitlementService.getPlan",
             "EntitlementService.getRateLimit",
             "EntitlementService.evictPlanCache",

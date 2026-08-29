@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -22,6 +24,11 @@ public interface RuleExecutionLogRepository extends JpaRepository<RuleExecutionL
     long countByRuleIdAndMatchedTrue(UUID ruleId);
 
     long countByRuleId(UUID ruleId);
+
+    /** Executions and matches for a whole page at once. */
+    @Query("SELECT l.ruleId, COUNT(l), SUM(CASE WHEN l.matched = true THEN 1 ELSE 0 END) "
+            + "FROM RuleExecutionLog l WHERE l.ruleId IN :ruleIds GROUP BY l.ruleId")
+    List<Object[]> countByRuleIds(@Param("ruleIds") Collection<UUID> ruleIds);
 
     @Modifying
     @Query("DELETE FROM RuleExecutionLog l WHERE l.executedAt < :cutoff")

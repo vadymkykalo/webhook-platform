@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -35,8 +36,8 @@ public class BillingOverviewService {
     /** The month usage is measured over: whole UTC months, half-open. */
     private record BillingPeriod(Instant start, Instant end) {
 
-        static BillingPeriod current() {
-            YearMonth month = YearMonth.now(ZoneOffset.UTC);
+        static BillingPeriod current(Clock clock) {
+            YearMonth month = YearMonth.now(clock.withZone(ZoneOffset.UTC));
             return new BillingPeriod(
                     month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC),
                     month.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC));
@@ -50,6 +51,7 @@ public class BillingOverviewService {
     private final ProjectRepository projectRepository;
     private final EndpointRepository endpointRepository;
     private final MembershipRepository membershipRepository;
+    private final Clock clock;
 
     /** The self-hosted plan is an internal row, not something to offer anyone. */
     public List<PlanResponse> catalog() {
@@ -64,7 +66,7 @@ public class BillingOverviewService {
         Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new NotFoundException("Organization not found"));
         Plan plan = entitlementService.getPlan();
-        BillingPeriod period = BillingPeriod.current();
+        BillingPeriod period = BillingPeriod.current(clock);
 
         return OrganizationBillingResponse.builder()
                 .organizationId(organizationId)
@@ -83,7 +85,7 @@ public class BillingOverviewService {
     public UsageResponse usage() {
         UUID organizationId = TenantContext.require();
         Plan plan = entitlementService.getPlan();
-        BillingPeriod period = BillingPeriod.current();
+        BillingPeriod period = BillingPeriod.current(clock);
 
         return UsageResponse.builder()
                 .events(against(eventsIn(period, organizationId), plan.getMaxEventsPerMonth()))

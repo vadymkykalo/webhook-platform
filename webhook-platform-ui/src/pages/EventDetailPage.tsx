@@ -38,7 +38,8 @@ export default function EventDetailPage() {
   const { data: eventTypes } = useEventTypes(projectId);
 
   const { data: deliveriesData, isLoading: deliveriesLoading, refetch: refetchDeliveries } = useQuery({
-    queryKey: ['event-deliveries', projectId, eventId],
+    // Prefixed with 'deliveries' so a replay's invalidation reaches this list too.
+    queryKey: ['deliveries', projectId, eventId, 'event-detail'],
     queryFn: () => deliveriesApi.listByProject(projectId!, { eventId, size: 50 }),
     enabled: !!projectId && !!eventId,
   });

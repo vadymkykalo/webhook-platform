@@ -8,6 +8,7 @@ import { Button } from '../ui/button';
 import { endpointsApi } from '../../api/endpoints.api';
 import { subscriptionsApi } from '../../api/subscriptions.api';
 import { apiKeysApi } from '../../api/apiKeys.api';
+import { queryKeys } from '../../api/queries';
 import { showSuccess, showApiError } from '../../lib/toast';
 import JsonEditor from '../JsonEditor';
 import ConditionTreeEditor, { mkGroup } from '../ConditionTreeEditor';
@@ -282,7 +283,7 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
   const [newDesc, setNewDesc] = useState('');
 
   const { data: endpoints, isLoading } = useQuery({
-    queryKey: ['endpoints-list', projectId],
+    queryKey: queryKeys.endpoints.list(projectId!),
     queryFn: () => endpointsApi.list(projectId!),
     enabled: !!projectId,
   });
@@ -291,7 +292,7 @@ function EndpointSelector({ value, onChange }: { value: string; onChange: (val: 
     mutationFn: () => endpointsApi.create(projectId!, { url: newUrl, description: newDesc || undefined, enabled: true }),
     onSuccess: (ep) => {
       showSuccess(t('workflows.nodeConfig.endpointCreated'));
-      qc.invalidateQueries({ queryKey: ['endpoints-list', projectId] });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.list(projectId!) });
       onChange(ep.id);
       setShowCreate(false);
       setNewUrl('');
@@ -380,7 +381,7 @@ function ApiKeyInfo() {
   const [copied, setCopied] = useState(false);
 
   const { data: keys, isLoading } = useQuery({
-    queryKey: ['api-keys-list', projectId],
+    queryKey: ['api-keys', projectId],
     queryFn: () => apiKeysApi.list(projectId!),
     enabled: !!projectId,
   });
@@ -389,7 +390,7 @@ function ApiKeyInfo() {
     mutationFn: () => apiKeysApi.create(projectId!, { name: newKeyName || 'Workflow Key' }),
     onSuccess: (resp) => {
       showSuccess(t('workflows.nodeConfig.apiKeyCreated'));
-      qc.invalidateQueries({ queryKey: ['api-keys-list', projectId] });
+      qc.invalidateQueries({ queryKey: ['api-keys', projectId] });
       if (resp.key) {
         setCreatedKey(resp.key);
       }
@@ -506,13 +507,13 @@ function SubscriptionInfo() {
   const [subEndpointId, setSubEndpointId] = useState('');
 
   const { data: subscriptions, isLoading } = useQuery({
-    queryKey: ['subscriptions-list', projectId],
+    queryKey: queryKeys.subscriptions.list(projectId!),
     queryFn: () => subscriptionsApi.list(projectId!),
     enabled: !!projectId,
   });
 
   const { data: endpoints } = useQuery({
-    queryKey: ['endpoints-list', projectId],
+    queryKey: queryKeys.endpoints.list(projectId!),
     queryFn: () => endpointsApi.list(projectId!),
     enabled: !!projectId,
   });
@@ -525,7 +526,7 @@ function SubscriptionInfo() {
     }),
     onSuccess: () => {
       showSuccess(t('workflows.nodeConfig.subscriptionCreated'));
-      qc.invalidateQueries({ queryKey: ['subscriptions-list', projectId] });
+      qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId!) });
       setShowCreate(false);
     },
     onError: (err) => showApiError(err, t('workflows.nodeConfig.subscriptionCreateFailed')),
@@ -613,7 +614,7 @@ function EndpointQuickFill({ onSelect }: { onSelect: (url: string) => void }) {
   const [open, setOpen] = useState(false);
 
   const { data: endpoints } = useQuery({
-    queryKey: ['endpoints-list', projectId],
+    queryKey: queryKeys.endpoints.list(projectId!),
     queryFn: () => endpointsApi.list(projectId!),
     enabled: !!projectId && open,
   });

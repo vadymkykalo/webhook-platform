@@ -20,6 +20,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Clock;
+
 /**
  * Holds everything an {@link OutgoingAttemptStore} needs, so a caller supplies only the message.
  *
@@ -44,6 +46,7 @@ public class OutgoingAttemptStoreFactory {
     private final ObjectMapper objectMapper;
     private final WebClient outgoingWebClient;
     private final Counter orderingGapTimeoutCounter;
+    private final Clock clock;
 
     /**
      * How long a Delivery blocked behind an outstanding sequence waits before it is re-polled.
@@ -68,6 +71,7 @@ public class OutgoingAttemptStoreFactory {
             ObjectMapper objectMapper,
             @Qualifier("outgoingWebClient") WebClient outgoingWebClient,
             MeterRegistry meterRegistry,
+            Clock clock,
             @Value("${ordering.buffer-reschedule-delay-seconds:5}") int orderingBufferRescheduleDelaySeconds) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
@@ -84,6 +88,7 @@ public class OutgoingAttemptStoreFactory {
         this.outgoingWebClient = outgoingWebClient;
         this.orderingGapTimeoutCounter = Counter.builder("webhook_ordering_gap_timeout_total")
                 .register(meterRegistry);
+        this.clock = clock;
         this.orderingBufferRescheduleDelaySeconds = orderingBufferRescheduleDelaySeconds;
     }
 
@@ -92,7 +97,7 @@ public class OutgoingAttemptStoreFactory {
                 deliveryRepository, deliveryAttemptRepository, endpointRepository, eventRepository,
                 transactionTemplate, orderingBufferService, kafkaTemplate, encryptionKeyRegistry,
                 mtlsWebClientFactory, transformationCacheService, payloadTransformService,
-                objectMapper, outgoingWebClient, orderingGapTimeoutCounter,
+                objectMapper, outgoingWebClient, orderingGapTimeoutCounter, clock,
                 orderingBufferRescheduleDelaySeconds, message, isRetry);
     }
 }

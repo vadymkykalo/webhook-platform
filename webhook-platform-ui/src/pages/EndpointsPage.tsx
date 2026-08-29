@@ -39,6 +39,7 @@ import { SecretField } from './ConnectionSetupPage';
 import { usePermissions } from '../auth/usePermissions';
 import PermissionGate from '../components/PermissionGate';
 import VerificationGate from '../components/VerificationGate';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 /**
  * The flat list of Endpoints — one half of a connection, for the times you
@@ -490,25 +491,14 @@ export default function EndpointsPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('endpoints.deleteDialog.title')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('endpoints.deleteDialog.description')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-halt text-primary-foreground hover:bg-halt/90"
-            >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {deleting ? t('common.deleting') : t('common.delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title={t('endpoints.deleteDialog.title')}
+        description={t('endpoints.deleteDialog.description')}
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
 
       <AlertDialog open={!!toggleId && !newSecret} onOpenChange={(open) => !open && setToggleId(null)}>
         <AlertDialogContent>

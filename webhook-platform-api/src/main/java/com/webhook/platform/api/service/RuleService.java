@@ -95,9 +95,32 @@ public class RuleService {
 
     public List<RuleResponse> list(UUID projectId) {
         validateProjectOwnership(projectId);
-        return ruleRepository.findByProjectIdOrderByPriorityDescCreatedAtDesc(projectId).stream()
-                .map(this::mapToResponse)
+        List<Rule> rules = ruleRepository.findByProjectIdOrderByPriorityDescCreatedAtDesc(projectId);
+        Set<UUID> ruleIds = rules.stream().map(Rule::getId).collect(Collectors.toSet());
+
+        Map<UUID, List<RuleAction>> actionsByRule = ruleActionRepository
+                .findByRuleIdInOrderBySortOrderAsc(ruleIds).stream()
+                .collect(Collectors.groupingBy(RuleAction::getRuleId));
+        Map<UUID, ExecutionCounts> countsByRule = executionCountsFor(ruleIds);
+
+        return rules.stream()
+                .map(rule -> mapToResponse(rule,
+                        actionsByRule.getOrDefault(rule.getId(), List.of()),
+                        countsByRule.getOrDefault(rule.getId(), ExecutionCounts.NONE)))
                 .collect(Collectors.toList());
+    }
+
+    /** How often a rule ran, and how often it matched. */
+    private record ExecutionCounts(long executions, long matches) {
+
+        static final ExecutionCounts NONE = new ExecutionCounts(0, 0);
+    }
+
+    private Map<UUID, ExecutionCounts> executionCountsFor(Set<UUID> ruleIds) {
+        return executionLogRepository.countByRuleIds(ruleIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> new ExecutionCounts((Long) row[1], row[2] == null ? 0L : ((Number) row[2]).longValue())));
     }
 
     @Auditable(action = AuditAction.UPDATE, resourceType = "Rule")
@@ -235,23 +258,33 @@ public class RuleService {
         }
     }
 
-    private RuleResponse mapToResponse(Rule rule) {
-        ConditionNode conditions = null;
-        if (rule.getConditions() != null && !rule.getConditions().isBlank()) {
-            try {
-                conditions = objectMapper.readValue(rule.getConditions(), ConditionNode.class);
-            } catch (Exception e) {
-                log.warn("Failed to parse condition tree for rule {}: {}", rule.getId(), e.getMessage());
-            }
+    private ConditionNode parseConditions(Rule rule) {
+        if (rule.getConditions() == null || rule.getConditions().isBlank()) {
+            return null;
         }
+        try {
+            return objectMapper.readValue(rule.getConditions(), ConditionNode.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse condition tree for rule {}: {}", rule.getId(), e.getMessage());
+            return null;
+        }
+    }
 
-        List<RuleAction> actionEntities = ruleActionRepository.findByRuleIdOrderBySortOrderAsc(rule.getId());
-        List<RuleActionResponse> actionResponses = actionEntities.stream()
+    private RuleResponse mapToResponse(Rule rule) {
+        return mapToResponse(rule,
+                ruleActionRepository.findByRuleIdOrderBySortOrderAsc(rule.getId()),
+                new ExecutionCounts(
+                        executionLogRepository.countByRuleId(rule.getId()),
+                        executionLogRepository.countByRuleIdAndMatchedTrue(rule.getId())));
+    }
+
+    private RuleResponse mapToResponse(Rule rule, List<RuleAction> actions, ExecutionCounts counts) {
+        ConditionNode conditions = parseConditions(rule);
+        List<RuleActionResponse> actionResponses = actions.stream()
                 .map(this::mapActionToResponse)
                 .collect(Collectors.toList());
-
-        long totalExec = executionLogRepository.countByRuleId(rule.getId());
-        long totalMatches = executionLogRepository.countByRuleIdAndMatchedTrue(rule.getId());
+        long totalExec = counts.executions();
+        long totalMatches = counts.matches();
 
         return RuleResponse.builder()
                 .id(rule.getId())
