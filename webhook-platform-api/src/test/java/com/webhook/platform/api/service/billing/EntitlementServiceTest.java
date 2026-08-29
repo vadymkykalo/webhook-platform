@@ -310,7 +310,8 @@ class EntitlementServiceTest {
     private EntitlementService createService(boolean billingEnabled) {
         return new EntitlementService(
                 billingEnabled, 100, 100,
-                organizationRepository, projectRepository,
+                new PlanLookup(organizationRepository, projectRepository, 5),
+                projectRepository,
                 endpointRepository, eventRepository, membershipRepository,
                 tunnelSessionRepository, quotaCounterService);
     }
