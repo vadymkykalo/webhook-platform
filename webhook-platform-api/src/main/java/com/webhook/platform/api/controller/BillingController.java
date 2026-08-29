@@ -1,19 +1,11 @@
 package com.webhook.platform.api.controller;
 
-import com.webhook.platform.api.domain.entity.Organization;
-import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.dto.*;
-import com.webhook.platform.api.domain.repository.EndpointRepository;
-import com.webhook.platform.api.domain.repository.EventRepository;
-import com.webhook.platform.api.domain.repository.MembershipRepository;
-import com.webhook.platform.api.domain.repository.OrganizationRepository;
-import com.webhook.platform.api.domain.repository.ProjectRepository;
-import com.webhook.platform.api.exception.NotFoundException;
 import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.RequireAccess;
+import com.webhook.platform.api.service.billing.BillingOverviewService;
 import com.webhook.platform.api.service.billing.BillingService;
-import com.webhook.platform.api.service.billing.EntitlementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -23,13 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
-import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/billing")
@@ -39,23 +26,14 @@ import java.util.stream.Collectors;
 public class BillingController {
 
     private final BillingService billingService;
-    private final EntitlementService entitlementService;
-    private final OrganizationRepository organizationRepository;
-    private final EventRepository eventRepository;
-    private final ProjectRepository projectRepository;
-    private final EndpointRepository endpointRepository;
-    private final MembershipRepository membershipRepository;
+    private final BillingOverviewService billingOverviewService;
 
     // ── Plan catalog (public) ─────────────────────────────────────
 
     @Operation(summary = "List available plans", description = "Returns all active plans with their limits and pricing")
     @GetMapping("/plans")
     public ResponseEntity<List<PlanResponse>> listPlans() {
-        List<PlanResponse> plans = billingService.listActivePlans().stream()
-                .filter(p -> !"self_hosted".equals(p.getName()))
-                .map(this::mapPlan)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(plans);
+        return ResponseEntity.ok(billingOverviewService.catalog());
     }
 
     // ── Organization billing ──────────────────────────────────────
@@ -64,30 +42,7 @@ public class BillingController {
     @GetMapping("/organization")
     public ResponseEntity<OrganizationBillingResponse> getOrganizationBilling(AuthContext auth) {
         auth.requireJwt();
-        UUID orgId = auth.organizationId();
-        Organization org = organizationRepository.findById(orgId)
-                .orElseThrow(() -> new NotFoundException("Organization not found"));
-        Plan plan = entitlementService.getPlan();
-
-        YearMonth ym = YearMonth.now(ZoneOffset.UTC);
-        Instant monthStart = ym.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant monthEnd = ym.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        long eventsThisMonth = eventRepository.countByOrganizationIdAndCreatedAtBetween(orgId, monthStart, monthEnd);
-        long projectCount = projectRepository.countByOrganizationIdAndDeletedAtIsNull(orgId);
-
-        OrganizationBillingResponse response = OrganizationBillingResponse.builder()
-                .organizationId(orgId)
-                .plan(mapPlan(plan))
-                .billingStatus(org.getBillingStatus())
-                .billingEmail(org.getBillingEmail())
-                .usage(OrganizationBillingResponse.UsageSnapshot.builder()
-                        .eventsThisMonth(eventsThisMonth)
-                        .eventsLimit(plan.getMaxEventsPerMonth())
-                        .projects(projectCount)
-                        .projectsLimit(plan.getMaxProjects())
-                        .build())
-                .build();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(billingOverviewService.organizationBilling());
     }
 
     @Operation(summary = "Update organization billing info", description = "Updates billing email for the organization (owner only)")
@@ -97,12 +52,7 @@ public class BillingController {
             @Valid @RequestBody UpdateBillingRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        UUID orgId = auth.organizationId();
-        Organization org = organizationRepository.findById(orgId)
-                .orElseThrow(() -> new NotFoundException("Organization not found"));
-        org.setBillingEmail(request.getBillingEmail());
-        organizationRepository.save(org);
-        return getOrganizationBilling(auth);
+        return ResponseEntity.ok(billingOverviewService.updateBillingEmail(request.getBillingEmail()));
     }
 
     @Operation(summary = "Change organization plan", description = "Directly assigns a plan to the organization (owner only). " +
@@ -113,8 +63,8 @@ public class BillingController {
             @Valid @RequestBody ChangePlanRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        billingService.assignPlan( request.getPlanName());
-        return getOrganizationBilling(auth);
+        billingService.assignPlan(request.getPlanName());
+        return ResponseEntity.ok(billingOverviewService.organizationBilling());
     }
 
     // ── Usage ──────────────────────────────────────────────────────
@@ -123,29 +73,7 @@ public class BillingController {
     @GetMapping("/usage")
     public ResponseEntity<UsageResponse> getUsage(AuthContext auth) {
         auth.requireJwt();
-        UUID orgId = auth.organizationId();
-        Plan plan = entitlementService.getPlan();
-
-        YearMonth ym = YearMonth.now(ZoneOffset.UTC);
-        Instant monthStart = ym.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant monthEnd = ym.plusMonths(1).atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-
-        long events = eventRepository.countByOrganizationIdAndCreatedAtBetween(orgId, monthStart, monthEnd);
-        long projects = projectRepository.countByOrganizationIdAndDeletedAtIsNull(orgId);
-        long members = membershipRepository.countByOrganizationId(orgId);
-        long endpoints = endpointRepository.maxEndpointsPerProjectInOrg(orgId);
-
-        UsageResponse response = UsageResponse.builder()
-                .events(usage(events, plan.getMaxEventsPerMonth()))
-                .endpoints(usage(endpoints, plan.getMaxEndpointsPerProject()))
-                .projects(usage(projects, plan.getMaxProjects()))
-                .members(usage(members, plan.getMaxMembers()))
-                .rateLimitPerSecond(plan.getRateLimitPerSecond())
-                .retentionDays(plan.getMaxRetentionDays())
-                .periodStart(monthStart)
-                .periodEnd(monthEnd)
-                .build();
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(billingOverviewService.usage());
     }
 
     // ── Invoices ───────────────────────────────────────────────────
@@ -155,9 +83,7 @@ public class BillingController {
     @GetMapping("/invoices")
     public ResponseEntity<List<InvoiceResponse>> listInvoices(AuthContext auth) {
         auth.requireJwt();
-        // Invoices come from billing provider — delegated via BillingService
-        List<InvoiceResponse> invoices = billingService.listInvoices();
-        return ResponseEntity.ok(invoices);
+        return ResponseEntity.ok(billingService.listInvoices());
     }
 
     // ── Checkout / Portal ─────────────────────────────────────────
@@ -170,7 +96,7 @@ public class BillingController {
             @Valid @RequestBody CheckoutRequest request,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        String url = billingService.createCheckoutSession( request.getPlanName(),
+        String url = billingService.createCheckoutSession(request.getPlanName(),
                 request.getProviderCode(), request.getBillingInterval(),
                 request.getSuccessUrl(), request.getCancelUrl());
         return ResponseEntity.ok(Map.of("url", url));
@@ -183,7 +109,7 @@ public class BillingController {
             @RequestParam("returnUrl") String returnUrl,
             AuthContext auth) {
         auth.requireOwnerAccess();
-        String url = billingService.createPortalSession( returnUrl);
+        String url = billingService.createPortalSession(returnUrl);
         return ResponseEntity.ok(Map.of("url", url));
     }
 
@@ -211,32 +137,4 @@ public class BillingController {
         return ResponseEntity.ok().build();
     }
 
-    // ── Helpers ────────────────────────────────────────────────────
-
-    private UsageResponse.ResourceUsage usage(long current, long limit) {
-        double pct = limit <= 0 ? 0 : Math.min(100.0, (double) current / limit * 100);
-        return UsageResponse.ResourceUsage.builder()
-                .current(current)
-                .limit(limit)
-                .percentUsed(Math.round(pct * 10) / 10.0)
-                .build();
-    }
-
-    private PlanResponse mapPlan(Plan plan) {
-        return PlanResponse.builder()
-                .id(plan.getId())
-                .name(plan.getName())
-                .displayName(plan.getDisplayName())
-                .maxEventsPerMonth(plan.getMaxEventsPerMonth())
-                .maxEndpointsPerProject(plan.getMaxEndpointsPerProject())
-                .maxProjects(plan.getMaxProjects())
-                .maxMembers(plan.getMaxMembers())
-                .maxActiveTunnels(plan.getMaxActiveTunnels())
-                .rateLimitPerSecond(plan.getRateLimitPerSecond())
-                .maxRetentionDays(plan.getMaxRetentionDays())
-                .features(plan.getFeatures())
-                .priceMonthlyCents(plan.getPriceMonthlyCents())
-                .priceYearlyCents(plan.getPriceYearlyCents())
-                .build();
-    }
 }
