@@ -213,6 +213,7 @@ const VERIFIED = [
   { name: 'GitLab', detailKey: 'landing.verified.gitlabDetail' },
   { name: 'Slack', detailKey: 'landing.verified.slackDetail' },
   { name: 'Shopify', detailKey: 'landing.verified.shopifyDetail' },
+  { name: 'Twilio', detailKey: 'landing.verified.twilioDetail' },
 ];
 
 function VerifiedSources() {

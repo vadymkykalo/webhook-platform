@@ -42,18 +42,20 @@ import ConfirmDialog from '../components/ConfirmDialog';
  * connection: open a source to see where its incoming events are forwarded.
  */
 
-const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO', 'CUSTOM'];
+const PROVIDER_TYPES: ProviderType[] = ['GENERIC', 'GITHUB', 'GITLAB', 'STRIPE', 'SHOPIFY', 'SLACK', 'TWILIO'];
 const VERIFICATION_MODES: VerificationMode[] = ['NONE', 'HMAC_GENERIC', 'PROVIDER'];
 
 /**
- * The providers WebhookVerifierFactory actually ships a verifier for.
+ * The providers WebhookVerifierFactory actually ships a verifier for — which is now every
+ * provider type except GENERIC.
  *
- * PROVIDER mode with any other name — GENERIC, TWILIO, CUSTOM — is refused by the API now,
- * and used to be worse: it saved, and then threw at ingress once the provider was already
- * sending. Narrowing the list here means the choice that fails cannot be made; the server
- * check stays the authority.
+ * GENERIC is the label for a provider Hookflow has no preset for, so PROVIDER mode with it is
+ * refused by the API: HMAC_GENERIC, with that provider's own header and prefix, is what verifies
+ * those. It used to be worse than a refusal — the source saved, and then threw at ingress once
+ * the provider was already sending. Narrowing the list here means the choice that fails cannot
+ * be made; the server check stays the authority.
  */
-const VERIFIABLE_PROVIDERS: ProviderType[] = ['STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY'];
+const VERIFIABLE_PROVIDERS: ProviderType[] = ['STRIPE', 'GITHUB', 'GITLAB', 'SLACK', 'SHOPIFY', 'TWILIO'];
 
 export default function IncomingSourcesPage() {
   const { t } = useTranslation();

@@ -56,7 +56,7 @@ class IncomingSourceServiceTest {
         service = new IncomingSourceService(
                 sourceRepository, projectRepository,
                 registry,
-                new WebhookVerifierFactory(),
+                new WebhookVerifierFactory("http://localhost:8080"),
                 "http://localhost:8080"
         );
         project = Project.builder()
@@ -256,11 +256,12 @@ class IncomingSourceServiceTest {
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
         IncomingSourceRequest request = new IncomingSourceRequest();
-        request.setName("Twilio");
-        request.setProviderType(ProviderType.TWILIO);
+        request.setName("Some provider");
+        request.setProviderType(ProviderType.GENERIC);
         request.setVerificationMode(VerificationMode.PROVIDER);
 
-        /* TWILIO, GENERIC and CUSTOM are ProviderType names no verifier is written for.
+        /* GENERIC is the one ProviderType with no verifier, and deliberately so: it is the
+           label for a provider with no preset, which HMAC_GENERIC mode is what verifies.
            This used to save happily and throw IllegalStateException at ingress — the source
            looked configured, and the failure showed up once the provider was already
            sending. */
@@ -280,7 +281,7 @@ class IncomingSourceServiceTest {
 
         for (ProviderType provider : new ProviderType[] {
                 ProviderType.STRIPE, ProviderType.GITHUB, ProviderType.GITLAB,
-                ProviderType.SLACK, ProviderType.SHOPIFY }) {
+                ProviderType.SLACK, ProviderType.SHOPIFY, ProviderType.TWILIO }) {
             IncomingSourceRequest request = new IncomingSourceRequest();
             request.setName("Source " + provider);
             request.setProviderType(provider);
@@ -312,7 +313,7 @@ class IncomingSourceServiceTest {
     @Test
     void updateIsJudgedOnTheResultingRowNotTheRequest() {
         IncomingSource existing = buildSource();
-        existing.setProviderType(ProviderType.TWILIO);
+        existing.setProviderType(ProviderType.GENERIC);
         existing.setVerificationMode(VerificationMode.NONE);
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(existing));
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
@@ -337,7 +338,7 @@ class IncomingSourceServiceTest {
 
         IncomingSourceRequest request = new IncomingSourceRequest();
         request.setName("A provider that does not sign at all");
-        request.setProviderType(ProviderType.CUSTOM);
+        request.setProviderType(ProviderType.GENERIC);
         request.setVerificationMode(VerificationMode.NONE);
 
         // Receiving from anything that can POST is the point; only PROVIDER mode makes a

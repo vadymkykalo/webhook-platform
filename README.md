@@ -133,7 +133,8 @@ attempt is on the record with the response it got.
 
 **Incoming** — a provider posts to a URL you own; Hookflow verifies the
 signature and forwards it to the destinations you nominated. Stripe, GitHub,
-GitLab, Shopify and Slack are understood out of the box, plus generic HMAC.
+GitLab, Shopify, Slack and Twilio are understood out of the box, plus generic
+HMAC for anything else.
 
 Both directions run the same claim → send → classify → finalise loop, so a fix
 to attempt behaviour lands once rather than twice.
