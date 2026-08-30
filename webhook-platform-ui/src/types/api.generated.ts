@@ -3623,7 +3623,11 @@ export interface components {
         };
         EventSchemaVersionRequest: {
             schemaJson: string;
-            compatibilityMode?: string;
+            /**
+             * @description Compatibility promise checked against the previous version. Defaults to the previous version's mode, or NONE for the first version.
+             * @enum {string}
+             */
+            compatibilityMode?: "NONE" | "BACKWARD" | "FORWARD" | "FULL";
             description?: string;
         };
         EventSchemaVersionResponse: {
@@ -3636,7 +3640,8 @@ export interface components {
             schemaJson?: string;
             fingerprint?: string;
             status?: string;
-            compatibilityMode?: string;
+            /** @enum {string} */
+            compatibilityMode?: "NONE" | "BACKWARD" | "FORWARD" | "FULL";
             description?: string;
             /** Format: uuid */
             createdBy?: string;

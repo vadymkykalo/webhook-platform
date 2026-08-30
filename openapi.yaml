@@ -7145,6 +7145,13 @@ components:
           minLength: 1
         compatibilityMode:
           type: string
+          description: "Compatibility promise checked against the previous version.\
+            \ Defaults to the previous version's mode, or NONE for the first version."
+          enum:
+          - NONE
+          - BACKWARD
+          - FORWARD
+          - FULL
         description:
           type: string
       required:
@@ -7169,6 +7176,11 @@ components:
           type: string
         compatibilityMode:
           type: string
+          enum:
+          - NONE
+          - BACKWARD
+          - FORWARD
+          - FULL
         description:
           type: string
         createdBy:

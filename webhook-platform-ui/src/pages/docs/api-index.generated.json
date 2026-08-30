@@ -8041,7 +8041,14 @@
       {
         "name": "compatibilityMode",
         "type": "string",
-        "required": false
+        "required": false,
+        "description": "Compatibility promise checked against the previous version. Defaults to the previous version's mode, or NONE for the first version.",
+        "values": [
+          "NONE",
+          "BACKWARD",
+          "FORWARD",
+          "FULL"
+        ]
       },
       {
         "name": "description",
@@ -8083,7 +8090,13 @@
       {
         "name": "compatibilityMode",
         "type": "string",
-        "required": false
+        "required": false,
+        "values": [
+          "NONE",
+          "BACKWARD",
+          "FORWARD",
+          "FULL"
+        ]
       },
       {
         "name": "description",
@@ -12799,7 +12812,7 @@
     },
     "EventSchemaVersionRequest": {
       "schemaJson": "string",
-      "compatibilityMode": "string",
+      "compatibilityMode": "NONE",
       "description": "string"
     },
     "EventSchemaVersionResponse": {
@@ -12809,7 +12822,7 @@
       "schemaJson": "string",
       "fingerprint": "string",
       "status": "string",
-      "compatibilityMode": "string",
+      "compatibilityMode": "NONE",
       "description": "string",
       "createdBy": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "createdAt": "2026-01-01T12:00:00Z"

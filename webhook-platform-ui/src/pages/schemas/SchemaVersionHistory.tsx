@@ -11,7 +11,7 @@ import {
 import { showApiError, showSuccess } from '../../lib/toast';
 import { formatDate } from '../../lib/date';
 import type {
-  EventTypeCatalogResponse, EventSchemaVersionResponse, SchemaChangeResponse,
+  CompatibilityMode, EventTypeCatalogResponse, EventSchemaVersionResponse, SchemaChangeResponse,
 } from '../../api/schemas.api';
 import EmptyState, { ErrorState } from '../../components/EmptyState';
 import { SkeletonRows } from '../../components/PageSkeleton';
@@ -20,6 +20,7 @@ import JsonEditor from '../../components/JsonEditor';
 import { Button, buttonVariants } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Select } from '../../components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -50,10 +51,16 @@ function statusLabelKey(status: string): string {
   }
 }
 
+const COMPATIBILITY_MODES: CompatibilityMode[] = ['NONE', 'BACKWARD', 'FORWARD', 'FULL'];
+
 interface ChangeSummary {
   added: { path: string; type?: string; required?: boolean }[];
   removed: { path: string }[];
   changed: { path: string; oldType?: string; type?: string }[];
+  /** Optional before, required now — the change BACKWARD refuses. */
+  tightened: { path: string }[];
+  /** Required before, optional now — the change FORWARD refuses. */
+  relaxed: { path: string }[];
 }
 
 function parseChangeSummary(summary: string): ChangeSummary {
@@ -63,9 +70,12 @@ function parseChangeSummary(summary: string): ChangeSummary {
       added: parsed.added || [],
       removed: parsed.removed || [],
       changed: parsed.changed || [],
+      // Changes recorded before these two buckets existed have neither key.
+      tightened: parsed.tightened || [],
+      relaxed: parsed.relaxed || [],
     };
   } catch {
-    return { added: [], removed: [], changed: [] };
+    return { added: [], removed: [], changed: [], tightened: [], relaxed: [] };
   }
 }
 
@@ -77,6 +87,8 @@ function ChangeTally({ summary }: { summary: ChangeSummary }) {
       {summary.added.length > 0 && <span>{`+${summary.added.length} ${t('schemas.board.added')}`}</span>}
       {summary.removed.length > 0 && <span>{`−${summary.removed.length} ${t('schemas.board.removed')}`}</span>}
       {summary.changed.length > 0 && <span>{`~${summary.changed.length} ${t('schemas.board.changed')}`}</span>}
+      {summary.tightened.length > 0 && <span>{`!${summary.tightened.length} ${t('schemas.board.tightened')}`}</span>}
+      {summary.relaxed.length > 0 && <span>{`?${summary.relaxed.length} ${t('schemas.board.relaxed')}`}</span>}
     </div>
   );
 }
@@ -86,7 +98,9 @@ function FieldList({ summary }: { summary: ChangeSummary }) {
     <div className="space-y-1.5">
       {[...summary.added.map((f) => ({ mark: '+', path: f.path, note: f.type })),
         ...summary.removed.map((f) => ({ mark: '−', path: f.path, note: undefined })),
-        ...summary.changed.map((f) => ({ mark: '~', path: f.path, note: `${f.oldType} → ${f.type}` }))]
+        ...summary.changed.map((f) => ({ mark: '~', path: f.path, note: `${f.oldType} → ${f.type}` })),
+        ...summary.tightened.map((f) => ({ mark: '!', path: f.path, note: undefined })),
+        ...summary.relaxed.map((f) => ({ mark: '?', path: f.path, note: undefined }))]
         .map((entry, i) => (
           <div key={`${entry.path}-${i}`} className="flex items-baseline gap-2 font-mono text-[11px]">
             <span className="w-3 flex-shrink-0 text-muted-foreground">{entry.mark}</span>
@@ -219,6 +233,7 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
   const [showUpload, setShowUpload] = useState(false);
   const [schemaInput, setSchemaInput] = useState('');
   const [versionDesc, setVersionDesc] = useState('');
+  const [compatibility, setCompatibility] = useState<CompatibilityMode | ''>('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -230,9 +245,16 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
       return;
     }
     try {
-      await createMutation.mutateAsync({ schemaJson: schemaInput, description: versionDesc.trim() || undefined });
+      // Left blank the field is omitted, and the server inherits the previous version's mode.
+      // Sending NONE explicitly is a different thing: it drops the promise the type was under.
+      await createMutation.mutateAsync({
+        schemaJson: schemaInput,
+        description: versionDesc.trim() || undefined,
+        compatibilityMode: compatibility || undefined,
+      });
       setSchemaInput('');
       setVersionDesc('');
+      setCompatibility('');
       setShowUpload(false);
       showSuccess(t('schemas.versionCreated'));
     } catch (err: any) {
@@ -275,15 +297,30 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
               placeholder='{"type": "object", "properties": {}}'
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sv-note" className="text-xs">{t('schemas.versionNote')}</Label>
-            <Input
-              id="sv-note"
-              value={versionDesc}
-              onChange={(e) => setVersionDesc(e.target.value)}
-              placeholder={t('schemas.versionNotePlaceholder')}
-              className="h-8 text-sm"
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sv-note" className="text-xs">{t('schemas.versionNote')}</Label>
+              <Input
+                id="sv-note"
+                value={versionDesc}
+                onChange={(e) => setVersionDesc(e.target.value)}
+                placeholder={t('schemas.versionNotePlaceholder')}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sv-compat" className="text-xs">{t('schemas.compatibility')}</Label>
+              <Select
+                id="sv-compat"
+                value={compatibility}
+                onChange={(e) => setCompatibility(e.target.value as CompatibilityMode | '')}
+                className="h-8 text-sm"
+              >
+                <option value="">{t('schemas.compatibilityInherit')}</option>
+                {COMPATIBILITY_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </Select>
+              <p className="text-[11px] text-muted-foreground">{t('schemas.compatibilityHint')}</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={handleUpload} disabled={!schemaInput.trim() || createMutation.isPending}>
@@ -335,6 +372,11 @@ function VersionList({ projectId, eventType }: { projectId: string; eventType: E
                     <span className="hidden truncate font-mono text-[11px] text-muted-foreground sm:inline">
                       {v.fingerprint.slice(0, 12)}
                     </span>
+                    {v.compatibilityMode !== 'NONE' && (
+                      <span className="hidden font-mono text-[11px] text-muted-foreground md:inline">
+                        {v.compatibilityMode}
+                      </span>
+                    )}
                     <span className="ml-auto flex-shrink-0 font-mono text-[11px] text-muted-foreground">
                       {formatDate(v.createdAt)}
                     </span>

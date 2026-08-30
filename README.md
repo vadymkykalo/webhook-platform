@@ -139,7 +139,8 @@ HMAC for anything else.
 Both directions run the same claim → send → classify → finalise loop, so a fix
 to attempt behaviour lands once rather than twice.
 
-Also: a schema registry with breaking-change detection, wildcard subscriptions,
+Also: a schema registry that detects breaking changes and refuses the ones that
+break the compatibility mode an event type declared, wildcard subscriptions,
 JSONPath transforms, replay, a CLI that tunnels webhooks to `localhost` while
 you develop, per-org rate limits, AES-256-GCM at rest, SSRF protection,
 Prometheus metrics and an audit log. Organizations → Projects → Endpoints, with
