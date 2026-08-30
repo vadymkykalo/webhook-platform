@@ -161,6 +161,11 @@ for example a reverse proxy on the same host, or a deployment that skips
 the bundled UI — set `API_BIND=0.0.0.0` explicitly in `.env`, or the API
 becomes unreachable from outside the host after upgrading.
 
+> `API_BIND` no longer exists. The api service publishes no host port at
+> all in current releases, so there is nothing to bind: reach it through
+> the dashboard's nginx on `HOOKFLOW_PORT`, or uncomment the example
+> `ports:` block in `docker-compose.yml` to publish it yourself.
+
 ### 4. Redis requires a password
 
 `docker-compose.yml`'s Redis service now runs with `--requirepass`, driven
