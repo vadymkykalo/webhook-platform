@@ -4,7 +4,6 @@ import com.webhook.platform.api.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import com.webhook.platform.api.domain.entity.IncomingDestination;
 import com.webhook.platform.api.domain.entity.IncomingSource;
-import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
@@ -55,7 +54,6 @@ class IncomingDestinationServiceTest {
     private final UUID sourceId = UUID.randomUUID();
     private final UUID destId = UUID.randomUUID();
 
-    private Project project;
     private IncomingSource source;
 
     @BeforeEach
@@ -68,7 +66,6 @@ class IncomingDestinationServiceTest {
                 registry,
                 true, List.of()
         );
-        project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         source = IncomingSource.builder()
                 .id(sourceId).projectId(projectId).name("src")
                 .slug("src").providerType(ProviderType.GENERIC)
