@@ -2,6 +2,7 @@ package com.webhook.platform.api.service;
 
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.repository.DeliveryAttemptRepository;
+import com.webhook.platform.api.domain.repository.EventRepository;
 import com.webhook.platform.api.domain.repository.IncomingEventRepository;
 import com.webhook.platform.api.domain.repository.TunnelRequestLogRepository;
 import io.micrometer.core.instrument.Counter;
@@ -24,37 +25,45 @@ public class DataRetentionService {
     private final DeliveryAttemptRepository deliveryAttemptRepository;
     private final IncomingEventRepository incomingEventRepository;
     private final TunnelRequestLogRepository tunnelRequestLogRepository;
+    private final EventRepository eventRepository;
     private final MeterRegistry meterRegistry;
     private final int deliveryAttemptsRetentionDays;
     private final int successfulAttemptsRetentionDays;
     private final int incomingEventsRetentionDays;
     private final int tunnelRequestLogRetentionDays;
     private final int maxAttemptsPerDelivery;
+    private final int eventsRetentionDays;
     private final int batchSize;
     private final AtomicLong totalAttemptsCount = new AtomicLong(0);
     private final AtomicLong deliveryAttemptsEstimatedRows = new AtomicLong(0);
     private final AtomicLong incomingEventsEstimatedRows = new AtomicLong(0);
+    private final AtomicLong eventsEstimatedRows = new AtomicLong(0);
+    private final AtomicLong deliveriesEstimatedRows = new AtomicLong(0);
 
     public DataRetentionService(
             DeliveryAttemptRepository deliveryAttemptRepository,
             IncomingEventRepository incomingEventRepository,
             TunnelRequestLogRepository tunnelRequestLogRepository,
+            EventRepository eventRepository,
             MeterRegistry meterRegistry,
             @Value("${data-retention.delivery-attempts-retention-days:90}") int deliveryAttemptsRetentionDays,
             @Value("${data-retention.successful-attempts-retention-days:14}") int successfulAttemptsRetentionDays,
             @Value("${data-retention.incoming-events-retention-days:30}") int incomingEventsRetentionDays,
             @Value("${data-retention.tunnel-request-log-retention-days:7}") int tunnelRequestLogRetentionDays,
             @Value("${data-retention.max-attempts-per-delivery:10}") int maxAttemptsPerDelivery,
+            @Value("${data-retention.events-retention-days:90}") int eventsRetentionDays,
             @Value("${data-retention.batch-size:1000}") int batchSize) {
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.incomingEventRepository = incomingEventRepository;
         this.tunnelRequestLogRepository = tunnelRequestLogRepository;
+        this.eventRepository = eventRepository;
         this.meterRegistry = meterRegistry;
         this.deliveryAttemptsRetentionDays = deliveryAttemptsRetentionDays;
         this.successfulAttemptsRetentionDays = successfulAttemptsRetentionDays;
         this.incomingEventsRetentionDays = incomingEventsRetentionDays;
         this.tunnelRequestLogRetentionDays = tunnelRequestLogRetentionDays;
         this.maxAttemptsPerDelivery = maxAttemptsPerDelivery;
+        this.eventsRetentionDays = eventsRetentionDays;
         this.batchSize = batchSize;
         
         Gauge.builder("delivery_attempts_total", totalAttemptsCount, AtomicLong::get)
@@ -66,9 +75,18 @@ public class DataRetentionService {
         Gauge.builder("incoming_events_table_rows", incomingEventsEstimatedRows, AtomicLong::get)
                 .description("Estimated row count in incoming_events table")
                 .register(meterRegistry);
+        // The two tables that had no retention at all also had no gauge, so the growth that
+        // mattered most was the growth nobody could see.
+        Gauge.builder("events_table_rows", eventsEstimatedRows, AtomicLong::get)
+                .description("Estimated row count in events table")
+                .register(meterRegistry);
+        Gauge.builder("deliveries_table_rows", deliveriesEstimatedRows, AtomicLong::get)
+                .description("Estimated row count in deliveries table")
+                .register(meterRegistry);
         
-        log.info("Data retention configured: attempts={}d (success={}d), incoming={}d, tunnelLog={}d, maxPerDelivery={}, batchSize={}", 
-                deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, tunnelRequestLogRetentionDays, maxAttemptsPerDelivery, batchSize);
+        log.info("Data retention configured: attempts={}d (success={}d), incoming={}d, tunnelLog={}d, events={}, maxPerDelivery={}, batchSize={}",
+                deliveryAttemptsRetentionDays, successfulAttemptsRetentionDays, incomingEventsRetentionDays, tunnelRequestLogRetentionDays,
+                eventsRetentionDays < 0 ? "unlimited" : eventsRetentionDays + "d", maxAttemptsPerDelivery, batchSize);
     }
 
     // REMOVED: Outbox cleanup is handled by OutboxPublisherService.cleanupOldMessages()
@@ -181,6 +199,51 @@ public class DataRetentionService {
         }
     }
 
+    /**
+     * Bounds {@code events}, and through the cascades everything hanging off them.
+     *
+     * <p>This is the retention that was missing rather than merely elsewhere. The billing
+     * scheduler ({@code RetentionCleanupScheduler}) enforces per-plan limits and returns
+     * immediately when {@code billing.enabled} is false — the self-hosted default — so in the
+     * deployment shape this project recommends, nothing deleted an event or a delivery ever.
+     * Attempts were still being dropped at 90 days by partition maintenance, which left the
+     * detail gone and the bulk behind.
+     *
+     * <p>Deliberately independent of billing: an operator running this for themselves needs a
+     * bounded database more than a paying customer does, not less. {@code -1} keeps the old
+     * behaviour for anyone who wants it, and is the same sentinel the plans table already uses.
+     */
+    @SystemTenant
+    @Scheduled(cron = "${data-retention.cleanup-cron:0 0 2 * * *}")
+    @SchedulerLock(name = "cleanupOldEvents", lockAtMostFor = "55m", lockAtLeastFor = "1m")
+    @Transactional
+    public void cleanupOldEvents() {
+        if (eventsRetentionDays < 0) {
+            log.debug("Events cleanup: retention is unlimited, nothing to do");
+            return;
+        }
+
+        Instant cutoffTime = Instant.now().minusSeconds(eventsRetentionDays * 86400L);
+        log.info("Starting events cleanup for events older than {}", cutoffTime);
+
+        int totalDeleted = 0;
+        int deletedInBatch;
+        do {
+            deletedInBatch = eventRepository.deleteOldEvents(cutoffTime, batchSize);
+            totalDeleted += deletedInBatch;
+        } while (deletedInBatch >= batchSize);
+
+        if (totalDeleted > 0) {
+            Counter.builder("events_cleanup_total")
+                    .register(meterRegistry)
+                    .increment(totalDeleted);
+            log.info("Events cleanup: deleted {} events and everything cascading from them "
+                    + "(older than {}d)", totalDeleted, eventsRetentionDays);
+        } else {
+            log.debug("Events cleanup: no old events to delete");
+        }
+    }
+
     @SystemTenant
     @Scheduled(fixedDelayString = "${data-retention.table-metrics-interval-ms:900000}")
     public void refreshTableSizeMetrics() {
@@ -189,7 +252,12 @@ public class DataRetentionService {
             deliveryAttemptsEstimatedRows.set(attemptsRows);
             long incomingRows = incomingEventRepository.estimatedRowCount();
             incomingEventsEstimatedRows.set(incomingRows);
-            log.debug("Table size metrics refreshed: delivery_attempts≈{}, incoming_events≈{}", attemptsRows, incomingRows);
+            long eventRows = eventRepository.estimatedRowCount();
+            eventsEstimatedRows.set(eventRows);
+            long deliveryRows = eventRepository.estimatedDeliveryRowCount();
+            deliveriesEstimatedRows.set(deliveryRows);
+            log.debug("Table size metrics refreshed: delivery_attempts≈{}, incoming_events≈{}, events≈{}, deliveries≈{}",
+                    attemptsRows, incomingRows, eventRows, deliveryRows);
         } catch (Exception e) {
             log.warn("Failed to refresh table size metrics: {}", e.getMessage());
         }
