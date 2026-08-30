@@ -7804,7 +7804,8 @@
       {
         "name": "rateLimitPerSecond",
         "type": "integer (int32)",
-        "required": false
+        "required": false,
+        "description": "Per-endpoint delivery throttle. 0 removes the limit."
       },
       {
         "name": "allowedSourceIps",
@@ -8505,7 +8506,7 @@
         "name": "transformationId",
         "type": "string (uuid)",
         "required": false,
-        "description": "ID of a reusable transformation template to apply (overrides payloadTransform if set)"
+        "description": "ID of a reusable transformation template to apply (overrides payloadTransform if set). Empty string detaches the destination from its template."
       }
     ],
     "IncomingDestinationResponse": [

@@ -3148,7 +3148,7 @@ export interface components {
             payloadTransform?: string;
             /**
              * Format: uuid
-             * @description ID of a reusable transformation template to apply (overrides payloadTransform if set)
+             * @description ID of a reusable transformation template to apply (overrides payloadTransform if set). Empty string detaches the destination from its template.
              */
             transformationId?: string;
         };
@@ -3294,7 +3294,10 @@ export interface components {
             description?: string;
             secret?: string;
             enabled?: boolean;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Per-endpoint delivery throttle. 0 removes the limit.
+             */
             rateLimitPerSecond?: number;
             allowedSourceIps?: string;
             /** @enum {string} */

@@ -6324,7 +6324,8 @@ components:
           type: string
           format: uuid
           description: ID of a reusable transformation template to apply (overrides
-            payloadTransform if set)
+            payloadTransform if set). Empty string detaches the destination from its
+            template.
       required:
       - url
     IncomingDestinationResponse:
@@ -6586,8 +6587,9 @@ components:
         rateLimitPerSecond:
           type: integer
           format: int32
+          description: Per-endpoint delivery throttle. 0 removes the limit.
           maximum: 10000
-          minimum: 1
+          minimum: 0
         allowedSourceIps:
           type: string
         signatureScheme:

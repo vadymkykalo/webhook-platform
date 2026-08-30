@@ -7,7 +7,6 @@ import com.webhook.platform.api.domain.entity.IncomingSource;
 import com.webhook.platform.api.domain.entity.Project;
 import com.webhook.platform.api.domain.repository.IncomingDestinationRepository;
 import com.webhook.platform.api.domain.repository.IncomingSourceRepository;
-import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.domain.repository.TransformationRepository;
 import com.webhook.platform.api.dto.IncomingDestinationRequest;
 import com.webhook.platform.api.dto.IncomingDestinationResponse;
@@ -47,8 +46,6 @@ class IncomingDestinationServiceTest {
     @Mock
     private IncomingSourceRepository sourceRepository;
     @Mock
-    private ProjectRepository projectRepository;
-    @Mock
     private TransformationRepository transformationRepository;
 
     private IncomingDestinationService service;
@@ -66,7 +63,7 @@ class IncomingDestinationServiceTest {
         EncryptionKeyRegistry registry = createTestRegistry(
                 "test_encryption_key_32_chars_pad", "test_salt");
         service = new IncomingDestinationService(
-                destinationRepository, sourceRepository, projectRepository,
+                destinationRepository, sourceRepository,
                 transformationRepository,
                 registry,
                 true, List.of()
@@ -93,7 +90,6 @@ class IncomingDestinationServiceTest {
 
     private void stubOwnership() {
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
     }
 
 
@@ -236,7 +232,7 @@ class IncomingDestinationServiceTest {
 
         IncomingDestinationRequest request = IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
-                .transformationId(transformId)
+                .transformationId(transformId.toString())
                 .build();
 
         assertThatThrownBy(() -> service.createDestination(sourceId, request))
@@ -262,7 +258,7 @@ class IncomingDestinationServiceTest {
 
         IncomingDestinationRequest request = IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
-                .transformationId(transformId)
+                .transformationId(transformId.toString())
                 .build();
 
         IncomingDestinationResponse response = service.createDestination(sourceId, request);
@@ -284,12 +280,61 @@ class IncomingDestinationServiceTest {
 
         IncomingDestinationRequest request = IncomingDestinationRequest.builder()
                 .url("https://example.com/hook")
-                .transformationId(transformId)
+                .transformationId(transformId.toString())
                 .build();
 
         assertThatThrownBy(() -> service.updateDestination(destId, request))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("Transformation does not belong to this project");
+    }
+
+    @Test
+    void updateDestination_blankTransformationId_detachesTheTemplate() {
+        IncomingDestination dest = buildDest();
+        dest.setTransformationId(UUID.randomUUID());
+        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubOwnership();
+
+        // Same signal that clears payloadTransform. There used to be none for this field, so a
+        // destination that acquired a transformation was stuck with one for good.
+        service.updateDestination(destId, IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .transformationId("")
+                .build());
+
+        assertThat(dest.getTransformationId()).isNull();
+        verify(transformationRepository, never()).findById(any());
+    }
+
+    @Test
+    void updateDestination_omittedTransformationId_leavesItAlone() {
+        IncomingDestination dest = buildDest();
+        UUID attached = UUID.randomUUID();
+        dest.setTransformationId(attached);
+        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        when(destinationRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubOwnership();
+
+        service.updateDestination(destId, IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .build());
+
+        assertThat(dest.getTransformationId()).isEqualTo(attached);
+    }
+
+    @Test
+    void updateDestination_malformedTransformationId_isRefused() {
+        IncomingDestination dest = buildDest();
+        when(destinationRepository.findById(destId)).thenReturn(Optional.of(dest));
+        stubOwnership();
+
+        assertThatThrownBy(() -> service.updateDestination(destId, IncomingDestinationRequest.builder()
+                .url("https://example.com/hook")
+                .transformationId("not-a-uuid")
+                .build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be a UUID");
     }
 
     @Test

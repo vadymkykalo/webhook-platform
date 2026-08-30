@@ -207,7 +207,8 @@ export interface IncomingDestinationRequest {
   timeoutSeconds?: number;
   retryDelays?: string;
   payloadTransform?: string;
-  transformationId?: string | null;
+  /** A UUID, or '' to detach the destination from its transformation template. */
+  transformationId?: string;
 }
 
 export interface IncomingDestinationResponse {

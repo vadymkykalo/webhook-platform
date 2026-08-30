@@ -214,7 +214,9 @@ export default function IncomingSourceDetailPage() {
       timeoutSeconds: parseInt(destTimeout) || 30,
       retryDelays: destRetryDelays || undefined,
       payloadTransform: destPayloadTransform || undefined,
-      transformationId: destTransformationId || null,
+      // '' rather than null: an omitted transformationId leaves the current one in place, and
+      // clearing the field on this form is a request to detach.
+      transformationId: destTransformationId,
     };
 
     try {
