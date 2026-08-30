@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -113,6 +114,8 @@ class CircuitBreakerServiceTest {
         when(redissonClient.<String>getBucket(anyString())).thenThrow(new RuntimeException("Redis down"));
 
         assertTrue(service.isCallPermitted(endpointId), "fail-open: Redis unavailability must never block deliveries");
+        assertEquals(1.0, meterRegistry.get("circuit_breaker_degraded_total").counter().count(),
+                "failing open is right; failing open invisibly is the bug");
     }
 
     // --- recordFailure: trips open when threshold crossed -----------------------------------
@@ -164,6 +167,12 @@ class CircuitBreakerServiceTest {
 
         // Best-effort: must swallow the exception, not propagate into the delivery path.
         service.recordFailure(endpointId, new RuntimeException("boom"));
+
+        /* Each of these is an outcome the breaker did not see. Swallowed at DEBUG with no
+           counter, a partially degraded Redis meant the breaker would never trip and nothing
+           anywhere said so — the endpoint stayed "healthy" precisely because the health of it
+           had stopped being measured. */
+        assertEquals(1.0, meterRegistry.get("circuit_breaker_degraded_total").counter().count());
     }
 
     // --- recordSuccess: trips open on a high slow-call rate ----------------------------------
