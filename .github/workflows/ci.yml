@@ -113,6 +113,197 @@ jobs:
           print(f"UI Deployment and probes all target {expected}.")
           EOF
 
+  # helm-lint above renders the chart and checks the manifests against the
+  # Kubernetes schema. Nothing applied them, and four defects lived in that gap
+  # for releases: WEBHOOK_ENCRYPTION_SALT was never supplied to either app
+  # (both require it with no default, so every api and worker pod CrashLooped),
+  # the PodDisruptionBudget template the values and the README both advertised
+  # did not exist, MANAGEMENT_PORT was never set so every metrics scrape hit the
+  # authenticated chain and got a 401, and APP_BASE_URL was left at the app's
+  # own http://localhost:5173 so verification and invite links pointed at
+  # nobody's machine. A render is not an install; this job installs.
+  #
+  # needs: docker-build for the same reason install-smoke does — it restores the
+  # three images from that job's layer cache rather than building them cold.
+  helm-kind-smoke:
+    name: Helm Chart Install Smoke Test
+    runs-on: ubuntu-latest
+    needs: docker-build
+    timeout-minutes: 30
+
+    env:
+      KIND_CLUSTER: hookflow-smoke
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the three images
+        run: |
+          set -e
+          for svc in api worker ui; do
+            docker buildx build --load \
+              -f "webhook-platform-${svc}/Dockerfile" \
+              -t "webhook-platform-${svc}:test" \
+              --cache-from "type=gha,scope=${svc}" .
+          done
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: hookflow-smoke
+          node_image: kindest/node:v1.31.0
+
+      - name: Load the images into the cluster
+        run: |
+          set -e
+          for svc in api worker ui; do
+            kind load docker-image "webhook-platform-${svc}:test" --name "$KIND_CLUSTER"
+          done
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.16.3
+
+      # Verbatim from the chart README's "Create secrets" step, including
+      # encryption-salt. If that snippet ever stops producing a Secret the chart
+      # can install against, this is where it shows.
+      - name: Create secrets, the way the chart README says to
+        run: |
+          set -e
+          kubectl create secret generic hookflow-secrets \
+            --from-literal=encryption-key="$(openssl rand -base64 32)" \
+            --from-literal=encryption-salt="$(openssl rand -base64 24)" \
+            --from-literal=jwt-secret="$(openssl rand -base64 64)"
+          kubectl create secret generic hookflow-postgresql-secret \
+            --from-literal=password="$(openssl rand -base64 32)"
+          kubectl create secret generic hookflow-redis-secret \
+            --from-literal=password="$(openssl rand -base64 32)"
+
+      - name: Stand up PostgreSQL, Kafka and Redis
+        run: |
+          set -e
+          kubectl apply -f deploy/ci/kind-dependencies.yaml
+          kubectl wait --for=condition=available --timeout=5m \
+            deployment/postgres deployment/kafka deployment/redis
+
+      # One replica of each and no HPA — a kind node on a CI runner cannot fit
+      # the production replica counts, and neither has anything to do with what
+      # this job checks. The PDBs are switched on precisely because they are new.
+      - name: helm install
+        run: |
+          set -e
+          helm install hookflow deploy/helm/hookflow \
+            --wait --timeout 15m \
+            --set postgresql.external.host=postgres \
+            --set kafka.external.bootstrapServers=kafka:9092 \
+            --set redis.external.host=redis \
+            --set api.image.repository=webhook-platform-api \
+            --set api.image.tag=test \
+            --set worker.image.repository=webhook-platform-worker \
+            --set worker.image.tag=test \
+            --set ui.image.repository=webhook-platform-ui \
+            --set ui.image.tag=test \
+            --set api.replicaCount=1 \
+            --set worker.replicaCount=1 \
+            --set ui.replicaCount=1 \
+            --set api.hpa.enabled=false \
+            --set worker.hpa.enabled=false \
+            --set api.pdb.enabled=true \
+            --set worker.pdb.enabled=true \
+            --set ui.pdb.enabled=true
+
+      - name: Every workload came up
+        run: |
+          set -e
+          kubectl get pods -o wide
+          kubectl rollout status deployment/hookflow-api --timeout=5m
+          kubectl rollout status deployment/hookflow-worker --timeout=5m
+          kubectl rollout status deployment/hookflow-ui --timeout=5m
+
+      - name: The PodDisruptionBudgets exist
+        run: |
+          set -e
+          kubectl get pdb
+          COUNT=$(kubectl get pdb -o name | wc -l)
+          [ "$COUNT" = "3" ] || { echo "::error::expected 3 PodDisruptionBudgets, found $COUNT"; exit 1; }
+
+      - name: Mail links do not point at localhost
+        run: |
+          set -e
+          BASE=$(kubectl get configmap hookflow-config -o jsonpath='{.data.APP_BASE_URL}')
+          CORS=$(kubectl get configmap hookflow-config -o jsonpath='{.data.CORS_ALLOWED_ORIGINS}')
+          echo "APP_BASE_URL=$BASE  CORS_ALLOWED_ORIGINS=$CORS"
+          case "$BASE$CORS" in
+            *localhost*|*127.0.0.1*|"")
+              echo "::error::APP_BASE_URL/CORS_ALLOWED_ORIGINS still point at localhost: $BASE / $CORS"
+              exit 1 ;;
+          esac
+
+      - name: Health and metrics answer from inside the cluster
+        run: |
+          set -e
+          kubectl run smoke-curl --image=curlimages/curl:8.10.1 --restart=Never \
+            --command -- sleep 1800
+          kubectl wait --for=condition=ready pod/smoke-curl --timeout=3m
+
+          check() {
+            code=$(kubectl exec smoke-curl -- \
+              curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$1")
+            printf '%-56s %s (want %s)\n' "$1" "$code" "$2"
+            [ "$code" = "$2" ] || { echo "::error::$1 returned $code, expected $2"; exit 1; }
+          }
+
+          # Actuator on the management port, for both services.
+          check http://hookflow-api:8082/actuator/health          200
+          check http://hookflow-worker:8081/actuator/health/liveness 200
+          # The scrape the ServiceMonitor performs. 200, not the 401 it got
+          # while the chart left actuator on the authenticated main port —
+          # which is the whole reason MANAGEMENT_PORT is set now.
+          check http://hookflow-api:8082/actuator/prometheus      200
+          check http://hookflow-worker:8081/actuator/prometheus   200
+          # And the main port still refuses it, so the 200 above is the split
+          # doing the work rather than actuator having been left wide open.
+          # Asserted as "not 200" rather than a specific code: SecurityConfig
+          # answers 401 there, but which of 401/404 you get depends on whether
+          # authorization or handler mapping speaks first, and the invariant is
+          # that metrics are not served unauthenticated on the traffic port.
+          code=$(kubectl exec smoke-curl -- \
+            curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+            http://hookflow-api:8080/actuator/prometheus)
+          echo "http://hookflow-api:8080/actuator/prometheus  $code (want anything but 200)"
+          [ "$code" != "200" ] || { echo "::error::metrics are served unauthenticated on the traffic port"; exit 1; }
+          # The UI image's nginx proxies /actuator/health to the literal
+          # upstream `api` on 8082 — this proves the alias Service forwards to
+          # the real management port.
+          check http://api:8082/actuator/health/liveness          200
+          check http://hookflow-ui/                               200
+          check http://hookflow-ui/actuator/health/liveness       200
+
+      - name: Helm Kind Smoke Summary
+        if: always()
+        run: |
+          echo "### Helm Chart Install Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "install into kind -> pods Ready -> health 200 -> metrics 200 (not 401)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Dump state on failure
+        if: failure()
+        run: |
+          kubectl get all -o wide || true
+          kubectl get events --sort-by=.lastTimestamp || true
+          kubectl describe pods || true
+          kubectl logs -l app.kubernetes.io/component=api --tail=200 --prefix || true
+          kubectl logs -l app.kubernetes.io/component=worker --tail=200 --prefix || true
+          kubectl logs -l app.kubernetes.io/component=ui --tail=100 --prefix || true
+
+      - name: Tear down
+        if: always()
+        run: helm uninstall hookflow || true
+
   backend-build:
     name: Backend Build & Compile
     runs-on: ubuntu-latest

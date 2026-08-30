@@ -14,7 +14,11 @@ spec:
       app.kubernetes.io/name: {{ include "hookflow.name" . }}
       app.kubernetes.io/component: api
   endpoints:
-    - port: http
+    # The management port, by name — on the main port /actuator/prometheus goes
+    # through SecurityConfig's authenticated filter chain and answers 401, so
+    # every scrape failed and the alerts in prometheusrule.yaml fired on absent
+    # data instead of on anything that had happened.
+    - port: management
       path: /actuator/prometheus
       interval: {{ .Values.monitoring.serviceMonitor.interval | default "15s" }}
       scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout | default "10s" }}
@@ -37,7 +41,11 @@ spec:
       app.kubernetes.io/name: {{ include "hookflow.name" . }}
       app.kubernetes.io/component: worker
   endpoints:
-    - port: http
+    # The management port, by name — on the main port /actuator/prometheus goes
+    # through SecurityConfig's authenticated filter chain and answers 401, so
+    # every scrape failed and the alerts in prometheusrule.yaml fired on absent
+    # data instead of on anything that had happened.
+    - port: management
       path: /actuator/prometheus
       interval: {{ .Values.monitoring.serviceMonitor.interval | default "15s" }}
       scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout | default "10s" }}

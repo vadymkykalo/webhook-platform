@@ -119,3 +119,48 @@ Redis port
 {{- default 6379 .Values.redis.external.port }}
 {{- end }}
 {{- end }}
+
+{{/*
+Actuator ("management") port for each service.
+
+Both apps read MANAGEMENT_PORT and serve /actuator/** on it (see each
+application.yml: `management.server.port`). Splitting actuator off the main
+port is what lets Prometheus scrape /actuator/prometheus at all: on the main
+port that path goes through SecurityConfig's authenticated filter chain and
+answers 401, so every scrape failed and the PrometheusRule alerts below fired
+on absent data rather than on anything real. The numbers match
+docker-compose.yml (8082 for api, 8081 for worker) so the two deployment
+paths cannot drift - that drift has already been a live metrics bug once.
+
+Declared here rather than in values.yaml because three things have to agree
+(the container's env, its containerPort, and the Service port the
+ServiceMonitor names by name), and a knob is a way for them to disagree.
+*/}}
+{{- define "hookflow.api.managementPort" -}}8082{{- end }}
+{{- define "hookflow.worker.managementPort" -}}8081{{- end }}
+
+{{/*
+The URL people type into a browser.
+
+Verification, password-reset and invite links are built from it, so a wrong
+value produces mail whose links nobody can follow - and the application's own
+default is http://localhost:5173, which is exactly that. install.sh asks for
+this and writes APP_BASE_URL (and CORS_ALLOWED_ORIGINS from the same value);
+this is the chart's equivalent, defaulting to the UI ingress host - https when
+TLS is configured - since that is the address the ingress already promises.
+Set app.baseUrl explicitly when browsers reach Hookflow by some other name.
+
+The last resort, the in-cluster UI Service, is not reachable from a mailbox,
+but it is at least this release's own address rather than the developer's
+laptop.
+*/}}
+{{- define "hookflow.appBaseUrl" -}}
+{{- if .Values.app.baseUrl }}
+{{- .Values.app.baseUrl | trimSuffix "/" }}
+{{- else if and .Values.ui.ingress.enabled .Values.ui.ingress.hosts }}
+{{- $scheme := ternary "https" "http" (not (empty .Values.ui.ingress.tls)) }}
+{{- printf "%s://%s" $scheme (first .Values.ui.ingress.hosts).host }}
+{{- else }}
+{{- printf "http://%s-ui" (include "hookflow.fullname" .) }}
+{{- end }}
+{{- end }}
