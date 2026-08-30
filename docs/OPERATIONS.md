@@ -101,25 +101,26 @@ Metrics (Prometheus): `/actuator/prometheus` — on port **8082** for the API,
 **8081** for the worker (a separate `management.server.port` from the main app
 port, so Prometheus can scrape without a JWT/API-key — the app's main-port
 `/actuator/**` still requires one). See `monitoring/README.md` "Metrics-scrape
-auth" for the full rationale and the one place this isn't fixed yet
-(Kubernetes/Helm's `ServiceMonitor` for the API still scrapes the authenticated
-main port and 401s — tracked below, not yet done).
+auth" for the full rationale. The Helm chart splits the port the same way, and
+its `ServiceMonitor` scrapes the management port by name.
 
 Alerting: `make monitoring-up` also starts Alertmanager (`:9093`), which routes
 the 14 rules in `deploy/prometheus/alerts.yml` to Slack/webhook/email via the
 `ALERTMANAGER_*` env vars (`.env.dist`). See `monitoring/README.md` "Alerting".
 
-**Kubernetes gap (open):** `deploy/helm/hookflow/templates/servicemonitor.yaml`
-scrapes the API's `/actuator/prometheus` on its main authenticated port — that
-scrape 401s today. Fixing it means adding a management port to
-`api-deployment.yaml` / `api-service.yaml` / `servicemonitor.yaml` /
-`values.yaml` and re-pointing the liveness/readiness probes, which needs a real
-cluster to validate before shipping; the app itself already supports it via the
-`MANAGEMENT_PORT`/`MANAGEMENT_ADDRESS` env vars (same mechanism the Compose
-path uses), the chart templates just don't set them yet. The worker's
-ServiceMonitor is unaffected (worker has no auth on its actuator at all) but
-was separately broken by `MANAGEMENT_ADDRESS` defaulting to `127.0.0.1` —
-since fixed (default is now `0.0.0.0`; not published to any host port).
+**Kubernetes (closed):** the chart sets `MANAGEMENT_PORT` on both deployments
+(8082 for the API, 8081 for the worker), exposes it as a named `management`
+port on the container and the Service, points the `ServiceMonitor` and the API's
+probes at it, and opens it in the NetworkPolicy. Before that, every scrape in
+Kubernetes returned 401 and the `PrometheusRule` alerts fired on no data — while
+`helm-lint` stayed green, because nothing in CI ever applied the chart. The
+`helm-kind-smoke` job does now, and asserts a 200 on both management ports and a
+non-200 on the API's traffic port.
+
+The worker was separately broken by `MANAGEMENT_ADDRESS` defaulting to
+`127.0.0.1`, which left its actuator answering nothing outside the pod —
+kubelet probes included. The chart sets it to `0.0.0.0`; the port is published
+to no host.
 
 ## Backup & Restore
 

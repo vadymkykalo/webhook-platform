@@ -72,15 +72,11 @@ listing, cardinality, in worker's case zero auth on `/actuator/env` too if ever
 exposed) becomes reachable to whatever else is on it — that's the residual risk
 to weigh, not "wide open to the internet" (the port still isn't published).
 
-**Known gap (Kubernetes/Helm):** `deploy/helm/hookflow/templates/servicemonitor.yaml`
-scrapes `/actuator/prometheus` on the API's main `http` port (8080), which is
-still behind SecurityConfig's auth there — that scrape target 401s today. The
-worker's ServiceMonitor is fine (worker has no `spring-security` dependency at
-all — its actuator was just unreachable, see below). This wasn't fixed in
-Doing it properly means adding a management port to
-`api-deployment.yaml`/`api-service.yaml`/`servicemonitor.yaml`/`values.yaml`
-and re-pointing `livenessProbe`/`readinessProbe`, which needs a real cluster to
-validate before shipping. Tracked in `docs/OPERATIONS.md`.
+**Kubernetes/Helm:** `deploy/helm/hookflow/templates/servicemonitor.yaml`
+scrapes the `management` port by name, which the chart sets to 8082 (API) and
+8081 (worker) — the same split Compose uses. It previously scraped the main
+authenticated port and every scrape 401'd, unnoticed because CI linted the
+chart but never applied it.
 
 **Bonus fix, not just Compose:** `MANAGEMENT_ADDRESS` defaulted to
 `127.0.0.1` — loopback *inside* the worker's own container — which silently
