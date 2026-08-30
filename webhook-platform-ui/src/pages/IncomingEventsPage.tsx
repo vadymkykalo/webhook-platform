@@ -423,6 +423,33 @@ export default function IncomingEventsPage() {
                                     {t('incomingEvents.detail.nextRetry', { time: formatDateTime(attempt.nextRetryAt) })}
                                   </p>
                                 )}
+                                {/* What we sent, not only what came back. The Forward's request
+                                    headers and body are recorded server-side — masked through
+                                    HeaderSanitizer and truncated there — and showing them is what
+                                    brings debugging a Forward level with debugging a Delivery,
+                                    which has shown both for as long as it has existed. Collapsed
+                                    by default: the response is what a reader looks at first, and
+                                    "what did we send them" is the second question. */}
+                                {attempt.requestHeadersJson && (
+                                  <details className="mt-1.5">
+                                    <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
+                                      {t('incomingEvents.detail.attemptRequestHeaders')}
+                                    </summary>
+                                    <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded bg-secondary p-2 font-mono text-[11px]">
+                                      {tryFormatJson(attempt.requestHeadersJson)}
+                                    </pre>
+                                  </details>
+                                )}
+                                {attempt.requestBodySnippet && (
+                                  <details className="mt-1.5">
+                                    <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
+                                      {t('incomingEvents.detail.attemptRequestBody')}
+                                    </summary>
+                                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-secondary p-2 font-mono text-[11px]">
+                                      {tryFormatJson(attempt.requestBodySnippet)}
+                                    </pre>
+                                  </details>
+                                )}
                                 {attempt.responseBodySnippet && (
                                   <pre className="mt-1.5 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded bg-secondary p-2 font-mono text-[11px]">
                                     {attempt.responseBodySnippet}

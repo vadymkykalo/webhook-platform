@@ -99,6 +99,12 @@ class MutatingHandlerScopeDeclarationTest {
             "MemberController.removeMember",
             "MemberController.reissueInvite",
             "MemberController.acceptInvite",
+            // Same reason, and stronger than the three above: suspend and reinstate declare
+            // @RequireAccess(OWNER), which the interceptor enforces for every caller. An API key
+            // holds MembershipRole.API_KEY and so is refused whatever its scope — a scope
+            // annotation could only weaken that.
+            "MemberController.suspendMember",
+            "MemberController.reinstateMember",
 
             // Unauthenticated by design — whitelisted public paths in SecurityConfig.
             "BillingController.handleWebhook",

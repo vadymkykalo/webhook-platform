@@ -240,7 +240,7 @@ class WebhookDeliveryServiceTest {
         when(redissonClient.getPermitExpirableSemaphore(anyString()))
                 .thenThrow(new RuntimeException("Redis unavailable in this test"));
         RedisConcurrencyControlService realConcurrencyControl = new RedisConcurrencyControlService(
-                redissonClient, new SimpleMeterRegistry(), maxConcurrent, 90);
+                redissonClient, new SimpleMeterRegistry(), maxConcurrent, 20, 90);
 
         // A real concurrency control, so the permit accounting this test is about is real.
         AttemptRunner runnerWithRealPermits = new AttemptRunner(
@@ -300,7 +300,7 @@ class WebhookDeliveryServiceTest {
             localService.processDelivery(message, true);
         }
 
-        assertTrue(realConcurrencyControl.tryAcquire(endpointId),
+        assertTrue(realConcurrencyControl.tryAcquireForTarget(endpointId),
                 "a fixed decrypt (or any other pre-HTTP throw) must not leave the endpoint " +
                         "permanently throttled to zero — every failing attempt has to release its permit");
     }
@@ -349,7 +349,8 @@ class WebhookDeliveryServiceTest {
     private void stubHappyPathPrerequisites(Endpoint endpoint) throws Exception {
         when(projectRateLimiterService.tryAcquire(any())).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(any())).thenReturn(true);
-        when(concurrencyControlService.tryAcquire(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(any())).thenReturn(true);
         when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
         when(payloadTransformService.transform(anyString(), any())).thenReturn("{}");
     }
@@ -583,7 +584,8 @@ class WebhookDeliveryServiceTest {
 
         when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
-        when(concurrencyControlService.tryAcquire(endpointId)).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(endpointId)).thenReturn(true);
         when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
 
         UUID transformationId = UUID.randomUUID();
@@ -656,7 +658,8 @@ class WebhookDeliveryServiceTest {
 
         when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
-        when(concurrencyControlService.tryAcquire(endpointId)).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(endpointId)).thenReturn(true);
         when(encryptionKeyRegistry.decryptWithFallback(anyString(), anyString(), anyInt())).thenReturn("secret");
 
         UUID deliveryId = UUID.randomUUID();
@@ -729,7 +732,7 @@ class WebhookDeliveryServiceTest {
             verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
             verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
             verify(circuitBreakerService).recordSuccess(eq(endpointId), anyLong());
-            verify(concurrencyControlService).release(endpointId);
+            verify(concurrencyControlService).releaseForTarget(endpointId);
         } finally {
             httpServer.stop(0);
         }
@@ -857,7 +860,7 @@ class WebhookDeliveryServiceTest {
             verify(deliveryRepository).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.PENDING));
             verify(deliveryRepository, never()).save(argThat(d -> d.getStatus() == Delivery.DeliveryStatus.SUCCESS));
             verify(circuitBreakerService).recordFailure(eq(endpointId), any());
-            verify(concurrencyControlService).release(endpointId);
+            verify(concurrencyControlService).releaseForTarget(endpointId);
         } finally {
             httpServer.stop(0);
         }
@@ -920,7 +923,8 @@ class WebhookDeliveryServiceTest {
         when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
         // No rate limit configured on this endpoint (rateLimitPerSecond is null), so the
         // rate limiter branch is skipped entirely -- concurrency is the blocking check.
-        when(concurrencyControlService.tryAcquire(endpointId)).thenReturn(false);
+        when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(endpointId)).thenReturn(false);
 
         Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
@@ -933,7 +937,7 @@ class WebhookDeliveryServiceTest {
         verifyNoInteractions(mockWebClient);
         // Concurrency was never actually acquired, so there must be nothing to release --
         // a spurious release() here would desync the permit accounting.
-        verify(concurrencyControlService, never()).release(any());
+        verify(concurrencyControlService, never()).releaseForTarget(any());
 
         ArgumentCaptor<Delivery> captor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(captor.capture());
@@ -960,7 +964,8 @@ class WebhookDeliveryServiceTest {
 
         when(projectRateLimiterService.tryAcquire(endpoint.getProjectId())).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(endpointId)).thenReturn(true);
-        when(concurrencyControlService.tryAcquire(endpointId)).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(endpointId)).thenReturn(true);
 
         Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);
         when(deliveryRepository.findById(deliveryId)).thenReturn(Optional.of(delivery));
@@ -977,8 +982,8 @@ class WebhookDeliveryServiceTest {
         // accounting for the paths that DO take one — a decryption failure on a rotated key, a
         // bad client certificate — is covered by
         // attemptDelivery_decryptSecretThrows_releasesPermitEveryTime_soEndpointNeverBlocks.
-        verify(concurrencyControlService, never()).tryAcquire(endpointId);
-        verify(concurrencyControlService, never()).release(endpointId);
+        verify(concurrencyControlService, never()).tryAcquireForTarget(endpointId);
+        verify(concurrencyControlService, never()).releaseForTarget(endpointId);
 
         ArgumentCaptor<Delivery> deliveryCaptor = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryRepository).save(deliveryCaptor.capture());
@@ -1259,7 +1264,7 @@ class WebhookDeliveryServiceTest {
                 "an unusable ladder must terminate the delivery, not schedule another attempt");
 
         // Nothing was sent, and no permit was ever taken: the check runs before admission.
-        verify(concurrencyControlService, never()).tryAcquire(endpointId);
+        verify(concurrencyControlService, never()).tryAcquireForTarget(endpointId);
         verify(deliveryRepository, never()).incrementAttemptCount(any());
     }
 
@@ -1273,6 +1278,13 @@ class WebhookDeliveryServiceTest {
         Endpoint endpoint = verifiedEndpoint(endpointId, UUID.randomUUID());
         when(endpointRepository.findById(endpointId)).thenReturn(Optional.of(endpoint));
         when(eventRepository.findById(eventId)).thenReturn(Optional.of(stubEvent(eventId, endpoint.getProjectId())));
+        // Admission is now ordered by what a refusal costs to undo: the breaker first (it
+        // consumes nothing), then the two concurrency permits (releasable), then the rate
+        // limiters (a token cannot be un-consumed). So this test has to get past three checks
+        // to still stop where it means to.
+        when(circuitBreakerService.isCallPermitted(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any())).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(any())).thenReturn(true);
         when(projectRateLimiterService.tryAcquire(any())).thenReturn(false); // stop right after the check
 
         Delivery delivery = baseDelivery(deliveryId, eventId, endpointId, 0, 5);

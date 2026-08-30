@@ -3590,6 +3590,68 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/orgs/{orgId}/members/{userId}/suspend:
+    post:
+      tags:
+      - Organizations
+      summary: Suspend member
+      description: "Suspends a member: the membership and its role are kept, the member\
+        \ is refused access, and their current sessions end immediately"
+      operationId: suspendMember
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Member suspended
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/orgs/{orgId}/members/{userId}/reinstate:
+    post:
+      tags:
+      - Organizations
+      summary: Reinstate member
+      description: "Lifts a suspension, restoring the member's access in the role\
+        \ they kept"
+      operationId: reinstateMember
+      parameters:
+      - name: orgId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Member reinstated
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/orgs/{orgId}/members/{userId}/invite:
     post:
       tags:

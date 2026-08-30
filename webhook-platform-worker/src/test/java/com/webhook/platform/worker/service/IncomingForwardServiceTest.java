@@ -139,7 +139,8 @@ class IncomingForwardServiceTest {
         // Tenant isolation guards — permissive by default
         when(projectRateLimiterService.tryAcquire(any(UUID.class))).thenReturn(true);
         when(circuitBreakerService.isCallPermitted(any(UUID.class))).thenReturn(true);
-        when(concurrencyControlService.tryAcquire(any(UUID.class))).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
+        when(concurrencyControlService.tryAcquireForTarget(any(UUID.class))).thenReturn(true);
 
         service = newService(WebClient.builder().build(), new SimpleMeterRegistry(), newAttemptRunner(true));
     }
@@ -260,7 +261,7 @@ class IncomingForwardServiceTest {
 
         verify(attemptRepository, never()).claimRetryForProcessing(any(), any(), anyInt(), any(), any(), any());
         // Guard chain must have been entered -- proves attemptForward ran.
-        verify(concurrencyControlService).tryAcquire(destinationId);
+        verify(concurrencyControlService).tryAcquireForTarget(destinationId);
     }
 
     @Test
@@ -298,7 +299,7 @@ class IncomingForwardServiceTest {
                 .claimRetryForProcessing(eq(eventId), eq(destinationId), eq(2), isNull(), eq(fencingToken), any(UUID.class));
         // Only the winning delivery must reach the dispatch guard chain -- i.e. exactly
         // one attempt to acquire a concurrency permit, which is what gates the HTTP POST.
-        verify(concurrencyControlService, times(1)).tryAcquire(destinationId);
+        verify(concurrencyControlService, times(1)).tryAcquireForTarget(destinationId);
     }
 
     // -- SSRF failure: claim + update, not INSERT --
@@ -658,7 +659,7 @@ class IncomingForwardServiceTest {
                 .contains("INVALID_RETRY_LADDER");
 
         // Checked after the claim but before admission: no permit taken, nothing sent.
-        verify(concurrencyControlService, never()).tryAcquire(destinationId);
+        verify(concurrencyControlService, never()).tryAcquireForTarget(destinationId);
     }
 
     // -- a Forward whose ladder is exhausted announces itself --

@@ -2,6 +2,7 @@ package com.webhook.platform.api.domain.repository;
 
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -35,7 +36,16 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     Optional<Membership> findByInviteTokenHash(String inviteTokenHash);
 
-    long countByOrganizationIdAndRole(UUID organizationId, MembershipRole role);
+    /**
+     * Members holding a role whose status is not the given one.
+     *
+     * <p>Used for the last-owner guard, with {@code DISABLED} excluded. Counting owner rows
+     * flatly would let a suspended owner stand in for an administrator who can actually sign
+     * in: suspend one of two owners, then remove or demote the other, and the organization is
+     * left with nobody able to administer it — including nobody able to lift the suspension.</p>
+     */
+    long countByOrganizationIdAndRoleAndStatusNot(UUID organizationId, MembershipRole role,
+            MembershipStatus status);
 
     long countByOrganizationId(UUID organizationId);
 

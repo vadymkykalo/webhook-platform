@@ -99,6 +99,20 @@ management:
       enabled: true
     readinessState:
       enabled: true
+    mail:
+      # Off, because mail is not what this service is for. Spring registers a
+      # MailHealthIndicator as soon as spring-boot-starter-mail is on the classpath and
+      # app.email.enabled is on, and it opens an SMTP connection on every health check —
+      # so an unreachable or misconfigured relay turned the whole aggregate DOWN and
+      # /actuator/health answered 503 while the API was ingesting and delivering webhooks
+      # perfectly well. The kind smoke test found exactly that.
+      #
+      # The consequence is worse than a red dashboard: anything paging on /actuator/health
+      # pages for an SMTP blip, and an operator who has not configured mail at all (the
+      # shipped default) gets a permanently unhealthy service. Verification, reset and
+      # invite mail failing is real and worth an alert — but it is a degradation of one
+      # feature, not a reason to take the platform out of rotation.
+      enabled: false
   server:
     # Defaults to the same port as `server.port` (i.e. no split — actuator
     # stays behind SecurityConfig's JWT/API-key auth on the main port, same as

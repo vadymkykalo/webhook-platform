@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -123,5 +124,38 @@ describe('IncomingEventsPage', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(screen.queryByText(/no incoming events/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it('shows what was actually forwarded, not only what came back', async () => {
+    /* The Forward's request headers and body were added to incoming_forward_attempts and
+       exposed on the response, and nothing rendered them — so debugging a failed Forward
+       stayed structurally weaker than debugging a failed Delivery, which has shown both
+       for as long as it has existed. "What did we send them" is the first question a
+       failing integration asks. */
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(incomingEventsApi.list).mockResolvedValue(populatedEventsPage([INCOMING_EVENT]));
+    vi.mocked(incomingEventsApi.getAttempts).mockResolvedValue({
+      content: [{
+        id: 'attempt-1',
+        incomingEventId: INCOMING_EVENT.id,
+        destinationId: 'dest-1',
+        destinationUrl: 'https://internal.example.com/hook',
+        attemptNumber: 1,
+        status: 'FAILED',
+        requestHeadersJson: '{"Authorization":"***","Content-Type":"application/json"}',
+        requestBodySnippet: '{"order":"ord_42"}',
+        responseCode: 500,
+        createdAt: new Date().toISOString(),
+      }],
+      totalElements: 1, totalPages: 1, size: 20, number: 0, first: true, last: true,
+    } as any);
+
+    renderIncomingEvents();
+    const row = await screen.findByText(INCOMING_EVENT.requestId!);
+    await userEvent.click(row);
+
+    expect(await screen.findByText('Forwarded request headers')).toBeInTheDocument();
+    expect(screen.getByText('Forwarded request body')).toBeInTheDocument();
+    expect(screen.getByText(/ord_42/)).toBeInTheDocument();
   });
 });

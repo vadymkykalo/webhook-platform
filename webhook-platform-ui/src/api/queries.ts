@@ -395,6 +395,22 @@ export function useRemoveMember(orgId: string) {
     });
 }
 
+export function useSuspendMember(orgId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => membersApi.suspend(orgId, userId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
+    });
+}
+
+export function useReinstateMember(orgId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => membersApi.reinstate(orgId, userId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
+    });
+}
+
 // ─── API Keys ──────────────────────────────────────────────────────
 
 export function useApiKeysPaged(projectId: string | undefined, page: number, size = 20) {

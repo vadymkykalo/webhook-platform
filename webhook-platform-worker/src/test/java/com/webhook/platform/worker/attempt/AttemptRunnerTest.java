@@ -35,6 +35,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * The Runner's interface is the test surface.
@@ -72,7 +74,8 @@ class AttemptRunnerTest {
 
         lenient().when(tenantRateLimiter.tryAcquire(any(UUID.class))).thenReturn(true);
         lenient().when(targetRateLimiter.tryAcquire(any(UUID.class), anyInt())).thenReturn(true);
-        lenient().when(concurrency.tryAcquire(any(UUID.class))).thenReturn(true);
+        lenient().when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
+        lenient().when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(true);
         lenient().when(circuitBreaker.isCallPermitted(any(UUID.class))).thenReturn(true);
 
         metrics = new RecordingMetrics();
@@ -287,7 +290,7 @@ class AttemptRunnerTest {
         @DisplayName("a concurrency cap defers and takes no permit to release")
         void concurrencyCapDefers() {
             FakeStore store = new FakeStore(baseUrl);
-            when(concurrency.tryAcquire(any(UUID.class))).thenReturn(false);
+            when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(false);
 
             runner.run(store, metrics);
 
@@ -304,7 +307,120 @@ class AttemptRunnerTest {
 
             assertInstanceOf(Finalization.TerminallyFailed.class, store.finalizations.get(0));
             assertEquals(0, store.attemptStartingCalls);
-            org.mockito.Mockito.verify(concurrency, org.mockito.Mockito.never()).tryAcquire(any(UUID.class));
+            verify(concurrency, never()).tryAcquireForTenant(any(UUID.class));
+            verify(concurrency, never()).tryAcquireForTarget(any(UUID.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("one tenant cannot take the whole worker")
+    class TenantIsolation {
+
+        @Test
+        @DisplayName("a tenant at its concurrency cap defers even though its endpoint is under its own")
+        void tenantCapDefersWhileTargetHasRoom() {
+            FakeStore store = new FakeStore(baseUrl);
+            when(concurrency.tryAcquireForTenant(store.tenantKey)).thenReturn(false);
+            when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(true);
+
+            runner.run(store, metrics);
+
+            /* The per-endpoint cap is the only one that existed, and it is the wrong shape for
+               this: it bounds one endpoint to a slice of the pool, so a tenant with enough
+               endpoints multiplies its way to all of it. Each endpoint here is well-behaved;
+               it is their sum that is not. */
+            assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
+            assertEquals(0, store.attemptStartingCalls, "a deferral is not an attempt");
+            assertEquals(0, store.records.size());
+        }
+
+        @Test
+        @DisplayName("a tenant at its cap does not hold a permit belonging to its endpoint")
+        void tenantCapReleasesNothingItDidNotTake() {
+            FakeStore store = new FakeStore(baseUrl);
+            when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(false);
+
+            runner.run(store, metrics);
+
+            /* The tenant permit is taken first, so a refusal there must not reach for the
+               target's. Invariant 3 is about releasing what you took; taking what you cannot
+               use is the other half of it. */
+            verify(concurrency, never()).tryAcquireForTarget(any(UUID.class));
+            verify(concurrency, never()).releaseForTarget(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("both permits come back on the ordinary path")
+        void bothPermitsReleasedAfterASend() {
+            respond(200, "ok");
+            FakeStore store = new FakeStore(baseUrl);
+
+            runner.run(store, metrics);
+
+            verify(concurrency).releaseForTenant(store.tenantKey);
+            verify(concurrency).releaseForTarget(store.targetKey);
+        }
+
+        @Test
+        @DisplayName("both permits come back when the attempt throws before the request is built")
+        void bothPermitsReleasedWhenBodyFails() {
+            FakeStore store = new FakeStore(baseUrl);
+            store.bodyFailure = new PayloadTransformException("template is broken");
+
+            runner.run(store, metrics);
+
+            /* Invariant 3, now with two permits: a transformation that throws before the
+               request exists must not strand either of them. A stranded tenant permit is
+               strictly worse than a stranded endpoint one — it costs the whole organization
+               rather than one receiver. */
+            verify(concurrency).releaseForTenant(store.tenantKey);
+            verify(concurrency).releaseForTarget(store.targetKey);
+        }
+
+        @Test
+        @DisplayName("the tenant permit comes back when the target's cap refuses")
+        void tenantPermitReleasedWhenTargetCapRefuses() {
+            FakeStore store = new FakeStore(baseUrl);
+            when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(true);
+            when(concurrency.tryAcquireForTarget(any(UUID.class))).thenReturn(false);
+
+            runner.run(store, metrics);
+
+            assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
+            verify(concurrency).releaseForTenant(store.tenantKey);
+        }
+
+        @Test
+        @DisplayName("a rate limit that refuses after the permits gives them back")
+        void permitsReleasedWhenARateLimitRefuses() {
+            FakeStore store = new FakeStore(baseUrl);
+            when(tenantRateLimiter.tryAcquire(any(UUID.class))).thenReturn(false);
+
+            runner.run(store, metrics);
+
+            /* The rate limiters are checked after the permits because a token cannot be
+               un-consumed and a permit can. That ordering is only correct if the permits are
+               handed back here — otherwise a rate-limited tenant would leak a permit per
+               deferral and throttle itself into a standstill it could never leave. */
+            assertInstanceOf(Finalization.Deferred.class, store.finalizations.get(0));
+            verify(concurrency).releaseForTenant(store.tenantKey);
+            verify(concurrency).releaseForTarget(store.targetKey);
+        }
+
+        @Test
+        @DisplayName("a refused admission consumes no rate-limit token")
+        void refusedAdmissionSpendsNoToken() {
+            FakeStore store = new FakeStore(baseUrl);
+            when(concurrency.tryAcquireForTenant(any(UUID.class))).thenReturn(false);
+
+            runner.run(store, metrics);
+
+            /* Tokens used to be spent before the concurrency check, so an attempt that never
+               happened still cost the tenant its budget. Under concurrency pressure — exactly
+               when the deferrals happen — a tenant got measurably less throughput than it was
+               configured for, and nothing said why. */
+            verify(tenantRateLimiter, never()).tryAcquire(any(UUID.class));
+            verify(targetRateLimiter, never()).tryAcquire(any(UUID.class), anyInt());
         }
     }
 
@@ -376,6 +492,8 @@ class AttemptRunnerTest {
         private final String url;
 
         ClaimResult<String> claimResult;
+        UUID tenantKey = UUID.randomUUID();
+        UUID targetKey = UUID.randomUUID();
         RetryLadder ladder = RetryLadder.parse("60,300", 5);
         int attemptNumber = 1;
         boolean finaliseApplies = true;
@@ -398,7 +516,7 @@ class AttemptRunnerTest {
                 return claimResult;
             }
             return new ClaimResult.Claimed<>("claim-1", new AttemptContext(
-                    "fake attempt", UUID.randomUUID(), UUID.randomUUID(), null,
+                    "fake attempt", tenantKey, targetKey, null,
                     attemptNumber, ladder, url, 5));
         }
 
