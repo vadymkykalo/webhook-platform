@@ -46,6 +46,7 @@ public class DeliveryService {
     private final ProjectRepository projectRepository;
     private final ObjectMapper objectMapper;
     private final DeliveryDispatch deliveryDispatch;
+    private final PiiMaskingService piiMaskingService;
 
     public DeliveryService(
             DeliveryRepository deliveryRepository,
@@ -54,7 +55,8 @@ public class DeliveryService {
             EventRepository eventRepository,
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
-            DeliveryDispatch deliveryDispatch) {
+            DeliveryDispatch deliveryDispatch,
+            PiiMaskingService piiMaskingService) {
         this.deliveryRepository = deliveryRepository;
         this.deliveryAttemptRepository = deliveryAttemptRepository;
         this.endpointRepository = endpointRepository;
@@ -62,6 +64,22 @@ public class DeliveryService {
         this.projectRepository = projectRepository;
         this.objectMapper = objectMapper;
         this.deliveryDispatch = deliveryDispatch;
+        this.piiMaskingService = piiMaskingService;
+    }
+
+    /**
+     * Applies the project's masking rules, tolerating a null body.
+     *
+     * <p>The rules used to reach the project events list, the event diff and a shared debug
+     * link, and stopped there — so the screens an operator opens *because* a delivery failed
+     * showed the payload the other screens had redacted. A masking feature that holds in some
+     * places is worse than none, because it is trusted.
+     */
+    private String mask(UUID projectId, String body) {
+        if (body == null || projectId == null) {
+            return body;
+        }
+        return piiMaskingService.sanitizePayload(projectId, body);
     }
 
     private void validateDeliveryAccess(Delivery delivery, AuthContext auth) {
@@ -159,8 +177,9 @@ public class DeliveryService {
         List<DeliveryAttempt> attempts = deliveryAttemptRepository
                 .findByDeliveryIdOrderByAttemptNumberAsc(deliveryId);
         
+        UUID projectId = resolveProjectId(delivery);
         return attempts.stream()
-                .map(this::mapAttemptToResponse)
+                .map(a -> mapAttemptToResponse(a, projectId))
                 .toList();
     }
 
@@ -280,16 +299,18 @@ public class DeliveryService {
         }
     }
 
-    private DeliveryAttemptResponse mapAttemptToResponse(DeliveryAttempt attempt) {
+    private DeliveryAttemptResponse mapAttemptToResponse(DeliveryAttempt attempt, UUID projectId) {
         return DeliveryAttemptResponse.builder()
                 .id(attempt.getId())
                 .deliveryId(attempt.getDeliveryId())
                 .attemptNumber(attempt.getAttemptNumber())
                 .requestHeaders(attempt.getRequestHeaders())
-                .requestBody(truncate(attempt.getRequestBody(), 100000)) // 100KB limit
+                // Masked before truncation: truncating first would let the tail of a 100 KB
+                // body escape the rules simply by being past the cut.
+                .requestBody(truncate(mask(projectId, attempt.getRequestBody()), 100000)) // 100KB limit
                 .httpStatusCode(attempt.getHttpStatusCode())
                 .responseHeaders(attempt.getResponseHeaders())
-                .responseBody(truncate(attempt.getResponseBody(), 100000)) // 100KB limit
+                .responseBody(truncate(mask(projectId, attempt.getResponseBody()), 100000)) // 100KB limit
                 .errorMessage(attempt.getErrorMessage())
                 .durationMs(attempt.getDurationMs())
                 .createdAt(attempt.getCreatedAt())
@@ -338,7 +359,7 @@ public class DeliveryService {
                 .endpointUrl(endpoint.getUrl())
                 .eventType(event.getEventType())
                 .idempotencyKey(idempotencyKey)
-                .payload(event.getDecompressedPayload())
+                .payload(mask(event.getProjectId(), event.getDecompressedPayload()))
                 .previousAttemptCount(delivery.getAttemptCount())
                 .maxAttempts(delivery.getMaxAttempts())
                 .currentStatus(delivery.getStatus().name())

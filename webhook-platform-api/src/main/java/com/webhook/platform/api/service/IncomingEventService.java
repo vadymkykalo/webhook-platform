@@ -51,6 +51,7 @@ public class IncomingEventService {
     private final ObjectMapper objectMapper;
     private final ForwardDispatch forwardDispatch;
     private final TransactionTemplate txTemplate;
+    private final PiiMaskingService piiMaskingService;
 
     public IncomingEventService(
             IncomingEventRepository eventRepository,
@@ -61,7 +62,8 @@ public class IncomingEventService {
             ProjectRepository projectRepository,
             ObjectMapper objectMapper,
             ForwardDispatch forwardDispatch,
-            PlatformTransactionManager txManager) {
+            PlatformTransactionManager txManager,
+            PiiMaskingService piiMaskingService) {
         this.eventRepository = eventRepository;
         this.sourceRepository = sourceRepository;
         this.forwardAttemptRepository = forwardAttemptRepository;
@@ -71,6 +73,7 @@ public class IncomingEventService {
         this.objectMapper = objectMapper;
         this.forwardDispatch = forwardDispatch;
         this.txTemplate = new TransactionTemplate(txManager);
+        this.piiMaskingService = piiMaskingService;
     }
 
     /**
@@ -299,7 +302,20 @@ public class IncomingEventService {
                 .collect(Collectors.toMap(IncomingSource::getId, IncomingSource::getName, (a, b) -> a));
     }
 
+    /**
+     * The raw body a provider posted, with the project's masking rules applied.
+     *
+     * <p>Incoming carries whatever a third party sent — routinely a customer record, a payment
+     * or an address. The rules reached the outgoing events list and not this, so the same
+     * personal data was redacted on one screen and printed verbatim on the other. Masking is
+     * configured per project, and an incoming event reaches its project through its source.
+     */
     private IncomingEventResponse mapToResponse(IncomingEvent event, Map<UUID, String> sourceNames) {
+        UUID projectId = resolveProjectIdFromSource(event.getIncomingSourceId());
+        String bodyRaw = event.getBodyRaw();
+        if (bodyRaw != null && projectId != null) {
+            bodyRaw = piiMaskingService.sanitizePayload(projectId, bodyRaw);
+        }
         return IncomingEventResponse.builder()
                 .sourceName(sourceNames.get(event.getIncomingSourceId()))
                 .id(event.getId())
@@ -309,7 +325,7 @@ public class IncomingEventService {
                 .path(event.getPath())
                 .queryParams(event.getQueryParams())
                 .headersJson(event.getHeadersJson())
-                .bodyRaw(event.getBodyRaw())
+                .bodyRaw(bodyRaw)
                 .bodySha256(event.getBodySha256())
                 .contentType(event.getContentType())
                 .clientIp(event.getClientIp())

@@ -77,16 +77,23 @@ class IncomingEventServiceTest {
     private final AuthContext auth = new AuthContext(UUID.randomUUID(), orgId, MembershipRole.OWNER, null, null);
 
     private Project project;
+    @Mock private PiiMaskingService piiMaskingService;
+
     private IncomingSource source;
 
     @BeforeEach
     void setUp() {
         when(txManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+        // What the real service does for a project with no masking rules: hand the payload
+        // straight back. An unstubbed mock returns null, which would silently assert that
+        // masking blanks every body.
+        lenient().when(piiMaskingService.sanitizePayload(any(), anyString()))
+                .thenAnswer(inv -> inv.getArgument(1));
 
         service = new IncomingEventService(
                 eventRepository, sourceRepository, forwardAttemptRepository,
                 destinationRepository, outboxMessageRepository, projectRepository,
-                objectMapper, new ForwardDispatch(objectMapper), txManager
+                objectMapper, new ForwardDispatch(objectMapper), txManager, piiMaskingService
         );
         project = Project.builder().id(projectId).organizationId(orgId).name("Test").build();
         source = IncomingSource.builder()
