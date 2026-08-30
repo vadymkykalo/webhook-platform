@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 187,
+  "operationCount": 193,
   "security": [
     {
       "id": "bearerAuth",
@@ -1150,6 +1150,69 @@
       "description": "DLQ management operations",
       "operations": [
         {
+          "id": "retryIncomingDlqItem",
+          "method": "POST",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}/retry",
+          "summary": "Retry single incoming DLQ item",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "forwardAttemptId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Forward queued for retry",
+              "type": "DlqActionResponse"
+            }
+          ],
+          "description": "Re-forwards one abandoned forward to the destination that failed"
+        },
+        {
+          "id": "retryIncomingDlqItems",
+          "method": "POST",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/retry",
+          "summary": "Bulk retry incoming DLQ items",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Forwards queued for retry",
+              "type": "DlqActionResponse"
+            }
+          ],
+          "description": "Re-forwards several abandoned forwards, each to the destination that failed",
+          "body": {
+            "contentType": "application/json",
+            "type": "IncomingDlqRetryRequest",
+            "required": true
+          }
+        },
+        {
           "id": "retrySingle",
           "method": "POST",
           "path": "/api/v1/projects/{projectId}/dlq/{deliveryId}/retry",
@@ -1211,6 +1274,134 @@
             "type": "DlqRetryRequest",
             "required": true
           }
+        },
+        {
+          "id": "listIncomingDlqItems",
+          "method": "GET",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq",
+          "summary": "List incoming DLQ items",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "page",
+              "in": "query",
+              "required": false,
+              "type": "integer (int32)"
+            },
+            {
+              "name": "size",
+              "in": "query",
+              "required": false,
+              "type": "integer (int32)"
+            },
+            {
+              "name": "destinationId",
+              "in": "query",
+              "required": false,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "OK",
+              "type": "PageIncomingDlqItemResponse"
+            }
+          ],
+          "description": "Returns paginated list of abandoned forwards in the incoming DLQ"
+        },
+        {
+          "id": "purgeIncomingDlq",
+          "method": "DELETE",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq",
+          "summary": "Purge all incoming DLQ items",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Incoming DLQ purged",
+              "type": "DlqActionResponse"
+            }
+          ],
+          "description": "Permanently deletes every abandoned forward in the project's incoming DLQ"
+        },
+        {
+          "id": "getIncomingDlqItem",
+          "method": "GET",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}",
+          "summary": "Get incoming DLQ item details",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "forwardAttemptId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "OK",
+              "type": "IncomingDlqItemResponse"
+            }
+          ],
+          "description": "Returns details of a single abandoned forward"
+        },
+        {
+          "id": "getIncomingDlqStats",
+          "method": "GET",
+          "path": "/api/v1/projects/{projectId}/incoming-dlq/stats",
+          "summary": "Get incoming DLQ stats",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "OK",
+              "type": "DlqStatsResponse"
+            }
+          ],
+          "description": "Returns incoming DLQ statistics for the project"
         },
         {
           "id": "listDlqItems",
@@ -3598,7 +3789,7 @@
             },
             {
               "status": "429",
-              "description": "Rate limit exceeded",
+              "description": "Rate limit or monthly event quota exceeded",
               "type": "IngressResponse"
             }
           ],
@@ -8540,6 +8731,75 @@
         "required": false
       }
     ],
+    "IncomingDlqItemResponse": [
+      {
+        "name": "forwardAttemptId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "incomingEventId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "destinationId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "incomingSourceId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "sourceName",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "destinationUrl",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "attemptNumber",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "maxAttempts",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "responseCode",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "lastError",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "failedAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      }
+    ],
+    "IncomingDlqRetryRequest": [
+      {
+        "name": "forwardAttemptIds",
+        "type": "string (uuid)[]",
+        "required": true
+      }
+    ],
     "IncomingEventResponse": [
       {
         "name": "id",
@@ -8668,6 +8928,16 @@
       {
         "name": "finishedAt",
         "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "requestHeadersJson",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "requestBodySnippet",
+        "type": "string",
         "required": false
       },
       {
@@ -9924,6 +10194,63 @@
       {
         "name": "content",
         "type": "IncomingDestinationResponse[]",
+        "required": false
+      },
+      {
+        "name": "number",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "sort",
+        "type": "SortObject",
+        "required": false
+      },
+      {
+        "name": "pageable",
+        "type": "PageableObject",
+        "required": false
+      },
+      {
+        "name": "numberOfElements",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "first",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "last",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "empty",
+        "type": "boolean",
+        "required": false
+      }
+    ],
+    "PageIncomingDlqItemResponse": [
+      {
+        "name": "totalPages",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "totalElements",
+        "type": "integer (int64)",
+        "required": false
+      },
+      {
+        "name": "size",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "content",
+        "type": "IncomingDlqItemResponse[]",
         "required": false
       },
       {
@@ -12934,6 +13261,25 @@
       "createdAt": "2026-01-01T12:00:00Z",
       "updatedAt": "2026-01-01T12:00:00Z"
     },
+    "IncomingDlqItemResponse": {
+      "forwardAttemptId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "destinationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "sourceName": "string",
+      "destinationUrl": "string",
+      "attemptNumber": 0,
+      "maxAttempts": 0,
+      "responseCode": 0,
+      "lastError": "string",
+      "failedAt": "2026-01-01T12:00:00Z",
+      "createdAt": "2026-01-01T12:00:00Z"
+    },
+    "IncomingDlqRetryRequest": {
+      "forwardAttemptIds": [
+        "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      ]
+    },
     "IncomingEventResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -12961,6 +13307,8 @@
       "status": "PENDING",
       "startedAt": "2026-01-01T12:00:00Z",
       "finishedAt": "2026-01-01T12:00:00Z",
+      "requestHeadersJson": "string",
+      "requestBodySnippet": "string",
       "responseCode": 0,
       "responseHeadersJson": "string",
       "responseBodySnippet": "string",
@@ -13541,6 +13889,45 @@
       "last": true,
       "empty": true
     },
+    "PageIncomingDlqItemResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "forwardAttemptId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "destinationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "incomingSourceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "sourceName": "string",
+          "destinationUrl": "string",
+          "attemptNumber": 0,
+          "maxAttempts": 0,
+          "responseCode": 0,
+          "lastError": "string",
+          "failedAt": "2026-01-01T12:00:00Z",
+          "createdAt": "2026-01-01T12:00:00Z"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "empty": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "offset": 0,
+        "sort": {},
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
     "PageIncomingEventResponse": {
       "totalPages": 0,
       "totalElements": 0,
@@ -13598,6 +13985,8 @@
           "status": "PENDING",
           "startedAt": "2026-01-01T12:00:00Z",
           "finishedAt": "2026-01-01T12:00:00Z",
+          "requestHeadersJson": "string",
+          "requestBodySnippet": "string",
           "responseCode": 0,
           "responseHeadersJson": "string",
           "responseBodySnippet": "string",

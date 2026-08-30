@@ -2276,6 +2276,52 @@
       "validate": "Validate"
     }
   },
+  "incomingDlq": {
+    "abandoned": "Abandoned",
+    "columns": {
+      "attempts": "Attempts",
+      "destination": "Destination",
+      "eventId": "Event ID",
+      "failedAt": "Failed At",
+      "lastError": "Last Error",
+      "source": "Source"
+    },
+    "ladderExhausted": "Retry ladder exhausted after {{count}} attempts",
+    "ladderExhausted_few": "Retry ladder exhausted after {{count}} attempts",
+    "ladderExhausted_many": "Retry ladder exhausted after {{count}} attempts",
+    "ladderExhausted_one": "Retry ladder exhausted after {{count}} attempt",
+    "ladderExhausted_other": "Retry ladder exhausted after {{count}} attempts",
+    "last24h": "Last 24 Hours",
+    "last7d": "Last 7 Days",
+    "noItems": "No abandoned forwards",
+    "noItemsDesc": "Every incoming webhook is reaching its destinations",
+    "pageTitle": "Failed Forwards",
+    "purgeAll": "Purge All",
+    "purgeDialog": {
+      "description": "This will permanently delete all {{count}} abandoned forwards. This action cannot be undone.",
+      "impactIrreversible": "These forwards cannot be recovered or retried after purging",
+      "impactItems": "{{count}} abandoned forwards will be permanently deleted",
+      "title": "Purge All Failed Forwards?"
+    },
+    "retryOne": "Retry this forward",
+    "retrySelected": "Retry selected ({{count}})",
+    "subtitle": "Incoming webhooks that never reached their destination in <strong>{{project}}</strong>",
+    "toast": {
+      "bulkRetried": "{{count}} forwards queued for retry",
+      "bulkRetried_few": "{{count}} forwards queued for retry",
+      "bulkRetried_many": "{{count}} forwards queued for retry",
+      "bulkRetried_one": "{{count}} forward queued for retry",
+      "bulkRetried_other": "{{count}} forwards queued for retry",
+      "bulkRetryFailed": "Failed to retry forwards",
+      "loadFailed": "Failed to load failed forwards",
+      "purgeFailed": "Failed to purge failed forwards",
+      "purged": "{{count}} forwards purged",
+      "retried": "Forward queued for retry",
+      "retryFailed": "Failed to retry forward"
+    },
+    "totalItems": "Total Items",
+    "unknownError": "Unknown error"
+  },
   "incomingEvents": {
     "columns": {
       "clientIp": "Client IP",
@@ -2818,6 +2864,7 @@
     "home": "Home",
     "incidents": "Incidents",
     "incoming": "Incoming",
+    "incomingDlq": "Failed Forwards",
     "incomingEvents": "Received",
     "incomingSources": "Sources",
     "lightMode": "Light mode",

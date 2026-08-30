@@ -78,10 +78,11 @@ public class IncomingForwardService {
         IncomingEvent event = eventOpt.get();
         IncomingDestination destination = destOpt.get();
 
-        // Whether the Destination is still admissible is the store's, deliberately, and so is URL
-        // validation the Runner's: deciding either here marks the row FAILED without holding a
-        // Claim on it, which is looser than every other terminal path. Only the two rows this
-        // method cannot resolve at all are settled below, because there is nothing to claim with.
+        // Whether the Destination is still admissible belongs to the store, and URL validation to
+        // the Runner, both deliberately: settling either here marks the row FAILED without
+        // holding a Claim on it, which is looser than every other terminal path. Only the two
+        // cases above are settled here, because a row whose Event or Destination cannot be
+        // resolved at all has nothing to build a store from.
         attemptRunner.run(storeFactory.create(message, event, destination), metrics);
     }
 

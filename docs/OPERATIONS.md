@@ -91,6 +91,16 @@ a substituted ladder.
 - Bulk retry from UI
 - Check endpoint availability
 
+### Failed forwards spike (incoming direction)
+`incoming_forward_dlq_depth` is the alertable gauge; it drops as the backlog is worked through.
+- Navigate to UI → Failed Forwards, or `GET /api/v1/projects/{projectId}/incoming-dlq`
+- Retry one or several from there. A retry re-forwards to the destination that failed and to
+  nothing else, on a fresh retry ladder. Do **not** use the Time Machine's replay for this: it
+  fans the incoming event out to *every* enabled destination, including the ones that already
+  received it.
+- Check destination availability, and that the destination is still enabled — a disabled
+  destination fails its forwards terminally rather than retrying them.
+
 ## Monitoring
 
 Health endpoints:

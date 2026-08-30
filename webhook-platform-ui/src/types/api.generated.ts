@@ -1056,6 +1056,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry single incoming DLQ item
+         * @description Re-forwards one abandoned forward to the destination that failed
+         */
+        post: operations["retryIncomingDlqItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk retry incoming DLQ items
+         * @description Re-forwards several abandoned forwards, each to the destination that failed
+         */
+        post: operations["retryIncomingDlqItems"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/incidents": {
         parameters: {
             query?: never;
@@ -2208,6 +2248,70 @@ export interface paths {
          * @description Returns forwarding attempts for an incoming event
          */
         get: operations["getEventAttempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incoming DLQ items
+         * @description Returns paginated list of abandoned forwards in the incoming DLQ
+         */
+        get: operations["listIncomingDlqItems"];
+        put?: never;
+        post?: never;
+        /**
+         * Purge all incoming DLQ items
+         * @description Permanently deletes every abandoned forward in the project's incoming DLQ
+         */
+        delete: operations["purgeIncomingDlq"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get incoming DLQ item details
+         * @description Returns details of a single abandoned forward
+         */
+        get: operations["getIncomingDlqItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{projectId}/incoming-dlq/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get incoming DLQ stats
+         * @description Returns incoming DLQ statistics for the project
+         */
+        get: operations["getIncomingDlqStats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3754,6 +3858,17 @@ export interface components {
              */
             totalForwardAttempts?: number;
         };
+        DlqActionResponse: {
+            /** Format: int32 */
+            retried?: number;
+            /** Format: int32 */
+            requested?: number;
+            /** Format: int32 */
+            purged?: number;
+        };
+        IncomingDlqRetryRequest: {
+            forwardAttemptIds: string[];
+        };
         TimelineEntryRequest: {
             /** @enum {string} */
             entryType: "FAILURE" | "RETRY" | "REPLAY" | "NOTE" | "STATUS_CHANGE";
@@ -3822,14 +3937,6 @@ export interface components {
             clientCert: string;
             clientKey: string;
             caCert?: string;
-        };
-        DlqActionResponse: {
-            /** Format: int32 */
-            retried?: number;
-            /** Format: int32 */
-            requested?: number;
-            /** Format: int32 */
-            purged?: number;
         };
         DlqRetryRequest: {
             deliveryIds: string[];
@@ -4298,6 +4405,8 @@ export interface components {
             startedAt?: string;
             /** Format: date-time */
             finishedAt?: string;
+            requestHeadersJson?: string;
+            requestBodySnippet?: string;
             /** Format: int32 */
             responseCode?: number;
             responseHeadersJson?: string;
@@ -4325,6 +4434,55 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
+        };
+        IncomingDlqItemResponse: {
+            /** Format: uuid */
+            forwardAttemptId?: string;
+            /** Format: uuid */
+            incomingEventId?: string;
+            /** Format: uuid */
+            destinationId?: string;
+            /** Format: uuid */
+            incomingSourceId?: string;
+            sourceName?: string;
+            destinationUrl?: string;
+            /** Format: int32 */
+            attemptNumber?: number;
+            /** Format: int32 */
+            maxAttempts?: number;
+            /** Format: int32 */
+            responseCode?: number;
+            lastError?: string;
+            /** Format: date-time */
+            failedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PageIncomingDlqItemResponse: {
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            size?: number;
+            content?: components["schemas"]["IncomingDlqItemResponse"][];
+            /** Format: int32 */
+            number?: number;
+            sort?: components["schemas"]["SortObject"];
+            pageable?: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            numberOfElements?: number;
+            first?: boolean;
+            last?: boolean;
+            empty?: boolean;
+        };
+        DlqStatsResponse: {
+            /** Format: int64 */
+            totalItems?: number;
+            /** Format: int64 */
+            last24Hours?: number;
+            /** Format: int64 */
+            last7Days?: number;
         };
         PageIncidentResponse: {
             /** Format: int32 */
@@ -4439,14 +4597,6 @@ export interface components {
             first?: boolean;
             last?: boolean;
             empty?: boolean;
-        };
-        DlqStatsResponse: {
-            /** Format: int64 */
-            totalItems?: number;
-            /** Format: int64 */
-            last24Hours?: number;
-            /** Format: int64 */
-            last7Days?: number;
         };
         PageApiKeyResponse: {
             /** Format: int32 */
@@ -6291,7 +6441,7 @@ export interface operations {
                     "*/*": components["schemas"]["IngressResponse"];
                 };
             };
-            /** @description Rate limit exceeded */
+            /** @description Rate limit or monthly event quota exceeded */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -7227,6 +7377,55 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["IncomingBulkReplayResponse"];
+                };
+            };
+        };
+    };
+    retryIncomingDlqItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                forwardAttemptId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forward queued for retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqActionResponse"];
+                };
+            };
+        };
+    };
+    retryIncomingDlqItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncomingDlqRetryRequest"];
+            };
+        };
+        responses: {
+            /** @description Forwards queued for retry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqActionResponse"];
                 };
             };
         };
@@ -9021,6 +9220,99 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PageIncomingForwardAttemptResponse"];
+                };
+            };
+        };
+    };
+    listIncomingDlqItems: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                destinationId?: string;
+            };
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageIncomingDlqItemResponse"];
+                };
+            };
+        };
+    };
+    purgeIncomingDlq: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Incoming DLQ purged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqActionResponse"];
+                };
+            };
+        };
+    };
+    getIncomingDlqItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                forwardAttemptId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IncomingDlqItemResponse"];
+                };
+            };
+        };
+    };
+    getIncomingDlqStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DlqStatsResponse"];
                 };
             };
         };

@@ -19,7 +19,8 @@ public class ForwardDispatch {
     public enum Reason {
         CREATED("IncomingForwardCreated"),
         REPLAY("IncomingForwardReplay"),
-        BULK_REPLAY("IncomingForwardBulkReplay");
+        BULK_REPLAY("IncomingForwardBulkReplay"),
+        DLQ_RETRY("IncomingForwardDlqRetry");
 
         private final String eventType;
 

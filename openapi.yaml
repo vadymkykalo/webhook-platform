@@ -1581,7 +1581,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/IngressResponse"
         "429":
-          description: Rate limit exceeded
+          description: Rate limit or monthly event quota exceeded
           content:
             '*/*':
               schema:
@@ -2715,6 +2715,67 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/IncomingBulkReplayResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}/retry:
+    post:
+      tags:
+      - Dead Letter Queue
+      summary: Retry single incoming DLQ item
+      description: Re-forwards one abandoned forward to the destination that failed
+      operationId: retryIncomingDlqItem
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: forwardAttemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Forward queued for retry
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqActionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/retry:
+    post:
+      tags:
+      - Dead Letter Queue
+      summary: Bulk retry incoming DLQ items
+      description: "Re-forwards several abandoned forwards, each to the destination\
+        \ that failed"
+      operationId: retryIncomingDlqItems
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncomingDlqRetryRequest"
+        required: true
+      responses:
+        "200":
+          description: Forwards queued for retry
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqActionResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -4751,6 +4812,128 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PageIncomingForwardAttemptResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq:
+    get:
+      tags:
+      - Dead Letter Queue
+      summary: List incoming DLQ items
+      description: Returns paginated list of abandoned forwards in the incoming DLQ
+      operationId: listIncomingDlqItems
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: destinationId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageIncomingDlqItemResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+    delete:
+      tags:
+      - Dead Letter Queue
+      summary: Purge all incoming DLQ items
+      description: Permanently deletes every abandoned forward in the project's incoming
+        DLQ
+      operationId: purgeIncomingDlq
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: Incoming DLQ purged
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqActionResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/{forwardAttemptId}:
+    get:
+      tags:
+      - Dead Letter Queue
+      summary: Get incoming DLQ item details
+      description: Returns details of a single abandoned forward
+      operationId: getIncomingDlqItem
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: forwardAttemptId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IncomingDlqItemResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
+  /api/v1/projects/{projectId}/incoming-dlq/stats:
+    get:
+      tags:
+      - Dead Letter Queue
+      summary: Get incoming DLQ stats
+      description: Returns incoming DLQ statistics for the project
+      operationId: getIncomingDlqStats
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DlqStatsResponse"
       security:
       - bearerAuth: []
       - apiKey: []
@@ -7340,6 +7523,29 @@ components:
           type: integer
           format: int32
           description: Total forward attempts created across all events
+    DlqActionResponse:
+      type: object
+      properties:
+        retried:
+          type: integer
+          format: int32
+        requested:
+          type: integer
+          format: int32
+        purged:
+          type: integer
+          format: int32
+    IncomingDlqRetryRequest:
+      type: object
+      properties:
+        forwardAttemptIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+      required:
+      - forwardAttemptIds
     TimelineEntryRequest:
       type: object
       properties:
@@ -7475,18 +7681,6 @@ components:
       required:
       - clientCert
       - clientKey
-    DlqActionResponse:
-      type: object
-      properties:
-        retried:
-          type: integer
-          format: int32
-        requested:
-          type: integer
-          format: int32
-        purged:
-          type: integer
-          format: int32
     DlqRetryRequest:
       type: object
       properties:
@@ -8371,6 +8565,10 @@ components:
         finishedAt:
           type: string
           format: date-time
+        requestHeadersJson:
+          type: string
+        requestBodySnippet:
+          type: string
         responseCode:
           type: integer
           format: int32
@@ -8418,6 +8616,86 @@ components:
           type: boolean
         empty:
           type: boolean
+    IncomingDlqItemResponse:
+      type: object
+      properties:
+        forwardAttemptId:
+          type: string
+          format: uuid
+        incomingEventId:
+          type: string
+          format: uuid
+        destinationId:
+          type: string
+          format: uuid
+        incomingSourceId:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+        destinationUrl:
+          type: string
+        attemptNumber:
+          type: integer
+          format: int32
+        maxAttempts:
+          type: integer
+          format: int32
+        responseCode:
+          type: integer
+          format: int32
+        lastError:
+          type: string
+        failedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    PageIncomingDlqItemResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncomingDlqItemResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        empty:
+          type: boolean
+    DlqStatsResponse:
+      type: object
+      properties:
+        totalItems:
+          type: integer
+          format: int64
+        last24Hours:
+          type: integer
+          format: int64
+        last7Days:
+          type: integer
+          format: int64
     PageIncidentResponse:
       type: object
       properties:
@@ -8617,18 +8895,6 @@ components:
           type: boolean
         empty:
           type: boolean
-    DlqStatsResponse:
-      type: object
-      properties:
-        totalItems:
-          type: integer
-          format: int64
-        last24Hours:
-          type: integer
-          format: int64
-        last7Days:
-          type: integer
-          format: int64
     PageApiKeyResponse:
       type: object
       properties:

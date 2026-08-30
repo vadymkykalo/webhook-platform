@@ -31,6 +31,7 @@ const BillingPage = lazy(() => import('./pages/BillingPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const ReplayPage = lazy(() => import('./pages/ReplayPage'));
 const DlqPage = lazy(() => import('./pages/DlqPage'));
+const IncomingDlqPage = lazy(() => import('./pages/IncomingDlqPage'));
 const TestEndpointsPage = lazy(() => import('./pages/TestEndpointsPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const IncomingSourcesPage = lazy(() => import('./pages/IncomingSourcesPage'));
@@ -181,6 +182,10 @@ export const router = createBrowserRouter([
       {
         path: 'projects/:projectId/dlq',
         element: <S><DlqPage /></S>,
+      },
+      {
+        path: 'projects/:projectId/incoming-dlq',
+        element: <S><IncomingDlqPage /></S>,
       },
       {
         path: 'projects/:projectId/test-endpoints',

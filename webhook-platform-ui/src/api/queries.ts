@@ -8,6 +8,7 @@ import { membersApi, type MembershipRole, type AddMemberRequest } from './member
 import { apiKeysApi, type ApiKeyRequest } from './apiKeys.api';
 import { dashboardApi } from './dashboard.api';
 import { dlqApi, type DlqFilters } from './dlq.api';
+import { incomingDlqApi, type IncomingDlqFilters } from './incomingDlq.api';
 import { testEndpointsApi } from './testEndpoints.api';
 import { auditLogApi, type AuditLogFilters } from './auditLog.api';
 import { incomingSourcesApi } from './incomingSources.api';
@@ -56,6 +57,10 @@ export const queryKeys = {
     },
     dlq: {
         list: (projectId: string, page: number, size: number, filters?: DlqFilters) => ['dlq', projectId, page, size, filters ?? {}] as const,
+    },
+    incomingDlq: {
+        list: (projectId: string, page: number, size: number, filters?: IncomingDlqFilters) => ['incoming-dlq', projectId, page, size, filters ?? {}] as const,
+        stats: (projectId: string) => ['incoming-dlq', projectId, 'stats'] as const,
     },
     testEndpoints: {
         list: (projectId: string) => ['test-endpoints', projectId] as const,
@@ -438,6 +443,48 @@ export function useDlqPurge(projectId: string) {
     return useMutation({
         mutationFn: () => dlqApi.purgeAll(projectId),
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['dlq', projectId] }); },
+    });
+}
+
+// ─── Incoming DLQ ──────────────────────────────────────────────────
+
+export function useIncomingDlq(projectId: string | undefined, page: number, size = 20, filters?: IncomingDlqFilters) {
+    return useQuery({
+        queryKey: queryKeys.incomingDlq.list(projectId!, page, size, filters),
+        queryFn: () => incomingDlqApi.list(projectId!, page, size, filters),
+        enabled: !!projectId,
+    });
+}
+
+export function useIncomingDlqStats(projectId: string | undefined) {
+    return useQuery({
+        queryKey: queryKeys.incomingDlq.stats(projectId!),
+        queryFn: () => incomingDlqApi.getStats(projectId!),
+        enabled: !!projectId,
+    });
+}
+
+export function useIncomingDlqRetry(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (forwardAttemptId: string) => incomingDlqApi.retrySingle(projectId, forwardAttemptId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-dlq', projectId] }); },
+    });
+}
+
+export function useIncomingDlqBulkRetry(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (ids: string[]) => incomingDlqApi.retryBulk(projectId, ids),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-dlq', projectId] }); },
+    });
+}
+
+export function useIncomingDlqPurge(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => incomingDlqApi.purgeAll(projectId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['incoming-dlq', projectId] }); },
     });
 }
 
