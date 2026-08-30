@@ -70,10 +70,11 @@ public class SecurityConfig {
                                                         // deployment sets MANAGEMENT_PORT to a separate port so
                                                         // Prometheus can reach /actuator/prometheus without a
                                                         // JWT/API-key — see application.yml `management.server.*`
-                                                        // and monitoring/README.md "Metrics-scrape auth". A
-                                                        // Kubernetes/Helm deployment that wants the same needs its
-                                                        // own port split (chart currently scrapes /actuator/prometheus
-                                                        // on the main authenticated port — see docs/OPERATIONS.md).
+                                                        // and monitoring/README.md "Metrics-scrape auth". The Helm
+                                                        // chart splits the port the same way and its ServiceMonitor
+                                                        // scrapes the management port by name; before it did, every
+                                                        // scrape in Kubernetes got a 401 and the alert rules fired
+                                                        // on no data.
                                                         // Everything arriving on the actuator's own port, when
                                                         // one is configured. That port is never published to the
                                                         // host — the Compose deployment exposes only nginx, and
