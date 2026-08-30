@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import com.webhook.platform.api.audit.AuditAction;
 import com.webhook.platform.api.audit.Auditable;
 import com.webhook.platform.api.domain.entity.Project;
@@ -66,6 +67,18 @@ public class TransformationService {
             }
             if (!expr.startsWith("$")) {
                 throw new IllegalArgumentException("Invalid template: expression '" + expr + "' must start with '$' (JSONPath)");
+            }
+            // Compiled, not merely prefix-checked. "$" plus nonsense used to pass here and
+            // fail at delivery time, once per attempt, for every event — and before the worker
+            // was taught to fail loudly it did not even do that: it substituted a JSON null and
+            // delivered a body full of holes. The author is the only person who can fix a typo
+            // in their own path, and this is the one moment they are looking at it.
+            try {
+                JsonPath.compile(expr);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        "Invalid template: expression '" + expr + "' is not a valid JSONPath - "
+                                + e.getMessage());
             }
         }
     }
