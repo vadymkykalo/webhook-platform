@@ -79,6 +79,8 @@ public class WorkflowStepExecution {
         RUNNING,
         SUCCESS,
         FAILED,
-        SKIPPED
+        SKIPPED,
+        /** The node asked the execution to be suspended and resumed later — see StepResult.waiting. */
+        WAITING
     }
 }

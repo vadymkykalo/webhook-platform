@@ -6966,6 +6966,7 @@ components:
           - SUCCESS
           - FAILED
           - SKIPPED
+          - WAITING
         inputData: {}
         outputData: {}
         errorMessage:
@@ -6998,6 +6999,7 @@ components:
           type: string
           enum:
           - RUNNING
+          - WAITING
           - COMPLETED
           - FAILED
           - CANCELLED

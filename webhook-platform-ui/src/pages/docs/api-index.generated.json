@@ -11254,7 +11254,8 @@
           "RUNNING",
           "SUCCESS",
           "FAILED",
-          "SKIPPED"
+          "SKIPPED",
+          "WAITING"
         ]
       },
       {
@@ -12161,6 +12162,7 @@
         "required": false,
         "values": [
           "RUNNING",
+          "WAITING",
           "COMPLETED",
           "FAILED",
           "CANCELLED"

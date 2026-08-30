@@ -4,14 +4,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.webhook.platform.api.domain.entity.WorkflowStepExecution.StepStatus;
 import com.webhook.platform.api.service.workflow.StepResult;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * The delay node asks to be woken; it does not wait.
+ *
+ * <p>These tests previously asserted that {@code execute} slept for roughly the configured
+ * number of seconds — which was the behaviour, and was the bug. The workflow pool is core-size 4
+ * / max-size 8 for the whole deployment and a delay may be 300 seconds, so eight delay nodes
+ * took every thread and no workflow belonging to any organization ran. The node now returns a
+ * due time and the engine suspends the execution, so the clamping the old tests checked is
+ * still worth checking — just not by timing it.
+ */
+@DisplayName("DelayNodeExecutor — returns a due time rather than occupying a thread")
 class DelayNodeExecutorTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -23,70 +33,61 @@ class DelayNodeExecutorTest {
     }
 
     @Test
-    void execute_sleepsRoughlyConfiguredSeconds_andPassesInputThrough() throws Exception {
-        JsonNode config = mapper.readTree("{\"delaySeconds\":1}");
+    @DisplayName("returns immediately, asking to resume after the configured delay")
+    void returnsWaitingWithoutSleeping() throws Exception {
+        JsonNode config = mapper.readTree("{\"delaySeconds\":300}");
         JsonNode input = mapper.readTree("{\"a\":1}");
 
+        Instant before = Instant.now();
         long start = System.currentTimeMillis();
         StepResult result = executor.execute(config, input);
         long elapsed = System.currentTimeMillis() - start;
 
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(result.output()).isEqualTo(input);
-        assertThat(elapsed).isGreaterThanOrEqualTo(1000);
+        assertThat(elapsed)
+                .as("300 seconds of delay must cost no thread time at all")
+                .isLessThan(500);
+        assertThat(result.status()).isEqualTo(StepStatus.WAITING);
+        assertThat(result.resumeAt())
+                .isBetween(before.plusSeconds(299), before.plusSeconds(302));
+        assertThat(result.output())
+                .as("a suspension is transparent to whatever comes next")
+                .isEqualTo(input);
     }
 
     @Test
-    void delaySecondsZero_isClampedToOneSecondMinimum() throws Exception {
-        JsonNode config = mapper.readTree("{\"delaySeconds\":0}");
-        JsonNode input = mapper.readTree("{}");
+    @DisplayName("no configured delay uses the default")
+    void defaultsToFiveSeconds() throws Exception {
+        Instant before = Instant.now();
+        StepResult result = executor.execute(mapper.readTree("{}"), mapper.readTree("{}"));
 
-        long start = System.currentTimeMillis();
-        StepResult result = executor.execute(config, input);
-        long elapsed = System.currentTimeMillis() - start;
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(elapsed).isGreaterThanOrEqualTo(900); // clamped to 1s min, allow small scheduling jitter
+        assertThat(result.resumeAt()).isBetween(before.plusSeconds(4), before.plusSeconds(7));
     }
 
     @Test
-    void delaySecondsNegative_isClampedToOneSecondMinimum() throws Exception {
-        JsonNode config = mapper.readTree("{\"delaySeconds\":-5}");
-        JsonNode input = mapper.readTree("{}");
+    @DisplayName("zero and negative are clamped to one second, not to 'now'")
+    void nonPositiveDelayIsClampedToOneSecond() throws Exception {
+        for (String raw : new String[]{"{\"delaySeconds\":0}", "{\"delaySeconds\":-30}"}) {
+            Instant before = Instant.now();
+            StepResult result = executor.execute(mapper.readTree(raw), mapper.readTree("{}"));
 
-        long start = System.currentTimeMillis();
-        StepResult result = executor.execute(config, input);
-        long elapsed = System.currentTimeMillis() - start;
-
-        assertThat(result.status()).isEqualTo(StepStatus.SUCCESS);
-        assertThat(elapsed).isGreaterThanOrEqualTo(900);
+            /* A resumeAt in the past would be resumed on the very next tick, which is close
+               enough to correct — but a delay node that resolves to no delay reads as a bug in
+               the workflow rather than in the configuration, and one second is the smallest
+               honest answer. */
+            assertThat(result.resumeAt())
+                    .as(raw)
+                    .isAfterOrEqualTo(before)
+                    .isBefore(before.plusSeconds(3));
+        }
     }
 
     @Test
-    void interruptedDuringDelay_returnsFailedAndRestoresInterruptFlag() throws Exception {
-        JsonNode config = mapper.readTree("{\"delaySeconds\":60}");
-        JsonNode input = mapper.readTree("{}");
+    @DisplayName("a delay beyond the maximum is capped rather than rejected")
+    void oversizedDelayIsCapped() throws Exception {
+        Instant before = Instant.now();
+        StepResult result = executor.execute(
+                mapper.readTree("{\"delaySeconds\":99999}"), mapper.readTree("{}"));
 
-        AtomicReference<StepResult> resultRef = new AtomicReference<>();
-        AtomicReference<Boolean> interruptedFlag = new AtomicReference<>();
-        CountDownLatch started = new CountDownLatch(1);
-        CountDownLatch finished = new CountDownLatch(1);
-
-        Thread worker = new Thread(() -> {
-            started.countDown();
-            resultRef.set(executor.execute(config, input));
-            interruptedFlag.set(Thread.currentThread().isInterrupted());
-            finished.countDown();
-        });
-        worker.start();
-        started.await(2, TimeUnit.SECONDS);
-        Thread.sleep(100); // let it enter Thread.sleep()
-        worker.interrupt();
-        boolean completed = finished.await(5, TimeUnit.SECONDS);
-
-        assertThat(completed).isTrue();
-        assertThat(resultRef.get().status()).isEqualTo(StepStatus.FAILED);
-        assertThat(resultRef.get().errorMessage()).isEqualTo("Delay interrupted");
-        assertThat(interruptedFlag.get()).isTrue();
+        assertThat(result.resumeAt()).isBefore(before.plusSeconds(302));
     }
 }
