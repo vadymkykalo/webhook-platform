@@ -192,6 +192,10 @@ webhook:
     replay-window-minutes: ${WEBHOOK_INGRESS_REPLAY_WINDOW_MINUTES:5}
   incoming:
     max-payload-size-bytes: ${WEBHOOK_INCOMING_MAX_PAYLOAD_SIZE_BYTES:524288}
+    # Applies to a Source that names no limit of its own. Matches
+    # event.ingestion.rate-limit-per-second: an incoming webhook costs the platform what an
+    # ingested event does.
+    rate-limit-per-second: ${WEBHOOK_INCOMING_RATE_LIMIT_PER_SECOND:100}
   # Trusted reverse-proxy peers, comma-separated IPs and/or CIDR ranges. X-Forwarded-For /
   # X-Real-IP are honoured ONLY when the direct TCP peer matches one of these — otherwise
   # ignored. Empty (default) trusts nothing: safe when the app is reachable directly.

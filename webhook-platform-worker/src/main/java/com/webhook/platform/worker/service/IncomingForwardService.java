@@ -62,28 +62,27 @@ public class IncomingForwardService {
         Optional<IncomingEvent> eventOpt = eventRepository.findById(eventId);
         if (eventOpt.isEmpty()) {
             log.error("Incoming event not found: {}", eventId);
-            markAttemptFailedIfExists(eventId, destinationId, attemptNumber, "Incoming event not found");
+            markAttemptFailedIfExists(eventId, destinationId, message.getReplaySessionId(), attemptNumber,
+                    "Incoming event not found");
             return;
         }
 
         Optional<IncomingDestination> destOpt = destinationRepository.findById(destinationId);
         if (destOpt.isEmpty()) {
             log.error("Incoming destination not found: {}", destinationId);
-            markAttemptFailedIfExists(eventId, destinationId, attemptNumber, "Incoming destination not found");
+            markAttemptFailedIfExists(eventId, destinationId, message.getReplaySessionId(), attemptNumber,
+                    "Incoming destination not found");
             return;
         }
 
         IncomingEvent event = eventOpt.get();
         IncomingDestination destination = destOpt.get();
 
-        if (!destination.getEnabled()) {
-            log.warn("Destination {} is disabled, skipping forward for event {}", destinationId, eventId);
-            markAttemptFailedIfExists(eventId, destinationId, attemptNumber, "Destination is disabled");
-            return;
-        }
-
-        // URL validation is the Runner's, deliberately. Doing it here would mark the row FAILED
-        // without holding a Claim on it, which is looser than every other terminal path.
+        // Whether the Destination is still admissible belongs to the store, and URL validation to
+        // the Runner, both deliberately: settling either here marks the row FAILED without
+        // holding a Claim on it, which is looser than every other terminal path. Only the two
+        // cases above are settled here, because a row whose Event or Destination cannot be
+        // resolved at all has nothing to build a store from.
         attemptRunner.run(storeFactory.create(message, event, destination), metrics);
     }
 
@@ -101,7 +100,8 @@ public class IncomingForwardService {
         int attemptNumber = resolveAttemptNumber(message);
 
         transactionTemplate.executeWithoutResult(tx -> {
-            IncomingForwardAttempt attempt = findAttempt(eventId, destinationId, attemptNumber);
+            IncomingForwardAttempt attempt = findAttempt(eventId, destinationId,
+                    message.getReplaySessionId(), attemptNumber);
             if (attempt == null) {
                 log.debug("Forward attempt {} for eventId={}, destId={} disappeared before backpressure reschedule",
                         attemptNumber, eventId, destinationId);
@@ -127,10 +127,11 @@ public class IncomingForwardService {
                 : 1;
     }
 
-    private void markAttemptFailedIfExists(UUID eventId, UUID destinationId, int attemptNumber, String reason) {
+    private void markAttemptFailedIfExists(UUID eventId, UUID destinationId, UUID replaySessionId,
+            int attemptNumber, String reason) {
         transactionTemplate.executeWithoutResult(tx -> {
             List<IncomingForwardAttempt> attempts = attemptRepository
-                    .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId);
+                    .findForwardAttempts(eventId, destinationId, replaySessionId);
 
             IncomingForwardAttempt attempt = attempts.stream()
                     .filter(a -> a.getAttemptNumber() == attemptNumber)
@@ -152,9 +153,10 @@ public class IncomingForwardService {
         });
     }
 
-    private IncomingForwardAttempt findAttempt(UUID eventId, UUID destinationId, int attemptNumber) {
+    private IncomingForwardAttempt findAttempt(UUID eventId, UUID destinationId, UUID replaySessionId,
+            int attemptNumber) {
         return attemptRepository
-                .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(eventId, destinationId)
+                .findForwardAttempts(eventId, destinationId, replaySessionId)
                 .stream()
                 .filter(a -> a.getAttemptNumber() == attemptNumber)
                 .findFirst()

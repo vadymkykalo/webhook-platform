@@ -2,6 +2,7 @@ package com.webhook.platform.api.controller;
 
 import com.webhook.platform.api.domain.entity.IncomingEvent;
 import com.webhook.platform.api.dto.IngressResponse;
+import com.webhook.platform.api.exception.QuotaExceededException;
 import com.webhook.platform.api.service.IngressService;
 import com.webhook.platform.api.service.ingress.PayloadTooLargeException;
 import com.webhook.platform.api.service.ingress.RateLimitExceededException;
@@ -46,7 +47,7 @@ public class IngressController {
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
             @ApiResponse(responseCode = "401", description = "Signature verification failed",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class))),
-            @ApiResponse(responseCode = "429", description = "Rate limit exceeded",
+            @ApiResponse(responseCode = "429", description = "Rate limit or monthly event quota exceeded",
                     content = @Content(schema = @Schema(implementation = IngressResponse.class)))
     })
     @PostMapping("/{token}")
@@ -84,6 +85,20 @@ public class IngressController {
                 .body(IngressResponse.builder()
                         .error("rate_limit_exceeded")
                         .message("Too many requests. Please retry later.")
+                        .build());
+    }
+
+    /**
+     * 429 rather than the 402 an authenticated caller gets, and with no detail: the sender is a
+     * third-party provider, not the customer, and it has no business learning which plan the
+     * customer is on or how much of it they have used.
+     */
+    @ExceptionHandler(QuotaExceededException.class)
+    ResponseEntity<IngressResponse> quotaExceeded(QuotaExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(IngressResponse.builder()
+                        .error("quota_exceeded")
+                        .message("This endpoint is not accepting webhooks right now.")
                         .build());
     }
 

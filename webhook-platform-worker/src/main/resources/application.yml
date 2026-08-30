@@ -161,6 +161,7 @@ stuck-delivery:
 
 stuck-forward:
   threshold-minutes: ${STUCK_FORWARD_THRESHOLD_MINUTES:5}
+  stranded-pending-threshold-minutes: ${STUCK_FORWARD_STRANDED_PENDING_THRESHOLD_MINUTES:60}
   check-interval-ms: ${STUCK_FORWARD_CHECK_INTERVAL_MS:60000}
 
 delivery:

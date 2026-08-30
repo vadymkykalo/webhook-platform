@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -33,8 +34,19 @@ final class AttemptSupport {
     }
 
     /** Host, Content-Length and Transfer-Encoding belong to the transport, not to the caller. */
-    @SuppressWarnings("unchecked")
     static void addCustomHeaders(WebClient.RequestBodySpec request, String customHeadersJson,
+            ObjectMapper objectMapper) {
+        Map<String, String> collected = new LinkedHashMap<>();
+        collectCustomHeaders(collected, customHeadersJson, objectMapper);
+        collected.forEach(request::header);
+    }
+
+    /**
+     * The same selection, into a map the caller still owns — a store that has to record what it
+     * sent needs the headers before they disappear into the request builder.
+     */
+    @SuppressWarnings("unchecked")
+    static void collectCustomHeaders(Map<String, String> into, String customHeadersJson,
             ObjectMapper objectMapper) {
         if (customHeadersJson == null || customHeadersJson.isBlank()) {
             return;
@@ -46,7 +58,7 @@ final class AttemptSupport {
                     String lower = key.toLowerCase();
                     if (!lower.equals("host") && !lower.equals("content-length")
                             && !lower.equals("transfer-encoding")) {
-                        request.header(key, value);
+                        into.put(key, value);
                     }
                 }
             });

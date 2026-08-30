@@ -260,12 +260,41 @@ export interface IncomingForwardAttemptResponse {
   status: ForwardAttemptStatus;
   startedAt?: string;
   finishedAt?: string;
+  requestHeadersJson?: string;
+  requestBodySnippet?: string;
   responseCode?: number;
   responseHeadersJson?: string;
   responseBodySnippet?: string;
   errorMessage?: string;
   nextRetryAt?: string;
   createdAt: string;
+}
+
+/** Statistics for either direction's DLQ; the backend returns one shape for both. */
+export interface DlqStatsResponse {
+  totalItems: number;
+  last24Hours: number;
+  last7Days: number;
+}
+
+/** One abandoned Forward: a Destination and an Incoming Event, keyed on the Attempt row. */
+export interface IncomingDlqItemResponse {
+  forwardAttemptId: string;
+  incomingEventId: string;
+  destinationId: string;
+  incomingSourceId?: string;
+  sourceName?: string;
+  destinationUrl?: string;
+  attemptNumber?: number;
+  maxAttempts?: number;
+  responseCode?: number;
+  lastError?: string;
+  failedAt?: string;
+  createdAt?: string;
+}
+
+export interface IncomingDlqRetryRequest {
+  forwardAttemptIds: string[];
 }
 
 export interface ReplayEventResponse {

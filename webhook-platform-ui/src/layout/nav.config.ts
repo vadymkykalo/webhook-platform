@@ -93,10 +93,11 @@ export const PROJECT_SECTIONS: NavSection[] = [
     nameKey: 'nav.deliveries',
     path: (projectId) => p(projectId, 'deliveries'),
     icon: Send,
-    owns: ['deliveries', 'dlq', 'replay'],
+    owns: ['deliveries', 'dlq', 'incoming-dlq', 'replay'],
     tabs: [
       tab('nav.allDeliveries', 'deliveries', Send),
       tab('nav.dlq', 'dlq', AlertTriangle),
+      tab('nav.incomingDlq', 'incoming-dlq', ArrowDownToLine),
       tab('nav.replay', 'replay', History),
     ],
   },
