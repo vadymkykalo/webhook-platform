@@ -1,5 +1,6 @@
 package com.webhook.platform.api.dto;
 
+import com.webhook.platform.api.domain.enums.CompatibilityMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,7 +20,7 @@ public class EventSchemaVersionResponse {
     private String schemaJson;
     private String fingerprint;
     private String status;
-    private String compatibilityMode;
+    private CompatibilityMode compatibilityMode;
     private String description;
     private UUID createdBy;
     private Instant createdAt;

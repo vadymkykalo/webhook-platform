@@ -249,16 +249,11 @@ scale-worker: ## Scale worker instances (usage: make scale-worker N=3)
 	@$(DOCKER_COMPOSE) up -d --scale worker=$(N) --no-recreate
 	@echo "$(GREEN)Worker scaled to $(N) instances$(NC)"
 
-# api normally binds a single fixed host port (127.0.0.1:${API_PORT}:8080) so a
-# human can curl it directly — Compose refuses to scale a service past 1 replica
-# while that fixed host port is bound. Passing API_PORT= (empty, not
-# unset) collapses that mapping to an auto-assigned ephemeral port per replica
-# instead — see the API_PORT comment in docker-compose.yml for why this is an
-# env var trick rather than a `-f docker-compose.scale.yml` overlay (Compose
-# concatenates `ports:` lists across -f files instead of replacing them, so an
-# overlay can't actually remove the fixed mapping). Traffic still reaches every
-# replica because the UI's nginx proxies to `api:8080` by Compose DNS, which
-# round-robins across all replicas on its own.
+# api publishes no host port, so nothing blocks Compose from running several
+# replicas of it — the API_PORT= trick this comment used to describe was working
+# around a fixed 127.0.0.1:8080 mapping that the file no longer has. Traffic
+# reaches every replica because the UI's nginx proxies to `api:8080` by Compose
+# DNS, which round-robins across all of them on its own.
 scale-api: ## Scale API instances (usage: make scale-api N=3)
 	@if [ -z "$(N)" ]; then \
 		echo "$(RED)ERROR: Please specify N=<number>, e.g. make scale-api N=3$(NC)"; \
@@ -266,7 +261,7 @@ scale-api: ## Scale API instances (usage: make scale-api N=3)
 	fi
 	@echo "$(GREEN)Scaling api to $(N) instances (nginx load-balances across them)...$(NC)"
 	@$(DOCKER_COMPOSE) up -d --scale api=$(N) --no-recreate
-	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' shows each replica's assigned port$(NC)"
+	@echo "$(GREEN)API scaled to $(N) instances — 'docker compose ps api' lists the replicas$(NC)"
 
 ##@ Release
 version-check: ## Fail if pom/Chart/UI/SDK versions disagree (same check CI runs)

@@ -114,7 +114,8 @@ public class EventService {
         UUID organizationId = TenantContext.require();
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new NotFoundException("Project not found"));
-        schemaValidationGate.check(project, projectId, request.getType(), request.getData());
+        List<String> schemaWarnings =
+                schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 
         Event event = createEvent(projectId, request);
         event = eventRepository.saveAndFlush(event);
@@ -145,7 +146,11 @@ public class EventService {
 
         int deliveriesCreated = savedDeliveries.size();
         log.info("Created {} deliveries for test event: {}", deliveriesCreated, event.getId());
-        return mapToResponseWithDeliveries(event, deliveriesCreated);
+        EventResponse response = mapToResponseWithDeliveries(event, deliveriesCreated);
+        // A test event is somebody checking their payload, so this is where a WARN policy's
+        // findings are worth the most: they arrive with the thing they are about.
+        response.setSchemaWarnings(schemaWarnings.isEmpty() ? null : schemaWarnings);
+        return response;
     }
 
     private Event createEvent(UUID projectId, EventIngestRequest request) {

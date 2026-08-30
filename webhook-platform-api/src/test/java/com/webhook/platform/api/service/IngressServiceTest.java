@@ -109,7 +109,7 @@ class IngressServiceTest {
         // is fail-closed, so a test that says nothing about it would be rejected before it starts.
         when(rateLimiterService.tryAcquireForSourceFailClosed(any(UUID.class), anyInt())).thenReturn(true);
         encryptionKeyRegistry = createTestRegistry(ENCRYPTION_KEY, ENCRYPTION_SALT);
-        verifierFactory = new WebhookVerifierFactory();
+        verifierFactory = new WebhookVerifierFactory("http://localhost:8080");
         TrustedProxyResolver clientIpResolver = new TrustedProxyResolver(
                 List.of("127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"));
         service = new IngressService(

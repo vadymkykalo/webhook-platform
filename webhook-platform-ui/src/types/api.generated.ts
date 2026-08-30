@@ -1884,6 +1884,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/device/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny device code
+         * @description Called by the authenticated user in the browser to refuse a device login request they did not start. The waiting CLI stops with 403 on its next poll instead of holding the code open until it expires.
+         */
+        post: operations["denyDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/device/code": {
         parameters: {
             query?: never;
@@ -3352,7 +3372,7 @@ export interface components {
             payloadTransform?: string;
             /**
              * Format: uuid
-             * @description ID of a reusable transformation template to apply (overrides payloadTransform if set)
+             * @description ID of a reusable transformation template to apply (overrides payloadTransform if set). Empty string detaches the destination from its template.
              */
             transformationId?: string;
         };
@@ -3398,7 +3418,7 @@ export interface components {
              * @example GITHUB
              * @enum {string}
              */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "CUSTOM";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
             /**
              * @description Source status
              * @enum {string}
@@ -3436,7 +3456,7 @@ export interface components {
             name?: string;
             slug?: string;
             /** @enum {string} */
-            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO" | "CUSTOM";
+            providerType?: "GENERIC" | "GITHUB" | "GITLAB" | "STRIPE" | "SHOPIFY" | "SLACK" | "TWILIO";
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED";
             ingressPathToken?: string;
@@ -3498,7 +3518,10 @@ export interface components {
             description?: string;
             secret?: string;
             enabled?: boolean;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description Per-endpoint delivery throttle. 0 removes the limit.
+             */
             rateLimitPerSecond?: number;
             allowedSourceIps?: string;
             /** @enum {string} */
@@ -3827,7 +3850,11 @@ export interface components {
         };
         EventSchemaVersionRequest: {
             schemaJson: string;
-            compatibilityMode?: string;
+            /**
+             * @description Compatibility promise checked against the previous version. Defaults to the previous version's mode, or NONE for the first version.
+             * @enum {string}
+             */
+            compatibilityMode?: "NONE" | "BACKWARD" | "FORWARD" | "FULL";
             description?: string;
         };
         EventSchemaVersionResponse: {
@@ -3840,7 +3867,8 @@ export interface components {
             schemaJson?: string;
             fingerprint?: string;
             status?: string;
-            compatibilityMode?: string;
+            /** @enum {string} */
+            compatibilityMode?: "NONE" | "BACKWARD" | "FORWARD" | "FULL";
             description?: string;
             /** Format: uuid */
             createdBy?: string;
@@ -4034,6 +4062,7 @@ export interface components {
             createdAt?: string;
             /** Format: int32 */
             deliveriesCreated?: number;
+            schemaWarnings?: string[];
         };
         VerificationResponse: {
             success?: boolean;
@@ -4116,6 +4145,25 @@ export interface components {
             inviteExpiresAt?: string;
             inviteUrl?: string;
         };
+        EventIngestResponse: {
+            /** Format: uuid */
+            eventId?: string;
+            type?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            deliveriesCreated?: number;
+            schemaWarnings?: string[];
+        };
+        ErrorResponse: {
+            error?: string;
+            message?: string;
+            /** Format: int32 */
+            status?: number;
+            fieldErrors?: {
+                [key: string]: string;
+            };
+        };
         BulkReplayRequest: {
             deliveryIds?: string[];
             /** @enum {string} */
@@ -4183,6 +4231,9 @@ export interface components {
         };
         DeviceTokenRequest: {
             deviceCode: string;
+        };
+        DeviceDenyRequest: {
+            userCode: string;
         };
         DeviceCodeResponse: {
             deviceCode?: string;
@@ -8279,7 +8330,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["EventIngestResponse"];
                 };
             };
             /** @description Invalid or missing API key */
@@ -8297,7 +8348,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -8818,6 +8869,35 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AuthResponse"];
                 };
+            };
+        };
+    };
+    denyDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDenyRequest"];
+            };
+        };
+        responses: {
+            /** @description Device code denied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Code not found or already used */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

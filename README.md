@@ -133,12 +133,14 @@ attempt is on the record with the response it got.
 
 **Incoming** — a provider posts to a URL you own; Hookflow verifies the
 signature and forwards it to the destinations you nominated. Stripe, GitHub,
-GitLab, Shopify and Slack are understood out of the box, plus generic HMAC.
+GitLab, Shopify, Slack and Twilio are understood out of the box, plus generic
+HMAC for anything else.
 
 Both directions run the same claim → send → classify → finalise loop, so a fix
 to attempt behaviour lands once rather than twice.
 
-Also: a schema registry with breaking-change detection, wildcard subscriptions,
+Also: a schema registry that detects breaking changes and refuses the ones that
+break the compatibility mode an event type declared, wildcard subscriptions,
 JSONPath transforms, replay, a CLI that tunnels webhooks to `localhost` while
 you develop, per-org rate limits, AES-256-GCM at rest, SSRF protection,
 Prometheus metrics and an audit log. Organizations → Projects → Endpoints, with

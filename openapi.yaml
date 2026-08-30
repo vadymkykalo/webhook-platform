@@ -3679,7 +3679,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/EventIngestResponse"
         "401":
           description: Invalid or missing API key
           content:
@@ -3691,7 +3691,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - apiKey: []
   /api/v1/deliveries/{id}/replay:
@@ -4120,6 +4120,28 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuthResponse"
+  /api/v1/auth/device/deny:
+    post:
+      tags:
+      - Device Authentication
+      summary: Deny device code
+      description: Called by the authenticated user in the browser to refuse a device
+        login request they did not start. The waiting CLI stops with 403 on its next
+        poll instead of holding the code open until it expires.
+      operationId: denyDeviceCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceDenyRequest"
+        required: true
+      responses:
+        "200":
+          description: Device code denied
+        "404":
+          description: Code not found or already used
+      security:
+      - bearerAuth: []
   /api/v1/auth/device/code:
     post:
       tags:
@@ -6673,7 +6695,8 @@ components:
           type: string
           format: uuid
           description: ID of a reusable transformation template to apply (overrides
-            payloadTransform if set)
+            payloadTransform if set). Empty string detaches the destination from its
+            template.
       required:
       - url
     IncomingDestinationResponse:
@@ -6749,7 +6772,6 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
-          - CUSTOM
           example: GITHUB
         status:
           type: string
@@ -6810,7 +6832,6 @@ components:
           - SHOPIFY
           - SLACK
           - TWILIO
-          - CUSTOM
         status:
           type: string
           enum:
@@ -6937,8 +6958,9 @@ components:
         rateLimitPerSecond:
           type: integer
           format: int32
+          description: Per-endpoint delivery throttle. 0 removes the limit.
           maximum: 10000
-          minimum: 1
+          minimum: 0
         allowedSourceIps:
           type: string
         signatureScheme:
@@ -7498,6 +7520,13 @@ components:
           minLength: 1
         compatibilityMode:
           type: string
+          description: "Compatibility promise checked against the previous version.\
+            \ Defaults to the previous version's mode, or NONE for the first version."
+          enum:
+          - NONE
+          - BACKWARD
+          - FORWARD
+          - FULL
         description:
           type: string
       required:
@@ -7522,6 +7551,11 @@ components:
           type: string
         compatibilityMode:
           type: string
+          enum:
+          - NONE
+          - BACKWARD
+          - FORWARD
+          - FULL
         description:
           type: string
         createdBy:
@@ -7826,6 +7860,10 @@ components:
         deliveriesCreated:
           type: integer
           format: int32
+        schemaWarnings:
+          type: array
+          items:
+            type: string
     VerificationResponse:
       type: object
       properties:
@@ -7991,6 +8029,38 @@ components:
           format: date-time
         inviteUrl:
           type: string
+    EventIngestResponse:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deliveriesCreated:
+          type: integer
+          format: int32
+        schemaWarnings:
+          type: array
+          items:
+            type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        status:
+          type: integer
+          format: int32
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: string
     BulkReplayRequest:
       type: object
       properties:
@@ -8158,6 +8228,14 @@ components:
           minLength: 1
       required:
       - deviceCode
+    DeviceDenyRequest:
+      type: object
+      properties:
+        userCode:
+          type: string
+          minLength: 1
+      required:
+      - userCode
     DeviceCodeResponse:
       type: object
       properties:

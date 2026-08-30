@@ -236,6 +236,121 @@ public class SchemaRegistryIntegrationTest extends AbstractIntegrationTest {
         assert id1.equals(id2) : "Duplicate schema should return same version";
     }
 
+    // ── Compatibility mode ──
+
+    private static final String COMPAT_V1 =
+            "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                    + "\"note\":{\"type\":\"string\"}},\"required\":[\"id\"]}";
+
+    private String postVersion(String eventTypeId, String schema, String mode) throws Exception {
+        String body = mode == null
+                ? "{\"schemaJson\": " + objectMapper.writeValueAsString(schema) + "}"
+                : "{\"schemaJson\": " + objectMapper.writeValueAsString(schema)
+                        + ", \"compatibilityMode\": \"" + mode + "\"}";
+        return body;
+    }
+
+    @Test
+    public void compatibility_backwardRefusesANewRequiredProperty() throws Exception {
+        String eventTypeId = createEventType("compat.backward");
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, COMPAT_V1, "BACKWARD")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.compatibilityMode").value("BACKWARD"));
+
+        String withNewRequired = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                + "\"note\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"}},"
+                + "\"required\":[\"id\",\"label\"]}";
+
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, withNewRequired, null)))
+                .andExpect(status().isBadRequest());
+
+        // And it is refused rather than stored: still one version.
+        mockMvc.perform(get(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    public void compatibility_theModeIsInheritedWhenTheNextVersionOmitsIt() throws Exception {
+        String eventTypeId = createEventType("compat.inherited");
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, COMPAT_V1, "FORWARD")))
+                .andExpect(status().isCreated());
+
+        // FORWARD refuses dropping a property the previous version required. The request below
+        // names no mode at all, so the only thing that can refuse it is the inherited one.
+        String dropsRequired = "{\"type\":\"object\",\"properties\":{\"note\":{\"type\":\"string\"}}}";
+
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, dropsRequired, null)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void compatibility_backwardAllowsAnAddedOptionalProperty() throws Exception {
+        String eventTypeId = createEventType("compat.allowed");
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, COMPAT_V1, "BACKWARD")))
+                .andExpect(status().isCreated());
+
+        String withOptional = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                + "\"note\":{\"type\":\"string\"},\"label\":{\"type\":\"string\"}},"
+                + "\"required\":[\"id\"]}";
+
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, withOptional, null)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.compatibilityMode").value("BACKWARD"));
+    }
+
+    @Test
+    public void compatibility_noneChecksNothing() throws Exception {
+        String eventTypeId = createEventType("compat.none");
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, COMPAT_V1, null)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.compatibilityMode").value("NONE"));
+
+        String unrecognisable = "{\"type\":\"object\",\"properties\":{\"total\":{\"type\":\"number\"}},"
+                + "\"required\":[\"total\"]}";
+
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, unrecognisable, null)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version").value(2));
+    }
+
+    @Test
+    public void compatibility_anUnrecognisedModeIsRefusedRatherThanSilentlyMeaningNone() throws Exception {
+        String eventTypeId = createEventType("compat.typo");
+
+        mockMvc.perform(post(schemasUrl() + "/" + eventTypeId + "/versions")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(postVersion(eventTypeId, COMPAT_V1, "BACKWARDS")))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     public void listVersions_returnsAll() throws Exception {
         String eventTypeId = createEventType("listver.test");

@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 199,
+  "operationCount": 200,
   "security": [
     {
       "id": "bearerAuth",
@@ -2127,6 +2127,32 @@
           }
         },
         {
+          "id": "denyDeviceCode",
+          "method": "POST",
+          "path": "/api/v1/auth/device/deny",
+          "summary": "Deny device code",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Device code denied"
+            },
+            {
+              "status": "404",
+              "description": "Code not found or already used"
+            }
+          ],
+          "description": "Called by the authenticated user in the browser to refuse a device login request they did not start. The waiting CLI stops with 403 on its next poll instead of holding the code open until it expires.",
+          "body": {
+            "contentType": "application/json",
+            "type": "DeviceDenyRequest",
+            "required": true
+          }
+        },
+        {
           "id": "initiateDeviceAuth",
           "method": "POST",
           "path": "/api/v1/auth/device/code",
@@ -2854,7 +2880,7 @@
             {
               "status": "201",
               "description": "Event accepted for delivery",
-              "type": "object"
+              "type": "EventIngestResponse"
             },
             {
               "status": "401",
@@ -2864,7 +2890,7 @@
             {
               "status": "429",
               "description": "Rate limit exceeded",
-              "type": "object"
+              "type": "ErrorResponse"
             }
           ],
           "description": "Sends an event to all subscribed webhook endpoints. Requires API Key authentication.",
@@ -7855,6 +7881,13 @@
         "required": false
       }
     ],
+    "DeviceDenyRequest": [
+      {
+        "name": "userCode",
+        "type": "string",
+        "required": true
+      }
+    ],
     "DeviceTokenRequest": [
       {
         "name": "deviceCode",
@@ -8181,7 +8214,8 @@
       {
         "name": "rateLimitPerSecond",
         "type": "integer (int32)",
-        "required": false
+        "required": false,
+        "description": "Per-endpoint delivery throttle. 0 removes the limit."
       },
       {
         "name": "allowedSourceIps",
@@ -8323,6 +8357,28 @@
         "required": false
       }
     ],
+    "ErrorResponse": [
+      {
+        "name": "error",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "status",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "fieldErrors",
+        "type": "map<string, string>",
+        "required": false
+      }
+    ],
     "EventDiffResponse": [
       {
         "name": "leftEventId",
@@ -8377,6 +8433,33 @@
         "required": true
       }
     ],
+    "EventIngestResponse": [
+      {
+        "name": "eventId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "deliveriesCreated",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "schemaWarnings",
+        "type": "string[]",
+        "required": false
+      }
+    ],
     "EventResponse": [
       {
         "name": "id",
@@ -8407,6 +8490,11 @@
         "name": "deliveriesCreated",
         "type": "integer (int32)",
         "required": false
+      },
+      {
+        "name": "schemaWarnings",
+        "type": "string[]",
+        "required": false
       }
     ],
     "EventSchemaVersionRequest": [
@@ -8418,7 +8506,14 @@
       {
         "name": "compatibilityMode",
         "type": "string",
-        "required": false
+        "required": false,
+        "description": "Compatibility promise checked against the previous version. Defaults to the previous version's mode, or NONE for the first version.",
+        "values": [
+          "NONE",
+          "BACKWARD",
+          "FORWARD",
+          "FULL"
+        ]
       },
       {
         "name": "description",
@@ -8460,7 +8555,13 @@
       {
         "name": "compatibilityMode",
         "type": "string",
-        "required": false
+        "required": false,
+        "values": [
+          "NONE",
+          "BACKWARD",
+          "FORWARD",
+          "FULL"
+        ]
       },
       {
         "name": "description",
@@ -8864,7 +8965,7 @@
         "name": "transformationId",
         "type": "string (uuid)",
         "required": false,
-        "description": "ID of a reusable transformation template to apply (overrides payloadTransform if set)"
+        "description": "ID of a reusable transformation template to apply (overrides payloadTransform if set). Empty string detaches the destination from its template."
       }
     ],
     "IncomingDestinationResponse": [
@@ -9257,8 +9358,7 @@
           "STRIPE",
           "SHOPIFY",
           "SLACK",
-          "TWILIO",
-          "CUSTOM"
+          "TWILIO"
         ]
       },
       {
@@ -9339,8 +9439,7 @@
           "STRIPE",
           "SHOPIFY",
           "SLACK",
-          "TWILIO",
-          "CUSTOM"
+          "TWILIO"
         ]
       },
       {
@@ -13235,6 +13334,9 @@
       "pollIntervalSeconds": 0,
       "expiresAt": "2026-01-01T12:00:00Z"
     },
+    "DeviceDenyRequest": {
+      "userCode": "string"
+    },
     "DeviceTokenRequest": {
       "deviceCode": "string"
     },
@@ -13352,6 +13454,14 @@
       "latencyMs": 0,
       "message": "string"
     },
+    "ErrorResponse": {
+      "error": "string",
+      "message": "string",
+      "status": 0,
+      "fieldErrors": {
+        "key": "string"
+      }
+    },
     "EventDiffResponse": {
       "leftEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "rightEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -13373,17 +13483,29 @@
       "type": "string",
       "data": {}
     },
+    "EventIngestResponse": {
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "type": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "deliveriesCreated": 0,
+      "schemaWarnings": [
+        "string"
+      ]
+    },
     "EventResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "projectId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "eventType": "string",
       "payload": "string",
       "createdAt": "2026-01-01T12:00:00Z",
-      "deliveriesCreated": 0
+      "deliveriesCreated": 0,
+      "schemaWarnings": [
+        "string"
+      ]
     },
     "EventSchemaVersionRequest": {
       "schemaJson": "string",
-      "compatibilityMode": "string",
+      "compatibilityMode": "NONE",
       "description": "string"
     },
     "EventSchemaVersionResponse": {
@@ -13393,7 +13515,7 @@
       "schemaJson": "string",
       "fingerprint": "string",
       "status": "string",
-      "compatibilityMode": "string",
+      "compatibilityMode": "NONE",
       "description": "string",
       "createdBy": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "createdAt": "2026-01-01T12:00:00Z"
@@ -14083,7 +14205,8 @@
           "eventType": "string",
           "payload": "string",
           "createdAt": "2026-01-01T12:00:00Z",
-          "deliveriesCreated": 0
+          "deliveriesCreated": 0,
+          "schemaWarnings": []
         }
       ],
       "number": 0,

@@ -1,6 +1,6 @@
 """Type definitions for Webhook Platform SDK."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from enum import Enum
 
@@ -25,6 +25,9 @@ class EventResponse:
     type: str
     created_at: str
     deliveries_created: int
+    #: Schema-validation errors this event was accepted despite, when the project has schema
+    #: validation on with the WARN policy. Empty when the payload matched or validation is off.
+    schema_warnings: List[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EventResponse":
@@ -33,6 +36,7 @@ class EventResponse:
             type=data["type"],
             created_at=data["createdAt"],
             deliveries_created=data["deliveriesCreated"],
+            schema_warnings=data.get("schemaWarnings") or [],
         )
 
 

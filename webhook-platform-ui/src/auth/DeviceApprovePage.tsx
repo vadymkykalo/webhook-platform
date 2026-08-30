@@ -37,7 +37,9 @@ export default function DeviceApprovePage() {
 
   const codeFromUrl = searchParams.get('code') || '';
   const [userCode, setUserCode] = useState(codeFromUrl);
-  const [status, setStatus] = useState<'input' | 'confirming' | 'loading' | 'success' | 'error' | 'needsLogin'>('input');
+  const [status, setStatus] = useState<
+    'input' | 'confirming' | 'loading' | 'denying' | 'success' | 'denied' | 'error' | 'needsLogin'
+  >('input');
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -66,6 +68,25 @@ export default function DeviceApprovePage() {
       setErrorMessage(msg);
       setStatus('error');
       showApiError(err, 'auth.device.failed');
+    }
+  };
+
+  /**
+   * The other half of the decision. Cancel used to only clear the form, which told the terminal
+   * nothing: the code stayed pending and whoever had asked for it kept polling until it expired.
+   * Denying ends the request now, and the CLI stops on its next poll.
+   */
+  const handleDeny = async () => {
+    setStatus('denying');
+    try {
+      await http.post('/api/v1/auth/device/deny', { userCode: userCode.trim().toUpperCase() });
+      setStatus('denied');
+      showSuccess(t('auth.device.denied'));
+    } catch (err: any) {
+      const msg = err.response?.data?.message || t('auth.device.denyFailed');
+      setErrorMessage(msg);
+      setStatus('error');
+      showApiError(err, 'auth.device.denyFailed');
     }
   };
 
@@ -110,6 +131,9 @@ export default function DeviceApprovePage() {
             <Button onClick={handleApprove} className="h-10 w-full">
               {t('auth.device.approve')}
             </Button>
+            <Button variant="destructive" onClick={handleDeny} className="h-10 w-full">
+              {t('auth.device.deny')}
+            </Button>
             <Button variant="ghost" onClick={handleReset} className="h-10 w-full">
               {t('common.cancel')}
             </Button>
@@ -119,15 +143,32 @@ export default function DeviceApprovePage() {
     );
   }
 
-  if (status === 'loading') {
+  if (status === 'loading' || status === 'denying') {
+    const label = status === 'denying' ? t('auth.device.denying') : t('auth.device.approving');
     return (
-      <AuthLayout title={t('auth.device.approving')} subtitle={t('auth.device.confirmDesc')}>
+      <AuthLayout title={label} subtitle={t('auth.device.confirmDesc')}>
         <div className="space-y-5">
           <DeviceCode code={formatCode(userCode)} />
           <div className="flex items-center gap-3 rounded-md border border-rail bg-card p-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
-            {t('auth.device.approving')}
+            {label}
           </div>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (status === 'denied') {
+    return (
+      <AuthLayout title={t('auth.device.deniedTitle')} subtitle={t('auth.device.deniedDesc')}>
+        <div className="space-y-5">
+          <DeviceCode code={formatCode(userCode)} />
+          <div className="rounded-md border border-halt/25 bg-halt-soft p-3 text-sm text-halt">
+            {t('auth.device.deniedHint')}
+          </div>
+          <Button className="h-10 w-full" onClick={() => navigate('/admin/dashboard')}>
+            {t('auth.device.goToDashboard')}
+          </Button>
         </div>
       </AuthLayout>
     );

@@ -75,6 +75,7 @@ class MutatingHandlerScopeDeclarationTest {
             "DeviceAuthController.initiateDeviceAuth",
             "DeviceAuthController.pollDeviceToken",
             "DeviceAuthController.approveDeviceCode",
+            "DeviceAuthController.denyDeviceCode",
 
             // Act on the caller's own sign-ins rather than on organization data, and are gated
             // on auth.requireJwt(), which rejects an API key outright — strictly stronger than

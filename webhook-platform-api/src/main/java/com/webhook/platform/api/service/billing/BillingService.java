@@ -360,8 +360,15 @@ public class BillingService {
             case "payment.refunded" -> {
                 if (event.externalPaymentId() != null) {
                     paymentRepository.findByExternalPaymentId(event.externalPaymentId()).ifPresent(payment -> {
-                        payment.setStatus(PaymentStatus.REFUNDED);
-                        payment.setRefundedCents(event.amountCents() != null ? event.amountCents() : payment.getAmountCents());
+                        // A refund for less than the charge is a partial one. This used to record
+                        // the smaller figure in refundedCents and still stamp the row REFUNDED, so
+                        // the status said the customer's money was back and the amount said it was
+                        // not; PARTIALLY_REFUNDED existed for exactly this and was never set.
+                        long refunded = event.amountCents() != null ? event.amountCents() : payment.getAmountCents();
+                        payment.setRefundedCents(refunded);
+                        payment.setStatus(refunded < payment.getAmountCents()
+                                ? PaymentStatus.PARTIALLY_REFUNDED
+                                : PaymentStatus.REFUNDED);
                         paymentRepository.save(payment);
                     });
                 }

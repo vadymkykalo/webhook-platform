@@ -17,6 +17,8 @@ export interface EventTypeCatalogRequest {
   description?: string;
 }
 
+export type CompatibilityMode = 'NONE' | 'BACKWARD' | 'FORWARD' | 'FULL';
+
 export interface EventSchemaVersionResponse {
   id: string;
   eventTypeId: string;
@@ -24,7 +26,7 @@ export interface EventSchemaVersionResponse {
   schemaJson: string;
   fingerprint: string;
   status: string;
-  compatibilityMode: string;
+  compatibilityMode: CompatibilityMode;
   description: string | null;
   createdBy: string | null;
   createdAt: string;
@@ -32,7 +34,7 @@ export interface EventSchemaVersionResponse {
 
 export interface EventSchemaVersionRequest {
   schemaJson: string;
-  compatibilityMode?: string;
+  compatibilityMode?: CompatibilityMode;
   description?: string;
 }
 

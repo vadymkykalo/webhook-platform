@@ -75,6 +75,7 @@ class MutatingHandlerAccessDeclarationTest {
             "AuthController.changePassword",
             "AuthController.updateProfile",
             "DeviceAuthController.approveDeviceCode",
+            "DeviceAuthController.denyDeviceCode",
             "MemberController.acceptInvite",
 
             // Org-level membership management, gated on requireJwt() plus the service's own

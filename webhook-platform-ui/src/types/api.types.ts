@@ -151,6 +151,8 @@ export interface EventResponse {
   payload: string;
   createdAt: string;
   deliveriesCreated?: number;
+  /** Set only on a test-event response, and only under a project whose policy is WARN. */
+  schemaWarnings?: string[];
 }
 
 export interface SubscriptionResponse {
@@ -165,7 +167,7 @@ export interface SubscriptionResponse {
 
 // ─── Incoming Webhooks ──────────────────────────────────────────────
 
-export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO' | 'CUSTOM';
+export type ProviderType = 'GENERIC' | 'GITHUB' | 'GITLAB' | 'STRIPE' | 'SHOPIFY' | 'SLACK' | 'TWILIO';
 export type IncomingSourceStatus = 'ACTIVE' | 'DISABLED';
 export type VerificationMode = 'NONE' | 'HMAC_GENERIC' | 'PROVIDER';
 export type IncomingAuthType = 'NONE' | 'BEARER' | 'BASIC' | 'CUSTOM_HEADER';
@@ -211,7 +213,8 @@ export interface IncomingDestinationRequest {
   timeoutSeconds?: number;
   retryDelays?: string;
   payloadTransform?: string;
-  transformationId?: string | null;
+  /** A UUID, or '' to detach the destination from its transformation template. */
+  transformationId?: string;
 }
 
 export interface IncomingDestinationResponse {

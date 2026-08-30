@@ -141,13 +141,18 @@ public class SchemaRegistryService {
 
         int nextVersion = versionRepository.findMaxVersionByEventTypeId(eventTypeId) + 1;
 
-        CompatibilityMode mode = CompatibilityMode.NONE;
-        if (request.getCompatibilityMode() != null) {
-            try {
-                mode = CompatibilityMode.valueOf(request.getCompatibilityMode().toUpperCase());
-            } catch (IllegalArgumentException ignored) {
-            }
-        }
+        Optional<EventSchemaVersion> previous = nextVersion > 1
+                ? versionRepository.findByEventTypeIdAndVersion(eventTypeId, nextVersion - 1)
+                : Optional.empty();
+
+        // Omitted means "the promise the previous version made", not "no promise": a project that
+        // asked for BACKWARD once should not lose it the first time somebody posts a schema
+        // without repeating the field.
+        CompatibilityMode mode = request.getCompatibilityMode() != null
+                ? request.getCompatibilityMode()
+                : previous.map(EventSchemaVersion::getCompatibilityMode).orElse(CompatibilityMode.NONE);
+
+        previous.ifPresent(prev -> enforceCompatibility(mode, prev, request.getSchemaJson()));
 
         EventSchemaVersion version = EventSchemaVersion.builder()
                 .eventTypeId(eventTypeId)
@@ -258,6 +263,40 @@ public class SchemaRegistryService {
 
     // ── Private helpers ──
 
+    /**
+     * Refuses a version that breaks the promise its mode makes about the one before it.
+     *
+     * <p>The registry stored a compatibility mode from the day it shipped, returned it on every
+     * response, and never once read it: a project could declare FULL and then post a schema that
+     * deleted every required property, and the only trace was a WARN line saying the change was
+     * breaking — after the version had been written. The check is the same diff the schema-changes
+     * board is built from, judged by {@link CompatibilityMode#violations}.
+     *
+     * <p>Nothing declares a mode by accident. It defaults to NONE, auto-discovered schemas get
+     * NONE, and NONE checks nothing — so this can only refuse a project that asked to be refused.
+     */
+    private void enforceCompatibility(CompatibilityMode mode, EventSchemaVersion previous, String schemaJson) {
+        if (mode == CompatibilityMode.NONE) {
+            return;
+        }
+
+        List<String> violations;
+        try {
+            violations = mode.violations(JsonSchemaUtils.diff(previous.getSchemaJson(), schemaJson));
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Could not compare this schema with version "
+                    + previous.getVersion() + ": " + e.getMessage());
+        }
+        if (violations.isEmpty()) {
+            return;
+        }
+
+        meterRegistry.counter("schema_compatibility_rejected_total", "mode", mode.name()).increment();
+        throw new IllegalArgumentException(
+                "Schema is not " + mode + "-compatible with version " + previous.getVersion()
+                        + ": " + String.join("; ", violations));
+    }
+
     private void computeAndSaveDiff(UUID eventTypeId, int previousVersion, EventSchemaVersion newVersion) {
         try {
             Optional<EventSchemaVersion> prevOpt = versionRepository.findByEventTypeIdAndVersion(eventTypeId, previousVersion);
@@ -322,7 +361,7 @@ public class SchemaRegistryService {
                 .schemaJson(entity.getSchemaJson())
                 .fingerprint(entity.getFingerprint())
                 .status(entity.getStatus().name())
-                .compatibilityMode(entity.getCompatibilityMode().name())
+                .compatibilityMode(entity.getCompatibilityMode())
                 .description(entity.getDescription())
                 .createdBy(entity.getCreatedBy())
                 .createdAt(entity.getCreatedAt())

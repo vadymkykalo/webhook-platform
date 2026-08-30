@@ -8,8 +8,8 @@ import java.util.*;
  * so that {@link BillingService} knows what to delegate vs. handle internally.
  *
  * <ul>
- *   <li><b>Stripe</b>  — MANAGED_SUBSCRIPTIONS, CUSTOMERS, CUSTOMER_PORTAL, EXTERNAL_INVOICES, REFUNDS</li>
- *   <li><b>WayForPay</b> — MERCHANT_RECURRING, REFUNDS</li>
+ *   <li><b>Stripe</b>  — MANAGED_SUBSCRIPTIONS, CUSTOMERS, CUSTOMER_PORTAL, EXTERNAL_INVOICES</li>
+ *   <li><b>WayForPay</b> — MERCHANT_RECURRING</li>
  *   <li><b>NoOp</b>     — (none)</li>
  * </ul>
  */
@@ -66,12 +66,12 @@ public interface BillingProvider {
     /** List invoices from external system. */
     default List<ExternalInvoice> fetchInvoices(String externalCustomerId) { return List.of(); }
 
-    // ── Refunds ─────────────────────────────────────────────────────
-
-    /** Refund a payment (full or partial). */
-    default void refund(String externalPaymentId, long amountCents) {
-        throw new UnsupportedOperationException(getProviderCode() + " does not support refunds");
-    }
+    // Refunds are not initiated from here. Hookflow has no refund endpoint and no screen that
+    // asks for one; a refund is issued in the provider's own dashboard and arrives back as a
+    // `payment.refunded` webhook, which BillingService records on the payment row. The outbound
+    // refund() this interface used to declare — implemented against the Stripe and WayForPay
+    // APIs, and guarded by a REFUNDS capability nothing ever queried — was never called by
+    // anything, so it was two untested money-moving code paths one wrong wire away from running.
 
     // ── Usage reporting (metered billing) ───────────────────────────
 

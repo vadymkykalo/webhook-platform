@@ -14,6 +14,8 @@ import com.webhook.platform.api.service.billing.RequireQuota;
 import com.webhook.platform.api.service.RedisRateLimiterService;
 import com.webhook.platform.api.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -51,10 +53,15 @@ public class EventController {
             description = "Sends an event to all subscribed webhook endpoints. Requires API Key authentication."
     )
     @SecurityRequirement(name = "apiKey")
+    // The handler returns ResponseEntity<?> because a 429 carries an ErrorResponse instead, so
+    // springdoc has no return type to read and published the success body as a bare object --
+    // schemaWarnings and deliveriesCreated alike were invisible to anyone coding against the spec.
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Event accepted for delivery"),
+            @ApiResponse(responseCode = "201", description = "Event accepted for delivery",
+                    content = @Content(schema = @Schema(implementation = EventIngestResponse.class))),
             @ApiResponse(responseCode = "401", description = "Invalid or missing API key"),
-            @ApiResponse(responseCode = "429", description = "Rate limit exceeded")
+            @ApiResponse(responseCode = "429", description = "Rate limit exceeded",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @RequireScope(ApiKeyScope.READ_WRITE)
     @RequireQuota(QuotaType.EVENTS_PER_MONTH)

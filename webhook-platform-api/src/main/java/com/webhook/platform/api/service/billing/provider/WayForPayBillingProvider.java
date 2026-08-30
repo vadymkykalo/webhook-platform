@@ -44,8 +44,7 @@ public class WayForPayBillingProvider implements BillingProvider {
     private static final String API_URL = "https://api.wayforpay.com/api";
     private static final String PAYMENT_URL = "https://secure.wayforpay.com/pay";
     private static final Set<BillingCapability> CAPABILITIES = Set.of(
-            BillingCapability.MERCHANT_RECURRING,
-            BillingCapability.REFUNDS
+            BillingCapability.MERCHANT_RECURRING
     );
 
     private final String merchantAccount;
@@ -194,48 +193,6 @@ public class WayForPayBillingProvider implements BillingProvider {
         } catch (Exception e) {
             log.error("WayForPay: recurring charge failed for orderRef={}", orderRef, e);
             return new ChargeResult(false, orderRef, null, null, "NETWORK_ERROR", e.getMessage());
-        }
-    }
-
-    // ── Refunds ─────────────────────────────────────────────────────
-
-    @Override
-    public void refund(String externalPaymentId, long amountCents) {
-        String amount = String.valueOf(amountCents / 100.0);
-        String currency = "UAH";
-
-        String signString = String.join(";",
-                merchantAccount, externalPaymentId, amount, currency);
-        String signature = hmacMd5(signString);
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("transactionType", "REFUND");
-        body.put("merchantAccount", merchantAccount);
-        body.put("merchantSignature", signature);
-        body.put("orderReference", externalPaymentId);
-        body.put("amount", amount);
-        body.put("currency", currency);
-        body.put("comment", "Refund via Hookflow billing");
-
-        try {
-            String responseBody = webClient.post()
-                    .uri(API_URL)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            JsonNode resp = objectMapper.readTree(responseBody);
-            String status = resp.path("transactionStatus").asText("");
-            if (!"Refunded".equalsIgnoreCase(status)) {
-                throw new RuntimeException("WayForPay refund failed: " + resp.path("reason").asText(""));
-            }
-            log.info("WayForPay: refunded {} cents on order {}", amountCents, externalPaymentId);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("WayForPay refund failed: " + e.getMessage(), e);
         }
     }
 

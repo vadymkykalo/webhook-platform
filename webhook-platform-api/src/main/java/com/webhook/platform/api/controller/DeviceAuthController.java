@@ -4,6 +4,7 @@ import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceApproveRequest;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
+import com.webhook.platform.api.dto.DeviceDenyRequest;
 import com.webhook.platform.api.dto.DeviceTokenRequest;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.TrustedProxyResolver;
@@ -92,6 +93,30 @@ public class DeviceAuthController {
         }
         deviceAuthService.approveDeviceCode(
                 request.getUserCode(), auth.requireUserId());
+        return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Deny device code",
+            description = "Called by the authenticated user in the browser to refuse a device login "
+                    + "request they did not start. The waiting CLI stops with 403 on its next poll "
+                    + "instead of holding the code open until it expires.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Device code denied"),
+            @ApiResponse(responseCode = "404", description = "Code not found or already used"),
+    })
+    @PostMapping("/deny")
+    public ResponseEntity<Void> denyDeviceCode(
+            @Valid @RequestBody DeviceDenyRequest request,
+            AuthContext auth,
+            HttpServletRequest httpRequest) {
+        // Rate-limited on the same bucket as approve, and for the same reason: the user_code
+        // space is small enough that unlimited authenticated attempts could enumerate a pending
+        // code, and guessing one to deny it is a denial-of-service on somebody else's login.
+        if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getUserCode())) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
+        }
+        deviceAuthService.denyDeviceCode(request.getUserCode(), auth.requireUserId());
         return ResponseEntity.ok().build();
     }
 

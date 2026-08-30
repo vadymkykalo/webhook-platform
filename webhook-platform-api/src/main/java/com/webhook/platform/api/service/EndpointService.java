@@ -95,12 +95,12 @@ public class EndpointService {
         Endpoint endpoint = Endpoint.builder()
                 .projectId(projectId)
                 .url(request.getUrl())
-                .description(request.getDescription())
+                .description(blankToNull(request.getDescription()))
                 .secretEncrypted(encrypted.getCiphertext())
                 .secretIv(encrypted.getIv())
                 .encryptionKeyVersion(encrypted.getKeyVersion())
-                .rateLimitPerSecond(request.getRateLimitPerSecond())
-                .allowedSourceIps(request.getAllowedSourceIps())
+                .rateLimitPerSecond(zeroToNull(request.getRateLimitPerSecond()))
+                .allowedSourceIps(blankToNull(request.getAllowedSourceIps()))
                 .build();
 
         if (request.getSignatureScheme() != null) {
@@ -178,8 +178,15 @@ public class EndpointService {
         }
 
         endpoint.setUrl(request.getUrl());
-        endpoint.setDescription(request.getDescription());
-        
+
+        // One rule, and it is on EndpointRequest: an absent field is unchanged, an explicitly
+        // empty value clears. description and rateLimitPerSecond used to be assigned straight
+        // from the request instead, three lines above the comment explaining why that is wrong,
+        // so an update that did not mention the rate limit removed the endpoint's throttle.
+        if (request.getDescription() != null) {
+            endpoint.setDescription(blankToNull(request.getDescription()));
+        }
+
         if (request.getSecret() != null && !request.getSecret().isEmpty()) {
             CryptoUtils.EncryptedData encrypted = encryptionKeyRegistry.encrypt(request.getSecret());
             endpoint.setSecretEncrypted(encrypted.getCiphertext());
@@ -191,10 +198,12 @@ public class EndpointService {
             endpoint.setEnabled(request.getEnabled());
         }
         
-        endpoint.setRateLimitPerSecond(request.getRateLimitPerSecond());
-        
+        if (request.getRateLimitPerSecond() != null) {
+            endpoint.setRateLimitPerSecond(zeroToNull(request.getRateLimitPerSecond()));
+        }
+
         if (request.getAllowedSourceIps() != null) {
-            endpoint.setAllowedSourceIps(request.getAllowedSourceIps());
+            endpoint.setAllowedSourceIps(blankToNull(request.getAllowedSourceIps()));
         }
 
         // Null means "not specified", not "reset to default": an update that leaves the field
@@ -207,6 +216,16 @@ public class EndpointService {
         endpoint = endpointRepository.saveAndFlush(endpoint);
         
         return mapToResponse(endpoint);
+    }
+
+    /** The empty value for a text field: blank clears it rather than storing whitespace. */
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    /** The empty value for the rate limit: 0 is "no limit", which the column stores as null. */
+    private static Integer zeroToNull(Integer value) {
+        return value == null || value == 0 ? null : value;
     }
 
     @Auditable(action = AuditAction.DELETE, resourceType = "Endpoint")

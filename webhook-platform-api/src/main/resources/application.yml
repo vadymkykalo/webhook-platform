@@ -125,7 +125,6 @@ outbox:
     max-per-project: ${OUTBOX_MAX_PER_PROJECT:30}
 
 data-retention:
-  outbox-retention-days: ${DATA_RETENTION_OUTBOX_DAYS:7}
   delivery-attempts-retention-days: ${DATA_RETENTION_ATTEMPTS_DAYS:90}
   successful-attempts-retention-days: ${DATA_RETENTION_SUCCESSFUL_ATTEMPTS_DAYS:14}
   incoming-events-retention-days: ${DATA_RETENTION_INCOMING_EVENTS_DAYS:30}
@@ -137,7 +136,6 @@ data-retention:
   burst-cleanup-cron: ${DATA_RETENTION_BURST_CLEANUP_CRON:0 0 */4 * * *}
   table-metrics-interval-ms: ${DATA_RETENTION_TABLE_METRICS_INTERVAL_MS:900000}
   tunnel-request-log-retention-days: ${TUNNEL_REQUEST_LOG_RETENTION_DAYS:7}
-  tunnel-log-cleanup-cron: ${TUNNEL_LOG_CLEANUP_CRON:0 30 2 * * *}
 
 # Partition maintenance for the declaratively-partitioned high-volume tables
 # (delivery_attempts, tunnel_request_log — see V052/V053 migrations and
