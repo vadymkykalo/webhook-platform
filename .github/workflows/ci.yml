@@ -188,8 +188,20 @@ jobs:
         run: |
           set -e
           kubectl apply -f deploy/ci/kind-dependencies.yaml
-          kubectl wait --for=condition=available --timeout=5m \
-            deployment/postgres deployment/kafka deployment/redis
+
+          # Waited for one at a time, each with its own deadline. A single wait over
+          # all three shares one clock, so the first slow one eats it and the others
+          # are reported as having timed out when they are Running and Ready — which
+          # is exactly what happened the first time this job ran: Kafka crash-looped
+          # and the log blamed Redis too. On failure, dump the culprit's own logs;
+          # `kubectl describe` shows a probe failing and never says why.
+          for d in postgres kafka redis; do
+            if ! kubectl wait --for=condition=available --timeout=4m "deployment/$d"; then
+              echo "::error::$d never became available"
+              kubectl logs "deployment/$d" --tail=100 || true
+              exit 1
+            fi
+          done
 
       # One replica of each and no HPA — a kind node on a CI runner cannot fit
       # the production replica counts, and neither has anything to do with what

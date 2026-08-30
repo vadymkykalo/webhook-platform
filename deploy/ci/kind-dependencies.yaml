@@ -112,13 +112,24 @@ spec:
             - name: KAFKA_LISTENERS
               value: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
             - name: KAFKA_ADVERTISED_LISTENERS
+              # Clients do go through the Service, and by the time any connect it has
+              # endpoints — so this one is correct as the Service name.
               value: PLAINTEXT://kafka:9092
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
               value: CONTROLLER
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: 1@kafka:9093
+              # localhost, not the Service name. This is the one line that does not
+              # transfer from docker-compose.yml: there `kafka` is the container's own
+              # hostname, so :9093 lands on the container itself. Here `kafka` is a
+              # Service that publishes 9092 and nothing else, so the controller looked
+              # for its own quorum on a port the Service does not define, never formed
+              # it, and never opened 9092 — the broker crash-looped and the readiness
+              # probe reported "connection refused" on a port that was never going to
+              # be listening. A single combined broker/controller node reaches its own
+              # controller over loopback and needs no Service to do it.
+              value: 1@localhost:9093
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
               value: "1"
             - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
