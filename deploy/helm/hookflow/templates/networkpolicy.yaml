@@ -29,6 +29,17 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # Actuator. Prometheus runs in its own namespace (kube-prometheus-stack's
+    # by convention), so this admits the management port from anywhere in the
+    # cluster rather than guessing that namespace's labels. Without it the
+    # ServiceMonitor this chart also ships is scraping a port the policy drops
+    # — enabled together in values-production.yaml, so the pairing is the
+    # normal case, not an exotic one.
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ include "hookflow.api.managementPort" . }}
   egress:
     - to:
         - podSelector: {}
@@ -65,6 +76,15 @@ spec:
       app.kubernetes.io/component: worker
   policyTypes:
     {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
+  # policyTypes includes Ingress, and a policy with no ingress rules denies
+  # all of it — which included the worker's own metrics. The worker still
+  # accepts nothing else: this is the actuator port only.
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: {{ include "hookflow.worker.managementPort" . }}
   egress:
     - to:
         - podSelector: {}
