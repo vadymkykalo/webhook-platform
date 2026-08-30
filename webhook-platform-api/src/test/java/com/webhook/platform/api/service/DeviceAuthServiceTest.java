@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
@@ -19,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -270,6 +272,41 @@ class DeviceAuthServiceTest {
         assertEquals("access-token-123", response.getAccessToken());
         assertEquals("refresh-token-456", response.getRefreshToken());
         verify(deviceAuthCodeRepository).markConsumedIfApproved(codeId);
+    }
+
+    @Test
+    void shouldRefuseTokensWhenTheMembershipIsSuspended() {
+        // The CLI is the other way a Membership becomes an authenticated context. A member can
+        // approve a device code and be suspended before the CLI polls for it — without this the
+        // exchange still mints a full token pair, and the suspension has a CLI-shaped hole in it.
+        UUID userId = UUID.randomUUID();
+        String deviceCode = "dev-suspended";
+        UUID codeId = UUID.randomUUID();
+
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(codeId)
+                .deviceCode(deviceCode)
+                .userCode("SUSP-0001")
+                .status(DeviceAuthStatus.APPROVED)
+                .userId(userId)
+                .organizationId(tenantOrgId)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        Membership membership = new Membership();
+        membership.setRole(MembershipRole.OWNER);
+        membership.setStatus(MembershipStatus.DISABLED);
+
+        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
+        when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId))
+                .thenReturn(Optional.of(membership));
+
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+                () -> deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
+        assertEquals(HttpStatus.FORBIDDEN, thrown.getStatusCode());
+
+        verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any());
     }
 
     @Test

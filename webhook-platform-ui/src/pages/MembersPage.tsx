@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Trash2, Users, RefreshCw, MailX } from 'lucide-react';
+import { UserPlus, Trash2, Users, RefreshCw, MailX, Ban, UserCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -14,7 +14,10 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import AddMemberModal from '../components/AddMemberModal';
 import InviteLink from '../components/InviteLink';
 import { type MembershipRole, type MemberResponse } from '../api/members.api';
-import { useMembers, useChangeMemberRole, useRemoveMember, useReissueInvite } from '../api/queries';
+import {
+  useMembers, useChangeMemberRole, useRemoveMember, useReissueInvite,
+  useSuspendMember, useReinstateMember,
+} from '../api/queries';
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
@@ -25,10 +28,15 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '../components/ui/dialog';
 
-/** A membership status is a state, not a delivery outcome, but it reads on the same four meanings. */
+/**
+ * A membership status is a state, not a delivery outcome, but it reads on the same four meanings.
+ * A suspension is `halt` rather than `idle`: somebody's access was deliberately stopped, which is
+ * not the same as an invite nobody has acted on yet.
+ */
 function kindOfMemberStatus(status: string): StatusKind {
   if (status === 'ACTIVE') return 'ok';
   if (status === 'INVITED') return 'retry';
+  if (status === 'DISABLED') return 'halt';
   return 'idle';
 }
 
@@ -41,6 +49,9 @@ export default function MembersPage() {
   const [revoking, setRevoking] = useState<MemberResponse | null>(null);
   const [reissued, setReissued] = useState<MemberResponse | null>(null);
 
+  const [suspending, setSuspending] = useState<MemberResponse | null>(null);
+  const [reinstating, setReinstating] = useState<MemberResponse | null>(null);
+
   const emailDelivered = user?.emailDeliveryEnabled ?? false;
 
   const orgId = user?.organization?.id;
@@ -50,6 +61,8 @@ export default function MembersPage() {
   const changeRole = useChangeMemberRole(orgId!);
   const removeMember = useRemoveMember(orgId!);
   const reissueInvite = useReissueInvite(orgId!);
+  const suspendMember = useSuspendMember(orgId!);
+  const reinstateMember = useReinstateMember(orgId!);
 
   const handleChangeRole = (userId: string, newRole: MembershipRole) => {
     changeRole.mutate(
@@ -94,6 +107,28 @@ export default function MembersPage() {
     reissueInvite.mutate(member.userId, {
       onSuccess: (fresh) => setReissued(fresh),
       onError: (err: any) => showApiError(err, 'members.toast.reissueFailed'),
+    });
+  };
+
+  const handleSuspend = () => {
+    if (!suspending) return;
+    suspendMember.mutate(suspending.userId, {
+      onSuccess: () => {
+        showSuccess(t('members.toast.suspended'));
+        setSuspending(null);
+      },
+      onError: (err: any) => showApiError(err, 'members.toast.suspendFailed'),
+    });
+  };
+
+  const handleReinstate = () => {
+    if (!reinstating) return;
+    reinstateMember.mutate(reinstating.userId, {
+      onSuccess: () => {
+        showSuccess(t('members.toast.reinstated'));
+        setReinstating(null);
+      },
+      onError: (err: any) => showApiError(err, 'members.toast.reinstateFailed'),
     });
   };
 
@@ -160,7 +195,7 @@ export default function MembersPage() {
                 <TableHead className="w-[120px]">{t('members.status')}</TableHead>
                 <TableHead className="w-[130px]">{t('members.joined')}</TableHead>
                 {canManageMembers && (
-                  <TableHead className="w-[60px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
+                  <TableHead className="w-[90px]"><span className="sr-only">{t('common.actions')}</span></TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -225,6 +260,11 @@ export default function MembersPage() {
                       <TableCell>
                         {!isSelf && (
                           <div className="flex items-center gap-0.5">
+                            {/* An invite, an active member and a suspended one are three
+                                different situations and each earns a different pair of
+                                actions. Only a pending invite can be re-issued or revoked;
+                                only an active member can be suspended; only a suspended one
+                                can be reinstated. */}
                             {member.status === 'INVITED' && (
                               <Button
                                 variant="ghost"
@@ -236,6 +276,30 @@ export default function MembersPage() {
                                 className="text-muted-foreground hover:text-foreground"
                               >
                                 <RefreshCw className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {member.status === 'ACTIVE' && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => setSuspending(member)}
+                                title={t('members.suspend')}
+                                aria-label={t('members.suspendMember', { email: member.email })}
+                                className="text-muted-foreground hover:text-halt"
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {member.status === 'DISABLED' && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => setReinstating(member)}
+                                title={t('members.reinstate')}
+                                aria-label={t('members.reinstateMember', { email: member.email })}
+                                className="text-muted-foreground hover:text-ok"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" />
                               </Button>
                             )}
                             {member.status === 'INVITED' ? (
@@ -307,6 +371,31 @@ export default function MembersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Suspending is reversible, so it asks once and plainly. Removal, below, is not, and
+          makes the owner type the member's address. */}
+      <ConfirmDialog
+        open={!!suspending}
+        onOpenChange={(open) => !open && setSuspending(null)}
+        title={t('members.suspendDialog.title')}
+        description={t('members.suspendDialog.description', { email: suspending?.email ?? '' })}
+        onConfirm={handleSuspend}
+        loading={suspendMember.isPending}
+        confirmLabel={t('members.suspend')}
+        loadingLabel={t('members.suspending')}
+      />
+
+      <ConfirmDialog
+        open={!!reinstating}
+        onOpenChange={(open) => !open && setReinstating(null)}
+        title={t('members.reinstateDialog.title')}
+        description={t('members.reinstateDialog.description', { email: reinstating?.email ?? '' })}
+        onConfirm={handleReinstate}
+        loading={reinstateMember.isPending}
+        confirmLabel={t('members.reinstate')}
+        loadingLabel={t('members.reinstating')}
+        destructive={false}
+      />
 
       <DangerConfirmDialog
         open={!!removing}

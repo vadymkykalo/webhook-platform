@@ -50,6 +50,15 @@ export const membersApi = {
     return http.delete<void>(`/api/v1/orgs/${orgId}/members/${userId}`);
   },
 
+  /** Keeps the membership and the role; the member is refused access until reinstated. */
+  suspend: (orgId: string, userId: string): Promise<MemberResponse> => {
+    return http.post<MemberResponse>(`/api/v1/orgs/${orgId}/members/${userId}/suspend`);
+  },
+
+  reinstate: (orgId: string, userId: string): Promise<MemberResponse> => {
+    return http.post<MemberResponse>(`/api/v1/orgs/${orgId}/members/${userId}/reinstate`);
+  },
+
   acceptInvite: (orgId: string, token: string): Promise<MemberResponse> => {
     return http.post<MemberResponse>(`/api/v1/orgs/${orgId}/members/accept-invite?token=${encodeURIComponent(token)}`);
   },

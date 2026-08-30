@@ -297,8 +297,10 @@
       "LOGIN": "Login",
       "LOGOUT": "Logout",
       "MEMBER_INVITED": "Member Invited",
+      "MEMBER_REINSTATED": "Member Reinstated",
       "MEMBER_REMOVED": "Member Removed",
       "MEMBER_ROLE_CHANGED": "Role Changed",
+      "MEMBER_SUSPENDED": "Member Suspended",
       "PASSWORD_CHANGED": "Password Changed",
       "PASSWORD_RESET": "Password Reset",
       "PASSWORD_RESET_REQUESTED": "Password Reset Requested",
@@ -2819,6 +2821,13 @@
     "joined": "Joined",
     "noMembers": "No members yet",
     "noMembersDesc": "You are the only member of this organization",
+    "reinstate": "Reinstate",
+    "reinstateDialog": {
+      "description": "{{email}} gets their access back in the role they held before the suspension.",
+      "title": "Reinstate Member?"
+    },
+    "reinstateMember": "Reinstate {{email}}",
+    "reinstating": "Reinstating...",
     "remove": "Remove",
     "removeDialog": {
       "description": "This member will lose access to the organization and all its resources. This action cannot be undone.",
@@ -2838,24 +2847,35 @@
     "rolesHeading": "What each role grants",
     "status": "Status",
     "subtitle": "Manage access to this organization",
+    "suspend": "Suspend",
+    "suspendDialog": {
+      "description": "{{email}} keeps their membership and their role but cannot sign in to this organization, and any session they have open ends immediately. You can reinstate them at any time.",
+      "title": "Suspend Member?"
+    },
+    "suspendMember": "Suspend {{email}}",
+    "suspending": "Suspending...",
     "title": "Members",
     "toast": {
       "added": "Member added successfully",
       "copyFailed": "Could not copy the link — select it and copy by hand",
       "inviteRevoked": "Invite revoked",
       "linkCopied": "Invite link copied to clipboard",
+      "reinstateFailed": "Failed to reinstate member",
+      "reinstated": "Member reinstated",
       "reissueFailed": "Failed to re-issue the invite",
       "removeFailed": "Failed to remove member",
       "removed": "Member removed successfully",
       "revokeFailed": "Failed to revoke the invite",
       "roleChangeFailed": "Failed to update member role",
-      "roleChanged": "Member role updated successfully"
+      "roleChanged": "Member role updated successfully",
+      "suspendFailed": "Failed to suspend member",
+      "suspended": "Member suspended"
     },
     "you": "You",
     "statuses": {
       "INVITED": "Invited",
       "ACTIVE": "Active",
-      "DISABLED": "Disabled"
+      "DISABLED": "Suspended"
     },
     "invite": {
       "emailDisabled": "Email delivery is not configured on this deployment, so nothing was sent to {{email}}. Pass on the link below yourself.",

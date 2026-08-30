@@ -8,6 +8,7 @@ import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.entity.UserSession;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
@@ -171,13 +172,7 @@ public class AuthService {
         // attack in progress. An account in daily use therefore never accumulates a lockout.
         accountLockoutService.clearFailures(user);
 
-        // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
-        // two organizations got whichever the database felt like returning, and with it a
-        // different tenant scope on each login. Oldest membership is where a session starts; the
-        // organization switcher moves it from there, and the session remembers.
-        Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
+        Membership membership = membershipToIssueTokenFor(user.getId());
 
         return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
                 Boolean.TRUE.equals(user.getEmailVerified()));
@@ -359,31 +354,62 @@ public class AuthService {
      * what made a second organization unreachable before: login picked the oldest membership and
      * refresh picked it again fifteen minutes later.
      *
-     * <p>A membership that has since been removed falls back to the oldest one the user still
-     * has, rather than failing: being removed from the organization you happened to be looking at
-     * should not lock you out of the others. The session is moved with it, so the next refresh
-     * does not have to work it out again.
+     * <p>A membership that has since been removed — or suspended — falls back to the oldest one
+     * the user still holds, rather than failing: losing the organization you happened to be
+     * looking at should not lock you out of the others. The session is moved with it, so the next
+     * refresh does not have to work it out again.
      */
     private Membership membershipForRefresh(User user, UserSession session) {
         if (session != null) {
             Optional<Membership> remembered = membershipRepository
-                    .findByUserIdAndOrganizationId(user.getId(), session.getOrganizationId());
+                    .findByUserIdAndOrganizationId(user.getId(), session.getOrganizationId())
+                    // A suspension has to reach the token the session is already holding.
+                    // Without this, suspending a member left them refreshing their way to a
+                    // fresh fifteen minutes indefinitely, because the session still named an
+                    // organization they were still technically a member of.
+                    .filter(m -> m.getStatus() != MembershipStatus.DISABLED);
             if (remembered.isPresent()) {
                 return remembered.get();
             }
-            log.info("Session {} named organization {}, which user {} is no longer a member of; "
-                            + "falling back to their oldest membership",
+            log.info("Session {} named organization {}, which user {} can no longer be issued a "
+                            + "token for; falling back to their oldest active membership",
                     session.getId(), session.getOrganizationId(), user.getId());
         }
 
-        Membership oldest = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
-
+        Membership oldest = membershipToIssueTokenFor(user.getId());
         if (session != null) {
             session.setOrganizationId(oldest.getOrganizationId());
         }
         return oldest;
+    }
+
+    /**
+     * The membership a freshly minted token will name, and the one place a suspension is
+     * refused.
+     *
+     * <p>Ordered, because findFirst() over an unordered query made this a coin toss: a user in
+     * two organizations got whichever the database felt like returning, and with it a different
+     * tenant scope on each login. Oldest membership is where a session starts; the organization
+     * switcher moves it from there, and the session remembers.
+     *
+     * <p>A suspended membership is skipped rather than fatal, because a suspension belongs to one
+     * organization: somebody suspended by one customer is still the other customer's member, and
+     * refusing the login outright would lock them out of an organization that never asked for it.
+     * Only when every membership is suspended is there nothing to issue a token for — and that is
+     * a 403, not the 404 of a user who belongs to no organization at all.
+     *
+     * <p>INVITED is deliberately not skipped: that is the membership an invitee signs in with in
+     * order to accept the invite.
+     */
+    private Membership membershipToIssueTokenFor(UUID userId) {
+        List<Membership> memberships = membershipRepository.findByUserIdOrderByCreatedAtAsc(userId);
+        return memberships.stream()
+                .filter(m -> m.getStatus() != MembershipStatus.DISABLED)
+                .findFirst()
+                .orElseThrow(() -> memberships.isEmpty()
+                        ? new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found")
+                        : new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                "Your membership in this organization has been suspended"));
     }
 
     @Auditable(action = AuditAction.LOGOUT, resourceType = "Auth")
