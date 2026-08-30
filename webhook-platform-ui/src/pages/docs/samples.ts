@@ -93,6 +93,64 @@ def verify(raw_body: bytes, header: str, secret: str) -> bool:
     return hmac.compare_digest(expected, parts["v1"]) and fresh`,
 };
 
+/**
+ * Verifying the Standard Webhooks headers.
+ *
+ * These lean on the SDKs rather than reimplementing the HMAC, because that is
+ * the whole point of speaking the convention: the receiver adds a dependency
+ * instead of reading a signing specification. The shell sample is the exception
+ * — there is no SDK there, and it is the only place the three differences from
+ * `X-Signature` are visible at once: the id is part of what is signed, the
+ * timestamp is seconds, and the digest is base64.
+ */
+export const standardSignatureSamples = {
+  curl: `# signed: "<webhook-id>.<webhook-timestamp>.<raw body>"
+# the key is the endpoint's standardWebhooksSecret, whsec_<base64>, decoded
+
+KEY_HEX=$(printf '%s' "\${WHSEC#whsec_}" | base64 -d | xxd -p | tr -d '\\n')
+SIGNED="\${WEBHOOK_ID}.\${WEBHOOK_TIMESTAMP}.\${BODY}"
+EXPECTED=$(printf '%s' "$SIGNED" \\
+  | openssl dgst -sha256 -mac HMAC -macopt "hexkey:$KEY_HEX" -binary | base64)
+
+# webhook-signature is "v1,<sig>", space-separated one per valid secret during
+# a rotation window — any one of them matching is enough.
+case " $WEBHOOK_SIGNATURE " in *" v1,$EXPECTED "*) ;; *) exit 1 ;; esac`,
+  node: `import express from 'express';
+import { verifyStandardWebhook } from '@webhook-platform/node';
+
+// express.raw, not express.json: the signature is over the bytes that arrived,
+// and a parsed-then-reserialized body hashes differently.
+app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    // The endpoint's standardWebhooksSecret — the whsec_… form, not the raw one.
+    verifyStandardWebhook(req.body.toString('utf8'), req.headers, process.env.HOOKFLOW_WHSEC);
+  } catch {
+    return res.sendStatus(400); // wrong signature, or older than 300 seconds
+  }
+
+  const event = JSON.parse(req.body.toString('utf8'));
+  return res.sendStatus(204);
+});`,
+  python: `import os
+
+from fastapi import HTTPException, Request, Response
+from hookflow import HookflowError, verify_standard_webhook
+
+
+@app.post("/webhooks")
+async def receive(request: Request) -> Response:
+    # The raw body, not the parsed one: the signature is over the bytes that
+    # arrived, and a reserialized body hashes differently.
+    body = (await request.body()).decode()
+    try:
+        # The endpoint's standardWebhooksSecret — the whsec_… form.
+        verify_standard_webhook(body, dict(request.headers), os.environ["HOOKFLOW_WHSEC"])
+    except HookflowError:
+        raise HTTPException(status_code=400)  # wrong signature, or too old
+
+    return Response(status_code=204)`,
+};
+
 export const challengeSamples = {
   request: `POST https://your-endpoint.com/webhooks
 Content-Type: application/json

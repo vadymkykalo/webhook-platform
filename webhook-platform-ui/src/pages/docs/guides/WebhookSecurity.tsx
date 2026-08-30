@@ -16,12 +16,17 @@ import {
   SubSection,
 } from '../primitives';
 import type { SampleLanguage } from '../primitives';
-import { challengeSamples, rotationSample, signatureSamples } from '../samples';
+import {
+  challengeSamples, rotationSample, signatureSamples, standardSignatureSamples,
+} from '../samples';
 
 /**
- * The header list is every header `OutgoingAttemptStore` sets, in the order it
- * sets them. It used to name four of the six, which is worse than naming none:
- * a reader who deduplicates on `Idempotency-Key` had no way to learn it exists.
+ * The header list is every `X-` header `OutgoingAttemptStore` sets, in the order
+ * it sets them. It used to name four of the six, which is worse than naming
+ * none: a reader who deduplicates on `Idempotency-Key` had no way to learn it
+ * exists. The three `webhook-*` headers the same request carries are a second
+ * signature over the same bytes, not more metadata, so they are listed in the
+ * Standard Webhooks section rather than mixed in here.
  */
 /**
  * What is signed, what travels, and what the receiver does with it.
@@ -113,6 +118,45 @@ export default function WebhookSecurity({
         </SubSection>
 
         <Note label={t('docsPage.security.pitfallsLabel')}>{t('docsPage.security.pitfallsDesc')}</Note>
+      </Section>
+
+      <Section title={t('docsPage.security.standard')} description={t('docsPage.security.standardDesc')}>
+        <SubSection title={t('docsPage.security.standardHeaders')}>
+          <DefinitionList
+            items={[
+              { term: 'webhook-id', definition: t('docsPage.security.standardHeaderId') },
+              { term: 'webhook-timestamp', definition: t('docsPage.security.standardHeaderTimestamp') },
+              { term: 'webhook-signature', definition: t('docsPage.security.standardHeaderSignature') },
+            ]}
+          />
+        </SubSection>
+
+        <SubSection title={t('docsPage.security.standardChoosing')}>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.standardChoosingDesc')}</Prose>
+          </p>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.standardChoosingWhere')}</Prose>
+          </p>
+        </SubSection>
+
+        <SubSection title={t('docsPage.security.standardSecret')}>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <Prose>{t('docsPage.security.standardSecretDesc')}</Prose>
+          </p>
+        </SubSection>
+
+        <SubSection title={t('docsPage.security.verificationExamples')}>
+          <CodeSample
+            samples={standardSignatureSamples}
+            language={language}
+            onLanguageChange={onLanguageChange}
+          />
+        </SubSection>
+
+        <Note label={t('docsPage.security.standardPitfallsLabel')}>
+          {t('docsPage.security.standardPitfallsDesc')}
+        </Note>
       </Section>
 
       <Section

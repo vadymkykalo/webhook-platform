@@ -37,13 +37,6 @@ non-Hookflow user, an embeddable surface, and enough theming not to look borrowe
 
 Each of these is a real absence, listed so nobody has to discover it mid-evaluation.
 
-**Standard Webhooks.** Signatures are Stripe-shaped — `X-Signature: t=…,v1=…` over
-`<timestamp>.<body>`. The [Standard Webhooks](https://github.com/standard-webhooks/standard-webhooks)
-convention (`webhook-id` / `webhook-timestamp` / `webhook-signature`) has been adopted by
-OpenAI, Anthropic, Twilio, PagerDuty and Supabase, and receivers that follow it can verify
-with an off-the-shelf library instead of reading our docs. Additive: both header sets can be
-sent at once, so nothing existing breaks.
-
 **SSO — SAML and OIDC.** Not implemented, and deliberately not advertised:
 `V059__drop_unimplemented_sso_feature_flag.sql` removed the plan flag that claimed it. A hard
 blocker for larger organizations.

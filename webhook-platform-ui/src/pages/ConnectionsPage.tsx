@@ -13,7 +13,7 @@ import {
   queryKeys, useDeliveries, useEndpoints, usePatchSubscription, useProject,
   useRotateSecret, useSubscriptions, useUpdateEndpoint, useVerifyEndpoint,
 } from '../api/queries';
-import type { DeliveryResponse, EndpointResponse } from '../types/api.types';
+import type { DeliveryResponse, EndpointResponse, SignatureScheme } from '../types/api.types';
 import PageHeader from '../components/PageHeader';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
 import EmptyState, { ErrorState } from '../components/EmptyState';
@@ -21,6 +21,7 @@ import StatusBadge, { EnabledBadge, type StatusKind } from '../components/Status
 import AttemptRail from '../components/AttemptRail';
 import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
 import { ConnectionSetupFlow, SecretField, ladderTicks } from './ConnectionSetupPage';
+import SignatureSchemePicker, { sendsStandardHeaders } from '../components/SignatureSchemePicker';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Switch } from '../components/ui/switch';
@@ -125,7 +126,14 @@ export default function ConnectionsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showSetup, setShowSetup] = useState(false);
   const [rotateFor, setRotateFor] = useState<EndpointResponse | null>(null);
-  const [rotatedSecret, setRotatedSecret] = useState<string | null>(null);
+  // The whole response, not just the secret: rotation is the other moment the
+  // `whsec_…` form is returned, and which of the two a reader needs depends on
+  // the scheme the response also carries.
+  const [rotated, setRotated] = useState<EndpointResponse | null>(null);
+  // The scheme a person just chose, held until the endpoints query catches up.
+  // Without it the radio springs back to the old option for the length of a
+  // refetch, which reads as the click having failed.
+  const [pendingScheme, setPendingScheme] = useState<Record<string, SignatureScheme>>({});
   const [subscribeTo, setSubscribeTo] = useState<string | null>(null);
   const [editingSubscription, setEditingSubscription] = useState<SubscriptionResponse | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -202,7 +210,7 @@ export default function ConnectionsPage() {
     if (!rotateFor) return;
     try {
       const updated = await rotateSecret.mutateAsync(rotateFor.id);
-      setRotatedSecret(updated.secret ?? null);
+      setRotated(updated);
       showSuccess(t('endpoints.toast.secretRotated'));
     } catch (err) {
       showApiError(err, 'endpoints.toast.rotateFailed');
@@ -212,7 +220,37 @@ export default function ConnectionsPage() {
 
   const closeSecretDialog = () => {
     setRotateFor(null);
-    setRotatedSecret(null);
+    setRotated(null);
+  };
+
+  /**
+   * The update carries `rateLimitPerSecond` because the API reads that field
+   * unconditionally — an update that leaves it out clears the endpoint's rate
+   * limit as a side effect of changing something else entirely.
+   */
+  const handleSchemeChange = async (endpoint: EndpointResponse, scheme: SignatureScheme) => {
+    setPendingScheme((prev) => ({ ...prev, [endpoint.id]: scheme }));
+    try {
+      await updateEndpoint.mutateAsync({
+        id: endpoint.id,
+        data: {
+          url: endpoint.url,
+          description: endpoint.description,
+          enabled: endpoint.enabled,
+          rateLimitPerSecond: endpoint.rateLimitPerSecond,
+          signatureScheme: scheme,
+        },
+      });
+      showSuccess(t('signatureScheme.saved'));
+    } catch (err) {
+      // A scheme the endpoint does not have must not go on looking chosen.
+      setPendingScheme((prev) => {
+        const next = { ...prev };
+        delete next[endpoint.id];
+        return next;
+      });
+      showApiError(err, 'signatureScheme.saveFailed');
+    }
   };
 
   const newConnectionButton = (
@@ -274,6 +312,7 @@ export default function ConnectionsPage() {
               {rows.map(({ endpoint, subs, health }) => {
                 const open = expanded.has(endpoint.id);
                 const ladderSource = subs[0];
+                const scheme = pendingScheme[endpoint.id] ?? endpoint.signatureScheme;
                 return [
                   <TableRow key={endpoint.id} className={cn(open && 'bg-secondary/40')}>
                     <TableCell>
@@ -462,6 +501,11 @@ export default function ConnectionsPage() {
                             <p className="text-sm text-muted-foreground">
                               {t('connections.secretHidden', 'The secret is stored hashed and is shown once, when it is created or rotated. Rotate it if it may have leaked — the old secret stops working immediately.')}
                             </p>
+                            {sendsStandardHeaders(scheme) && (
+                              <p className="text-sm text-muted-foreground">
+                                {t('connections.standardSecretHidden')}
+                              </p>
+                            )}
                             <PermissionGate allowed={canManageEndpoints}>
                               <VerificationGate>
                                 <Button variant="outline" size="sm" onClick={() => setRotateFor(endpoint)}>
@@ -469,6 +513,15 @@ export default function ConnectionsPage() {
                                 </Button>
                               </VerificationGate>
                             </PermissionGate>
+
+                            <div className="pt-2">
+                              <SignatureSchemePicker
+                                value={scheme}
+                                onChange={(next) => handleSchemeChange(endpoint, next)}
+                                disabled={!canManageEndpoints}
+                              />
+                            </div>
+
                             <dl className="grid grid-cols-2 gap-2 pt-2 text-xs">
                               <dt className="text-muted-foreground">{t('connections.detailRateLimit', 'Rate limit')}</dt>
                               <dd className="font-mono">
@@ -511,7 +564,7 @@ export default function ConnectionsPage() {
       </Dialog>
 
       {/* Rotate: confirm, then show the new secret exactly once. */}
-      <AlertDialog open={!!rotateFor && !rotatedSecret} onOpenChange={(open) => !open && setRotateFor(null)}>
+      <AlertDialog open={!!rotateFor && !rotated} onOpenChange={(open) => !open && setRotateFor(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('endpoints.rotateDialog.title')}</AlertDialogTitle>
@@ -527,13 +580,26 @@ export default function ConnectionsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!rotatedSecret} onOpenChange={closeSecretDialog}>
+      <Dialog open={!!rotated} onOpenChange={closeSecretDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('endpoints.secretDialog.title')}</DialogTitle>
             <DialogDescription>{t('endpoints.secretDialog.description')}</DialogDescription>
           </DialogHeader>
-          {rotatedSecret && <SecretField secret={rotatedSecret} />}
+          {rotated?.secret && (
+            <SecretField secret={rotated.secret} label={t('connectionSetup.secret.label')} />
+          )}
+          {/* The `whsec_…` form is the one a Standard Webhooks library takes, and
+              it is only worth showing to an endpoint that is sent those headers. */}
+          {rotated?.standardWebhooksSecret && sendsStandardHeaders(rotated.signatureScheme) && (
+            <>
+              <SecretField
+                secret={rotated.standardWebhooksSecret}
+                label={t('connectionSetup.secret.standardLabel')}
+              />
+              <p className="text-xs text-muted-foreground">{t('connectionSetup.secret.standardHint')}</p>
+            </>
+          )}
           <p className="text-sm text-muted-foreground">{t('endpoints.secretDialog.hint')}</p>
           <div className="flex justify-end">
             <Button onClick={closeSecretDialog}>{t('endpoints.secretDialog.done')}</Button>

@@ -747,7 +747,9 @@
     "secret": {
       "hide": "Hide secret",
       "label": "Signing secret",
-      "reveal": "Reveal secret"
+      "reveal": "Reveal secret",
+      "standardLabel": "Standard Webhooks secret",
+      "standardHint": "The same secret in the form a Standard Webhooks library expects. Pass this one, whsec_ prefix included, to a Standard Webhooks verifier; pass the signing secret above to one written against X-Signature."
     },
     "stepCounter": "Step {{n}} of {{total}} · {{name}}"
   },
@@ -788,7 +790,8 @@
     "noSubscriptionsDesc": "Nothing is subscribed, so this endpoint receives no events.",
     "secretHidden": "The secret is stored hashed and is shown once, when it is created or rotated. Rotate it if it may have leaked — the old secret stops working immediately.",
     "sendTest": "Send test event",
-    "toggleSubscription": "Enable {{eventType}}"
+    "toggleSubscription": "Enable {{eventType}}",
+    "standardSecretHidden": "The whsec_… form a Standard Webhooks library expects is derived from the same secret, and is shown beside it whenever the secret itself is."
   },
   "createSubscription": {
     "descriptionCreate": "A subscription connects an event type to an endpoint. When a matching event is received, it will be delivered to the endpoint.",
@@ -1670,7 +1673,20 @@
       "sigVerificationDesc": "`X-Signature` is `t=<unix-ms>,v1=<hex>`. `v1` is HMAC-SHA256 over the exact string `<t>.<raw body>`, keyed with the endpoint secret. `t` is milliseconds, not seconds. The header may carry more than one `v1` — see rotating a secret below — so treat the delivery as authentic when any of them matches.",
       "subtitle": "What Hookflow puts on a request it sends, and how the receiver checks it.",
       "title": "Webhook Security",
-      "verificationExamples": "Verifying it"
+      "verificationExamples": "Verifying it",
+      "standard": "Standard Webhooks",
+      "standardDesc": "Every delivery also carries the Standard Webhooks headers — `webhook-id`, `webhook-timestamp` and `webhook-signature` — unless the endpoint is set to send only `X-Signature`. It is the convention OpenAI, Anthropic, Twilio, PagerDuty and Supabase send, so there is a verification library for it in most languages and you write no signing code of your own.",
+      "standardHeaders": "The three headers",
+      "standardHeaderId": "The delivery id — one event to one endpoint, unchanged across every attempt of it, and part of what is signed. Safe to deduplicate on.",
+      "standardHeaderTimestamp": "When this body was signed, in unix seconds — not the milliseconds `X-Timestamp` carries on the same request. Do not hand one to a verifier expecting the other.",
+      "standardHeaderSignature": "`v1,<base64>`. HMAC-SHA256 over `<webhook-id>.<webhook-timestamp>.<raw body>`, keyed with the endpoint’s `whsec_…` secret. Space-separated, one entry per valid secret while a rotated secret is inside its grace window — so treat the delivery as authentic when any of them matches.",
+      "standardChoosing": "Which one to verify",
+      "standardChoosingDesc": "Either, and you can change your mind. An endpoint is sent both header sets by default, and a receiver ignores the headers it does not read, so the choice costs nothing to defer and nothing to revisit — verify `X-Signature` today, move to the Standard Webhooks headers when it suits you, and no deploy of yours has to line up with one of ours.",
+      "standardChoosingWhere": "Reach for the Standard Webhooks headers when you would rather add a dependency than write signing code, or when you already verify another provider the same way. Reach for `X-Signature` when you have working verification code for it. Narrow an endpoint to one set only once nothing is reading the other — on the Connections tab, beside that endpoint’s signing secret.",
+      "standardSecret": "Which secret",
+      "standardSecretDesc": "Not the same string. `X-Signature` is keyed with the endpoint secret as it is; the Standard Webhooks headers are keyed with that same secret in the conventional `whsec_<base64>` form. The API returns it as `standardWebhooksSecret` whenever it returns the secret itself — at creation and at rotation — and the dashboard shows it beside the other. The official SDKs accept a raw secret too and use it as-is, so handing over the wrong form fails as an invalid signature rather than as an error that says which one you meant.",
+      "standardPitfallsLabel": "Common mistakes",
+      "standardPitfallsDesc": "Sign the raw bytes, as with `X-Signature`. Then the three that belong to this scheme alone: the timestamp is seconds, so a milliseconds comparison rejects everything; the digest is base64, not hex; and `webhook-id` is part of the signed string, so leaving it out produces a digest that never matches and never says why. Read every space-separated entry in `webhook-signature` rather than the first, or a rotation looks like a forged request."
     },
     "sidebar": {
       "apiDocs": "API Documentation",
@@ -3475,6 +3491,24 @@
     "yourAccess": "Your access",
     "yourAccessDesc": "The role you hold in this organization and what it lets you do.",
     "emailUnverified": "Not confirmed"
+  },
+  "signatureScheme": {
+    "label": "Signature headers",
+    "desc": "Which signature Hookflow puts on every delivery to this endpoint. A receiver ignores the headers it does not read, so sending a set it has never seen breaks nothing that already works.",
+    "both": {
+      "title": "Both header sets",
+      "desc": "Verify whichever one you already have code for, and move to the other later without a deploy on both sides at once. The default, and the answer when you are not sure."
+    },
+    "standard": {
+      "title": "Standard Webhooks only",
+      "desc": "The convention OpenAI, Twilio, PagerDuty and Supabase send, so an off-the-shelf Standard Webhooks library verifies it and you write no signing code. Verify with the whsec_… secret, not the raw one."
+    },
+    "legacy": {
+      "title": "X-Signature only",
+      "desc": "Hookflow’s own header: HMAC-SHA256 of <t>.<raw body> in hex, keyed with the raw secret. Choose it when your receiver already verifies this and you would rather it saw nothing else."
+    },
+    "saved": "Signature headers updated",
+    "saveFailed": "Could not change the signature headers"
   },
   "sharedDebug": {
     "error": "Something went wrong loading this debug link.",
