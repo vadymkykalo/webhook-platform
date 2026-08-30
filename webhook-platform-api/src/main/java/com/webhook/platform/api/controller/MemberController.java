@@ -78,6 +78,22 @@ public class MemberController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Re-issue invite",
+            description = "Issues a fresh invite token for a member whose invite is still pending, "
+                    + "replacing the previous one and restarting its 48-hour expiry. The accept-invite "
+                    + "link is returned so an owner can pass it on when email delivery is not configured.")
+    @ApiResponse(responseCode = "200", description = "Invite re-issued")
+    @RequireOrgAccess
+    @PostMapping("/{userId}/invite")
+    public ResponseEntity<MemberResponse> reissueInvite(
+            @PathVariable("orgId") UUID orgId,
+            @PathVariable("userId") UUID userId,
+            AuthContext auth) {
+        auth.requireJwt();
+        MemberResponse response = membershipService.reissueInvite(userId, auth.role());
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "Remove member", description = "Removes a member from the organization")
     @ApiResponse(responseCode = "204", description = "Member removed")
     @RequireOrgAccess

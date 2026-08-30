@@ -88,6 +88,7 @@ class MutatingHandlerScopeDeclarationTest {
             "MemberController.addMember",
             "MemberController.changeMemberRole",
             "MemberController.removeMember",
+            "MemberController.reissueInvite",
             "MemberController.acceptInvite",
 
             // Unauthenticated by design — whitelisted public paths in SecurityConfig.

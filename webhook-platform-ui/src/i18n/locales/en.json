@@ -2712,12 +2712,14 @@
       "copyLink": "Copy link",
       "description": "Invite a new member to this organization",
       "email": "Email",
+      "emailDisabledNote": "Email delivery is not configured on this deployment, so no invitation will be sent. You will get a link to pass on yourself.",
       "emailInvalid": "Invalid email format",
       "emailNote": "The member will receive an invitation email to join the organization.",
       "emailRequired": "Email is required",
       "inviteLink": "Invite Link",
       "inviteLinkHint": "Share this link with the member. The link expires in 48 hours.",
-      "inviteSent": "Invitation sent successfully!",
+      "issuedDescription": "The invite is valid for 48 hours. Make sure it reaches the person before then.",
+      "issuedTitle": "Invitation created",
       "ownerNote": "An Owner can change billing, remove members and delete the organization. Grant it sparingly.",
       "role": "Role",
       "roleHint": "Developer: Can create and manage resources. Viewer: Read-only access.",
@@ -2751,10 +2753,13 @@
     "title": "Members",
     "toast": {
       "added": "Member added successfully",
-      "invited": "Invitation sent! The member will need to accept the invite.",
+      "copyFailed": "Could not copy the link — select it and copy by hand",
+      "inviteRevoked": "Invite revoked",
       "linkCopied": "Invite link copied to clipboard",
+      "reissueFailed": "Failed to re-issue the invite",
       "removeFailed": "Failed to remove member",
       "removed": "Member removed successfully",
+      "revokeFailed": "Failed to revoke the invite",
       "roleChangeFailed": "Failed to update member role",
       "roleChanged": "Member role updated successfully"
     },
@@ -2763,6 +2768,24 @@
       "INVITED": "Invited",
       "ACTIVE": "Active",
       "DISABLED": "Disabled"
+    },
+    "invite": {
+      "emailDisabled": "Email delivery is not configured on this deployment, so nothing was sent to {{email}}. Pass on the link below yourself.",
+      "emailed": "The invitation was emailed to {{email}}. You can also pass on the link below."
+    },
+    "inviteExpires": "Invite expires {{when}}",
+    "inviteExpired": "Invite expired — re-issue it",
+    "reissueInvite": "Re-issue invite",
+    "reissueInviteFor": "Re-issue the invite for {{email}}",
+    "revokeInvite": "Revoke invite",
+    "revokeInviteFor": "Revoke the invite for {{email}}",
+    "revokeDialog": {
+      "description": "The link sent to {{email}} stops working and they will not be able to join. You can invite them again at any time.",
+      "title": "Revoke this invite?"
+    },
+    "reissueDialog": {
+      "description": "The previous link has stopped working. This one is valid for the next 48 hours.",
+      "title": "New invite link"
     }
   },
   "mtls": {

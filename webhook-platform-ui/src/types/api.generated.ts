@@ -1424,6 +1424,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{orgId}/members/{userId}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-issue invite
+         * @description Issues a fresh invite token for a member whose invite is still pending, replacing the previous one and restarting its 48-hour expiry. The accept-invite link is returned so an owner can pass it on when email delivery is not configured.
+         */
+        post: operations["reissueInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{orgId}/members/accept-invite": {
         parameters: {
             query?: never;
@@ -3875,6 +3895,9 @@ export interface components {
             status?: "INVITED" | "ACTIVE" | "DISABLED";
             /** Format: date-time */
             createdAt?: string;
+            /** Format: date-time */
+            inviteExpiresAt?: string;
+            inviteUrl?: string;
         };
         BulkReplayRequest: {
             deliveryIds?: string[];
@@ -4864,6 +4887,7 @@ export interface components {
             organization?: components["schemas"]["OrganizationResponse"];
             /** @enum {string} */
             role?: "OWNER" | "DEVELOPER" | "VIEWER" | "API_KEY";
+            emailDeliveryEnabled?: boolean;
         };
         AuditLogResponse: {
             /** Format: uuid */
@@ -7822,6 +7846,29 @@ export interface operations {
         responses: {
             /** @description Member added */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MemberResponse"];
+                };
+            };
+        };
+    };
+    reissueInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invite re-issued */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

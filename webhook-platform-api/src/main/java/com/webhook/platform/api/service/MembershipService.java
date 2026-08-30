@@ -71,6 +71,10 @@ public class MembershipService {
                             .role(membership.getRole())
                             .status(membership.getStatus())
                             .createdAt(membership.getCreatedAt())
+                            // The expiry, so a pending invite can be seen running out and
+                            // re-issued. Never the link: only the token's hash is stored,
+                            // and a listing is readable by every member of the org.
+                            .inviteExpiresAt(membership.getInviteExpiresAt())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -133,6 +137,61 @@ public class MembershipService {
                 .role(membership.getRole())
                 .status(membership.getStatus())
                 .createdAt(membership.getCreatedAt())
+                .inviteExpiresAt(membership.getInviteExpiresAt())
+                // Handed back to the owner who issued it. With email delivery off — the
+                // shipped default — sendInviteEmail only printed this to the container
+                // log while the browser was told the invitation had been sent, so an
+                // invite in a default install could not be delivered at all. The
+                // temporary password stays where it is: see EmailService's javadoc.
+                .inviteUrl(isNewUser ? emailService.inviteUrl(organizationId.toString(), inviteToken) : null)
+                .build();
+    }
+
+    /**
+     * Mints a fresh invite token for a membership still sitting at INVITED, replacing
+     * whatever was issued before and starting the 48 hours again.
+     *
+     * <p>The previous token stops working the moment this returns — the row holds one
+     * hash — which is what makes this the revoke-and-replace an expired invite needs.
+     * No new temporary password is generated: the invitee's account already exists, and
+     * a second non-expiring credential would be one more than anyone can deliver.
+     */
+    @Auditable(action = AuditAction.MEMBER_INVITED, resourceType = "Member")
+    @Transactional
+    public MemberResponse reissueInvite(UUID userId, MembershipRole requestingRole) {
+        UUID organizationId = TenantContext.require();
+        if (requestingRole != MembershipRole.OWNER) {
+            throw new ForbiddenException("Only owners can re-issue invites");
+        }
+
+        Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
+                .orElseThrow(() -> new NotFoundException("Membership not found"));
+
+        if (membership.getStatus() != MembershipStatus.INVITED) {
+            throw new IllegalStateException("Membership has no pending invite to re-issue");
+        }
+
+        String inviteToken = generateInviteToken();
+        membership.setInviteTokenHash(CryptoUtils.hashApiKey(inviteToken));
+        membership.setInviteExpiresAt(Instant.now().plus(INVITE_EXPIRATION_HOURS, ChronoUnit.HOURS));
+        membershipRepository.save(membership);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        log.info("Invite re-issued: userId={}, orgId={}, expiresAt={}",
+                userId, organizationId, membership.getInviteExpiresAt());
+
+        emailService.sendInviteEmail(user.getEmail(), organizationId.toString(), inviteToken);
+
+        return MemberResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .role(membership.getRole())
+                .status(membership.getStatus())
+                .createdAt(membership.getCreatedAt())
+                .inviteExpiresAt(membership.getInviteExpiresAt())
+                .inviteUrl(emailService.inviteUrl(organizationId.toString(), inviteToken))
                 .build();
     }
 

@@ -130,6 +130,11 @@ export const router = createBrowserRouter([
     path: '/docs/:sectionId',
     element: <S><DocumentationPage /></S>,
   },
+  /* No child route below states a role. `/admin` requires a session, and what
+     each destination requires beyond that is declared once in nav.config's
+     `requiredRoleFor` — which AppLayout applies around the outlet, and which the
+     sidebar and tab strip filter from. Two hand-kept lists is how the personal
+     profile page came to be shown to everyone and guarded at OWNER. */
   {
     path: '/admin',
     element: (
@@ -264,7 +269,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'members',
-        element: <ProtectedRoute requiredRole="OWNER"><S><MembersPage /></S></ProtectedRoute>,
+        element: <S><MembersPage /></S>,
       },
       {
         path: 'audit-log',
@@ -272,15 +277,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <ProtectedRoute requiredRole="OWNER"><S><SettingsPage /></S></ProtectedRoute>,
+        element: <S><SettingsPage /></S>,
       },
       {
         path: 'org-settings',
-        element: <ProtectedRoute requiredRole="OWNER"><S><OrgSettingsPage /></S></ProtectedRoute>,
+        element: <S><OrgSettingsPage /></S>,
       },
       {
         path: 'billing',
-        element: <ProtectedRoute requiredRole="OWNER"><S><BillingPage /></S></ProtectedRoute>,
+        element: <S><BillingPage /></S>,
       },
       {
         path: '*',

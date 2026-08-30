@@ -83,6 +83,7 @@ class MutatingHandlerAccessDeclarationTest {
             "MemberController.addMember",
             "MemberController.changeMemberRole",
             "MemberController.removeMember",
+            "MemberController.reissueInvite",
 
             // Platform-admin only, gated on the PLATFORM_ADMIN authority for /api/v1/admin/**
             // in SecurityConfig. A platform admin holds no membership role, so the interceptor

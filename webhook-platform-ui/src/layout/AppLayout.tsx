@@ -11,9 +11,10 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { CommandPalette } from '../components/CommandPalette';
 import { getTheme, setTheme } from '../lib/theme';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ProtectedRoute from '../auth/ProtectedRoute';
 import Sidebar from './Sidebar';
 import SectionTabs from './SectionTabs';
-import { sectionFor } from './nav.config';
+import { requiredRoleFor, sectionFor } from './nav.config';
 
 const COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -182,9 +183,15 @@ export default function AppLayout() {
             </div>
           )}
 
+          {/* The role gate for every /admin page, applied here rather than route
+              by route so it reads from the same nav.config table the sidebar and
+              the tab strip filter from. Inside <main> on purpose: a refusal is a
+              page, and the person keeps their navigation to go somewhere else. */}
           <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto">
             <div className="animate-fade-in">
-              <Outlet />
+              <ProtectedRoute requiredRole={requiredRoleFor(location.pathname)}>
+                <Outlet />
+              </ProtectedRoute>
             </div>
           </main>
         </div>

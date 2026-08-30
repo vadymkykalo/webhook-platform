@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 187,
+  "operationCount": 188,
   "security": [
     {
       "id": "bearerAuth",
@@ -3756,6 +3756,38 @@
           }
         },
         {
+          "id": "reissueInvite",
+          "method": "POST",
+          "path": "/api/v1/orgs/{orgId}/members/{userId}/invite",
+          "summary": "Re-issue invite",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "orgId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "userId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Invite re-issued",
+              "type": "MemberResponse"
+            }
+          ],
+          "description": "Issues a fresh invite token for a member whose invite is still pending, replacing the previous one and restarting its 48-hour expiry. The accept-invite link is returned so an owner can pass it on when email delivery is not configured."
+        },
+        {
           "id": "acceptInvite",
           "method": "POST",
           "path": "/api/v1/orgs/{orgId}/members/accept-invite",
@@ -7096,6 +7128,11 @@
           "VIEWER",
           "API_KEY"
         ]
+      },
+      {
+        "name": "emailDeliveryEnabled",
+        "type": "boolean",
+        "required": false
       }
     ],
     "DailyUsage": [
@@ -9163,6 +9200,16 @@
       {
         "name": "createdAt",
         "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "inviteExpiresAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "inviteUrl",
+        "type": "string",
         "required": false
       }
     ],
@@ -12500,7 +12547,8 @@
         "name": "string",
         "createdAt": "2026-01-01T12:00:00Z"
       },
-      "role": "OWNER"
+      "role": "OWNER",
+      "emailDeliveryEnabled": true
     },
     "DailyUsage": {
       "date": "string",
@@ -13075,7 +13123,9 @@
       "email": "string",
       "role": "OWNER",
       "status": "INVITED",
-      "createdAt": "2026-01-01T12:00:00Z"
+      "createdAt": "2026-01-01T12:00:00Z",
+      "inviteExpiresAt": "2026-01-01T12:00:00Z",
+      "inviteUrl": "string"
     },
     "MtlsConfigRequest": {
       "clientCert": "string",

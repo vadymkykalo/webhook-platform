@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Trash2, Users } from 'lucide-react';
+import { UserPlus, Trash2, Users, RefreshCw, MailX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDate } from '../lib/date';
@@ -10,15 +10,20 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge, { type StatusKind } from '../components/StatusBadge';
 import PermissionGate, { GRANTABLE_ROLES, ROLES, ROLE_ICON, RoleCard } from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
 import AddMemberModal from '../components/AddMemberModal';
+import InviteLink from '../components/InviteLink';
 import { type MembershipRole, type MemberResponse } from '../api/members.api';
-import { useMembers, useChangeMemberRole, useRemoveMember } from '../api/queries';
+import { useMembers, useChangeMemberRole, useRemoveMember, useReissueInvite } from '../api/queries';
 import { useAuth } from '../auth/auth.store';
 import { usePermissions } from '../auth/usePermissions';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Select } from '../components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '../components/ui/dialog';
 
 /** A membership status is a state, not a delivery outcome, but it reads on the same four meanings. */
 function kindOfMemberStatus(status: string): StatusKind {
@@ -33,6 +38,10 @@ export default function MembersPage() {
   const { canManageMembers } = usePermissions();
   const [showAddModal, setShowAddModal] = useState(false);
   const [removing, setRemoving] = useState<MemberResponse | null>(null);
+  const [revoking, setRevoking] = useState<MemberResponse | null>(null);
+  const [reissued, setReissued] = useState<MemberResponse | null>(null);
+
+  const emailDelivered = user?.emailDeliveryEnabled ?? false;
 
   const orgId = user?.organization?.id;
   const queryClient = useQueryClient();
@@ -40,6 +49,7 @@ export default function MembersPage() {
   const { data: members = [], isLoading, isError, error, refetch, isRefetching } = useMembers(orgId);
   const changeRole = useChangeMemberRole(orgId!);
   const removeMember = useRemoveMember(orgId!);
+  const reissueInvite = useReissueInvite(orgId!);
 
   const handleChangeRole = (userId: string, newRole: MembershipRole) => {
     changeRole.mutate(
@@ -59,6 +69,31 @@ export default function MembersPage() {
         setRemoving(null);
       },
       onError: (err: any) => showApiError(err, 'members.toast.removeFailed'),
+    });
+  };
+
+  /* An invite that has not been accepted has no member behind it yet, so taking it
+     back is deleting the membership row — the same call as removing a member, asked
+     for in the words of what it actually does and without the type-the-name ritual
+     an irreversible removal earns. */
+  const handleRevoke = () => {
+    if (!revoking) return;
+    removeMember.mutate(revoking.userId, {
+      onSuccess: () => {
+        showSuccess(t('members.toast.inviteRevoked'));
+        setRevoking(null);
+      },
+      onError: (err: any) => showApiError(err, 'members.toast.revokeFailed'),
+    });
+  };
+
+  /* Re-issuing replaces the token, so the previous link stops working. The new one
+     is put on screen rather than announced as sent: with EMAIL_ENABLED=false, the
+     shipped default, nothing leaves the server. */
+  const handleReissue = (member: MemberResponse) => {
+    reissueInvite.mutate(member.userId, {
+      onSuccess: (fresh) => setReissued(fresh),
+      onError: (err: any) => showApiError(err, 'members.toast.reissueFailed'),
     });
   };
 
@@ -175,6 +210,13 @@ export default function MembersPage() {
                         kind={kindOfMemberStatus(member.status)}
                         label={t(`members.statuses.${member.status}`)}
                       />
+                      {member.status === 'INVITED' && member.inviteExpiresAt && (
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {new Date(member.inviteExpiresAt) < new Date()
+                            ? t('members.inviteExpired')
+                            : t('members.inviteExpires', { when: formatDate(member.inviteExpiresAt) })}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-[13px] text-muted-foreground">
                       {formatDate(member.createdAt)}
@@ -182,16 +224,44 @@ export default function MembersPage() {
                     {canManageMembers && (
                       <TableCell>
                         {!isSelf && (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setRemoving(member)}
-                            title={t('members.remove')}
-                            aria-label={t('members.removeFrom', { email: member.email })}
-                            className="text-muted-foreground hover:text-halt"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex items-center gap-0.5">
+                            {member.status === 'INVITED' && (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => handleReissue(member)}
+                                disabled={reissueInvite.isPending}
+                                title={t('members.reissueInvite')}
+                                aria-label={t('members.reissueInviteFor', { email: member.email })}
+                                className="text-muted-foreground hover:text-foreground"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {member.status === 'INVITED' ? (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => setRevoking(member)}
+                                title={t('members.revokeInvite')}
+                                aria-label={t('members.revokeInviteFor', { email: member.email })}
+                                className="text-muted-foreground hover:text-halt"
+                              >
+                                <MailX className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => setRemoving(member)}
+                                title={t('members.remove')}
+                                aria-label={t('members.removeFrom', { email: member.email })}
+                                className="text-muted-foreground hover:text-halt"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                     )}
@@ -211,6 +281,32 @@ export default function MembersPage() {
           onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['members'] }); }}
         />
       )}
+
+      <ConfirmDialog
+        open={!!revoking}
+        onOpenChange={(open) => !open && setRevoking(null)}
+        title={t('members.revokeDialog.title')}
+        description={t('members.revokeDialog.description', { email: revoking?.email ?? '' })}
+        onConfirm={handleRevoke}
+        loading={removeMember.isPending}
+        confirmLabel={t('members.revokeInvite')}
+      />
+
+      <Dialog open={!!reissued} onOpenChange={(open) => !open && setReissued(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('members.reissueDialog.title')}</DialogTitle>
+            <DialogDescription>{t('members.reissueDialog.description')}</DialogDescription>
+          </DialogHeader>
+          {reissued?.inviteUrl && (
+            <InviteLink
+              email={reissued.email}
+              url={reissued.inviteUrl}
+              emailDelivered={emailDelivered}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <DangerConfirmDialog
         open={!!removing}

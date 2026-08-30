@@ -99,7 +99,7 @@ export default function Sidebar({
       )}
 
       <nav aria-label={t('nav.navigation')} className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {PROJECT_SECTIONS.map((section) => (
+        {PROJECT_SECTIONS.filter((section) => !section.requiredRole || hasMinRole(role, section.requiredRole)).map((section) => (
           <RailLink
             key={section.nameKey}
             section={section}
@@ -134,24 +134,25 @@ export default function Sidebar({
           <BookOpen className="h-4 w-4 flex-shrink-0" />
           {!narrow && <span>{t('nav.documentation')}</span>}
         </Link>
-        {hasMinRole(role, 'VIEWER') && (
-          <Link
-            to={SETTINGS_SECTION.path()}
-            onClick={isMobile ? onNavigate : undefined}
-            aria-current={SETTINGS_SECTION.owns.includes(segment) ? 'page' : undefined}
-            title={narrow ? t('nav.settings') : undefined}
-            className={cn(
-              'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
-              narrow && 'justify-center px-2',
-              SETTINGS_SECTION.owns.includes(segment)
-                ? 'bg-secondary font-medium text-foreground'
-                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-            )}
-          >
-            <Settings className="h-4 w-4 flex-shrink-0" />
-            {!narrow && <span>{t('nav.settings')}</span>}
-          </Link>
-        )}
+        {/* Shown to everyone, and it lands on the personal profile — the page
+            where a member changes their own password. What the section's
+            org-level tabs need is stated in nav.config and filtered there. */}
+        <Link
+          to={SETTINGS_SECTION.path()}
+          onClick={isMobile ? onNavigate : undefined}
+          aria-current={SETTINGS_SECTION.owns.includes(segment) ? 'page' : undefined}
+          title={narrow ? t('nav.settings') : undefined}
+          className={cn(
+            'relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm transition-colors',
+            narrow && 'justify-center px-2',
+            SETTINGS_SECTION.owns.includes(segment)
+              ? 'bg-secondary font-medium text-foreground'
+              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+          )}
+        >
+          <Settings className="h-4 w-4 flex-shrink-0" />
+          {!narrow && <span>{t('nav.settings')}</span>}
+        </Link>
       </div>
 
       <div className="border-t border-rail p-2">

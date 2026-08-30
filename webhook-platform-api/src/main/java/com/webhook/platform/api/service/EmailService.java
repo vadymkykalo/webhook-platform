@@ -89,8 +89,18 @@ public class EmailService {
         }
     }
 
+    /**
+     * The address an invitee opens to accept, built here because this is where the
+     * deployment's base URL lives. Handed back to the inviting owner as well as put in
+     * the mail: with {@code app.email.enabled=false} — the shipped default — nothing is
+     * sent, and a link the owner can pass on by hand is the only way the invite arrives.
+     */
+    public String inviteUrl(String orgId, String inviteToken) {
+        return baseUrl + "/accept-invite?token=" + inviteToken + "&orgId=" + orgId;
+    }
+
     public void sendInviteEmail(String to, String orgId, String inviteToken) {
-        String inviteUrl = baseUrl + "/accept-invite?token=" + inviteToken + "&orgId=" + orgId;
+        String inviteUrl = inviteUrl(orgId, inviteToken);
 
         if (!emailEnabled) {
             log.info("========== MEMBER INVITE ==========");
