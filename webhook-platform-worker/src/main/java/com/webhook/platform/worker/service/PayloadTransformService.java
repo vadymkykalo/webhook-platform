@@ -147,20 +147,34 @@ public class PayloadTransformService {
         }
     }
 
+    /**
+     * Reads one {@code ${...}} expression, distinguishing "no such field" from "no such path".
+     *
+     * <p>The config carries {@code SUPPRESS_EXCEPTIONS}, so a well-formed path that matches
+     * nothing already comes back as {@code null} without throwing — an ordinary optional field,
+     * and it stays a JSON null. Anything that still throws is the path itself being malformed:
+     * a typo the author made, which no amount of retrying fixes and which the caller must see.
+     *
+     * <p>This used to catch that and substitute a null too, at DEBUG. The receiver then got a
+     * successfully delivered, successfully signed body with nulls where the data should have
+     * been, and nothing anywhere said so — contradicting both {@code AttemptStore.buildBody}'s
+     * "never return the untransformed payload" (a transformation is all-or-nothing) and
+     * {@code AttemptRunner}'s invariant 4. The case it hurt most is the one
+     * {@link #transform} names: a template whose job is to strip PII by whitelisting fields is
+     * exactly the template whose silent misfire nobody notices.
+     *
+     * <p>Note the asymmetry this removes: {@code IncomingAttemptStore} evaluates its paths with
+     * a raw {@code JsonPath.read} and has always thrown.
+     */
     private JsonNode evaluateJsonPath(String jsonPath, JsonNode sourceNode) {
-        try {
-            Object result = JsonPath.using(jsonPathConfig).parse(sourceNode).read(jsonPath);
-            if (result == null) {
-                return objectMapper.getNodeFactory().nullNode();
-            }
-            if (result instanceof JsonNode) {
-                return (JsonNode) result;
-            }
-            return objectMapper.valueToTree(result);
-        } catch (Exception e) {
-            log.debug("JSONPath evaluation failed for '{}': {}", jsonPath, e.getMessage());
+        Object result = JsonPath.using(jsonPathConfig).parse(sourceNode).read(jsonPath);
+        if (result == null) {
             return objectMapper.getNodeFactory().nullNode();
         }
+        if (result instanceof JsonNode) {
+            return (JsonNode) result;
+        }
+        return objectMapper.valueToTree(result);
     }
 
     /**
