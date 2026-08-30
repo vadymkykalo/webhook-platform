@@ -44,6 +44,7 @@ public class CircuitBreakerService {
     private final long slowCallThresholdMs;
     private final int slowCallRateThreshold;
     private final Counter slowTripCounter;
+    private final Counter degradedCounter;
     private final String recordSuccessScript;
     private final String recordFailureScript;
 
@@ -73,6 +74,15 @@ public class CircuitBreakerService {
         this.slowTripCounter = Counter.builder("circuit_breaker_slow_trips_total")
                 .description("Circuit breaker trips due to slow call rate")
                 .register(meterRegistry);
+        // Failing open when Redis is unreachable is right — a blip must not stop deliveries.
+        // Failing open *silently* is not: a partially degraded Redis meant the breaker never
+        // tripped and never would, and there was no signal anywhere that said so. The two
+        // recording paths logged at DEBUG. RedisRateLimiterService and
+        // RedisConcurrencyControlService both already publish a fallback counter; this is the
+        // same idea under the same naming.
+        this.degradedCounter = Counter.builder("circuit_breaker_degraded_total")
+                .description("Circuit breaker operations that could not reach Redis and failed open")
+                .register(meterRegistry);
 
         this.recordSuccessScript = loadLuaScript("lua/circuit_breaker_record_success.lua");
         this.recordFailureScript = loadLuaScript("lua/circuit_breaker_record_failure.lua");
@@ -91,6 +101,7 @@ public class CircuitBreakerService {
             }
             return true;
         } catch (Exception e) {
+            degradedCounter.increment();
             log.warn("Redis unavailable for circuit breaker check, permitting call for endpoint {}: {}",
                     endpointId, e.getMessage());
             return true;
@@ -120,7 +131,11 @@ public class CircuitBreakerService {
                 tripCircuit(endpointId, slowRate);
             }
         } catch (Exception e) {
-            log.debug("Redis unavailable for circuit breaker success recording: {}", e.getMessage());
+            // WARN, not DEBUG: every one of these is an outcome the breaker did not see, so a
+            // run of them means the breaker is not measuring anything and cannot trip.
+            degradedCounter.increment();
+            log.warn("Redis unavailable for circuit breaker success recording, endpoint {}: {}",
+                    endpointId, e.getMessage());
         }
     }
 
@@ -144,7 +159,9 @@ public class CircuitBreakerService {
                 tripCircuit(endpointId, failureRate);
             }
         } catch (Exception e) {
-            log.debug("Redis unavailable for circuit breaker failure recording: {}", e.getMessage());
+            degradedCounter.increment();
+            log.warn("Redis unavailable for circuit breaker failure recording, endpoint {}: {}",
+                    endpointId, e.getMessage());
         }
     }
 
