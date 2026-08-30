@@ -1,47 +1,34 @@
 # License decisions
 
-Hookflow itself is [MIT](../../LICENSE). This records the two license
-questions an evaluating company's legal team is most likely to raise,
-plus how they were checked.
+Hookflow itself is [MIT](../../LICENSE). This records the license questions an evaluating company's legal team is
+most likely to raise, plus how they were checked.
 
-## MinIO is AGPL-3.0 — decision: keep it, but it is opt-in and undeployed by default
+## MinIO was AGPL-3.0 — decision: removed, because nothing ever used it
 
-`docker-compose.yml`'s `minio` service is the only AGPL-3.0-licensed component
-anywhere in this repo's dependency graph (confirmed below — nothing in the
-Maven or npm dependency trees is AGPL/GPL/SSPL/BSL). Three things keep it from
-being a problem for the MIT-branded default distribution:
+`docker-compose.yml` used to carry a `minio` service behind its own Compose
+profile: the only AGPL-3.0-licensed component anywhere in this repo's
+dependency graph. It was kept on the argument that it was opt-in, undeployed
+by default, and reserved for future object-storage work.
 
-1. **It is not started by default.** `minio` sits behind its own Compose
-   profile (`profiles: [minio]` in `docker-compose.yml`), which neither
-   `make up` (`--profile embedded-db`) nor `install.sh` activates. A fresh
-   install never pulls the MinIO image.
-2. **Nothing in the application calls it yet.** `.env.dist` labels it
-   `# MINIO (OPTIONAL - for future file storage)`
-   (`.env.dist:616`) — grepping `webhook-platform-api/src` and
-   `webhook-platform-worker/src` for MinIO/S3 client usage finds nothing;
-   `ProductionSafetyValidator`'s one hit is unrelated config validation, not an
-   S3 client. There is no code path today where running Hookflow requires
-   accepting MinIO's terms.
-3. **Running an unmodified AGPL service as a separate container, talked to
-   only over its network API, does not put Hookflow's own MIT code under
-   AGPL.** AGPL-3.0's network-copyleft clause (§13) is triggered by modifying
-   and distributing/running a *modified* copy of the covered work and offering
-   it to users over a network; it does not reach out and relicense an
-   unrelated program that merely happens to call it over HTTP. This is the
-   same reasoning under which most self-hosted stacks that offer a MinIO
-   profile operate.
+That future never arrived. Two years on, no application code referenced it —
+no `minio`, `S3Client`, `amazonaws` or `software.amazon` import in any module,
+and no object-storage dependency in any `pom.xml`. The only hit outside the
+Compose file was `ProductionSafetyValidator` checking a password for a service
+that nothing connected to. What it did carry was a pinned
+`RELEASE.2024-01-16` image, ageing into CVE-scanner findings on a service the
+product could not use, and a licensing question every evaluating legal team
+had to be walked through for no benefit.
 
-**Decision:** keep MinIO as an explicit opt-in profile for future
-object-storage work (large payload bodies, replay archives), not part of the
-default install. When that feature actually ships, document the AGPL
-obligation explicitly at that point (anyone who enables the `minio` profile
-and *modifies* MinIO's own source would need to comply with AGPL for their
-modified copy — vanilla/unmodified use does not), and offer a non-copyleft
-alternative for operators who'd rather not carry AGPL infrastructure at all,
-e.g. [SeaweedFS](https://github.com/seaweedfs/seaweedfs) (Apache-2.0) or any
-external S3-compatible bucket (AWS S3, Cloudflare R2, Backblaze B2) via the
-same S3 API — nothing in the (not-yet-written) integration should be
-MinIO-specific.
+**Decision:** removed from `docker-compose.yml`, `.env.dist`, the `Makefile`,
+`NOTICE` and `ProductionSafetyValidator`. Hookflow's dependency graph now
+contains no AGPL/GPL/SSPL/BSL component at all, which is a simpler and more
+honest answer than the one this section used to give.
+
+When object storage is actually built, the integration should target the S3
+API rather than MinIO specifically, so an operator can point it at MinIO,
+[SeaweedFS](https://github.com/seaweedfs/seaweedfs) (Apache-2.0), or any
+hosted bucket (AWS S3, Cloudflare R2, Backblaze B2). The AGPL obligation is
+then a choice the operator makes, not one the default distribution ships.
 
 ## Bitnami subchart pins (Helm chart)
 

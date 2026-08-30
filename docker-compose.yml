@@ -206,40 +206,6 @@ services:
       - webhook-network
     restart: unless-stopped
 
-  minio:
-    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-01-16T16-07-38Z}
-    container_name: webhook-minio
-    command: server /data --console-address ":9001"
-    profiles:
-      - minio
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_password}
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
-    deploy:
-      resources:
-        limits:
-          memory: "${MINIO_MEMORY_LIMIT:-512m}"
-        reservations:
-          memory: "128m"
-    networks:
-      - webhook-network
-    restart: unless-stopped
-
   api:
     image: ${DOCKER_REGISTRY:-ghcr.io/vadymkykalo/hookflow}-api:${API_IMAGE_TAG:-latest}
     container_name: webhook-api
@@ -351,7 +317,6 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-webhook_redis_pass}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
       ALERTS_NOTIFICATIONS_ENABLED: ${ALERTS_NOTIFICATIONS_ENABLED:-false}
       ALERTS_EVALUATION_CRON: ${ALERTS_EVALUATION_CRON:-0 * * * * *}
       RULES_CACHE_REFRESH_MS: ${RULES_CACHE_REFRESH_MS:-30000}
@@ -640,7 +605,6 @@ services:
 volumes:
   caddy_data:
   caddy_config:
-  minio_data:
   # Project-scoped, like kafka_data and redis_data beside it. It used to carry
   # `name: ${POSTGRES_VOLUME_NAME:-webhook_pgdata}`, which pins one global volume
   # shared by every Compose project on the host: a second install silently

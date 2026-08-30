@@ -126,7 +126,7 @@ down-pull: ## Stop pull-based services (keeps data)
 
 down: ## Stop services (keeps data)
 	@echo "$(YELLOW)Stopping services...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db down 2>/dev/null || true
 	@echo "$(GREEN)Services stopped$(NC)"
 
 stop: ## Stop services (alias for down)
@@ -134,7 +134,7 @@ stop: ## Stop services (alias for down)
 
 clean: ## Stop services and remove containers (keeps volumes)
 	@echo "$(YELLOW)Cleaning up containers...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down --remove-orphans 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db down --remove-orphans 2>/dev/null || true
 	@echo "$(GREEN)Cleanup complete (volumes preserved)$(NC)"
 
 ##@ Build
@@ -482,7 +482,7 @@ nuke: ## DESTROY EVERYTHING including volumes (requires CONFIRM=YES)
 	@echo "$(RED)Stopping monitoring stack...$(NC)"
 	@$(MONITORING_COMPOSE) down -v --remove-orphans 2>/dev/null || true
 	@echo "$(RED)Stopping main platform...$(NC)"
-	@$(DOCKER_COMPOSE) --profile embedded-db --profile minio down -v --remove-orphans --rmi local 2>/dev/null || true
-	@docker volume rm webhook_pgdata kafka_data redis_data minio_data 2>/dev/null || true
+	@$(DOCKER_COMPOSE) --profile embedded-db down -v --remove-orphans --rmi local 2>/dev/null || true
+	@docker volume rm webhook_pgdata kafka_data redis_data 2>/dev/null || true
 	@docker network rm webhook-platform_webhook-network 2>/dev/null || true
 	@echo "$(GREEN)Nuclear option complete — platform + monitoring destroyed$(NC)"

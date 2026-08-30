@@ -234,11 +234,12 @@ is what makes that true: with billing off, quota and feature checks are
 short-circuited and nothing is gated.
 
 The `Plan`/`Subscription` entities, the Stripe and WayForPay providers and the
-seeded price rows in `V036__billing_plans.sql` exist because we also run a
-managed cloud instance of this same code, and that is the only thing we sell.
-Selling hosting rather than features is why none of it needs to be closed —
-so it lives in the open repository like everything else, dormant unless you
-turn it on.
+seeded price rows in `V036__billing_plans.sql` exist because the plan is to
+offer a managed cloud instance of this same code, and hosting is the only
+thing that would ever be sold. That instance is not running yet. Selling
+hosting rather than features is why none of this needs to be closed — so it
+lives in the open repository like everything else, dormant unless you turn it
+on.
 
 If you would rather not carry the price rows at all, they are inert data in
 five table rows; nothing reads them while billing is off.
