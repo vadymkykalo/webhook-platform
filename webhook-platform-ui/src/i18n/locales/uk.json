@@ -2378,6 +2378,8 @@
     "createSourceFirst": "Створити вхідне джерело",
     "detail": {
       "attempt": "Спроба #{{number}}",
+      "attemptRequestBody": "Тіло надісланого запиту",
+      "attemptRequestHeaders": "Заголовки надісланого запиту",
       "body": "Тіло запиту",
       "bodyTruncated": "Тіло обрізано ({{size}})",
       "error": "Помилка",

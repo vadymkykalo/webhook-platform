@@ -2378,6 +2378,8 @@
     "createSourceFirst": "Create Incoming Source",
     "detail": {
       "attempt": "Attempt #{{number}}",
+      "attemptRequestBody": "Forwarded request body",
+      "attemptRequestHeaders": "Forwarded request headers",
       "body": "Request Body",
       "bodyTruncated": "Body truncated ({{size}})",
       "error": "Error",

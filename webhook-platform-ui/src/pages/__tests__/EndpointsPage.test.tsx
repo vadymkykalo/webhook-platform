@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import '../../i18n';
 import { renderPage, TEST_PROJECT_ID } from '../../test/renderPage';
@@ -144,5 +145,27 @@ describe('EndpointsPage', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(trigger).toBeInTheDocument();
+  });
+
+  it('lets the creator choose a signature scheme, and sends the one they chose', async () => {
+    /* The picker was wired into the two Connection surfaces and not into this one, which is
+       the flat sibling list — so an endpoint created here silently took the BOTH default and
+       nobody was shown that there was a decision. The scheme decides which headers a
+       receiver has to verify, which is the first thing their developer needs to know. */
+    vi.mocked(projectsApi.get).mockResolvedValue(PROJECT);
+    vi.mocked(endpointsApi.listPaged).mockResolvedValue(emptyPage());
+    vi.mocked(endpointsApi.create).mockResolvedValue({ ...ENDPOINT, secret: 'whsec_x' } as any);
+
+    renderEndpoints();
+    await userEvent.click(await screen.findByRole('button', { name: /new endpoint/i }));
+
+    await userEvent.type(screen.getByLabelText(/endpoint url/i), 'https://api.customer.com/hook');
+    await userEvent.click(screen.getByRole('radio', { name: /standard webhooks only/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^create endpoint$/i }));
+
+    await waitFor(() => expect(endpointsApi.create).toHaveBeenCalledWith(
+      TEST_PROJECT_ID,
+      expect.objectContaining({ signatureScheme: 'STANDARD' }),
+    ));
   });
 });
