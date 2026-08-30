@@ -99,6 +99,7 @@ webhook:
     allow-private-ips: ${WEBHOOK_ALLOW_PRIVATE_IPS:false}
     allowed-hosts: ${WEBHOOK_ALLOWED_HOSTS:}
   max-concurrent-per-endpoint: ${WEBHOOK_MAX_CONCURRENT_PER_ENDPOINT:5}
+  max-concurrent-per-tenant: ${WEBHOOK_MAX_CONCURRENT_PER_TENANT:20}
   concurrency:
     permit-lease-seconds: ${WEBHOOK_CONCURRENCY_PERMIT_LEASE_SECONDS:90}
   project-rate-limit-per-second: ${WEBHOOK_PROJECT_RATE_LIMIT_PER_SECOND:50}
