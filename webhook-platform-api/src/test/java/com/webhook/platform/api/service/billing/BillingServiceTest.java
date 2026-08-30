@@ -61,8 +61,7 @@ class BillingServiceTest {
 
         stripeProvider = new TestBillingProvider("stripe", "Stripe",
                 EnumSet.of(BillingCapability.MANAGED_SUBSCRIPTIONS, BillingCapability.CUSTOMERS,
-                        BillingCapability.CUSTOMER_PORTAL, BillingCapability.EXTERNAL_INVOICES,
-                        BillingCapability.REFUNDS));
+                        BillingCapability.CUSTOMER_PORTAL, BillingCapability.EXTERNAL_INVOICES));
 
         var noopProvider = new NoOpBillingProvider();
         providerRegistry = new BillingProviderRegistry(List.of(stripeProvider, noopProvider), "stripe");
@@ -447,6 +446,27 @@ class BillingServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         assertThat(payment.getRefundedCents()).isEqualTo(2900L);
         verify(paymentRepository).save(payment);
+    }
+
+    @Test
+    void processWebhook_partiallyRefunded_saysSoOnTheStatus() {
+        BillingPayment payment = BillingPayment.builder()
+                .id(UUID.randomUUID()).amountCents(2900)
+                .status(PaymentStatus.SUCCEEDED)
+                .externalPaymentId("pi_part").build();
+        when(subscriptionRepository.findByExternalSubscriptionId(any())).thenReturn(Optional.empty());
+        when(subscriptionRepository.findByExternalCustomerId(any())).thenReturn(Optional.empty());
+        when(paymentRepository.findByExternalPaymentId("pi_part"))
+                .thenReturn(Optional.of(payment));
+
+        stripeProvider.setWebhookEvent(new BillingProvider.BillingWebhookEvent(
+                "payment.refunded", null, null, "pi_part", null,
+                1000L, "USD", null, null, null, null, null, null, null, Map.of()));
+
+        service.processWebhook("stripe", "{}", Map.of());
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+        assertThat(payment.getRefundedCents()).isEqualTo(1000L);
     }
 
     @Test

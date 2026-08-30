@@ -13,8 +13,6 @@ public enum BillingCapability {
     CUSTOMER_PORTAL,
     /** Provider can list/manage invoices externally */
     EXTERNAL_INVOICES,
-    /** Provider supports refunds */
-    REFUNDS,
     /** Provider supports creating customers as a first-class entity */
     CUSTOMERS
 }

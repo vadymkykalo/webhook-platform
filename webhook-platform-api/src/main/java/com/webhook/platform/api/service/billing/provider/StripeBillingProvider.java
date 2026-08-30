@@ -34,8 +34,7 @@ public class StripeBillingProvider implements BillingProvider {
             BillingCapability.MANAGED_SUBSCRIPTIONS,
             BillingCapability.CUSTOMERS,
             BillingCapability.CUSTOMER_PORTAL,
-            BillingCapability.EXTERNAL_INVOICES,
-            BillingCapability.REFUNDS
+            BillingCapability.EXTERNAL_INVOICES
     );
 
     private final String webhookSecret;
@@ -188,23 +187,6 @@ public class StripeBillingProvider implements BillingProvider {
         } catch (StripeException e) {
             log.error("Stripe: failed to fetch invoices for customer {}", externalCustomerId, e);
             return List.of();
-        }
-    }
-
-    // ── Refunds ─────────────────────────────────────────────────────
-
-    @Override
-    public void refund(String externalPaymentId, long amountCents) {
-        try {
-            RefundCreateParams params = RefundCreateParams.builder()
-                    .setPaymentIntent(externalPaymentId)
-                    .setAmount(amountCents)
-                    .build();
-            Refund.create(params);
-            log.info("Stripe: refunded {} cents on payment {}", amountCents, externalPaymentId);
-        } catch (StripeException e) {
-            log.error("Stripe: failed to refund payment {}", externalPaymentId, e);
-            throw new RuntimeException("Stripe refund failed: " + e.getMessage(), e);
         }
     }
 

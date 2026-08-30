@@ -503,8 +503,7 @@
     "invoiceStatuses": {
       "PAID": "Paid",
       "OPEN": "Open",
-      "VOID": "Void",
-      "UNCOLLECTIBLE": "Uncollectible",
+      "PAST_DUE": "Past due",
       "DRAFT": "Draft"
     },
     "invoiceView": "View",

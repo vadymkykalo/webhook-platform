@@ -200,12 +200,25 @@ class SubscriptionLifecycleServiceTest {
     void startGracePeriod_transitionsFromPastDue() {
         BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE);
         when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
 
         service.startGracePeriod(SUB_ID);
 
         assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.GRACE_PERIOD);
         verifyEvent(SubscriptionEventType.GRACE_PERIOD_STARTED,
                 SubscriptionStatus.PAST_DUE, SubscriptionStatus.GRACE_PERIOD);
+    }
+
+    @Test
+    void startGracePeriod_syncsBillingStatusOntoTheOrganization() {
+        BillingSubscription sub = buildSub(SubscriptionStatus.PAST_DUE);
+        org.setBillingStatus(BillingStatus.PAST_DUE);
+        when(subscriptionRepository.findById(SUB_ID)).thenReturn(Optional.of(sub));
+        when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
+
+        service.startGracePeriod(SUB_ID);
+
+        assertThat(org.getBillingStatus()).isEqualTo(BillingStatus.GRACE_PERIOD);
     }
 
     // ── suspend ─────────────────────────────────────────────────────

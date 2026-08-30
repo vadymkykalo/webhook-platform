@@ -503,8 +503,7 @@
     "invoiceStatuses": {
       "PAID": "Оплачено",
       "OPEN": "Відкрито",
-      "VOID": "Анульовано",
-      "UNCOLLECTIBLE": "Безнадійна",
+      "PAST_DUE": "Прострочено",
       "DRAFT": "Чернетка"
     },
     "invoiceView": "Переглянути",
