@@ -3494,7 +3494,7 @@ export interface components {
             nodeId?: string;
             nodeType?: string;
             /** @enum {string} */
-            status?: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "SKIPPED";
+            status?: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED" | "SKIPPED" | "WAITING";
             inputData?: unknown;
             outputData?: unknown;
             errorMessage?: string;
@@ -3515,7 +3515,7 @@ export interface components {
             /** Format: uuid */
             triggerEventId?: string;
             /** @enum {string} */
-            status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+            status?: "RUNNING" | "WAITING" | "COMPLETED" | "FAILED" | "CANCELLED";
             triggerData?: unknown;
             /** Format: date-time */
             startedAt?: string;

@@ -219,11 +219,12 @@ workflow:
     max-recursion-depth: ${WORKFLOW_MAX_RECURSION_DEPTH:3}
     stuck-threshold-minutes: ${WORKFLOW_STUCK_THRESHOLD_MINUTES:15}
     recovery-interval-ms: ${WORKFLOW_RECOVERY_INTERVAL_MS:120000}
+    resume-interval-ms: ${WORKFLOW_RESUME_INTERVAL_MS:5000}
+    resume-batch-size: ${WORKFLOW_RESUME_BATCH_SIZE:50}
   node-timeout:
     default-seconds: ${WORKFLOW_NODE_TIMEOUT_DEFAULT_SECONDS:30}
     http-seconds: ${WORKFLOW_NODE_TIMEOUT_HTTP_SECONDS:60}
     slack-seconds: ${WORKFLOW_NODE_TIMEOUT_SLACK_SECONDS:60}
-    delay-seconds: ${WORKFLOW_NODE_TIMEOUT_DELAY_SECONDS:305}
     create-event-seconds: ${WORKFLOW_NODE_TIMEOUT_CREATE_EVENT_SECONDS:30}
     pool-size: ${WORKFLOW_NODE_TIMEOUT_POOL_SIZE:16}
   shutdown:
