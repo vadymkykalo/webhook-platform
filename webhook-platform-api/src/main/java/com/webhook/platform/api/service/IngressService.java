@@ -22,6 +22,8 @@ import com.webhook.platform.api.service.ingress.RateLimitExceededException;
 import com.webhook.platform.api.service.ingress.SignatureVerificationFailedException;
 import com.webhook.platform.api.service.ingress.SourceDisabledException;
 import com.webhook.platform.api.service.ingress.SourceNotFoundException;
+import com.webhook.platform.api.service.billing.EntitlementService;
+import com.webhook.platform.api.service.billing.QuotaCounterService;
 import com.webhook.platform.api.service.verification.ReplayDetectionService;
 import com.webhook.platform.api.service.verification.WebhookVerificationStrategy;
 import com.webhook.platform.api.service.verification.WebhookVerifierFactory;
@@ -62,7 +64,10 @@ public class IngressService {
     private final TrustedProxyResolver clientIpResolver;
     private final TransactionTemplate transactionTemplate;
     private final EncryptionKeyRegistry encryptionKeyRegistry;
+    private final EntitlementService entitlementService;
+    private final QuotaCounterService quotaCounterService;
     private final long maxPayloadSizeBytes;
+    private final int defaultRateLimitPerSecond;
 
     public IngressService(
             IncomingSourceRepository sourceRepository,
@@ -79,7 +84,10 @@ public class IngressService {
             TrustedProxyResolver clientIpResolver,
             PlatformTransactionManager transactionManager,
             EncryptionKeyRegistry encryptionKeyRegistry,
-            @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes) {
+            EntitlementService entitlementService,
+            QuotaCounterService quotaCounterService,
+            @Value("${webhook.incoming.max-payload-size-bytes:524288}") long maxPayloadSizeBytes,
+            @Value("${webhook.incoming.rate-limit-per-second:100}") int defaultRateLimitPerSecond) {
         this.sourceRepository = sourceRepository;
         this.eventRepository = eventRepository;
         this.destinationRepository = destinationRepository;
@@ -93,7 +101,10 @@ public class IngressService {
         this.rateLimiterService = rateLimiterService;
         this.clientIpResolver = clientIpResolver;
         this.encryptionKeyRegistry = encryptionKeyRegistry;
+        this.entitlementService = entitlementService;
+        this.quotaCounterService = quotaCounterService;
         this.maxPayloadSizeBytes = maxPayloadSizeBytes;
+        this.defaultRateLimitPerSecond = defaultRateLimitPerSecond;
 
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -119,6 +130,11 @@ public class IngressService {
     private IncomingEvent receiveVerifiedWebhook(IncomingSource source, String body, HttpServletRequest request) {
         enforceRateLimit(source);
         enforcePayloadSize(body);
+        // An Incoming Event is an Event the Organization is charged for, same as one it posts to
+        // /events itself. This runs inside the Source's tenant scope, which is the only thing on
+        // this path that names an organization: ingress is unauthenticated, so the AuthContext
+        // @RequireQuota resolves against does not exist here and the annotation would no-op.
+        entitlementService.checkEventQuota();
 
         RequestMetadata meta = extractMetadata(body, request);
         VerificationOutcome verification = verifyAndCheckReplay(source, body, request);
@@ -150,8 +166,10 @@ public class IngressService {
         }
 
         try {
-            return transactionTemplate.execute(status ->
+            IncomingEvent stored = transactionTemplate.execute(status ->
                     persistEventAndForwardAttempts(source, meta, providerEventId, verification));
+            chargeQuotaPostCommit();
+            return stored;
         } catch (DataIntegrityViolationException e) {
             IncomingEvent recovered = handleDuplicateRace(source, providerEventId, e);
             if (recovered != null) {
@@ -178,12 +196,38 @@ public class IngressService {
         return source;
     }
 
+    /**
+     * Charges the Organization for the Incoming Event that just committed.
+     *
+     * <p>Deliberately fire-and-forget and deliberately after the commit, for the reason
+     * EventIngestService gives: the counter is an approximate Redis value that no rollback
+     * undoes, so charging inside the transaction billed for ingests that never happened. A
+     * webhook resolved by dedup never reaches here, because nothing new was stored.
+     */
+    private void chargeQuotaPostCommit() {
+        try {
+            quotaCounterService.increment();
+        } catch (Exception e) {
+            log.error("Failed to charge quota after a committed incoming webhook: {}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Per-source rate limiting, fail-closed: reject if Redis is down.
+     *
+     * <p>A Source that names no limit of its own gets the configured default rather than none.
+     * Until it did, the only thing standing between an unauthenticated {@code /ingress/{token}}
+     * and the database was one platform-wide bucket shared by every tenant.
+     */
     private void enforceRateLimit(IncomingSource source) {
-        // Per-source rate limiting (fail-closed: reject if Redis is down)
-        if (source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0) {
-            if (!rateLimiterService.tryAcquireForSourceFailClosed(source.getId(), source.getRateLimitPerSecond())) {
-                throw new RateLimitExceededException("Rate limit exceeded for source " + source.getId());
-            }
+        int limit = source.getRateLimitPerSecond() != null && source.getRateLimitPerSecond() > 0
+                ? source.getRateLimitPerSecond()
+                : defaultRateLimitPerSecond;
+        if (limit <= 0) {
+            return;
+        }
+        if (!rateLimiterService.tryAcquireForSourceFailClosed(source.getId(), limit)) {
+            throw new RateLimitExceededException("Rate limit exceeded for source " + source.getId());
         }
     }
 
