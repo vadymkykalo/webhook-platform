@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Plus, Key, Loader2, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Plus, Key, Loader2, Trash2, Copy, Check, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTimeShort, formatRelativeTime } from '../lib/date';
@@ -10,6 +10,7 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import DangerConfirmDialog from '../components/DangerConfirmDialog';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { apiKeysApi, ApiKeyResponse, ApiKeyScope } from '../api/apiKeys.api';
 import { projectsApi } from '../api/projects.api';
 import type { ProjectResponse, PageResponse } from '../types/api.types';
@@ -64,6 +65,9 @@ export default function ApiKeysPage() {
 
   const [revoking, setRevoking] = useState<ApiKeyResponse | null>(null);
   const [revokePending, setRevokePending] = useState(false);
+  const [rotating, setRotating] = useState<ApiKeyResponse | null>(null);
+  const [rotateGraceHours, setRotateGraceHours] = useState('24');
+  const [rotatePending, setRotatePending] = useState(false);
   const [newApiKey, setNewApiKey] = useState<ApiKeyResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -129,6 +133,27 @@ export default function ApiKeysPage() {
     }
   };
 
+  const handleRotate = async () => {
+    if (!rotating || !projectId) return;
+    setRotatePending(true);
+    try {
+      const replacement = await apiKeysApi.rotate(projectId, rotating.id, {
+        gracePeriodHours: parseInt(rotateGraceHours, 10),
+      });
+      setRotating(null);
+      setCopied(false);
+      // Straight into the same one-and-only-sighting dialog the create flow uses: a rotation
+      // produces a real key that is shown exactly once, and inventing a second way to show it
+      // would be two places to get "you cannot see this again" wrong.
+      setNewApiKey(replacement);
+      loadData();
+    } catch (err: any) {
+      showApiError(err, 'apiKeys.toast.rotateFailed');
+    } finally {
+      setRotatePending(false);
+    }
+  };
+
   const handleCopyKey = () => {
     if (!newApiKey?.key) return;
     navigator.clipboard.writeText(newApiKey.key);
@@ -182,6 +207,9 @@ export default function ApiKeysPage() {
         <div className="animate-fade-in space-y-3">
           {apiKeys.map((apiKey) => {
             const expired = !!apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date();
+            // A key with a rotated-at is not merely expiring, it is being handed over: its
+            // successor is already live and this one stops working when the window closes.
+            const retiring = !!apiKey.rotatedAt && !expired;
             return (
               <Card key={apiKey.id}>
                 <CardContent className="flex flex-wrap items-start justify-between gap-4 p-4 lg:p-5">
@@ -189,8 +217,8 @@ export default function ApiKeysPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium">{apiKey.name}</p>
                       <StatusBadge
-                        kind={expired ? 'halt' : 'ok'}
-                        label={t(expired ? 'apiKeys.expired' : 'apiKeys.activeKey')}
+                        kind={expired ? 'halt' : retiring ? 'retry' : 'ok'}
+                        label={t(expired ? 'apiKeys.expired' : retiring ? 'apiKeys.retiring' : 'apiKeys.activeKey')}
                       />
                       <span className="rounded-md border border-rail px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
                         {t(apiKey.scope === 'READ_ONLY' ? 'apiKeys.scopeReadOnly' : 'apiKeys.scopeReadWrite')}
@@ -211,14 +239,30 @@ export default function ApiKeysPage() {
                         </dd>
                       </div>
                       <div className="flex gap-1.5">
-                        <dt className="mono-label">{t('apiKeys.expires')}</dt>
-                        <dd className={cn('text-muted-foreground', expired && 'text-halt')}>
+                        <dt className="mono-label">{t(retiring ? 'apiKeys.stopsWorking' : 'apiKeys.expires')}</dt>
+                        <dd className={cn('text-muted-foreground', expired && 'text-halt', retiring && 'text-retry')}>
                           {apiKey.expiresAt ? formatDateTimeShort(apiKey.expiresAt) : t('apiKeys.createDialog.noExpiration')}
                         </dd>
                       </div>
                     </dl>
+                    {retiring && (
+                      <p className="mt-2 text-xs text-retry">{t('apiKeys.retiringHint')}</p>
+                    )}
                   </div>
                   {canManageApiKeys && (
+                    <div className="flex flex-shrink-0 items-center gap-1">
+                    {!apiKey.rotatedAt && !expired && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => { setRotateGraceHours('24'); setRotating(apiKey); }}
+                      title={t('apiKeys.rotate')}
+                      aria-label={t('apiKeys.rotateNamed', { name: apiKey.name })}
+                      className="flex-shrink-0 text-muted-foreground hover:text-primary"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -229,6 +273,7 @@ export default function ApiKeysPage() {
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -323,6 +368,37 @@ export default function ApiKeysPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Rotate: the create-then-revoke race, done by the server instead of by hand. */}
+      <ConfirmDialog
+        open={!!rotating}
+        onOpenChange={(open) => !open && setRotating(null)}
+        title={t('apiKeys.rotateDialog.title', { name: rotating?.name ?? '' })}
+        description={t('apiKeys.rotateDialog.description')}
+        confirmLabel={t('apiKeys.rotate')}
+        destructive={false}
+        loading={rotatePending}
+        onConfirm={handleRotate}
+      >
+        <div className="space-y-2">
+          <Label htmlFor="rotate-grace">{t('apiKeys.rotateDialog.grace')}</Label>
+          <Select
+            id="rotate-grace"
+            value={rotateGraceHours}
+            onChange={(e) => setRotateGraceHours(e.target.value)}
+            disabled={rotatePending}
+          >
+            <option value="0">{t('apiKeys.rotateDialog.grace0')}</option>
+            <option value="1">{t('apiKeys.rotateDialog.grace1h')}</option>
+            <option value="24">{t('apiKeys.rotateDialog.grace24h')}</option>
+            <option value="72">{t('apiKeys.rotateDialog.grace72h')}</option>
+            <option value="168">{t('apiKeys.rotateDialog.grace168h')}</option>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {t(rotateGraceHours === '0' ? 'apiKeys.rotateDialog.grace0Hint' : 'apiKeys.rotateDialog.graceHint')}
+          </p>
+        </div>
+      </ConfirmDialog>
 
       {/* Revoke */}
       <DangerConfirmDialog

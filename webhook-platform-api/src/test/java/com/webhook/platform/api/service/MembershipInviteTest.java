@@ -10,6 +10,7 @@ import com.webhook.platform.api.dto.AddMemberRequest;
 import com.webhook.platform.api.dto.MemberResponse;
 import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.tenancy.TenantContext;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,8 +67,12 @@ class MembershipInviteTest {
         organizationId = UUID.randomUUID();
         TenantContext.set(organizationId);
 
+        // Cost 4: MembershipService now takes the shared encoder bean instead of building one,
+        // and the production cost of 12 would add ~200ms to every test that creates an invitee
+        // for no assertion's benefit.
         membershipService = new MembershipService(
-                userRepository, membershipRepository, emailService, tokenBlacklistService);
+                userRepository, membershipRepository, emailService, tokenBlacklistService,
+                new BCryptPasswordEncoder(4));
 
         when(membershipRepository.save(any(Membership.class))).thenAnswer(i -> i.getArgument(0));
         when(userRepository.save(any(User.class))).thenAnswer(i -> {

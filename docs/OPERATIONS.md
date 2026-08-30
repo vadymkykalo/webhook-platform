@@ -86,6 +86,22 @@ a substituted ladder.
 - Check connections: `docker exec webhook-postgres pg_isready`
 - Connection pool exhausted: increase `DB_POOL_MAX_SIZE` (API) or `WORKER_DB_POOL_MAX_SIZE` (Worker) — separately named on purpose, see `.env.dist`
 
+### "Too many failed sign-in attempts" — a locked account
+An account locks after `AUTH_LOCKOUT_THRESHOLD` consecutive failed sign-ins (default 5). There is
+deliberately no administrator unlock, because one would make locking a known email address a
+denial of service with no self-service way out. Two things end a lockout, both available to the
+account holder:
+- **Wait.** The window starts at `AUTH_LOCKOUT_INITIAL_SECONDS` (60), doubles per further failure
+  and is capped at `AUTH_LOCKOUT_MAX_SECONDS` (900). It lapses on its own.
+- **Reset the password.** Completing a reset clears the counter and the lockout immediately.
+
+If an operator genuinely has to intervene (e.g. the mail transport is down and nobody can reset),
+the state is three columns on `users` and clearing them is enough:
+```sql
+UPDATE users SET failed_login_attempts = 0, lockout_expires_at = NULL, last_failed_login_at = NULL
+ WHERE email = 'someone@example.com';
+```
+
 ### Failed deliveries spike
 - Check DLQ: Navigate to UI → Failed Messages
 - Bulk retry from UI
@@ -241,6 +257,8 @@ Production must have:
 - [ ] `SWAGGER_ENABLED=false`
 - [ ] `DB_SSL_MODE=require`
 - [ ] TLS termination at ingress/load balancer
+- [ ] `AUTH_BCRYPT_STRENGTH` left at 12 (lower it only if a login is measurably slow on your hardware)
+- [ ] `AUTH_LOCKOUT_ENABLED=true` unless something in front of the API already bounds attempts per account
 
 ## Environment Variables
 

@@ -58,8 +58,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 } else {
                     UUID userId = UUID.fromString(claims.getSubject());
 
+                    UUID sessionId = sessionIdOf(claims);
+
                     if (tokenBlacklistService.isTokenRevokedByEpoch(userId, claims.getIssuedAt())) {
                         log.debug("Token for user {} was issued before revocation epoch, rejecting", userId);
+                    } else if (sessionId != null && tokenBlacklistService.isSessionRevoked(sessionId)) {
+                        // Without this, "sign this device out" would only take effect once the
+                        // access token already in that device's hands expired on its own -- a
+                        // promise kept a quarter of an hour late, on the one screen where a user
+                        // is acting because they believe a device is compromised.
+                        log.debug("Token belongs to revoked session {}, rejecting", sessionId);
                     } else {
                         UUID organizationId = UUID.fromString(claims.get("organizationId", String.class));
                         MembershipRole role = MembershipRole.valueOf(claims.get("role", String.class));
@@ -87,6 +95,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             MDC.remove("userId");
             MDC.remove("projectId");
             JwtUtil.clearCache();
+        }
+    }
+
+    /**
+     * The session a token names, or {@code null} when it names none — which is the case for
+     * every token minted before sessions existed. A malformed value is also {@code null}: it
+     * cannot match a real session, and treating it as one would reject a token on a typo.
+     */
+    private static UUID sessionIdOf(Claims claims) {
+        String raw = claims.get(JwtUtil.CLAIM_SESSION_ID, String.class);
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            log.debug("Token carries an unparseable {} claim, treating it as sessionless",
+                    JwtUtil.CLAIM_SESSION_ID);
+            return null;
         }
     }
 }

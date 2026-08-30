@@ -266,9 +266,27 @@
       "created": "API key created successfully",
       "loadFailed": "Failed to load data",
       "revokeFailed": "Failed to revoke API key",
-      "revoked": "API key revoked successfully"
+      "revoked": "API key revoked successfully",
+      "rotateFailed": "Could not rotate the key. Please try again."
     },
-    "activeKey": "Active"
+    "activeKey": "Active",
+    "retiring": "Retiring",
+    "retiringHint": "Replaced by a newer key. This one keeps working until the time above, then stops.",
+    "stopsWorking": "Stops working",
+    "rotate": "Rotate",
+    "rotateNamed": "Rotate {{name}}",
+    "rotateDialog": {
+      "title": "Rotate {{name}}",
+      "description": "Issues a replacement key straight away. This key keeps working for the window you choose, so you can deploy the new one before the old one stops.",
+      "grace": "Keep the old key working for",
+      "grace0": "Not at all — stop it immediately",
+      "grace1h": "1 hour",
+      "grace24h": "24 hours",
+      "grace72h": "3 days",
+      "grace168h": "7 days",
+      "graceHint": "Both keys authenticate during this window. Deploy the new key everywhere before it closes.",
+      "grace0Hint": "The old key stops working the moment you confirm. Choose this if it may have leaked."
+    }
   },
   "auditLog": {
     "actions": {
@@ -3560,7 +3578,28 @@
     },
     "yourAccess": "Your access",
     "yourAccessDesc": "The role you hold in this organization and what it lets you do.",
-    "emailUnverified": "Not confirmed"
+    "emailUnverified": "Not confirmed",
+    "sessions": {
+      "title": "Active sessions",
+      "description": "Everything currently signed in to your account, including logins from the command line.",
+      "thisDevice": "This device",
+      "unknownIp": "unknown address",
+      "meta": "{{ip}} · last active {{lastSeen}}",
+      "signedInAt": "Signed in {{at}}",
+      "revoke": "Sign out",
+      "revoked": "Session signed out",
+      "revokeFailed": "Could not sign that session out. Please try again.",
+      "revokeTitle": "Sign this session out?",
+      "revokeDesc": "That device is signed out immediately and has to sign in again.",
+      "revokeCurrentDesc": "This is the device you are using. You will be signed out and returned to the login screen.",
+      "revokeAll": "Sign out everywhere",
+      "revokeAllTitle": "Sign out everywhere?",
+      "revokeAllDesc": "Every device, including this one, is signed out immediately. Use this if you think someone else has access to your account.",
+      "client": {
+        "WEB": "Browser",
+        "CLI": "Command line"
+      }
+    }
   },
   "signatureScheme": {
     "label": "Signature headers",
@@ -3792,7 +3831,8 @@
       "server": "Something went wrong on our end. Please try again later.",
       "tooManyRequests": "Too many requests. Please wait a moment.",
       "unauthorized": "Session expired. Please sign in again.",
-      "validation": "Please check your input and try again."
+      "validation": "Please check your input and try again.",
+      "locked": "Too many failed sign-in attempts. Wait for the lockout to lapse, or reset your password to unlock the account now."
     },
     "retry": "Retry"
   },
@@ -4371,5 +4411,10 @@
       "description": "Free for 10,000 events a month. Starter $29, Pro $99, Enterprise on request — or run the MIT-licensed build yourself with no limits at all.",
       "title": "Pricing — Hookflow"
     }
+  },
+  "org": {
+    "switcherLabel": "Switch organization",
+    "currentOrganization": "Current organization: {{name}}",
+    "switchFailed": "Could not switch organization. Please try again."
   }
 }

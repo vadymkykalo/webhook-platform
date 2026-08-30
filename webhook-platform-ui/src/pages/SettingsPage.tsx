@@ -11,6 +11,7 @@ import PageSkeleton, { SkeletonCards } from '../components/PageSkeleton';
 import StatusBadge from '../components/StatusBadge';
 import { RoleCard } from '../components/PermissionGate';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
+import ActiveSessions from '../components/ActiveSessions';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -333,6 +334,13 @@ export default function SettingsPage() {
               )}
             </FormSection>
           </form>
+
+          <FormSection
+            title={t('settings.sessions.title')}
+            description={t('settings.sessions.description')}
+          >
+            <ActiveSessions />
+          </FormSection>
 
           <FormSection
             title={t('settings.timezone.title')}

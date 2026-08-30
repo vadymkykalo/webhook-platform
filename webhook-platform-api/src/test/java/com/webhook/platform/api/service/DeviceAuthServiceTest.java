@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
@@ -28,6 +29,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -43,7 +45,14 @@ class DeviceAuthServiceTest {
     private MembershipRepository membershipRepository;
 
     @Mock
+    private UserSessionService userSessionService;
+
+    @Mock
     private JwtUtil jwtUtil;
+
+    /** What the CLI's poll looks like as far as the session list is concerned. */
+    private static final SessionOrigin CLI_ORIGIN =
+            SessionOrigin.of(SessionClient.CLI, "hookflow-cli/2.9.1", "203.0.113.7");
 
     @InjectMocks
     private DeviceAuthService deviceAuthService;
@@ -51,6 +60,17 @@ class DeviceAuthServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(deviceAuthService, "appBaseUrl", "http://localhost:5173");
+    }
+
+    /**
+     * A granted device code now also opens a {@code user_sessions} row, so that a CLI login
+     * appears in — and can be revoked from — the dashboard's session list. The row is built from
+     * the refresh token's own jti and expiry, which a mocked {@link JwtUtil} has to be told.
+     */
+    private void stubSessionTokenReads() {
+        when(jwtUtil.getJtiFromToken(anyString())).thenReturn(UUID.randomUUID().toString());
+        when(jwtUtil.getExpirationFromToken(anyString()))
+                .thenReturn(java.util.Date.from(Instant.now().plus(1, ChronoUnit.DAYS)));
     }
 
 
@@ -168,10 +188,12 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.of(membership));
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
-        when(jwtUtil.generateAccessToken(userId, tenantOrgId, MembershipRole.OWNER)).thenReturn("access-token-123");
-        when(jwtUtil.generateRefreshToken(userId)).thenReturn("refresh-token-456");
+        when(jwtUtil.generateAccessToken(eq(userId), eq(tenantOrgId), eq(MembershipRole.OWNER), any()))
+                .thenReturn("access-token-123");
+        when(jwtUtil.generateRefreshToken(eq(userId), any())).thenReturn("refresh-token-456");
+        stubSessionTokenReads();
 
-        AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode);
+        AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN);
 
         assertNotNull(response);
         assertEquals("access-token-123", response.getAccessToken());
@@ -214,14 +236,16 @@ class DeviceAuthServiceTest {
         // this test would fail with an unstubbed-mock (null) NPE rather than silently
         // passing with the wrong role.
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(1);
-        when(jwtUtil.generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER)).thenReturn("viewer-token");
-        when(jwtUtil.generateRefreshToken(userId)).thenReturn("refresh-token");
+        when(jwtUtil.generateAccessToken(eq(userId), eq(clientOrgId), eq(MembershipRole.VIEWER), any()))
+                .thenReturn("viewer-token");
+        when(jwtUtil.generateRefreshToken(eq(userId), any())).thenReturn("refresh-token");
+        stubSessionTokenReads();
 
-        AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode);
+        AuthResponse response = deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN);
 
         assertEquals("viewer-token", response.getAccessToken());
-        verify(jwtUtil).generateAccessToken(userId, clientOrgId, MembershipRole.VIEWER);
-        verify(jwtUtil, never()).generateAccessToken(eq(userId), eq(ownOrgId), any());
+        verify(jwtUtil).generateAccessToken(eq(userId), eq(clientOrgId), eq(MembershipRole.VIEWER), any());
+        verify(jwtUtil, never()).generateAccessToken(eq(userId), eq(ownOrgId), any(), any());
         verify(membershipRepository, never()).findByUserId(any());
     }
 
@@ -244,10 +268,10 @@ class DeviceAuthServiceTest {
         when(membershipRepository.findByUserIdAndOrganizationId(userId, tenantOrgId)).thenReturn(Optional.empty());
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode));
+                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(403, ex.getStatusCode().value());
         verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any());
     }
 
     @Test
@@ -263,7 +287,7 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode));
+                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
         verify(membershipRepository, never()).findByUserIdAndOrganizationId(any(), any());
     }
@@ -294,9 +318,9 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.markConsumedIfApproved(codeId)).thenReturn(0);
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode));
+                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
-        verify(jwtUtil, never()).generateAccessToken(any(), any(), any());
+        verify(jwtUtil, never()).generateAccessToken(any(), any(), any(), any());
     }
 
     @Test
@@ -312,7 +336,7 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode));
+                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(202, ex.getStatusCode().value());
     }
 
@@ -329,7 +353,7 @@ class DeviceAuthServiceTest {
         when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
-                deviceAuthService.pollDeviceToken(deviceCode));
+                deviceAuthService.pollDeviceToken(deviceCode, CLI_ORIGIN));
         assertEquals(410, ex.getStatusCode().value());
     }
 }

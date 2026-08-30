@@ -88,12 +88,27 @@ public class JwtUtil {
      */
     public static final String TOKEN_TYPE_REFRESH = "refresh";
 
-    public String generateAccessToken(UUID userId, UUID organizationId, MembershipRole role) {
+    /**
+     * Name of the claim naming the {@code user_sessions} row a token was minted for.
+     *
+     * <p>It is what makes revoking one session mean something to an access token, which is
+     * otherwise self-contained for its whole fifteen minutes:
+     * {@link JwtAuthenticationFilter} asks {@code TokenBlacklistService.isSessionRevoked} about
+     * it on every request. Tokens minted before sessions existed carry no {@code sid}, and are
+     * treated as belonging to no session rather than to some session — they still authenticate
+     * until they expire, and simply cannot be individually signed out.
+     */
+    public static final String CLAIM_SESSION_ID = "sid";
+
+    public String generateAccessToken(UUID userId, UUID organizationId, MembershipRole role, UUID sessionId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId.toString());
         claims.put("organizationId", organizationId.toString());
         claims.put("role", role.name());
         claims.put("typ", TOKEN_TYPE_ACCESS);
+        if (sessionId != null) {
+            claims.put(CLAIM_SESSION_ID, sessionId.toString());
+        }
 
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
@@ -105,15 +120,38 @@ public class JwtUtil {
                 .compact();
     }
 
-    public String generateRefreshToken(UUID userId) {
-        return Jwts.builder()
+    public String generateRefreshToken(UUID userId, UUID sessionId) {
+        var builder = Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .claim("typ", TOKEN_TYPE_REFRESH)
                 .subject(userId.toString())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
-                .signWith(secretKey)
-                .compact();
+                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration));
+        if (sessionId != null) {
+            builder.claim(CLAIM_SESSION_ID, sessionId.toString());
+        }
+        return builder.signWith(secretKey).compact();
+    }
+
+    /** How long a refresh token minted now would live — what a session's expiry is set from. */
+    public long getRefreshTokenExpirationMs() {
+        return refreshTokenExpiration;
+    }
+
+    /**
+     * The session a token belongs to, or {@code null} for a token minted before sessions
+     * existed. Callers must treat {@code null} as "no session", never as "any session".
+     */
+    public UUID getSessionIdFromToken(String token) {
+        String sessionId = parseToken(token).get(CLAIM_SESSION_ID, String.class);
+        if (sessionId == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(sessionId);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public Claims parseToken(String token) {

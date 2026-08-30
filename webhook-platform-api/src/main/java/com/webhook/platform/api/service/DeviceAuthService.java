@@ -3,8 +3,10 @@ package com.webhook.platform.api.service;
 import com.webhook.platform.api.tenancy.SystemTenant;
 import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
+import com.webhook.platform.api.domain.entity.UserSession;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
@@ -33,6 +35,7 @@ public class DeviceAuthService {
 
     private final DeviceAuthCodeRepository deviceAuthCodeRepository;
     private final MembershipRepository membershipRepository;
+    private final UserSessionService userSessionService;
     private final JwtUtil jwtUtil;
 
     @Value("${app.base-url:http://localhost:5173}")
@@ -93,7 +96,7 @@ public class DeviceAuthService {
 
     @SystemTenant("polled by an unauthenticated CLI; the membership read is what decides which organization the issued token names")
     @Transactional
-    public AuthResponse pollDeviceToken(String deviceCode) {
+    public AuthResponse pollDeviceToken(String deviceCode, SessionOrigin origin) {
         DeviceAuthCode code = deviceAuthCodeRepository.findByDeviceCode(deviceCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device code not found"));
 
@@ -136,9 +139,26 @@ public class DeviceAuthService {
             throw new ResponseStatusException(HttpStatus.GONE, "Device code has already been used");
         }
 
+        // A CLI grant is recorded as a session like any browser sign-in, and named CLI so the
+        // dashboard can say what it is. It is the credential most likely to outlive the machine
+        // it was issued to, and before this it was the one a user could neither see nor end.
+        UUID sessionId = UUID.randomUUID();
+        String refreshToken = jwtUtil.generateRefreshToken(code.getUserId(), sessionId);
+
+        userSessionService.open(UserSession.builder()
+                .id(sessionId)
+                .userId(code.getUserId())
+                .organizationId(code.getOrganizationId())
+                .refreshTokenJti(jwtUtil.getJtiFromToken(refreshToken))
+                .client(SessionClient.CLI)
+                .userAgent(origin.userAgent())
+                .ipAddress(origin.ipAddress())
+                .lastSeenAt(Instant.now())
+                .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
+                .build());
+
         String accessToken = jwtUtil.generateAccessToken(
-                code.getUserId(), code.getOrganizationId(), membership.getRole());
-        String refreshToken = jwtUtil.generateRefreshToken(code.getUserId());
+                code.getUserId(), code.getOrganizationId(), membership.getRole(), sessionId);
 
         return AuthResponse.builder()
                 .accessToken(accessToken)

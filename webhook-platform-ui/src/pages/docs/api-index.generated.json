@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 194,
+  "operationCount": 199,
   "security": [
     {
       "id": "bearerAuth",
@@ -357,6 +357,43 @@
           }
         },
         {
+          "id": "rotateApiKey",
+          "method": "POST",
+          "path": "/api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate",
+          "summary": "Rotate API key",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "projectId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "apiKeyId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "201",
+              "description": "Replacement key created; the old key is retiring",
+              "type": "ApiKeyResponse"
+            }
+          ],
+          "description": "Issues a replacement key and puts the old one into a grace window, during which both authenticate. The replacement is shown only once. Default window is 24 hours; pass gracePeriodHours=0 to cut the old key off immediately after a suspected leak.",
+          "body": {
+            "contentType": "application/json",
+            "type": "ApiKeyRotateRequest",
+            "required": false
+          }
+        },
+        {
           "id": "revokeApiKey",
           "method": "DELETE",
           "path": "/api/v1/projects/{projectId}/api-keys/{apiKeyId}",
@@ -565,6 +602,67 @@
             }
           ],
           "description": "Verifies user email with the token sent to their email"
+        },
+        {
+          "id": "switchOrganization",
+          "method": "POST",
+          "path": "/api/v1/auth/switch-organization",
+          "summary": "Switch organization",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [
+            {
+              "name": "refresh_token",
+              "in": "cookie",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Access token re-issued for the target organization",
+              "type": "AuthResponse"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated, or no live session",
+              "type": "AuthResponse"
+            },
+            {
+              "status": "403",
+              "description": "Caller is not a member of that organization",
+              "type": "AuthResponse"
+            }
+          ],
+          "description": "Re-issues an access token scoped to another organization the caller belongs to. The refresh token is untouched and no other session is affected; the new token's role comes from the membership in the target organization, not from the token being replaced.",
+          "body": {
+            "contentType": "application/json",
+            "type": "SwitchOrganizationRequest",
+            "required": true
+          }
+        },
+        {
+          "id": "revokeAllSessions",
+          "method": "POST",
+          "path": "/api/v1/auth/sessions/revoke-all",
+          "summary": "Sign out everywhere",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "204",
+              "description": "All sessions revoked"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated"
+            }
+          ],
+          "description": "Ends every session for the authenticated user, including the one making the call."
         },
         {
           "id": "resetPassword",
@@ -809,6 +907,36 @@
           }
         },
         {
+          "id": "listSessions",
+          "method": "GET",
+          "path": "/api/v1/auth/sessions",
+          "summary": "List active sessions",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [
+            {
+              "name": "refresh_token",
+              "in": "cookie",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Sessions returned",
+              "type": "SessionResponse[]"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated",
+              "type": "SessionResponse[]"
+            }
+          ],
+          "description": "Returns every live sign-in for the authenticated user — browser sessions and CLI device-code grants alike — with the session making the request flagged as current. No token material is returned."
+        },
+        {
           "id": "getCurrentUser",
           "method": "GET",
           "path": "/api/v1/auth/me",
@@ -830,6 +958,38 @@
             }
           ],
           "description": "Returns information about the authenticated user"
+        },
+        {
+          "id": "revokeSession",
+          "method": "DELETE",
+          "path": "/api/v1/auth/sessions/{sessionId}",
+          "summary": "Revoke a session",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [
+            {
+              "name": "sessionId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "204",
+              "description": "Session revoked"
+            },
+            {
+              "status": "401",
+              "description": "Not authenticated"
+            },
+            {
+              "status": "404",
+              "description": "No such session for this user"
+            }
+          ],
+          "description": "Signs one device out. The session's refresh token stops working and so does the access token it already issued, rather than surviving until its own expiry."
         }
       ]
     },
@@ -6998,6 +7158,28 @@
         "name": "key",
         "type": "string",
         "required": false
+      },
+      {
+        "name": "rotatedAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "replacedById",
+        "type": "string (uuid)",
+        "required": false
+      }
+    ],
+    "ApiKeyRotateRequest": [
+      {
+        "name": "gracePeriodHours",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "expiresAt",
+        "type": "string (date-time)",
+        "required": false
       }
     ],
     "AuditLogData": [
@@ -11456,6 +11638,52 @@
         "required": false
       }
     ],
+    "SessionResponse": [
+      {
+        "name": "id",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "client",
+        "type": "string",
+        "required": false,
+        "values": [
+          "WEB",
+          "CLI"
+        ]
+      },
+      {
+        "name": "userAgent",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "ipAddress",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "lastSeenAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "expiresAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "current",
+        "type": "boolean",
+        "required": false
+      }
+    ],
     "SharedDebugLinkPublicResponse": [
       {
         "name": "eventType",
@@ -11790,6 +12018,13 @@
         "name": "updatedAt",
         "type": "string (date-time)",
         "required": false
+      }
+    ],
+    "SwitchOrganizationRequest": [
+      {
+        "name": "organizationId",
+        "type": "string (uuid)",
+        "required": true
       }
     ],
     "TestEndpointRequest": [
@@ -12787,7 +13022,13 @@
       "revokedAt": "2026-01-01T12:00:00Z",
       "expiresAt": "2026-01-01T12:00:00Z",
       "scope": "string",
-      "key": "string"
+      "key": "string",
+      "rotatedAt": "2026-01-01T12:00:00Z",
+      "replacedById": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "ApiKeyRotateRequest": {
+      "gracePeriodHours": 0,
+      "expiresAt": "2026-01-01T12:00:00Z"
     },
     "AuditLogData": {
       "action": "string",
@@ -13608,7 +13849,9 @@
           "revokedAt": "2026-01-01T12:00:00Z",
           "expiresAt": "2026-01-01T12:00:00Z",
           "scope": "string",
-          "key": "string"
+          "key": "string",
+          "rotatedAt": "2026-01-01T12:00:00Z",
+          "replacedById": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
         }
       ],
       "number": 0,
@@ -14479,6 +14722,16 @@
       "breaking": true,
       "createdAt": "2026-01-01T12:00:00Z"
     },
+    "SessionResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "client": "WEB",
+      "userAgent": "string",
+      "ipAddress": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "lastSeenAt": "2026-01-01T12:00:00Z",
+      "expiresAt": "2026-01-01T12:00:00Z",
+      "current": true
+    },
     "SharedDebugLinkPublicResponse": {
       "eventType": "string",
       "sanitizedPayload": "string",
@@ -14558,6 +14811,9 @@
       "transformationName": "string",
       "createdAt": "2026-01-01T12:00:00Z",
       "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "SwitchOrganizationRequest": {
+      "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
     },
     "TestEndpointRequest": {
       "name": "string",
