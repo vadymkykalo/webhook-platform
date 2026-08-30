@@ -8030,6 +8030,11 @@
         "name": "deliveriesCreated",
         "type": "integer (int32)",
         "required": false
+      },
+      {
+        "name": "schemaWarnings",
+        "type": "string[]",
+        "required": false
       }
     ],
     "EventSchemaVersionRequest": [
@@ -12808,7 +12813,10 @@
       "eventType": "string",
       "payload": "string",
       "createdAt": "2026-01-01T12:00:00Z",
-      "deliveriesCreated": 0
+      "deliveriesCreated": 0,
+      "schemaWarnings": [
+        "string"
+      ]
     },
     "EventSchemaVersionRequest": {
       "schemaJson": "string",
@@ -13487,7 +13495,8 @@
           "eventType": "string",
           "payload": "string",
           "createdAt": "2026-01-01T12:00:00Z",
-          "deliveriesCreated": 0
+          "deliveriesCreated": 0,
+          "schemaWarnings": []
         }
       ],
       "number": 0,

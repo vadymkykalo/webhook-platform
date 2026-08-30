@@ -13,6 +13,11 @@ export interface EventResponse {
   payload: string;
   createdAt: string;
   deliveriesCreated?: number;
+  /**
+   * Schema-validation errors the event was accepted despite, under a project whose policy is
+   * WARN. Only a test-event response carries them; a stored event read back does not.
+   */
+  schemaWarnings?: string[];
 }
 
 export interface EventFilters {

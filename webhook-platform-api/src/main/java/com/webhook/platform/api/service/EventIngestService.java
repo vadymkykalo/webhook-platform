@@ -196,7 +196,7 @@ public class EventIngestService {
             }
         }
 
-        schemaValidationGate.check(project, projectId, request.getType(), request.getData());
+        List<String> schemaWarnings = schemaValidationGate.check(project, projectId, request.getType(), request.getData());
 
         Event event = createEvent(projectId, request, idempotencyKey);
         event = eventRepository.saveAndFlush(event);
@@ -245,7 +245,7 @@ public class EventIngestService {
         if (plan.dropped()) {
             log.info("Rule DROP action — skipping deliveries for event {}", event.getId());
             Counter.builder("rules_drop_total").register(meterRegistry).increment();
-            return buildResponse(event, 0);
+            return buildResponse(event, 0, schemaWarnings);
         }
 
         List<Delivery> deliveriesToSave = new ArrayList<>(plan.deliveries().size());
@@ -283,7 +283,7 @@ public class EventIngestService {
                 .depth(depth)
                 .build());
 
-        return buildResponse(event, deliveriesCreated);
+        return buildResponse(event, deliveriesCreated, schemaWarnings);
     }
 
     private Event createEvent(UUID projectId, EventIngestRequest request, String idempotencyKey) {
@@ -368,11 +368,16 @@ public class EventIngestService {
     }
 
     private EventIngestResponse buildResponse(Event event, int deliveriesCreated) {
+        return buildResponse(event, deliveriesCreated, List.of());
+    }
+
+    private EventIngestResponse buildResponse(Event event, int deliveriesCreated, List<String> schemaWarnings) {
         return EventIngestResponse.builder()
                 .eventId(event.getId())
                 .type(event.getEventType())
                 .createdAt(event.getCreatedAt())
                 .deliveriesCreated(deliveriesCreated)
+                .schemaWarnings(schemaWarnings.isEmpty() ? null : schemaWarnings)
                 .build();
     }
 }

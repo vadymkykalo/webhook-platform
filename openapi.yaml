@@ -7462,6 +7462,10 @@ components:
         deliveriesCreated:
           type: integer
           format: int32
+        schemaWarnings:
+          type: array
+          items:
+            type: string
     VerificationResponse:
       type: object
       properties:

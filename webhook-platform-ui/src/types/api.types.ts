@@ -145,6 +145,8 @@ export interface EventResponse {
   payload: string;
   createdAt: string;
   deliveriesCreated?: number;
+  /** Set only on a test-event response, and only under a project whose policy is WARN. */
+  schemaWarnings?: string[];
 }
 
 export interface SubscriptionResponse {

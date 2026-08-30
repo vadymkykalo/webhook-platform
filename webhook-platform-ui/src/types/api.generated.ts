@@ -3824,6 +3824,7 @@ export interface components {
             createdAt?: string;
             /** Format: int32 */
             deliveriesCreated?: number;
+            schemaWarnings?: string[];
         };
         VerificationResponse: {
             success?: boolean;

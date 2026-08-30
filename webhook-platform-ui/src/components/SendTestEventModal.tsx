@@ -102,6 +102,19 @@ export default function SendTestEventModal({
         data,
       });
 
+      // A project on the WARN policy accepts a payload that does not match its schema. Saying
+      // so here is the whole point of that policy: the person who can fix the payload is the
+      // one who just typed it.
+      if (response.schemaWarnings?.length) {
+        showWarning(
+          t('events.sendModal.schemaWarnings', {
+            count: response.schemaWarnings.length,
+            errors: response.schemaWarnings.join('; '),
+          }),
+          { duration: 12000 },
+        );
+      }
+
       const count = response.deliveriesCreated || 0;
       if (count === 0) {
         showWarning(t('events.toast.noSubscriptionMatch', { eventType }), { duration: 8000 });
