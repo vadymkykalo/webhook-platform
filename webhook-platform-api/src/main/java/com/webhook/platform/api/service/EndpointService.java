@@ -31,6 +31,7 @@ import com.webhook.platform.api.exception.NotFoundException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -149,7 +150,33 @@ public class EndpointService {
         validateProjectOwnership(endpoint.getProjectId());
         
         UrlValidator.validateWebhookUrl(request.getUrl(), allowPrivateIps, allowedHosts);
-        
+
+        // Verification belongs to the URL that earned it, not to the endpoint row. The worker
+        // gate asks only whether the status is VERIFIED or SKIPPED, so leaving the status alone
+        // here let an owner verify a URL they controlled and then re-point the endpoint
+        // anywhere while it kept delivering — a one-time check with a hole the size of a PUT.
+        //
+        // A changed URL therefore re-derives the state createEndpoint would have given a brand
+        // new endpoint at that URL, rather than unconditionally forcing PENDING. That gate in
+        // the worker is *not* behind webhook.endpoint-verification-required — it always demands
+        // VERIFIED or SKIPPED — so forcing PENDING when verification is switched off would turn
+        // every URL edit into a silent, permanent outage for the default configuration.
+        //
+        // SKIPPED is re-derived alongside VERIFIED because it passes that gate identically:
+        // sparing it would leave the hole open for every endpoint created while the flag was off.
+        // An unchanged URL is left entirely alone, or editing a description would stop delivery.
+        if (!Objects.equals(endpoint.getUrl(), request.getUrl())) {
+            endpoint.setVerificationStatus(endpointVerificationRequired
+                    ? Endpoint.VerificationStatus.PENDING
+                    : Endpoint.VerificationStatus.SKIPPED);
+            endpoint.setVerificationToken(null);
+            endpoint.setVerificationAttemptedAt(null);
+            endpoint.setVerificationCompletedAt(null);
+            endpoint.setVerificationSkipReason(null);
+            log.info("Endpoint {} re-pointed to a new URL; verification re-derived as {}",
+                    id, endpoint.getVerificationStatus());
+        }
+
         endpoint.setUrl(request.getUrl());
         endpoint.setDescription(request.getDescription());
         
