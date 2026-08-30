@@ -251,6 +251,7 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:5173}
   alerts:
     notifications-enabled: ${ALERTS_NOTIFICATIONS_ENABLED:false}
+    evaluation-cron: ${ALERTS_EVALUATION_CRON:0 * * * * *}
   email:
     enabled: ${EMAIL_ENABLED:false}
     from: ${EMAIL_FROM:noreply@hookflow.dev}

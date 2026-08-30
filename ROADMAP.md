@@ -17,10 +17,16 @@ disables. So an endpoint whose owner deleted the receiving service goes on consu
 budget, queue depth and delivery rows until a human notices. Svix, Convoy and Hookdeck Outpost
 all disable and notify; this is expected baseline behaviour, not a premium feature.
 
-Most of the parts exist: `AlertType.CONSECUTIVE_FAILURES` already counts the condition,
-`AlertChannel` already reaches email, Slack and a webhook, and `Endpoint.enabled` already
-stops delivery. What is missing is the action that joins them — disable, notify, and give the
-owner a clear way to re-enable once they have fixed their end.
+The parts now exist. `AlertEvaluatorService` measures `AlertType.CONSECUTIVE_FAILURES`
+against an endpoint's trailing run of outcomes and fires once per crossing, `AlertChannel`
+reaches email, Slack and a webhook, and `Endpoint.enabled` stops delivery. What is missing is
+the action that joins them — disable, notify, and give the owner a clear way to re-enable once
+they have fixed their end.
+
+This entry previously claimed `CONSECUTIVE_FAILURES` "already counts the condition". It did
+not: nothing called `AlertService.fireAlert`, all four `AlertType` values were unreferenced
+outside their enum, and every rule a user created was inert. The evaluator that closed that
+gap is what makes the rest of this item the small piece it was always described as.
 
 ### An app portal for the customer's own users
 
