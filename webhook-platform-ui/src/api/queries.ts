@@ -5,7 +5,9 @@ import { deliveriesApi, type DeliveryFilters, type BulkReplayRequest } from './d
 import { eventsApi } from './events.api';
 import { subscriptionsApi, type SubscriptionRequest } from './subscriptions.api';
 import { membersApi, type MembershipRole, type AddMemberRequest } from './members.api';
-import { apiKeysApi, type ApiKeyRequest } from './apiKeys.api';
+import { apiKeysApi, type ApiKeyRequest, type ApiKeyRotateRequest } from './apiKeys.api';
+import { authApi } from './auth.api';
+import { organizationsApi } from './organizations.api';
 import { dashboardApi } from './dashboard.api';
 import { dlqApi, type DlqFilters } from './dlq.api';
 import { testEndpointsApi } from './testEndpoints.api';
@@ -53,6 +55,14 @@ export const queryKeys = {
     },
     apiKeys: {
         paged: (projectId: string, page: number, size: number) => ['api-keys', projectId, page, size] as const,
+    },
+    // Account-level rather than organization-level: a user's sessions and their organizations
+    // are both things they hold across tenants, so neither key carries an organization.
+    sessions: {
+        all: ['auth', 'sessions'] as const,
+    },
+    organizations: {
+        mine: ['organizations', 'mine'] as const,
     },
     dlq: {
         list: (projectId: string, page: number, size: number, filters?: DlqFilters) => ['dlq', projectId, page, size, filters ?? {}] as const,
@@ -396,6 +406,54 @@ export function useRevokeApiKey(projectId: string) {
     return useMutation({
         mutationFn: (id: string) => apiKeysApi.revoke(projectId, id),
         onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
+    });
+}
+
+export function useRotateApiKey(projectId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, ...data }: ApiKeyRotateRequest & { id: string }) =>
+            apiKeysApi.rotate(projectId, id, data),
+        // Both rows change: a replacement appears and the old one gains a rotated-at and an
+        // expiry, so the list has to come back rather than be patched in place.
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
+    });
+}
+
+// ─── Sessions ──────────────────────────────────────────────────────
+
+export function useSessions() {
+    return useQuery({
+        queryKey: queryKeys.sessions.all,
+        queryFn: () => authApi.listSessions(),
+        // A stale session list is worse than a slow one: it invites somebody to revoke a device
+        // that is already gone, or to miss one that is not.
+        staleTime: 0,
+    });
+}
+
+export function useRevokeSession() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (sessionId: string) => authApi.revokeSession(sessionId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.sessions.all }); },
+    });
+}
+
+export function useRevokeAllSessions() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => authApi.revokeAllSessions(),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.sessions.all }); },
+    });
+}
+
+// ─── Organizations ─────────────────────────────────────────────────
+
+export function useOrganizations() {
+    return useQuery({
+        queryKey: queryKeys.organizations.mine,
+        queryFn: () => organizationsApi.list(),
     });
 }
 

@@ -52,6 +52,17 @@ public class ApiKey {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    /**
+     * When this key was rotated away. Together with {@link #expiresAt} it is the grace window:
+     * the key keeps authenticating until the expiry, and this says the expiry is a retirement
+     * rather than an expiry the customer asked for.
+     */
+    @Column(name = "rotated_at")
+    private Instant rotatedAt;
+
+    @Column(name = "replaced_by_id")
+    private UUID replacedById;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

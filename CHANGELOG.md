@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Five gaps in authentication, closed together because they are the same question asked five ways:
+who is signed in to this account, with what, and how do I take it back.
+
+### Added
+
+- **Active sessions, and per-session revoke.** Refresh tokens are self-contained JWTs, so nothing
+  anywhere knew how many were outstanding: a user could not see that a laptop they no longer own
+  was still signed in, and could not see a CLI device-code grant at all — the credential most
+  likely to outlive the machine it was issued to. Settings now lists every live session with its
+  client, address and last activity, and ends any one of them. Revoking reaches the access token
+  too, via a `sid` claim the JWT filter checks, rather than leaving the device authenticated for
+  the remaining quarter of an hour. "Sign out everywhere" reuses the per-user revocation epoch
+  that already existed, which is one Redis write for every token at once.
+- **API key rotation with a grace window.** `POST /api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate`
+  issues a replacement and gives the outgoing key an expiry — 24 hours by default, `0` to cut it
+  off immediately after a suspected leak. Both keys authenticate for the window, so a rollover is
+  no longer a create-then-revoke race the customer has to time by hand. The same shape endpoint
+  signing secrets have had since their grace window landed; the enforcement is borrowed rather
+  than built, since `ApiKeyAuthenticationFilter` already honours `expires_at`.
+- **An organization switcher.** `GET /api/v1/orgs` has always returned every organization a user
+  belongs to and nothing ever called it, because login minted a token for the oldest membership
+  and refresh minted the same one again — so accepting an invite to a second organization changed
+  nothing you could see. `POST /api/v1/auth/switch-organization` re-issues an access token for a
+  membership the caller genuinely holds, with the role from *that* row rather than the token being
+  replaced. The choice is stored on the session, so a refresh fifteen minutes later does not undo
+  it. It invalidates nothing: no token is blacklisted and no other session is touched.
+- **Account lockout on consecutive failed sign-ins.** Progressive — a minute at the fifth failure,
+  doubling, capped at fifteen — and every lockout lapses on its own, with a password reset
+  clearing it outright. Configured through `AUTH_LOCKOUT_*`; see `.env.dist` and
+  `docs/OPERATIONS.md`.
+
+### Changed
+
+- **BCrypt work factor is now 12 and configurable via `AUTH_BCRYPT_STRENGTH`.** Both services that
+  hash a password called `new BCryptPasswordEncoder()`, which is the library's 2010 default of 10.
+  Raising it is not a migration: BCrypt writes the cost into each hash, so every stored password
+  keeps verifying and is rewritten at the new cost the next time it changes. Measured cost of the
+  change is about 160 ms per sign-in.
+
 ## [2.9.1] - 2026-08-29
 
 The other half of the API-reference fix that shipped in 2.9.0.

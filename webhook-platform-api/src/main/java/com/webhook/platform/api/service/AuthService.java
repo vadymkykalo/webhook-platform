@@ -6,8 +6,10 @@ import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.User;
+import com.webhook.platform.api.domain.entity.UserSession;
 import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.enums.UserStatus;
+import com.webhook.platform.api.exception.ForbiddenException;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.PlanRepository;
@@ -26,9 +28,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -42,6 +47,8 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UserSessionService userSessionService;
+    private final AccountLockoutService accountLockoutService;
     private final EmailService emailService;
     private final boolean billingEnabled;
 
@@ -54,7 +61,10 @@ public class AuthService {
             MembershipRepository membershipRepository,
             PlanRepository planRepository,
             JwtUtil jwtUtil,
+            BCryptPasswordEncoder passwordEncoder,
             TokenBlacklistService tokenBlacklistService,
+            UserSessionService userSessionService,
+            AccountLockoutService accountLockoutService,
             EmailService emailService,
             @Value("${billing.enabled:false}") boolean billingEnabled) {
         this.userRepository = userRepository;
@@ -62,8 +72,13 @@ public class AuthService {
         this.membershipRepository = membershipRepository;
         this.planRepository = planRepository;
         this.jwtUtil = jwtUtil;
-        this.passwordEncoder = new BCryptPasswordEncoder();
+        // Injected rather than constructed, so the BCrypt work factor is one configured number
+        // for the whole application instead of the library's 2010 default in two places --
+        // see PasswordEncoderConfig.
+        this.passwordEncoder = passwordEncoder;
         this.tokenBlacklistService = tokenBlacklistService;
+        this.userSessionService = userSessionService;
+        this.accountLockoutService = accountLockoutService;
         this.emailService = emailService;
         this.billingEnabled = billingEnabled;
     }
@@ -71,7 +86,7 @@ public class AuthService {
     @SystemTenant("creates the Organization it then belongs to, so there is no tenant to run in yet; the Membership it inserts sets organizationId explicitly")
     @Auditable(action = AuditAction.REGISTER, resourceType = "Auth")
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request, SessionOrigin origin) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
@@ -122,23 +137,29 @@ public class AuthService {
             emailService.sendVerificationEmail(user.getEmail(), verificationToken);
         }
 
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), organization.getId(), MembershipRole.OWNER);
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
-
-        return AuthResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .emailVerified(!verificationIsDeliverable)
-                .build();
+        return issueSession(user, organization.getId(), MembershipRole.OWNER, origin,
+                !verificationIsDeliverable);
     }
 
     @SystemTenant("reads memberships to find which organization to issue a token for -- the answer is what a tenant scope would need as input")
     @Auditable(action = AuditAction.LOGIN, resourceType = "Auth")
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, SessionOrigin origin) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
 
+        // Before the password check, not after. Verifying first would still spend a BCrypt hash
+        // -- deliberately expensive -- on every attempt of an attack the lockout exists to stop,
+        // which turns the lockout into a way to make the server do the work instead.
+        Duration lockedFor = accountLockoutService.remainingLockout(user);
+        if (!lockedFor.isZero()) {
+            throw new ResponseStatusException(HttpStatus.LOCKED,
+                    "Too many failed sign-in attempts. Try again in "
+                            + Math.max(1, lockedFor.toMinutes() + (lockedFor.toSecondsPart() > 0 ? 1 : 0))
+                            + " minute(s), or reset your password to unlock the account now.");
+        }
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            accountLockoutService.recordFailure(user);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
@@ -146,26 +167,120 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
+        // The password was right, so whatever was counted against this account was not an
+        // attack in progress. An account in daily use therefore never accumulates a lockout.
+        accountLockoutService.clearFailures(user);
+
         // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
         // two organizations got whichever the database felt like returning, and with it a
-        // different tenant scope on each login. Oldest membership wins until there is an
-        // endpoint to switch organizations deliberately.
+        // different tenant scope on each login. Oldest membership is where a session starts; the
+        // organization switcher moves it from there, and the session remembers.
         Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
 
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), membership.getOrganizationId(), membership.getRole());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
+                Boolean.TRUE.equals(user.getEmailVerified()));
+    }
+
+    /**
+     * Mints a token pair and the {@code user_sessions} row that ties them together.
+     *
+     * <p>The session id is chosen here rather than by the database because it has to be inside
+     * the tokens: it is the {@code sid} claim that lets one session be signed out without
+     * touching the others.
+     */
+    private AuthResponse issueSession(User user, UUID organizationId, MembershipRole role,
+                                      SessionOrigin origin, boolean emailVerified) {
+        UUID sessionId = UUID.randomUUID();
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), sessionId);
+
+        userSessionService.open(UserSession.builder()
+                .id(sessionId)
+                .userId(user.getId())
+                .organizationId(organizationId)
+                .refreshTokenJti(jwtUtil.getJtiFromToken(refreshToken))
+                .client(origin.client())
+                .userAgent(origin.userAgent())
+                .ipAddress(origin.ipAddress())
+                .lastSeenAt(Instant.now())
+                .expiresAt(jwtUtil.getExpirationFromToken(refreshToken).toInstant())
+                .build());
 
         return AuthResponse.builder()
-                .accessToken(accessToken)
+                .accessToken(jwtUtil.generateAccessToken(user.getId(), organizationId, role, sessionId))
                 .refreshToken(refreshToken)
+                .emailVerified(emailVerified)
+                .build();
+    }
+
+    /**
+     * Re-scopes the caller's current session to another organization they belong to.
+     *
+     * <p>The two things this must not do, which is most of what it is:
+     *
+     * <ul>
+     *   <li><b>Mint for an organization the caller is not in.</b> The target arrives as caller
+     *       input — the only endpoint where that is the point rather than a smell — so nothing is
+     *       issued until a {@code Membership} joining this user to this organization has been
+     *       found, and the role on the new token comes from <em>that row</em>, never from the
+     *       token being replaced. A user who is OWNER of one organization and VIEWER of another
+     *       must not carry OWNER across.</li>
+     *   <li><b>Invalidate anything.</b> Switching is a navigation action a person may click
+     *       twice. It writes one column of one session row and mints a fresh access token; the
+     *       refresh token keeps working untouched, other sessions are not consulted, and doing it
+     *       again is the same operation with the same result.</li>
+     * </ul>
+     */
+    @SystemTenant("re-scopes a session from one organization to another, so it is in neither while it decides")
+    public AuthResponse switchOrganization(UUID userId, SwitchOrganizationRequest request, String refreshToken) {
+        UserSession session = requireOwnLiveSession(userId, refreshToken);
+
+        Membership membership = membershipRepository
+                .findByUserIdAndOrganizationId(userId, request.getOrganizationId())
+                .orElseThrow(() -> new ForbiddenException("You are not a member of that organization"));
+
+        session.setOrganizationId(membership.getOrganizationId());
+        session.setLastSeenAt(Instant.now());
+        userSessionService.save(session);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
+
+        log.info("User {} switched session {} to organization {}",
+                userId, session.getId(), membership.getOrganizationId());
+
+        return AuthResponse.builder()
+                .accessToken(jwtUtil.generateAccessToken(
+                        userId, membership.getOrganizationId(), membership.getRole(), session.getId()))
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
                 .build();
     }
 
+    /**
+     * The session the presented refresh token names, once it has been shown to be live and to
+     * belong to this user.
+     *
+     * <p>Looked up by jti rather than by the {@code sid} claim: the jti is rotated on every
+     * refresh, so a token carrying a correct {@code sid} but a superseded jti — the shape a
+     * replayed token has — finds nothing here.
+     */
+    private UserSession requireOwnLiveSession(UUID userId, String refreshToken) {
+        if (refreshToken == null || !jwtUtil.validateToken(refreshToken)
+                || !JwtUtil.TOKEN_TYPE_REFRESH.equals(jwtUtil.getTokenType(refreshToken))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing or invalid");
+        }
+        UserSession session = userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session not found"));
+
+        if (!session.getUserId().equals(userId) || !session.isActive(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session is no longer valid");
+        }
+        return session;
+    }
+
     @SystemTenant("same as login: the membership read decides the organization the new token names")
-    public AuthResponse refreshToken(String refreshToken) {
+    public AuthResponse refreshToken(String refreshToken, SessionOrigin origin) {
         if (!jwtUtil.validateToken(refreshToken)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
         }
@@ -198,24 +313,77 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
-        // two organizations got whichever the database felt like returning, and with it a
-        // different tenant scope on each login. Oldest membership wins until there is an
-        // endpoint to switch organizations deliberately.
-        Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
+        UserSession session = userSessionService.findByRefreshJti(oldJti).orElse(null);
+
+        if (session == null && jwtUtil.getSessionIdFromToken(refreshToken) != null) {
+            // The token names a session, and this jti is not the one that session accepts. That
+            // is either a token rotated away in a refresh whose blacklist entry has since expired
+            // or been lost with Redis, or a session that has been signed out. Neither may be
+            // exchanged for a new pair, and the durable row -- not Redis -- is what says so.
+            log.warn("Refresh token names session {} but is not its current token; refusing",
+                    jwtUtil.getSessionIdFromToken(refreshToken));
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session is no longer valid");
+        }
+        if (session != null && !session.isActive(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Session has been signed out");
+        }
+
+        Membership membership = membershipForRefresh(user, session);
 
         tokenBlacklistService.blacklist(oldJti, jwtUtil.getExpirationFromToken(refreshToken));
 
-        String newAccessToken = jwtUtil.generateAccessToken(user.getId(), membership.getOrganizationId(), membership.getRole());
-        String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
+        if (session == null) {
+            // A refresh token minted before sessions existed. Rather than refuse it -- which
+            // would sign out everybody who was logged in across the upgrade -- give it the
+            // session it should have had, so it appears in the list from here on.
+            return issueSession(user, membership.getOrganizationId(), membership.getRole(), origin,
+                    Boolean.TRUE.equals(user.getEmailVerified()));
+        }
+
+        String newRefreshToken = jwtUtil.generateRefreshToken(user.getId(), session.getId());
+        userSessionService.rotate(session, jwtUtil.getJtiFromToken(newRefreshToken),
+                jwtUtil.getExpirationFromToken(newRefreshToken).toInstant(), origin.ipAddress());
 
         return AuthResponse.builder()
-                .accessToken(newAccessToken)
+                .accessToken(jwtUtil.generateAccessToken(
+                        user.getId(), membership.getOrganizationId(), membership.getRole(), session.getId()))
                 .refreshToken(newRefreshToken)
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
                 .build();
+    }
+
+    /**
+     * Which organization a refreshed token names.
+     *
+     * <p>The session remembers what the switcher chose, so a refresh does not undo it — which is
+     * what made a second organization unreachable before: login picked the oldest membership and
+     * refresh picked it again fifteen minutes later.
+     *
+     * <p>A membership that has since been removed falls back to the oldest one the user still
+     * has, rather than failing: being removed from the organization you happened to be looking at
+     * should not lock you out of the others. The session is moved with it, so the next refresh
+     * does not have to work it out again.
+     */
+    private Membership membershipForRefresh(User user, UserSession session) {
+        if (session != null) {
+            Optional<Membership> remembered = membershipRepository
+                    .findByUserIdAndOrganizationId(user.getId(), session.getOrganizationId());
+            if (remembered.isPresent()) {
+                return remembered.get();
+            }
+            log.info("Session {} named organization {}, which user {} is no longer a member of; "
+                            + "falling back to their oldest membership",
+                    session.getId(), session.getOrganizationId(), user.getId());
+        }
+
+        Membership oldest = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
+
+        if (session != null) {
+            session.setOrganizationId(oldest.getOrganizationId());
+        }
+        return oldest;
     }
 
     @Auditable(action = AuditAction.LOGOUT, resourceType = "Auth")
@@ -229,7 +397,22 @@ public class AuthService {
             tokenBlacklistService.blacklist(
                     jwtUtil.getJtiFromToken(refreshToken),
                     jwtUtil.getExpirationFromToken(refreshToken));
+            // The row too, or the session a user just signed out of would still be sitting in
+            // their session list looking live.
+            userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
+                    .ifPresent(session -> userSessionService.revokeSession(session.getUserId(), session.getId()));
         }
+    }
+
+    /** Every live session for the caller, with the one making the request flagged. */
+    public List<SessionResponse> listSessions(UUID userId, String refreshToken) {
+        UUID currentSessionId = null;
+        if (refreshToken != null && jwtUtil.validateToken(refreshToken)) {
+            currentSessionId = userSessionService.findByRefreshJti(jwtUtil.getJtiFromToken(refreshToken))
+                    .map(UserSession::getId)
+                    .orElse(null);
+        }
+        return userSessionService.listSessions(userId, currentSessionId);
     }
 
     @SystemTenant("acts on a User by emailed token, before any organization is established")
@@ -291,11 +474,16 @@ public class AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // Someone who supplied their current password is present, whatever a failure counter
+        // says about them.
+        user.setFailedLoginAttempts(0);
+        user.setLastFailedLoginAt(null);
+        user.setLockoutExpiresAt(null);
         userRepository.save(user);
         // Access tokens are self-contained and nothing re-checks the database per request, so
         // without this every session opened with the old password stays valid until its TTL
         // runs out. Changing a password has to mean the old one no longer gets you anywhere.
-        tokenBlacklistService.revokeAllUserTokens(userId);
+        userSessionService.revokeAllSessions(userId);
         log.info("Password changed for user {}, all sessions revoked", userId);
     }
 
@@ -337,12 +525,19 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setPasswordResetToken(null);
         user.setPasswordResetTokenExpiresAt(null);
+        // This is the unlock path, and it is the reason account lockout is not a denial of
+        // service against a known email address: somebody a stranger locked out reaches their
+        // account through their own mailbox, without waiting for a window to lapse or for an
+        // administrator to be awake. See AccountLockoutService.
+        user.setFailedLoginAttempts(0);
+        user.setLastFailedLoginAt(null);
+        user.setLockoutExpiresAt(null);
         userRepository.save(user);
         // The reset path is the one that matters most: it is how somebody recovers an account
         // that has been taken over. Leaving the attacker's already-issued access token valid
         // for the rest of its TTL hands them the account back for another quarter of an hour,
         // while the owner believes they have just locked them out.
-        tokenBlacklistService.revokeAllUserTokens(user.getId());
+        userSessionService.revokeAllSessions(user.getId());
         log.info("Password reset completed for user {}, all sessions revoked", user.getEmail());
     }
 

@@ -6,6 +6,7 @@ import com.webhook.platform.api.domain.enums.MembershipRole;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.UserRepository;
 import com.webhook.platform.api.tenancy.TenantContext;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,7 @@ class MembershipRevokesSessionsTest {
         TenantContext.set(organizationId);
 
         membershipService = new MembershipService(
-                userRepository, membershipRepository, emailService, tokenBlacklistService);
+                userRepository, membershipRepository, emailService, tokenBlacklistService, new BCryptPasswordEncoder(4));
 
         membership = new Membership();
         membership.setUserId(memberId);

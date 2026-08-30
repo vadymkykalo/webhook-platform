@@ -158,6 +158,21 @@ auth:
   rate-limit:
     login-per-minute: ${AUTH_RATE_LIMIT_LOGIN_PER_MINUTE:10}
     register-per-minute: ${AUTH_RATE_LIMIT_REGISTER_PER_MINUTE:5}
+  bcrypt:
+    # BCrypt work factor. Raising it is not a migration: the cost is written into every hash,
+    # so existing passwords keep verifying at the cost they were stored with.
+    strength: ${AUTH_BCRYPT_STRENGTH:12}
+  lockout:
+    # Bounds how many passwords may be guessed against one account, which rate limiting does not.
+    # Held in Postgres, not Redis: the auth rate limiter degrades to a per-instance bucket when
+    # Redis is unavailable, and a lockout with that property is not a lockout.
+    enabled: ${AUTH_LOCKOUT_ENABLED:true}
+    threshold: ${AUTH_LOCKOUT_THRESHOLD:5}
+    initial-seconds: ${AUTH_LOCKOUT_INITIAL_SECONDS:60}
+    max-seconds: ${AUTH_LOCKOUT_MAX_SECONDS:900}
+    failure-window-minutes: ${AUTH_LOCKOUT_FAILURE_WINDOW_MINUTES:60}
+  session:
+    cleanup-interval-ms: ${AUTH_SESSION_CLEANUP_INTERVAL_MS:3600000}
 
 rate-limit:
   global:

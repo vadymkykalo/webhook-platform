@@ -1336,6 +1336,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate API key
+         * @description Issues a replacement key and puts the old one into a grace window, during which both authenticate. The replacement is shown only once. Default window is 24 hours; pass gracePeriodHours=0 to cut the old key off immediately after a suspected leak.
+         */
+        post: operations["rotateApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{projectId}/alerts/rules": {
         parameters: {
             query?: never;
@@ -1598,6 +1618,46 @@ export interface paths {
          * @description Verifies user email with the token sent to their email
          */
         post: operations["verifyEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/switch-organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch organization
+         * @description Re-issues an access token scoped to another organization the caller belongs to. The refresh token is untouched and no other session is affected; the new token's role comes from the membership in the target organization, not from the token being replaced.
+         */
+        post: operations["switchOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/revoke-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out everywhere
+         * @description Ends every session for the authenticated user, including the one making the call.
+         */
+        post: operations["revokeAllSessions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2660,6 +2720,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active sessions
+         * @description Returns every live sign-in for the authenticated user — browser sessions and CLI device-code grants alike — with the session making the request flagged as current. No token material is returned.
+         */
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -2795,6 +2875,26 @@ export interface paths {
          * @description Permanently revokes an API key
          */
         delete: operations["revokeApiKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a session
+         * @description Signs one device out. The session's refresh token stops working and so does the access token it already issued, rather than surviving until its own expiry.
+         */
+        delete: operations["revokeSession"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3858,6 +3958,16 @@ export interface components {
             expiresAt?: string;
             scope?: string;
             key?: string;
+            /** Format: date-time */
+            rotatedAt?: string;
+            /** Format: uuid */
+            replacedById?: string;
+        };
+        ApiKeyRotateRequest: {
+            /** Format: int32 */
+            gracePeriodHours?: number;
+            /** Format: date-time */
+            expiresAt?: string;
         };
         AddMemberRequest: {
             /** Format: email */
@@ -3906,6 +4016,15 @@ export interface components {
             providerCode?: string;
             billingInterval?: string;
         };
+        SwitchOrganizationRequest: {
+            /** Format: uuid */
+            organizationId: string;
+        };
+        AuthResponse: {
+            accessToken?: string;
+            refreshToken?: string;
+            emailVerified?: boolean;
+        };
         ResetPasswordRequest: {
             token: string;
             newPassword: string;
@@ -3916,11 +4035,6 @@ export interface components {
             password: string;
             fullName?: string;
             organizationName: string;
-        };
-        AuthResponse: {
-            accessToken?: string;
-            refreshToken?: string;
-            emailVerified?: boolean;
         };
         RefreshTokenRequest: {
             refreshToken: string;
@@ -4858,6 +4972,21 @@ export interface components {
             /** Format: date-time */
             paidAt?: string;
             invoiceUrl?: string;
+        };
+        SessionResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            client?: "WEB" | "CLI";
+            userAgent?: string;
+            ipAddress?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            lastSeenAt?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            current?: boolean;
         };
         CurrentUserResponse: {
             user?: components["schemas"]["UserResponse"];
@@ -7690,6 +7819,33 @@ export interface operations {
             };
         };
     };
+    rotateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+                apiKeyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyRotateRequest"];
+            };
+        };
+        responses: {
+            /** @description Replacement key created; the old key is retiring */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiKeyResponse"];
+                };
+            };
+        };
+    };
     listAlertRules: {
         parameters: {
             query?: never;
@@ -8061,6 +8217,75 @@ export interface operations {
             };
             /** @description Invalid or expired token */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    switchOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                refresh_token?: string;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Access token re-issued for the target organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Not authenticated, or no live session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Caller is not a member of that organization */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthResponse"];
+                };
+            };
+        };
+    };
+    revokeAllSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All sessions revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9580,6 +9805,37 @@ export interface operations {
             };
         };
     };
+    listSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                refresh_token?: string;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SessionResponse"][];
+                };
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SessionResponse"][];
+                };
+            };
+        };
+    };
     getCurrentUser: {
         parameters: {
             query?: never;
@@ -9745,6 +10001,40 @@ export interface operations {
         responses: {
             /** @description API key revoked */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such session for this user */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

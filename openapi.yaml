@@ -3326,6 +3326,44 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/projects/{projectId}/api-keys/{apiKeyId}/rotate:
+    post:
+      tags:
+      - API Keys
+      summary: Rotate API key
+      description: "Issues a replacement key and puts the old one into a grace window,\
+        \ during which both authenticate. The replacement is shown only once. Default\
+        \ window is 24 hours; pass gracePeriodHours=0 to cut the old key off immediately\
+        \ after a suspected leak."
+      operationId: rotateApiKey
+      parameters:
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: apiKeyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyRotateRequest"
+      responses:
+        "201":
+          description: Replacement key created; the old key is retiring
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+      security:
+      - bearerAuth: []
+      - apiKey: []
   /api/v1/projects/{projectId}/alerts/rules:
     get:
       tags:
@@ -3725,6 +3763,64 @@ paths:
           description: Email verified successfully
         "400":
           description: Invalid or expired token
+  /api/v1/auth/switch-organization:
+    post:
+      tags:
+      - Authentication
+      summary: Switch organization
+      description: "Re-issues an access token scoped to another organization the caller\
+        \ belongs to. The refresh token is untouched and no other session is affected;\
+        \ the new token's role comes from the membership in the target organization,\
+        \ not from the token being replaced."
+      operationId: switchOrganization
+      parameters:
+      - name: refresh_token
+        in: cookie
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwitchOrganizationRequest"
+        required: true
+      responses:
+        "200":
+          description: Access token re-issued for the target organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: "Not authenticated, or no live session"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "403":
+          description: Caller is not a member of that organization
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+      security:
+      - bearerAuth: []
+  /api/v1/auth/sessions/revoke-all:
+    post:
+      tags:
+      - Authentication
+      summary: Sign out everywhere
+      description: "Ends every session for the authenticated user, including the one\
+        \ making the call."
+      operationId: revokeAllSessions
+      responses:
+        "204":
+          description: All sessions revoked
+        "401":
+          description: Not authenticated
+      security:
+      - bearerAuth: []
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -5497,6 +5593,40 @@ paths:
                   $ref: "#/components/schemas/InvoiceResponse"
       security:
       - bearerAuth: []
+  /api/v1/auth/sessions:
+    get:
+      tags:
+      - Authentication
+      summary: List active sessions
+      description: Returns every live sign-in for the authenticated user — browser
+        sessions and CLI device-code grants alike — with the session making the request
+        flagged as current. No token material is returned.
+      operationId: listSessions
+      parameters:
+      - name: refresh_token
+        in: cookie
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Sessions returned
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionResponse"
+        "401":
+          description: Not authenticated
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionResponse"
+      security:
+      - bearerAuth: []
   /api/v1/auth/me:
     get:
       tags:
@@ -5706,6 +5836,31 @@ paths:
       security:
       - bearerAuth: []
       - apiKey: []
+  /api/v1/auth/sessions/{sessionId}:
+    delete:
+      tags:
+      - Authentication
+      summary: Revoke a session
+      description: "Signs one device out. The session's refresh token stops working\
+        \ and so does the access token it already issued, rather than surviving until\
+        \ its own expiry."
+      operationId: revokeSession
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          description: Not authenticated
+        "404":
+          description: No such session for this user
+      security:
+      - bearerAuth: []
 components:
   schemas:
     WebhookCaptureResponse:
@@ -7544,6 +7699,23 @@ components:
           type: string
         key:
           type: string
+        rotatedAt:
+          type: string
+          format: date-time
+        replacedById:
+          type: string
+          format: uuid
+    ApiKeyRotateRequest:
+      type: object
+      properties:
+        gracePeriodHours:
+          type: integer
+          format: int32
+          maximum: 168
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
     AddMemberRequest:
       type: object
       properties:
@@ -7652,6 +7824,23 @@ components:
       - cancelUrl
       - planName
       - successUrl
+    SwitchOrganizationRequest:
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+      required:
+      - organizationId
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        emailVerified:
+          type: boolean
     ResetPasswordRequest:
       type: object
       properties:
@@ -7692,15 +7881,6 @@ components:
       - email
       - organizationName
       - password
-    AuthResponse:
-      type: object
-      properties:
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
-        emailVerified:
-          type: boolean
     RefreshTokenRequest:
       type: object
       properties:
@@ -9338,6 +9518,32 @@ components:
           format: date-time
         invoiceUrl:
           type: string
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client:
+          type: string
+          enum:
+          - WEB
+          - CLI
+        userAgent:
+          type: string
+        ipAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
     CurrentUserResponse:
       type: object
       properties:

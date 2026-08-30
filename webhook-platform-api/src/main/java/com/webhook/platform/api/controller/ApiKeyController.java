@@ -3,6 +3,7 @@ package com.webhook.platform.api.controller;
 import com.webhook.platform.api.domain.enums.ApiKeyScope;
 import com.webhook.platform.api.dto.ApiKeyRequest;
 import com.webhook.platform.api.dto.ApiKeyResponse;
+import com.webhook.platform.api.dto.ApiKeyRotateRequest;
 import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.RequireAccess;
@@ -63,6 +64,26 @@ public class ApiKeyController {
         auth.validateProjectAccess(projectId);
         Page<ApiKeyResponse> response = apiKeyService.listApiKeys(projectId, pageable);
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Rotate API key",
+            description = "Issues a replacement key and puts the old one into a grace window, during which "
+                    + "both authenticate. The replacement is shown only once. Default window is 24 hours; "
+                    + "pass gracePeriodHours=0 to cut the old key off immediately after a suspected leak.")
+    @ApiResponse(responseCode = "201", description = "Replacement key created; the old key is retiring")
+    @RequireScope(ApiKeyScope.READ_WRITE)
+    @RequireAccess(AccessLevel.WRITE)
+    @PostMapping("/{apiKeyId}/rotate")
+    public ResponseEntity<ApiKeyResponse> rotateApiKey(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("apiKeyId") UUID apiKeyId,
+            @Valid @RequestBody(required = false) ApiKeyRotateRequest request,
+            AuthContext auth) {
+        auth.requireWriteAccess();
+        auth.validateProjectAccess(projectId);
+        ApiKeyResponse response = apiKeyService.rotateApiKey(projectId, apiKeyId, request);
+        log.info("Rotated API key {} for project {} into {}", apiKeyId, projectId, response.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @Operation(summary = "Revoke API key", description = "Permanently revokes an API key")

@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.DeviceApproveRequest;
 import com.webhook.platform.api.dto.DeviceCodeResponse;
@@ -8,6 +9,7 @@ import com.webhook.platform.api.security.AuthContext;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.DeviceAuthService;
+import com.webhook.platform.api.service.SessionOrigin;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -62,7 +64,9 @@ public class DeviceAuthController {
         if (!authRateLimiterService.allowTokenAction(getClientIp(httpRequest), request.getDeviceCode())) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Try again later.");
         }
-        AuthResponse response = deviceAuthService.pollDeviceToken(request.getDeviceCode());
+        AuthResponse response = deviceAuthService.pollDeviceToken(
+                request.getDeviceCode(),
+                SessionOrigin.of(SessionClient.CLI, httpRequest.getHeader("User-Agent"), getClientIp(httpRequest)));
         return ResponseEntity.ok(response);
     }
 

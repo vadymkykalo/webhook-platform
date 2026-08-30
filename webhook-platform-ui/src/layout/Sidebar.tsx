@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { cn } from '../lib/utils';
 import { hasMinRole, type Role } from '../auth/ProtectedRoute';
 import ProjectSwitcher from '../components/ProjectSwitcher';
+import OrganizationSwitcher from '../components/OrganizationSwitcher';
 import { PROJECT_SECTIONS, SETTINGS_SECTION, segmentOf, type NavSection } from './nav.config';
 import type { CurrentUserResponse } from '../types/api.types';
 
@@ -165,11 +166,9 @@ export default function Sidebar({
             <>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] leading-tight">{user.user?.email}</p>
-                {user.organization && (
-                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                    {user.organization.name}
-                  </p>
-                )}
+                {/* Renders as the plain name it always was until there is a second organization
+                    to switch to, so nobody gets a control over a list of one. */}
+                <OrganizationSwitcher />
               </div>
               <Button variant="ghost" size="icon-sm" onClick={onLogout}
                 className="flex-shrink-0 text-muted-foreground hover:text-halt"

@@ -49,12 +49,13 @@ public class MembershipService {
             UserRepository userRepository,
             MembershipRepository membershipRepository,
             EmailService emailService,
-            TokenBlacklistService tokenBlacklistService) {
+            TokenBlacklistService tokenBlacklistService,
+            BCryptPasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.emailService = emailService;
         this.tokenBlacklistService = tokenBlacklistService;
-        this.passwordEncoder = new BCryptPasswordEncoder();
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<MemberResponse> getOrganizationMembers() {

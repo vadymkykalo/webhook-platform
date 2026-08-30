@@ -50,6 +50,21 @@ public class User {
     @Column(name = "password_reset_token_expires_at")
     private Instant passwordResetTokenExpiresAt;
 
+    /**
+     * Consecutive failed logins, reset by anything that proves the account holder is present.
+     * See {@code AccountLockoutService} for what the count buys and why it is held here rather
+     * than in Redis.
+     */
+    @Builder.Default
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "last_failed_login_at")
+    private Instant lastFailedLoginAt;
+
+    @Column(name = "lockout_expires_at")
+    private Instant lockoutExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

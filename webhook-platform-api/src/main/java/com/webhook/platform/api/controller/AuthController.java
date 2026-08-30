@@ -1,5 +1,6 @@
 package com.webhook.platform.api.controller;
 
+import com.webhook.platform.api.domain.enums.SessionClient;
 import com.webhook.platform.api.dto.AuthResponse;
 import com.webhook.platform.api.dto.ChangePasswordRequest;
 import com.webhook.platform.api.dto.CurrentUserResponse;
@@ -9,12 +10,18 @@ import com.webhook.platform.api.dto.LogoutRequest;
 import com.webhook.platform.api.dto.RefreshTokenRequest;
 import com.webhook.platform.api.dto.RegisterRequest;
 import com.webhook.platform.api.dto.ResetPasswordRequest;
+import com.webhook.platform.api.dto.SessionResponse;
+import com.webhook.platform.api.dto.SwitchOrganizationRequest;
 import com.webhook.platform.api.dto.UpdateProfileRequest;
 import com.webhook.platform.api.dto.UserResponse;
+import com.webhook.platform.api.security.AccessLevel;
 import com.webhook.platform.api.security.AuthContext;
+import com.webhook.platform.api.security.RequireAccess;
 import com.webhook.platform.api.security.TrustedProxyResolver;
 import com.webhook.platform.api.service.AuthRateLimiterService;
 import com.webhook.platform.api.service.AuthService;
+import com.webhook.platform.api.service.SessionOrigin;
+import com.webhook.platform.api.service.UserSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -31,6 +38,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+import java.util.UUID;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -38,6 +48,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserSessionService userSessionService;
     private final AuthRateLimiterService authRateLimiterService;
     private final TrustedProxyResolver trustedProxyResolver;
     private final boolean isProduction;
@@ -45,11 +56,13 @@ public class AuthController {
 
     public AuthController(
             AuthService authService,
+            UserSessionService userSessionService,
             AuthRateLimiterService authRateLimiterService,
             TrustedProxyResolver trustedProxyResolver,
             @Value("${app.env:development}") String appEnv,
             @Value("${jwt.refresh-token-expiration:86400000}") long refreshTokenExpirationMs) {
         this.authService = authService;
+        this.userSessionService = userSessionService;
         this.authRateLimiterService = authRateLimiterService;
         this.trustedProxyResolver = trustedProxyResolver;
         this.isProduction = "production".equalsIgnoreCase(appEnv);
@@ -74,7 +87,7 @@ public class AuthController {
                     "Too many registration attempts. Try again later.");
         }
         try {
-            AuthResponse response = authService.register(request);
+            AuthResponse response = authService.register(request, originOf(httpRequest));
             setRefreshTokenCookie(httpResponse, response.getRefreshToken());
             response.setRefreshToken(null);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -98,7 +111,7 @@ public class AuthController {
                     "Too many login attempts. Try again later.");
         }
         try {
-            AuthResponse response = authService.login(request);
+            AuthResponse response = authService.login(request, originOf(httpRequest));
             setRefreshTokenCookie(httpResponse, response.getRefreshToken());
             response.setRefreshToken(null);
             return ResponseEntity.ok(response);
@@ -129,7 +142,7 @@ public class AuthController {
             if (refreshToken == null) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token missing");
             }
-            AuthResponse response = authService.refreshToken(refreshToken);
+            AuthResponse response = authService.refreshToken(refreshToken, originOf(httpRequest));
             setRefreshTokenCookie(httpResponse, response.getRefreshToken());
             response.setRefreshToken(null);
             return ResponseEntity.ok(response);
@@ -233,6 +246,82 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "List active sessions",
+            description = "Returns every live sign-in for the authenticated user — browser sessions and "
+                    + "CLI device-code grants alike — with the session making the request flagged as current. "
+                    + "No token material is returned.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Sessions returned"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @GetMapping("/sessions")
+    public ResponseEntity<List<SessionResponse>> listSessions(
+            @CookieValue(value = "refresh_token", required = false) String cookieRefreshToken,
+            AuthContext auth) {
+        return ResponseEntity.ok(authService.listSessions(auth.requireUserId(), cookieRefreshToken));
+    }
+
+    @Operation(summary = "Revoke a session",
+            description = "Signs one device out. The session's refresh token stops working and so does the "
+                    + "access token it already issued, rather than surviving until its own expiry.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Session revoked"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated"),
+            @ApiResponse(responseCode = "404", description = "No such session for this user")
+    })
+    // READ rather than WRITE: this acts on the caller's own sign-ins, not on organization data,
+    // so a Viewer must be able to sign their own laptop out. Same reasoning as change-password.
+    @RequireAccess(AccessLevel.READ)
+    @DeleteMapping("/sessions/{sessionId}")
+    public ResponseEntity<Void> revokeSession(@PathVariable("sessionId") UUID sessionId, AuthContext auth) {
+        auth.requireJwt();
+        userSessionService.revokeSession(auth.requireUserId(), sessionId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Sign out everywhere",
+            description = "Ends every session for the authenticated user, including the one making the call.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "All sessions revoked"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated")
+    })
+    @RequireAccess(AccessLevel.READ)
+    @PostMapping("/sessions/revoke-all")
+    public ResponseEntity<Void> revokeAllSessions(AuthContext auth, HttpServletResponse httpResponse) {
+        auth.requireJwt();
+        userSessionService.revokeAllSessions(auth.requireUserId());
+        clearRefreshTokenCookie(httpResponse);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Switch organization",
+            description = "Re-issues an access token scoped to another organization the caller belongs to. "
+                    + "The refresh token is untouched and no other session is affected; the new token's role "
+                    + "comes from the membership in the target organization, not from the token being replaced.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Access token re-issued for the target organization"),
+            @ApiResponse(responseCode = "401", description = "Not authenticated, or no live session"),
+            @ApiResponse(responseCode = "403", description = "Caller is not a member of that organization")
+    })
+    @RequireAccess(AccessLevel.READ)
+    @PostMapping("/switch-organization")
+    public ResponseEntity<AuthResponse> switchOrganization(
+            @Valid @RequestBody SwitchOrganizationRequest request,
+            @CookieValue(value = "refresh_token", required = false) String cookieRefreshToken,
+            AuthContext auth) {
+        auth.requireJwt();
+        AuthResponse response = authService.switchOrganization(
+                auth.requireUserId(), request, cookieRefreshToken);
+        // Deliberately not re-issuing the refresh cookie: the organization now lives on the
+        // session row, so the refresh token needs no change, and rotating it would make a
+        // double-clicked switcher look like a replayed token to the reuse detection.
+        return ResponseEntity.ok(response);
+    }
+
     @Operation(summary = "Forgot password", description = "Sends a password reset email to the user")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "If the email exists, a reset link has been sent"),
@@ -269,6 +358,15 @@ public class AuthController {
 
     private String getClientIp(HttpServletRequest request) {
         return trustedProxyResolver.resolve(request);
+    }
+
+    /**
+     * What a browser sign-in gets recorded as. Both fields are for a human reading their own
+     * session list -- a User-Agent is whatever the client claimed and the IP is whatever
+     * {@link TrustedProxyResolver} could establish -- so neither is ever an authorization input.
+     */
+    private SessionOrigin originOf(HttpServletRequest request) {
+        return SessionOrigin.of(SessionClient.WEB, request.getHeader("User-Agent"), getClientIp(request));
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {

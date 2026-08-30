@@ -16,6 +16,7 @@ public class TokenBlacklistService {
 
     private static final String KEY_PREFIX = "jwt:blacklist:";
     private static final String EPOCH_PREFIX = "jwt:epoch:";
+    private static final String SESSION_PREFIX = "jwt:session-revoked:";
 
     private final RedissonClient redissonClient;
     private final Duration epochTtl;
@@ -57,6 +58,38 @@ public class TokenBlacklistService {
         // could ever be reclaimed.
         bucket.set(System.currentTimeMillis(), epochTtl);
         log.info("Revoked all tokens for user {}", userId);
+    }
+
+    /**
+     * Ends one session, for every token it ever minted.
+     *
+     * <p>Revoking a session by blacklisting only its refresh token would be a promise kept
+     * fifteen minutes late: the access token already in the client's hands is self-contained and
+     * nothing re-checks it. Access tokens therefore carry the session id as a {@code sid} claim
+     * and {@code JwtAuthenticationFilter} asks this on every request, so "sign this device out"
+     * means what it says.
+     *
+     * <p>Distinct from {@link #revokeAllUserTokens}, which is an epoch over the whole account.
+     * This one is per-session, so signing out a laptop leaves the phone alone.
+     */
+    public void revokeSession(UUID sessionId, Date sessionExpiry) {
+        long ttlMs = sessionExpiry.getTime() - System.currentTimeMillis();
+        if (ttlMs <= 0) {
+            // Every token this session could have issued has already expired; a marker would
+            // only occupy a key until it timed out saying nothing.
+            return;
+        }
+        RBucket<String> bucket = redissonClient.getBucket(SESSION_PREFIX + sessionId);
+        bucket.set("1", Duration.ofMillis(ttlMs));
+        log.info("Revoked session {} (TTL={}ms)", sessionId, ttlMs);
+    }
+
+    public boolean isSessionRevoked(UUID sessionId) {
+        if (sessionId == null) {
+            return false;
+        }
+        RBucket<String> bucket = redissonClient.getBucket(SESSION_PREFIX + sessionId);
+        return bucket.isExists();
     }
 
     public boolean isTokenRevokedByEpoch(UUID userId, Date issuedAt) {
