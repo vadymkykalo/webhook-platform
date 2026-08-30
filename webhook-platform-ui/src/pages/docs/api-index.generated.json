@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 187,
+  "operationCount": 188,
   "security": [
     {
       "id": "bearerAuth",
@@ -1772,6 +1772,32 @@
           "body": {
             "contentType": "application/json",
             "type": "DeviceTokenRequest",
+            "required": true
+          }
+        },
+        {
+          "id": "denyDeviceCode",
+          "method": "POST",
+          "path": "/api/v1/auth/device/deny",
+          "summary": "Deny device code",
+          "auth": [
+            "bearerAuth"
+          ],
+          "params": [],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Device code denied"
+            },
+            {
+              "status": "404",
+              "description": "Code not found or already used"
+            }
+          ],
+          "description": "Called by the authenticated user in the browser to refuse a device login request they did not start. The waiting CLI stops with 403 on its next poll instead of holding the code open until it expires.",
+          "body": {
+            "contentType": "application/json",
+            "type": "DeviceDenyRequest",
             "required": true
           }
         },
@@ -7445,6 +7471,13 @@
         "required": false
       }
     ],
+    "DeviceDenyRequest": [
+      {
+        "name": "userCode",
+        "type": "string",
+        "required": true
+      }
+    ],
     "DeviceTokenRequest": [
       {
         "name": "deviceCode",
@@ -12616,6 +12649,9 @@
       "expiresInSeconds": 0,
       "pollIntervalSeconds": 0,
       "expiresAt": "2026-01-01T12:00:00Z"
+    },
+    "DeviceDenyRequest": {
+      "userCode": "string"
     },
     "DeviceTokenRequest": {
       "deviceCode": "string"

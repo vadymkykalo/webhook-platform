@@ -75,6 +75,7 @@ class MutatingHandlerScopeDeclarationTest {
             "DeviceAuthController.initiateDeviceAuth",
             "DeviceAuthController.pollDeviceToken",
             "DeviceAuthController.approveDeviceCode",
+            "DeviceAuthController.denyDeviceCode",
 
             // Owner-level org and billing operations: gated on requireOwnerAccess(), which is
             // strictly stronger than any API-key scope (API keys never hold OWNER).

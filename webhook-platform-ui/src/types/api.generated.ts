@@ -1764,6 +1764,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/device/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny device code
+         * @description Called by the authenticated user in the browser to refuse a device login request they did not start. The waiting CLI stops with 403 on its next poll instead of holding the code open until it expires.
+         */
+        post: operations["denyDeviceCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/device/code": {
         parameters: {
             query?: never;
@@ -3939,6 +3959,9 @@ export interface components {
         };
         DeviceTokenRequest: {
             deviceCode: string;
+        };
+        DeviceDenyRequest: {
+            userCode: string;
         };
         DeviceCodeResponse: {
             deviceCode?: string;
@@ -8347,6 +8370,35 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["AuthResponse"];
                 };
+            };
+        };
+    };
+    denyDeviceCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceDenyRequest"];
+            };
+        };
+        responses: {
+            /** @description Device code denied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Code not found or already used */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

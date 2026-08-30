@@ -91,6 +91,31 @@ public class DeviceAuthService {
         log.info("Device auth approved: userCode={}, userId={}", userCode, userId);
     }
 
+    /**
+     * The other answer to "a terminal somewhere is asking to log in as you".
+     *
+     * <p>{@code DENIED} was a status the poll path already refused a token for, with a 403 the CLI
+     * already prints as "Authorization denied" — and nothing could ever set it. The verification
+     * screen offered Approve and a Cancel that only reset the form, so a person who did not
+     * recognise the code had no way to say so: the code stayed PENDING and whoever had asked for it
+     * kept polling for the rest of its ten minutes. Denying ends that immediately.
+     *
+     * <p>Only the status is written. The code carries no user and no organization afterwards, so
+     * there is nothing for a later poll to mint a token from even if one reached the APPROVED
+     * branch, and the row does not read as an approval by the person who refused it.
+     */
+    @Transactional
+    public void denyDeviceCode(String userCode, UUID userId) {
+        DeviceAuthCode code = deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Device code not found or already used"));
+
+        code.setStatus(DeviceAuthStatus.DENIED);
+        deviceAuthCodeRepository.save(code);
+
+        log.warn("Device auth denied: userCode={}, deniedBy={}", userCode, userId);
+    }
+
     @SystemTenant("polled by an unauthenticated CLI; the membership read is what decides which organization the issued token names")
     @Transactional
     public AuthResponse pollDeviceToken(String deviceCode) {

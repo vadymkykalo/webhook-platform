@@ -147,6 +147,77 @@ class DeviceAuthServiceTest {
     }
 
     @Test
+    void shouldDenyPendingCode() {
+        String userCode = "DENY-0001";
+        UUID userId = UUID.randomUUID();
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(UUID.randomUUID())
+                .userCode(userCode)
+                .status(DeviceAuthStatus.PENDING)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        when(deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING))
+                .thenReturn(Optional.of(code));
+        when(deviceAuthCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        deviceAuthService.denyDeviceCode(userCode, userId);
+
+        ArgumentCaptor<DeviceAuthCode> captor = ArgumentCaptor.forClass(DeviceAuthCode.class);
+        verify(deviceAuthCodeRepository).save(captor.capture());
+        assertEquals(DeviceAuthStatus.DENIED, captor.getValue().getStatus());
+    }
+
+    @Test
+    void aDeniedCodeNeverBecomesATokenEvenIfItsUserIdIsSet() {
+        String userCode = "DENY-0002";
+        UUID userId = UUID.randomUUID();
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(UUID.randomUUID())
+                .userCode(userCode)
+                .status(DeviceAuthStatus.PENDING)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        when(deviceAuthCodeRepository.findByUserCodeAndStatus(userCode, DeviceAuthStatus.PENDING))
+                .thenReturn(Optional.of(code));
+        when(deviceAuthCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        deviceAuthService.denyDeviceCode(userCode, userId);
+
+        assertNull(code.getApprovedAt());
+        assertNull(code.getOrganizationId());
+    }
+
+    @Test
+    void shouldThrowWhenDenyingNonexistentCode() {
+        when(deviceAuthCodeRepository.findByUserCodeAndStatus("ZZZZ-9999", DeviceAuthStatus.PENDING))
+                .thenReturn(Optional.empty());
+
+        assertThrows(ResponseStatusException.class, () ->
+                deviceAuthService.denyDeviceCode("ZZZZ-9999", UUID.randomUUID()));
+    }
+
+    @Test
+    void shouldRefusePollingADeniedCode() {
+        String deviceCode = "dev-denied";
+        DeviceAuthCode code = DeviceAuthCode.builder()
+                .id(UUID.randomUUID())
+                .deviceCode(deviceCode)
+                .userCode("DENY-0003")
+                .status(DeviceAuthStatus.DENIED)
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .build();
+
+        when(deviceAuthCodeRepository.findByDeviceCode(deviceCode)).thenReturn(Optional.of(code));
+
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class, () ->
+                deviceAuthService.pollDeviceToken(deviceCode));
+        assertEquals(403, thrown.getStatusCode().value());
+        verify(deviceAuthCodeRepository, never()).markConsumedIfApproved(any());
+    }
+
+    @Test
     void shouldReturnTokensWhenPollingApprovedCode() {
         UUID userId = UUID.randomUUID();
         String deviceCode = "dev-approved";

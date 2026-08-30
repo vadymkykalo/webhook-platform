@@ -3930,6 +3930,28 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AuthResponse"
+  /api/v1/auth/device/deny:
+    post:
+      tags:
+      - Device Authentication
+      summary: Deny device code
+      description: Called by the authenticated user in the browser to refuse a device
+        login request they did not start. The waiting CLI stops with 403 on its next
+        poll instead of holding the code open until it expires.
+      operationId: denyDeviceCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceDenyRequest"
+        required: true
+      responses:
+        "200":
+          description: Device code denied
+        "404":
+          description: Code not found or already used
+      security:
+      - bearerAuth: []
   /api/v1/auth/device/code:
     post:
       tags:
@@ -7744,6 +7766,14 @@ components:
           minLength: 1
       required:
       - deviceCode
+    DeviceDenyRequest:
+      type: object
+      properties:
+        userCode:
+          type: string
+          minLength: 1
+      required:
+      - userCode
     DeviceCodeResponse:
       type: object
       properties:
