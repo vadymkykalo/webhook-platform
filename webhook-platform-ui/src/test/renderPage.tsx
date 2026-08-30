@@ -11,6 +11,9 @@ const FAKE_USER: CurrentUserResponse = {
   user: { id: 'user-1', email: 'owner@example.com', fullName: 'Test Owner', status: 'ACTIVE' },
   organization: { id: 'org-1', name: 'Test Org', createdAt: new Date().toISOString() },
   role: 'OWNER',
+  // Matches the shipped default (EMAIL_ENABLED=false), so a page under test
+  // renders the "nothing was sent" wording the majority of installs see.
+  emailDeliveryEnabled: false,
 };
 
 const FAKE_AUTH_STATE: AuthState = {

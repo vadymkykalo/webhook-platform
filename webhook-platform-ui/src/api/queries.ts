@@ -364,6 +364,14 @@ export function useChangeMemberRole(orgId: string) {
     });
 }
 
+export function useReissueInvite(orgId: string) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (userId: string) => membersApi.reissueInvite(orgId, userId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
+    });
+}
+
 export function useRemoveMember(orgId: string) {
     const qc = useQueryClient();
     return useMutation({

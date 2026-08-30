@@ -39,6 +39,12 @@ export interface CurrentUserResponse {
   user: UserResponse;
   organization: OrganizationResponse;
   role: 'OWNER' | 'DEVELOPER' | 'VIEWER';
+  /**
+   * Whether this deployment can deliver mail. False is the shipped default
+   * (`EMAIL_ENABLED=false`), and where it is false the product must not claim an
+   * invite or a reset "was sent" — it wasn't.
+   */
+  emailDeliveryEnabled: boolean;
 }
 
 export interface OrganizationResponse {

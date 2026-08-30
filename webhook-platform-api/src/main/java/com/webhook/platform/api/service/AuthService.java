@@ -391,6 +391,7 @@ public class AuthService {
                 .user(userResponse)
                 .organization(orgResponse)
                 .role(role)
+                .emailDeliveryEnabled(emailService.isEnabled())
                 .build();
     }
 }

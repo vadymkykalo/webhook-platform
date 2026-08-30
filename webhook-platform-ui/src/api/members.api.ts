@@ -9,6 +9,14 @@ export interface MemberResponse {
   role: MembershipRole;
   status: MembershipStatus;
   createdAt: string;
+  /** When a pending invite stops being accepted. Absent once it has been accepted. */
+  inviteExpiresAt?: string;
+  /**
+   * The accept-invite link, returned only from `add` and `reissueInvite` and never
+   * from `list` — it carries the token. With `EMAIL_ENABLED=false`, the shipped
+   * default, this is the only copy that reaches a person.
+   */
+  inviteUrl?: string;
 }
 
 export interface AddMemberRequest {
@@ -31,6 +39,11 @@ export const membersApi = {
 
   changeRole: (orgId: string, userId: string, request: ChangeMemberRoleRequest): Promise<MemberResponse> => {
     return http.patch<MemberResponse>(`/api/v1/orgs/${orgId}/members/${userId}`, request);
+  },
+
+  /** Replaces a pending invite's token and restarts its 48-hour expiry. */
+  reissueInvite: (orgId: string, userId: string): Promise<MemberResponse> => {
+    return http.post<MemberResponse>(`/api/v1/orgs/${orgId}/members/${userId}/invite`);
   },
 
   remove: (orgId: string, userId: string): Promise<void> => {
