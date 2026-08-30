@@ -30,8 +30,13 @@ public class ForwardDispatch {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * @param replaySessionId the Replay this Forward belongs to, null for one created by ingress.
+     *                        A Replay's Attempts live in their own numbering, so every claim the
+     *                        worker makes is scoped to this value.
+     */
     public OutboxMessage outboxFor(UUID eventId, UUID sourceId, UUID destinationId, UUID projectId,
-            int attemptNumber, Reason reason) {
+            int attemptNumber, UUID replaySessionId, Reason reason) {
         try {
             IncomingForwardMessage message = IncomingForwardMessage.builder()
                     .incomingEventId(eventId)
@@ -39,6 +44,7 @@ public class ForwardDispatch {
                     .incomingSourceId(sourceId)
                     .attemptCount(attemptNumber)
                     .replay(reason != Reason.CREATED)
+                    .replaySessionId(replaySessionId)
                     .build();
 
             return OutboxMessage.builder()

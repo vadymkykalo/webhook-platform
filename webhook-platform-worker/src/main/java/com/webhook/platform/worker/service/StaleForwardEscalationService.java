@@ -152,6 +152,7 @@ public class StaleForwardEscalationService {
                             .incomingEventId(attempt.getIncomingEventId())
                             .destinationId(attempt.getDestinationId())
                             .attemptCount(attempt.getAttemptNumber())
+                            .replaySessionId(attempt.getReplaySessionId())
                             .build());
         } catch (Exception e) {
             log.error("Failed to publish DLQ notification for escalated forward eventId={}, destId={}: {}",

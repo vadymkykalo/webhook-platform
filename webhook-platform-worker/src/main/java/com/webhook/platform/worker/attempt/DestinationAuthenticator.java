@@ -5,7 +5,6 @@ import com.webhook.platform.common.enums.IncomingAuthType;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Base64;
 import java.util.Map;
@@ -28,8 +27,12 @@ class DestinationAuthenticator {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Puts the credentials into the header map rather than straight onto the request: the caller
+     * has to record what it sent, and a header applied to the request builder cannot be read back.
+     */
     @SuppressWarnings("unchecked")
-    void authenticate(WebClient.RequestBodySpec request) {
+    void authenticate(Map<String, String> headers) {
         if (destination.getAuthType() == IncomingAuthType.NONE || destination.getAuthConfigEncrypted() == null) {
             return;
         }
@@ -44,20 +47,20 @@ class DestinationAuthenticator {
                 case BEARER -> {
                     String token = config.get("token");
                     if (token != null) {
-                        request.header("Authorization", "Bearer " + token);
+                        headers.put("Authorization", "Bearer " + token);
                     }
                 }
                 case BASIC -> {
                     String username = config.getOrDefault("username", "");
                     String password = config.getOrDefault("password", "");
-                    request.header("Authorization", "Basic " + Base64.getEncoder()
+                    headers.put("Authorization", "Basic " + Base64.getEncoder()
                             .encodeToString((username + ":" + password).getBytes()));
                 }
                 case CUSTOM_HEADER -> {
                     String name = config.get("headerName");
                     String value = config.get("headerValue");
                     if (name != null && value != null) {
-                        request.header(name, value);
+                        headers.put(name, value);
                     }
                 }
                 default -> {

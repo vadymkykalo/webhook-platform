@@ -29,10 +29,6 @@ public interface IncomingForwardAttemptRepository extends JpaRepository<Incoming
             @Param("now") Instant now,
             PageRequest pageRequest);
 
-    @Query("SELECT MAX(a.attemptNumber) FROM IncomingForwardAttempt a " +
-            "WHERE a.incomingEventId = :eventId AND a.destinationId = :destinationId")
-    Integer findMaxAttemptNumber(@Param("eventId") UUID eventId, @Param("destinationId") UUID destinationId);
-
     @Query("SELECT COUNT(a) FROM IncomingForwardAttempt a " +
             "JOIN IncomingEvent e ON a.incomingEventId = e.id " +
             "JOIN IncomingSource s ON e.incomingSourceId = s.id " +

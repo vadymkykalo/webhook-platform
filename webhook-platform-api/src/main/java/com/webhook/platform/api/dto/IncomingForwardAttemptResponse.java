@@ -22,6 +22,8 @@ public class IncomingForwardAttemptResponse {
     private ForwardAttemptStatus status;
     private Instant startedAt;
     private Instant finishedAt;
+    private String requestHeadersJson;
+    private String requestBodySnippet;
     private Integer responseCode;
     private String responseHeadersJson;
     private String responseBodySnippet;

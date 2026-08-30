@@ -7,6 +7,7 @@ import com.webhook.platform.common.dto.IncomingForwardMessage;
 import com.webhook.platform.common.enums.ForwardAttemptStatus;
 import com.webhook.platform.common.retry.RetryLadder;
 import com.webhook.platform.common.security.EncryptionKeyRegistry;
+import com.webhook.platform.common.util.HeaderSanitizer;
 import com.webhook.platform.worker.domain.entity.IncomingDestination;
 import com.webhook.platform.worker.domain.entity.IncomingEvent;
 import com.webhook.platform.worker.domain.entity.IncomingForwardAttempt;
@@ -20,7 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -37,13 +40,21 @@ import java.util.UUID;
 @Slf4j
 public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.Claim> {
 
+    /** What {@code delivery_attempts} keeps of a request body; Incoming keeps the same. */
+    private static final int REQUEST_BODY_SNIPPET_LIMIT = 10240;
+
     /**
      * Ownership of one forward attempt row.
      *
-     * @param fence the claim_token this attempt was claimed under, null only for a retry
-     *              message published before the token existed
+     * @param fence           the claim_token this attempt was claimed under, null only for a
+     *                        retry message published before the token existed
+     * @param replaySessionId the Replay this Forward belongs to, null for one created by
+     *                        ingress. Part of the Claim because it is part of the row's
+     *                        identity: (event, destination, attempt number) alone names two
+     *                        different rows once a Replay has started a second ladder.
      */
-    public record Claim(UUID eventId, UUID destinationId, int attemptNumber, UUID fence) {
+    public record Claim(UUID eventId, UUID destinationId, int attemptNumber, UUID fence,
+            UUID replaySessionId) {
     }
 
     private final IncomingForwardAttemptRepository attemptRepository;
@@ -111,7 +122,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                 return claimed(attemptNumber, null);
             }
             Integer applied = transactionTemplate.execute(tx -> attemptRepository.claimRetryForProcessing(
-                    event.getId(), destination.getId(), attemptNumber, expected, claimToken));
+                    event.getId(), destination.getId(), attemptNumber, message.getReplaySessionId(),
+                    expected, claimToken));
             if (applied == null || applied == 0) {
                 return new ClaimResult.NotClaimed<>(
                         "retry attempt already claimed by a prior delivery of this Kafka message");
@@ -122,29 +134,39 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         }
 
         final int number = attemptNumber;
-        Integer applied = transactionTemplate.execute(tx ->
-                attemptRepository.claimForProcessing(event.getId(), destination.getId(), number, claimToken));
+        Integer applied = transactionTemplate.execute(tx -> attemptRepository.claimForProcessing(
+                event.getId(), destination.getId(), number, message.getReplaySessionId(), claimToken));
         if (applied == null || applied == 0) {
             return new ClaimResult.NotClaimed<>("forward attempt already claimed or not PENDING");
         }
         return claimed(number, claimToken);
     }
 
+    /**
+     * Admissibility, once the Claim is held. Deliberately after it rather than before: a
+     * Destination that has been turned off is turned off for Forwards already queued or partway
+     * through the Ladder too, and failing one of those has to be written under the fencing token
+     * like every other finalisation. The enabled check used to run in IncomingForwardService
+     * before anything was claimed, so it wrote FAILED over whatever else owned the row.
+     */
     private ClaimResult<Claim> claimed(int attemptNumber, UUID fence) {
+        Claim claim = new Claim(event.getId(), destination.getId(), attemptNumber, fence,
+                message.getReplaySessionId());
+
+        if (!Boolean.TRUE.equals(destination.getEnabled())) {
+            return terminal(claim, "Destination is disabled");
+        }
+
         RetryLadder ladder;
         try {
             ladder = RetryLadder.parse(destination.getRetryDelays(), destination.getMaxAttempts());
         } catch (IllegalArgumentException e) {
             // Retrying cannot fix a ladder that does not parse. The api rejects a malformed
             // one on write, so reaching this means the column was written outside the api.
-            String reason = "INVALID_RETRY_LADDER: " + e.getMessage();
             log.error("Destination {} carries an unusable retry ladder: {}", destination.getId(), e.getMessage());
-            Claim claim = new Claim(event.getId(), destination.getId(), attemptNumber, fence);
-            finalise(claim, new Finalization.TerminallyFailed(reason));
-            return new ClaimResult.NotClaimed<>(reason);
+            return terminal(claim, "INVALID_RETRY_LADDER: " + e.getMessage());
         }
 
-        Claim claim = new Claim(event.getId(), destination.getId(), attemptNumber, fence);
         AttemptContext context = new AttemptContext(
                 "forward eventId=" + event.getId() + " destId=" + destination.getId()
                         + " attempt=" + attemptNumber + "/" + destination.getMaxAttempts(),
@@ -158,24 +180,50 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         return new ClaimResult.Claimed<>(claim, context);
     }
 
+    /** Fails the Forward under its fencing token and reports that there is nothing to attempt. */
+    private ClaimResult<Claim> terminal(Claim claim, String reason) {
+        log.warn("Forward eventId={}, destId={} will not be attempted: {}",
+                claim.eventId(), claim.destinationId(), reason);
+        // Never reaches AttemptRunner, so it owes the release itself — and only if its own
+        // finalisation applied.
+        if (finalise(claim, new Finalization.TerminallyFailed(reason))) {
+            onTerminallyFailed(claim);
+        }
+        return new ClaimResult.NotClaimed<>(reason);
+    }
+
     @Override
     public RequestSpec buildRequest(Claim claim, String body) {
         String contentType = event.getContentType() != null ? event.getContentType() : "application/json";
         String idempotencyKey = event.getId() + "-" + destination.getId();
 
-        return new RequestSpec(
-                webClient,
-                request -> {
-                    request.header("Content-Type", contentType)
-                            .header("X-Incoming-Event-Id", event.getId().toString())
-                            .header("X-Incoming-Request-Id", event.getRequestId())
-                            .header("X-Forward-Attempt", String.valueOf(claim.attemptNumber()))
-                            .header("Idempotency-Key", idempotencyKey);
-                    new DestinationAuthenticator(destination, encryptionKeyRegistry, objectMapper)
-                            .authenticate(request);
-                    AttemptSupport.addCustomHeaders(request, destination.getCustomHeadersJson(), objectMapper);
-                },
-                null); // Incoming has never recorded its request headers on the attempt row
+        // Collected before they are applied, because the attempt row records what went out and
+        // a header handed to the request builder cannot be read back off it.
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Content-Type", contentType);
+        headers.put("X-Incoming-Event-Id", event.getId().toString());
+        if (event.getRequestId() != null) {
+            headers.put("X-Incoming-Request-Id", event.getRequestId());
+        }
+        headers.put("X-Forward-Attempt", String.valueOf(claim.attemptNumber()));
+        headers.put("Idempotency-Key", idempotencyKey);
+        new DestinationAuthenticator(destination, encryptionKeyRegistry, objectMapper).authenticate(headers);
+        AttemptSupport.collectCustomHeaders(headers, destination.getCustomHeadersJson(), objectMapper);
+
+        return new RequestSpec(webClient, request -> headers.forEach(request::header), recorded(headers));
+    }
+
+    /**
+     * What the dashboard shows for this request. The Destination's own credentials go out on
+     * every Forward, so they are masked here rather than anywhere downstream.
+     */
+    private String recorded(Map<String, String> headers) {
+        try {
+            return objectMapper.writeValueAsString(HeaderSanitizer.sanitize(headers));
+        } catch (Exception e) {
+            log.warn("Failed to serialise forward request headers: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -287,6 +335,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                         .destinationId(claim.destinationId())
                         .organizationId(attempt.getOrganizationId())
                         .attemptNumber(claim.attemptNumber() + 1)
+                        .replaySessionId(claim.replaySessionId())
                         .status(ForwardAttemptStatus.PENDING)
                         .nextRetryAt(retry.at())
                         .build());
@@ -316,6 +365,7 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
                             .destinationId(claim.destinationId())
                             .incomingSourceId(event.getIncomingSourceId())
                             .attemptCount(claim.attemptNumber())
+                            .replaySessionId(claim.replaySessionId())
                             .build());
             log.info("Published DLQ event for forward eventId={}, destId={}",
                     claim.eventId(), claim.destinationId());
@@ -334,6 +384,9 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
         if (pendingRecord == null) {
             return;
         }
+        attempt.setRequestHeadersJson(pendingRecord.requestHeaders());
+        attempt.setRequestBodySnippet(
+                AttemptSupport.truncate(pendingRecord.requestBody(), REQUEST_BODY_SNIPPET_LIMIT));
         attempt.setResponseCode(pendingRecord.statusCode());
         attempt.setResponseHeadersJson(pendingRecord.responseHeaders());
         attempt.setResponseBodySnippet(AttemptSupport.truncate(pendingRecord.responseBody(), 10240));
@@ -341,8 +394,8 @@ public class IncomingAttemptStore implements AttemptStore<IncomingAttemptStore.C
     }
 
     private IncomingForwardAttempt findAttempt(Claim claim) {
-        List<IncomingForwardAttempt> attempts = attemptRepository
-                .findByIncomingEventIdAndDestinationIdOrderByAttemptNumberDesc(claim.eventId(), claim.destinationId());
+        List<IncomingForwardAttempt> attempts = attemptRepository.findForwardAttempts(
+                claim.eventId(), claim.destinationId(), claim.replaySessionId());
         return attempts.stream()
                 .filter(a -> a.getAttemptNumber() == claim.attemptNumber())
                 .findFirst()

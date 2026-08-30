@@ -336,7 +336,8 @@ public class IngressService {
                         .build());
 
                 outboxMessages.add(forwardDispatch.outboxFor(event.getId(), source.getId(),
-                        destination.getId(), source.getProjectId(), 0, ForwardDispatch.Reason.CREATED));
+                        destination.getId(), source.getProjectId(), 0, null,
+                        ForwardDispatch.Reason.CREATED));
             }
 
             forwardAttemptRepository.saveAll(attempts);
