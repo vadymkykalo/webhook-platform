@@ -3547,7 +3547,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/EventIngestResponse"
         "401":
           description: Invalid or missing API key
           content:
@@ -3559,7 +3559,7 @@ paths:
           content:
             '*/*':
               schema:
-                type: object
+                $ref: "#/components/schemas/ErrorResponse"
       security:
       - apiKey: []
   /api/v1/deliveries/{id}/replay:
@@ -7623,6 +7623,38 @@ components:
         createdAt:
           type: string
           format: date-time
+    EventIngestResponse:
+      type: object
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        type:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deliveriesCreated:
+          type: integer
+          format: int32
+        schemaWarnings:
+          type: array
+          items:
+            type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        status:
+          type: integer
+          format: int32
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: string
     BulkReplayRequest:
       type: object
       properties:

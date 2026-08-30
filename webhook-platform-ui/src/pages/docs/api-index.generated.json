@@ -2529,7 +2529,7 @@
             {
               "status": "201",
               "description": "Event accepted for delivery",
-              "type": "object"
+              "type": "EventIngestResponse"
             },
             {
               "status": "401",
@@ -2539,7 +2539,7 @@
             {
               "status": "429",
               "description": "Rate limit exceeded",
-              "type": "object"
+              "type": "ErrorResponse"
             }
           ],
           "description": "Sends an event to all subscribed webhook endpoints. Requires API Key authentication.",
@@ -7947,6 +7947,28 @@
         "required": false
       }
     ],
+    "ErrorResponse": [
+      {
+        "name": "error",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "status",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "fieldErrors",
+        "type": "map<string, string>",
+        "required": false
+      }
+    ],
     "EventDiffResponse": [
       {
         "name": "leftEventId",
@@ -7999,6 +8021,33 @@
         "name": "data",
         "type": "JsonNode",
         "required": true
+      }
+    ],
+    "EventIngestResponse": [
+      {
+        "name": "eventId",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "type",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "deliveriesCreated",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "schemaWarnings",
+        "type": "string[]",
+        "required": false
       }
     ],
     "EventResponse": [
@@ -12787,6 +12836,14 @@
       "latencyMs": 0,
       "message": "string"
     },
+    "ErrorResponse": {
+      "error": "string",
+      "message": "string",
+      "status": 0,
+      "fieldErrors": {
+        "key": "string"
+      }
+    },
     "EventDiffResponse": {
       "leftEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "rightEventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -12807,6 +12864,15 @@
     "EventIngestRequest": {
       "type": "string",
       "data": {}
+    },
+    "EventIngestResponse": {
+      "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "type": "string",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "deliveriesCreated": 0,
+      "schemaWarnings": [
+        "string"
+      ]
     },
     "EventResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",

@@ -3905,6 +3905,25 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        EventIngestResponse: {
+            /** Format: uuid */
+            eventId?: string;
+            type?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            deliveriesCreated?: number;
+            schemaWarnings?: string[];
+        };
+        ErrorResponse: {
+            error?: string;
+            message?: string;
+            /** Format: int32 */
+            status?: number;
+            fieldErrors?: {
+                [key: string]: string;
+            };
+        };
         BulkReplayRequest: {
             deliveryIds?: string[];
             /** @enum {string} */
@@ -7909,7 +7928,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["EventIngestResponse"];
                 };
             };
             /** @description Invalid or missing API key */
@@ -7927,7 +7946,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "*/*": components["schemas"]["ErrorResponse"];
                 };
             };
         };
