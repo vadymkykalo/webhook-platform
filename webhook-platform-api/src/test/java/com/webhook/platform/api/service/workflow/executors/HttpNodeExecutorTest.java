@@ -1,6 +1,7 @@
 package com.webhook.platform.api.service.workflow.executors;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -43,7 +44,7 @@ class HttpNodeExecutorTest {
     }
 
     private HttpNodeExecutor executor(boolean allowPrivateIps) {
-        return new HttpNodeExecutor(WebClient.builder(), mapper, allowPrivateIps);
+        return new HttpNodeExecutor(WebClient.builder(), mapper, allowPrivateIps, List.of());
     }
 
     private JsonNode json(String raw) throws Exception {
