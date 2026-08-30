@@ -44,8 +44,7 @@ public class ProductionSafetyValidator {
             Map.entry("WEBHOOK_ENCRYPTION_KEY", "dev_encryption_key_32_chars_min!"),
             Map.entry("WEBHOOK_ENCRYPTION_SALT", "dev_encryption_salt_16_chars"),
             Map.entry("DB_PASSWORD", "webhook_dev_pass_12345"),
-            Map.entry("REDIS_PASSWORD", "webhook_redis_pass"),
-            Map.entry("MINIO_ROOT_PASSWORD", "minio_dev_password_12345")
+            Map.entry("REDIS_PASSWORD", "webhook_redis_pass")
     );
 
     // Floor for the Shannon-entropy estimate (bits, frequency-based) of a secret value.
@@ -74,13 +73,6 @@ public class ProductionSafetyValidator {
 
     @Value("${REDIS_PASSWORD:}")
     private String redisPassword;
-
-    // Not yet consumed by the app itself (MinIO integration is optional/future, see
-    // .env.dist) but still validated so a shipped default doesn't sit
-    // unnoticed in a production .env — see docker-compose.yml, which now forwards it
-    // to the api container purely for this check.
-    @Value("${MINIO_ROOT_PASSWORD:}")
-    private String minioRootPassword;
 
     @Value("${cors.allowed-origins:}")
     private String corsAllowedOrigins;
@@ -111,7 +103,6 @@ public class ProductionSafetyValidator {
         // secret to the api container's environment.
         validateSecret(violations, "POSTGRES_PASSWORD (checked via DB_PASSWORD)", "DB_PASSWORD", dbPassword);
         validateSecret(violations, "REDIS_PASSWORD", "REDIS_PASSWORD", redisPassword);
-        validateSecret(violations, "MINIO_ROOT_PASSWORD", "MINIO_ROOT_PASSWORD", minioRootPassword);
 
         if (allowPrivateIps) {
             violations.add("WEBHOOK_ALLOW_PRIVATE_IPS=true — must be false in production (SSRF risk)");

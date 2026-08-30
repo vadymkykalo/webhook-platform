@@ -1,9 +1,9 @@
 # Dependency license report & SBOM
 
 Generated, versioned inventories of every dependency Hookflow pulls in and the
-license it ships under — see `../../NOTICE` and `DECISIONS.md` for the two
-license questions this exists to answer (MinIO AGPL-3.0, Bitnami subchart
-pins).
+license it ships under — see `../../NOTICE` and `DECISIONS.md` for the license
+questions this exists to answer (Bitnami subchart pins, and why the one AGPL
+component this repo used to carry was removed rather than argued for).
 
 | File | What | Tool |
 |---|---|---|

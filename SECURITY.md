@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 2.6.x   | :white_check_mark: |
-| < 2.6   | :x:                |
+| 2.10.x  | :white_check_mark: |
+| < 2.10  | :x:                |
 
 Fixes land on the latest minor line. Older releases are not backported — upgrade
 first, and see [`UPGRADING.md`](./UPGRADING.md) if the jump crosses a major.
