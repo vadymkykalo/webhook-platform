@@ -14,6 +14,11 @@ export interface EventResponse {
   type: string;
   createdAt: string;
   deliveriesCreated: number;
+  /**
+   * Schema-validation errors this event was accepted despite, when the project has schema
+   * validation on with the WARN policy. Absent when the payload matched or validation is off.
+   */
+  schemaWarnings?: string[];
 }
 
 export interface Endpoint {
