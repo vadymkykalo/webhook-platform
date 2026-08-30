@@ -221,11 +221,8 @@ public class MembershipService {
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
-        if (membership.getRole() == MembershipRole.OWNER) {
-            long ownerCount = membershipRepository.countByOrganizationIdAndRole(organizationId, MembershipRole.OWNER);
-            if (ownerCount <= 1) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot demote the last owner");
-            }
+        if (membership.getRole() == MembershipRole.OWNER && ownersWhoCanStillSignIn(organizationId) <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot demote the last owner");
         }
 
         membership.setRole(newRole);
@@ -258,11 +255,8 @@ public class MembershipService {
         Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
 
-        if (membership.getRole() == MembershipRole.OWNER) {
-            long ownerCount = membershipRepository.countByOrganizationIdAndRole(organizationId, MembershipRole.OWNER);
-            if (ownerCount <= 1) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot remove the last owner");
-            }
+        if (membership.getRole() == MembershipRole.OWNER && ownersWhoCanStillSignIn(organizationId) <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot remove the last owner");
         }
 
         membershipRepository.delete(membership);
@@ -271,5 +265,120 @@ public class MembershipService {
         // Refreshing is already blocked — that path 404s on the missing membership — which is
         // precisely why the live access token is the gap left to close.
         tokenBlacklistService.revokeAllUserTokens(userId);
+    }
+
+    /**
+     * Takes a member's access away without taking their membership away.
+     *
+     * <p>The alternative was {@link #removeMember}, which deletes the row: a colleague on leave,
+     * a stolen laptop or an offboarding still in progress all cost the record of who the person
+     * was and what they held. A suspension keeps the row and the role, so reinstating is one
+     * call and nothing has to be reconstructed from memory.</p>
+     *
+     * <p>Refusal happens where a membership becomes an authenticated context — {@code login} and
+     * {@code refreshToken} in {@link AuthService} will not mint a token naming this organization
+     * any more — plus the epoch revocation here, for the same reason a demotion and a removal do
+     * it: the access token already in the member's hands is self-contained and re-checks nothing,
+     * so without this the suspension would begin whenever that token happened to expire.</p>
+     */
+    @Auditable(action = AuditAction.MEMBER_SUSPENDED, resourceType = "Member")
+    @Transactional
+    public MemberResponse suspendMember(UUID userId, UUID requestingUserId, MembershipRole requestingRole) {
+        UUID organizationId = TenantContext.require();
+        if (requestingRole != MembershipRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can suspend members");
+        }
+
+        if (userId.equals(requestingUserId)) {
+            // Nobody else can lift it for you unless another owner is left, and the check below
+            // does not cover this case: an owner beside a second owner would pass it and lock
+            // themselves out of their own organization.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot suspend yourself");
+        }
+
+        Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+
+        if (membership.getStatus() != MembershipStatus.ACTIVE) {
+            // An INVITED membership is not access that can be withdrawn — it is an offer that can
+            // be left to expire or removed. Suspending it would also have no way back: reinstating
+            // sets ACTIVE, which would let the invitee in without ever accepting the invite.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only an active member can be suspended");
+        }
+
+        if (membership.getRole() == MembershipRole.OWNER && ownersWhoCanStillSignIn(organizationId) <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot suspend the last owner");
+        }
+
+        membership.setStatus(MembershipStatus.DISABLED);
+        membershipRepository.save(membership);
+        tokenBlacklistService.revokeAllUserTokens(userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        log.info("Member suspended: userId={}, orgId={}, role={}", userId, organizationId, membership.getRole());
+
+        return MemberResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .role(membership.getRole())
+                .status(membership.getStatus())
+                .createdAt(membership.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * Gives a suspended member their access back, in the role the suspension preserved.
+     *
+     * <p>Nothing is revoked here: the epoch marker only invalidates tokens issued before it, so
+     * a token minted after the reinstatement is valid without any further action.</p>
+     */
+    @Auditable(action = AuditAction.MEMBER_REINSTATED, resourceType = "Member")
+    @Transactional
+    public MemberResponse reinstateMember(UUID userId, MembershipRole requestingRole) {
+        UUID organizationId = TenantContext.require();
+        if (requestingRole != MembershipRole.OWNER) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owners can reinstate members");
+        }
+
+        Membership membership = membershipRepository.findByUserIdAndOrganizationId(userId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Membership not found"));
+
+        if (membership.getStatus() != MembershipStatus.DISABLED) {
+            // Said out loud rather than passed over: reinstating an INVITED membership would
+            // turn an unaccepted invite into a full membership, and reinstating an ACTIVE one
+            // means the caller is looking at a stale list.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Member is not suspended");
+        }
+
+        membership.setStatus(MembershipStatus.ACTIVE);
+        membershipRepository.save(membership);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found"));
+
+        log.info("Member reinstated: userId={}, orgId={}, role={}", userId, organizationId, membership.getRole());
+
+        return MemberResponse.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .role(membership.getRole())
+                .status(membership.getStatus())
+                .createdAt(membership.getCreatedAt())
+                .build();
+    }
+
+    /**
+     * How many owners could still sign in and administer this organization.
+     *
+     * <p>Deliberately not a count of owner rows. A suspended owner cannot sign in, so counting
+     * one would let the last-owner guard be walked around in two steps: suspend one of two
+     * owners, then remove or demote the other, and nobody is left who can administer the
+     * organization — including nobody who can lift the suspension.</p>
+     */
+    private long ownersWhoCanStillSignIn(UUID organizationId) {
+        return membershipRepository.countByOrganizationIdAndRoleAndStatusNot(
+                organizationId, MembershipRole.OWNER, MembershipStatus.DISABLED);
     }
 }

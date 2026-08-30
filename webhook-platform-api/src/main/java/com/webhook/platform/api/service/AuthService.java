@@ -7,6 +7,7 @@ import com.webhook.platform.api.domain.entity.Organization;
 import com.webhook.platform.api.domain.entity.Plan;
 import com.webhook.platform.api.domain.entity.User;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.enums.UserStatus;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
@@ -29,6 +30,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -146,13 +148,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
-        // two organizations got whichever the database felt like returning, and with it a
-        // different tenant scope on each login. Oldest membership wins until there is an
-        // endpoint to switch organizations deliberately.
-        Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
+        Membership membership = membershipToIssueTokenFor(user.getId());
 
         String accessToken = jwtUtil.generateAccessToken(user.getId(), membership.getOrganizationId(), membership.getRole());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
@@ -198,13 +194,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        // Ordered, because findFirst() over an unordered query made this a coin toss: a user in
-        // two organizations got whichever the database felt like returning, and with it a
-        // different tenant scope on each login. Oldest membership wins until there is an
-        // endpoint to switch organizations deliberately.
-        Membership membership = membershipRepository.findByUserIdOrderByCreatedAtAsc(user.getId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found"));
+        Membership membership = membershipToIssueTokenFor(user.getId());
 
         tokenBlacklistService.blacklist(oldJti, jwtUtil.getExpirationFromToken(refreshToken));
 
@@ -216,6 +206,35 @@ public class AuthService {
                 .refreshToken(newRefreshToken)
                 .emailVerified(Boolean.TRUE.equals(user.getEmailVerified()))
                 .build();
+    }
+
+    /**
+     * The membership a freshly minted token will name, and the one place a suspension is
+     * refused.
+     *
+     * <p>Ordered, because findFirst() over an unordered query made this a coin toss: a user in
+     * two organizations got whichever the database felt like returning, and with it a different
+     * tenant scope on each login. Oldest membership wins until there is an endpoint to switch
+     * organizations deliberately.</p>
+     *
+     * <p>A suspended membership is skipped rather than fatal, because a suspension belongs to one
+     * organization: somebody suspended by one customer is still the other customer's member, and
+     * refusing the login outright would lock them out of an organization that never asked for it.
+     * Only when every membership is suspended is there nothing to issue a token for — and that is
+     * a 403, not the 404 of a user who belongs to no organization at all.</p>
+     *
+     * <p>INVITED is deliberately not skipped: that is the membership an invitee signs in with in
+     * order to accept the invite.</p>
+     */
+    private Membership membershipToIssueTokenFor(UUID userId) {
+        List<Membership> memberships = membershipRepository.findByUserIdOrderByCreatedAtAsc(userId);
+        return memberships.stream()
+                .filter(m -> m.getStatus() != MembershipStatus.DISABLED)
+                .findFirst()
+                .orElseThrow(() -> memberships.isEmpty()
+                        ? new ResponseStatusException(HttpStatus.NOT_FOUND, "No organization membership found")
+                        : new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                "Your membership in this organization has been suspended"));
     }
 
     @Auditable(action = AuditAction.LOGOUT, resourceType = "Auth")

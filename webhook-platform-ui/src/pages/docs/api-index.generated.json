@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 187,
+  "operationCount": 189,
   "security": [
     {
       "id": "bearerAuth",
@@ -3754,6 +3754,70 @@
             "type": "AddMemberRequest",
             "required": true
           }
+        },
+        {
+          "id": "suspendMember",
+          "method": "POST",
+          "path": "/api/v1/orgs/{orgId}/members/{userId}/suspend",
+          "summary": "Suspend member",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "orgId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "userId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Member suspended",
+              "type": "MemberResponse"
+            }
+          ],
+          "description": "Suspends a member: the membership and its role are kept, the member is refused access, and their current sessions end immediately"
+        },
+        {
+          "id": "reinstateMember",
+          "method": "POST",
+          "path": "/api/v1/orgs/{orgId}/members/{userId}/reinstate",
+          "summary": "Reinstate member",
+          "auth": [
+            "bearerAuth",
+            "apiKey"
+          ],
+          "params": [
+            {
+              "name": "orgId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            },
+            {
+              "name": "userId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Member reinstated",
+              "type": "MemberResponse"
+            }
+          ],
+          "description": "Lifts a suspension, restoring the member's access in the role they kept"
         },
         {
           "id": "acceptInvite",

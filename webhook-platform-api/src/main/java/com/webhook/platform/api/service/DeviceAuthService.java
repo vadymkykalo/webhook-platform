@@ -5,6 +5,7 @@ import com.webhook.platform.api.domain.entity.DeviceAuthCode;
 import com.webhook.platform.api.domain.entity.Membership;
 import com.webhook.platform.api.domain.enums.DeviceAuthStatus;
 import com.webhook.platform.api.domain.enums.MembershipRole;
+import com.webhook.platform.api.domain.enums.MembershipStatus;
 import com.webhook.platform.api.domain.repository.DeviceAuthCodeRepository;
 import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.dto.AuthResponse;
@@ -126,6 +127,16 @@ public class DeviceAuthService {
                 .findByUserIdAndOrganizationId(code.getUserId(), code.getOrganizationId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
                         "User is not a member of the approved organization"));
+
+        // The other place a Membership becomes an authenticated context, and so the other place
+        // a suspension has to be refused (AuthService.membershipToIssueTokenFor is the first).
+        // The approval itself needs a live session, which suspending revokes — but a code
+        // approved just before the suspension is still sitting there waiting to be polled, and
+        // exchanging it would hand out a fresh fifteen minutes of access.
+        if (membership.getStatus() == MembershipStatus.DISABLED) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Your membership in this organization has been suspended");
+        }
 
         // Single-use, compare-and-set: only the caller that actually flips APPROVED ->
         // CONSUMED gets to mint tokens. A second concurrent poll (or a replay after the
