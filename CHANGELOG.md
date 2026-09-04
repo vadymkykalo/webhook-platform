@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Spring Boot 4.1.1.** 3.5.16 was the final OSS release of the 3.5.x line, and the fixes for
+  the five CVSS 9.8/9.1 CVEs in `spring-core`/`spring-web` 6.2.19 and `spring-security` 6.5.11
+  ship only in Framework 7 / Security 7 — there was no patch coming to the line we were on, so
+  the nightly `Security SCA` had been failing on vulnerabilities that could not be fixed by
+  waiting. Java stays on 17.
+
+  Most of the work was not renaming imports. Boot 4 stopped auto-configuring a technology just
+  because its library is on the classpath, and the way that announces itself is silence:
+  `flyway-core` without `spring-boot-starter-flyway` starts the application, applies no
+  migrations at all, and fails on the first missing table. Kafka's auto-configuration and
+  WebClient's each moved into modules only their own starter pulls in — the latter meaning
+  `spring-boot-starter-webflux`, which this API only ever wanted for `WebClient`, no longer
+  provides one.
+
+  Redisson moves to 4.7.0 for the same reason its predecessor worked: the 3.x starter wires
+  itself against Boot 3's module layout. Nothing in the test suite would have caught that —
+  the integration tests exclude Redisson's auto-configuration outright and mock every service
+  that reaches for Redis — so it was checked against a running stack instead.
+
+- **HTTP stays on Jackson 2**, through Spring's own bridge module and one property. Boot 4
+  defaults to Jackson 3, and two DTOs put a Jackson 2 `JsonNode` on the wire; one of them is
+  backed by a JSONB column on the `Plan` entity that the schema-validation gate also reads.
+  Changing mappers is therefore an entity change with a migration behind it, which is not
+  something an upgrade whose purpose is closing CVEs should smuggle in.
+
+  The two directions fail separately, which is worth knowing before someone tidies either
+  piece away: without the property, *reading* a body into a `JsonNode` field answers 500 while
+  writing one still works — and `EventIngestRequest.data` is such a field, so what breaks first
+  is every event the platform ingests. Both the bridge and the property are deprecated or
+  easily mistaken for decoration, so the contract is pinned by a test that covers each
+  direction rather than left for whoever removes them to rediscover.
+
 ## [2.10.0] - 2026-09-04
 
 Fifty-five commits since 2.9.1. The theme, if there is one, is closing the gap between what the

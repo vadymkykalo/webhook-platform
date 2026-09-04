@@ -44,6 +44,24 @@
             <artifactId>reactor-netty-http</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!--
+          SsrfProtectionCustomizer names io.netty.channel.ChannelOption directly, and
+          netty 4.2 (which Boot 4 pins) declares netty-transport as a *runtime* transitive
+          of netty-codec-http rather than a compile one, so it no longer reaches the compile
+          classpath through reactor-netty-http on its own. Declared here at the same
+          `provided` scope and for the same reason as the dependency above: the CLI depends
+          on this module and must not ship netty for a class it never calls.
+        -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
