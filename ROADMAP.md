@@ -54,6 +54,12 @@ carry it.
 **RBAC granularity.** Three fixed roles (`OWNER` / `DEVELOPER` / `VIEWER`) and two API-key
 scopes (`READ_WRITE` / `READ_ONLY`). No custom roles, no per-resource scoping.
 
+**The operator back-office is thin.** `/api/v1/admin/**` lists and searches organizations, shows
+one with its plan and counts, and suspends or reinstates it — enough to answer a support question
+and act on an abuse report without psql. What it does not have: usage and delivery history per
+tenant, a way to adjust a quota outside the plan catalog, or a read-only support view of a
+customer's own screens.
+
 **Terraform provider, and SDKs beyond Node/PHP/Python.** No Go SDK. The three that exist cover
 the send-an-event / manage-endpoints / verify-a-signature path and offer a generic
 authenticated-request escape hatch for the rest.

@@ -38,6 +38,7 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(v, "billingEnabled", false);
         ReflectionTestUtils.setField(v, "emailEnabled", false);
         ReflectionTestUtils.setField(v, "billingProvider", "noop");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "");
     }
 
     // -----------------------------------------------------------------
@@ -245,6 +246,7 @@ class ProductionSafetyValidatorTest {
         setValid(v);
         ReflectionTestUtils.setField(v, "billingEnabled", true);
         ReflectionTestUtils.setField(v, "billingProvider", "stripe");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
         ReflectionTestUtils.setField(v, "emailEnabled", false);
 
         IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
@@ -257,6 +259,7 @@ class ProductionSafetyValidatorTest {
         setValid(v);
         ReflectionTestUtils.setField(v, "billingEnabled", true);
         ReflectionTestUtils.setField(v, "emailEnabled", true);
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
         ReflectionTestUtils.setField(v, "billingProvider", "noop");
 
         IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
@@ -270,7 +273,22 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(v, "billingEnabled", true);
         ReflectionTestUtils.setField(v, "emailEnabled", true);
         ReflectionTestUtils.setField(v, "billingProvider", "stripe");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "0x4AAAAAAA-turnstile-secret");
 
         assertDoesNotThrow(v::validateProductionConfig);
+    }
+    @Test
+    void billingWithoutACaptchaIsRejected() {
+        // The registration rate limit is per address, and an address is the one thing a signup
+        // farm has plenty of. A free tier with no challenge is a free tier anyone can mint.
+        ProductionSafetyValidator v = newValidator();
+        setValid(v);
+        ReflectionTestUtils.setField(v, "billingEnabled", true);
+        ReflectionTestUtils.setField(v, "emailEnabled", true);
+        ReflectionTestUtils.setField(v, "billingProvider", "stripe");
+        ReflectionTestUtils.setField(v, "captchaSecretKey", "");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, v::validateProductionConfig);
+        assertTrue(e.getMessage().contains("CAPTCHA_SECRET_KEY"));
     }
 }

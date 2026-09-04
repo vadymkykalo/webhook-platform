@@ -41,6 +41,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   easily mistaken for decoration, so the contract is pinned by a test that covers each
   direction rather than left for whoever removes them to rediscover.
 
+### Added
+
+- **An operator back-office.** `/api/v1/admin/**` was one endpoint that rotates encryption keys;
+  everything else an operator might need — who is on this deployment, why did this customer's
+  deliveries stop, make this one stop — was psql. It now lists and searches organizations, shows
+  one with its plan, billing status and project/member counts, and suspends or reinstates it.
+  Behind the same platform-admin credential, which no tenant JWT or API key can carry.
+
+- **Suspension that suspends.** `BillingStatus.SUSPENDED` was written by the dunning scheduler
+  when a grace period expired and read by nothing at all, so an organization that had stopped
+  paying went on ingesting and delivering exactly as before — and an operator had no way to stop
+  an abusive tenant except by editing the database. A suspended organization is now refused
+  every write, ingest included, with the reason the operator typed; reads keep working so the
+  tenant can sign in and be told what happened.
+
+  Stored on the organization rather than in `billing_status`, deliberately: that column belongs
+  to the payment state machine, and an abuse suspension recorded there would be lifted by the
+  next successful charge. Both actions land in the audit log.
+
 ### Security
 
 - **Email verification is enforced on the server.** It was a component in the dashboard:
@@ -50,12 +69,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is a read. Inert where verification is meaningless — with mail off, registration marks the
   account verified on the spot, so a self-hosted instance sees no change.
 
+- **A CAPTCHA on registration**, off by default. The auth rate limit is per address, and an
+  address is the one thing a signup farm has plenty of. Cloudflare Turnstile out of the box;
+  hCaptcha speaks the same siteverify shape, so the URL is what picks between them. Verification
+  fails closed — an unreachable provider refuses the registration rather than waving it through,
+  because a CAPTCHA that silently stops checking is the state it was added to prevent. A
+  deployment that configures none gets a verifier that accepts everything, which is the honest
+  shape of a control that is switched off and the right default for self-hosting.
+
 - **A hosted deployment refuses to start half configured.** `BILLING_ENABLED` is the whole of
   what separates hosted from self-hosted, which also means one unset variable away from an
   open, unbilled, unverified service that starts happily. In production it now requires
-  `EMAIL_ENABLED=true` and a real payment provider: billing on with mail off is a paid tier
-  behind an address nobody proved they own, and billing on with the no-op provider is plans
-  enforced and never charged for.
+  `EMAIL_ENABLED=true`, a CAPTCHA and a real payment provider: billing on with mail off is a
+  paid tier behind an address nobody proved they own, billing on with no challenge is a free
+  tier anyone can mint, and billing on with the no-op provider is plans enforced and never
+  charged for.
 
 ### Fixed
 

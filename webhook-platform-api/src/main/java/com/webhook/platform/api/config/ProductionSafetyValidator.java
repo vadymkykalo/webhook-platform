@@ -94,6 +94,9 @@ public class ProductionSafetyValidator {
     @Value("${billing.default-provider:noop}")
     private String billingProvider;
 
+    @Value("${captcha.secret-key:}")
+    private String captchaSecretKey;
+
     @PostConstruct
     public void validateProductionConfig() {
         if (!"production".equalsIgnoreCase(appEnv)) {
@@ -156,6 +159,8 @@ public class ProductionSafetyValidator {
      *       registration it means every account is verified by assertion.</li>
      *   <li>A payment provider. {@code noop} accepts every plan change and charges for none, so
      *       billing is "enabled" and free.</li>
+     *   <li>A CAPTCHA. The registration rate limit is per address, which is the one thing a
+     *       signup farm has plenty of.</li>
      * </ul>
      *
      * <p>Nothing here fires for a self-hosted deployment: with billing off, which is the shipped
@@ -174,6 +179,11 @@ public class ProductionSafetyValidator {
             violations.add("BILLING_ENABLED=true with BILLING_DEFAULT_PROVIDER=" + billingProvider
                     + " — the no-op provider accepts every plan change and charges for none, so plans "
                     + "would be enforced and free");
+        }
+        if (captchaSecretKey == null || captchaSecretKey.isBlank()) {
+            violations.add("BILLING_ENABLED=true with no CAPTCHA_SECRET_KEY — registration is then "
+                    + "rate-limited per address and nothing else, which a signup farm distributes "
+                    + "around; a free tier with no challenge is a free tier anyone can mint");
         }
     }
 

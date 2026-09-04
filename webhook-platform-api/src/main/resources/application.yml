@@ -332,6 +332,19 @@ ordering:
   sequence-reconciliation-lookback-hours: ${ORDERING_SEQUENCE_RECONCILIATION_LOOKBACK_HOURS:48}
   sequence-reconciliation-interval-ms: ${ORDERING_SEQUENCE_RECONCILIATION_INTERVAL_MS:900000}
 
+captcha:
+  # Empty is the shipped default and means no challenge: a self-hosted registration page has
+  # nobody to challenge, and sending its visitors to a third party would be a worse default.
+  # Setting a secret turns it on. Turnstile and hCaptcha share this siteverify shape, so the
+  # URL is what picks between them.
+  secret-key: ${CAPTCHA_SECRET_KEY:}
+  verify-url: ${CAPTCHA_VERIFY_URL:https://challenges.cloudflare.com/turnstile/v0/siteverify}
+
+organization:
+  # Suspension is asked on the write path of every request, ingest included; this is what
+  # keeps it from being a row read per event. See SuspensionLookup.
+  suspension-cache-ttl-seconds: ${ORGANIZATION_SUSPENSION_CACHE_TTL_SECONDS:60}
+
 billing:
   enabled: ${BILLING_ENABLED:false}
   default-provider: ${BILLING_DEFAULT_PROVIDER:noop}
