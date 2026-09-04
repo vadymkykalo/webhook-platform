@@ -28,7 +28,11 @@ jobs:
 
       - name: Install k6
         run: |
-          curl -sL https://github.com/grafana/k6/releases/download/v2.2.0/k6-v2.2.0-linux-amd64.tar.gz | tar xz
+          # Fetch, then unpack — a retry cannot rescue a half-read pipe.
+          curl -fsSL --retry 5 --retry-delay 2 --retry-all-errors \
+            -o k6.tar.gz \
+            https://github.com/grafana/k6/releases/download/v2.2.0/k6-v2.2.0-linux-amd64.tar.gz
+          tar xzf k6.tar.gz
           sudo mv k6-v2.2.0-linux-amd64/k6 /usr/local/bin/k6
           k6 version
 
