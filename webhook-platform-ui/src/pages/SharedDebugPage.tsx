@@ -6,6 +6,7 @@ import { formatDateTime } from '../lib/date';
 import { debugLinksApi, SharedDebugLinkPublicResponse } from '../api/debugLinks.api';
 import { ErrorState } from '../components/EmptyState';
 import PageSkeleton from '../components/PageSkeleton';
+import { formatJson } from '../lib/json';
 
 /**
  * A public page: whoever opens it has a link and nothing else, so it stands on
@@ -50,13 +51,6 @@ export default function SharedDebugPage() {
     if (token) loadData();
   }, [token, loadData]);
 
-  const formatPayload = (payload: string) => {
-    try {
-      return JSON.stringify(JSON.parse(payload), null, 2);
-    } catch {
-      return payload;
-    }
-  };
 
   if (loading) {
     return (
@@ -116,7 +110,7 @@ export default function SharedDebugPage() {
             <h2 className="mono-label">{t('sharedDebug.sanitizedPayload')}</h2>
           </div>
           <pre className="max-h-[600px] overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-relaxed">
-            {formatPayload(data.sanitizedPayload)}
+            {formatJson(data.sanitizedPayload)}
           </pre>
         </section>
 

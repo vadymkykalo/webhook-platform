@@ -28,6 +28,8 @@ import { showApiError, showSuccess } from '../lib/toast';
 import { formatDateTime } from '../lib/date';
 import { nodeTypes, nodeTemplates, type NodeTemplate } from '../components/workflow/nodes/nodeTypes';
 import NodeConfigPanel from '../components/workflow/NodeConfigPanel';
+import StatusBadge, { type StatusKind } from '../components/StatusBadge';
+import JsonBlock from '../components/JsonBlock';
 
 let nodeIdCounter = 0;
 function getNextNodeId() {
@@ -337,7 +339,7 @@ function WorkflowBuilderInner() {
               <span className="text-sm">{template.icon}</span>
               <div className="min-w-0">
                 <div className="text-xs font-medium truncate">{t(`workflows.nodeTypes.${template.type}.label`)}</div>
-                <div className="text-[9px] text-muted-foreground truncate">{t(`workflows.nodeTypes.${template.type}.description`)}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{t(`workflows.nodeTypes.${template.type}.description`)}</div>
               </div>
             </div>
           ))}
@@ -527,14 +529,6 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
     PENDING: 'bg-idle',
   };
 
-  const stepStatusBadge: Record<string, string> = {
-    SUCCESS: 'text-ok bg-ok-soft',
-    FAILED: 'text-halt bg-halt-soft',
-    SKIPPED: 'text-idle bg-idle-soft',
-    RUNNING: 'text-retry bg-retry-soft',
-    PENDING: 'text-idle bg-idle-soft',
-  };
-
   const steps = exec.steps;
 
   return (
@@ -557,16 +551,18 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
               {steps.map((step, i) => (
                 <div key={step.id} className="rounded-md border border-rail bg-secondary/30">
                   <div
-                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[10px] transition-colors hover:bg-secondary/60"
+                    className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[11px] transition-colors hover:bg-secondary/60"
                     onClick={(e) => { e.stopPropagation(); setExpandedStep(expandedStep === step.id ? null : step.id); }}
                   >
                     <span className="text-muted-foreground w-4 text-center font-mono">{i + 1}</span>
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stepStatusCls[step.status] || 'bg-idle'}`} />
                     <span className="font-mono font-medium">{step.nodeType}</span>
-                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${stepStatusBadge[step.status] || ''}`}>
-                      {t(`workflows.stepStatus.${step.status}`)}
-                    </span>
-                    {step.durationMs != null && <span className="font-mono text-muted-foreground">{step.durationMs}ms</span>}
+                    <StatusBadge
+                      kind={kindOfStepStatus(step.status)}
+                      label={t(`workflows.stepStatus.${step.status}`)}
+                      icon={false}
+                    />
+                    {step.durationMs != null && <span className="font-mono text-[11px] text-muted-foreground">{step.durationMs}ms</span>}
                     {step.errorMessage && <span className="flex-1 truncate text-halt">{step.errorMessage}</span>}
                     <ChevronDown className={`h-2.5 w-2.5 ml-auto text-muted-foreground transition-transform ${expandedStep === step.id ? 'rotate-180' : ''}`} />
                   </div>
@@ -574,26 +570,18 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
                     <div className="space-y-1.5 border-t border-rail px-2.5 pb-2">
                       {step.outputData != null && (
                         <div className="pt-1.5">
-                          <span className="mono-label !text-[9px]">{t('workflows.builder.stepOutput')}</span>
-                          <pre className="mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-rail bg-background p-1.5 font-mono text-[9px]">
-                            {typeof step.outputData === 'string' ? step.outputData : JSON.stringify(step.outputData, null, 2)}
-                          </pre>
+                          <JsonBlock label={t('workflows.builder.stepOutput')} value={asText(step.outputData)} maxHeight="max-h-32" />
                         </div>
                       )}
                       {step.inputData != null && (
-                        <div>
-                          <span className="mono-label !text-[9px]">{t('workflows.builder.stepInput')}</span>
-                          <pre className="mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-rail bg-background p-1.5 font-mono text-[9px]">
-                            {typeof step.inputData === 'string' ? step.inputData : JSON.stringify(step.inputData, null, 2)}
-                          </pre>
-                        </div>
+                        <JsonBlock label={t('workflows.builder.stepInput')} value={asText(step.inputData)} maxHeight="max-h-32" />
                       )}
                       {step.errorMessage && (
                         <div>
-                          <span className="mono-label !text-[9px] !text-halt">{t('workflows.builder.stepError')}</span>
-                          <pre className="mt-0.5 break-all rounded border border-halt/25 bg-halt-soft p-1.5 font-mono text-[9px] text-halt">
+                          <span className="mono-label !text-halt">{t('workflows.builder.stepError')}</span>
+                          <p className="mt-0.5 break-all rounded border border-halt/25 bg-halt-soft p-2 font-mono text-[11px] text-halt">
                             {step.errorMessage}
-                          </pre>
+                          </p>
                         </div>
                       )}
                     </div>
@@ -608,6 +596,28 @@ function ExecutionRow({ exec }: { exec: WorkflowExecutionResponse }) {
       )}
     </div>
   );
+}
+
+/**
+ * A workflow step's status is a domain status, so it wears the four reserved
+ * meanings like every other one: a finished step is `ok`, one still going is
+ * `retry` (an attempt still owed), a failure is `halt`, and a step that never
+ * ran is `idle`. This page used to keep a private colour map that reached for
+ * the same tokens by hand — which is exactly how a status stops matching the
+ * rest of the product one rename later.
+ */
+function kindOfStepStatus(status: string): StatusKind {
+  switch (status) {
+    case 'SUCCESS': return 'ok';
+    case 'RUNNING': return 'retry';
+    case 'FAILED': return 'halt';
+    default: return 'idle';
+  }
+}
+
+/** Step payloads arrive as either a JSON string or an already-parsed object. */
+function asText(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 }
 
 export default function WorkflowBuilderPage() {

@@ -20,7 +20,8 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge, { EnabledBadge, type StatusKind } from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
 import CreateSubscriptionModal from '../components/CreateSubscriptionModal';
-import { ConnectionSetupFlow, SecretField, ladderTicks } from './ConnectionSetupPage';
+import { SecretField, ladderTicks } from './ConnectionSetupPage';
+import ConnectionSetupDialog from '../components/ConnectionSetupDialog';
 import SignatureSchemePicker, { sendsStandardHeaders } from '../components/SignatureSchemePicker';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -257,7 +258,7 @@ export default function ConnectionsPage() {
     <PermissionGate allowed={canManageEndpoints}>
       <VerificationGate>
         <Button onClick={() => setShowSetup(true)}>
-          <Plus className="h-4 w-4" /> {t('connections.newConnection', 'New connection')}
+          <Plus className="h-4 w-4" /> {t('connections.newConnection')}
         </Button>
       </VerificationGate>
     </PermissionGate>
@@ -544,24 +545,7 @@ export default function ConnectionsPage() {
         </Card>
       )}
 
-      {/* New connection — the wizard, as an action rather than a destination. */}
-      <Dialog open={showSetup} onOpenChange={setShowSetup}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{t('connections.newConnection', 'New connection')}</DialogTitle>
-            <DialogDescription>
-              {t('connectionSetup.pageDesc', 'One endpoint, its signing secret and the event types it is subscribed to.')}
-            </DialogDescription>
-          </DialogHeader>
-          {projectId && showSetup && (
-            <ConnectionSetupFlow
-              projectId={projectId}
-              onDone={() => setShowSetup(false)}
-              onCancel={() => setShowSetup(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ConnectionSetupDialog projectId={projectId} open={showSetup} onOpenChange={setShowSetup} />
 
       {/* Rotate: confirm, then show the new secret exactly once. */}
       <AlertDialog open={!!rotateFor && !rotated} onOpenChange={(open) => !open && setRotateFor(null)}>

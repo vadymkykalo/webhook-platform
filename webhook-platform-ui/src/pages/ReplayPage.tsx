@@ -230,7 +230,6 @@ export default function ReplayPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
-        title={t('replay.pageTitle')}
         description={<Trans i18nKey="replay.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
       />
 
@@ -364,7 +363,7 @@ export default function ReplayPage() {
                 return (
                   <TableRow key={session.id}>
                     <TableCell>
-                      <span className="flex flex-col gap-1">
+                      <span className="flex flex-col items-start gap-1">
                         <StatusBadge kind={kindOfReplayStatus(session.status)} label={t(`replay.status.${session.status}`)} />
                         {session.errorMessage && (
                           <span className="block max-w-[200px] truncate text-[11px] text-halt" title={session.errorMessage}>

@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import IntentPicker from '../components/IntentPicker';
+import { writeIntent } from '../lib/onboarding';
 import PasswordStrengthIndicator, { passwordMeetsPolicy } from '../components/PasswordStrengthIndicator';
 
 export default function RegisterPage() {
@@ -75,7 +76,12 @@ export default function RegisterPage() {
   if (registered && showIntent) {
     return (
       <AuthLayout title={t('auth.intent.title')} subtitle={t('auth.intent.subtitle')}>
-        <IntentPicker onSelect={() => navigate('/admin/dashboard')} />
+        <IntentPicker
+          onSelect={(intent) => {
+            writeIntent(intent);
+            navigate('/admin/dashboard');
+          }}
+        />
       </AuthLayout>
     );
   }

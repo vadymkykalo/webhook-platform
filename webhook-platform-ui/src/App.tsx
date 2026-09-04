@@ -8,6 +8,8 @@ import { http } from './api/http';
 import { authApi } from './api/auth.api';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import type { CurrentUserResponse } from './types/api.types';
+import BootSplash from './components/BootSplash';
+import { showApiError } from './lib/toast';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,11 +20,11 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: true,
     },
     mutations: {
-      onError: (error: unknown) => {
-        const err = error as { response?: { data?: { message?: string } } };
-        const message = err?.response?.data?.message || 'An unexpected error occurred';
-        import('sonner').then(({ toast }) => toast.error(message));
-      },
+      // The net under mutations that define no onError of their own. It used to
+      // reach into the response shape by hand and fall back to a hardcoded
+      // English sentence — the same job showApiError already does, in the
+      // reader's language, with the HTTP-status map and toast de-duplication.
+      onError: (error: unknown) => showApiError(error, 'toast.errors.unhandledMutation'),
     },
   },
 });
@@ -94,16 +96,7 @@ export default function App() {
     },
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <BootSplash />;
 
   return (
     <ErrorBoundary>

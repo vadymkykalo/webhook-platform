@@ -34,6 +34,7 @@ import { railFromCounts } from './attemptRailData';
 import { AttemptCell, CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, SORTABLE_HEAD_CLASS, TimeCell } from './tableParts';
 import { useDebounced } from '../hooks/useDebounced';
 import Callout from '../components/Callout';
+import { cn } from '../lib/utils';
 
 const STATUS_VALUES = ['', 'SUCCESS', 'FAILED', 'DLQ', 'PENDING', 'PROCESSING'] as const;
 const DATE_RANGE_VALUES = ['24h', '7d', '30d'] as const;
@@ -231,7 +232,6 @@ export default function DeliveriesPage() {
     <div className="p-4 lg:p-6">
       <PageHeader
         eyebrow={t('nav.outgoing')}
-        title={t('deliveries.allTitle')}
         description={<Trans i18nKey="deliveries.subtitle" values={{ project: project?.name }} components={{ strong: <strong /> }} />}
         actions={replayAllMatching || undefined}
       />
@@ -331,8 +331,8 @@ export default function DeliveriesPage() {
                   <TableHead>{t('deliveries.columns.event')}</TableHead>
                   <TableHead>{t('deliveries.columns.endpoint')}</TableHead>
                   <SortableTableHead field="attemptCount" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.attempts')}</SortableTableHead>
-                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={SORTABLE_HEAD_CLASS}>{t('deliveries.columns.created')}</SortableTableHead>
-                  <TableHead>{t('deliveries.columns.deliveryId')}</TableHead>
+                  <SortableTableHead field="createdAt" sort={sort} onSort={toggleSort} className={cn(SORTABLE_HEAD_CLASS, 'hidden lg:table-cell')}>{t('deliveries.columns.created')}</SortableTableHead>
+                  <TableHead className="hidden xl:table-cell">{t('deliveries.columns.deliveryId')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -360,7 +360,7 @@ export default function DeliveriesPage() {
                         </TableCell>
                       )}
                       <TableCell>
-                        <span className="flex flex-col gap-1">
+                        <span className="flex flex-col items-start gap-1">
                           <StatusBadge
                             kind={kindOfDeliveryStatus(delivery.status)}
                             label={t(`deliveries.status.${delivery.status}`)}
@@ -395,8 +395,8 @@ export default function DeliveriesPage() {
                           nextRetryAt={delivery.status === 'PENDING' ? delivery.nextRetryAt : undefined}
                         />
                       </TableCell>
-                      <TableCell><TimeCell value={delivery.createdAt} /></TableCell>
-                      <TableCell><CopyId value={delivery.id} /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><TimeCell value={delivery.createdAt} /></TableCell>
+                      <TableCell className="hidden xl:table-cell"><CopyId value={delivery.id} /></TableCell>
                     </TableRow>
                   );
                 })}
