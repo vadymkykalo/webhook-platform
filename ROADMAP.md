@@ -70,9 +70,6 @@ direction has no filtering at all — every incoming event goes to every enabled
 **No batching**, no static egress IPs, no PagerDuty or OpsGenie channel, no cold-storage
 archival. MinIO is present in the Compose file but nothing consumes it yet.
 
-**An organization switcher.** A user belonging to two organizations gets the oldest one on
-login; there is no way to change it without a second account.
-
 ## Deliberately not planned
 
 **A hosted-only tier.** Self-hosting gets every feature, with no licence key and nothing
