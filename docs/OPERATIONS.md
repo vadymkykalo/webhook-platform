@@ -74,6 +74,18 @@ malformed `retryDelays` is rejected with a `400` at write time; a stored one tha
 not parse fails its delivery terminally with `INVALID_RETRY_LADDER` rather than being retried on
 a substituted ladder.
 
+## Known limitations
+
+Recorded here rather than left to be discovered during an incident.
+
+**A Postgres restore does not reconcile Kafka and Redis.** A point-in-time or full restore leaves
+in-flight outbox rows, Kafka messages already published for events the restore rolled back, and
+Redis counters that no longer agree with the restored database. There is no written procedure for
+reconciling the three — see [Backup & Restore](#backup--restore) for the detail.
+
+**Delivery is at-least-once.** An Attempt can succeed at the endpoint and fail to record. Receivers
+must dedupe on the delivery id, which the `webhook-id` header carries unchanged across retries.
+
 ## Common Issues
 
 ### High Kafka lag
@@ -271,6 +283,11 @@ Key settings:
 ## Detailed Documentation
 
 - **[Self-Hosted Deployment Guide](./SELF_HOSTED_GUIDE.md)** — hardware sizing, pre-flight checks, Helm install, TLS, monitoring
+- **[Architecture](./ARCHITECTURE.md)** — the two pipelines, the attempt lifecycle, consistency and failure modes
+- **[Observability](./guides/observability.md)** — every metric worth alerting on, and the three to start with
+- **[Access control and tenancy](./guides/rbac-and-tenancy.md)** — roles, scopes, and what `@TenantId` does and does not cover
+- **[Data retention and export](./guides/data-retention.md)** — what is kept and for how long, and how to bound the two largest tables
+- **[Static egress IP](./guides/static-egress-ip.md)** — giving customers a fixed address to allowlist
 
 ## Support
 
