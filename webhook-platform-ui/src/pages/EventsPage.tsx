@@ -52,7 +52,12 @@ function statusOf(rollup: Rollup | undefined, deliveriesCreated: number | undefi
   return 'delivered';
 }
 
-const STATUS_KIND: Record<EventStatus, StatusKind> = {
+/**
+ * Exported for the locale test: a Record over the union means TypeScript
+ * guarantees these keys are the complete set of statuses this page can render,
+ * so the test does not have to restate them and cannot fall behind.
+ */
+export const STATUS_KIND: Record<EventStatus, StatusKind> = {
   delivered: 'ok',
   owed: 'retry',
   abandoned: 'halt',

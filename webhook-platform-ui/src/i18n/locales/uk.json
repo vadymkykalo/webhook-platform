@@ -568,9 +568,10 @@
     "selfHosted": "Self-hosted режим — всі функції розблоковані, без лімітів",
     "statuses": {
       "ACTIVE": "Активна",
-      "CANCELED": "Скасована",
-      "PAST_DUE": "Прострочена",
-      "TRIALING": "Пробний період"
+      "CANCELLED": "Скасовано",
+      "GRACE_PERIOD": "Пільговий період",
+      "PAST_DUE": "Прострочено",
+      "SUSPENDED": "Призупинено"
     },
     "subtitle": "Керуйте планом та використанням",
     "switchPlan": "Змінити",
@@ -2282,6 +2283,7 @@
       "abandoned": "Полишено",
       "delivered": "Доставлено",
       "owed": "Ще в черзі",
+      "unknown": "Немає на цій сторінці",
       "unsubscribed": "Немає підписника"
     },
     "details": {
@@ -4445,10 +4447,11 @@
     "edit": "Редагувати",
     "enable": "Увімкнути",
     "execStatus": {
+      "CANCELLED": "Скасовано",
       "COMPLETED": "Завершено",
-      "FAILED": "Невдало",
-      "PENDING": "Очікує",
-      "RUNNING": "Виконується"
+      "FAILED": "Помилка",
+      "RUNNING": "Виконується",
+      "WAITING": "Очікує"
     },
     "failed": "Помилок",
     "loading": "Завантаження...",
@@ -4568,11 +4571,12 @@
     },
     "nodes": "вузлів",
     "stepStatus": {
-      "FAILED": "Невдало",
-      "PENDING": "Очікує",
+      "FAILED": "Помилка",
+      "PENDING": "У черзі",
       "RUNNING": "Виконується",
       "SKIPPED": "Пропущено",
-      "SUCCESS": "Успішно"
+      "SUCCESS": "Успіх",
+      "WAITING": "Очікує"
     },
     "subtitle": "Візуальні автоматизації, що запускаються подіями webhook",
     "successful": "Успішних",
