@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
-  useAnalytics, useDashboardStats, useDeliveries, useOnboardingStatus, useOpenIncidentCount,
+  useAnalytics, useDashboardStats, useDeliveries, useOpenIncidentCount,
   useProjects, useUnresolvedAlertCount,
 } from '../api/queries';
 import type { DeliveryFilters } from '../api/deliveries.api';
@@ -16,8 +16,7 @@ import EmptyState, { ErrorState } from '../components/EmptyState';
 import StatusBadge, { kindOfDeliveryStatus } from '../components/StatusBadge';
 import AttemptRail from '../components/AttemptRail';
 import { railFromCounts } from './attemptRailData';
-import OnboardingChecklist from '../components/OnboardingChecklist';
-import OnboardingWizard, { hasSeenWizard } from '../components/OnboardingWizard';
+import GettingStarted from '../components/GettingStarted';
 import { cn } from '../lib/utils';
 import { Card } from '../components/ui/card';
 import { Select } from '../components/ui/select';
@@ -107,12 +106,9 @@ export default function DashboardPage() {
     error: analyticsError, isFetching: analyticsFetching, refetch: refetchAnalytics,
   } = useAnalytics(projectId, DASHBOARD_PERIOD);
 
-  const { data: onboarding } = useOnboardingStatus(projectId);
   const { data: inFlightPage } = useDeliveries(projectId, IN_FLIGHT_FILTER);
   const { data: unresolvedAlerts } = useUnresolvedAlertCount(projectId);
   const { data: openIncidents } = useOpenIncidentCount(projectId);
-
-  const [showWizard, setShowWizard] = useState(() => !hasSeenWizard());
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
@@ -200,19 +196,7 @@ export default function DashboardPage() {
         }
       />
 
-      <OnboardingWizard open={showWizard} onClose={() => setShowWizard(false)} projectId={projectId} />
-
-      <OnboardingChecklist
-        projectId={projectId}
-        hasProjects={projects.length > 0}
-        hasEndpoints={onboarding?.hasEndpoints ?? endpointHealth.length > 0}
-        hasSubscriptions={onboarding?.hasSubscriptions ?? false}
-        hasApiKeys={onboarding?.hasApiKeys ?? false}
-        hasEvents={onboarding?.hasEvents ?? recentEvents.length > 0}
-        hasDeliveries={onboarding?.hasDeliveries ?? stats.totalDeliveries > 0}
-        hasIncomingSources={onboarding?.hasIncomingSources ?? false}
-        hasIncomingDestinations={onboarding?.hasIncomingDestinations ?? false}
-      />
+      {selectedProject && <GettingStarted projectId={projectId} />}
 
       {!selectedProject ? (
         <EmptyState

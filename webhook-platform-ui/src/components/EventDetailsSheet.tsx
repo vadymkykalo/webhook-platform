@@ -21,6 +21,7 @@ import {
   SheetDescription,
 } from './ui/sheet';
 import { Button } from './ui/button';
+import { formatJson } from '../lib/json';
 
 interface EventDetailsSheetProps {
   projectId: string;
@@ -76,14 +77,7 @@ export default function EventDetailsSheet({
     showSuccess(t('common.copied'));
   };
 
-  const formatPayload = (payload: string | undefined) => {
-    if (!payload) return '';
-    try {
-      return JSON.stringify(JSON.parse(payload), null, 2);
-    } catch {
-      return payload;
-    }
-  };
+  const formatPayload = (payload: string | undefined) => (payload ? formatJson(payload) : '');
 
   const tabs = [
     { id: 'raw' as const, label: t('events.details.raw'), icon: FileJson },

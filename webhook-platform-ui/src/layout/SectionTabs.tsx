@@ -7,6 +7,14 @@ import { sectionFor, segmentOf } from './nav.config';
 /**
  * The second level of navigation, rendered once by the layout rather than by
  * every page, so a page cannot disagree with the rail about where it lives.
+ *
+ * <p>It looks like a tab strip and it is not one. These are `<Link>`s that
+ * change the route; ARIA tabs are required to control a `tabpanel`, and there
+ * is none here, so `role="tablist"` had a screen reader announce "tab 1 of 8"
+ * and then wait for a panel that never arrives. The rail one level up
+ * (`Sidebar.tsx`) already got this right with `aria-current="page"` — two
+ * levels of the same menu, in the same directory, disagreeing. This is the
+ * navigation markup, matching its sibling.
  */
 export default function SectionTabs({ projectId, role }: { projectId?: string; role: Role }) {
   const { t } = useTranslation();
@@ -21,8 +29,7 @@ export default function SectionTabs({ projectId, role }: { projectId?: string; r
 
   return (
     <div className="border-b border-rail bg-background">
-      <div
-        role="tablist"
+      <nav
         aria-label={t(section.nameKey)}
         className="flex gap-1 overflow-x-auto px-4 lg:px-6"
       >
@@ -33,8 +40,7 @@ export default function SectionTabs({ projectId, role }: { projectId?: string; r
             <Link
               key={tab.nameKey + tab.owns[0]}
               to={tab.path(projectId)}
-              role="tab"
-              aria-selected={active}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] transition-colors',
                 active
@@ -47,7 +53,7 @@ export default function SectionTabs({ projectId, role }: { projectId?: string; r
             </Link>
           );
         })}
-      </div>
+      </nav>
     </div>
   );
 }

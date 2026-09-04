@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { DiffEntry, DiffType } from '../api/eventDiff.api';
 import JsonEditor from './JsonEditor';
+import { formatJson } from '../lib/json';
 
 /**
  * Two payloads and what moved between them.
@@ -31,13 +32,6 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function formatPayload(payload: string): string {
-  try {
-    return JSON.stringify(JSON.parse(payload), null, 2);
-  } catch {
-    return payload;
-  }
-}
 
 export default function EventDiffView({ leftPayload, rightPayload, diffs, leftLabel, rightLabel }: EventDiffViewProps) {
   const { t } = useTranslation();
@@ -79,11 +73,11 @@ export default function EventDiffView({ leftPayload, rightPayload, diffs, leftLa
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="space-y-1.5">
           <p className="mono-label truncate">{leftLabel || t('eventDiff.left')}</p>
-          <JsonEditor value={formatPayload(leftPayload)} readOnly minHeight="220px" maxHeight="380px" />
+          <JsonEditor value={formatJson(leftPayload)} readOnly minHeight="220px" maxHeight="380px" />
         </div>
         <div className="space-y-1.5">
           <p className="mono-label truncate">{rightLabel || t('eventDiff.right')}</p>
-          <JsonEditor value={formatPayload(rightPayload)} readOnly minHeight="220px" maxHeight="380px" />
+          <JsonEditor value={formatJson(rightPayload)} readOnly minHeight="220px" maxHeight="380px" />
         </div>
       </div>
     </div>

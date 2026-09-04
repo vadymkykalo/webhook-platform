@@ -4,6 +4,7 @@ import { Shield, Plus, Trash2, Loader2, Sparkles, EyeOff, X } from 'lucide-react
 import { useTranslation } from 'react-i18next';
 import { showApiError, showSuccess } from '../lib/toast';
 import PageSkeleton, { SkeletonRows } from '../components/PageSkeleton';
+import PiiPreview from '../components/PiiPreview';
 import PageHeader from '../components/PageHeader';
 import EmptyState, { ErrorState } from '../components/EmptyState';
 import { EnabledBadge } from '../components/StatusBadge';
@@ -33,19 +34,6 @@ import VerificationGate from '../components/VerificationGate';
  */
 
 const MASK_STYLE_VALUES: MaskStyle[] = ['PARTIAL', 'FULL', 'HASH'];
-
-function maskExample(style: MaskStyle, pattern: string): string {
-  switch (style) {
-    case 'FULL': return '***';
-    case 'HASH': return 'sha256:a1b2c3d4e5f6';
-    case 'PARTIAL':
-    default:
-      if (pattern === 'email') return 'jo***@example.com';
-      if (pattern === 'phone') return '+1***89';
-      if (pattern === 'card') return '42***56';
-      return 'ab***yz';
-  }
-}
 
 export default function PiiRulesPage() {
   const { t } = useTranslation();
@@ -281,9 +269,6 @@ export default function PiiRulesPage() {
                       ) : (
                         <RuleActionChip icon={EyeOff} label={t(`piiRules.maskStyles.${rule.maskStyle}`)} />
                       )}
-                      <code className="font-mono text-[11px] text-muted-foreground">
-                        {maskExample(rule.maskStyle, rule.patternName)}
-                      </code>
                     </span>
                   }
                   status={<EnabledBadge enabled={rule.enabled} />}
@@ -314,6 +299,12 @@ export default function PiiRulesPage() {
               </li>
             ))}
           </ul>
+
+          {/* What the rules above actually do to a payload. This used to be a
+              hand-written example per row — including a hash nothing ever
+              produced — while the endpoint that answers it honestly went
+              uncalled. */}
+          <PiiPreview projectId={projectId!} />
         </div>
       )}
 

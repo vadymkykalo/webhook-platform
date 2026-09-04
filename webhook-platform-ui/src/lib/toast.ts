@@ -164,17 +164,6 @@ export function showError(messageOrKey: string, options?: ToastOptions) {
 }
 
 /**
- * Sticky error toast for critical/destructive action failures.
- * Stays visible until manually dismissed.
- */
-export function showCriticalError(err: unknown, fallbackKey: string, options?: ToastOptions) {
-  showApiError(err, fallbackKey, {
-    ...options,
-    duration: Infinity,
-  });
-}
-
-/**
  * Sticky success for critical completed actions (e.g. purge, delete).
  * Stays for 8s so user has time to read.
  */

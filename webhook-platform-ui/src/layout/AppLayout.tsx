@@ -15,6 +15,7 @@ import ProtectedRoute from '../auth/ProtectedRoute';
 import Sidebar from './Sidebar';
 import SectionTabs from './SectionTabs';
 import { requiredRoleFor, sectionFor } from './nav.config';
+import { useProjects } from '../api/queries';
 
 const COLLAPSED_KEY = 'sidebar-collapsed';
 
@@ -31,7 +32,22 @@ export default function AppLayout() {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   const [resending, setResending] = useState(false);
 
-  const projectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
+  const routeProjectId = params.projectId || location.pathname.match(/\/admin\/projects\/([^/]+)/)?.[1];
+
+  /**
+   * The rail is project-scoped, and `/admin/projects`, `/admin/dashboard` and
+   * the org-level pages carry no project in the URL. `nav.config` used to
+   * resolve that to `/admin/projects` — the page you are usually already on —
+   * so on the projects list every rail entry was a link that changed nothing.
+   * It reads as six broken buttons, and the switcher above them compounded it
+   * by saying "Select project" while exactly one existed.
+   *
+   * So the layout picks one up: the URL's, else the first the account has. With
+   * no projects at all there is nothing to fall back to and `/admin/projects`
+   * becomes the honest destination again — go make one.
+   */
+  const { data: projects = [] } = useProjects();
+  const projectId = routeProjectId ?? projects[0]?.id;
   const needsVerification = user?.user?.status === 'PENDING_VERIFICATION';
   const section = sectionFor(location.pathname);
 

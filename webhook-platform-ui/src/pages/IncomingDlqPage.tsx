@@ -223,7 +223,7 @@ export default function IncomingDlqPage() {
                         </TableCell>
                       )}
                       <TableCell>
-                        <span className="flex flex-col gap-1">
+                        <span className="flex flex-col items-start gap-1">
                           <StatusBadge kind="halt" label={t('incomingDlq.abandoned')} />
                           <span className="text-[11px] text-muted-foreground">
                             {t('incomingDlq.ladderExhausted', { count: attemptCount })}

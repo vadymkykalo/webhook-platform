@@ -29,6 +29,7 @@ import { usePermissions } from '../auth/usePermissions';
 import { railFromForwardAttempts } from './attemptRailData';
 import { CopyId, FilterBar, FilterField, SearchField, SelectBox, SelectionBar, TimeCell } from './tableParts';
 import Callout from '../components/Callout';
+import { formatJson } from '../lib/json';
 
 
 /** Verification is the incoming direction's status: did this really come from the source. */
@@ -38,13 +39,6 @@ function verificationOf(event: IncomingEventResponse): { kind: StatusKind; key: 
   return { kind: 'idle', key: 'incomingEvents.noVerification' };
 }
 
-function tryFormatJson(str: string): string {
-  try {
-    return JSON.stringify(JSON.parse(str), null, 2);
-  } catch {
-    return str;
-  }
-}
 
 /**
  * Incoming events are the same table as outgoing events, read from the other
@@ -275,7 +269,7 @@ export default function IncomingEventsPage() {
                         </TableCell>
                       )}
                       <TableCell>
-                        <span className="flex flex-col gap-1">
+                        <span className="flex flex-col items-start gap-1">
                           <StatusBadge kind={verification.kind} label={t(verification.key)} />
                           {event.verificationError && (
                             <span className="block max-w-[180px] truncate text-[11px] text-muted-foreground" title={event.verificationError}>
@@ -436,7 +430,7 @@ export default function IncomingEventsPage() {
                                       {t('incomingEvents.detail.attemptRequestHeaders')}
                                     </summary>
                                     <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded bg-secondary p-2 font-mono text-[11px]">
-                                      {tryFormatJson(attempt.requestHeadersJson)}
+                                      {formatJson(attempt.requestHeadersJson)}
                                     </pre>
                                   </details>
                                 )}
@@ -446,7 +440,7 @@ export default function IncomingEventsPage() {
                                       {t('incomingEvents.detail.attemptRequestBody')}
                                     </summary>
                                     <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-secondary p-2 font-mono text-[11px]">
-                                      {tryFormatJson(attempt.requestBodySnippet)}
+                                      {formatJson(attempt.requestBodySnippet)}
                                     </pre>
                                   </details>
                                 )}
@@ -469,7 +463,7 @@ export default function IncomingEventsPage() {
                 <section className="rounded-lg border border-rail">
                   <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.headers')}</h3>
                   <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
-                    {tryFormatJson(selectedEvent.headersJson)}
+                    {formatJson(selectedEvent.headersJson)}
                   </pre>
                 </section>
               )}
@@ -478,7 +472,7 @@ export default function IncomingEventsPage() {
                 <section className="rounded-lg border border-rail">
                   <h3 className="border-b border-rail px-4 py-2.5 text-[13px] font-medium">{t('incomingEvents.detail.body')}</h3>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all p-4 font-mono text-[11px]">
-                    {tryFormatJson(selectedEvent.bodyRaw)}
+                    {formatJson(selectedEvent.bodyRaw)}
                   </pre>
                 </section>
               )}
