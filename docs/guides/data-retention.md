@@ -76,9 +76,15 @@ Deliveries and Attempts. It is exposed through the API, is scoped by `@TenantId`
 else, and therefore cannot return another tenant's rows even if asked to.
 
 Erasure is the same mechanism as retention, narrowed: deleting an Organization cascades through
-the rows that hang off it. For a request that names a single data subject rather than a whole
-tenant, use the PII masking rules to prevent the field being stored in the first place — masking
-happens on the way in, so it is the only approach that does not require finding every copy later.
+the rows that hang off it.
+
+For a request that names a single data subject rather than a whole tenant, there is no
+field-level erasure tool — the honest answer is that retention is what removes the payload, on
+the schedule above. **Do not reach for PII masking here.** Masking is applied when a payload is
+*displayed* — in the dashboard, in an event diff, through a shared debug link — and changes
+neither what is stored nor what is delivered. It limits who sees a value; it does not stop the
+value being kept. If a field must never be stored, the place to drop it is before the Event is
+sent to Hookflow, or in a Transformation.
 
 ## Related
 
