@@ -51,6 +51,11 @@ blocker for larger organizations.
 delivery cannot be followed across ingest → Kafka → attempt. Correlation ids exist and would
 carry it.
 
+**A rolling upgrade is untested.** CI installs the last release, upgrades it in place and
+checks the data survived, which is what a Compose deployment does. It never runs two versions at
+once, so a migration that breaks the previous release's code while it is still serving would
+pass. `docs/OPERATIONS.md` argues the current migrations are safe; nothing verifies it.
+
 **RBAC granularity.** Three fixed roles (`OWNER` / `DEVELOPER` / `VIEWER`) and two API-key
 scopes (`READ_WRITE` / `READ_ONLY`). No custom roles, no per-resource scoping.
 

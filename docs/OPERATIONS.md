@@ -299,6 +299,18 @@ helm upgrade hookflow ./deploy/helm/hookflow
 kubectl rollout undo deployment hookflow-api
 ```
 
+**Upgrade drill (CI):** `.github/workflows/ci.yml`'s `upgrade-smoke` job installs the last
+release tag, registers an account, creates a project and an API key, ingests an event, then
+swaps in the images built from the branch and checks the rows survived and ingest still works —
+using the credential minted before the upgrade, which is what a customer's integration does the
+morning after. It is the only place Flyway meets a populated schema; a fresh install can never
+exercise that, and it is where a migration written against an empty database goes wrong.
+
+It does not prove a *rolling* upgrade. Both versions never run at once here, so a migration that
+breaks the previous release's code while it is still serving — a `NOT NULL` column added without
+a default, say — would pass this and fail in Kubernetes. See the V056 note below for what that
+looks like in practice.
+
 ### V056 — the tenant column is not an instant migration
 
 `V056__tenant_organization_id.sql` adds `organization_id` to 31 tables, backfills each one from
