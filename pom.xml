@@ -51,8 +51,8 @@
           be a downgrade - and for Tomcat a breaking one, since Boot 4 needs
           the Jakarta EE 11 line. The BOM manages all three.
         -->
-        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <!--
           Single knob controlling where the JaCoCo agent writes exec
           data AND where the per-module `report` goal reads it back from, so
