@@ -716,6 +716,56 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
+  sdk-test:
+    name: SDK Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The three SDKs had no per-PR coverage at all: their suites ran on a release tag
+    # (publish-sdks.yml) and in the nightly contract workflow, so a change that broke one
+    # merged green and surfaced either overnight or at release. These are the unit tests
+    # only - no stack, no containers - which is what makes them cheap enough to run here.
+    # The contract tests, which need a live platform, stay nightly.
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: sdks/node/package-lock.json
+
+      - name: Node SDK tests
+        working-directory: sdks/node
+        run: |
+          npm ci
+          npm test
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Python SDK tests
+        working-directory: sdks/python
+        run: |
+          pip install -e ".[dev]"
+          pytest -m "not contract"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json
+
+      - name: PHP SDK tests
+        working-directory: sdks/php
+        run: |
+          composer install --prefer-dist --no-progress
+          vendor/bin/phpunit --no-coverage
+
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest

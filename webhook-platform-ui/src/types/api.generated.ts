@@ -4352,19 +4352,19 @@ export interface components {
             empty?: boolean;
         };
         PageableObject: {
+            /** Format: int64 */
+            offset?: number;
+            sort?: components["schemas"]["SortObject"];
             paged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
-            /** Format: int64 */
-            offset?: number;
-            sort?: components["schemas"]["SortObject"];
             unpaged?: boolean;
         };
         SortObject: {
-            sorted?: boolean;
             empty?: boolean;
+            sorted?: boolean;
             unsorted?: boolean;
         };
         TunnelRequestLog: {
@@ -5008,7 +5008,8 @@ export interface components {
             endpointId?: string;
             /** Format: uuid */
             subscriptionId?: string;
-            status?: string;
+            /** @enum {string} */
+            status?: "PENDING" | "PROCESSING" | "SUCCESS" | "FAILED" | "DLQ";
             /** Format: int32 */
             attemptCount?: number;
             /** Format: int32 */

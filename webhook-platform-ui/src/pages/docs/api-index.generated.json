@@ -7836,7 +7836,14 @@
       {
         "name": "status",
         "type": "string",
-        "required": false
+        "required": false,
+        "values": [
+          "PENDING",
+          "PROCESSING",
+          "SUCCESS",
+          "FAILED",
+          "DLQ"
+        ]
       },
       {
         "name": "attemptCount",
@@ -10024,6 +10031,16 @@
     ],
     "PageableObject": [
       {
+        "name": "offset",
+        "type": "integer (int64)",
+        "required": false
+      },
+      {
+        "name": "sort",
+        "type": "SortObject",
+        "required": false
+      },
+      {
         "name": "paged",
         "type": "boolean",
         "required": false
@@ -10036,16 +10053,6 @@
       {
         "name": "pageSize",
         "type": "integer (int32)",
-        "required": false
-      },
-      {
-        "name": "offset",
-        "type": "integer (int64)",
-        "required": false
-      },
-      {
-        "name": "sort",
-        "type": "SortObject",
         "required": false
       },
       {
@@ -11932,12 +11939,12 @@
     ],
     "SortObject": [
       {
-        "name": "sorted",
+        "name": "empty",
         "type": "boolean",
         "required": false
       },
       {
-        "name": "empty",
+        "name": "sorted",
         "type": "boolean",
         "required": false
       },
@@ -13370,7 +13377,7 @@
       "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "subscriptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-      "status": "string",
+      "status": "PENDING",
       "attemptCount": 0,
       "maxAttempts": 0,
       "nextRetryAt": "2026-01-01T12:00:00Z",
@@ -13971,15 +13978,15 @@
       "deliveriesPerSecond": 0
     },
     "PageableObject": {
+      "offset": 0,
+      "sort": {
+        "empty": true,
+        "sorted": true,
+        "unsorted": true
+      },
       "paged": true,
       "pageNumber": 0,
       "pageSize": 0,
-      "offset": 0,
-      "sort": {
-        "sorted": true,
-        "empty": true,
-        "unsorted": true
-      },
       "unpaged": true
     },
     "PageAlertEventResponse": {
@@ -14003,16 +14010,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14042,16 +14049,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14082,16 +14089,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14120,16 +14127,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14147,7 +14154,7 @@
           "eventId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "endpointId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "subscriptionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-          "status": "string",
+          "status": "PENDING",
           "attemptCount": 0,
           "maxAttempts": 0,
           "nextRetryAt": "2026-01-01T12:00:00Z",
@@ -14159,16 +14166,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14197,16 +14204,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14241,16 +14248,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14275,16 +14282,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14312,16 +14319,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14354,16 +14361,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14393,16 +14400,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14436,16 +14443,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14479,16 +14486,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14521,16 +14528,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14568,16 +14575,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14615,16 +14622,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14652,16 +14659,16 @@
       ],
       "number": 0,
       "sort": {
-        "sorted": true,
         "empty": true,
+        "sorted": true,
         "unsorted": true
       },
       "pageable": {
+        "offset": 0,
+        "sort": {},
         "paged": true,
         "pageNumber": 0,
         "pageSize": 0,
-        "offset": 0,
-        "sort": {},
         "unpaged": true
       },
       "numberOfElements": 0,
@@ -14943,8 +14950,8 @@
       "reason": "string"
     },
     "SortObject": {
-      "sorted": true,
       "empty": true,
+      "sorted": true,
       "unsorted": true
     },
     "StepExecutionResponse": {
