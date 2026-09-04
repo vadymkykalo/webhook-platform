@@ -90,6 +90,12 @@ class ServiceTenantParameterTest {
             "PlatformAdminService.suspend",
             "PlatformAdminService.reinstate",
 
+            // Same subject-not-caller reason, with one addition worth stating: getUsage does not
+            // query anything itself. It enters the subject's tenant scope with callAs and asks
+            // the service the tenant's own billing page asks, so the operator and the customer
+            // read one set of figures rather than two implementations of the same question.
+            "PlatformAdminService.getUsage",
+
             // Suspension lookup and its cache, exactly parallel to PlanLookup above: asked about
             // an organization by whoever holds its id - the request filter chain, before any
             // handler, and the operator evicting after a change.

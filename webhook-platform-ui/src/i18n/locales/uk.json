@@ -848,6 +848,7 @@
       "noTransformation": "Без трансформації — оригінальне тіло",
       "payloadFields": "Поля (v{{version}})",
       "payloadTemplate": "Шаблон тіла",
+      "payloadTemplateHint": "JSONPath: ${$.path}. Порожнє означає, що надсилається початковий payload без змін.",
       "retryDelays": "Затримки повторів",
       "retryDelaysHint": "Секунди між повторами",
       "selectEndpoint": "Оберіть ендпоінт...",
@@ -3819,6 +3820,7 @@
       "showHint": "Повертає його в усіх проєктах, де ви його приховали.",
       "title": "Початок роботи"
     },
+    "language": "Мова",
     "newPassword": "Новий пароль",
     "newPasswordHint": "Мінімум 8 символів, повинен містити велику, малу літеру, цифру та спецсимвол",
     "notifications": {

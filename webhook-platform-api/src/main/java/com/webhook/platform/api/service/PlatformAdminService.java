@@ -5,8 +5,11 @@ import com.webhook.platform.api.domain.repository.MembershipRepository;
 import com.webhook.platform.api.domain.repository.OrganizationRepository;
 import com.webhook.platform.api.domain.repository.ProjectRepository;
 import com.webhook.platform.api.dto.AdminOrganizationResponse;
+import com.webhook.platform.api.dto.UsageResponse;
 import com.webhook.platform.api.exception.NotFoundException;
+import com.webhook.platform.api.service.billing.BillingOverviewService;
 import com.webhook.platform.api.tenancy.SystemTenant;
+import com.webhook.platform.api.tenancy.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,6 +44,7 @@ public class PlatformAdminService {
     private final ProjectRepository projectRepository;
     private final MembershipRepository membershipRepository;
     private final SuspensionLookup suspensionLookup;
+    private final BillingOverviewService billingOverviewService;
     private final Clock clock;
 
     @SystemTenant("the operator listing every tenant belongs to none of them")
@@ -106,6 +110,29 @@ public class PlatformAdminService {
 
         log.warn("Organization {} reinstated by operator", organizationId);
         return toResponse(organization);
+    }
+
+    /**
+     * What one tenant has used against the plan they are on.
+     *
+     * <p>"Are they near their limit" is the question behind most support tickets that reach an
+     * operator, and the back-office could not answer it: the list carried a plan name and two
+     * row counts, and everything else meant a psql session against the customer's tables.
+     *
+     * <p>Answered by entering the subject's tenant scope and asking the same service the tenant's
+     * own billing page asks, rather than by a second set of queries taking an organization id.
+     * A parallel implementation is how the operator's numbers and the customer's numbers come to
+     * disagree, which is the one thing a support conversation cannot survive.
+     *
+     * <p>Not {@code @Transactional}: the scope is entered around the call, so it must be entered
+     * before any transaction opens rather than switched underneath one that is already running.
+     */
+    @SystemTenant("the operator asking about a tenant's usage is not a member of it")
+    public UsageResponse getUsage(UUID organizationId) {
+        if (!organizationRepository.existsById(organizationId)) {
+            throw new NotFoundException("Organization not found: " + organizationId);
+        }
+        return TenantContext.callAs(organizationId, billingOverviewService::usage);
     }
 
     private AdminOrganizationResponse toResponse(Organization organization) {

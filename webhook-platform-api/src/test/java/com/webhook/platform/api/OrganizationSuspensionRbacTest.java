@@ -206,4 +206,61 @@ public class OrganizationSuspensionRbacTest extends AbstractIntegrationTest {
                 .isTrue();
         assertThat(suspensionLookup.forOrganization(tenant.organizationId())).isPresent();
     }
+
+    // ── What the operator can see about one tenant ─────────────────
+
+    @Test
+    public void theOperatorSeesWhatATenantHasUsedAgainstTheirPlan() throws Exception {
+        Tenant tenant = registerTenant("suspension-usage@example.com");
+
+        mockMvc.perform(post("/api/v1/projects")
+                        .header("Authorization", "Bearer " + tenant.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Counted\"}"))
+                .andExpect(status().isCreated());
+
+        // "Are they near their limit" is the question behind most support tickets that reach an
+        // operator, and answering it used to mean a psql session against the tenant's rows.
+        mockMvc.perform(get("/api/v1/admin/organizations/" + tenant.organizationId() + "/usage")
+                        .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects.current").value(1))
+                .andExpect(jsonPath("$.events.limit").exists())
+                .andExpect(jsonPath("$.periodStart").exists());
+    }
+
+    @Test
+    public void usageIsCountedForTheTenantAskedAboutAndNotTheAsker() throws Exception {
+        Tenant busy = registerTenant("suspension-usage-busy@example.com");
+        Tenant quiet = registerTenant("suspension-usage-quiet@example.com");
+
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/api/v1/projects")
+                            .header("Authorization", "Bearer " + busy.token())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Busy " + i + "\"}"))
+                    .andExpect(status().isCreated());
+        }
+
+        // The operator holds no organization of their own, so this only works by entering the
+        // subject's scope. Getting that wrong reads as an empty tenant rather than an error.
+        mockMvc.perform(get("/api/v1/admin/organizations/" + busy.organizationId() + "/usage")
+                        .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects.current").value(3));
+
+        mockMvc.perform(get("/api/v1/admin/organizations/" + quiet.organizationId() + "/usage")
+                        .header("X-Platform-Admin-Token", PLATFORM_ADMIN_TEST_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects.current").value(0));
+    }
+
+    @Test
+    public void anOwnerCannotReadAnotherTenantsUsage() throws Exception {
+        Tenant mine = registerTenant("suspension-usage-mine@example.com");
+
+        mockMvc.perform(get("/api/v1/admin/organizations/" + mine.organizationId() + "/usage")
+                        .header("Authorization", "Bearer " + mine.token()))
+                .andExpect(status().isForbidden());
+    }
 }

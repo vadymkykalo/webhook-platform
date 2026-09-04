@@ -115,24 +115,64 @@ Everything under `/api/v1/admin/**` takes the `X-Platform-Admin-Token` header an
 no tenant JWT or API key satisfies it, however privileged the role. Set `PLATFORM_ADMIN_TOKEN`;
 leaving it empty keeps these endpoints unreachable, which is the shipped default.
 
+The CLI is the intended client:
+
 ```bash
-# Who is on this deployment
+export HOOKFLOW_ADMIN_TOKEN=...        # or pass --token; never saved to the config file
+
+hookflow admin orgs                    # who is on this deployment
+hookflow admin orgs --search acme
+hookflow admin orgs --suspended        # only the ones currently stopped
+
+hookflow admin org $ORG_ID             # plan, counts, and usage against the plan's limits
+
+hookflow admin suspend $ORG_ID --reason "Confirmed spam reports" --by ops@example.com
+hookflow admin reinstate $ORG_ID
+```
+
+The same over HTTP, for a script or a runbook that would rather not depend on the CLI:
+
+```bash
 curl -H "X-Platform-Admin-Token: $TOKEN" \
   'http://localhost/api/v1/admin/organizations?search=acme&size=20'
 
-# One of them, with plan, billing status and project/member counts
 curl -H "X-Platform-Admin-Token: $TOKEN" \
   http://localhost/api/v1/admin/organizations/$ORG_ID
+curl -H "X-Platform-Admin-Token: $TOKEN" \
+  http://localhost/api/v1/admin/organizations/$ORG_ID/usage
 
-# Stop it. The reason is required, and the tenant is shown it.
+# The reason is required, and the tenant is shown it.
 curl -X POST -H "X-Platform-Admin-Token: $TOKEN" -H 'Content-Type: application/json' \
   -d '{"reason":"Confirmed spam reports","suspendedBy":"ops@example.com"}' \
   http://localhost/api/v1/admin/organizations/$ORG_ID/suspend
 
-# Let it go again
 curl -X POST -H "X-Platform-Admin-Token: $TOKEN" \
   http://localhost/api/v1/admin/organizations/$ORG_ID/reinstate
 ```
+
+### Why there is no back-office page in the dashboard
+
+There is deliberately no browser UI for any of this. The dashboard is served from the same
+origin as the API, so a platform-admin token kept in a browser turns any XSS anywhere in the
+tenant dashboard into the deployment's master credential — one that is the same secret for
+every tenant on the instance and that no tenant role can otherwise reach. A terminal is a much
+smaller blast radius than a page a hundred customers also load.
+
+`hookflow admin` reads the token from `HOOKFLOW_ADMIN_TOKEN` or `--token` on each invocation
+and never writes it to `~/.config/hookflow/config.json`, so it does not outlive the command and
+`hookflow status` cannot print it.
+
+### What the usage view answers
+
+`hookflow admin org $ORG_ID` shows events this billing period, endpoints, projects and members,
+each against the limit the tenant's plan allows — the **same** numbers the customer sees on
+their own billing page, because it is the same service reading them under that tenant's scope
+rather than a second set of queries. Two implementations of "how much have they used" is how a
+support conversation ends up with the operator and the customer reading different figures.
+
+It carries counts and limits only: no member emails, no endpoint URLs, no payloads. Answering
+"who is this and are they in trouble" needs none of them, and a support view that shows customer
+data by default becomes a reason not to give anyone the credential.
 
 ### What suspension does, and what it deliberately does not
 
