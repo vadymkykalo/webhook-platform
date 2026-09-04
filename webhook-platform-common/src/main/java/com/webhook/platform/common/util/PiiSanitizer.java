@@ -9,7 +9,8 @@ import java.util.regex.Pattern;
  * PII sanitizer for webhook payloads.
  * Masks personally identifiable information based on configurable rules.
  * <p>
- * Supports built-in patterns (email, phone, card numbers) and custom JSON paths.
+ * Supports built-in patterns (email, phone, card numbers — flat or inside a card object)
+ * and custom JSON paths.
  * Three masking styles: FULL (replace entirely), PARTIAL (show prefix/suffix), HASH (SHA-256 prefix).
  */
 public final class PiiSanitizer {
@@ -37,6 +38,29 @@ public final class PiiSanitizer {
 
     private static final Pattern CARD_PATTERN = Pattern.compile(
             "\"([^\"]*(?:card|pan|credit|debit|account)[^\"]*?)\"\\s*:\\s*\"(\\d[\\d\\s\\-]{11,18}\\d)\"",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * The same PAN, one level down.
+     *
+     * <p>{@link #CARD_PATTERN} asks the key holding the digits to be card-ish,
+     * which is true of {@code "cardNumber"} and {@code "pan"} but not of the
+     * shape every payment provider actually sends:
+     * {@code {"card": {"number": "4242…"}}}. There the key on the digits is the
+     * entirely innocent {@code "number"}, and the only thing saying "card" is
+     * the object around it — so a rule an operator had enabled, and which the
+     * UI showed as enabled, forwarded the PAN in the clear.
+     *
+     * <p>The context comes from a lookbehind rather than a wider key list
+     * because {@code "number"} on its own is not evidence of anything: an order
+     * number of the same length must survive untouched, and it does — nothing
+     * matches unless a card-ish key opens the object it sits in. Every quantifier
+     * here is bounded, which Java requires of a lookbehind and which also caps
+     * how far the context may reach.
+     */
+    private static final Pattern CARD_OBJECT_PATTERN = Pattern.compile(
+            "(?<=\"[^\"]{0,40}(?:card|credit|debit)[^\"]{0,40}\"\\s{0,4}:\\s{0,4}\\{[^{}]{0,300})"
+                    + "\"(number|pan|num|value)\"\\s*:\\s*\"(\\d[\\d\\s\\-]{11,18}\\d)\"",
             Pattern.CASE_INSENSITIVE);
 
     /**
@@ -74,6 +98,7 @@ public final class PiiSanitizer {
         detectPattern(json, EMAIL_PATTERN, BUILTIN_EMAIL, matches);
         detectPattern(json, PHONE_PATTERN, BUILTIN_PHONE, matches);
         detectPattern(json, CARD_PATTERN, BUILTIN_CARD, matches);
+        detectPattern(json, CARD_OBJECT_PATTERN, BUILTIN_CARD, matches);
         return matches;
     }
 
@@ -91,7 +116,10 @@ public final class PiiSanitizer {
             case BUILTIN_PHONE:
                 return applyBuiltinPattern(json, PHONE_PATTERN, rule.maskStyle);
             case BUILTIN_CARD:
-                return applyBuiltinPattern(json, CARD_PATTERN, rule.maskStyle);
+                // Both shapes, because a payload routinely carries only one of them.
+                return applyBuiltinPattern(
+                        applyBuiltinPattern(json, CARD_PATTERN, rule.maskStyle),
+                        CARD_OBJECT_PATTERN, rule.maskStyle);
             default:
                 if (rule.jsonPath != null && !rule.jsonPath.isBlank()) {
                     return applyJsonPathRule(json, rule.jsonPath, rule.maskStyle);
