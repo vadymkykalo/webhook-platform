@@ -36,6 +36,8 @@ Nothing is written in both places.
 
 ## Adopting it
 
+- **[How Hookflow compares](./guides/comparison.md)** — a feature-by-feature table
+  against Svix, Hookdeck and Convoy, with the gaps included rather than omitted.
 - **[Migrating from Svix, Hookdeck or Convoy](./guides/migrating-from-other-providers.md)** —
   concept mapping, why your receivers probably do not change, and an honest list of what
   Hookflow does not have.
