@@ -146,7 +146,7 @@ rebuild: ## Rebuild and restart services (embedded DB)
 	@echo "$(GREEN)Rebuilding services...$(NC)"
 	@$(DOCKER_COMPOSE) --profile embedded-db down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
-	@$(DOCKER_COMPOSE) --profile embedded-db up -d
+	@$(DOCKER_COMPOSE_BUILD) --profile embedded-db up -d
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Rebuild complete$(NC)"
@@ -155,28 +155,36 @@ rebuild-external-db: ## Rebuild and restart services (external DB)
 	@echo "$(GREEN)Rebuilding services (external DB mode)...$(NC)"
 	@$(DOCKER_COMPOSE) down
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache
-	@$(DOCKER_COMPOSE) up -d
+	@$(DOCKER_COMPOSE_BUILD) up -d
 	@$(MAKE) wait-healthy
 	@$(MAKE) create-topics
 	@echo "$(GREEN)Rebuild complete$(NC)"
 
 ##@ Development (Fast Rebuilds)
+# Every target below builds through DOCKER_COMPOSE_BUILD *and starts through it
+# too*. The overlay does not only add build contexts — it renames the images
+# (`image: webhook-platform-ui:${UI_IMAGE_TAG:-local}`), so a `build` through the
+# overlay followed by an `up -d` through the base file built one image and
+# started another: the published ghcr one, silently, with none of your changes.
+# `make dev-ui` looked like it worked and served five-day-old code.
+# The scale-* targets below deliberately stay on the base file: a production
+# host scaling replicas has no locally built image to start.
 rebuild-api: ## Rebuild only API service (fast)
 	@echo "$(GREEN)Rebuilding API...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache api
-	@$(DOCKER_COMPOSE) up -d api
+	@$(DOCKER_COMPOSE_BUILD) up -d api
 	@echo "$(GREEN) API rebuilt and restarted$(NC)"
 
 rebuild-worker: ## Rebuild only Worker service (fast)
 	@echo "$(GREEN)Rebuilding Worker...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache worker
-	@$(DOCKER_COMPOSE) up -d worker
+	@$(DOCKER_COMPOSE_BUILD) up -d worker
 	@echo "$(GREEN) Worker rebuilt and restarted$(NC)"
 
 rebuild-ui: ## Rebuild only UI service (fast)
 	@echo "$(GREEN)Rebuilding UI...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build --no-cache ui
-	@$(DOCKER_COMPOSE) up -d ui
+	@$(DOCKER_COMPOSE_BUILD) up -d ui
 	@echo "$(GREEN) UI rebuilt and restarted$(NC)"
 
 restart-api: ## Restart API service (no rebuild)
@@ -197,21 +205,21 @@ restart-ui: ## Restart UI service (no rebuild)
 dev-api: ## Quick dev: rebuild API with cache + restart
 	@echo "$(GREEN)Quick rebuild API (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build api
-	@$(DOCKER_COMPOSE) up -d api
+	@$(DOCKER_COMPOSE_BUILD) up -d api
 	@echo "$(GREEN) API ready$(NC)"
 	@$(MAKE) logs-api
 
 dev-worker: ## Quick dev: rebuild Worker with cache + restart
 	@echo "$(GREEN)Quick rebuild Worker (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build worker
-	@$(DOCKER_COMPOSE) up -d worker
+	@$(DOCKER_COMPOSE_BUILD) up -d worker
 	@echo "$(GREEN) Worker ready$(NC)"
 	@$(MAKE) logs-worker
 
 dev-ui: ## Quick dev: rebuild UI with cache + restart
 	@echo "$(GREEN)Quick rebuild UI (with cache)...$(NC)"
 	@$(DOCKER_COMPOSE_BUILD) build ui
-	@$(DOCKER_COMPOSE) up -d ui
+	@$(DOCKER_COMPOSE_BUILD) up -d ui
 	@echo "$(GREEN) UI ready$(NC)"
 	@$(MAKE) logs-ui
 
