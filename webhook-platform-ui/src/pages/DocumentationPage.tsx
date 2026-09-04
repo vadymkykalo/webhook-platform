@@ -15,18 +15,23 @@ import {
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { Footer } from '../layout/PublicLayout';
 
+import Alerts from './docs/guides/Alerts';
 import Authentication from './docs/guides/Authentication';
 import Cli from './docs/guides/Cli';
 import Configuration from './docs/guides/Configuration';
 import DeterministicReplay from './docs/guides/DeterministicReplay';
+import EndpointSecurity from './docs/guides/EndpointSecurity';
 import ErrorsAndLimits from './docs/guides/ErrorsAndLimits';
 import GettingStarted from './docs/guides/GettingStarted';
 import IncomingWebhooks from './docs/guides/IncomingWebhooks';
+import Ordering from './docs/guides/Ordering';
 import Overview from './docs/guides/Overview';
+import PiiMasking from './docs/guides/PiiMasking';
 import Retries from './docs/guides/Retries';
 import RulesEngine from './docs/guides/RulesEngine';
 import SchemaRegistry from './docs/guides/SchemaRegistry';
 import Sdks from './docs/guides/Sdks';
+import Transformations from './docs/guides/Transformations';
 import WebhookSecurity from './docs/guides/WebhookSecurity';
 import Workflows from './docs/guides/Workflows';
 
@@ -127,9 +132,14 @@ export default function DocumentationPage() {
             {section === 'retries' && <Retries />}
             {section === 'incoming-webhooks' && <IncomingWebhooks />}
             {section === 'rules-engine' && <RulesEngine />}
+            {section === 'transformations' && <Transformations />}
+            {section === 'ordering' && <Ordering />}
             {section === 'schema-registry' && <SchemaRegistry />}
             {section === 'deterministic-replay' && <DeterministicReplay />}
             {section === 'workflows' && <Workflows />}
+            {section === 'endpoint-security' && <EndpointSecurity />}
+            {section === 'pii-masking' && <PiiMasking />}
+            {section === 'alerts' && <Alerts />}
             {section === 'errors' && <ErrorsAndLimits />}
             {section === 'cli' && <Cli />}
             {section === 'sdks' && <Sdks />}
