@@ -4,14 +4,12 @@ import { endpointsApi } from './endpoints.api';
 import { deliveriesApi, type DeliveryFilters, type BulkReplayRequest } from './deliveries.api';
 import { eventsApi } from './events.api';
 import { subscriptionsApi, type SubscriptionRequest } from './subscriptions.api';
-import { membersApi, type MembershipRole, type AddMemberRequest } from './members.api';
-import { apiKeysApi, type ApiKeyRequest, type ApiKeyRotateRequest } from './apiKeys.api';
+import { membersApi, type MembershipRole } from './members.api';
 import { authApi } from './auth.api';
 import { organizationsApi } from './organizations.api';
 import { dashboardApi } from './dashboard.api';
 import { dlqApi, type DlqFilters } from './dlq.api';
 import { incomingDlqApi, type IncomingDlqFilters } from './incomingDlq.api';
-import { testEndpointsApi } from './testEndpoints.api';
 import { auditLogApi, type AuditLogFilters } from './auditLog.api';
 import { incomingSourcesApi } from './incomingSources.api';
 import { incomingDestinationsApi } from './incomingDestinations.api';
@@ -235,12 +233,6 @@ export function useRotateSecret(projectId: string) {
     });
 }
 
-export function useTestEndpointAction(projectId: string) {
-    return useMutation({
-        mutationFn: (id: string) => endpointsApi.test(projectId, id),
-    });
-}
-
 export function useVerifyEndpoint(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -272,14 +264,6 @@ export function useDeliveries(projectId: string | undefined, filters: DeliveryFi
             );
             return hasActive ? 5000 : false;
         },
-    });
-}
-
-export function useReplayDelivery() {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (deliveryId: string) => deliveriesApi.replay(deliveryId),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['deliveries'] }); },
     });
 }
 
@@ -320,22 +304,6 @@ export function useSubscriptions(projectId: string | undefined) {
     });
 }
 
-export function useCreateSubscription(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (data: SubscriptionRequest) => subscriptionsApi.create(projectId, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) }); },
-    });
-}
-
-export function useUpdateSubscription(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: SubscriptionRequest }) => subscriptionsApi.update(projectId, id, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.subscriptions.list(projectId) }); },
-    });
-}
-
 export function usePatchSubscription(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -359,14 +327,6 @@ export function useMembers(orgId: string | undefined) {
         queryKey: queryKeys.members.list(orgId!),
         queryFn: () => membersApi.list(orgId!),
         enabled: !!orgId,
-    });
-}
-
-export function useAddMember(orgId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (data: AddMemberRequest) => membersApi.add(orgId, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.members.list(orgId) }); },
     });
 }
 
@@ -412,42 +372,6 @@ export function useReinstateMember(orgId: string) {
 }
 
 // ─── API Keys ──────────────────────────────────────────────────────
-
-export function useApiKeysPaged(projectId: string | undefined, page: number, size = 20) {
-    return useQuery({
-        queryKey: queryKeys.apiKeys.paged(projectId!, page, size),
-        queryFn: () => apiKeysApi.listPaged(projectId!, page, size),
-        enabled: !!projectId,
-        staleTime: 0,
-    });
-}
-
-export function useCreateApiKey(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (data: ApiKeyRequest) => apiKeysApi.create(projectId, data),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
-    });
-}
-
-export function useRevokeApiKey(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (id: string) => apiKeysApi.revoke(projectId, id),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
-    });
-}
-
-export function useRotateApiKey(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, ...data }: ApiKeyRotateRequest & { id: string }) =>
-            apiKeysApi.rotate(projectId, id, data),
-        // Both rows change: a replacement appears and the old one gains a rotated-at and an
-        // expiry, so the list has to come back rather than be patched in place.
-        onSuccess: () => { qc.invalidateQueries({ queryKey: ['api-keys', projectId] }); },
-    });
-}
 
 // ─── Sessions ──────────────────────────────────────────────────────
 
@@ -572,39 +496,6 @@ export function useIncomingDlqPurge(projectId: string) {
 
 // ─── Test Endpoints ────────────────────────────────────────────────
 
-export function useTestEndpoints(projectId: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.testEndpoints.list(projectId!),
-        queryFn: () => testEndpointsApi.list(projectId!),
-        enabled: !!projectId,
-    });
-}
-
-export function useTestEndpointRequests(projectId: string | undefined, endpointId: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.testEndpoints.requests(projectId!, endpointId!),
-        queryFn: () => testEndpointsApi.getRequests(projectId!, endpointId!),
-        enabled: !!projectId && !!endpointId,
-        refetchInterval: 5000,
-    });
-}
-
-export function useCreateTestEndpoint(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: () => testEndpointsApi.create(projectId),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId) }); },
-    });
-}
-
-export function useDeleteTestEndpoint(projectId: string) {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: (id: string) => testEndpointsApi.delete(projectId, id),
-        onSuccess: () => { qc.invalidateQueries({ queryKey: queryKeys.testEndpoints.list(projectId) }); },
-    });
-}
-
 // ─── Audit Log ─────────────────────────────────────────────────────
 
 export function useAuditLog(page: number, size = 20, filters?: AuditLogFilters) {
@@ -698,14 +589,6 @@ export function useIncomingEvents(projectId: string | undefined, filters: Incomi
         queryKey: queryKeys.incomingEvents.list(projectId!, filters),
         queryFn: () => incomingEventsApi.list(projectId!, filters),
         enabled: !!projectId,
-    });
-}
-
-export function useIncomingEvent(projectId: string | undefined, id: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.incomingEvents.detail(projectId!, id!),
-        queryFn: () => incomingEventsApi.get(projectId!, id!),
-        enabled: !!projectId && !!id,
     });
 }
 
@@ -979,14 +862,6 @@ export function useTransformations(projectId: string) {
     });
 }
 
-export function useTransformation(projectId: string, id: string) {
-    return useQuery({
-        queryKey: queryKeys.transformations.detail(projectId, id),
-        queryFn: () => transformationsApi.get(projectId, id),
-        enabled: !!projectId && !!id,
-    });
-}
-
 export function useCreateTransformation(projectId: string) {
     const qc = useQueryClient();
     return useMutation({
@@ -1044,14 +919,6 @@ export function useRules(projectId: string) {
         queryKey: queryKeys.rules.list(projectId),
         queryFn: () => rulesApi.list(projectId),
         enabled: !!projectId,
-    });
-}
-
-export function useRule(projectId: string, id: string | undefined) {
-    return useQuery({
-        queryKey: queryKeys.rules.detail(projectId, id!),
-        queryFn: () => rulesApi.get(projectId, id!),
-        enabled: !!projectId && !!id,
     });
 }
 
