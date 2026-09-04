@@ -3035,6 +3035,7 @@
     "joined": "Joined",
     "noMembers": "No members yet",
     "noMembersDesc": "You are the only member of this organization",
+    "noResults": "No members match this search.",
     "reinstate": "Reinstate",
     "reinstateDialog": {
       "description": "{{email}} gets their access back in the role they held before the suspension.",
@@ -3071,6 +3072,7 @@
       "VIEWER": "Viewer"
     },
     "rolesHeading": "What each role grants",
+    "search": "Search by email or role",
     "status": "Status",
     "statuses": {
       "ACTIVE": "Active",
