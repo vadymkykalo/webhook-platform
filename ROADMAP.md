@@ -68,7 +68,8 @@ hangs off event ingestion. A subscription cannot carry its own filter, and the i
 direction has no filtering at all — every incoming event goes to every enabled destination.
 
 **No batching**, no static egress IPs, no PagerDuty or OpsGenie channel, no cold-storage
-archival. MinIO is present in the Compose file but nothing consumes it yet.
+archival. Archival has no object store behind it either: MinIO used to sit in the Compose
+file with nothing consuming it, and was removed rather than left there implying a feature.
 
 ## Deliberately not planned
 
