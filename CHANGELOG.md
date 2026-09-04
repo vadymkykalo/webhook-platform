@@ -60,6 +60,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the payment state machine, and an abuse suspension recorded there would be lifted by the
   next successful charge. Both actions land in the audit log.
 
+- **A transform node can use the project's transformation library.** The library was
+  unreachable from the canvas: a project could build up named transformations and point rule
+  actions at them, and then in a workflow had to retype one into a box. Retyping it did not
+  work, silently — a saved transformation is `${$.json.path}` run by the engine that transforms
+  a delivery payload, the node's own template is `{{field.path}}`, and text written for one is a
+  literal string in the other with no error either way. The node now takes either, as an
+  explicit choice rather than a guess about what was pasted, and a transformation can be created
+  from the node panel without leaving the canvas. A reference that is deleted or disabled fails
+  the step: passing the payload through would send a raw event somewhere promised a reshaped
+  one and report it as a success.
+
+- **`hookflow admin`** — orgs, org, suspend, reinstate — and `/admin/organizations/{id}/usage`
+  behind it, so an operator can see what a tenant has used against their plan. Deliberately no
+  page in the dashboard: it is served from the same origin as the API, so a platform-admin token
+  in a browser turns any XSS in the tenant dashboard into the deployment's master credential.
+  The token is read from the environment or a flag on each invocation and never saved.
+
+- **The create-event node offers the schema registry's event types** as suggestions. A datalist
+  and not a select, because emitting a type that has no schema yet is allowed.
+
 ### Security
 
 - **Email verification is enforced on the server.** It was a component in the dashboard:
@@ -86,6 +106,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   charged for.
 
 ### Fixed
+
+- **A dialog taller than the window had no reachable edges.** `DialogContent` is centred with
+  `translate-y-[-50%]` and had no height cap and no overflow, and Radix freezes the page behind
+  an open dialog — so the endpoint form opened with its title above the top of the screen and
+  Save and Cancel below the bottom, with nothing to scroll. Six call sites had already hit this
+  and pasted `max-h-[85vh] overflow-y-auto` onto their own dialog at three different heights,
+  which is what kept it alive: the bug looked fixed everywhere anyone had looked. The cap is
+  now the primitive's, in `dvh` rather than `vh`, and a test fails if a call site starts setting
+  its own.
+
+- **Two of the three incident tiles counted one page, not the project.** "Open" came from a
+  server count; "Investigating" and "Critical" were `filter()` over the twenty rows on screen.
+  A project with more open incidents than fit on a page showed "Critical: 0" with a critical
+  incident open on page two — the tile went quiet exactly when there was too much going on to
+  fit. All three are now counted server-side over the project.
+
+- **A public page starts at its own top.** `createBrowserRouter` leaves the scroll offset alone
+  across a navigation, so following "Pricing" from halfway down the home page opened `/pricing`
+  somewhere in its FAQ. A hash still wins, or every anchor in the header would break.
+
+- **No input in the workflow node inspector had an accessible name.** The label and the control
+  were siblings with nothing joining them, so every field — the URL a workflow posts to, the
+  endpoint it delivers through — was announced as an unlabelled textbox and clicking a label
+  focused nothing.
+
+- **The pricing page said "requests / second"** where only ingest is metered per plan, which is
+  what the billing page had already been corrected to say.
 
 - **`WEBHOOK_ALLOWED_HOSTS` reaches the connection it exempts.** The admission check honoured
   the list and the post-connect check — the one that closes the DNS rebinding window — had no
