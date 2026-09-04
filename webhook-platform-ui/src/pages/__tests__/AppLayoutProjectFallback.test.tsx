@@ -27,6 +27,15 @@ function renderAt(path: string) {
   return renderPage(<AppLayout />, { path: '/admin/*', initialEntry: path });
 }
 
+/**
+ * The rail's href only settles once `useProjects` resolves, and waitFor's
+ * default second is not enough for that on a loaded CI runner — this failed at
+ * 1313ms there while passing locally every time. Same reasoning as
+ * DashboardPage's SETTLE_MS: room for a slow machine, no cover for a wrong
+ * render, because a bad href still fails on the first poll after settling.
+ */
+const SETTLE_MS = 8_000;
+
 beforeEach(() => vi.clearAllMocks());
 
 describe('the rail without a project in the URL', () => {
@@ -39,14 +48,14 @@ describe('the rail without a project in the URL', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('link', { name: /Deliveries/i }))
-        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/deliveries`));
+        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/deliveries`), { timeout: SETTLE_MS });
   });
 
   it('names the project it fell back to instead of asking you to pick one', async () => {
     vi.mocked(projectsApi.list).mockResolvedValue([project(TEST_PROJECT_ID, 'Production')]);
     renderAt('/admin/projects');
 
-    expect(await screen.findByText('Production')).toBeInTheDocument();
+    expect(await screen.findByText('Production', undefined, { timeout: SETTLE_MS })).toBeInTheDocument();
     expect(screen.queryByText(/Select project/i)).toBeNull();
   });
 
@@ -68,6 +77,6 @@ describe('the rail without a project in the URL', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('link', { name: /^Events/i }))
-        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/events`));
+        .toHaveAttribute('href', `/admin/projects/${TEST_PROJECT_ID}/events`), { timeout: SETTLE_MS });
   });
 });
