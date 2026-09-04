@@ -568,9 +568,10 @@
     "selfHosted": "Self-hosted mode — all features unlocked, no limits",
     "statuses": {
       "ACTIVE": "Active",
-      "CANCELED": "Canceled",
+      "CANCELLED": "Cancelled",
+      "GRACE_PERIOD": "Grace period",
       "PAST_DUE": "Past due",
-      "TRIALING": "Trial"
+      "SUSPENDED": "Suspended"
     },
     "subtitle": "Manage your plan and usage",
     "switchPlan": "Switch",
@@ -2282,6 +2283,7 @@
       "abandoned": "Abandoned",
       "delivered": "Delivered",
       "owed": "Still owed",
+      "unknown": "Not on this page",
       "unsubscribed": "No subscriber"
     },
     "details": {
@@ -4445,10 +4447,11 @@
     "edit": "Edit",
     "enable": "Enable",
     "execStatus": {
+      "CANCELLED": "Cancelled",
       "COMPLETED": "Completed",
       "FAILED": "Failed",
-      "PENDING": "Pending",
-      "RUNNING": "Running"
+      "RUNNING": "Running",
+      "WAITING": "Waiting"
     },
     "failed": "Failed",
     "loading": "Loading...",
@@ -4572,7 +4575,8 @@
       "PENDING": "Pending",
       "RUNNING": "Running",
       "SKIPPED": "Skipped",
-      "SUCCESS": "Success"
+      "SUCCESS": "Success",
+      "WAITING": "Waiting"
     },
     "subtitle": "Visual automation workflows triggered by webhook events",
     "successful": "Successful",
