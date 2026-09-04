@@ -1,7 +1,7 @@
 {
   "title": "Hookflow API",
   "version": "1.0.0",
-  "operationCount": 202,
+  "operationCount": 206,
   "security": [
     {
       "id": "bearerAuth",
@@ -3989,6 +3989,182 @@
       ]
     },
     {
+      "id": "organization-admin",
+      "name": "Organization Admin",
+      "description": "Operator view of every tenant, and suspension (platform-admin operator credential only)",
+      "operations": [
+        {
+          "id": "adminSuspendOrganization",
+          "method": "POST",
+          "path": "/api/v1/admin/organizations/{organizationId}/suspend",
+          "summary": "Suspend an organization",
+          "auth": [
+            "platformAdminToken"
+          ],
+          "params": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Suspended",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "400",
+              "description": "No reason given — the tenant is shown it",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "403",
+              "description": "Forbidden — requires the platform-admin operator credential",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "404",
+              "description": "No such organization",
+              "type": "AdminOrganizationResponse"
+            }
+          ],
+          "description": "Stops the organization changing anything — ingest included — until it is reinstated. Reads keep working, so the tenant can sign in and be shown why. Independent of billing status, so a payment does not lift it.",
+          "body": {
+            "contentType": "application/json",
+            "type": "SuspendOrganizationRequest",
+            "required": true
+          }
+        },
+        {
+          "id": "adminReinstateOrganization",
+          "method": "POST",
+          "path": "/api/v1/admin/organizations/{organizationId}/reinstate",
+          "summary": "Reinstate an organization",
+          "auth": [
+            "platformAdminToken"
+          ],
+          "params": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "Reinstated",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "403",
+              "description": "Forbidden — requires the platform-admin operator credential",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "404",
+              "description": "No such organization",
+              "type": "AdminOrganizationResponse"
+            }
+          ],
+          "description": "Lifts a suspension. Reinstating one that is not suspended is a no-op."
+        },
+        {
+          "id": "adminListOrganizations",
+          "method": "GET",
+          "path": "/api/v1/admin/organizations",
+          "summary": "List organizations",
+          "auth": [
+            "platformAdminToken"
+          ],
+          "params": [
+            {
+              "name": "search",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "suspendedOnly",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "name": "page",
+              "in": "query",
+              "required": false,
+              "type": "integer (int32)"
+            },
+            {
+              "name": "size",
+              "in": "query",
+              "required": false,
+              "type": "integer (int32)"
+            },
+            {
+              "name": "sort",
+              "in": "query",
+              "required": false,
+              "type": "string[]"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "A page of organizations",
+              "type": "PageAdminOrganizationResponse"
+            },
+            {
+              "status": "403",
+              "description": "Forbidden — requires the platform-admin operator credential",
+              "type": "PageAdminOrganizationResponse"
+            }
+          ],
+          "description": "Every organization on this deployment, newest first. Optionally narrowed by name, or to those currently suspended. Requires X-Platform-Admin-Token."
+        },
+        {
+          "id": "adminGetOrganization",
+          "method": "GET",
+          "path": "/api/v1/admin/organizations/{organizationId}",
+          "summary": "Get one organization",
+          "auth": [
+            "platformAdminToken"
+          ],
+          "params": [
+            {
+              "name": "organizationId",
+              "in": "path",
+              "required": true,
+              "type": "string (uuid)"
+            }
+          ],
+          "responses": [
+            {
+              "status": "200",
+              "description": "The organization",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "403",
+              "description": "Forbidden — requires the platform-admin operator credential",
+              "type": "AdminOrganizationResponse"
+            },
+            {
+              "status": "404",
+              "description": "No such organization",
+              "type": "AdminOrganizationResponse"
+            }
+          ],
+          "description": "Plan, billing status, project and member counts, and any suspension."
+        }
+      ]
+    },
+    {
       "id": "organizations",
       "name": "Organizations",
       "description": "Organization member management",
@@ -6851,6 +7027,65 @@
           "VIEWER",
           "API_KEY"
         ]
+      }
+    ],
+    "AdminOrganizationResponse": [
+      {
+        "name": "id",
+        "type": "string (uuid)",
+        "required": false
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "planName",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "billingStatus",
+        "type": "string",
+        "required": false,
+        "values": [
+          "ACTIVE",
+          "PAST_DUE",
+          "GRACE_PERIOD",
+          "SUSPENDED",
+          "CANCELLED"
+        ]
+      },
+      {
+        "name": "createdAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "projectCount",
+        "type": "integer (int64)",
+        "required": false
+      },
+      {
+        "name": "memberCount",
+        "type": "integer (int64)",
+        "required": false
+      },
+      {
+        "name": "suspendedAt",
+        "type": "string (date-time)",
+        "required": false
+      },
+      {
+        "name": "suspensionReason",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "suspendedBy",
+        "type": "string",
+        "required": false
       }
     ],
     "AlertEventResponse": [
@@ -10061,6 +10296,63 @@
         "required": false
       }
     ],
+    "PageAdminOrganizationResponse": [
+      {
+        "name": "totalPages",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "totalElements",
+        "type": "integer (int64)",
+        "required": false
+      },
+      {
+        "name": "size",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "content",
+        "type": "AdminOrganizationResponse[]",
+        "required": false
+      },
+      {
+        "name": "number",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "sort",
+        "type": "SortObject",
+        "required": false
+      },
+      {
+        "name": "pageable",
+        "type": "PageableObject",
+        "required": false
+      },
+      {
+        "name": "numberOfElements",
+        "type": "integer (int32)",
+        "required": false
+      },
+      {
+        "name": "first",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "last",
+        "type": "boolean",
+        "required": false
+      },
+      {
+        "name": "empty",
+        "type": "boolean",
+        "required": false
+      }
+    ],
     "PageAlertEventResponse": [
       {
         "name": "totalPages",
@@ -11341,6 +11633,11 @@
         "name": "organizationName",
         "type": "string",
         "required": true
+      },
+      {
+        "name": "captchaToken",
+        "type": "string",
+        "required": false
       }
     ],
     "ReplayEstimateResponse": [
@@ -12187,6 +12484,18 @@
       {
         "name": "updatedAt",
         "type": "string (date-time)",
+        "required": false
+      }
+    ],
+    "SuspendOrganizationRequest": [
+      {
+        "name": "reason",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "suspendedBy",
+        "type": "string",
         "required": false
       }
     ],
@@ -13050,6 +13359,18 @@
     "AddMemberRequest": {
       "email": "you@example.com",
       "role": "OWNER"
+    },
+    "AdminOrganizationResponse": {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "string",
+      "planName": "string",
+      "billingStatus": "ACTIVE",
+      "createdAt": "2026-01-01T12:00:00Z",
+      "projectCount": 0,
+      "memberCount": 0,
+      "suspendedAt": "2026-01-01T12:00:00Z",
+      "suspensionReason": "string",
+      "suspendedBy": "string"
     },
     "AlertEventResponse": {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -13989,6 +14310,43 @@
       "pageSize": 0,
       "unpaged": true
     },
+    "PageAdminOrganizationResponse": {
+      "totalPages": 0,
+      "totalElements": 0,
+      "size": 0,
+      "content": [
+        {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "name": "string",
+          "planName": "string",
+          "billingStatus": "ACTIVE",
+          "createdAt": "2026-01-01T12:00:00Z",
+          "projectCount": 0,
+          "memberCount": 0,
+          "suspendedAt": "2026-01-01T12:00:00Z",
+          "suspensionReason": "string",
+          "suspendedBy": "string"
+        }
+      ],
+      "number": 0,
+      "sort": {
+        "empty": true,
+        "sorted": true,
+        "unsorted": true
+      },
+      "pageable": {
+        "offset": 0,
+        "sort": {},
+        "paged": true,
+        "pageNumber": 0,
+        "pageSize": 0,
+        "unpaged": true
+      },
+      "numberOfElements": 0,
+      "first": true,
+      "last": true,
+      "empty": true
+    },
     "PageAlertEventResponse": {
       "totalPages": 0,
       "totalElements": 0,
@@ -14791,7 +15149,8 @@
       "email": "you@example.com",
       "password": "string",
       "fullName": "string",
-      "organizationName": "string"
+      "organizationName": "string",
+      "captchaToken": "string"
     },
     "ReplayEstimateResponse": {
       "totalEvents": 0,
@@ -15005,6 +15364,10 @@
       "transformationName": "string",
       "createdAt": "2026-01-01T12:00:00Z",
       "updatedAt": "2026-01-01T12:00:00Z"
+    },
+    "SuspendOrganizationRequest": {
+      "reason": "string",
+      "suspendedBy": "string"
     },
     "SwitchOrganizationRequest": {
       "organizationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"

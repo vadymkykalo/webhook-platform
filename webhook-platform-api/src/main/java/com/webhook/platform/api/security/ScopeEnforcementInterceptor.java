@@ -14,6 +14,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,6 +36,14 @@ import java.util.UUID;
 public class ScopeEnforcementInterceptor implements HandlerInterceptor {
 
     private static final String PROJECT_ID_PATH_VAR = "projectId";
+
+    private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
+
+    private final SuspensionCheck suspensionCheck;
+
+    public ScopeEnforcementInterceptor(SuspensionCheck suspensionCheck) {
+        this.suspensionCheck = suspensionCheck;
+    }
 
     /**
      * Enforces {@link RequireAccess}, for both JWT and API-key callers.
@@ -126,6 +135,47 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
                         + "requested from the dashboard.");
     }
 
+    /**
+     * Refuses to change anything on behalf of a suspended organization.
+     *
+     * <p>Suspension used to be a word. {@code BillingStatus.SUSPENDED} is written by the dunning
+     * scheduler when a grace period expires and read by nothing at all, so an organization that
+     * had stopped paying — or one an operator wanted stopped for abuse — went on ingesting and
+     * delivering exactly as before. There was also no way for an operator to suspend anyone
+     * except by editing the database.
+     *
+     * <p>Keyed off the HTTP method rather than {@link RequireAccess}, unlike the verification
+     * gate next to it, and for a specific reason: ingest carries no access-level annotation, and
+     * ingest is the thing a suspension most needs to stop. Reads stay open so the tenant can
+     * sign in and be told why, and so support can look at the same screens they can.
+     *
+     * <p>The reason the operator wrote is returned to the caller. That is deliberate — a tenant
+     * discovering they are suspended should not have to open a ticket to find out what for —
+     * and it is why the field is documented as something a customer can be shown.
+     */
+    void enforceNotSuspended(HttpServletRequest request, Authentication authentication) {
+        if (READ_METHODS.contains(request.getMethod())) {
+            return;
+        }
+
+        UUID organizationId;
+        if (authentication instanceof JwtAuthenticationToken jwt) {
+            organizationId = jwt.getOrganizationId();
+        } else if (authentication instanceof ApiKeyAuthenticationToken apiKey) {
+            organizationId = apiKey.getOrganizationId();
+        } else {
+            // Unauthenticated, or the platform admin - who is the one able to lift a suspension
+            // and must not be locked out by it.
+            return;
+        }
+
+        suspensionCheck.suspensionReason(organizationId).ifPresent(reason -> {
+            log.warn("Write refused: organization {} is suspended ({})", organizationId, reason);
+            throw new ForbiddenException("This organization is suspended and cannot make changes."
+                    + (reason.isBlank() ? "" : " Reason: " + reason));
+        });
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod handlerMethod)) {
@@ -137,6 +187,7 @@ public class ScopeEnforcementInterceptor implements HandlerInterceptor {
         enforceProjectScope(request, handlerMethod, authentication);
         enforceAccessLevel(handlerMethod, authentication);
         enforceVerifiedEmail(handlerMethod, authentication);
+        enforceNotSuspended(request, authentication);
 
         if (!(authentication instanceof ApiKeyAuthenticationToken apiKeyAuth)) {
             return true;

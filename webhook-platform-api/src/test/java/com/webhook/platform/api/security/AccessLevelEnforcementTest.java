@@ -37,7 +37,7 @@ import static org.mockito.Mockito.mock;
  */
 class AccessLevelEnforcementTest {
 
-    private final ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor();
+    private final ScopeEnforcementInterceptor interceptor = new ScopeEnforcementInterceptor(org -> java.util.Optional.empty());
 
     @AfterEach
     void clearAuth() {
